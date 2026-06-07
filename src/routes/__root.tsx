@@ -88,7 +88,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Dr. Clóvis Bacha, ginecologista e obstetra especialista em gestação de alto risco. Acolhimento, segurança e cuidado em cada etapa." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Dr. Clóvis Bacha — Ginecologia e Obstetrícia de Alto Risco" },
       { name: "twitter:description", content: "Dr. Clóvis Bacha, ginecologista e obstetra especialista em gestação de alto risco. Acolhimento, segurança e cuidado em cada etapa." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/61cab0bf-ff3d-4cb1-9625-9d6b61b51f41/id-preview-fec0bca5--93840587-fecb-4d08-aeac-3321628e517e.lovable.app-1780586074675.png" },
