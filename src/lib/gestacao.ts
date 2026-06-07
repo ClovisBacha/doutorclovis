@@ -1,47 +1,199 @@
-export const BABY_BY_WEEK: Record<number, { size: string; weight: string; fruit: string; desc: string }> = {
-  4: { size: "2 mm", weight: "—", fruit: "Semente de papoula", desc: "Implantação no útero. Tubo neural começa a se formar." },
+export const BABY_BY_WEEK: Record<
+  number,
+  { size: string; weight: string; fruit: string; desc: string }
+> = {
+  4: {
+    size: "2 mm",
+    weight: "—",
+    fruit: "Semente de papoula",
+    desc: "Implantação no útero. Tubo neural começa a se formar.",
+  },
   5: { size: "3 mm", weight: "—", fruit: "Semente de gergelim", desc: "Coração começa a bater." },
   6: { size: "5 mm", weight: "—", fruit: "Lentilha", desc: "Brotos de braços e pernas aparecem." },
   7: { size: "1 cm", weight: "—", fruit: "Mirtilo", desc: "Rosto começa a se formar." },
-  8: { size: "1,6 cm", weight: "1 g", fruit: "Framboesa", desc: "Dedinhos das mãos começam a se separar." },
-  9: { size: "2,3 cm", weight: "2 g", fruit: "Uva", desc: "Já se chama feto. Movimentos pequenos." },
-  10: { size: "3,1 cm", weight: "4 g", fruit: "Morango", desc: "Órgãos vitais começam a funcionar." },
+  8: {
+    size: "1,6 cm",
+    weight: "1 g",
+    fruit: "Framboesa",
+    desc: "Dedinhos das mãos começam a se separar.",
+  },
+  9: {
+    size: "2,3 cm",
+    weight: "2 g",
+    fruit: "Uva",
+    desc: "Já se chama feto. Movimentos pequenos.",
+  },
+  10: {
+    size: "3,1 cm",
+    weight: "4 g",
+    fruit: "Morango",
+    desc: "Órgãos vitais começam a funcionar.",
+  },
   11: { size: "4,1 cm", weight: "7 g", fruit: "Figo", desc: "Unhas começam a crescer." },
-  12: { size: "5,4 cm", weight: "14 g", fruit: "Limão", desc: "Reflexos surgem. Risco de aborto diminui muito." },
+  12: {
+    size: "5,4 cm",
+    weight: "14 g",
+    fruit: "Limão",
+    desc: "Reflexos surgem. Risco de aborto diminui muito.",
+  },
   13: { size: "7,4 cm", weight: "23 g", fruit: "Vagem", desc: "Cordas vocais se formam." },
   14: { size: "8,7 cm", weight: "43 g", fruit: "Limão siciliano", desc: "Pode chupar o dedinho." },
-  15: { size: "10,1 cm", weight: "70 g", fruit: "Maçã", desc: "Pode sentir a luz através das pálpebras." },
-  16: { size: "11,6 cm", weight: "100 g", fruit: "Abacate", desc: "Movimentos coordenados de cabeça." },
+  15: {
+    size: "10,1 cm",
+    weight: "70 g",
+    fruit: "Maçã",
+    desc: "Pode sentir a luz através das pálpebras.",
+  },
+  16: {
+    size: "11,6 cm",
+    weight: "100 g",
+    fruit: "Abacate",
+    desc: "Movimentos coordenados de cabeça.",
+  },
   17: { size: "13 cm", weight: "140 g", fruit: "Cebola", desc: "Esqueleto começa a endurecer." },
   18: { size: "14,2 cm", weight: "190 g", fruit: "Pimentão", desc: "Audição se desenvolvendo." },
   19: { size: "15,3 cm", weight: "240 g", fruit: "Tomate", desc: "Vernix caseoso cobre a pele." },
-  20: { size: "25,6 cm", weight: "300 g", fruit: "Banana", desc: "Você já pode sentir os movimentos!" },
-  21: { size: "26,7 cm", weight: "360 g", fruit: "Cenoura", desc: "Sobrancelhas e pálpebras formadas." },
-  22: { size: "27,8 cm", weight: "430 g", fruit: "Espiga de milho", desc: "Reconhece sons externos." },
-  23: { size: "28,9 cm", weight: "501 g", fruit: "Manga grande", desc: "Pode soluçar dentro do útero." },
+  20: {
+    size: "25,6 cm",
+    weight: "300 g",
+    fruit: "Banana",
+    desc: "Você já pode sentir os movimentos!",
+  },
+  21: {
+    size: "26,7 cm",
+    weight: "360 g",
+    fruit: "Cenoura",
+    desc: "Sobrancelhas e pálpebras formadas.",
+  },
+  22: {
+    size: "27,8 cm",
+    weight: "430 g",
+    fruit: "Espiga de milho",
+    desc: "Reconhece sons externos.",
+  },
+  23: {
+    size: "28,9 cm",
+    weight: "501 g",
+    fruit: "Manga grande",
+    desc: "Pode soluçar dentro do útero.",
+  },
   24: { size: "30 cm", weight: "600 g", fruit: "Milho", desc: "Limite da viabilidade fetal." },
-  25: { size: "34,6 cm", weight: "660 g", fruit: "Couve-flor", desc: "Cabelo começa a ganhar cor." },
+  25: {
+    size: "34,6 cm",
+    weight: "660 g",
+    fruit: "Couve-flor",
+    desc: "Cabelo começa a ganhar cor.",
+  },
   26: { size: "35,6 cm", weight: "760 g", fruit: "Alface", desc: "Olhos começam a abrir." },
   27: { size: "36,6 cm", weight: "875 g", fruit: "Berinjela", desc: "Reconhece sua voz." },
-  28: { size: "37,6 cm", weight: "1 kg", fruit: "Abóbora", desc: "Sonha em REM. Início do 3º trimestre." },
-  29: { size: "38,6 cm", weight: "1,15 kg", fruit: "Repolho", desc: "Músculos e pulmões amadurecem." },
-  30: { size: "39,9 cm", weight: "1,3 kg", fruit: "Pepino grande", desc: "Cérebro se desenvolve rapidamente." },
+  28: {
+    size: "37,6 cm",
+    weight: "1 kg",
+    fruit: "Abóbora",
+    desc: "Sonha em REM. Início do 3º trimestre.",
+  },
+  29: {
+    size: "38,6 cm",
+    weight: "1,15 kg",
+    fruit: "Repolho",
+    desc: "Músculos e pulmões amadurecem.",
+  },
+  30: {
+    size: "39,9 cm",
+    weight: "1,3 kg",
+    fruit: "Pepino grande",
+    desc: "Cérebro se desenvolve rapidamente.",
+  },
   31: { size: "41,1 cm", weight: "1,5 kg", fruit: "Coco", desc: "Pode girar a cabeça." },
   32: { size: "42,4 cm", weight: "1,7 kg", fruit: "Aipo", desc: "Unhas dos pés se formam." },
-  33: { size: "43,7 cm", weight: "1,9 kg", fruit: "Abacaxi", desc: "Sistema imunológico em desenvolvimento." },
+  33: {
+    size: "43,7 cm",
+    weight: "1,9 kg",
+    fruit: "Abacaxi",
+    desc: "Sistema imunológico em desenvolvimento.",
+  },
   34: { size: "45 cm", weight: "2,1 kg", fruit: "Melão", desc: "Pulmões quase prontos." },
-  35: { size: "46,2 cm", weight: "2,4 kg", fruit: "Melão honeydew", desc: "Posição cefálica se define." },
-  36: { size: "47,4 cm", weight: "2,6 kg", fruit: "Mamão", desc: "Considerado a termo precoce em breve." },
-  37: { size: "48,6 cm", weight: "2,9 kg", fruit: "Acelga", desc: "Termo precoce — pulmões prontos." },
-  38: { size: "49,8 cm", weight: "3,1 kg", fruit: "Alho-poró", desc: "Encaixe pélvico em muitos casos." },
+  35: {
+    size: "46,2 cm",
+    weight: "2,4 kg",
+    fruit: "Melão honeydew",
+    desc: "Posição cefálica se define.",
+  },
+  36: {
+    size: "47,4 cm",
+    weight: "2,6 kg",
+    fruit: "Mamão",
+    desc: "Considerado a termo precoce em breve.",
+  },
+  37: {
+    size: "48,6 cm",
+    weight: "2,9 kg",
+    fruit: "Acelga",
+    desc: "Termo precoce — pulmões prontos.",
+  },
+  38: {
+    size: "49,8 cm",
+    weight: "3,1 kg",
+    fruit: "Alho-poró",
+    desc: "Encaixe pélvico em muitos casos.",
+  },
   39: { size: "50,7 cm", weight: "3,3 kg", fruit: "Melancia pequena", desc: "Termo completo!" },
   40: { size: "51,2 cm", weight: "3,4 kg", fruit: "Abóbora moranga", desc: "Pronto para nascer." },
-  41: { size: "51,7 cm", weight: "3,6 kg", fruit: "Jaca pequena", desc: "Pós-termo — acompanhamento próximo." },
+  41: {
+    size: "51,7 cm",
+    weight: "3,6 kg",
+    fruit: "Jaca pequena",
+    desc: "Pós-termo — acompanhamento próximo.",
+  },
+  42: {
+    size: "52,2 cm",
+    weight: "3,7 kg",
+    fruit: "Abóbora grande",
+    desc: "Pós-termo — avaliação frequente do bem-estar fetal e decisão sobre indução.",
+  },
 };
 
+export const WEEK_MIN = 4;
+export const WEEK_MAX = 42;
+
 export function babyForWeek(week: number) {
-  const clamped = Math.max(4, Math.min(41, week));
+  const clamped = Math.max(WEEK_MIN, Math.min(WEEK_MAX, week));
   return BABY_BY_WEEK[clamped] ?? BABY_BY_WEEK[40];
+}
+
+/** Trimestre da gestação (1, 2 ou 3) para uma dada semana. */
+export function trimesterForWeek(week: number): 1 | 2 | 3 {
+  if (week <= 13) return 1;
+  if (week <= 27) return 2;
+  return 3;
+}
+
+/**
+ * Estágio de desenvolvimento usado pela ilustração.
+ * Embrião → feto inicial → feto → feto tardio → bebê a termo.
+ */
+export type BabyStage = "embriao" | "inicial" | "feto" | "tardio" | "termo";
+
+export function babyStage(week: number): BabyStage {
+  if (week < 10) return "embriao";
+  if (week < 16) return "inicial";
+  if (week < 28) return "feto";
+  if (week < 37) return "tardio";
+  return "termo";
+}
+
+/** Consulta/exame obrigatório mais relevante para a semana informada. */
+export function consultaForWeek(week: number): string {
+  if (week <= 8)
+    return "1ª consulta pré-natal: confirmação da gestação, exames de sangue/urina e início do ácido fólico.";
+  if (week <= 10) return "Ultrassom inicial para datação e avaliação do saco gestacional.";
+  if (week <= 13) return "Translucência nucal (11s–13s6d) + bioquímica do 1º trimestre.";
+  if (week <= 17) return "Consulta mensal + exames de rotina (sangue e urina).";
+  if (week <= 22) return "Ultrassom morfológico do 2º trimestre — exame fundamental.";
+  if (week <= 27) return "Teste oral de tolerância à glicose (rastreio de diabetes gestacional).";
+  if (week <= 31) return "Consulta quinzenal. Avaliação de crescimento e bem-estar fetal.";
+  if (week <= 35) return "Ultrassom de crescimento + Doppler quando indicado.";
+  return "Consulta semanal. Cardiotocografia e planejamento do parto.";
 }
 
 /** Returns total days of gestation from a reference (LMP or USG anchor). */
