@@ -39,8 +39,8 @@ cp .env.example .env
 - `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` (+ versões `VITE_`): públicas,
   já preenchidas no `.env.example` (vão para o bundle do navegador).
 - `SUPABASE_SERVICE_ROLE_KEY`: **secreto**, usado server-side.
-- `ANTHROPIC_API_KEY`: **secreto**, usado pelo chatbot (ver abaixo).
-- `CHAT_MODEL`: opcional, modelo do chatbot (padrão `claude-haiku-4-5`).
+- `GOOGLE_GENERATIVE_AI_API_KEY`: **secreto**, usado pelo chatbot (ver abaixo).
+- `CHAT_MODEL`: opcional, modelo do chatbot (padrão `gemini-2.5-flash`).
 
 O `.env` está no `.gitignore` — nunca commite chaves reais.
 
@@ -54,7 +54,7 @@ Passo a passo (uma vez):
 1. Acesse https://vercel.com e entre com o GitHub
 2. **Add New → Project** e importe `clovisbacha/doutorclovis`
 3. Em **Environment Variables**, adicione as chaves do `.env` (todas as
-   `VITE_*` são necessárias no build; `ANTHROPIC_API_KEY` e
+   `VITE_*` são necessárias no build; `GOOGLE_GENERATIVE_AI_API_KEY` e
    `SUPABASE_SERVICE_ROLE_KEY` no runtime)
 4. **Deploy**
 
@@ -91,10 +91,10 @@ Tabelas (ver `supabase/migrations/`):
 
 ## Chatbot (AI)
 
-`src/routes/api/chat.ts` usa o **Claude (Anthropic)** via Vercel AI SDK
-(`streamText` + `@ai-sdk/anthropic`). Configuração em
-`src/lib/ai-gateway.server.ts`. Requer `ANTHROPIC_API_KEY`; o modelo é
-definido por `CHAT_MODEL` (padrão `claude-haiku-4-5`).
+`src/routes/api/chat.ts` usa o **Google Gemini** via Vercel AI SDK
+(`streamText` + `@ai-sdk/google`). Configuração em
+`src/lib/ai-gateway.server.ts`. Requer `GOOGLE_GENERATIVE_AI_API_KEY`; o modelo
+é definido por `CHAT_MODEL` (padrão `gemini-2.5-flash`).
 
 ## Resquícios do Lovable (opcional remover)
 

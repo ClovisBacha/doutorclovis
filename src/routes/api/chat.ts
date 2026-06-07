@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
-import { createAnthropicProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
+import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 
 const SYSTEM_PROMPT = `Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra brasileiro especialista em gestação de alto risco.
 
@@ -33,12 +33,12 @@ export const Route = createFileRoute("/api/chat")({
         if (!Array.isArray(body.messages)) {
           return new Response("Messages are required", { status: 400 });
         }
-        const key = process.env.ANTHROPIC_API_KEY;
-        if (!key) return new Response("Missing ANTHROPIC_API_KEY", { status: 500 });
+        const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        if (!key) return new Response("Missing GOOGLE_GENERATIVE_AI_API_KEY", { status: 500 });
 
-        const anthropic = createAnthropicProvider(key);
+        const google = createChatProvider(key);
         const result = streamText({
-          model: anthropic(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
+          model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           system: SYSTEM_PROMPT,
           messages: await convertToModelMessages(body.messages as UIMessage[]),
         });
