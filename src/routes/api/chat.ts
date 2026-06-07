@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
-import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
+import { createAnthropicProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 
 const SYSTEM_PROMPT = `Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra brasileiro especialista em gestação de alto risco.
 
@@ -33,12 +33,12 @@ export const Route = createFileRoute("/api/chat")({
         if (!Array.isArray(body.messages)) {
           return new Response("Messages are required", { status: 400 });
         }
-        const key = process.env.LOVABLE_API_KEY;
-        if (!key) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
+        const key = process.env.ANTHROPIC_API_KEY;
+        if (!key) return new Response("Missing ANTHROPIC_API_KEY", { status: 500 });
 
-        const gateway = createLovableAiGatewayProvider(key);
+        const anthropic = createAnthropicProvider(key);
         const result = streamText({
-          model: gateway("google/gemini-3-flash-preview"),
+          model: anthropic(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           system: SYSTEM_PROMPT,
           messages: await convertToModelMessages(body.messages as UIMessage[]),
         });

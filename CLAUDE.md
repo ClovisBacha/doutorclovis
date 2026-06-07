@@ -39,7 +39,8 @@ cp .env.example .env
 - `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` (+ versões `VITE_`): públicas,
   já preenchidas no `.env.example` (vão para o bundle do navegador).
 - `SUPABASE_SERVICE_ROLE_KEY`: **secreto**, usado server-side.
-- `LOVABLE_API_KEY`: **secreto**, usado pelo chatbot (ver abaixo).
+- `ANTHROPIC_API_KEY`: **secreto**, usado pelo chatbot (ver abaixo).
+- `CHAT_MODEL`: opcional, modelo do chatbot (padrão `claude-haiku-4-5`).
 
 O `.env` está no `.gitignore` — nunca commite chaves reais.
 
@@ -73,11 +74,10 @@ Tabelas (ver `supabase/migrations/`):
 
 ## Chatbot (AI)
 
-`src/routes/api/chat.ts` usa o **AI Gateway do Lovable**
-(`ai.gateway.lovable.dev`) via `LOVABLE_API_KEY`, modelo
-`google/gemini-3-flash-preview`. Para desacoplar do Lovable, troque
-`src/lib/ai-gateway.server.ts` por um provedor direto (ex.: `@ai-sdk/anthropic`
-ou `@ai-sdk/openai`) e atualize a chave/modelo em `chat.ts`.
+`src/routes/api/chat.ts` usa o **Claude (Anthropic)** via Vercel AI SDK
+(`streamText` + `@ai-sdk/anthropic`). Configuração em
+`src/lib/ai-gateway.server.ts`. Requer `ANTHROPIC_API_KEY`; o modelo é
+definido por `CHAT_MODEL` (padrão `claude-haiku-4-5`).
 
 ## Resquícios do Lovable (opcional remover)
 
@@ -86,4 +86,3 @@ ou `@ai-sdk/openai`) e atualize a chave/modelo em `chat.ts`.
 - `src/lib/lovable-error-reporting.ts` — no-op fora do Lovable (usa
   `window.__lovableEvents`).
 - `.lovable/project.json` — metadados do template.
-- AI Gateway do Lovable no chatbot (ver acima).
