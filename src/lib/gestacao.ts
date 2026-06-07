@@ -1,0 +1,75 @@
+export const BABY_BY_WEEK: Record<number, { size: string; weight: string; fruit: string; desc: string }> = {
+  4: { size: "2 mm", weight: "—", fruit: "Semente de papoula", desc: "Implantação no útero. Tubo neural começa a se formar." },
+  5: { size: "3 mm", weight: "—", fruit: "Semente de gergelim", desc: "Coração começa a bater." },
+  6: { size: "5 mm", weight: "—", fruit: "Lentilha", desc: "Brotos de braços e pernas aparecem." },
+  7: { size: "1 cm", weight: "—", fruit: "Mirtilo", desc: "Rosto começa a se formar." },
+  8: { size: "1,6 cm", weight: "1 g", fruit: "Framboesa", desc: "Dedinhos das mãos começam a se separar." },
+  9: { size: "2,3 cm", weight: "2 g", fruit: "Uva", desc: "Já se chama feto. Movimentos pequenos." },
+  10: { size: "3,1 cm", weight: "4 g", fruit: "Morango", desc: "Órgãos vitais começam a funcionar." },
+  11: { size: "4,1 cm", weight: "7 g", fruit: "Figo", desc: "Unhas começam a crescer." },
+  12: { size: "5,4 cm", weight: "14 g", fruit: "Limão", desc: "Reflexos surgem. Risco de aborto diminui muito." },
+  13: { size: "7,4 cm", weight: "23 g", fruit: "Vagem", desc: "Cordas vocais se formam." },
+  14: { size: "8,7 cm", weight: "43 g", fruit: "Limão siciliano", desc: "Pode chupar o dedinho." },
+  15: { size: "10,1 cm", weight: "70 g", fruit: "Maçã", desc: "Pode sentir a luz através das pálpebras." },
+  16: { size: "11,6 cm", weight: "100 g", fruit: "Abacate", desc: "Movimentos coordenados de cabeça." },
+  17: { size: "13 cm", weight: "140 g", fruit: "Cebola", desc: "Esqueleto começa a endurecer." },
+  18: { size: "14,2 cm", weight: "190 g", fruit: "Pimentão", desc: "Audição se desenvolvendo." },
+  19: { size: "15,3 cm", weight: "240 g", fruit: "Tomate", desc: "Vernix caseoso cobre a pele." },
+  20: { size: "25,6 cm", weight: "300 g", fruit: "Banana", desc: "Você já pode sentir os movimentos!" },
+  21: { size: "26,7 cm", weight: "360 g", fruit: "Cenoura", desc: "Sobrancelhas e pálpebras formadas." },
+  22: { size: "27,8 cm", weight: "430 g", fruit: "Espiga de milho", desc: "Reconhece sons externos." },
+  23: { size: "28,9 cm", weight: "501 g", fruit: "Manga grande", desc: "Pode soluçar dentro do útero." },
+  24: { size: "30 cm", weight: "600 g", fruit: "Milho", desc: "Limite da viabilidade fetal." },
+  25: { size: "34,6 cm", weight: "660 g", fruit: "Couve-flor", desc: "Cabelo começa a ganhar cor." },
+  26: { size: "35,6 cm", weight: "760 g", fruit: "Alface", desc: "Olhos começam a abrir." },
+  27: { size: "36,6 cm", weight: "875 g", fruit: "Berinjela", desc: "Reconhece sua voz." },
+  28: { size: "37,6 cm", weight: "1 kg", fruit: "Abóbora", desc: "Sonha em REM. Início do 3º trimestre." },
+  29: { size: "38,6 cm", weight: "1,15 kg", fruit: "Repolho", desc: "Músculos e pulmões amadurecem." },
+  30: { size: "39,9 cm", weight: "1,3 kg", fruit: "Pepino grande", desc: "Cérebro se desenvolve rapidamente." },
+  31: { size: "41,1 cm", weight: "1,5 kg", fruit: "Coco", desc: "Pode girar a cabeça." },
+  32: { size: "42,4 cm", weight: "1,7 kg", fruit: "Aipo", desc: "Unhas dos pés se formam." },
+  33: { size: "43,7 cm", weight: "1,9 kg", fruit: "Abacaxi", desc: "Sistema imunológico em desenvolvimento." },
+  34: { size: "45 cm", weight: "2,1 kg", fruit: "Melão", desc: "Pulmões quase prontos." },
+  35: { size: "46,2 cm", weight: "2,4 kg", fruit: "Melão honeydew", desc: "Posição cefálica se define." },
+  36: { size: "47,4 cm", weight: "2,6 kg", fruit: "Mamão", desc: "Considerado a termo precoce em breve." },
+  37: { size: "48,6 cm", weight: "2,9 kg", fruit: "Acelga", desc: "Termo precoce — pulmões prontos." },
+  38: { size: "49,8 cm", weight: "3,1 kg", fruit: "Alho-poró", desc: "Encaixe pélvico em muitos casos." },
+  39: { size: "50,7 cm", weight: "3,3 kg", fruit: "Melancia pequena", desc: "Termo completo!" },
+  40: { size: "51,2 cm", weight: "3,4 kg", fruit: "Abóbora moranga", desc: "Pronto para nascer." },
+  41: { size: "51,7 cm", weight: "3,6 kg", fruit: "Jaca pequena", desc: "Pós-termo — acompanhamento próximo." },
+};
+
+export function babyForWeek(week: number) {
+  const clamped = Math.max(4, Math.min(41, week));
+  return BABY_BY_WEEK[clamped] ?? BABY_BY_WEEK[40];
+}
+
+/** Returns total days of gestation from a reference (LMP or USG anchor). */
+export function computeGestation(opts: {
+  lmp?: string | null;
+  referenceDate?: string | null;
+  referenceWeeks?: number | null;
+  referenceDays?: number | null;
+  today?: Date;
+}) {
+  const today = opts.today ?? new Date();
+  let totalDays: number | null = null;
+  if (opts.referenceDate && opts.referenceWeeks != null) {
+    const ref = new Date(opts.referenceDate + "T00:00:00");
+    const diff = Math.floor((today.getTime() - ref.getTime()) / 86400000);
+    totalDays = opts.referenceWeeks * 7 + (opts.referenceDays ?? 0) + diff;
+  } else if (opts.lmp) {
+    const lmp = new Date(opts.lmp + "T00:00:00");
+    totalDays = Math.floor((today.getTime() - lmp.getTime()) / 86400000);
+  }
+  if (totalDays == null || totalDays < 0) return null;
+  const weeks = Math.floor(totalDays / 7);
+  const days = totalDays % 7;
+  return { weeks, days, totalDays };
+}
+
+export function dueDateFromLmp(lmp: string) {
+  const d = new Date(lmp + "T00:00:00");
+  d.setDate(d.getDate() + 280);
+  return d.toISOString().slice(0, 10);
+}
