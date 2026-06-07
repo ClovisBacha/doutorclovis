@@ -12,4 +12,15 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Build for Vercel (Nitro vercel preset). Override the Lovable defaults so the
+  // output matches Vercel's Build Output API layout (.vercel/output), which Vercel
+  // auto-detects: config.json + static/ + functions/__server.func/.
+  nitro: {
+    preset: "vercel",
+    output: {
+      dir: ".vercel/output",
+      publicDir: ".vercel/output/static",
+      serverDir: ".vercel/output/functions/__server.func",
+    },
+  },
 });

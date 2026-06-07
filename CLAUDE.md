@@ -44,6 +44,23 @@ cp .env.example .env
 
 O `.env` está no `.gitignore` — nunca commite chaves reais.
 
+## Deploy (Vercel)
+
+O build usa o preset **vercel** do Nitro e gera `.vercel/output` (Build Output
+API), que a Vercel detecta automaticamente. Configurado em `vite.config.ts` e
+`vercel.json` (`buildCommand: bun run build`).
+
+Passo a passo (uma vez):
+1. Acesse https://vercel.com e entre com o GitHub
+2. **Add New → Project** e importe `clovisbacha/doutorclovis`
+3. Em **Environment Variables**, adicione as chaves do `.env` (todas as
+   `VITE_*` são necessárias no build; `ANTHROPIC_API_KEY` e
+   `SUPABASE_SERVICE_ROLE_KEY` no runtime)
+4. **Deploy**
+
+Depois disso, cada `git push` atualiza o site: a branch de produção vira a URL
+principal e as outras branches ganham uma URL de **preview** automática.
+
 ## Estrutura
 
 ```
