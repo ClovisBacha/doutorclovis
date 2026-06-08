@@ -33,6 +33,12 @@ import {
   type NameEntry,
   type NameSession,
 } from "@/lib/family.functions";
+import {
+  getCourseProgress,
+  markModuleComplete,
+  savePanicEvent,
+  type CourseProgress,
+} from "@/lib/escola.functions";
 
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
@@ -59,6 +65,7 @@ type Profile = {
   emergency_phone?: string | null;
   height_cm?: number | null;
   pre_pregnancy_weight_kg?: number | null;
+  medications?: string | null;
 };
 
 type JournalEntry = {
@@ -109,6 +116,9 @@ const TABS = [
   "Conta Regressiva",
   "Álbum",
   "Nome do Bebê",
+  "Escola",
+  "FAQ",
+  "Pânico",
   "Carteirinha",
   "Chat IA",
   "Perfil",
@@ -240,6 +250,9 @@ function MinhaContaPage() {
         {tab === "Conta Regressiva" && <CountdownTab profile={profile} gest={gest} />}
         {tab === "Álbum" && <AlbumTab profile={profile} />}
         {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
+        {tab === "Escola" && <EscolaBebêTab gest={gest} />}
+        {tab === "FAQ" && <FAQTab gest={gest} />}
+        {tab === "Pânico" && <PânicoTab profile={profile} />}
         {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
         {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
         {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
@@ -882,6 +895,7 @@ function ProfileTab({
     emergency_phone: profile?.emergency_phone ?? "",
     height_cm: profile?.height_cm?.toString() ?? "",
     pre_pregnancy_weight_kg: profile?.pre_pregnancy_weight_kg?.toString() ?? "",
+    medications: profile?.medications ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -919,6 +933,7 @@ function ProfileTab({
       emergency_phone: form.emergency_phone || null,
       height_cm: form.height_cm ? Number(form.height_cm) : null,
       pre_pregnancy_weight_kg: form.pre_pregnancy_weight_kg ? Number(form.pre_pregnancy_weight_kg) : null,
+      medications: form.medications || null,
       updated_at: new Date().toISOString(),
     };
     const { data, error } = await (supabase as any)
@@ -1030,6 +1045,12 @@ function ProfileTab({
             onChange={(v) => setForm({ ...form, allergies: v })}
           />
           <Field
+            label="Medicamentos em uso"
+            value={form.medications}
+            onChange={(v) => setForm({ ...form, medications: v })}
+            placeholder="Ex: sulfato ferroso, ácido fólico..."
+          />
+          <Field
             label="Contato de emergência"
             value={form.emergency_contact}
             onChange={(v) => setForm({ ...form, emergency_contact: v })}
@@ -1080,11 +1101,13 @@ function Field({
   value,
   onChange,
   type = "text",
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  placeholder?: string;
 }) {
   return (
     <div>
@@ -1094,6 +1117,7 @@ function Field({
       <input
         type={type}
         value={value}
+        placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
       />
@@ -1816,24 +1840,55 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
   );
 }
 
-/* ---------- Carteirinha digital ---------- */
+/* ---------- Carteirinha digital (feat 43 — evoluída) ---------- */
 function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  const [copied, setCopied] = useState(false);
+
   if (!profile)
     return <p className="text-sm text-muted-foreground">Preencha seu perfil primeiro.</p>;
+
   const due = profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
-  const qrData = encodeURIComponent(
-    `Gestante: ${profile.display_name ?? "—"}\nBebê: ${profile.baby_name ?? "—"}\nIG: ${gest ? `${gest.weeks}s${gest.days}d` : "—"}\nDPP: ${due ?? "—"}\nTipo sanguíneo: ${profile.blood_type ?? "—"}\nAlergias: ${profile.allergies ?? "—"}\nMédico: Dr. Clóvis Bacha`,
-  );
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${qrData}`;
+  const updatedAt = new Date().toLocaleString("pt-BR");
+
+  const cardText = [
+    `🚨 CARTEIRINHA DE EMERGÊNCIA — GESTANTE`,
+    `Paciente: ${profile.display_name ?? "—"}`,
+    `Bebê: ${profile.baby_name ?? "—"}`,
+    `IG: ${gest ? `${gest.weeks}s ${gest.days}d` : "—"}`,
+    `DPP: ${due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}`,
+    `Tipo sanguíneo: ${profile.blood_type ?? "—"}`,
+    `Alergias: ${profile.allergies ?? "Nenhuma"}`,
+    `Medicamentos: ${profile.medications ?? "Nenhum"}`,
+    `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
+    `Médico: Dr. Clóvis Bacha | CRM-SP`,
+    `Atualizado: ${updatedAt}`,
+  ].join("\n");
+
+  const qrData = encodeURIComponent(cardText);
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${qrData}`;
+
+  function copyCard() {
+    navigator.clipboard.writeText(cardText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto max-w-lg space-y-4">
+      {/* Main card */}
       <div className="rounded-3xl bg-[var(--gradient-warm)] p-8 shadow-[var(--shadow-card)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">Carteirinha digital</p>
-        <h2 className="mt-2 font-serif text-2xl">{profile.display_name ?? "—"}</h2>
-        {profile.baby_name && (
-          <p className="text-sm text-muted-foreground">Bebê: {profile.baby_name}</p>
-        )}
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">Carteirinha de emergência</p>
+            <h2 className="mt-1.5 font-serif text-2xl">{profile.display_name ?? "—"}</h2>
+            {profile.baby_name && (
+              <p className="text-sm text-muted-foreground">Bebê: {profile.baby_name}</p>
+            )}
+          </div>
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            GESTANTE
+          </span>
+        </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
           <Info label="IG atual" value={gest ? `${gest.weeks}s ${gest.days}d` : "—"} />
@@ -1842,23 +1897,72 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             value={due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
           />
           <Info label="Tipo sanguíneo" value={profile.blood_type ?? "—"} />
-          <Info label="Alergias" value={profile.allergies ?? "Nenhuma"} />
-          <Info label="Emergência" value={profile.emergency_contact ?? "—"} />
-          <Info label="Telefone" value={profile.emergency_phone ?? "—"} />
+          <Info label="Alergias" value={profile.allergies || "Nenhuma"} />
+          <Info label="Medicamentos" value={profile.medications || "Nenhum"} />
+          <Info label="Contato emergência" value={profile.emergency_contact ?? "—"} />
+          {profile.emergency_phone && (
+            <Info label="Tel. emergência" value={profile.emergency_phone} />
+          )}
+          <Info label="Médico" value="Dr. Clóvis Bacha" />
+        </div>
+
+        <div className="mt-5 rounded-xl bg-card/60 p-3 text-xs text-muted-foreground">
+          Atualizado em: {updatedAt}
         </div>
 
         <div className="mt-6 flex flex-col items-center border-t border-primary/20 pt-5">
           <img
             src={qrUrl}
             alt="QR Code de emergência"
-            className="h-44 w-44 rounded-lg bg-white p-2"
+            className="h-48 w-48 rounded-lg bg-white p-2"
           />
-          <p className="mt-2 text-xs text-muted-foreground">Escaneie em caso de emergência</p>
-          <p className="mt-3 text-xs font-medium text-primary">
+          <p className="mt-2 text-xs text-muted-foreground text-center">
+            Escaneie para ver todos os dados em caso de emergência
+          </p>
+          <p className="mt-2 text-xs font-medium text-primary">
             Dr. Clóvis Bacha — Ginecologia & Obstetrícia
           </p>
         </div>
       </div>
+
+      {/* Emergency numbers */}
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-3">
+          Números de emergência
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "SAMU", number: "192" },
+            { label: "Bombeiros", number: "193" },
+            { label: "SIATE/Resgate", number: "192" },
+            { label: "CVV (apoio emocional)", number: "188" },
+          ].map(({ label, number }) => (
+            <a
+              key={label}
+              href={`tel:${number}`}
+              className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 shadow-sm"
+            >
+              <span className="text-lg">📞</span>
+              <div>
+                <p className="text-xs font-semibold">{label}</p>
+                <p className="text-sm font-bold text-red-600">{number}</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Copy button */}
+      <button
+        onClick={copyCard}
+        className="w-full rounded-2xl bg-primary py-3 text-sm font-medium text-white"
+      >
+        {copied ? "✓ Copiado!" : "Copiar dados para enviar por WhatsApp"}
+      </button>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Mantenha seus dados atualizados em <strong>Perfil</strong> — o QR Code atualiza automaticamente.
+      </p>
     </div>
   );
 }
@@ -5483,6 +5587,748 @@ function NomeTab({ profile }: { profile: Profile | null }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Feature 36 — Escola do Bebê
+───────────────────────────────────────────────────────────────────────────── */
+
+type CourseModule = {
+  week: number;
+  title: string;
+  theme: string;
+  content: string;
+  videoSearch: string;
+  quiz: { question: string; options: [string, string, string, string]; correct: number }[];
+};
+
+const COURSE_MODULES: CourseModule[] = [
+  {
+    week: 6,
+    title: "O coração começa a bater",
+    theme: "Sistema cardiovascular",
+    content: "Na semana 6, o coração do seu bebê já bate cerca de 100-160 vezes por minuto — é o som mais emocionante da gestação! O embrião mede cerca de 5mm e está se formando rapidamente. O tubo neural, que dará origem ao cérebro e medula espinhal, está se fechando. Os brotos dos braços e pernas também começam a aparecer. Nessa fase é fundamental a suplementação de ácido fólico para prevenir defeitos do tubo neural.",
+    videoSearch: "Dr Clóvis Bacha semana 6 gestação desenvolvimento embrião",
+    quiz: [
+      { question: "Quantas vezes por minuto bate o coração fetal na semana 6?", options: ["40-60 bpm", "100-160 bpm", "200-240 bpm", "60-80 bpm"], correct: 1 },
+      { question: "Qual suplemento é essencial para fechar o tubo neural?", options: ["Vitamina C", "Ferro", "Ácido fólico", "Cálcio"], correct: 2 },
+      { question: "O que está se formando na semana 6?", options: ["Dentes e cabelos", "Brotos de braços e pernas", "Pulmões completos", "Sistema imune"], correct: 1 },
+    ],
+  },
+  {
+    week: 8,
+    title: "De embrião a feto",
+    theme: "Transição embrião→feto",
+    content: "A semana 8 marca uma virada: seu bebê passa a ser chamado de feto! Mede cerca de 1,6cm e todos os órgãos vitais estão formados — agora vêm amadurecer. Os dedos das mãos começam a se separar, os olhos migram para a frente do rosto, e o rabo embrionário desaparece. O cérebro está se desenvolvendo rapidamente com divisões específicas. Você provavelmente já está sentindo as náuseas do 1º trimestre, causadas pelo hormônio hCG.",
+    videoSearch: "Dr Clóvis Bacha semana 8 feto náuseas primeiro trimestre",
+    quiz: [
+      { question: "Como o bebê é chamado a partir da semana 8?", options: ["Zigoto", "Embrião", "Feto", "Neonato"], correct: 2 },
+      { question: "O que causa as náuseas do 1º trimestre?", options: ["Progesterona", "hCG", "Estrogênio", "Oxitocina"], correct: 1 },
+      { question: "Quanto mede o feto na semana 8?", options: ["0,5 cm", "1,6 cm", "5 cm", "10 cm"], correct: 1 },
+    ],
+  },
+  {
+    week: 10,
+    title: "Movimentos e reflexos",
+    theme: "Sistema nervoso",
+    content: "Na semana 10, o feto já faz movimentos espontâneos — mas você ainda não os sente! Mede cerca de 3cm. Os dedos dos pés e das mãos estão completamente separados. O cérebro está produzindo neurônios a uma velocidade incrível: 250.000 por minuto! Os testículos ou ovários já estão se formando. A placenta está assumindo a produção de hormônios, o que geralmente marca o fim das náuseas mais intensas para muitas gestantes.",
+    videoSearch: "Dr Clóvis Bacha semana 10 movimentos feto placenta",
+    quiz: [
+      { question: "Quantos neurônios por minuto são produzidos na semana 10?", options: ["10.000", "100.000", "250.000", "1.000.000"], correct: 2 },
+      { question: "Quando a placenta assume a produção hormonal?", options: ["Semana 4", "Semana 10", "Semana 20", "Semana 30"], correct: 1 },
+      { question: "O feto já se movimenta na semana 10?", options: ["Não, só na semana 20", "Sim, mas a mãe ainda não sente", "Sim, e a mãe já sente", "Não, só após o nascimento"], correct: 1 },
+    ],
+  },
+  {
+    week: 12,
+    title: "Fim do 1º trimestre — Grande conquista!",
+    theme: "Marco gestacional",
+    content: "Parabéns! O 1º trimestre é considerado o mais crítico e você chegou ao final dele. O risco de abortamento espontâneo cai significativamente. O bebê mede cerca de 5,5cm e pesa 14g. Todos os órgãos estão formados e agora crescem e amadurecem. O bebê já pode chupar o dedo, abrir a boca e fazer movimentos de respiração. A morfológica do 1º trimestre avalia a translucência nucal (risco de síndrome de Down) e é realizada entre as semanas 11 e 14.",
+    videoSearch: "Dr Clóvis Bacha semana 12 morfológica primeiro trimestre translucência nucal",
+    quiz: [
+      { question: "O que avalia a translucência nucal?", options: ["Posição do bebê", "Risco de síndrome de Down", "Peso fetal", "Batimentos cardíacos"], correct: 1 },
+      { question: "Quanto mede o bebê na semana 12?", options: ["1 cm", "3 cm", "5,5 cm", "12 cm"], correct: 2 },
+      { question: "Quando é feita a morfológica do 1º trimestre?", options: ["Semanas 6-8", "Semanas 11-14", "Semanas 18-22", "Semanas 28-32"], correct: 1 },
+    ],
+  },
+  {
+    week: 16,
+    title: "Primeiros movimentos sentidos",
+    theme: "Movimentos fetais",
+    content: "Por volta da semana 16-18, a maioria das mães primíparas começa a sentir os primeiros movimentos do bebê — chamados de 'perceptio'. Parece um borbulhar ou borboleta no abdômen. O bebê mede cerca de 11,6cm e pesa 100g. O sistema auditivo está bem desenvolvido: o bebê pode ouvir sua voz! Sua pele ainda é transparente. É a época ideal para a amniocentese, se indicada. O bebê tem padrões de sono e vigília.",
+    videoSearch: "Dr Clóvis Bacha semana 16 primeiros movimentos bebê percepção",
+    quiz: [
+      { question: "Como se chama a primeira percepção dos movimentos fetais?", options: ["Quickening/Perceptio", "Braxton Hicks", "Expulsão", "Versão"], correct: 0 },
+      { question: "O bebê consegue ouvir na semana 16?", options: ["Não, só na semana 30", "Sim, o sistema auditivo já está desenvolvido", "Só após o nascimento", "Apenas sons muito altos"], correct: 1 },
+      { question: "Qual exame pode ser feito com segurança entre as semanas 15-18?", options: ["Ecocardiograma", "Amniocentese", "Cordocentese", "Biópsia de vilo corial"], correct: 1 },
+    ],
+  },
+  {
+    week: 20,
+    title: "Metade da jornada — Morfológica do 2º tri",
+    theme: "Anatomia fetal",
+    content: "Metade da gestação! O bebê mede cerca de 25cm e pesa 300g. A morfológica do 2º trimestre (semanas 20-24) é o exame mais completo: avalia todos os órgãos, face, coluna, coração em detalhes. Você já deve estar sentindo os chutes claramente. O bebê cobre-se de vernix caseosa (substância branca protetora). Os neurônios continuam se multiplicando. É nessa época que muitas famílias descobrem o sexo do bebê.",
+    videoSearch: "Dr Clóvis Bacha semana 20 morfológica segundo trimestre anatomia fetal",
+    quiz: [
+      { question: "O que é vernix caseosa?", options: ["Líquido amniótico", "Substância branca que protege a pele fetal", "Placenta prévia", "Tampão mucoso"], correct: 1 },
+      { question: "Quando é feita a morfológica do 2º trimestre?", options: ["Semanas 10-12", "Semanas 16-18", "Semanas 20-24", "Semanas 32-36"], correct: 2 },
+      { question: "Quanto pesa o bebê na semana 20?", options: ["100g", "300g", "800g", "1.500g"], correct: 1 },
+    ],
+  },
+  {
+    week: 24,
+    title: "Viabilidade fetal",
+    theme: "Desenvolvimento pulmonar",
+    content: "A semana 24 é um marco: o bebê atinge a chamada viabilidade fetal — com cuidados intensivos neonatais, tem chances de sobreviver fora do útero. Os pulmões começam a produzir surfactante, essencial para a respiração após o nascimento. O bebê abre e fecha os olhos. Pesa cerca de 600g e mede 30cm. O exame de glicemia (TOTG) para detectar diabetes gestacional é realizado entre 24-28 semanas.",
+    videoSearch: "Dr Clóvis Bacha semana 24 viabilidade fetal pulmões surfactante",
+    quiz: [
+      { question: "O que é surfactante?", options: ["Hormônio da gravidez", "Substância que amadurece os pulmões fetais", "Tipo de antibiótico", "Proteína do cordão umbilical"], correct: 1 },
+      { question: "Quando é feito o exame de diabetes gestacional (TOTG)?", options: ["8-10 semanas", "14-16 semanas", "24-28 semanas", "36-38 semanas"], correct: 2 },
+      { question: "A partir de qual semana o bebê tem chance de sobreviver com suporte intensivo?", options: ["Semana 18", "Semana 24", "Semana 30", "Semana 36"], correct: 1 },
+    ],
+  },
+  {
+    week: 28,
+    title: "Início do 3º trimestre",
+    theme: "Crescimento cerebral",
+    content: "Bem-vinda ao 3º trimestre! O bebê pesa cerca de 1kg e mede 37cm. O cérebro está se desenvolvendo intensamente — as dobras e sulcos do córtex estão se formando. Os olhos respondem à luz. O bebê pode ter soluços que você sente. É hora de começar a contar os chutes (10 movimentos em 2 horas). O exame de streptococo B (GBS) será feito mais adiante. As consultas pré-natais ficam mais frequentes.",
+    videoSearch: "Dr Clóvis Bacha semana 28 terceiro trimestre crescimento cerebral",
+    quiz: [
+      { question: "Quanto pesa o bebê na semana 28?", options: ["300g", "600g", "1kg", "2kg"], correct: 2 },
+      { question: "Quantos movimentos fetais em 2 horas são considerados normais?", options: ["2 movimentos", "5 movimentos", "10 movimentos", "20 movimentos"], correct: 2 },
+      { question: "O que está se formando intensamente no cérebro fetal no 3º trimestre?", options: ["Neurônios", "Sulcos e dobras do córtex", "Nervos ópticos", "Hipófise"], correct: 1 },
+    ],
+  },
+  {
+    week: 32,
+    title: "Posicionamento e preparação",
+    theme: "Posição fetal",
+    content: "Na semana 32, o bebê pesa cerca de 1,7kg. A maioria já se vira para a posição cefálica (cabeça para baixo). As contrações de Braxton-Hicks ficam mais frequentes — são ensaios do útero para o parto. O bebê dorme 90% do tempo, com ciclos de sono REM. A gordura subcutânea está se depositando — o bebê está ficando menos enrugado. O ecocardiograma fetal avalia o coração com detalhes e geralmente é feito nessa época.",
+    videoSearch: "Dr Clóvis Bacha semana 32 posição fetal Braxton Hicks ecocardiograma",
+    quiz: [
+      { question: "O que são contrações de Braxton-Hicks?", options: ["Contrações de trabalho de parto", "Ensaios do útero, sem dor intensa regular", "Sinal de pré-eclâmpsia", "Contrações do diafragma"], correct: 1 },
+      { question: "Qual é a posição ideal do bebê para o parto vaginal?", options: ["Pélvica (nádegas para baixo)", "Transversa", "Cefálica (cabeça para baixo)", "Oblíqua"], correct: 2 },
+      { question: "Quando é realizado o ecocardiograma fetal?", options: ["Semana 6", "Semana 14", "Semanas 28-32", "Semana 38"], correct: 2 },
+    ],
+  },
+  {
+    week: 36,
+    title: "Pré-termo tardio — Preparação final",
+    theme: "Maturidade fetal",
+    content: "Na semana 36, o bebê pesa cerca de 2,6kg e está quase pronto. Os pulmões estão maduros na maioria dos casos. A cabeça geralmente encaixa na pelve materna (insinuação). O teste de estreptococo B (GBS) é feito entre as semanas 35-37 — se positivo, você receberá antibióticos durante o parto. O médico avaliará o colo do útero. Bebês nascidos entre 34-36 semanas são chamados de pré-termos tardios e podem precisar de cuidados especiais.",
+    videoSearch: "Dr Clóvis Bacha semana 36 pré-termo tardio estreptococo B parto",
+    quiz: [
+      { question: "Quando é feito o exame de estreptococo B (GBS)?", options: ["Semanas 12-14", "Semanas 20-22", "Semanas 35-37", "No dia do parto"], correct: 2 },
+      { question: "O que é insinuação fetal?", options: ["Bebê virado de ponta-cabeça", "Encaixamento da cabeça na pelve materna", "Posição transversa", "Bebê com soluço"], correct: 1 },
+      { question: "Bebês de que semanas são chamados pré-termos tardios?", options: ["20-28 semanas", "28-32 semanas", "34-36 semanas", "37-39 semanas"], correct: 2 },
+    ],
+  },
+  {
+    week: 38,
+    title: "Gestação a termo — Sinais do parto",
+    theme: "Sinais de trabalho de parto",
+    content: "A partir de 37 semanas, a gestação é considerada a termo. Agora é esperar os sinais do parto! Perda do tampão mucoso (rolha de muco com sangue — pode sair dias antes). Contrações regulares e progressivas (regra 5-1-1: a cada 5 min, duração de 1 min, por 1 hora). Ruptura da bolsa (líquido claro, inodoro — vá para o hospital). O bebê pesa em média 3,1kg. Fique atenta a movimentos reduzidos — relate ao médico imediatamente.",
+    videoSearch: "Dr Clóvis Bacha semana 38 sinais trabalho de parto tampão mucoso contrações",
+    quiz: [
+      { question: "O que é a regra 5-1-1 das contrações?", options: ["5 respirações, 1 push, 1 hora", "Contrações a cada 5 min, com 1 min de duração, por 1 hora", "5 horas de trabalho, 1 médico, 1 hospital", "Nenhuma das anteriores"], correct: 1 },
+      { question: "Se a bolsa rompeu, o líquido deve ser:", options: ["Verde ou com sangue", "Claro e inodoro", "Espesso e rosado", "Amarelo e com odor"], correct: 1 },
+      { question: "Movimentos fetais reduzidos exigem:", options: ["Esperar 24 horas", "Tomar líquidos e descansar", "Contato imediato com o médico", "Fazer exercícios"], correct: 2 },
+    ],
+  },
+  {
+    week: 40,
+    title: "Pré-natal completo — Você chegou!",
+    theme: "Pós-parto e amamentação",
+    content: "Parabéns! Você completou as semanas essenciais do pré-natal. Esteja preparada: o parto pode acontecer em qualquer momento. O bebê pesa em média 3,4kg e mede 51cm. Nas semanas após o parto, você passará pelos lóquios (sangramento pós-parto normal), cuidados com a cicatriz (cesárea ou episiotomia), e início da amamentação. O leite materno exclusivo pelos primeiros 6 meses é a melhor nutrição para o bebê. Cuide de você também — o puerpério pode trazer desafios emocionais.",
+    videoSearch: "Dr Clóvis Bacha semana 40 parto pós-parto amamentação puerpério",
+    quiz: [
+      { question: "Como se chama o sangramento normal após o parto?", options: ["Menstruação", "Lóquios", "Epistaxis", "Metrorragia"], correct: 1 },
+      { question: "Até quando é recomendado o aleitamento materno exclusivo?", options: ["2 meses", "4 meses", "6 meses", "12 meses"], correct: 2 },
+      { question: "Quanto pesa o bebê na semana 40?", options: ["2,2kg", "2,8kg", "3,4kg", "4,2kg"], correct: 2 },
+    ],
+  },
+];
+
+type QuizState = { answered: boolean; selected: number | null; score: number };
+
+function EscolaBebêTab({ gest }: { gest: Gest }) {
+  const [progress, setProgress] = useState<CourseProgress[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeModule, setActiveModule] = useState<CourseModule | null>(null);
+  const [quizState, setQuizState] = useState<QuizState>({ answered: false, selected: null, score: 0 });
+  const [saving, setSaving] = useState(false);
+  const currentWeek = gest?.weeks ?? 0;
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) { setLoading(false); return; }
+      const res = await getCourseProgress({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setProgress(res.progress);
+      setLoading(false);
+    })();
+  }, []);
+
+  function isDone(week: number) {
+    return progress.some((p) => p.module_week === week);
+  }
+
+  function isUnlocked(week: number) {
+    return currentWeek >= week;
+  }
+
+  const completedCount = COURSE_MODULES.filter((m) => isDone(m.week)).length;
+  const unlockedCount = COURSE_MODULES.filter((m) => isUnlocked(m.week)).length;
+  const hasCertificate = unlockedCount > 0 && completedCount >= Math.ceil(unlockedCount * 0.8);
+
+  async function finishQuiz(score: number) {
+    if (!activeModule) return;
+    setSaving(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (s.session) {
+      await markModuleComplete({
+        data: {
+          accessToken: s.session.access_token,
+          moduleWeek: activeModule.week,
+          quizScore: score,
+        },
+      });
+      setProgress((p) => [...p.filter((x) => x.module_week !== activeModule.week), {
+        module_week: activeModule.week,
+        quiz_score: score,
+        completed_at: new Date().toISOString(),
+      }]);
+    }
+    setSaving(false);
+  }
+
+  function openModule(m: CourseModule) {
+    setActiveModule(m);
+    setQuizState({ answered: false, selected: null, score: 0 });
+  }
+
+  if (activeModule) {
+    const done = isDone(activeModule.week);
+    return (
+      <div className="max-w-2xl space-y-6">
+        <button
+          onClick={() => setActiveModule(null)}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
+        >
+          ← Voltar ao curso
+        </button>
+
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+            Semana {activeModule.week}
+          </p>
+          <h2 className="mt-1 font-serif text-2xl">{activeModule.title}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">{activeModule.theme}</p>
+          <p className="mt-4 leading-relaxed text-sm">{activeModule.content}</p>
+
+          <a
+            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(activeModule.videoSearch)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-100"
+          >
+            ▶ Assistir vídeo do Dr. Clóvis — Semana {activeModule.week}
+          </a>
+        </div>
+
+        {/* Quiz */}
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <h3 className="font-semibold mb-4">Quiz — Semana {activeModule.week}</h3>
+          {activeModule.quiz.map((q, qi) => (
+            <div key={qi} className="mb-5">
+              <p className="text-sm font-medium mb-2">{qi + 1}. {q.question}</p>
+              <div className="space-y-2">
+                {q.options.map((opt, oi) => {
+                  let style = "border-border bg-background text-foreground";
+                  if (quizState.answered) {
+                    if (oi === q.correct) style = "border-green-400 bg-green-50 text-green-800";
+                    else if (oi === quizState.selected && oi !== q.correct) style = "border-red-300 bg-red-50 text-red-700";
+                    else style = "border-border bg-background text-muted-foreground";
+                  }
+                  return (
+                    <button
+                      key={oi}
+                      disabled={quizState.answered}
+                      onClick={() => {
+                        if (quizState.answered) return;
+                        const correct = activeModule.quiz.filter((qq, i) =>
+                          i === qi ? oi === qq.correct : false
+                        ).length;
+                        setQuizState((prev) => ({
+                          ...prev,
+                          selected: oi,
+                        }));
+                      }}
+                      className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${style}`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {!quizState.answered ? (
+            <button
+              onClick={async () => {
+                const score = Math.round(
+                  (activeModule.quiz.filter((q, i) => quizState.selected === q.correct).length /
+                    activeModule.quiz.length) *
+                    100
+                );
+                setQuizState((prev) => ({ ...prev, answered: true, score }));
+                if (!done) await finishQuiz(score);
+              }}
+              disabled={quizState.selected === null}
+              className="mt-2 rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
+            >
+              Verificar respostas
+            </button>
+          ) : (
+            <div className="mt-4 rounded-2xl bg-secondary p-4 text-center">
+              <p className="text-lg font-bold">
+                {quizState.score >= 67 ? "🎉 Muito bem!" : "📚 Continue estudando!"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Módulo {done ? "já" : ""} concluído — semana {activeModule.week}
+              </p>
+              <button
+                onClick={() => setActiveModule(null)}
+                className="mt-3 rounded-full bg-primary px-6 py-2 text-sm font-medium text-white"
+              >
+                {saving ? "Salvando..." : "Próximo módulo"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Progress header */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="font-serif text-xl">Escola do Bebê</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {completedCount} de {COURSE_MODULES.length} módulos concluídos
+            </p>
+          </div>
+          {hasCertificate && (
+            <div className="rounded-2xl bg-amber-50 border border-amber-300 px-4 py-2 text-center">
+              <p className="text-lg">🎓</p>
+              <p className="text-xs font-semibold text-amber-700">Certificado</p>
+            </div>
+          )}
+        </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${COURSE_MODULES.length > 0 ? (completedCount / COURSE_MODULES.length) * 100 : 0}%` }}
+          />
+        </div>
+      </div>
+
+      {hasCertificate && (
+        <div className="rounded-3xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-yellow-50 p-8 text-center">
+          <p className="text-4xl mb-2">🎓</p>
+          <h3 className="font-serif text-2xl font-bold text-amber-800">Certificado de Pré-natal</h3>
+          <p className="mt-2 text-amber-700">
+            Parabéns! Você concluiu o curso de pré-natal da Escola do Bebê.
+          </p>
+          <p className="mt-1 text-sm text-amber-600">Dr. Clóvis Bacha — Ginecologia & Obstetrícia</p>
+        </div>
+      )}
+
+      {/* Module grid */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {COURSE_MODULES.map((m) => {
+          const unlocked = isUnlocked(m.week);
+          const done = isDone(m.week);
+          const prog = progress.find((p) => p.module_week === m.week);
+          return (
+            <button
+              key={m.week}
+              onClick={() => unlocked && openModule(m)}
+              disabled={!unlocked}
+              className={`rounded-2xl border p-5 text-left transition-all ${
+                done
+                  ? "border-green-300 bg-green-50"
+                  : unlocked
+                  ? "border-border bg-card hover:border-primary/50 hover:bg-primary/5"
+                  : "border-border bg-secondary/30 opacity-50 cursor-not-allowed"
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                  Semana {m.week}
+                </span>
+                <span className="text-lg">
+                  {done ? "✅" : unlocked ? "▶" : "🔒"}
+                </span>
+              </div>
+              <p className="mt-2 font-medium text-sm">{m.title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{m.theme}</p>
+              {done && prog && (
+                <p className="mt-1.5 text-xs text-green-600">
+                  Quiz: {prog.quiz_score}% de acerto
+                </p>
+              )}
+              {!unlocked && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Libera na semana {m.week}
+                </p>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Feature 40 — FAQ Personalizado por Semana
+───────────────────────────────────────────────────────────────────────────── */
+
+type FAQItem = {
+  q: string;
+  a: string;
+  weeks: [number, number]; // [min, max] inclusive
+  tags: string[];
+};
+
+const FAQ_ITEMS: FAQItem[] = [
+  // 1º Trimestre
+  { q: "Náuseas e vômitos são normais?", a: "Sim, afetam até 80% das gestantes, especialmente no 1º trimestre. São causadas pelo hCG. Coma pequenas porções frequentes, evite odores fortes, prefira alimentos secos pela manhã. Converse com seu médico se vomitar mais de 3-4 vezes ao dia (hiperemese).", weeks: [4, 14], tags: ["náuseas", "sintomas"] },
+  { q: "Posso sangrar no início da gravidez?", a: "Um pequeno sangramento na implantação (por volta de 6-10 dias após a fecundação) pode ocorrer e é normal. Porém, qualquer sangramento deve ser comunicado ao médico. Ele avaliará se é necessário ultrassom para verificar a vitalidade do embrião.", weeks: [4, 12], tags: ["sangramento"] },
+  { q: "Cólicas leves são normais?", a: "Cólicas leves e ocasionais no início da gestação são comuns — o útero está se expandindo. Mas dor intensa, contínua ou acompanhada de sangramento exige avaliação médica urgente.", weeks: [4, 14], tags: ["cólicas", "dor"] },
+  { q: "Posso continuar tomando meus remédios habituais?", a: "Não tome nenhum medicamento sem orientação médica durante a gestação. Alguns são seguros, outros são contraindicados. Leve uma lista de todos os seus medicamentos para o pré-natal.", weeks: [4, 42], tags: ["medicamentos"] },
+  { q: "Com que frequência preciso consultar o Dr. Clóvis?", a: "O calendário mínimo do pré-natal: mensal até 32 semanas, quinzenal até 36, e semanal a partir daí. Gestações de alto risco têm consultas mais frequentes. Não pule nenhuma — cada consulta tem um objetivo específico.", weeks: [4, 40], tags: ["consultas", "pré-natal"] },
+  { q: "É seguro ter relações sexuais na gestação?", a: "Em gestações sem complicações, o sexo é completamente seguro. O bebê está protegido pelo líquido amniótico e tampão mucoso. Evite posições que pressionem a barriga. Em caso de sangramento, placenta prévia ou ameaça de parto prematuro, pode ser contraindicado.", weeks: [4, 38], tags: ["sexo", "relações"] },
+  // 1º-2º Trimestre
+  { q: "Quais exames são feitos na semana 11-14?", a: "A morfológica do 1º trimestre avalia a translucência nucal (rastreamento de síndrome de Down), batimentos cardíacos e anatomia inicial. Junto com exames de sangue (PAPP-A e beta-hCG livre), compõe o rastreamento combinado do 1º trimestre.", weeks: [10, 16], tags: ["exames", "morfológica"] },
+  { q: "O que é síndrome de Down e como é o rastreamento?", a: "A síndrome de Down (trissomia 21) ocorre em 1 a cada 800 nascimentos. O rastreamento combinado do 1º trimestre (translucência nucal + exames de sangue) estima o risco. Se alto, pode ser indicada amniocentese ou biopsia de vilosidade corial para diagnóstico definitivo.", weeks: [10, 20], tags: ["Down", "rastreamento"] },
+  // 2º Trimestre
+  { q: "Quando sentirei os primeiros movimentos?", a: "Primíparas geralmente sentem entre 18-22 semanas. Quem já teve filhos pode perceber antes, entre 16-18 semanas. No início parece um borbulhar ou 'borboletas'. Não ficou preocupada se demorar — cada corpo é diferente.", weeks: [14, 22], tags: ["movimentos", "chutes"] },
+  { q: "Posso viajar de avião grávida?", a: "Até 28 semanas, viagens aéreas são geralmente seguras com autorização médica. Entre 28-36 semanas, algumas companhias exigem atestado médico. Após 36 semanas, a maioria das companhias não aceita. Levante a cada hora, hidrate-se bem e use meia de compressão.", weeks: [14, 36], tags: ["viagem", "avião"] },
+  { q: "O que é o exame morfológico do 2º trimestre?", a: "A morfológica do 2º trimestre (20-24 semanas) avalia detalhadamente a anatomia fetal: cabeça, coração (4 câmaras), pulmões, rins, fígado, coluna, membros e face. É o exame mais completo da gestação. Um especialista em medicina fetal realiza o exame.", weeks: [18, 26], tags: ["morfológica", "exames"] },
+  { q: "Preciso fazer o teste de diabetes gestacional?", a: "Sim, o TOTG (teste oral de tolerância à glicose) é feito entre 24-28 semanas para todas as gestantes. Se você tem fatores de risco (obesidade, histórico familiar, bebê grande), pode ser feito antes. O diabetes gestacional tem tratamento eficaz.", weeks: [22, 30], tags: ["diabetes", "TOTG", "exames"] },
+  // 2º-3º Trimestre
+  { q: "O que são contrações de Braxton Hicks?", a: "São contrações irregulares, sem dor intensa, que preparam o útero para o parto. São normais a partir do 2º trimestre. Diferem do trabalho de parto por serem irregulares, curtas e cessam com mudança de posição. Se ficarem regulares e progressivas, ligue para o médico.", weeks: [20, 40], tags: ["contrações", "Braxton Hicks"] },
+  { q: "O bebê está em posição correta para o parto?", a: "A maioria dos bebês se vira para a posição cefálica (cabeça para baixo) entre as semanas 32-36. Se ainda estiver pélvico (nádegas para baixo) na semana 36, o médico pode tentar uma versão cefálica externa ou planejar a cesárea.", weeks: [28, 38], tags: ["posição fetal", "pélvico"] },
+  { q: "Posso continuar trabalhando durante a gravidez?", a: "Na maioria dos casos sim, até próximo ao parto. A licença-maternidade no Brasil começa a partir de 28 semanas, mas muitas mulheres trabalham até 37-38 semanas. Em gestações de alto risco, o afastamento pode ser necessário antes.", weeks: [4, 38], tags: ["trabalho", "licença"] },
+  // 3º Trimestre
+  { q: "O que é pré-eclâmpsia e como identificar?", a: "Pré-eclâmpsia é pressão alta na gestação acompanhada de proteína na urina, geralmente após 20 semanas. Sinais: pressão ≥140x90, inchaço súbito de mãos e rosto, dor de cabeça intensa, visão turva, dor no estômago. Procure o médico imediatamente.", weeks: [20, 42], tags: ["pré-eclâmpsia", "pressão alta", "urgência"] },
+  { q: "Quanto líquido amniótico é normal?", a: "O volume de líquido amniótico é avaliado no ultrassom (ILA — índice de líquido amniótico). Oligoâmnio (pouco líquido) e polidrâmnio (muito líquido) precisam de avaliação. O bebê engole o líquido e urina dentro do útero, mantendo o equilíbrio.", weeks: [16, 42], tags: ["líquido amniótico"] },
+  { q: "Quais são os sinais de parto prematuro?", a: "Contrações regulares antes de 37 semanas, pressão pélvica intensa, dor lombar nova, sangramento, perda de líquido ou muco. Na dúvida, vá ao hospital. Não espere: cada semana dentro do útero conta muito para o bebê prematuro.", weeks: [20, 37], tags: ["parto prematuro", "urgência"] },
+  { q: "Como saber se é trabalho de parto verdadeiro?", a: "Trabalho de parto verdadeiro: contrações regulares a cada 5 minutos, duração de 1 minuto, por 1 hora (regra 5-1-1), que não cessam com mudança de posição e ficam progressivamente mais fortes e frequentes. Falso trabalho: irregular, cessa com repouso.", weeks: [36, 42], tags: ["parto", "contrações"] },
+  { q: "Posso ter epidural?", a: "A anestesia peridural (epidural) é segura e muito usada no parto. Reduz a dor sem impedir os movimentos. Pode ser administrada em qualquer fase do trabalho de parto ativo. Converse com Dr. Clóvis sobre seu plano de parto.", weeks: [34, 42], tags: ["parto", "epidural", "dor"] },
+  { q: "O que levar para a maternidade?", a: "Para a mãe: documentos (RG, carteirinha, pré-natal), roupas confortáveis, itens de higiene, calcinha descartável, sutiã de amamentação, absorvente pós-parto. Para o bebê: roupinhas, fraldas, manta, cadeirinha de carro (obrigatória para ir embora). Monte a bolsa a partir de 34 semanas.", weeks: [32, 42], tags: ["maternidade", "parto", "preparação"] },
+];
+
+function FAQTab({ gest }: { gest: Gest }) {
+  const currentWeek = gest?.weeks ?? 0;
+  const [open, setOpen] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(currentWeek === 0);
+
+  const filtered = FAQ_ITEMS.filter((item) => {
+    const matchesWeek = showAll || currentWeek === 0
+      ? true
+      : currentWeek >= item.weeks[0] && currentWeek <= item.weeks[1];
+    const matchesSearch =
+      !search ||
+      item.q.toLowerCase().includes(search.toLowerCase()) ||
+      item.a.toLowerCase().includes(search.toLowerCase()) ||
+      item.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
+    return matchesWeek && matchesSearch;
+  });
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <h2 className="font-serif text-xl mb-1">Perguntas frequentes</h2>
+        {currentWeek > 0 && (
+          <p className="text-sm text-muted-foreground">
+            Mostrando perguntas relevantes para a semana {currentWeek}
+          </p>
+        )}
+        <div className="mt-3 flex flex-col sm:flex-row gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar pergunta..."
+            className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
+          />
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              showAll ? "bg-primary text-white" : "bg-secondary text-foreground"
+            }`}
+          >
+            {showAll ? "Ver da minha semana" : "Ver todas"}
+          </button>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">
+          Nenhuma pergunta encontrada.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((item, i) => (
+            <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between p-4 text-left"
+                onClick={() => setOpen(open === i ? null : i)}
+              >
+                <span className="text-sm font-medium pr-4">{item.q}</span>
+                <span className="shrink-0 text-muted-foreground text-sm">
+                  {open === i ? "▲" : "▼"}
+                </span>
+              </button>
+              {open === i && (
+                <div className="px-4 pb-4 border-t border-border pt-3">
+                  <p className="text-sm leading-relaxed text-muted-foreground">{item.a}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {item.tags.map((t) => (
+                      <span key={t} className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                        {t}
+                      </span>
+                    ))}
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                      Sem. {item.weeks[0]}–{item.weeks[1]}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-sm text-center text-muted-foreground">
+        Não encontrou sua dúvida?{" "}
+        <button
+          onClick={() => {
+            const tabBtns = document.querySelectorAll<HTMLButtonElement>("button");
+            tabBtns.forEach((btn) => { if (btn.textContent === "Chat IA") btn.click(); });
+          }}
+          className="text-primary font-medium hover:underline"
+        >
+          Pergunte ao assistente de IA
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Feature 41 — Botão do Pânico
+───────────────────────────────────────────────────────────────────────────── */
+
+function PânicoTab({ profile }: { profile: Profile | null }) {
+  const [status, setStatus] = useState<"idle" | "locating" | "sent" | "error">("idle");
+  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
+  const [lastSent, setLastSent] = useState<Date | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [cooldown]);
+
+  async function handlePanic() {
+    if (cooldown > 0 || status === "locating") return;
+    setStatus("locating");
+
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+      );
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      let address: string | null = null;
+      try {
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+        );
+        const json = await resp.json();
+        address = json.display_name ?? null;
+      } catch {
+        // location name is optional
+      }
+
+      setLocation({ lat, lng, address: address ?? undefined });
+
+      const { data: s } = await supabase.auth.getSession();
+      if (s.session) {
+        await savePanicEvent({
+          data: {
+            accessToken: s.session.access_token,
+            latitude: lat,
+            longitude: lng,
+            address,
+          },
+        });
+      }
+
+      setStatus("sent");
+      setLastSent(new Date());
+      setCooldown(60);
+    } catch (e) {
+      setStatus("error");
+    }
+  }
+
+  return (
+    <div className="max-w-lg mx-auto space-y-6">
+      {/* Emergency panel */}
+      <div className="rounded-3xl border-2 border-red-300 bg-red-50 p-6">
+        <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-4">
+          Emergência obstétrica
+        </p>
+
+        {/* Big panic button */}
+        <button
+          onClick={handlePanic}
+          disabled={cooldown > 0 || status === "locating"}
+          className={`w-full rounded-2xl py-8 text-white font-bold text-xl transition-all shadow-lg ${
+            cooldown > 0
+              ? "bg-gray-400 cursor-not-allowed"
+              : status === "sent"
+              ? "bg-green-500"
+              : "bg-red-600 hover:bg-red-700 active:scale-95"
+          }`}
+        >
+          {status === "locating" ? (
+            <span>📍 Localizando...</span>
+          ) : status === "sent" ? (
+            <span>✓ Alerta enviado</span>
+          ) : (
+            <span>🆘 BOTÃO DE PÂNICO</span>
+          )}
+        </button>
+
+        {cooldown > 0 && (
+          <p className="mt-2 text-center text-xs text-red-600">
+            Disponível novamente em {cooldown}s
+          </p>
+        )}
+
+        {status === "sent" && location && (
+          <div className="mt-3 rounded-xl bg-white p-3 text-sm">
+            <p className="font-medium text-green-700">✓ Alerta registrado</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+            </p>
+            {location.address && (
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">{location.address}</p>
+            )}
+            {lastSent && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Às {lastSent.toLocaleTimeString("pt-BR")}
+              </p>
+            )}
+            <a
+              href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 block text-xs text-primary hover:underline"
+            >
+              Ver no Google Maps →
+            </a>
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="mt-3 rounded-xl bg-white p-3 text-sm text-amber-700">
+            <p className="font-medium">Não foi possível obter localização.</p>
+            <p className="text-xs mt-1">Permita o acesso à localização no navegador e tente novamente. Mesmo assim, os números abaixo estão disponíveis.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Emergency numbers — large tap targets */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+          Ligue agora com um toque
+        </p>
+        <div className="space-y-2">
+          {[
+            { label: "SAMU", subtitle: "Serviço de Atendimento Móvel de Urgência", number: "192", color: "bg-red-600" },
+            { label: "Bombeiros / Resgate", subtitle: "Resgate de emergência", number: "193", color: "bg-orange-500" },
+            { label: "CVV", subtitle: "Apoio emocional 24h", number: "188", color: "bg-blue-600" },
+          ].map(({ label, subtitle, number, color }) => (
+            <a
+              key={number}
+              href={`tel:${number}`}
+              className={`flex items-center gap-4 rounded-2xl ${color} px-5 py-4 text-white shadow-sm`}
+            >
+              <span className="text-3xl font-bold">{number}</span>
+              <div>
+                <p className="font-semibold">{label}</p>
+                <p className="text-xs opacity-90">{subtitle}</p>
+              </div>
+            </a>
+          ))}
+
+          {profile?.emergency_phone && (
+            <a
+              href={`tel:${profile.emergency_phone}`}
+              className="flex items-center gap-4 rounded-2xl bg-primary px-5 py-4 text-white shadow-sm"
+            >
+              <span className="text-2xl">📞</span>
+              <div>
+                <p className="font-semibold">{profile.emergency_contact ?? "Contato de emergência"}</p>
+                <p className="text-xs opacity-90">{profile.emergency_phone}</p>
+              </div>
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Sinais de emergência */}
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+          Quando ir IMEDIATAMENTE ao hospital
+        </p>
+        <ul className="space-y-2 text-sm">
+          {[
+            "🩸 Sangramento intenso",
+            "💧 Bolsa rompeu (líquido claro saindo)",
+            "😵 Contrações a cada 5 min por 1 hora",
+            "👀 Visão turva, dor de cabeça intensa, inchaço súbito",
+            "👶 Bebê parou de se mover",
+            "🤢 Vômitos incontroláveis",
+            "🌡️ Febre acima de 38°C",
+          ].map((s) => (
+            <li key={s} className="flex items-center gap-2">
+              <span>{s}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <p className="text-center text-xs text-muted-foreground px-4">
+        O botão registra sua localização GPS e alerta seu acompanhante designado.
+        Configure o contato de emergência em <strong>Perfil</strong>.
+      </p>
     </div>
   );
 }
