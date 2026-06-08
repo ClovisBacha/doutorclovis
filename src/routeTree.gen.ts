@@ -32,6 +32,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AcompanharTokenRouteImport } from './routes/acompanhar.$token'
+import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
 
 const TamanhoRealRoute = TamanhoRealRouteImport.update({
@@ -148,6 +149,11 @@ const AcompanharTokenRoute = AcompanharTokenRouteImport.update({
   path: '/acompanhar/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMinhaContaRoute = AuthenticatedMinhaContaRouteImport.update({
   id: '/minha-conta',
   path: '/minha-conta',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -228,6 +236,7 @@ export interface FileRoutesById {
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/_authenticated/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
   '/api/chat': typeof ApiChatRoute
 }
@@ -255,6 +264,7 @@ export interface FileRouteTypes {
     | '/sobre'
     | '/tamanho-real'
     | '/minha-conta'
+    | '/painel'
     | '/acompanhar/$token'
     | '/api/chat'
   fileRoutesByTo: FileRoutesByTo
@@ -280,6 +290,7 @@ export interface FileRouteTypes {
     | '/sobre'
     | '/tamanho-real'
     | '/minha-conta'
+    | '/painel'
     | '/acompanhar/$token'
     | '/api/chat'
   id:
@@ -306,6 +317,7 @@ export interface FileRouteTypes {
     | '/sobre'
     | '/tamanho-real'
     | '/_authenticated/minha-conta'
+    | '/_authenticated/painel'
     | '/acompanhar/$token'
     | '/api/chat'
   fileRoutesById: FileRoutesById
@@ -499,6 +511,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AcompanharTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/painel': {
+      id: '/_authenticated/painel'
+      path: '/painel'
+      fullPath: '/painel'
+      preLoaderRoute: typeof AuthenticatedPainelRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/minha-conta': {
       id: '/_authenticated/minha-conta'
       path: '/minha-conta'
@@ -511,10 +530,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedMinhaContaRoute: typeof AuthenticatedMinhaContaRoute
+  AuthenticatedPainelRoute: typeof AuthenticatedPainelRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMinhaContaRoute: AuthenticatedMinhaContaRoute,
+  AuthenticatedPainelRoute: AuthenticatedPainelRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
