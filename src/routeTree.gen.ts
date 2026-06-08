@@ -33,6 +33,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
 import { Route as AcompanharTokenRouteImport } from './routes/acompanhar.$token'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
@@ -156,6 +157,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCartaSemanalRoute = ApiCartaSemanalRouteImport.update({
+  id: '/api/carta-semanal',
+  path: '/api/carta-semanal',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AcompanharTokenRoute = AcompanharTokenRouteImport.update({
   id: '/acompanhar/$token',
   path: '/acompanhar/$token',
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
+  '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
+  '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
+  '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/minha-conta'
     | '/painel'
     | '/acompanhar/$token'
+    | '/api/carta-semanal'
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/minha-conta'
     | '/painel'
     | '/acompanhar/$token'
+    | '/api/carta-semanal'
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
@@ -341,6 +352,7 @@ export interface FileRouteTypes {
     | '/_authenticated/minha-conta'
     | '/_authenticated/painel'
     | '/acompanhar/$token'
+    | '/api/carta-semanal'
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
@@ -369,6 +381,7 @@ export interface RootRouteChildren {
   SobreRoute: typeof SobreRoute
   TamanhoRealRoute: typeof TamanhoRealRoute
   AcompanharTokenRoute: typeof AcompanharTokenRoute
+  ApiCartaSemanalRoute: typeof ApiCartaSemanalRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
@@ -544,6 +557,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/carta-semanal': {
+      id: '/api/carta-semanal'
+      path: '/api/carta-semanal'
+      fullPath: '/api/carta-semanal'
+      preLoaderRoute: typeof ApiCartaSemanalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/acompanhar/$token': {
       id: '/acompanhar/$token'
       path: '/acompanhar/$token'
@@ -604,6 +624,7 @@ const rootRouteChildren: RootRouteChildren = {
   SobreRoute: SobreRoute,
   TamanhoRealRoute: TamanhoRealRoute,
   AcompanharTokenRoute: AcompanharTokenRoute,
+  ApiCartaSemanalRoute: ApiCartaSemanalRoute,
   ApiChatRoute: ApiChatRoute,
   ApiNutritionRoute: ApiNutritionRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,

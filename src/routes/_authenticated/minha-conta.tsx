@@ -74,6 +74,7 @@ type Gest = ReturnType<typeof computeGestation>;
 
 const TABS = [
   "Bebê",
+  "Carta do Bebê",
   "Calendário",
   "Linha do Tempo",
   "Diário",
@@ -83,6 +84,9 @@ const TABS = [
   "Saúde",
   "Nutrição",
   "Meditações",
+  "Sons",
+  "Exercícios",
+  "Quartinho",
   "Alertas",
   "Pré-consulta",
   "Perguntas",
@@ -198,6 +202,7 @@ function MinhaContaPage() {
 
       <div className="mt-8">
         {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
+        {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
         {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
         {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
         {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
@@ -207,6 +212,9 @@ function MinhaContaPage() {
         {tab === "Saúde" && <HealthTab gest={gest} profile={profile} />}
         {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
         {tab === "Meditações" && <MeditacoesTab gest={gest} />}
+        {tab === "Sons" && <SonsBebêTab gest={gest} />}
+        {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
+        {tab === "Quartinho" && <QuartinhoTab gest={gest} />}
         {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
         {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
         {tab === "Perguntas" && <QuestionsTab gest={gest} />}
@@ -3934,6 +3942,995 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------- Carta Semanal do Bebê (Feature #21) ---------- */
+
+function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  const [letter, setLetter] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [cachedWeek, setCachedWeek] = useState<number | null>(null);
+  const week = gest?.weeks ?? null;
+
+  useEffect(() => {
+    if (!week) return;
+    loadCached(week);
+  }, [week]);
+
+  async function loadCached(w: number) {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { data } = await (supabase as any)
+      .from("baby_letters")
+      .select("week, content")
+      .eq("user_id", u.user.id)
+      .eq("week", w)
+      .single();
+    if (data?.content) {
+      setLetter(data.content);
+      setCachedWeek(data.week);
+    }
+  }
+
+  async function generate() {
+    if (!week) return;
+    setLoading(true);
+    try {
+      const baby = babyForWeek(week);
+      const res = await fetch("/api/carta-semanal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          week,
+          babyName: profile?.baby_name ?? null,
+          babyDesc: `${baby.desc} Tamanho: ${baby.size}. Peso estimado: ${baby.weight}. Comparado a: ${baby.fruit}.`,
+        }),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
+      setLetter(json.letter);
+      setCachedWeek(week);
+      // Save to DB
+      const { data: u } = await supabase.auth.getUser();
+      if (u.user) {
+        await (supabase as any)
+          .from("baby_letters")
+          .upsert({ user_id: u.user.id, week, content: json.letter });
+      }
+    } catch (e: any) {
+      setLetter("Erro ao gerar a carta: " + (e?.message ?? "tente novamente."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (!gest || !week) {
+    return (
+      <div className="rounded-3xl border border-border bg-card p-8 text-center">
+        <p className="text-muted-foreground">Configure sua gestação em <strong>Perfil</strong> para receber a carta semanal do seu bebê.</p>
+      </div>
+    );
+  }
+
+  const baby = babyForWeek(week);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">Semana {week}</p>
+            <p className="mt-1 font-serif text-2xl">Carta do seu bebê</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Uma mensagem especial na perspectiva do {profile?.baby_name ?? "seu bebê"}, gerada por IA com base no desenvolvimento real desta semana.
+            </p>
+          </div>
+          <div className="text-4xl">{baby.fruit}</div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <span className="rounded-full bg-secondary px-3 py-1">📏 {baby.size}</span>
+          <span className="rounded-full bg-secondary px-3 py-1">⚖️ {baby.weight}</span>
+        </div>
+      </div>
+
+      {/* Letter display */}
+      {letter ? (
+        <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-b from-primary/5 to-background p-8">
+          {/* Decorative stamp */}
+          <div className="absolute right-6 top-6 flex h-14 w-14 items-center justify-center rounded-full border-4 border-primary/20 text-xs font-bold uppercase tracking-wider text-primary/40">
+            Semana<br />{week}
+          </div>
+          <p className="mb-6 font-serif text-sm text-muted-foreground">
+            {new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+          <p className="whitespace-pre-line font-serif text-base leading-relaxed text-foreground">
+            {letter}
+          </p>
+          {cachedWeek === week && (
+            <p className="mt-6 text-xs text-muted-foreground">Carta da semana {week} · salva automaticamente</p>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-dashed border-border p-10 text-center">
+          <p className="font-serif text-xl text-muted-foreground">Sua carta ainda não foi gerada</p>
+          <p className="mt-2 text-sm text-muted-foreground">Clique abaixo para receber uma mensagem especial do seu bebê nesta semana.</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={generate}
+          disabled={loading}
+          className="rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        >
+          {loading ? "Gerando carta..." : letter ? "Gerar nova carta" : "✉️ Receber carta desta semana"}
+        </button>
+        {letter && (
+          <button
+            onClick={() => {
+              const text = `Carta do bebê — Semana ${week}\n\n${letter}`;
+              navigator.clipboard?.writeText(text).then(() => alert("Copiado!"));
+            }}
+            className="rounded-full border border-border px-6 py-3 text-sm text-muted-foreground hover:bg-secondary"
+          >
+            Copiar texto
+          </button>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground">A IA gera uma carta única por semana — clique em "Gerar nova carta" para criar uma versão diferente.</p>
+    </div>
+  );
+}
+
+/* ---------- Sons para o Bebê (Feature #25) ---------- */
+
+type SoundType = "heartbeat" | "pink-noise" | "binaural" | "lullaby" | "rain";
+
+const SOUND_INFO: Record<SoundType, { label: string; description: string; minWeek: number; icon: string }> = {
+  heartbeat: {
+    label: "Batimento cardíaco materno",
+    description: "Sons do coração da mamãe — o primeiro som que o bebê ouve.",
+    minWeek: 16,
+    icon: "❤️",
+  },
+  "pink-noise": {
+    label: "Ruído rosa",
+    description: "Frequências suaves que imitam o ambiente uterino e auxiliam no sono.",
+    minWeek: 20,
+    icon: "🌊",
+  },
+  binaural: {
+    label: "Batidas binaurais",
+    description: "Dois tons levemente diferentes criam uma sensação de relaxamento profundo.",
+    minWeek: 24,
+    icon: "🎵",
+  },
+  lullaby: {
+    label: "Melodia de ninar",
+    description: "Sequência pentatônica suave — o bebê reconhecerá essa melodia após o nascimento.",
+    minWeek: 24,
+    icon: "🎶",
+  },
+  rain: {
+    label: "Chuva suave",
+    description: "Som de chuva filtrado, semelhante ao líquido amniótico.",
+    minWeek: 18,
+    icon: "🌧️",
+  },
+};
+
+function SonsBebêTab({ gest }: { gest: Gest }) {
+  const currentWeek = gest?.weeks ?? 0;
+  const [playing, setPlaying] = useState<SoundType | null>(null);
+  const [volume, setVolume] = useState(0.5);
+  const [playCount, setPlayCount] = useState<Partial<Record<SoundType, number>>>(() => {
+    try { return JSON.parse(localStorage.getItem("sons_play_count") ?? "{}"); } catch { return {}; }
+  });
+  const ctxRef = useRef<AudioContext | null>(null);
+  const nodesRef = useRef<AudioNode[]>([]);
+  const masterRef = useRef<GainNode | null>(null);
+  const schedulerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nextBeatRef = useRef<number>(0);
+
+  function getCtx() {
+    if (!ctxRef.current || ctxRef.current.state === "closed") {
+      ctxRef.current = new AudioContext();
+    }
+    if (ctxRef.current.state === "suspended") ctxRef.current.resume();
+    return ctxRef.current;
+  }
+
+  function stopAll() {
+    if (schedulerRef.current) { clearInterval(schedulerRef.current); schedulerRef.current = null; }
+    nodesRef.current.forEach((n) => { try { (n as any).stop?.(); n.disconnect(); } catch {} });
+    nodesRef.current = [];
+    if (masterRef.current) { masterRef.current.disconnect(); masterRef.current = null; }
+    setPlaying(null);
+  }
+
+  function playPinkNoise(ctx: AudioContext, master: GainNode) {
+    const bufferSize = 4 * ctx.sampleRate;
+    const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buffer.getChannelData(ch);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + white * 0.5362) * 0.11;
+      }
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    src.connect(master);
+    src.start();
+    nodesRef.current.push(src);
+  }
+
+  function playRain(ctx: AudioContext, master: GainNode) {
+    const bufferSize = 2 * ctx.sampleRate;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 1200;
+    filter.Q.value = 0.5;
+    src.connect(filter);
+    filter.connect(master);
+    src.start();
+    nodesRef.current.push(src);
+  }
+
+  function playBinaural(ctx: AudioContext, master: GainNode) {
+    const merger = ctx.createChannelMerger(2);
+    merger.connect(master);
+    const left = ctx.createOscillator();
+    const right = ctx.createOscillator();
+    const gL = ctx.createGain(); gL.gain.value = 0.3;
+    const gR = ctx.createGain(); gR.gain.value = 0.3;
+    left.frequency.value = 200; right.frequency.value = 210;
+    left.connect(gL); gL.connect(merger, 0, 0);
+    right.connect(gR); gR.connect(merger, 0, 1);
+    left.start(); right.start();
+    nodesRef.current.push(left, right);
+  }
+
+  function scheduleHeartbeats(ctx: AudioContext, master: GainNode) {
+    const interval = 60 / 140;
+    nextBeatRef.current = ctx.currentTime + 0.1;
+    schedulerRef.current = setInterval(() => {
+      const t = nextBeatRef.current;
+      if (t > ctx.currentTime + 0.3) return;
+      // Lub
+      const o1 = ctx.createOscillator(); const g1 = ctx.createGain();
+      o1.type = "sine"; o1.frequency.value = 80;
+      g1.gain.setValueAtTime(0, t);
+      g1.gain.linearRampToValueAtTime(0.4, t + 0.02);
+      g1.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      o1.connect(g1); g1.connect(master);
+      o1.start(t); o1.stop(t + 0.14);
+      // Dub
+      const o2 = ctx.createOscillator(); const g2 = ctx.createGain();
+      o2.type = "sine"; o2.frequency.value = 65;
+      const t2 = t + 0.13;
+      g2.gain.setValueAtTime(0, t2);
+      g2.gain.linearRampToValueAtTime(0.25, t2 + 0.02);
+      g2.gain.exponentialRampToValueAtTime(0.001, t2 + 0.1);
+      o2.connect(g2); g2.connect(master);
+      o2.start(t2); o2.stop(t2 + 0.12);
+      nextBeatRef.current = t + interval;
+    }, 50) as ReturnType<typeof setInterval>;
+  }
+
+  function scheduleLullaby(ctx: AudioContext, master: GainNode) {
+    // C major pentatonic: C4 D4 E4 G4 A4
+    const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 392.00, 329.63, 293.66];
+    const dur = 0.6;
+    let idx = 0;
+    let t = ctx.currentTime + 0.1;
+
+    function scheduleNote() {
+      const freq = notes[idx % notes.length];
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.2, t + 0.05);
+      gain.gain.linearRampToValueAtTime(0, t + dur - 0.05);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(t);
+      osc.stop(t + dur);
+      t += dur;
+      idx++;
+    }
+
+    for (let i = 0; i < 16; i++) scheduleNote();
+    schedulerRef.current = setInterval(() => {
+      if (t - ctx.currentTime < 1.5) {
+        for (let i = 0; i < 8; i++) scheduleNote();
+      }
+    }, 2000) as ReturnType<typeof setInterval>;
+  }
+
+  function play(type: SoundType) {
+    if (playing === type) { stopAll(); return; }
+    stopAll();
+    const ctx = getCtx();
+    const master = ctx.createGain();
+    master.gain.value = volume;
+    master.connect(ctx.destination);
+    masterRef.current = master;
+    if (type === "pink-noise") playPinkNoise(ctx, master);
+    else if (type === "rain") playRain(ctx, master);
+    else if (type === "binaural") playBinaural(ctx, master);
+    else if (type === "heartbeat") scheduleHeartbeats(ctx, master);
+    else if (type === "lullaby") scheduleLullaby(ctx, master);
+    setPlaying(type);
+    const newCount = { ...playCount, [type]: (playCount[type] ?? 0) + 1 };
+    setPlayCount(newCount);
+    localStorage.setItem("sons_play_count", JSON.stringify(newCount));
+  }
+
+  useEffect(() => {
+    if (masterRef.current) masterRef.current.gain.value = volume;
+  }, [volume]);
+
+  useEffect(() => () => stopAll(), []);
+
+  const sortedByPlays = (Object.keys(SOUND_INFO) as SoundType[]).sort(
+    (a, b) => (playCount[b] ?? 0) - (playCount[a] ?? 0)
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Info */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Sons para o bebê</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          O bebê começa a ouvir sons por volta da semana 16–18. Sons reproduzidos regularmente durante a gestação são reconhecidos pelo recém-nascido.
+        </p>
+        {currentWeek > 0 && currentWeek < 16 && (
+          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            Na semana {currentWeek}, o bebê ainda não ouve sons externos. A partir da semana 16 o sistema auditivo começa a se desenvolver.
+          </p>
+        )}
+      </div>
+
+      {/* Volume */}
+      <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-5 py-3">
+        <span className="text-sm text-muted-foreground">🔉 Volume</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={volume}
+          onChange={(e) => setVolume(Number(e.target.value))}
+          className="flex-1"
+        />
+        <span className="w-10 text-right text-xs text-muted-foreground">{Math.round(volume * 100)}%</span>
+      </div>
+
+      {/* Sound cards */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {sortedByPlays.map((type) => {
+          const info = SOUND_INFO[type];
+          const isPlaying = playing === type;
+          const unlocked = currentWeek === 0 || currentWeek >= info.minWeek;
+          const count = playCount[type] ?? 0;
+          return (
+            <button
+              key={type}
+              onClick={() => unlocked && play(type)}
+              className={`rounded-2xl border p-5 text-left transition-all ${
+                isPlaying
+                  ? "border-primary bg-primary/10 shadow-md"
+                  : unlocked
+                  ? "border-border bg-card hover:border-primary/40"
+                  : "border-border bg-secondary/40 opacity-60"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{info.icon}</span>
+                    <p className="text-sm font-medium">{info.label}</p>
+                    {isPlaying && (
+                      <span className="flex gap-0.5">
+                        {[1, 2, 3].map((i) => (
+                          <span
+                            key={i}
+                            className="inline-block h-3 w-1 animate-bounce rounded-full bg-primary"
+                            style={{ animationDelay: `${i * 0.15}s` }}
+                          />
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{info.description}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  {!unlocked && (
+                    <span className="text-xs text-muted-foreground">Sem. {info.minWeek}</span>
+                  )}
+                  {count > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">{count}× tocado</p>
+                  )}
+                </div>
+              </div>
+              {isPlaying && (
+                <p className="mt-3 text-xs font-medium text-primary">▶ Tocando — clique para pausar</p>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Most played */}
+      {Object.values(playCount).some((v) => v > 0) && (
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="font-serif text-lg">Sons favoritos do seu bebê</p>
+          <div className="mt-4 space-y-2">
+            {sortedByPlays.filter((t) => (playCount[t] ?? 0) > 0).map((t) => (
+              <div key={t} className="flex items-center gap-3">
+                <span className="text-xl">{SOUND_INFO[t].icon}</span>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span>{SOUND_INFO[t].label}</span>
+                    <span className="text-muted-foreground">{playCount[t]}×</span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{
+                        width: `${Math.round(((playCount[t] ?? 0) / Math.max(...Object.values(playCount).map(v => v ?? 0))) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Anote os sons favoritos — o bebê pode reconhecê-los após o nascimento 🌟</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Exercícios por Trimestre (Feature #19) ---------- */
+
+type Exercise = {
+  id: string;
+  title: string;
+  category: string;
+  duration: string;
+  benefit: string;
+  description: string;
+  steps: string[];
+  trimester: number[];
+  minWeek: number;
+  maxWeek?: number;
+  safetyLevel: "verde" | "amarelo";
+  caution?: string;
+  youtubeSearch: string;
+};
+
+const EXERCISES: Exercise[] = [
+  {
+    id: "kegel",
+    title: "Exercícios de Kegel",
+    category: "Assoalho Pélvico",
+    duration: "10 min",
+    benefit: "Fortalece o assoalho pélvico, reduz risco de incontinência e facilita o parto",
+    description: "Contrações do assoalho pélvico — o exercício mais recomendado durante toda a gestação.",
+    steps: [
+      "Sente-se ou deite-se confortavelmente",
+      "Identifique os músculos do assoalho pélvico (como se fosse segurar a urina)",
+      "Contraia por 5 segundos, relaxe por 5 segundos",
+      "Repita 10 vezes por série",
+      "Faça 3 séries ao longo do dia",
+    ],
+    trimester: [1, 2, 3],
+    minWeek: 4,
+    safetyLevel: "verde",
+    youtubeSearch: "exercício kegel gestação como fazer",
+  },
+  {
+    id: "agachamento",
+    title: "Agachamento com apoio",
+    category: "Fortalecimento",
+    duration: "15 min",
+    benefit: "Fortalece pernas e quadril, abre a pelve para o parto",
+    description: "Agachamento parcial apoiado na parede — excelente para preparar o corpo para o parto.",
+    steps: [
+      "Fique de costas para a parede, pés afastados na largura dos ombros",
+      "Deslize as costas pela parede até os joelhos formarem ~90°",
+      "Segure por 10–30 segundos",
+      "Suba devagar contraindo os glúteos",
+      "Repita 5–8 vezes",
+    ],
+    trimester: [1, 2, 3],
+    minWeek: 8,
+    safetyLevel: "verde",
+    caution: "Interrompa se sentir dor pélvica ou pressão excessiva",
+    youtubeSearch: "agachamento gestante seguro exercício",
+  },
+  {
+    id: "respiracao-diafragmatica",
+    title: "Respiração diafragmática",
+    category: "Respiração",
+    duration: "10 min",
+    benefit: "Reduz ansiedade, melhora oxigenação e prepara para o parto",
+    description: "Técnica de respiração profunda que acalma o sistema nervoso e aumenta a oxigenação.",
+    steps: [
+      "Sente-se confortavelmente com uma mão na barriga",
+      "Inspire pelo nariz contando até 4, sentindo a barriga subir",
+      "Segure por 2 segundos",
+      "Expire lentamente pela boca contando até 6",
+      "Repita por 10 ciclos, 2× ao dia",
+    ],
+    trimester: [1, 2, 3],
+    minWeek: 4,
+    safetyLevel: "verde",
+    youtubeSearch: "respiração diafragmática gestantes técnica",
+  },
+  {
+    id: "caminhada",
+    title: "Caminhada moderada",
+    category: "Cardio",
+    duration: "20–30 min",
+    benefit: "Melhora circulação, controla peso, reduz inchaço e melhora humor",
+    description: "A caminhada é o exercício mais seguro e recomendado durante toda a gestação.",
+    steps: [
+      "Use tênis com boa sustentação",
+      "Comece com 10 min e aumente gradualmente",
+      "Mantenha ritmo confortável — você deve conseguir conversar",
+      "Hidrate-se bem antes, durante e depois",
+      "Evite horários muito quentes (prefira manhã cedo ou fim de tarde)",
+    ],
+    trimester: [1, 2, 3],
+    minWeek: 4,
+    safetyLevel: "verde",
+    caution: "Reduza a intensidade e distância no 3º trimestre conforme o conforto",
+    youtubeSearch: "caminhada gestante benefícios dicas segurança",
+  },
+  {
+    id: "gato-vaca",
+    title: "Gato e Vaca (Cat-Cow)",
+    category: "Yoga",
+    duration: "10 min",
+    benefit: "Alivia dor lombar, melhora postura e mobiliza a coluna vertebral",
+    description: "Movimento clássico de yoga — excelente para aliviar as dores lombares comuns na gestação.",
+    steps: [
+      "Ajoelhe-se em 4 apoios (mãos e joelhos)",
+      "Inspire: arqueie as costas para baixo, levante a cabeça (posição vaca)",
+      "Expire: redonde as costas para cima, abaixe a cabeça (posição gato)",
+      "Repita 10–15 vezes de forma fluida e suave",
+      "Mantenha os movimentos lentos e controlados",
+    ],
+    trimester: [1, 2, 3],
+    minWeek: 8,
+    safetyLevel: "verde",
+    youtubeSearch: "yoga gestante gato vaca lombar alívio",
+  },
+  {
+    id: "alongamento-pescoco",
+    title: "Alongamento de pescoço e ombros",
+    category: "Alongamento",
+    duration: "8 min",
+    benefit: "Alivia tensão cervical e cefaleias comuns no 1º trimestre",
+    description: "Alongamentos suaves para aliviar a tensão acumulada na região cervical.",
+    steps: [
+      "Sente-se ereto numa cadeira sem encostar na coluna",
+      "Incline a cabeça lateralmente devagar, orelha ao ombro",
+      "Segure 20–30 segundos de cada lado",
+      "Gire o pescoço suavemente em semicírculos (NUNCA círculo completo)",
+      "Encolha e abaixe os ombros, solte. Repita 5 vezes.",
+    ],
+    trimester: [1, 2, 3],
+    minWeek: 4,
+    safetyLevel: "verde",
+    youtubeSearch: "alongamento pescoço ombros gestante tensão cervical",
+  },
+  {
+    id: "borboleta",
+    title: "Postura da borboleta",
+    category: "Yoga",
+    duration: "10 min",
+    benefit: "Abre o quadril, flexibiliza a virilha e prepara para o parto",
+    description: "Sentada com as plantas dos pés juntas — abre o quadril progressivamente.",
+    steps: [
+      "Sente-se no chão com as costas apoiadas na parede",
+      "Junte as plantas dos pés, deixando os joelhos caírem para os lados",
+      "Segure os pés com as mãos",
+      "Mantenha a posição por 1–3 minutos respirando profundamente",
+      "Opcionalmente, mova os joelhos levemente para cima e para baixo (\"asa de borboleta\")",
+    ],
+    trimester: [1, 2, 3],
+    minWeek: 10,
+    safetyLevel: "verde",
+    caution: "Não force além do conforto — respeite os limites do seu corpo",
+    youtubeSearch: "postura borboleta gestante yoga quadril",
+  },
+  {
+    id: "hidroginastica",
+    title: "Hidroginástica gestacional",
+    category: "Cardio",
+    duration: "30–45 min",
+    benefit: "Baixo impacto, alivia inchaço e dores articulares, melhora circulação",
+    description: "A água reduz o impacto sobre as articulações — ideal especialmente no 3º trimestre.",
+    steps: [
+      "Procure uma turma específica para gestantes",
+      "Use roupa de banho confortável e óculos de natação",
+      "Comunicique à professora sua semana gestacional",
+      "Prefira piscinas aquecidas (evite frio extremo)",
+      "Hidrate-se mesmo dentro d'água",
+    ],
+    trimester: [2, 3],
+    minWeek: 14,
+    safetyLevel: "verde",
+    youtubeSearch: "hidroginástica gestante benefícios exercícios água",
+  },
+  {
+    id: "yoga-3t",
+    title: "Yoga para o 3º trimestre",
+    category: "Yoga",
+    duration: "20 min",
+    benefit: "Prepara corpo e mente para o parto, alivia desconfortos do final da gestação",
+    description: "Sequência de yoga adaptada para o 3º trimestre com foco em abertura de quadril e relaxamento.",
+    steps: [
+      "Postura do guerreiro modificada: apoie a mão na parede",
+      "Postura da pomba: com apoios, abre quadril profundamente",
+      "Postura da criança adaptada: abre joelhos para a barriga",
+      "Savasana lateral: deite-se de lado com travesseiros de suporte",
+      "Mantenha cada posição por 1–3 minutos",
+    ],
+    trimester: [3],
+    minWeek: 28,
+    safetyLevel: "verde",
+    youtubeSearch: "yoga terceiro trimestre gestante preparação parto",
+  },
+];
+
+const EXERCISE_CATEGORIES = [...new Set(EXERCISES.map((e) => e.category))];
+
+function ExerciciosTab({ gest }: { gest: Gest }) {
+  const currentWeek = gest?.weeks ?? 0;
+  const currentTrimester = gest ? trimesterForWeek(gest.weeks) : null;
+  const [catFilter, setCatFilter] = useState<string>("todos");
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const available = EXERCISES.filter((ex) => {
+    const weekOk = currentWeek === 0 || (currentWeek >= ex.minWeek && (!ex.maxWeek || currentWeek <= ex.maxWeek));
+    const trimOk = currentTrimester === null || ex.trimester.includes(currentTrimester);
+    const catOk = catFilter === "todos" || ex.category === catFilter;
+    return catOk && weekOk && trimOk;
+  });
+
+  const locked = EXERCISES.filter((ex) => {
+    const weekOk = currentWeek > 0 && (currentWeek < ex.minWeek || (ex.maxWeek && currentWeek > ex.maxWeek));
+    const catOk = catFilter === "todos" || ex.category === catFilter;
+    return catOk && weekOk;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Exercícios para gestantes</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {currentTrimester
+            ? `Exercícios liberados para o ${currentTrimester}º trimestre (semana ${currentWeek}).`
+            : "Configure sua gestação em Perfil para ver os exercícios recomendados para sua semana."}
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          ⚠️ Consulte seu médico antes de iniciar qualquer atividade física na gestação.
+        </p>
+      </div>
+
+      {/* Category filter */}
+      <div className="flex flex-wrap gap-2">
+        {["todos", ...EXERCISE_CATEGORIES].map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setCatFilter(cat)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              catFilter === cat ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"
+            }`}
+          >
+            {cat === "todos" ? "Todos" : cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Exercise list */}
+      {available.length === 0 && locked.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-8">Nenhum exercício encontrado para este filtro.</p>
+      ) : (
+        <div className="space-y-3">
+          {available.map((ex) => (
+            <div key={ex.id} className="rounded-2xl border border-border bg-card overflow-hidden">
+              <button
+                onClick={() => setExpanded(expanded === ex.id ? null : ex.id)}
+                className="flex w-full items-start justify-between gap-3 p-5 text-left"
+              >
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">{ex.title}</p>
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${ex.safetyLevel === "verde" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                      {ex.safetyLevel === "verde" ? "✓ Liberado" : "⚠ Consulte médico"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{ex.category} · {ex.duration} · {ex.benefit}</p>
+                </div>
+                <span className="text-muted-foreground">{expanded === ex.id ? "▲" : "▼"}</span>
+              </button>
+
+              {expanded === ex.id && (
+                <div className="border-t border-border px-5 pb-5">
+                  <p className="mt-4 text-sm text-muted-foreground">{ex.description}</p>
+                  {ex.caution && (
+                    <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">{ex.caution}</p>
+                  )}
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Como fazer</p>
+                    <ol className="mt-2 space-y-1.5">
+                      {ex.steps.map((step, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                  <a
+                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.youtubeSearch)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:bg-secondary"
+                  >
+                    ▶ Ver vídeos no YouTube
+                  </a>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {locked.length > 0 && (
+            <details className="rounded-2xl border border-dashed border-border p-4">
+              <summary className="cursor-pointer text-xs text-muted-foreground">
+                {locked.length} exercício(s) não disponíveis para sua semana atual
+              </summary>
+              <div className="mt-3 space-y-2">
+                {locked.map((ex) => (
+                  <div key={ex.id} className="flex items-center justify-between rounded-xl bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+                    <span>{ex.title}</span>
+                    <span>A partir da semana {ex.minWeek}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Quartinho (Feature #29) ---------- */
+
+type QuartinhoItem = {
+  id: string;
+  category: string;
+  label: string;
+  priority: "essencial" | "recomendado" | "opcional";
+  weekSuggested: number;
+  searchQuery: string;
+};
+
+const QUARTO_ITEMS: QuartinhoItem[] = [
+  // Sono
+  { id: "qb-bercinho", category: "Sono", label: "Berço ou mini berço", priority: "essencial", weekSuggested: 25, searchQuery: "berço bebê" },
+  { id: "qb-colchao", category: "Sono", label: "Colchão firminho para berço", priority: "essencial", weekSuggested: 25, searchQuery: "colchão berço bebê" },
+  { id: "qb-protetor", category: "Sono", label: "Protetor de berço respirável", priority: "recomendado", weekSuggested: 28, searchQuery: "protetor berço respirável" },
+  { id: "qb-mosquiteiro", category: "Sono", label: "Mosquiteiro para berço", priority: "recomendado", weekSuggested: 30, searchQuery: "mosquiteiro berço bebê" },
+  { id: "qb-baba", category: "Sono", label: "Babá eletrônica / monitor de bebê", priority: "recomendado", weekSuggested: 32, searchQuery: "babá eletrônica monitor bebê" },
+  { id: "qb-cortina", category: "Sono", label: "Cortina blackout", priority: "recomendado", weekSuggested: 30, searchQuery: "cortina blackout quarto bebê" },
+  // Troca
+  { id: "qb-trocador", category: "Troca", label: "Trocador com proteção lateral", priority: "essencial", weekSuggested: 28, searchQuery: "trocador bebê" },
+  { id: "qb-fraldas-rn", category: "Troca", label: "Fraldas descartáveis RN e P", priority: "essencial", weekSuggested: 34, searchQuery: "fralda descartável recém-nascido" },
+  { id: "qb-toalhinhas", category: "Troca", label: "Toalhinhas umedecidas sem álcool", priority: "essencial", weekSuggested: 34, searchQuery: "toalhinhas umedecidas bebê sem álcool" },
+  { id: "qb-pomada", category: "Troca", label: "Pomada para assadura", priority: "essencial", weekSuggested: 34, searchQuery: "pomada assadura bebê" },
+  { id: "qb-termometro", category: "Troca", label: "Termômetro digital axilar", priority: "essencial", weekSuggested: 32, searchQuery: "termômetro digital bebê" },
+  // Banho
+  { id: "qb-banheira", category: "Banho", label: "Banheira plástica com suporte", priority: "essencial", weekSuggested: 28, searchQuery: "banheira bebê plástica" },
+  { id: "qb-sabonete", category: "Banho", label: "Sabonete líquido neutro para bebê", priority: "essencial", weekSuggested: 34, searchQuery: "sabonete líquido neutro bebê" },
+  { id: "qb-shampoo", category: "Banho", label: "Shampoo para bebê sem lágrimas", priority: "essencial", weekSuggested: 34, searchQuery: "shampoo bebê sem lágrimas" },
+  { id: "qb-toalha", category: "Banho", label: "Toalhas com capuz (mín. 3)", priority: "essencial", weekSuggested: 32, searchQuery: "toalha capuz bebê" },
+  { id: "qb-algodao", category: "Banho", label: "Algodão hidrófilo e cotonete bebê", priority: "essencial", weekSuggested: 34, searchQuery: "algodão hidrófilo bebê cotonete" },
+  // Alimentação
+  { id: "qb-almofada", category: "Alimentação", label: "Almofada de amamentação", priority: "essencial", weekSuggested: 30, searchQuery: "almofada amamentação" },
+  { id: "qb-bomba", category: "Alimentação", label: "Bomba de leite (manual ou elétrica)", priority: "recomendado", weekSuggested: 32, searchQuery: "bomba de leite materno" },
+  { id: "qb-mamadeiras", category: "Alimentação", label: "Mamadeiras anticolica (caso necessário)", priority: "opcional", weekSuggested: 35, searchQuery: "mamadeira anticólica bebê" },
+  { id: "qb-creme", category: "Alimentação", label: "Lanolina para mamilos", priority: "recomendado", weekSuggested: 34, searchQuery: "lanolina mamilo amamentação" },
+  // Transporte
+  { id: "qb-carrinho", category: "Transporte", label: "Carrinho de bebê", priority: "essencial", weekSuggested: 28, searchQuery: "carrinho de bebê" },
+  { id: "qb-bebe-conforto", category: "Transporte", label: "Bebê conforto (obrigatório por lei)", priority: "essencial", weekSuggested: 26, searchQuery: "bebê conforto cadeirinha carro" },
+  { id: "qb-sling", category: "Transporte", label: "Sling ou canguru ergonômico", priority: "recomendado", weekSuggested: 30, searchQuery: "sling ergonômico bebê" },
+  // Segurança e conforto
+  { id: "qb-aspirador", category: "Saúde", label: "Aspirador nasal", priority: "essencial", weekSuggested: 35, searchQuery: "aspirador nasal bebê" },
+  { id: "qb-cortador-unhas", category: "Saúde", label: "Kit manicure para bebê", priority: "essencial", weekSuggested: 35, searchQuery: "kit manicure cortador unhas bebê" },
+  { id: "qb-cadeira", category: "Conforto", label: "Cadeira de amamentação/poltrona", priority: "recomendado", weekSuggested: 30, searchQuery: "cadeira amamentação poltrona" },
+  { id: "qb-humidificador", category: "Conforto", label: "Umidificador de ar", priority: "opcional", weekSuggested: 32, searchQuery: "umidificador ar quarto bebê" },
+];
+
+const PRIORITY_STYLE: Record<QuartinhoItem["priority"], { badge: string; label: string }> = {
+  essencial: { badge: "bg-rose-100 text-rose-700", label: "Essencial" },
+  recomendado: { badge: "bg-amber-100 text-amber-700", label: "Recomendado" },
+  opcional: { badge: "bg-sky-100 text-sky-700", label: "Opcional" },
+};
+
+const QUARTO_CATEGORIES = [...new Set(QUARTO_ITEMS.map((i) => i.category))];
+
+function QuartinhoTab({ gest }: { gest: Gest }) {
+  const [checked, setChecked] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("quartinho_checked") ?? "[]")); } catch { return new Set(); }
+  });
+  const [catFilter, setCatFilter] = useState<string>("todos");
+  const [priorityFilter, setPriorityFilter] = useState<string>("todos");
+  const currentWeek = gest?.weeks ?? 0;
+
+  function toggle(id: string) {
+    const next = new Set(checked);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setChecked(next);
+    localStorage.setItem("quartinho_checked", JSON.stringify([...next]));
+  }
+
+  const filtered = QUARTO_ITEMS.filter((item) => {
+    const catOk = catFilter === "todos" || item.category === catFilter;
+    const prioOk = priorityFilter === "todos" || item.priority === priorityFilter;
+    return catOk && prioOk;
+  });
+
+  const essentialItems = QUARTO_ITEMS.filter((i) => i.priority === "essencial");
+  const doneEssential = essentialItems.filter((i) => checked.has(i.id)).length;
+  const totalChecked = QUARTO_ITEMS.filter((i) => checked.has(i.id)).length;
+  const completionPct = Math.round((totalChecked / QUARTO_ITEMS.length) * 100);
+
+  // Items to focus this week
+  const upcoming = currentWeek > 0
+    ? QUARTO_ITEMS.filter((i) => !checked.has(i.id) && i.weekSuggested <= currentWeek + 4 && i.weekSuggested >= currentWeek - 1)
+        .sort((a, b) => a.weekSuggested - b.weekSuggested)
+        .slice(0, 5)
+    : [];
+
+  return (
+    <div className="space-y-6">
+      {/* Progress */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-serif text-lg">Preparação do quartinho</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {doneEssential}/{essentialItems.length} itens essenciais adquiridos · {totalChecked}/{QUARTO_ITEMS.length} total
+            </p>
+          </div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-primary/20 text-sm font-bold text-primary">
+            {completionPct}%
+          </div>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${completionPct}%` }} />
+        </div>
+      </div>
+
+      {/* Upcoming this week */}
+      {upcoming.length > 0 && (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-sm font-semibold text-amber-800">⏰ Comprar nas próximas semanas</p>
+          <div className="mt-3 space-y-2">
+            {upcoming.map((item) => (
+              <div key={item.id} className="flex items-center justify-between text-xs text-amber-700">
+                <span>{item.label}</span>
+                <span>Sem. {item.weekSuggested}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {["todos", ...QUARTO_CATEGORIES].map((c) => (
+            <button key={c} onClick={() => setCatFilter(c)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${catFilter === c ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"}`}>
+              {c === "todos" ? "Todas as categorias" : c}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {["todos", "essencial", "recomendado", "opcional"].map((p) => (
+            <button key={p} onClick={() => setPriorityFilter(p)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${priorityFilter === p ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"}`}>
+              {p === "todos" ? "Todas as prioridades" : p.charAt(0).toUpperCase() + p.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Items grouped by category */}
+      {QUARTO_CATEGORIES.filter((cat) => catFilter === "todos" || catFilter === cat).map((cat) => {
+        const items = filtered.filter((i) => i.category === cat);
+        if (items.length === 0) return null;
+        const doneCat = items.filter((i) => checked.has(i.id)).length;
+        return (
+          <div key={cat} className="rounded-3xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <p className="font-medium">{cat}</p>
+              <span className="text-xs text-muted-foreground">{doneCat}/{items.length}</span>
+            </div>
+            <div className="divide-y divide-border">
+              {items.map((item) => {
+                const isChecked = checked.has(item.id);
+                const pStyle = PRIORITY_STYLE[item.priority];
+                const isTimely = currentWeek > 0 && Math.abs(item.weekSuggested - currentWeek) <= 3;
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center gap-3 px-5 py-3.5 ${isChecked ? "bg-secondary/30" : ""}`}
+                  >
+                    <button
+                      onClick={() => toggle(item.id)}
+                      className={`h-5 w-5 shrink-0 rounded border-2 transition-colors ${isChecked ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground"}`}
+                    >
+                      {isChecked && <span className="flex items-center justify-center text-xs">✓</span>}
+                    </button>
+                    <div className="flex-1">
+                      <p className={`text-sm ${isChecked ? "line-through text-muted-foreground" : ""}`}>{item.label}</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${pStyle.badge}`}>{pStyle.label}</span>
+                        {currentWeek > 0 && (
+                          <span className={`rounded-full px-2 py-0.5 text-xs ${isTimely ? "bg-amber-100 text-amber-700" : "bg-secondary text-muted-foreground"}`}>
+                            Sem. {item.weekSuggested}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <a
+                      href={`https://www.amazon.com.br/s?k=${encodeURIComponent(item.searchQuery)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-full border border-border p-1.5 text-xs text-muted-foreground hover:bg-secondary"
+                      title="Buscar na Amazon"
+                    >
+                      🛒
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
