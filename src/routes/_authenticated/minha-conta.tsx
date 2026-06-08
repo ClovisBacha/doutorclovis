@@ -16,6 +16,11 @@ import {
   getMyPreConsultas,
   type PreConsultaForm,
 } from "@/lib/preconsulta.functions";
+import {
+  getMyTeleconsultas,
+  savePatientNotes,
+  type TeleconsultaSession,
+} from "@/lib/teleconsulta.functions";
 
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
@@ -70,16 +75,20 @@ type Gest = ReturnType<typeof computeGestation>;
 const TABS = [
   "Bebê",
   "Calendário",
+  "Linha do Tempo",
   "Diário",
+  "Humor",
   "Chutes",
   "Contrações",
   "Saúde",
   "Nutrição",
+  "Meditações",
   "Alertas",
   "Pré-consulta",
   "Perguntas",
   "Checklist",
   "Consultas",
+  "Teleconsulta",
   "Acompanhante",
   "Carteirinha",
   "Chat IA",
@@ -190,16 +199,20 @@ function MinhaContaPage() {
       <div className="mt-8">
         {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
         {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
+        {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
         {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
+        {tab === "Humor" && <HumorTab />}
         {tab === "Chutes" && <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />}
         {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
         {tab === "Saúde" && <HealthTab gest={gest} profile={profile} />}
         {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
+        {tab === "Meditações" && <MeditacoesTab gest={gest} />}
         {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
         {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
         {tab === "Perguntas" && <QuestionsTab gest={gest} />}
         {tab === "Checklist" && <ChecklistTab gest={gest} />}
         {tab === "Consultas" && <ConsultasTab />}
+        {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
         {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
         {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
         {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
@@ -3144,6 +3157,783 @@ function ConsultasTab() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Linha do Tempo (Feature #12) ---------- */
+
+type TimelineEvent = {
+  id: string;
+  date: string;
+  type: "saude" | "diario" | "consulta" | "chutes" | "preconsulta" | "marco";
+  title: string;
+  detail?: string;
+  badge?: string;
+};
+
+const EV_STYLE: Record<TimelineEvent["type"], { dot: string; badge: string }> = {
+  saude: { dot: "bg-sky-400", badge: "bg-sky-100 text-sky-700" },
+  diario: { dot: "bg-violet-400", badge: "bg-violet-100 text-violet-700" },
+  consulta: { dot: "bg-emerald-400", badge: "bg-emerald-100 text-emerald-700" },
+  chutes: { dot: "bg-amber-400", badge: "bg-amber-100 text-amber-700" },
+  preconsulta: { dot: "bg-rose-400", badge: "bg-rose-100 text-rose-700" },
+  marco: { dot: "bg-primary", badge: "bg-primary/10 text-primary" },
+};
+
+const EV_LABEL: Record<TimelineEvent["type"], string> = {
+  saude: "Saúde",
+  diario: "Diário",
+  consulta: "Consulta",
+  chutes: "Chutes",
+  preconsulta: "Pré-consulta",
+  marco: "Marco",
+};
+
+function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<TimelineEvent["type"] | "todos">("todos");
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function load() {
+    setLoading(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+
+    const [logsRes, journalRes, consultRes, kicksRes, preRes] = await Promise.all([
+      (supabase as any).from("health_logs").select("id, log_date, weight_kg, systolic, diastolic").eq("user_id", u.user.id).order("log_date", { ascending: false }),
+      (supabase as any).from("journal_entries").select("id, entry_date, mood, content").eq("user_id", u.user.id).order("entry_date", { ascending: false }),
+      (supabase as any).from("consultation_notes").select("id, recorded_at, title, orientacoes").eq("user_id", u.user.id).order("recorded_at", { ascending: false }),
+      (supabase as any).from("kick_sessions").select("id, started_at, kick_count").eq("user_id", u.user.id).not("ended_at", "is", null).order("started_at", { ascending: false }),
+      (supabase as any).from("preconsulta_forms").select("id, submitted_at, weeks_at_submission, emotional_state").eq("user_id", u.user.id).order("submitted_at", { ascending: false }),
+    ]);
+
+    const all: TimelineEvent[] = [];
+
+    for (const r of logsRes.data ?? []) {
+      const parts = [];
+      if (r.weight_kg) parts.push(`Peso: ${r.weight_kg} kg`);
+      if (r.systolic && r.diastolic) parts.push(`PA: ${r.systolic}/${r.diastolic}`);
+      all.push({ id: r.id, date: r.log_date, type: "saude", title: "Registro de saúde", detail: parts.join(" · ") || undefined });
+    }
+    for (const r of journalRes.data ?? []) {
+      all.push({ id: r.id, date: r.entry_date, type: "diario", title: `Diário ${r.mood ?? ""}`.trim(), detail: r.content?.slice(0, 100) + (r.content?.length > 100 ? "..." : "") });
+    }
+    for (const r of consultRes.data ?? []) {
+      all.push({ id: r.id, date: r.recorded_at?.slice(0, 10), type: "consulta", title: r.title ?? "Consulta", detail: r.orientacoes?.split("\n")?.[0] });
+    }
+    for (const r of kicksRes.data ?? []) {
+      all.push({ id: r.id, date: r.started_at?.slice(0, 10), type: "chutes", title: `${r.kick_count ?? 0} chutes registrados` });
+    }
+    for (const r of preRes.data ?? []) {
+      all.push({ id: r.id, date: r.submitted_at?.slice(0, 10), type: "preconsulta", title: `Pré-consulta — semana ${r.weeks_at_submission ?? "?"}`, detail: r.emotional_state ? `Humor: ${r.emotional_state}` : undefined });
+    }
+
+    // Gestational milestones already passed
+    if (gest) {
+      const { PRENATAL_MILESTONES } = await import("./minha-conta").catch(() => ({ PRENATAL_MILESTONES: [] as any[] }));
+      // Use hardcoded milestones since we can't import from same file
+    }
+
+    all.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+    setEvents(all);
+    setLoading(false);
+  }
+
+  const filtered = filter === "todos" ? events : events.filter((e) => e.type === filter);
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Sua jornada pré-natal</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Todos os seus registros numa linha do tempo cronológica.
+        </p>
+
+        {/* Filter chips */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(["todos", "saude", "diario", "consulta", "chutes", "preconsulta"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                filter === f ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"
+              }`}
+            >
+              {f === "todos" ? "Todos" : EV_LABEL[f]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="text-center text-sm text-muted-foreground">Carregando...</p>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border p-10 text-center">
+          <p className="text-muted-foreground">Nenhum registro ainda. Comece usando as outras abas!</p>
+        </div>
+      ) : (
+        <div className="relative ml-4">
+          {/* Vertical line */}
+          <div className="absolute left-3 top-0 h-full w-px bg-border" />
+
+          <div className="space-y-4">
+            {filtered.map((ev) => {
+              const s = EV_STYLE[ev.type];
+              return (
+                <div key={ev.id} className="relative flex gap-4 pl-10">
+                  {/* Dot */}
+                  <div className={`absolute left-0 top-4 h-6 w-6 rounded-full border-2 border-background ${s.dot} flex items-center justify-center`} />
+
+                  <div className="flex-1 rounded-2xl border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium">{ev.title}</p>
+                        {ev.detail && <p className="mt-0.5 text-xs text-muted-foreground">{ev.detail}</p>}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${s.badge}`}>{EV_LABEL[ev.type]}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {ev.date ? new Date(ev.date + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Humor (Feature #18) ---------- */
+
+const MOOD_VALUE: Record<string, number> = {
+  "🥰": 5,
+  "😊": 4,
+  "😴": 3,
+  "🤢": 2,
+  "😢": 1,
+  "😰": 1,
+};
+
+const MOOD_LABEL: Record<string, string> = {
+  "🥰": "Muito bem",
+  "😊": "Bem",
+  "😴": "Cansada",
+  "🤢": "Mal-estar",
+  "😢": "Triste",
+  "😰": "Ansiosa",
+};
+
+const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+const MOOD_SUGGESTIONS: Record<number, string[]> = {
+  5: ["Que semana maravilhosa! Anote o que trouxe tanta alegria para se lembrar depois.", "Compartilhe sua energia com quem você ama."],
+  4: ["Você está indo muito bem! Uma caminhada leve pode ampliar ainda mais essa sensação.", "Pratique gratidão escrevendo 3 coisas boas do dia."],
+  3: ["O cansaço é parte normal da gestação. Descanse sem culpa e peça ajuda quando precisar.", "Hidrate-se bem e tente dormir mais cedo esta semana."],
+  2: ["Dias difíceis passam. Gentileza consigo mesma é o melhor remédio.", "Gengibre, torradas secas e pequenas refeições frequentes podem ajudar no mal-estar."],
+  1: ["Seus sentimentos são válidos. Se a tristeza ou ansiedade persistir, conversar com o Dr. Clóvis pode ajudar.", "Técnicas de respiração profunda e meditação guiada (aba Meditações) podem aliviar a ansiedade."],
+};
+
+function HumorTab() {
+  const [entries, setEntries] = useState<{ entry_date: string; mood: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("journal_entries")
+        .select("entry_date, mood")
+        .order("entry_date", { ascending: false })
+        .limit(180);
+      setEntries(data ?? []);
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) return <p className="text-center text-sm text-muted-foreground py-10">Carregando...</p>;
+
+  if (entries.length === 0)
+    return (
+      <div className="rounded-3xl border border-dashed border-border p-10 text-center">
+        <p className="font-serif text-xl">Nenhum registro ainda</p>
+        <p className="mt-2 text-sm text-muted-foreground">Use a aba <strong>Diário</strong> para registrar seu humor diariamente e ver as análises aqui.</p>
+      </div>
+    );
+
+  // Last 8 weeks of data for chart
+  const today = new Date();
+  const weeks: { label: string; avg: number | null }[] = [];
+  for (let w = 7; w >= 0; w--) {
+    const weekEnd = new Date(today);
+    weekEnd.setDate(today.getDate() - w * 7);
+    const weekStart = new Date(weekEnd);
+    weekStart.setDate(weekEnd.getDate() - 6);
+    const label = `${weekStart.getDate()}/${weekStart.getMonth() + 1}`;
+    const inWeek = entries.filter((e) => {
+      const d = new Date(e.entry_date + "T00:00:00");
+      return d >= weekStart && d <= weekEnd;
+    });
+    const vals = inWeek.map((e) => MOOD_VALUE[e.mood ?? ""] ?? 3).filter(Boolean);
+    weeks.push({ label, avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null });
+  }
+
+  // Day-of-week averages
+  const dayMap: Record<number, number[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+  entries.forEach((e) => {
+    const d = new Date(e.entry_date + "T00:00:00");
+    const v = MOOD_VALUE[e.mood ?? ""];
+    if (v) dayMap[d.getDay()].push(v);
+  });
+  const dayAvg = Array.from({ length: 7 }, (_, i) => {
+    const vals = dayMap[i];
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  });
+
+  // Overall trend
+  const recent = entries.slice(0, 14);
+  const recentAvg = recent.map((e) => MOOD_VALUE[e.mood ?? ""] ?? 3);
+  const overallAvg = recentAvg.length ? Math.round(recentAvg.reduce((a, b) => a + b, 0) / recentAvg.length) : 3;
+  const suggestions = MOOD_SUGGESTIONS[Math.min(5, Math.max(1, overallAvg))] ?? MOOD_SUGGESTIONS[3];
+
+  const bestDay = dayAvg.reduce((best, v, i) => (v !== null && (best === -1 || v > (dayAvg[best] ?? 0)) ? i : best), -1);
+  const hardDay = dayAvg.reduce((hard, v, i) => (v !== null && (hard === -1 || v < (dayAvg[hard] ?? 6)) ? i : hard), -1);
+
+  // SVG chart dimensions
+  const W = 340, H = 100, pad = 10;
+  const chartW = W - pad * 2;
+  const chartH = H - pad * 2;
+  const points = weeks.map((w, i) => ({
+    x: pad + (i / (weeks.length - 1)) * chartW,
+    y: w.avg !== null ? pad + chartH - ((w.avg - 1) / 4) * chartH : null,
+    avg: w.avg,
+    label: w.label,
+  }));
+  const polyline = points.filter((p) => p.y !== null).map((p) => `${p.x},${p.y}`).join(" ");
+
+  // Mood frequency
+  const moodCount: Record<string, number> = {};
+  entries.forEach((e) => { if (e.mood) moodCount[e.mood] = (moodCount[e.mood] ?? 0) + 1; });
+  const topMoods = Object.entries(moodCount).sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+  return (
+    <div className="space-y-6">
+      {/* Summary */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Resumo dos últimos 14 dias</p>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-2xl bg-secondary/50 p-3 text-center">
+            <p className="text-2xl">{Object.entries(MOOD_VALUE).find(([, v]) => v === Math.round(overallAvg))?.[0] ?? "😊"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Humor médio</p>
+          </div>
+          <div className="rounded-2xl bg-secondary/50 p-3 text-center">
+            <p className="text-lg font-bold text-primary">{entries.length}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Registros totais</p>
+          </div>
+          {bestDay >= 0 && (
+            <div className="rounded-2xl bg-emerald-50 p-3 text-center">
+              <p className="text-lg font-bold text-emerald-600">{DAY_NAMES[bestDay]}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Melhor dia da semana</p>
+            </div>
+          )}
+          {hardDay >= 0 && hardDay !== bestDay && (
+            <div className="rounded-2xl bg-amber-50 p-3 text-center">
+              <p className="text-lg font-bold text-amber-600">{DAY_NAMES[hardDay]}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Dia mais difícil</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Weekly mood chart */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Humor por semana</p>
+        <p className="text-xs text-muted-foreground mt-1">Média semanal das últimas 8 semanas (1=muito ruim · 5=ótimo)</p>
+        <div className="mt-4 overflow-x-auto">
+          <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full max-w-sm">
+            {/* Grid lines */}
+            {[1, 2, 3, 4, 5].map((v) => {
+              const y = pad + chartH - ((v - 1) / 4) * chartH;
+              return <line key={v} x1={pad} y1={y} x2={W - pad} y2={y} stroke="currentColor" strokeOpacity={0.08} strokeWidth={1} />;
+            })}
+            {/* Polyline */}
+            {polyline && <polyline points={polyline} fill="none" stroke="hsl(var(--primary))" strokeWidth={2} strokeLinejoin="round" />}
+            {/* Data points */}
+            {points.map((p, i) => p.y !== null && (
+              <g key={i}>
+                <circle cx={p.x} cy={p.y!} r={4} fill="hsl(var(--primary))" />
+                <text x={p.x} y={H + 18} textAnchor="middle" fontSize={8} fill="currentColor" opacity={0.5}>{p.label}</text>
+              </g>
+            ))}
+          </svg>
+        </div>
+      </div>
+
+      {/* Day of week heatmap */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Padrão por dia da semana</p>
+        <div className="mt-4 flex gap-2">
+          {DAY_NAMES.map((name, i) => {
+            const avg = dayAvg[i];
+            const val = avg !== null ? Math.round(avg) : null;
+            const colors = ["", "bg-rose-200", "bg-orange-200", "bg-amber-100", "bg-emerald-100", "bg-emerald-300"];
+            return (
+              <div key={name} className="flex flex-1 flex-col items-center gap-1.5">
+                <div className={`h-10 w-full rounded-lg ${val !== null ? colors[val] : "bg-secondary"} flex items-center justify-center`}>
+                  {val !== null ? (
+                    <span className="text-lg">{Object.entries(MOOD_VALUE).find(([, v]) => v === val)?.[0] ?? "😐"}</span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">{name}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Top moods */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Seus humores mais frequentes</p>
+        <div className="mt-4 space-y-2">
+          {topMoods.map(([emoji, count]) => (
+            <div key={emoji} className="flex items-center gap-3">
+              <span className="text-2xl">{emoji}</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span>{MOOD_LABEL[emoji] ?? emoji}</span>
+                  <span className="text-muted-foreground">{count}×</span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((count / entries.length) * 100)}%` }} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Personalized suggestions */}
+      <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
+        <p className="font-serif text-lg">Sugestões personalizadas</p>
+        <ul className="mt-3 space-y-2">
+          {suggestions.map((s, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm">
+              <span className="mt-0.5 text-primary">✦</span>
+              {s}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Meditações Guiadas (Feature #17) ---------- */
+
+type Meditation = {
+  id: string;
+  title: string;
+  duration: string;
+  topic: string;
+  trimester: 1 | 2 | 3 | 0;
+  script: string;
+};
+
+const MEDITATIONS: Meditation[] = [
+  {
+    id: "nausea",
+    title: "Alívio das náuseas",
+    duration: "5 min",
+    topic: "Bem-estar físico",
+    trimester: 1,
+    script: `Encontre uma posição confortável, de preferência sentada com as costas apoiadas. Feche os olhos suavemente. Comece a respirar fundo pelo nariz, devagar. Inspire... e expire... Inspire contando até quatro... e expire contando até seis... Sinta seu corpo relaxar a cada expiração. Agora visualize uma cor calmante — pode ser azul suave, verde menta, ou qualquer cor que traga paz para você. Imagine essa cor preenchendo seu corpo de cima para baixo, como uma luz gentil. Enquanto respira, sinta sua digestão se acalmando. Seu corpo é sábio. Ele cuida de você e do seu bebê a cada momento. A náusea é um sinal de que sua gestação está saudável — mas agora você escolhe dar ao seu corpo um momento de descanso. Continue respirando devagar... Inspire pelo nariz... Expire pela boca, soltando a tensão... Visualize sua barriga se aquecendo com uma luz dourada e protetora. Você e seu bebê estão seguros e bem. Permaneça nesse estado de quietude por mais alguns instantes. Quando estiver pronta, abra os olhos lentamente.`,
+  },
+  {
+    id: "ansiedade-inicial",
+    title: "Acalmando a ansiedade",
+    duration: "6 min",
+    topic: "Saúde mental",
+    trimester: 1,
+    script: `Sente-se ou deite-se confortavelmente. Feche os olhos. Coloque uma mão sobre o coração e a outra sobre a barriga. Respire fundo... Sinta o movimento suave das suas mãos. Você está aqui. Você está presente. Comece a respiração em quatro tempos: inspire pelo nariz enquanto conta 1... 2... 3... 4... Segure suavemente: 1... 2... 3... 4... Expire pela boca: 1... 2... 3... 4... 5... 6... Repita esse ciclo mais três vezes. Enquanto você respira, reconheça que a ansiedade é uma forma de amor — é seu corpo tentando proteger você e seu bebê. Mas você é capaz. As gerações de mulheres que vieram antes de você carregaram seus filhos com amor e saíram fortes pelo outro lado. Você também vai. Visualize um lugar seguro — pode ser uma praia, um jardim, o sofá da sua casa. Esteja completamente nesse lugar. Sinta a textura, ouça os sons, perceba o cheiro. Você está segura. Seu bebê está seguro. Continue respirando... Lentamente, devagar. Permita que essa sensação de calma se espalhe por todo o seu corpo. Quando estiver pronta, abra os olhos, piscando devagar.`,
+  },
+  {
+    id: "conexao-bebe",
+    title: "Conexão com o bebê",
+    duration: "7 min",
+    topic: "Vínculo materno",
+    trimester: 2,
+    script: `Deite-se de lado, com um travesseiro entre os joelhos, na posição mais confortável possível. Feche os olhos. Coloque as duas mãos sobre a barriga com carinho. Respire fundo e, na expiração, imagine que seu amor vai diretamente para o seu bebê — como uma onda de calor que o envolve. Neste momento, pense no nome que você escolheu, ou simplesmente pense: meu bebê. Seu bebê já te ouve. Já sente a temperatura da sua voz. Sente seus movimentos. Diga baixinho — ou apenas pense: Eu te amo. Estou aqui com você. Você é muito esperado. Visualize seu bebê quentinho e confortável dentro de você. Pequeno, mas completo. Perfeito a cada dia. Sinta os batimentos do seu próprio coração... e imagine o coraçãozinho do seu bebê batendo no mesmo ritmo. Dois corações. Uma só história. Permaneça nessa conexão por quantos momentos quiser. Não existe pressa. Você tem tudo que seu bebê precisa agora mesmo. Quando estiver pronta, agradeça ao seu corpo por este momento. Abra os olhos com calma.`,
+  },
+  {
+    id: "dor-lombar",
+    title: "Relaxamento para dor lombar",
+    duration: "8 min",
+    topic: "Bem-estar físico",
+    trimester: 2,
+    script: `Deite-se de costas em uma superfície firme, com os joelhos dobrados e os pés apoiados no chão. Se preferir, coloque um travesseiro embaixo dos joelhos. Feche os olhos. Respire fundo, lentamente. Na inspiração, sinta seu pulmão expandir. Na expiração, sinta seu corpo afundar na superfície, mais pesado, mais relaxado. Comece pelo topo da cabeça. Solte a tensão da testa. Relaxe as sobrancelhas, os olhos, as bochechas, a mandíbula. Desça pelo pescoço... pelos ombros... Sinta os ombros afundarem gentilmente. Agora concentre sua atenção na lombar — a parte baixa das costas. A cada expiração, imagine que a tensão nessa área vai se dissolvendo como açúcar na água. Inspire... expire... Visualize uma luz quente e relaxante envolvendo sua coluna, do sacro até os ombros. Quente, suave, aliviante. Seu corpo carrega um precioso presente. É natural sentir desconforto, mas agora você escolhe dar a ele descanso. Permaneça nessa leveza. Continue respirando. Sinta a gravidade trabalhar por você, liberando peso. Quando quiser, flexione os pés, vire para o lado, e levante-se com cuidado.`,
+  },
+  {
+    id: "insonia",
+    title: "Para dormir melhor",
+    duration: "10 min",
+    topic: "Sono",
+    trimester: 3,
+    script: `Este exercício é para ser feito na cama, na hora de dormir. Deite-se na posição que for mais confortável. Feche os olhos. Deixe o corpo relaxar completamente. Não há mais nada a fazer hoje. Você cuidou de tudo que precisava. Agora é o tempo do descanso. Comece relaxando os pés. Solte os dedos... os arcos plantares... os calcanhares... Suba pelos tornozelos, panturrilhas, joelhos. Sinta as pernas ficarem pesadas e quentes. Continue pelo quadril... pela barriga... Agradeça ao seu bebê por este dia de companhia. Relaxe o peito... os ombros... os braços... as mãos. Solte os dedos das mãos. Sinta-os formigando de relaxamento. Pelo pescoço... pelo rosto inteiro... Respire lento, ritmado. Inspire... quatro tempos... Expire... seis tempos... Imagine que você está flutuando em uma água morna e tranquila. Não há esforço. Só flutuação. A cada onda de pensamento, deixe passar sem segurar. Pensamento? Deixa ir. Preocupação? Amanhã você resolve. Agora só existe o presente momento. Você... seu bebê... este quarto... esta cama... Continuando a respiração lenta e ritmada... Cada expiração te leva mais fundo para o descanso... Mais fundo... Mais tranquila... Permita que o sono venha naturalmente.`,
+  },
+  {
+    id: "preparo-parto",
+    title: "Preparando-se para o parto",
+    duration: "9 min",
+    topic: "Preparo emocional",
+    trimester: 3,
+    script: `Sente-se confortavelmente, com as costas apoiadas e as mãos sobre a barriga. Feche os olhos. Respire fundo... Inspire... e expire... Você está se aproximando de um dos momentos mais poderosos da sua vida. E você está pronta. Nem todo o preparo vem de livros ou cursos — parte dele já está dentro de você, inscrita na sua biologia, no instinto milenar de cada mãe que já existiu antes de você. Comece visualizando o dia do parto como você gostaria que fosse: você está calm, rodeada de pessoas que te apoiam. A cada contração, você respira fundo. A dor é sua aliada — ela te aproxima do seu bebê. Visualize você mesma forte, presente, capaz. Agora pense no momento em que você verá seu bebê pela primeira vez. O peso nos seus braços. O cheiro. Os olhinhos tentando te enxergar. Este momento está se aproximando. E você está mais do que pronta para ele. Respire... Inspire força... Expire medo... Inspire confiança... Expire tensão... Continue por alguns ciclos, no seu ritmo. Lembre: cada contração te traz mais perto. Cada respiração é suporte para o seu bebê. Você foi feita para isso. Quando estiver pronta, abra os olhos com gratidão.`,
+  },
+  {
+    id: "gratidao",
+    title: "Gratidão gestacional",
+    duration: "6 min",
+    topic: "Bem-estar mental",
+    trimester: 0,
+    script: `Encontre uma posição confortável. Feche os olhos. Coloque as mãos sobre o coração. Comece respirando lentamente. Inspire... e expire... Neste momento, pense em três coisas pelas quais você é grata hoje. Podem ser pequenas: o sol entrando pela janela, uma mensagem de alguém que você ama, um momento de quietude. Sinta essa gratidão no peito — como um calor agradável que se expande. Agora pense no seu bebê. Ele está aí, crescendo, se desenvolvendo, se preparando para te conhecer. Que milagre silencioso acontece dentro de você a cada momento. Agradeça ao seu corpo pelo trabalho incansável que realiza. Agradeça ao seu coração, aos seus pulmões, aos seus rins, à sua placenta. Tudo funciona em harmonia para proteger a vida que você carrega. Você não precisa fazer tudo perfeito. Você só precisa estar presente. E você está. Respire essa gratidão... Deixe ela preencher cada célula. Quando estiver pronta, abra os olhos com um sorriso gentil.`,
+  },
+];
+
+const TOPICS = [...new Set(MEDITATIONS.map((m) => m.topic))];
+
+function MeditacoesTab({ gest }: { gest: Gest }) {
+  const currentTrimester = gest ? trimesterForWeek(gest.weeks) : null;
+  const [selected, setSelected] = useState<Meditation | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [rate, setRate] = useState(0.9);
+  const [topicFilter, setTopicFilter] = useState<string>("todos");
+  const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [breathPhase, setBreathPhase] = useState<"inhale" | "hold" | "exhale" | null>(null);
+  const breathRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function startBreathing() {
+    let phase: "inhale" | "hold" | "exhale" = "inhale";
+    const durations = { inhale: 4000, hold: 4000, exhale: 6000 };
+    setBreathPhase("inhale");
+    breathRef.current = setInterval(() => {
+      if (phase === "inhale") { phase = "hold"; setBreathPhase("hold"); }
+      else if (phase === "hold") { phase = "exhale"; setBreathPhase("exhale"); }
+      else { phase = "inhale"; setBreathPhase("inhale"); }
+    }, durations[phase]);
+  }
+
+  function stopBreathing() {
+    if (breathRef.current) clearInterval(breathRef.current);
+    setBreathPhase(null);
+  }
+
+  function speak(med: Meditation) {
+    if (!("speechSynthesis" in window)) {
+      alert("Seu navegador não suporta síntese de voz. Use Chrome ou Edge para a melhor experiência.");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(med.script);
+    utter.lang = "pt-BR";
+    utter.rate = rate;
+    utter.pitch = 0.95;
+    const voices = window.speechSynthesis.getVoices();
+    const ptVoice = voices.find((v) => v.lang.startsWith("pt")) || null;
+    if (ptVoice) utter.voice = ptVoice;
+    utter.onend = () => { setPlaying(false); stopBreathing(); };
+    utterRef.current = utter;
+    window.speechSynthesis.speak(utter);
+    setPlaying(true);
+    startBreathing();
+  }
+
+  function togglePlay() {
+    if (!selected) return;
+    if (playing) {
+      window.speechSynthesis.pause();
+      setPlaying(false);
+      stopBreathing();
+    } else if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      setPlaying(true);
+      startBreathing();
+    } else {
+      speak(selected);
+    }
+  }
+
+  function stop() {
+    window.speechSynthesis.cancel();
+    setPlaying(false);
+    stopBreathing();
+  }
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis?.cancel();
+      if (breathRef.current) clearInterval(breathRef.current);
+    };
+  }, []);
+
+  const filtered = MEDITATIONS.filter((m) => {
+    const matchesTopic = topicFilter === "todos" || m.topic === topicFilter;
+    return matchesTopic;
+  });
+
+  const breathLabel = { inhale: "Inspire...", hold: "Segure...", exhale: "Expire..." };
+  const breathScale = { inhale: "scale-125", hold: "scale-125", exhale: "scale-75" };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Meditações Guiadas</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Sessões de meditação narradas por voz, específicas para cada fase da gestação.
+          {currentTrimester && ` No ${currentTrimester}º trimestre, recomendamos as meditações destacadas.`}
+        </p>
+        {!("speechSynthesis" in window) && (
+          <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            Use Chrome, Edge ou Safari para narração em voz. Outros navegadores podem não suportar.
+          </p>
+        )}
+      </div>
+
+      {/* Topic filter */}
+      <div className="flex flex-wrap gap-2">
+        {["todos", ...TOPICS].map((t) => (
+          <button
+            key={t}
+            onClick={() => setTopicFilter(t)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              topicFilter === t ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"
+            }`}
+          >
+            {t === "todos" ? "Todos os temas" : t}
+          </button>
+        ))}
+      </div>
+
+      {/* Player */}
+      {selected && (
+        <div className="rounded-3xl border-2 border-primary/30 bg-primary/5 p-6">
+          <p className="font-serif text-xl">{selected.title}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{selected.topic} · {selected.duration}</p>
+
+          {/* Breathing animation */}
+          {breathPhase && (
+            <div className="my-6 flex flex-col items-center gap-3">
+              <div className={`h-20 w-20 rounded-full bg-primary/30 transition-transform duration-[4000ms] ease-in-out ${breathScale[breathPhase]}`} />
+              <p className="text-sm font-medium text-primary animate-pulse">{breathLabel[breathPhase]}</p>
+            </div>
+          )}
+
+          {/* Controls */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              onClick={togglePlay}
+              className="flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground"
+            >
+              {playing ? "⏸ Pausar" : "▶ Iniciar meditação"}
+            </button>
+            {(playing || window.speechSynthesis?.paused) && (
+              <button onClick={stop} className="rounded-full border border-border px-4 py-2.5 text-sm text-muted-foreground hover:bg-secondary">
+                ⏹ Parar
+              </button>
+            )}
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Velocidade
+              <input
+                type="range"
+                min="0.6"
+                max="1.2"
+                step="0.1"
+                value={rate}
+                onChange={(e) => setRate(Number(e.target.value))}
+                className="w-20"
+              />
+              <span>{rate}×</span>
+            </label>
+          </div>
+
+          {/* Script preview */}
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:underline">Ver script completo</summary>
+            <p className="mt-2 whitespace-pre-wrap rounded-2xl bg-background p-4 text-xs leading-relaxed text-muted-foreground">{selected.script}</p>
+          </details>
+        </div>
+      )}
+
+      {/* Meditation list */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {filtered.map((med) => {
+          const isRecommended = currentTrimester !== null && (med.trimester === 0 || med.trimester === currentTrimester);
+          return (
+            <button
+              key={med.id}
+              onClick={() => { setSelected(med); stop(); }}
+              className={`rounded-2xl border p-4 text-left transition-all hover:border-primary/50 ${
+                selected?.id === med.id ? "border-primary bg-primary/5" : "border-border bg-card"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">{med.title}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{med.topic}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className="text-xs text-muted-foreground">{med.duration}</span>
+                  {isRecommended && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      {med.trimester === 0 ? "Para qualquer trimestre" : `${med.trimester}º trim.`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Teleconsulta (Feature #13) ---------- */
+
+function TeleconsultaTab({ profile }: { profile: Profile | null }) {
+  const [sessions, setSessions] = useState<TeleconsultaSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeSession, setActiveSession] = useState<TeleconsultaSession | null>(null);
+  const [notes, setNotes] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase.auth.getSession();
+    const tk = data.session?.access_token ?? "";
+    const res = await getMyTeleconsultas({ data: { accessToken: tk } });
+    if (res.ok) setSessions(res.sessions);
+    setLoading(false);
+  }
+
+  async function saveNotes(id: string) {
+    setSavingNotes(true);
+    const { data } = await supabase.auth.getSession();
+    const tk = data.session?.access_token ?? "";
+    await savePatientNotes({ data: { accessToken: tk, id, notes } });
+    setSavingNotes(false);
+    setSessions((prev) => prev.map((s) => s.id === id ? { ...s, patient_notes: notes } : s));
+  }
+
+  const STATUS_LABEL_TC: Record<string, string> = {
+    agendada: "Agendada",
+    sala_aberta: "Sala aberta",
+    encerrada: "Encerrada",
+  };
+  const STATUS_STYLE_TC: Record<string, string> = {
+    agendada: "bg-amber-100 text-amber-700",
+    sala_aberta: "bg-emerald-100 text-emerald-700",
+    encerrada: "bg-secondary text-muted-foreground",
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Info card */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Teleconsulta</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Quando o Dr. Clóvis abrir uma sala, você poderá entrar diretamente pelo portal — sem instalar nada.
+        </p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Para solicitar uma teleconsulta, entre em contato pelo WhatsApp ou pelo formulário de <strong>Agendamento</strong>.
+        </p>
+      </div>
+
+      {loading ? (
+        <p className="text-center text-sm text-muted-foreground">Carregando...</p>
+      ) : sessions.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border p-10 text-center">
+          <p className="text-muted-foreground">Nenhuma teleconsulta agendada no momento.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {sessions.map((s) => (
+            <div key={s.id} className="rounded-3xl border border-border bg-card p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">
+                    {s.scheduled_for
+                      ? new Date(s.scheduled_for).toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" })
+                      : "Horário a definir"}
+                  </p>
+                  {s.doctor_notes && <p className="mt-1 text-sm text-muted-foreground">{s.doctor_notes}</p>}
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLE_TC[s.status]}`}>
+                  {STATUS_LABEL_TC[s.status]}
+                </span>
+              </div>
+
+              {s.status === "sala_aberta" && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => setActiveSession(activeSession?.id === s.id ? null : s)}
+                    className="flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    🎥 {activeSession?.id === s.id ? "Fechar sala" : "Entrar na sala"}
+                  </button>
+                </div>
+              )}
+
+              {/* Jitsi embed */}
+              {activeSession?.id === s.id && s.status === "sala_aberta" && (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-border">
+                  <iframe
+                    src={`https://meet.jit.si/drclovis-${s.room_name}#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinPageEnabled=true&userInfo.displayName=${encodeURIComponent(profile?.display_name ?? "Paciente")}`}
+                    allow="camera; microphone; fullscreen; display-capture"
+                    className="h-[480px] w-full"
+                    title="Teleconsulta"
+                  />
+                </div>
+              )}
+
+              {/* Patient notes */}
+              <div className="mt-4 border-t border-border pt-4">
+                <p className="text-xs font-medium text-muted-foreground">Suas anotações da consulta</p>
+                <textarea
+                  value={s.id === activeSession?.id ? notes : (s.patient_notes ?? "")}
+                  onChange={(e) => setNotes(e.target.value)}
+                  onFocus={() => { setActiveSession(s); setNotes(s.patient_notes ?? ""); }}
+                  rows={2}
+                  placeholder="Anote dúvidas antes ou orientações recebidas durante a consulta..."
+                  className="mt-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                />
+                {activeSession?.id === s.id && (
+                  <button
+                    onClick={() => saveNotes(s.id)}
+                    disabled={savingNotes}
+                    className="mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-60"
+                  >
+                    {savingNotes ? "Salvando..." : "Salvar anotações"}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

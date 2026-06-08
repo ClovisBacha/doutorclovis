@@ -15,6 +15,12 @@ import {
   type PatientEngagement,
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
+import {
+  getTeleconsultasAdmin,
+  createTeleconsulta,
+  updateTeleconsultaStatus,
+  type TeleconsultaSession,
+} from "@/lib/teleconsulta.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({ meta: [{ title: "Painel do médico — Dr. Clóvis Bacha" }] }),
@@ -34,7 +40,7 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: "bg-rose-100 text-rose-700",
 };
 
-const PANEL_TABS = ["Agendamentos", "Perguntas", "Pré-consultas", "Engajamento"] as const;
+const PANEL_TABS = ["Agendamentos", "Perguntas", "Pré-consultas", "Teleconsultas", "Engajamento"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 
 async function token() {
@@ -49,6 +55,7 @@ function PainelPage() {
   const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [preForms, setPreForms] = useState<AdminPreConsulta[]>([]);
+  const [teleconsultas, setTeleconsultas] = useState<TeleconsultaSession[]>([]);
   const [engagement, setEngagement] = useState<{
     totalPatients: number;
     activeLastWeek: number;
@@ -83,6 +90,12 @@ function PainelPage() {
     if (res.ok) setPreForms(res.forms);
   }
 
+  async function loadTeleconsultas() {
+    const tk = await token();
+    const res = await getTeleconsultasAdmin({ data: { accessToken: tk } });
+    if (res.ok) setTeleconsultas(res.sessions);
+  }
+
   useEffect(() => {
     load();
   }, []);
@@ -91,6 +104,7 @@ function PainelPage() {
     if (!allowed) return;
     if (tab === "Engajamento" && !engagement) loadEngagement();
     if (tab === "Pré-consultas") loadPreForms();
+    if (tab === "Teleconsultas") loadTeleconsultas();
   }, [tab, allowed]);
 
   async function changeStatus(id: string, status: AdminAppointment["status"]) {
@@ -170,6 +184,11 @@ function PainelPage() {
                 {unseenForms}
               </span>
             )}
+            {t === "Teleconsultas" && teleconsultas.filter((s) => s.status === "sala_aberta").length > 0 && (
+              <span className="ml-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-xs font-bold text-white">
+                {teleconsultas.filter((s) => s.status === "sala_aberta").length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -186,6 +205,14 @@ function PainelPage() {
         )}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
+        )}
+        {tab === "Teleconsultas" && (
+          <TeleconsultasSection
+            sessions={teleconsultas}
+            onRefresh={loadTeleconsultas}
+            tokenFn={token}
+            patients={engagement?.patients ?? []}
+          />
         )}
         {tab === "Engajamento" && (
           <EngagementSection engagement={engagement} onRefresh={loadEngagement} tokenFn={token} />
@@ -735,6 +762,190 @@ function InfoBox({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl bg-secondary/60 p-3">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-medium">{value}</p>
+    </div>
+  );
+}
+
+/* ---------- Teleconsultas ---------- */
+
+function TeleconsultasSection({
+  sessions,
+  onRefresh,
+  tokenFn,
+  patients,
+}: {
+  sessions: TeleconsultaSession[];
+  onRefresh: () => void;
+  tokenFn: () => Promise<string>;
+  patients: import("@/lib/admin.functions").PatientEngagement[];
+}) {
+  const [form, setForm] = useState({ patientUserId: "", scheduledFor: "", doctorNotes: "" });
+  const [creating, setCreating] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+
+  const STATUS_LABEL_TC: Record<string, string> = {
+    agendada: "Agendada",
+    sala_aberta: "Sala aberta",
+    encerrada: "Encerrada",
+  };
+  const STATUS_STYLE_TC: Record<string, string> = {
+    agendada: "bg-amber-100 text-amber-700",
+    sala_aberta: "bg-emerald-100 text-emerald-700",
+    encerrada: "bg-secondary text-muted-foreground",
+  };
+
+  async function openRoom(id: string) {
+    const tk = await tokenFn();
+    await updateTeleconsultaStatus({ data: { accessToken: tk, id, status: "sala_aberta" } });
+    onRefresh();
+  }
+
+  async function closeRoom(id: string) {
+    const tk = await tokenFn();
+    await updateTeleconsultaStatus({ data: { accessToken: tk, id, status: "encerrada" } });
+    onRefresh();
+  }
+
+  async function create() {
+    if (!form.patientUserId) return;
+    setCreating(true);
+    const tk = await tokenFn();
+    await createTeleconsulta({
+      data: {
+        accessToken: tk,
+        patientUserId: form.patientUserId,
+        scheduledFor: form.scheduledFor || null,
+        doctorNotes: form.doctorNotes || null,
+      },
+    });
+    setCreating(false);
+    setShowForm(false);
+    setForm({ patientUserId: "", scheduledFor: "", doctorNotes: "" });
+    onRefresh();
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-serif text-2xl">Teleconsultas</p>
+          <p className="mt-1 text-sm text-muted-foreground">Gerencie salas de teleconsulta e abra a sala para as pacientes entrarem.</p>
+        </div>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground"
+        >
+          + Agendar
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+          <p className="font-serif text-lg">Nova teleconsulta</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Paciente</label>
+              <select
+                value={form.patientUserId}
+                onChange={(e) => setForm((f) => ({ ...f, patientUserId: e.target.value }))}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Selecione a paciente...</option>
+                {patients.map((p) => (
+                  <option key={p.userId} value={p.userId}>{p.displayName ?? p.email ?? p.userId}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Data e hora</label>
+              <input
+                type="datetime-local"
+                value={form.scheduledFor}
+                onChange={(e) => setForm((f) => ({ ...f, scheduledFor: e.target.value }))}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observações para a paciente</label>
+            <input
+              type="text"
+              value={form.doctorNotes}
+              onChange={(e) => setForm((f) => ({ ...f, doctorNotes: e.target.value }))}
+              placeholder="Ex: Trazer resultados dos últimos exames"
+              className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            onClick={create}
+            disabled={creating || !form.patientUserId}
+            className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          >
+            {creating ? "Criando..." : "Criar teleconsulta"}
+          </button>
+        </div>
+      )}
+
+      {sessions.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border p-10 text-center">
+          <p className="text-muted-foreground">Nenhuma teleconsulta cadastrada ainda.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {sessions.map((s) => (
+            <div key={s.id} className="rounded-3xl border border-border bg-card p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{s.patient_name ?? "Paciente"}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {s.scheduled_for
+                      ? new Date(s.scheduled_for).toLocaleString("pt-BR", { dateStyle: "long", timeStyle: "short" })
+                      : "Horário a definir"}
+                  </p>
+                  {s.doctor_notes && <p className="mt-1 text-xs text-muted-foreground">{s.doctor_notes}</p>}
+                  {s.patient_notes && (
+                    <p className="mt-2 rounded-xl bg-secondary/50 px-3 py-2 text-xs italic text-muted-foreground">
+                      Notas da paciente: {s.patient_notes}
+                    </p>
+                  )}
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLE_TC[s.status]}`}>
+                  {STATUS_LABEL_TC[s.status]}
+                </span>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {s.status === "agendada" && (
+                  <button
+                    onClick={() => openRoom(s.id)}
+                    className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+                  >
+                    🟢 Abrir sala agora
+                  </button>
+                )}
+                {s.status === "sala_aberta" && (
+                  <>
+                    <a
+                      href={`https://meet.jit.si/drclovis-${s.room_name}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+                    >
+                      🎥 Entrar na sala
+                    </a>
+                    <button
+                      onClick={() => closeRoom(s.id)}
+                      className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:bg-secondary"
+                    >
+                      Encerrar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
