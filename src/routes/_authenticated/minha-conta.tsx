@@ -39,6 +39,26 @@ import {
   savePanicEvent,
   type CourseProgress,
 } from "@/lib/escola.functions";
+import {
+  savePpdScreening,
+  getMyPpdScreenings,
+  startBreastfeeding,
+  endBreastfeeding,
+  getBreastfeedingLogs,
+  setMilestone,
+  getMilestones,
+  removeMilestone,
+  addBabyWeight,
+  getBabyWeights,
+  markVaccineGiven,
+  getBabyVaccines,
+  removeVaccine,
+  type PpdScreening,
+  type BreastfeedingLog,
+  type BabyMilestone,
+  type BabyWeight,
+  type BabyVaccine,
+} from "@/lib/postpartum.functions";
 
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
@@ -66,6 +86,7 @@ type Profile = {
   height_cm?: number | null;
   pre_pregnancy_weight_kg?: number | null;
   medications?: string | null;
+  birth_date?: string | null;
 };
 
 type JournalEntry = {
@@ -106,6 +127,7 @@ const TABS = [
   "Sons",
   "Exercícios",
   "Quartinho",
+  "Clima",
   "Alertas",
   "Pré-consulta",
   "Perguntas",
@@ -120,6 +142,7 @@ const TABS = [
   "FAQ",
   "Pânico",
   "Carteirinha",
+  "Pós-parto",
   "Chat IA",
   "Perfil",
 ] as const;
@@ -240,6 +263,7 @@ function MinhaContaPage() {
         {tab === "Sons" && <SonsBebêTab gest={gest} />}
         {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
         {tab === "Quartinho" && <QuartinhoTab gest={gest} />}
+        {tab === "Clima" && <ClimaTab gest={gest} />}
         {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
         {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
         {tab === "Perguntas" && <QuestionsTab gest={gest} />}
@@ -254,6 +278,7 @@ function MinhaContaPage() {
         {tab === "FAQ" && <FAQTab gest={gest} />}
         {tab === "Pânico" && <PânicoTab profile={profile} />}
         {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
+        {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
         {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
         {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
       </div>
@@ -896,6 +921,7 @@ function ProfileTab({
     height_cm: profile?.height_cm?.toString() ?? "",
     pre_pregnancy_weight_kg: profile?.pre_pregnancy_weight_kg?.toString() ?? "",
     medications: profile?.medications ?? "",
+    birth_date: profile?.birth_date ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -934,6 +960,7 @@ function ProfileTab({
       height_cm: form.height_cm ? Number(form.height_cm) : null,
       pre_pregnancy_weight_kg: form.pre_pregnancy_weight_kg ? Number(form.pre_pregnancy_weight_kg) : null,
       medications: form.medications || null,
+      birth_date: form.birth_date || null,
       updated_at: new Date().toISOString(),
     };
     const { data, error } = await (supabase as any)
@@ -1059,6 +1086,21 @@ function ProfileTab({
             label="Telefone de emergência"
             value={form.emergency_phone}
             onChange={(v) => setForm({ ...form, emergency_phone: v })}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Pós-parto</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Preencha após o nascimento do bebê para ativar o Portal Pós-parto.
+        </p>
+        <div className="mt-4">
+          <Field
+            label="Data de nascimento do bebê"
+            type="date"
+            value={form.birth_date}
+            onChange={(v) => setForm({ ...form, birth_date: v })}
           />
         </div>
       </div>
@@ -6329,6 +6371,1094 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
         O botão registra sua localização GPS e alerta seu acompanhante designado.
         Configure o contato de emergência em <strong>Perfil</strong>.
       </p>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Feature 45 — Clima & Qualidade do Ar
+───────────────────────────────────────────────────────────────────────────── */
+
+type WeatherData = {
+  temp: number;
+  apparentTemp: number;
+  humidity: number;
+  weatherCode: number;
+  aqi: number | null;
+  pm25: number | null;
+};
+
+function weatherEmoji(code: number): string {
+  if (code === 0) return "☀️";
+  if (code <= 3) return "🌤️";
+  if (code <= 48) return "🌫️";
+  if (code <= 67) return "🌧️";
+  if (code <= 77) return "❄️";
+  if (code <= 82) return "🌦️";
+  if (code <= 99) return "⛈️";
+  return "🌡️";
+}
+
+function weatherDesc(code: number): string {
+  if (code === 0) return "Céu limpo";
+  if (code <= 3) return "Parcialmente nublado";
+  if (code <= 48) return "Névoa / Nevoeiro";
+  if (code <= 57) return "Chuviscos";
+  if (code <= 67) return "Chuva";
+  if (code <= 77) return "Neve";
+  if (code <= 82) return "Pancadas de chuva";
+  return "Tempestade";
+}
+
+function aqiLabel(aqi: number): { label: string; color: string } {
+  if (aqi <= 20) return { label: "Ótima", color: "text-green-600" };
+  if (aqi <= 40) return { label: "Boa", color: "text-lime-600" };
+  if (aqi <= 60) return { label: "Moderada", color: "text-amber-600" };
+  if (aqi <= 80) return { label: "Ruim", color: "text-orange-600" };
+  return { label: "Muito ruim", color: "text-red-600" };
+}
+
+function ClimaTab({ gest }: { gest: Gest }) {
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  async function fetchWeather() {
+    setLoading(true);
+    setError(null);
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+      );
+      const { latitude: lat, longitude: lon } = pos.coords;
+
+      const [wx, aq] = await Promise.all([
+        fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code&timezone=auto`
+        ).then((r) => r.json()),
+        fetch(
+          `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=european_aqi,pm2_5&timezone=auto`
+        ).then((r) => r.json()).catch(() => null),
+      ]);
+
+      setWeather({
+        temp: Math.round(wx.current.temperature_2m),
+        apparentTemp: Math.round(wx.current.apparent_temperature),
+        humidity: Math.round(wx.current.relative_humidity_2m),
+        weatherCode: wx.current.weather_code,
+        aqi: aq?.current?.european_aqi ?? null,
+        pm25: aq?.current?.pm2_5 ?? null,
+      });
+      setLastUpdate(new Date());
+    } catch (e) {
+      setError("Não foi possível obter sua localização. Permita o acesso no navegador e tente novamente.");
+    }
+    setLoading(false);
+  }
+
+  const isHot = weather && weather.temp >= 35;
+  const isVeryHot = weather && weather.temp >= 38;
+  const aqiBad = weather?.aqi != null && weather.aqi > 40;
+  const aqiVeryBad = weather?.aqi != null && weather.aqi > 60;
+  const hasAlert = isHot || aqiBad;
+
+  return (
+    <div className="max-w-xl space-y-6">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-serif text-xl">Clima e qualidade do ar</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Alertas específicos para gestantes
+            </p>
+          </div>
+          {lastUpdate && (
+            <span className="text-xs text-muted-foreground">
+              {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </div>
+
+        {!weather && !loading && (
+          <button
+            onClick={fetchWeather}
+            className="w-full rounded-2xl bg-primary py-3 text-sm font-medium text-white"
+          >
+            📍 Ver condições atuais
+          </button>
+        )}
+
+        {loading && (
+          <div className="py-6 text-center text-muted-foreground text-sm">Obtendo localização...</div>
+        )}
+
+        {error && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-700">
+            {error}
+          </div>
+        )}
+
+        {weather && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-2xl bg-secondary/40 p-4">
+                <p className="text-4xl text-center">{weatherEmoji(weather.weatherCode)}</p>
+                <p className={`mt-2 text-center text-3xl font-bold ${isVeryHot ? "text-red-600" : isHot ? "text-orange-500" : ""}`}>
+                  {weather.temp}°C
+                </p>
+                <p className="text-center text-xs text-muted-foreground mt-0.5">
+                  {weatherDesc(weather.weatherCode)}
+                </p>
+                <p className="text-center text-xs text-muted-foreground">
+                  Sensação: {weather.apparentTemp}°C
+                </p>
+              </div>
+              <div className="rounded-2xl bg-secondary/40 p-4 flex flex-col justify-center gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Umidade</p>
+                  <p className="text-xl font-semibold">{weather.humidity}%</p>
+                </div>
+                {weather.aqi != null && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase">Qualidade do ar</p>
+                    <p className={`text-xl font-semibold ${aqiLabel(weather.aqi).color}`}>
+                      {aqiLabel(weather.aqi).label}
+                    </p>
+                    <p className="text-xs text-muted-foreground">IQA: {weather.aqi}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={fetchWeather}
+              className="mt-3 w-full rounded-xl border border-border py-2 text-xs text-muted-foreground hover:bg-secondary"
+            >
+              Atualizar
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Alerts */}
+      {weather && hasAlert && (
+        <div className="space-y-3">
+          {isVeryHot && (
+            <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-2">
+                ⚠️ Onda de calor — Risco alto para gestantes
+              </p>
+              <ul className="space-y-1.5 text-sm text-red-800">
+                <li>🌡️ Temperatura extrema ({weather.temp}°C) — superaquecimento fetal é perigoso</li>
+                <li>💧 Beba pelo menos 3L de água ao longo do dia</li>
+                <li>❄️ Fique em ambientes refrigerados (ar-condicionado ou ventilador)</li>
+                <li>🚫 Evite sol das 10h às 17h sem necessidade</li>
+                <li>👁️ Procure o médico se sentir tontura, coração acelerado ou parar de urinar</li>
+              </ul>
+            </div>
+          )}
+          {isHot && !isVeryHot && (
+            <div className="rounded-2xl border border-orange-300 bg-orange-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 mb-2">
+                🌡️ Temperatura elevada ({weather.temp}°C)
+              </p>
+              <ul className="space-y-1.5 text-sm text-orange-800">
+                <li>💧 Aumente a ingestão de água — mínimo 2,5L por dia</li>
+                <li>👗 Use roupas leves e frescas (algodão, linho)</li>
+                <li>🕙 Evite sol entre 10h e 16h</li>
+                <li>🧴 Aplique protetor solar FPS 50+ se sair</li>
+                <li>🍋 Aposte em frutas hidratantes: melancia, pepino, laranja</li>
+              </ul>
+            </div>
+          )}
+          {aqiVeryBad && (
+            <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-2">
+                😷 Qualidade do ar muito ruim (IQA: {weather.aqi})
+              </p>
+              <ul className="space-y-1.5 text-sm text-red-800">
+                <li>🏠 FIQUE EM CASA — feche janelas e portas</li>
+                <li>🌬️ Use purificador de ar se disponível</li>
+                <li>🚫 Cancele atividades ao ar livre</li>
+                <li>😮‍💨 Procure o médico se sentir falta de ar, tosse ou dor no peito</li>
+              </ul>
+            </div>
+          )}
+          {aqiBad && !aqiVeryBad && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">
+                😷 Qualidade do ar moderada (IQA: {weather.aqi})
+              </p>
+              <ul className="space-y-1.5 text-sm text-amber-800">
+                <li>🌬️ Limite exercícios físicos intensos ao ar livre</li>
+                <li>🕙 Prefira horários com menor tráfego (manhã cedo ou noite)</li>
+                <li>💧 Mantenha boa hidratação para ajudar as vias aéreas</li>
+                <li>🤧 Se sentir irritação nasal ou tosse persistente, informe ao médico</li>
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {weather && !hasAlert && (
+        <div className="rounded-2xl border border-green-300 bg-green-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-green-700 mb-1">
+            ✅ Condições favoráveis para gestantes
+          </p>
+          <p className="text-sm text-green-800">
+            {weather.temp < 28
+              ? "Temperatura agradável! Ótimo para uma caminhada leve de 20-30 minutos."
+              : "Temperatura amena. Hidrate-se bem e aproveite com moderação."}
+            {weather.aqi != null && weather.aqi <= 20
+              ? " O ar está limpo — excelente para respirar fundo!"
+              : ""}
+          </p>
+        </div>
+      )}
+
+      {!weather && !loading && (
+        <div className="rounded-2xl border border-border bg-secondary/30 p-5 text-sm text-muted-foreground">
+          <p className="font-medium mb-2">Por que isso é importante na gestação?</p>
+          <ul className="space-y-1">
+            <li>🌡️ Calor extremo pode causar desidratação e risco ao feto</li>
+            <li>😷 Poluição do ar está ligada a parto prematuro e baixo peso ao nascer</li>
+            <li>💧 Gestantes precisam de mais hidratação — especialmente no calor</li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Feature 50 — Portal Pós-parto
+───────────────────────────────────────────────────────────────────────────── */
+
+const EPDS_QUESTIONS = [
+  {
+    q: "Tenho sido capaz de rir e ver o lado divertido das coisas",
+    opts: ["Tanto quanto antes", "Não tanto agora", "Definitivamente menos", "Não consigo mais"],
+    reverse: true,
+  },
+  {
+    q: "Tenho aguardado com satisfação as coisas boas que estavam por acontecer",
+    opts: ["Sim, tanto quanto antes", "Um pouco menos que antes", "Definitivamente menos", "Quase nada"],
+    reverse: true,
+  },
+  {
+    q: "Me culpei sem necessidade quando as coisas correram mal",
+    opts: ["Nunca", "Raramente", "Às vezes", "Sim, na maioria das vezes"],
+    reverse: false,
+  },
+  {
+    q: "Tenho estado ansiosa ou preocupada sem motivo",
+    opts: ["Não, de jeito nenhum", "Quase nunca", "Sim, às vezes", "Sim, com muita frequência"],
+    reverse: false,
+  },
+  {
+    q: "Tenho sentido medo ou ficado apavorada sem motivo",
+    opts: ["Não, nunca", "Não muito", "Sim, às vezes", "Sim, bastante"],
+    reverse: false,
+  },
+  {
+    q: "As coisas têm me oprimido",
+    opts: ["Tenho lidado tão bem quanto antes", "Tenho lidado na maioria das vezes", "Às vezes não consigo lidar", "Não tenho conseguido lidar"],
+    reverse: false,
+  },
+  {
+    q: "Tenho me sentido tão infeliz que tenho tido dificuldade em dormir",
+    opts: ["Nunca", "Raramente", "Às vezes", "Sim, na maioria das vezes"],
+    reverse: false,
+  },
+  {
+    q: "Tenho me sentido triste ou muito mal",
+    opts: ["Nunca", "Raramente", "Sim, com bastante frequência", "Sim, na maioria das vezes"],
+    reverse: false,
+  },
+  {
+    q: "Tenho estado tão infeliz que tenho chorado",
+    opts: ["Nunca", "Às vezes", "Sim, com bastante frequência", "Sim, na maioria das vezes"],
+    reverse: false,
+  },
+  {
+    q: "O pensamento de me machucar ocorreu a mim",
+    opts: ["Nunca", "Quase nunca", "Às vezes", "Sim, com bastante frequência"],
+    reverse: false,
+  },
+];
+
+const VACCINE_SCHEDULE = [
+  { key: "bcg", name: "BCG", disease: "Tuberculose", ageLabel: "Ao nascer" },
+  { key: "hepb_0", name: "Hepatite B (1ª)", disease: "Hepatite B", ageLabel: "Ao nascer" },
+  { key: "hepb_1", name: "Hepatite B (2ª)", disease: "Hepatite B", ageLabel: "1 mês" },
+  { key: "penta_1", name: "Pentavalente (1ª)", disease: "DTP + Hib + HepB", ageLabel: "2 meses" },
+  { key: "vip_1", name: "VIP (1ª)", disease: "Poliomielite", ageLabel: "2 meses" },
+  { key: "pneumo_1", name: "Pneumocócica 10v (1ª)", disease: "Pneumococo", ageLabel: "2 meses" },
+  { key: "rota_1", name: "Rotavírus (1ª)", disease: "Rotavírus", ageLabel: "2 meses" },
+  { key: "meningo_1", name: "Meningocócica C (1ª)", disease: "Meningite C", ageLabel: "3 meses" },
+  { key: "penta_2", name: "Pentavalente (2ª)", disease: "DTP + Hib + HepB", ageLabel: "4 meses" },
+  { key: "vip_2", name: "VIP (2ª)", disease: "Poliomielite", ageLabel: "4 meses" },
+  { key: "pneumo_2", name: "Pneumocócica 10v (2ª)", disease: "Pneumococo", ageLabel: "4 meses" },
+  { key: "rota_2", name: "Rotavírus (2ª)", disease: "Rotavírus", ageLabel: "4 meses" },
+  { key: "penta_3", name: "Pentavalente (3ª)", disease: "DTP + Hib + HepB", ageLabel: "6 meses" },
+  { key: "vip_3", name: "VIP (3ª)", disease: "Poliomielite", ageLabel: "6 meses" },
+  { key: "fa_1", name: "Febre Amarela", disease: "Febre Amarela", ageLabel: "9 meses" },
+  { key: "scr_1", name: "Tríplice Viral (1ª)", disease: "Sarampo/Caxumba/Rubéola", ageLabel: "12 meses" },
+  { key: "hepa_1", name: "Hepatite A (1ª)", disease: "Hepatite A", ageLabel: "12 meses" },
+  { key: "meningo_ref", name: "Meningocócica C (reforço)", disease: "Meningite C", ageLabel: "12 meses" },
+  { key: "varicela_1", name: "Varicela (1ª)", disease: "Catapora", ageLabel: "12 meses" },
+  { key: "dtp_ref1", name: "DTP (1º reforço)", disease: "Difteria/Tétano/Coqueluche", ageLabel: "15 meses" },
+  { key: "vop_1", name: "VOP (1ª)", disease: "Poliomielite", ageLabel: "15 meses" },
+  { key: "pneumo_ref", name: "Pneumocócica (reforço)", disease: "Pneumococo", ageLabel: "15 meses" },
+  { key: "scr_2", name: "Tríplice Viral (2ª)", disease: "Sarampo/Caxumba/Rubéola", ageLabel: "15 meses" },
+];
+
+const MILESTONES_DEF = [
+  { key: "primeiro_sorriso", label: "Primeiro sorriso social", emoji: "😊", weekApprox: 6 },
+  { key: "vira_cabeca", label: "Vira a cabeça para sons", emoji: "👂", weekApprox: 8 },
+  { key: "segura_cabeca", label: "Sustenta a cabeça", emoji: "💪", weekApprox: 12 },
+  { key: "rola", label: "Rola sozinho", emoji: "🔄", weekApprox: 16 },
+  { key: "gargalhada", label: "Ri alto / gargalha", emoji: "😂", weekApprox: 16 },
+  { key: "senta", label: "Senta sem apoio", emoji: "🪑", weekApprox: 26 },
+  { key: "first_tooth", label: "Primeiro dente", emoji: "🦷", weekApprox: 26 },
+  { key: "papas", label: "Primeiras papas/alimentos", emoji: "🥣", weekApprox: 26 },
+  { key: "engatinha", label: "Engatinha", emoji: "🐣", weekApprox: 34 },
+  { key: "fica_em_pe", label: "Fica de pé com apoio", emoji: "🧍", weekApprox: 38 },
+  { key: "primeiro_passo", label: "Primeiro passo", emoji: "👣", weekApprox: 52 },
+  { key: "primeira_palavra", label: "Primeira palavra", emoji: "💬", weekApprox: 52 },
+];
+
+function PosPartoTab({ profile }: { profile: Profile | null }) {
+  const [subTab, setSubTab] = useState<"saúde" | "amamentação" | "marcos" | "vacinas" | "retorno">("saúde");
+
+  if (!profile?.birth_date) {
+    return (
+      <div className="max-w-md mx-auto rounded-3xl border border-border bg-card p-8 text-center space-y-4">
+        <p className="text-4xl">🍼</p>
+        <h2 className="font-serif text-xl">Portal Pós-parto</h2>
+        <p className="text-sm text-muted-foreground">
+          Ative o portal após o nascimento do bebê preenchendo a data de nascimento em{" "}
+          <strong>Perfil → Pós-parto</strong>.
+        </p>
+        <div className="rounded-xl bg-secondary/50 p-4 text-left text-sm space-y-1">
+          <p className="font-medium">Recursos disponíveis:</p>
+          <p>🧠 Rastreio de depressão pós-parto (EPDS)</p>
+          <p>🤱 Registro de amamentações</p>
+          <p>⭐ Marcos do bebê</p>
+          <p>💉 Calendário de vacinas</p>
+          <p>📅 Consultas de retorno</p>
+        </div>
+      </div>
+    );
+  }
+
+  const birthDate = new Date(profile.birth_date + "T00:00:00");
+  const babyAgeDays = Math.floor((Date.now() - birthDate.getTime()) / 86400000);
+  const babyAgeWeeks = Math.floor(babyAgeDays / 7);
+  const babyName = profile.baby_name ?? "bebê";
+
+  const subTabs: { key: typeof subTab; label: string }[] = [
+    { key: "saúde", label: "Bem-estar" },
+    { key: "amamentação", label: "Amamentação" },
+    { key: "marcos", label: "Marcos" },
+    { key: "vacinas", label: "Vacinas" },
+    { key: "retorno", label: "Retorno" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5 flex items-center gap-4">
+        <span className="text-4xl">🍼</span>
+        <div>
+          <p className="font-semibold">
+            {babyName} nasceu! {babyAgeWeeks > 0 ? `${babyAgeWeeks} semana${babyAgeWeeks > 1 ? "s" : ""}` : `${babyAgeDays} dia${babyAgeDays !== 1 ? "s" : ""}`} de vida
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Nascimento: {birthDate.toLocaleDateString("pt-BR")}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-b border-border pb-1">
+        {subTabs.map((st) => (
+          <button
+            key={st.key}
+            onClick={() => setSubTab(st.key)}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              subTab === st.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-primary"
+            }`}
+          >
+            {st.label}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "saúde" && <PpdSection babyAgeDays={babyAgeDays} />}
+      {subTab === "amamentação" && <BreastfeedingSection />}
+      {subTab === "marcos" && <MilestonesSection babyAgeWeeks={babyAgeWeeks} babyName={babyName} />}
+      {subTab === "vacinas" && <VaccinesSection birthDate={birthDate} />}
+      {subTab === "retorno" && <RetornoSection birthDate={birthDate} profile={profile} />}
+    </div>
+  );
+}
+
+// ── PPD Section ────────────────────────────────────────────────────────────
+
+function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
+  const [answers, setAnswers] = useState<(number | null)[]>(Array(10).fill(null));
+  const [submitted, setSubmitted] = useState(false);
+  const [score, setScore] = useState<number | null>(null);
+  const [history, setHistory] = useState<PpdScreening[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) { setLoadingHistory(false); return; }
+      const res = await getMyPpdScreenings({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setHistory(res.screenings);
+      setLoadingHistory(false);
+    })();
+  }, []);
+
+  function getScore(ans: (number | null)[]): number {
+    return EPDS_QUESTIONS.reduce((sum, q, i) => {
+      const v = ans[i] ?? 0;
+      return sum + (q.reverse ? 3 - v : v);
+    }, 0);
+  }
+
+  async function handleSubmit() {
+    if (answers.some((a) => a === null)) return;
+    const s = getScore(answers as number[]);
+    setScore(s);
+    setSubmitted(true);
+    const { data: sess } = await supabase.auth.getSession();
+    if (sess.session) {
+      await savePpdScreening({
+        data: { accessToken: sess.session.access_token, score: s, answers: answers as number[] },
+      });
+      const res = await getMyPpdScreenings({ data: { accessToken: sess.session.access_token } });
+      if (res.ok) setHistory(res.screenings);
+    }
+  }
+
+  function scoreColor(s: number) {
+    if (s <= 9) return "text-green-600";
+    if (s <= 12) return "text-amber-600";
+    return "text-red-600";
+  }
+
+  function scoreLabel(s: number) {
+    if (s <= 9) return "Sem indicativo de depressão pós-parto";
+    if (s <= 12) return "Possível depressão leve — monitore e converse com seu médico";
+    return "Indicativo de depressão pós-parto — busque apoio profissional";
+  }
+
+  const lastItem10 = submitted && (answers[9] ?? 0);
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <h3 className="font-semibold mb-1">Rastreio de depressão pós-parto (EPDS)</h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          Escala de Edimburgo — 10 perguntas sobre como você se sentiu nos últimos 7 dias
+        </p>
+
+        {!submitted ? (
+          <div className="space-y-6">
+            {EPDS_QUESTIONS.map((q, qi) => (
+              <div key={qi}>
+                <p className="text-sm font-medium mb-2">{qi + 1}. {q.q}</p>
+                <div className="space-y-1.5">
+                  {q.opts.map((opt, oi) => (
+                    <button
+                      key={oi}
+                      onClick={() => setAnswers((prev) => prev.map((a, i) => i === qi ? oi : a))}
+                      className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${
+                        answers[qi] === oi
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:bg-secondary"
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={handleSubmit}
+              disabled={answers.some((a) => a === null)}
+              className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white disabled:opacity-40"
+            >
+              Ver resultado
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-2xl bg-secondary/40 p-5 text-center">
+              <p className="text-4xl font-bold">
+                <span className={scoreColor(score!)}>{score}</span>
+                <span className="text-xl text-muted-foreground"> / 30</span>
+              </p>
+              <p className={`mt-2 font-medium ${scoreColor(score!)}`}>{scoreLabel(score!)}</p>
+            </div>
+
+            {score! >= 13 && (
+              <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-4">
+                <p className="font-semibold text-red-700 mb-2">Apoio disponível agora:</p>
+                <div className="space-y-2">
+                  <a href="tel:188" className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-sm">
+                    <span className="text-xl">📞</span>
+                    <div>
+                      <p className="font-semibold text-sm">CVV — Centro de Valorização da Vida</p>
+                      <p className="text-lg font-bold text-red-600">188</p>
+                    </div>
+                  </a>
+                </div>
+                <p className="mt-2 text-xs text-red-700">
+                  Informe o Dr. Clóvis sobre seu resultado na próxima consulta.
+                </p>
+              </div>
+            )}
+
+            {lastItem10 !== false && (lastItem10 as number) >= 1 && (
+              <div className="rounded-2xl border-2 border-red-500 bg-red-50 p-4">
+                <p className="font-bold text-red-700">🚨 Resposta à questão 10</p>
+                <p className="text-sm text-red-700 mt-1">
+                  Você indicou ter pensamentos de se machucar. Por favor, ligue imediatamente para o CVV (188) ou vá ao pronto-socorro mais próximo.
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={() => { setAnswers(Array(10).fill(null)); setSubmitted(false); setScore(null); }}
+              className="w-full rounded-xl border border-border py-2.5 text-sm text-muted-foreground hover:bg-secondary"
+            >
+              Refazer o rastreio
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!loadingHistory && history.length > 0 && (
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <h3 className="font-semibold mb-3">Histórico</h3>
+          <div className="space-y-2">
+            {history.map((h) => (
+              <div key={h.id} className="flex items-center justify-between rounded-xl bg-secondary/30 px-4 py-3">
+                <span className="text-sm">{new Date(h.screened_at).toLocaleDateString("pt-BR")}</span>
+                <span className={`font-semibold ${scoreColor(h.score)}`}>{h.score}/30</span>
+                <span className="text-xs text-muted-foreground">{scoreLabel(h.score).split(" — ")[0]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-xs text-muted-foreground">
+        A EPDS é um rastreio, não um diagnóstico. Apenas um profissional de saúde pode diagnosticar depressão pós-parto.
+        O resultado deve ser compartilhado com o Dr. Clóvis.
+        {babyAgeDays < 42 && <span> Recomenda-se repetir o rastreio com 6 semanas após o parto.</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Breastfeeding Section ─────────────────────────────────────────────────
+
+function BreastfeedingSection() {
+  const [logs, setLogs] = useState<BreastfeedingLog[]>([]);
+  const [activeSide, setActiveSide] = useState("esquerdo");
+  const [activeLog, setActiveLog] = useState<string | null>(null);
+  const [activeStart, setActiveStart] = useState<Date | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadLogs();
+  }, []);
+
+  useEffect(() => {
+    if (!activeLog) return;
+    const t = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(t);
+  }, [activeLog]);
+
+  async function loadLogs() {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) { setLoading(false); return; }
+    const res = await getBreastfeedingLogs({ data: { accessToken: s.session.access_token } });
+    if (res.ok) setLogs(res.logs);
+    setLoading(false);
+  }
+
+  async function handleStart() {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    const res = await startBreastfeeding({ data: { accessToken: s.session.access_token, side: activeSide } });
+    if (res.ok && res.id) {
+      setActiveLog(res.id);
+      setActiveStart(new Date());
+      setElapsed(0);
+    }
+  }
+
+  async function handleEnd() {
+    if (!activeLog) return;
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    await endBreastfeeding({ data: { accessToken: s.session.access_token, id: activeLog, notes: notes || null } });
+    setActiveLog(null);
+    setActiveStart(null);
+    setElapsed(0);
+    setNotes("");
+    await loadLogs();
+  }
+
+  const todayLogs = logs.filter((l) => l.started_at.startsWith(new Date().toISOString().slice(0, 10)));
+  const todayCount = todayLogs.length;
+  const todayMinutes = todayLogs.reduce((sum, l) => {
+    if (!l.ended_at) return sum;
+    return sum + Math.round((new Date(l.ended_at).getTime() - new Date(l.started_at).getTime()) / 60000);
+  }, 0);
+
+  return (
+    <div className="max-w-xl space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-border bg-card p-4 text-center">
+          <p className="text-3xl font-bold text-primary">{todayCount}</p>
+          <p className="text-xs text-muted-foreground">mamadas hoje</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-4 text-center">
+          <p className="text-3xl font-bold text-primary">{todayMinutes}</p>
+          <p className="text-xs text-muted-foreground">minutos hoje</p>
+        </div>
+      </div>
+
+      {/* Timer */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <h3 className="font-semibold mb-4">Registrar mamada</h3>
+        {!activeLog ? (
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              {["esquerdo", "direito", "ambos", "mamadeira"].map((side) => (
+                <button
+                  key={side}
+                  onClick={() => setActiveSide(side)}
+                  className={`flex-1 rounded-xl py-2 text-xs font-medium capitalize transition-colors ${
+                    activeSide === side ? "bg-primary text-white" : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  {side === "esquerdo" ? "🤱 Esq." : side === "direito" ? "🤱 Dir." : side === "ambos" ? "🤱 Ambos" : "🍼 Mamadeira"}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleStart}
+              className="w-full rounded-2xl bg-primary py-4 text-base font-semibold text-white"
+            >
+              ▶ Iniciar mamada
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4 text-center">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Em andamento — {activeSide}</p>
+            <p className="text-5xl font-bold tabular-nums text-primary">
+              {String(Math.floor(elapsed / 60)).padStart(2, "0")}:{String(elapsed % 60).padStart(2, "0")}
+            </p>
+            <input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Observação opcional..."
+              className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
+            />
+            <button
+              onClick={handleEnd}
+              className="w-full rounded-2xl bg-secondary py-3 text-sm font-medium text-foreground"
+            >
+              ■ Finalizar mamada
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Recent logs */}
+      {!loading && logs.length > 0 && (
+        <div>
+          <h3 className="font-semibold mb-3">Últimas 7 dias</h3>
+          <div className="space-y-2">
+            {logs.slice(0, 20).map((log) => {
+              const dur = log.ended_at
+                ? Math.round((new Date(log.ended_at).getTime() - new Date(log.started_at).getTime()) / 60000)
+                : null;
+              return (
+                <div key={log.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                  <span className="text-xl">{log.side === "mamadeira" ? "🍼" : "🤱"}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium capitalize">{log.side}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(log.started_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                  {dur != null && (
+                    <span className="text-sm font-semibold text-primary">{dur}min</span>
+                  )}
+                  {!log.ended_at && (
+                    <span className="text-xs text-amber-600 font-medium">em andamento</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Milestones Section ────────────────────────────────────────────────────
+
+function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; babyName: string }) {
+  const [milestones, setMilestones] = useState<BabyMilestone[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState<string | null>(null);
+  const [dateInput, setDateInput] = useState(new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) { setLoading(false); return; }
+      const res = await getMilestones({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setMilestones(res.milestones);
+      setLoading(false);
+    })();
+  }, []);
+
+  function isDone(key: string) {
+    return milestones.some((m) => m.milestone_key === key);
+  }
+
+  async function toggleMilestone(key: string) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    if (isDone(key)) {
+      await removeMilestone({ data: { accessToken: s.session.access_token, milestoneKey: key } });
+      setMilestones((m) => m.filter((x) => x.milestone_key !== key));
+    } else {
+      await setMilestone({
+        data: { accessToken: s.session.access_token, milestoneKey: key, achievedAt: dateInput, notes: null, customLabel: null },
+      });
+      setMilestones((m) => [...m, { id: "", milestone_key: key, custom_label: null, achieved_at: dateInput, notes: null }]);
+    }
+    setMarking(null);
+  }
+
+  const doneMilestones = MILESTONES_DEF.filter((m) => isDone(m.key));
+  const upcoming = MILESTONES_DEF.filter((m) => !isDone(m.key) && m.weekApprox > babyAgeWeeks).slice(0, 3);
+
+  if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+
+  return (
+    <div className="max-w-xl space-y-6">
+      {doneMilestones.length > 0 && (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-3">
+            🎉 {doneMilestones.length} marcos conquistados!
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {doneMilestones.map((m) => (
+              <span key={m.key} className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800">
+                {m.emoji} {m.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div className="rounded-3xl border border-border bg-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+            Em breve para {babyName}
+          </p>
+          <div className="space-y-2">
+            {upcoming.map((m) => (
+              <div key={m.key} className="flex items-center gap-3 text-sm">
+                <span className="text-xl">{m.emoji}</span>
+                <span>{m.label}</span>
+                <span className="ml-auto text-xs text-muted-foreground">~{m.weekApprox}ª semana</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <div className="mb-3 flex items-center gap-3">
+          <h3 className="font-semibold flex-1">Todos os marcos</h3>
+          <input
+            type="date"
+            value={dateInput}
+            onChange={(e) => setDateInput(e.target.value)}
+            className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">Selecione a data e clique para marcar como conquistado</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {MILESTONES_DEF.map((m) => {
+            const done = isDone(m.key);
+            const rec = milestones.find((x) => x.milestone_key === m.key);
+            return (
+              <button
+                key={m.key}
+                onClick={() => toggleMilestone(m.key)}
+                className={`rounded-2xl border p-4 text-left transition-all ${
+                  done ? "border-amber-300 bg-amber-50" : "border-border bg-card hover:border-primary/40"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{m.emoji}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{m.label}</p>
+                    {done && rec && (
+                      <p className="text-xs text-amber-700">
+                        ✅ {new Date(rec.achieved_at + "T00:00:00").toLocaleDateString("pt-BR")}
+                      </p>
+                    )}
+                    {!done && (
+                      <p className="text-xs text-muted-foreground">~{m.weekApprox}ª semana</p>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Vaccines Section ──────────────────────────────────────────────────────
+
+function VaccinesSection({ birthDate }: { birthDate: Date }) {
+  const [vaccines, setVaccines] = useState<BabyVaccine[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dateInput, setDateInput] = useState(new Date().toISOString().slice(0, 10));
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) { setLoading(false); return; }
+      const res = await getBabyVaccines({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setVaccines(res.vaccines);
+      setLoading(false);
+    })();
+  }, []);
+
+  function isDone(key: string) {
+    return vaccines.some((v) => v.vaccine_key === key);
+  }
+
+  async function toggleVaccine(key: string) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    if (isDone(key)) {
+      await removeVaccine({ data: { accessToken: s.session.access_token, vaccineKey: key } });
+      setVaccines((v) => v.filter((x) => x.vaccine_key !== key));
+    } else {
+      await markVaccineGiven({ data: { accessToken: s.session.access_token, vaccineKey: key, administeredAt: dateInput, batch: null } });
+      setVaccines((v) => [...v, { id: "", vaccine_key: key, administered_at: dateInput, batch: null }]);
+    }
+  }
+
+  const done = vaccines.length;
+  const total = VACCINE_SCHEDULE.length;
+
+  if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+
+  return (
+    <div className="max-w-xl space-y-5">
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-semibold">Calendário de vacinas</h3>
+            <p className="text-xs text-muted-foreground">Calendário Nacional de Vacinação (SUS)</p>
+          </div>
+          <span className="text-sm font-semibold text-primary">{done}/{total}</span>
+        </div>
+        <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(done / total) * 100}%` }} />
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <label className="text-xs text-muted-foreground">Data de aplicação:</label>
+          <input
+            type="date"
+            value={dateInput}
+            onChange={(e) => setDateInput(e.target.value)}
+            className="rounded-xl border border-border bg-background px-3 py-1 text-xs"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {VACCINE_SCHEDULE.map((v) => {
+          const done = isDone(v.key);
+          const rec = vaccines.find((x) => x.vaccine_key === v.key);
+          return (
+            <button
+              key={v.key}
+              onClick={() => toggleVaccine(v.key)}
+              className={`w-full flex items-center gap-4 rounded-2xl border p-4 text-left transition-all ${
+                done ? "border-green-300 bg-green-50" : "border-border bg-card hover:border-primary/40"
+              }`}
+            >
+              <span className={`h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center text-xs ${done ? "border-green-500 bg-green-500 text-white" : "border-muted-foreground"}`}>
+                {done ? "✓" : ""}
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{v.name}</p>
+                <p className="text-xs text-muted-foreground">{v.disease}</p>
+                {done && rec && (
+                  <p className="text-xs text-green-700">
+                    Aplicada em {new Date(rec.administered_at + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </p>
+                )}
+              </div>
+              <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                {v.ageLabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Return Visits Section ─────────────────────────────────────────────────
+
+function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Profile }) {
+  const [babyWeight, setBabyWeight] = useState("");
+  const [weightDate, setWeightDate] = useState(new Date().toISOString().slice(0, 10));
+  const [weights, setWeights] = useState<BabyWeight[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return;
+      const res = await getBabyWeights({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setWeights(res.weights);
+    })();
+  }, []);
+
+  async function handleAddWeight() {
+    if (!babyWeight || parseFloat(babyWeight) <= 0) return;
+    setSaving(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (s.session) {
+      const weightG = Math.round(parseFloat(babyWeight) * 1000);
+      await addBabyWeight({ data: { accessToken: s.session.access_token, measuredAt: weightDate, weightG } });
+      const res = await getBabyWeights({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setWeights(res.weights);
+      setBabyWeight("");
+    }
+    setSaving(false);
+  }
+
+  const returnVisits = [
+    { label: "Revisão pós-parto (mãe)", daysAfter: 7, note: "Verificar cicatriz, pressão, involução uterina" },
+    { label: "Consulta pediátrica (bebê)", daysAfter: 15, note: "Peso, reflexos, icterícia" },
+    { label: "Revisão 40 dias (mãe)", daysAfter: 40, note: "Consulta completa de puerpério" },
+    { label: "Consulta 1 mês (bebê)", daysAfter: 30, note: "Desenvolvimento, vacinas" },
+    { label: "Consulta 2 meses (bebê)", daysAfter: 60, note: "Vacinas do 2º mês" },
+    { label: "Consulta 4 meses (bebê)", daysAfter: 120, note: "Vacinas do 4º mês" },
+    { label: "Consulta 6 meses (bebê)", daysAfter: 180, note: "Início da alimentação complementar" },
+  ];
+
+  return (
+    <div className="max-w-xl space-y-6">
+      <div>
+        <h3 className="font-semibold mb-3">Consultas de retorno</h3>
+        <div className="space-y-2">
+          {returnVisits.map((v) => {
+            const date = new Date(birthDate.getTime() + v.daysAfter * 86400000);
+            const isPast = date < new Date();
+            return (
+              <div
+                key={v.label}
+                className={`flex items-start gap-3 rounded-2xl border p-4 ${
+                  isPast ? "border-border bg-secondary/30 opacity-60" : "border-border bg-card"
+                }`}
+              >
+                <span className="text-xl mt-0.5">{isPast ? "✅" : "📅"}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{v.label}</p>
+                  <p className="text-xs text-muted-foreground">{v.note}</p>
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {date.toLocaleDateString("pt-BR")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <h3 className="font-semibold mb-3">Peso do bebê</h3>
+        <div className="flex gap-2 mb-4">
+          <input
+            type="number"
+            step="0.01"
+            value={babyWeight}
+            onChange={(e) => setBabyWeight(e.target.value)}
+            placeholder="Peso em kg (ex: 3.5)"
+            className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
+          />
+          <input
+            type="date"
+            value={weightDate}
+            onChange={(e) => setWeightDate(e.target.value)}
+            className="rounded-xl border border-border bg-background px-3 py-2 text-xs"
+          />
+          <button
+            onClick={handleAddWeight}
+            disabled={saving || !babyWeight}
+            className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
+        {weights.length > 0 && (
+          <div className="space-y-2">
+            {weights.map((w, i) => {
+              const prev = weights[i - 1];
+              const gain = prev ? w.weight_g - prev.weight_g : null;
+              return (
+                <div key={w.id} className="flex items-center justify-between rounded-xl bg-secondary/30 px-4 py-2.5">
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(w.measured_at + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </span>
+                  <span className="font-semibold">
+                    {(w.weight_g / 1000).toFixed(2)} kg
+                  </span>
+                  {gain != null && (
+                    <span className={`text-xs ${gain >= 0 ? "text-green-600" : "text-red-500"}`}>
+                      {gain >= 0 ? "+" : ""}{gain}g
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
