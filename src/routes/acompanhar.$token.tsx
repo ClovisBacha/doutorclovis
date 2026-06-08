@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getCompanionView, type CompanionView as Profile } from "@/lib/companion.functions";
 import { babyForWeek, computeGestation, dueDateFromLmp, trimesterForWeek } from "@/lib/gestacao";
+import { getRecentPanicByToken } from "@/lib/escola.functions";
 
 export const Route = createFileRoute("/acompanhar/$token")({
   head: () => ({ meta: [{ title: "Painel do Papai — Dr. Clóvis Bacha" }] }),
@@ -91,6 +92,7 @@ function CompanionView() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PapaiTab>("bebe");
+  const [panicEvent, setPanicEvent] = useState<{ latitude: number | null; longitude: number | null; address: string | null; created_at: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -106,6 +108,9 @@ function CompanionView() {
       }
       setProfile(res.profile);
       setLoading(false);
+      // Check for recent panic events
+      const panicRes = await getRecentPanicByToken({ data: { token } });
+      if (panicRes.ok && panicRes.event) setPanicEvent(panicRes.event as any);
     })();
   }, [token]);
 
@@ -138,6 +143,36 @@ function CompanionView() {
 
   return (
     <section className="mx-auto max-w-2xl px-5 py-10">
+      {panicEvent && (
+        <div className="mb-6 rounded-2xl border-2 border-red-500 bg-red-50 p-5 animate-pulse">
+          <p className="text-lg font-bold text-red-700">🚨 ALERTA DE EMERGÊNCIA</p>
+          <p className="text-sm text-red-700 mt-1">
+            {profile.display_name ?? "A gestante"} acionou o botão de pânico às{" "}
+            {new Date(panicEvent.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+          </p>
+          {panicEvent.address && (
+            <p className="text-xs text-red-600 mt-1">📍 {panicEvent.address}</p>
+          )}
+          {panicEvent.latitude && panicEvent.longitude && (
+            <a
+              href={`https://www.google.com/maps?q=${panicEvent.latitude},${panicEvent.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block rounded-full bg-red-600 px-4 py-1.5 text-sm font-semibold text-white"
+            >
+              Ver localização no mapa →
+            </a>
+          )}
+          <div className="mt-3 flex gap-2">
+            <a href="tel:192" className="rounded-full bg-red-700 px-4 py-1.5 text-sm font-semibold text-white">
+              📞 SAMU 192
+            </a>
+            <button onClick={() => setPanicEvent(null)} className="rounded-full bg-secondary px-4 py-1.5 text-xs text-muted-foreground">
+              Dispensar
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Painel do Papai</p>
       <h1 className="mt-2 font-serif text-3xl">

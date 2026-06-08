@@ -69,10 +69,12 @@ export const getRecentPanicByToken = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: invite } = await supabaseAdmin
       .from("companion_invites")
-      .select("user_id")
+      .select("user_id, expires_at")
       .eq("token", data.token)
       .single();
     if (!invite) return { ok: false as const };
+    if (invite.expires_at && new Date(invite.expires_at) < new Date())
+      return { ok: false as const };
     const since = new Date(Date.now() - 30 * 60 * 1000).toISOString(); // last 30 min
     const { data: events } = await supabaseAdmin
       .from("panic_events")

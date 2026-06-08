@@ -50,7 +50,8 @@ function AlbumPage() {
         const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
         canvas.width = Math.round(img.width * ratio);
         canvas.height = Math.round(img.height * ratio);
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         setImageData(canvas.toDataURL("image/jpeg", 0.75));
       };

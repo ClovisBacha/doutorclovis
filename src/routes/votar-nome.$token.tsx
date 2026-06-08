@@ -19,6 +19,7 @@ export const Route = createFileRoute("/votar-nome/$token")({
 });
 
 function getVoterToken(): string {
+  if (typeof window === "undefined") return "";
   const KEY = "voter_token";
   let t = localStorage.getItem(KEY);
   if (!t) {
@@ -36,11 +37,16 @@ function VotarNomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [voterName, setVoterName] = useState(() => localStorage.getItem("voter_name") ?? "");
+  const [voterName, setVoterName] = useState("");
   const [newName, setNewName] = useState("");
-  const [votedEntryId, setVotedEntryId] = useState<string | null>(
-    () => localStorage.getItem(`voted_${shareToken}`) ?? null
-  );
+  const [votedEntryId, setVotedEntryId] = useState<string | null>(null);
+
+  // Hydrate from localStorage only on the client
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setVoterName(localStorage.getItem("voter_name") ?? "");
+    setVotedEntryId(localStorage.getItem(`voted_${shareToken}`) ?? null);
+  }, [shareToken]);
   const [submittingVote, setSubmittingVote] = useState<string | null>(null);
   const [submittingName, setSubmittingName] = useState(false);
   const [addedName, setAddedName] = useState(false);

@@ -4292,6 +4292,7 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
   const [playing, setPlaying] = useState<SoundType | null>(null);
   const [volume, setVolume] = useState(0.5);
   const [playCount, setPlayCount] = useState<Partial<Record<SoundType, number>>>(() => {
+    if (typeof window === "undefined") return {};
     try { return JSON.parse(localStorage.getItem("sons_play_count") ?? "{}"); } catch { return {}; }
   });
   const ctxRef = useRef<AudioContext | null>(null);
@@ -4955,7 +4956,8 @@ const QUARTO_CATEGORIES = [...new Set(QUARTO_ITEMS.map((i) => i.category))];
 
 function QuartinhoTab({ gest }: { gest: Gest }) {
   const [checked, setChecked] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("quartinho_checked") ?? "[]")); } catch { return new Set(); }
+    if (typeof window === "undefined") return new Set<string>();
+    try { return new Set(JSON.parse(localStorage.getItem("quartinho_checked") ?? "[]")); } catch { return new Set<string>(); }
   });
   const [catFilter, setCatFilter] = useState<string>("todos");
   const [priorityFilter, setPriorityFilter] = useState<string>("todos");
@@ -5276,7 +5278,8 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
         const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
         canvas.width = Math.round(img.width * ratio);
         canvas.height = Math.round(img.height * ratio);
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         setImageData(canvas.toDataURL("image/jpeg", 0.75));
       };
@@ -5793,13 +5796,13 @@ const COURSE_MODULES: CourseModule[] = [
   },
 ];
 
-type QuizState = { answered: boolean; selected: number | null; score: number };
+type QuizState = { answered: boolean; answers: (number | null)[]; score: number };
 
 function EscolaBebêTab({ gest }: { gest: Gest }) {
   const [progress, setProgress] = useState<CourseProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeModule, setActiveModule] = useState<CourseModule | null>(null);
-  const [quizState, setQuizState] = useState<QuizState>({ answered: false, selected: null, score: 0 });
+  const [quizState, setQuizState] = useState<QuizState>({ answered: false, answers: [], score: 0 });
   const [saving, setSaving] = useState(false);
   const currentWeek = gest?.weeks ?? 0;
 
@@ -5848,7 +5851,7 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
 
   function openModule(m: CourseModule) {
     setActiveModule(m);
-    setQuizState({ answered: false, selected: null, score: 0 });
+    setQuizState({ answered: false, answers: Array(m.quiz.length).fill(null), score: 0 });
   }
 
   if (activeModule) {
@@ -5891,8 +5894,10 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
                   let style = "border-border bg-background text-foreground";
                   if (quizState.answered) {
                     if (oi === q.correct) style = "border-green-400 bg-green-50 text-green-800";
-                    else if (oi === quizState.selected && oi !== q.correct) style = "border-red-300 bg-red-50 text-red-700";
+                    else if (oi === quizState.answers[qi] && oi !== q.correct) style = "border-red-300 bg-red-50 text-red-700";
                     else style = "border-border bg-background text-muted-foreground";
+                  } else if (quizState.answers[qi] === oi) {
+                    style = "border-primary bg-primary/5 text-primary";
                   }
                   return (
                     <button
@@ -5900,13 +5905,11 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
                       disabled={quizState.answered}
                       onClick={() => {
                         if (quizState.answered) return;
-                        const correct = activeModule.quiz.filter((qq, i) =>
-                          i === qi ? oi === qq.correct : false
-                        ).length;
-                        setQuizState((prev) => ({
-                          ...prev,
-                          selected: oi,
-                        }));
+                        setQuizState((prev) => {
+                          const newAnswers = [...prev.answers];
+                          newAnswers[qi] = oi;
+                          return { ...prev, answers: newAnswers };
+                        });
                       }}
                       className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${style}`}
                     >
@@ -5922,14 +5925,14 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
             <button
               onClick={async () => {
                 const score = Math.round(
-                  (activeModule.quiz.filter((q, i) => quizState.selected === q.correct).length /
+                  (activeModule.quiz.filter((q, i) => quizState.answers[i] === q.correct).length /
                     activeModule.quiz.length) *
                     100
                 );
                 setQuizState((prev) => ({ ...prev, answered: true, score }));
                 if (!done) await finishQuiz(score);
               }}
-              disabled={quizState.selected === null}
+              disabled={quizState.answers.some((a) => a === null)}
               className="mt-2 rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
             >
               Verificar respostas
@@ -6198,6 +6201,11 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
     if (cooldown > 0 || status === "locating") return;
     setStatus("locating");
 
+    if (!navigator?.geolocation) {
+      setStatus("error");
+      return;
+    }
+
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
@@ -6427,6 +6435,11 @@ function ClimaTab({ gest }: { gest: Gest }) {
   async function fetchWeather() {
     setLoading(true);
     setError(null);
+    if (!navigator?.geolocation) {
+      setError("Seu navegador não suporta geolocalização. Tente em Chrome ou Firefox.");
+      setLoading(false);
+      return;
+    }
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
@@ -6856,7 +6869,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
     return "Indicativo de depressão pós-parto — busque apoio profissional";
   }
 
-  const lastItem10 = submitted && (answers[9] ?? 0);
+  const q10Score = submitted ? (answers[9] ?? 0) : 0;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -6924,7 +6937,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
               </div>
             )}
 
-            {lastItem10 !== false && (lastItem10 as number) >= 1 && (
+            {submitted && q10Score >= 1 && (
               <div className="rounded-2xl border-2 border-red-500 bg-red-50 p-4">
                 <p className="font-bold text-red-700">🚨 Resposta à questão 10</p>
                 <p className="text-sm text-red-700 mt-1">

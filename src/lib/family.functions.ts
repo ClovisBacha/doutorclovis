@@ -240,7 +240,8 @@ export const getPublicNameSession = createServerFn({ method: "POST" })
       .eq("share_token", data.shareToken)
       .single();
     if (!session) return { ok: false as const, error: "Link inválido." };
-    if (!session.is_active) return { ok: false as const, error: "A votação foi encerrada." };
+    if (!session.is_active && !session.reveal_winner)
+      return { ok: false as const, error: "A votação foi encerrada." };
     const { data: entries } = await supabaseAdmin
       .from("baby_name_entries")
       .select("*, baby_name_votes(count)")
