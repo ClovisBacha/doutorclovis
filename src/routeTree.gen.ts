@@ -30,6 +30,8 @@ import { Route as AgendamentoRouteImport } from './routes/agendamento'
 import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
+import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AcompanharTokenRouteImport } from './routes/acompanhar.$token'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
@@ -139,6 +141,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNutritionRoute = ApiNutritionRouteImport.update({
+  id: '/api/nutrition',
+  path: '/api/nutrition',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -185,6 +197,8 @@ export interface FileRoutesByFullPath {
   '/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/nutrition': typeof ApiNutritionRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -211,6 +225,8 @@ export interface FileRoutesByTo {
   '/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/nutrition': typeof ApiNutritionRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -239,6 +255,8 @@ export interface FileRoutesById {
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/nutrition': typeof ApiNutritionRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -267,6 +285,8 @@ export interface FileRouteTypes {
     | '/painel'
     | '/acompanhar/$token'
     | '/api/chat'
+    | '/api/nutrition'
+    | '/api/transcribe'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -293,6 +313,8 @@ export interface FileRouteTypes {
     | '/painel'
     | '/acompanhar/$token'
     | '/api/chat'
+    | '/api/nutrition'
+    | '/api/transcribe'
   id:
     | '__root__'
     | '/'
@@ -320,6 +342,8 @@ export interface FileRouteTypes {
     | '/_authenticated/painel'
     | '/acompanhar/$token'
     | '/api/chat'
+    | '/api/nutrition'
+    | '/api/transcribe'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -346,6 +370,8 @@ export interface RootRouteChildren {
   TamanhoRealRoute: typeof TamanhoRealRoute
   AcompanharTokenRoute: typeof AcompanharTokenRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiNutritionRoute: typeof ApiNutritionRoute
+  ApiTranscribeRoute: typeof ApiTranscribeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -497,6 +523,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/nutrition': {
+      id: '/api/nutrition'
+      path: '/api/nutrition'
+      fullPath: '/api/nutrition'
+      preLoaderRoute: typeof ApiNutritionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -565,6 +605,8 @@ const rootRouteChildren: RootRouteChildren = {
   TamanhoRealRoute: TamanhoRealRoute,
   AcompanharTokenRoute: AcompanharTokenRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiNutritionRoute: ApiNutritionRoute,
+  ApiTranscribeRoute: ApiTranscribeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
