@@ -39,10 +39,19 @@ cp .env.example .env
 - `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` (+ versões `VITE_`): públicas,
   já preenchidas no `.env.example` (vão para o bundle do navegador).
 - `SUPABASE_SERVICE_ROLE_KEY`: **secreto**, usado server-side.
-- `GOOGLE_GENERATIVE_AI_API_KEY`: **secreto**, usado pelo chatbot (ver abaixo).
+- `GOOGLE_GENERATIVE_AI_API_KEY`: **secreto**, usado pelo chatbot e pela triagem
+  de sintomas (ver abaixo).
 - `CHAT_MODEL`: opcional, modelo do chatbot (padrão `gemini-2.5-flash`).
+- `ADMIN_EMAILS`: e-mails (separados por vírgula) que acessam o **Painel do
+  médico** (`/painel`) e recebem aviso de novos agendamentos.
+- `RESEND_API_KEY` / `MAIL_FROM`: opcionais, envio de e-mail de confirmação de
+  consulta via Resend. Sem a chave, o agendamento funciona, mas não envia e-mail.
 
 O `.env` está no `.gitignore` — nunca commite chaves reais.
+
+> **Atenção:** a migration `supabase/migrations/20260608120000_security_hardening.sql`
+> precisa ser aplicada no Supabase (SQL Editor) para fechar o acesso anônimo
+> aos convites de acompanhante e ativar a expiração.
 
 ## Deploy (Vercel)
 
