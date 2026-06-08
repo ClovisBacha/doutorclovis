@@ -11,6 +11,11 @@ import {
 } from "@/lib/gestacao";
 import { assessSymptoms } from "@/lib/triage.functions";
 import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
+import {
+  submitPreConsulta,
+  getMyPreConsultas,
+  type PreConsultaForm,
+} from "@/lib/preconsulta.functions";
 
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
@@ -62,10 +67,13 @@ type Gest = ReturnType<typeof computeGestation>;
 
 const TABS = [
   "Bebê",
+  "Calendário",
   "Diário",
   "Chutes",
+  "Contrações",
   "Saúde",
   "Alertas",
+  "Pré-consulta",
   "Perguntas",
   "Checklist",
   "Acompanhante",
@@ -177,10 +185,13 @@ function MinhaContaPage() {
 
       <div className="mt-8">
         {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
+        {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
         {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
         {tab === "Chutes" && <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />}
+        {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
         {tab === "Saúde" && <HealthTab gest={gest} />}
         {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
+        {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
         {tab === "Perguntas" && <QuestionsTab gest={gest} />}
         {tab === "Checklist" && <ChecklistTab gest={gest} />}
         {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
@@ -1839,6 +1850,670 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           {loading ? "..." : "Enviar"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Calendário do Pré-natal ---------- */
+
+type Milestone = {
+  week: number;
+  type: "exam" | "consult" | "vaccine" | "milestone";
+  label: string;
+  detail?: string;
+};
+
+const PRENATAL_MILESTONES: Milestone[] = [
+  { week: 6, type: "consult", label: "1ª consulta pré-natal", detail: "Confirmação da gestação, exames iniciais e início do ácido fólico." },
+  { week: 8, type: "exam", label: "Exames iniciais (sangue e urina)", detail: "Hemograma, sorologias, tipagem sanguínea, urina EAS." },
+  { week: 11, type: "exam", label: "Translucência nucal", detail: "Ultrassom entre 11s–13s6d + PAPP-A e beta-hCG." },
+  { week: 12, type: "milestone", label: "Fim do 1º trimestre 🎉", detail: "Risco de aborto reduz significativamente." },
+  { week: 14, type: "consult", label: "Consulta mensal" },
+  { week: 16, type: "consult", label: "Consulta mensal" },
+  { week: 18, type: "exam", label: "Ultrassom morfológico", detail: "Avaliação detalhada da anatomia fetal. Entre 18–22 semanas." },
+  { week: 20, type: "milestone", label: "Metade da gestação! 🌟", detail: "Bebê começa a ser sentido com mais frequência." },
+  { week: 24, type: "exam", label: "Curva glicêmica (TOTG)", detail: "Rastreio de diabetes gestacional. Jejum de 8h." },
+  { week: 26, type: "consult", label: "Consulta mensal" },
+  { week: 26, type: "exam", label: "Hemograma e exames de rotina" },
+  { week: 28, type: "milestone", label: "Início do 3º trimestre", detail: "Conte os movimentos diariamente a partir de agora." },
+  { week: 30, type: "consult", label: "Consultas quinzenais", detail: "A partir da 30ª semana, consultas a cada 2 semanas." },
+  { week: 32, type: "exam", label: "Ultrassom de crescimento fetal", detail: "Avaliação de crescimento e Doppler quando indicado." },
+  { week: 34, type: "consult", label: "Consulta quinzenal" },
+  { week: 35, type: "exam", label: "Cultura Streptococcus Grupo B", detail: "Swab vaginal/retal entre 35–37 semanas." },
+  { week: 36, type: "consult", label: "Consultas semanais", detail: "A partir da 36ª semana, consultas semanais." },
+  { week: 37, type: "milestone", label: "A TERMO! Bebê pronto para nascer 🎉", detail: "Semana 37 marca o início do período a termo." },
+  { week: 38, type: "exam", label: "Cardiotocografia (CTG)", detail: "Avaliação do bem-estar fetal e planejamento do parto." },
+  { week: 40, type: "milestone", label: "DPP — Data Provável do Parto 👶" },
+];
+
+const TYPE_COLOR: Record<Milestone["type"], string> = {
+  exam: "bg-blue-100 text-blue-700 border-blue-200",
+  consult: "bg-violet-100 text-violet-700 border-violet-200",
+  vaccine: "bg-amber-100 text-amber-700 border-amber-200",
+  milestone: "bg-primary/10 text-primary border-primary/20",
+};
+const TYPE_LABEL: Record<Milestone["type"], string> = {
+  exam: "Exame",
+  consult: "Consulta",
+  vaccine: "Vacina",
+  milestone: "Marco",
+};
+
+function weekToDate(targetWeek: number, profile: Profile): Date | null {
+  if (profile.reference_date && profile.reference_weeks != null) {
+    const ref = new Date(profile.reference_date + "T00:00:00");
+    const gestDaysSoFar = profile.reference_weeks * 7 + (profile.reference_days ?? 0);
+    const lmpEquiv = new Date(ref.getTime() - gestDaysSoFar * 86400000);
+    return new Date(lmpEquiv.getTime() + targetWeek * 7 * 86400000);
+  }
+  if (profile.lmp_date) {
+    const lmp = new Date(profile.lmp_date + "T00:00:00");
+    return new Date(lmp.getTime() + targetWeek * 7 * 86400000);
+  }
+  return null;
+}
+
+function toGoogleCalUrl(label: string, date: Date) {
+  const ymd = date.toISOString().slice(0, 10).replace(/-/g, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `Pré-natal: ${label}`,
+    dates: `${ymd}/${ymd}`,
+    details: "Acompanhamento pré-natal — Dr. Clóvis Bacha",
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  if (!profile || (!profile.lmp_date && !profile.reference_date)) {
+    return (
+      <div className="rounded-3xl border border-border bg-card p-8 text-center">
+        <p className="text-muted-foreground">
+          Configure a DUM ou os dados do ultrassom em <strong>Perfil</strong> para gerar o calendário personalizado.
+        </p>
+      </div>
+    );
+  }
+
+  const currentWeek = gest?.weeks ?? 0;
+  const today = new Date();
+
+  function downloadAllIcs() {
+    const events: string[] = [];
+    PRENATAL_MILESTONES.forEach((m) => {
+      const d = weekToDate(m.week, profile!);
+      if (!d) return;
+      const ymd = d.toISOString().slice(0, 10).replace(/-/g, "");
+      events.push(
+        "BEGIN:VEVENT",
+        `UID:prenatal-${m.week}-${m.label.slice(0,10).replace(/\s/g,"")}@doutorclovis`,
+        `DTSTART;VALUE=DATE:${ymd}`,
+        `DTEND;VALUE=DATE:${ymd}`,
+        `SUMMARY:Pré-natal S${m.week}: ${m.label}`,
+        m.detail ? `DESCRIPTION:${m.detail}` : "",
+        "END:VEVENT",
+      ).filter(Boolean);
+    });
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Dr Clovis Bacha//Prenatal Calendar//PT-BR",
+      ...events,
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "prenatal-dr-clovis.ics";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.22em] text-primary">Calendário do Pré-natal</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Todos os marcos, exames e consultas da sua gestação.
+          </p>
+        </div>
+        <button
+          onClick={downloadAllIcs}
+          className="rounded-full border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary"
+        >
+          ↓ Baixar .ics
+        </button>
+      </div>
+
+      <div className="relative space-y-3 pl-6">
+        {/* Vertical line */}
+        <div className="absolute left-2.5 top-0 bottom-0 w-px bg-border" />
+
+        {PRENATAL_MILESTONES.map((m, idx) => {
+          const date = weekToDate(m.week, profile);
+          const isPast = date != null && date < today;
+          const isCurrent = m.week === currentWeek || (m.week === Math.ceil(currentWeek / 2) * 2 && Math.abs(m.week - currentWeek) <= 1);
+          const isUpcoming = !isPast && date != null && date.getTime() - today.getTime() < 21 * 86400000;
+
+          return (
+            <div key={idx} className={`relative rounded-2xl border p-4 transition-all ${
+              isPast ? "border-border bg-card opacity-60" :
+              isUpcoming ? "border-primary/40 bg-primary/5 shadow-sm" :
+              "border-border bg-card"
+            }`}>
+              {/* Timeline dot */}
+              <div className={`absolute -left-4 top-5 h-3 w-3 rounded-full border-2 ${
+                isPast ? "border-border bg-background" :
+                isUpcoming ? "border-primary bg-primary" :
+                "border-primary/40 bg-background"
+              }`} />
+
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}>
+                      {TYPE_LABEL[m.type]}
+                    </span>
+                    <span className="text-xs text-muted-foreground">Semana {m.week}</span>
+                    {isPast && <span className="text-xs text-emerald-600">✓ concluído</span>}
+                    {isUpcoming && !isPast && <span className="text-xs font-medium text-primary">Em breve!</span>}
+                  </div>
+                  <p className={`mt-1 text-sm font-medium ${isPast ? "text-muted-foreground" : "text-foreground"}`}>
+                    {m.label}
+                  </p>
+                  {m.detail && <p className="mt-0.5 text-xs text-muted-foreground">{m.detail}</p>}
+                  {date && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {date.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                    </p>
+                  )}
+                </div>
+                {date && !isPast && (
+                  <a
+                    href={toGoogleCalUrl(m.label, date)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 rounded-full border border-primary/30 px-3 py-1 text-xs text-primary hover:bg-primary/5"
+                  >
+                    + Agenda
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Contrações ---------- */
+
+type Contraction = {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  intensity: number;
+};
+
+const INTENSITY_LABEL = ["", "Leve", "Moderada", "Forte"];
+const INTENSITY_COLOR = ["", "bg-blue-100 text-blue-700", "bg-amber-100 text-amber-700", "bg-rose-100 text-rose-700"];
+
+function analyzeContractions(list: Contraction[]): {
+  status: "normal" | "atencao" | "alerta" | "urgente";
+  label: string;
+  detail: string;
+} {
+  if (list.length < 2) return { status: "normal", label: "Monitorando", detail: "Registre mais contrações para análise do padrão." };
+
+  const completed = list.filter((c) => c.ended_at != null);
+  if (completed.length < 2) return { status: "normal", label: "Monitorando", detail: "Continue registrando." };
+
+  // Average duration (seconds)
+  const avgDur =
+    completed.reduce((sum, c) => {
+      const dur = (new Date(c.ended_at!).getTime() - new Date(c.started_at).getTime()) / 1000;
+      return sum + dur;
+    }, 0) / completed.length;
+
+  // Average interval between contractions (minutes)
+  const sorted = [...list].sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
+  let intervals: number[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const interval = (new Date(sorted[i].started_at).getTime() - new Date(sorted[i - 1].started_at).getTime()) / 60000;
+    intervals.push(interval);
+  }
+  const avgInterval = intervals.reduce((s, x) => s + x, 0) / intervals.length;
+
+  if (avgInterval <= 3 && avgDur >= 60)
+    return { status: "urgente", label: "⚠️ Vá para a maternidade agora", detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — trabalho de parto avançado.` };
+  if (avgInterval <= 5 && avgDur >= 45)
+    return { status: "alerta", label: "Trabalho de parto ativo", detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — ligue para o consultório.` };
+  if (avgInterval <= 10 && avgDur >= 30)
+    return { status: "atencao", label: "Atenção — padrão irregular", detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — monitore de perto.` };
+  return { status: "normal", label: "Padrão normal", detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s.` };
+}
+
+function ContracoesTab({ weeks }: { weeks: number | null }) {
+  const [contractions, setContractions] = useState<Contraction[]>([]);
+  const [active, setActive] = useState<Contraction | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [intensity, setIntensity] = useState(2);
+  const startRef = useRef<number>(0);
+
+  async function load() {
+    const { data } = await (supabase as any)
+      .from("contraction_logs")
+      .select("*")
+      .order("started_at", { ascending: false })
+      .limit(30);
+    setContractions(data ?? []);
+    // Resume active contraction if exists (no ended_at)
+    const open = (data ?? []).find((c: Contraction) => !c.ended_at);
+    if (open) {
+      setActive(open);
+      startRef.current = new Date(open.started_at).getTime();
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setElapsed(Date.now() - startRef.current), 1000);
+    return () => clearInterval(t);
+  }, [active]);
+
+  async function startContraction() {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const { data } = await (supabase as any)
+      .from("contraction_logs")
+      .insert({ user_id: u.user.id, intensity })
+      .select()
+      .single();
+    setActive(data);
+    startRef.current = Date.now();
+    setElapsed(0);
+    load();
+  }
+
+  async function stopContraction() {
+    if (!active) return;
+    await (supabase as any)
+      .from("contraction_logs")
+      .update({ ended_at: new Date().toISOString() })
+      .eq("id", active.id);
+    setActive(null);
+    setElapsed(0);
+    load();
+  }
+
+  async function clearSession() {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    // Only remove last 6 hours of contractions
+    const sixHoursAgo = new Date(Date.now() - 6 * 3600000).toISOString();
+    await (supabase as any).from("contraction_logs").delete().eq("user_id", u.user.id).gte("started_at", sixHoursAgo);
+    setActive(null);
+    load();
+  }
+
+  const elapsedSecs = Math.floor(elapsed / 1000);
+  const elapsedMins = Math.floor(elapsedSecs / 60);
+  const recentContractions = contractions.slice(0, 10);
+  const analysis = analyzeContractions(recentContractions);
+
+  const statusStyle: Record<string, string> = {
+    normal: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    atencao: "border-amber-200 bg-amber-50 text-amber-800",
+    alerta: "border-rose-200 bg-rose-50 text-rose-800",
+    urgente: "border-rose-400 bg-rose-100 text-rose-900",
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
+        Use este diário se sentir contrações regulares. <strong>Em dúvida, ligue para o consultório.</strong> Em emergência, ligue <strong>192 (SAMU)</strong>.
+      </div>
+
+      {/* Analysis banner */}
+      {recentContractions.length >= 2 && (
+        <div className={`rounded-2xl border p-4 ${statusStyle[analysis.status]}`}>
+          <p className="font-semibold">{analysis.label}</p>
+          <p className="mt-0.5 text-sm">{analysis.detail}</p>
+          {analysis.status === "urgente" && (
+            <a href="tel:192" className="mt-3 inline-block rounded-full bg-rose-600 px-5 py-2 text-sm font-medium text-white">
+              Ligar 192 (SAMU)
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Main button */}
+      <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+        <p className="text-xs uppercase tracking-[0.22em] text-primary">Cronômetro de contrações</p>
+
+        {/* Intensity selector */}
+        {!active && (
+          <div className="mt-4 flex justify-center gap-2">
+            {[1, 2, 3].map((i) => (
+              <button
+                key={i}
+                onClick={() => setIntensity(i)}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                  intensity === i
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-primary"
+                }`}
+              >
+                {INTENSITY_LABEL[i]}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-6">
+          {active ? (
+            <div>
+              <button
+                onClick={stopContraction}
+                className="mx-auto flex h-44 w-44 items-center justify-center rounded-full bg-rose-500 text-white shadow-xl transition-transform active:scale-95"
+              >
+                <div>
+                  <div className="font-serif text-4xl">
+                    {String(elapsedMins).padStart(2, "0")}:{String(elapsedSecs % 60).padStart(2, "0")}
+                  </div>
+                  <div className="text-xs uppercase tracking-widest opacity-80 mt-1">Toque p/ parar</div>
+                </div>
+              </button>
+              <p className="mt-3 text-sm font-medium text-rose-600 animate-pulse">Contração ativa...</p>
+            </div>
+          ) : (
+            <button
+              onClick={startContraction}
+              className="mx-auto flex h-44 w-44 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform active:scale-95"
+            >
+              <div>
+                <div className="text-lg font-medium">Iniciar</div>
+                <div className="text-xs uppercase tracking-widest opacity-80 mt-1">contração</div>
+              </div>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* History table */}
+      {recentContractions.length > 0 && (
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Últimas contrações
+            </p>
+            <button onClick={clearSession} className="text-xs text-muted-foreground hover:text-destructive">
+              Limpar sessão
+            </button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {recentContractions.map((c, idx) => {
+              const dur = c.ended_at
+                ? Math.round((new Date(c.ended_at).getTime() - new Date(c.started_at).getTime()) / 1000)
+                : null;
+              const interval = idx < recentContractions.length - 1
+                ? Math.round((new Date(c.started_at).getTime() - new Date(recentContractions[idx + 1].started_at).getTime()) / 60000)
+                : null;
+              return (
+                <div key={c.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-sm">
+                  <span className="text-muted-foreground">
+                    {new Date(c.started_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${INTENSITY_COLOR[c.intensity] ?? ""}`}>
+                    {INTENSITY_LABEL[c.intensity] ?? "—"}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {dur != null ? `${dur}s` : "ativa"}
+                    {interval != null && ` · intervalo ${interval}min`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Pré-consulta Inteligente ---------- */
+
+const PRE_CONSULT_SYMPTOMS = [
+  "Náuseas ou vômitos",
+  "Dor de cabeça",
+  "Inchaço nos pés",
+  "Dor lombar",
+  "Sangramento",
+  "Redução de movimentos",
+  "Tontura",
+  "Febre",
+  "Dificuldade para dormir",
+  "Cansaço excessivo",
+];
+
+const EMOTIONAL_OPTIONS = [
+  { value: "otima", label: "Ótima 😊" },
+  { value: "bem", label: "Bem 🙂" },
+  { value: "ansiosa", label: "Ansiosa 😰" },
+  { value: "cansada", label: "Cansada 😴" },
+  { value: "triste", label: "Triste 😢" },
+];
+
+function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  const [form, setForm] = useState({
+    weight: "",
+    systolic: "",
+    diastolic: "",
+    symptoms: [] as string[],
+    medications: "",
+    questions: "",
+    emotional_state: "",
+    other_notes: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [history, setHistory] = useState<PreConsultaForm[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  async function loadHistory() {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    const forms = await getMyPreConsultas({ data: { accessToken: s.session.access_token } });
+    setHistory(forms);
+  }
+  useEffect(() => { loadHistory(); }, []);
+
+  function toggleSymptom(s: string) {
+    setForm((f) => ({
+      ...f,
+      symptoms: f.symptoms.includes(s) ? f.symptoms.filter((x) => x !== s) : [...f.symptoms, s],
+    }));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    const res = await submitPreConsulta({
+      data: {
+        accessToken: s.session.access_token,
+        weeks: gest?.weeks ?? null,
+        ...form,
+      },
+    });
+    setLoading(false);
+    if (res.ok) {
+      setDone(true);
+      loadHistory();
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="rounded-3xl border border-emerald-300 bg-emerald-50 p-10 text-center">
+        <p className="text-4xl">✓</p>
+        <h2 className="mt-3 font-serif text-2xl text-emerald-800">Formulário enviado!</h2>
+        <p className="mt-2 text-sm text-emerald-700">
+          O Dr. Clóvis receberá seu resumo antes da consulta. Pode chegar com tranquilidade!
+        </p>
+        <button
+          onClick={() => { setDone(false); setForm({ weight: "", systolic: "", diastolic: "", symptoms: [], medications: "", questions: "", emotional_state: "", other_notes: "" }); }}
+          className="mt-5 rounded-full bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white"
+        >
+          Preencher novamente
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
+        <strong>Para o Dr. Clóvis Bacha:</strong> preencha antes de cada consulta. Seu resumo chega formatado para o médico — sem precisar lembrar de tudo na hora!
+        {gest && (
+          <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
+            Semana {gest.weeks}
+          </span>
+        )}
+      </div>
+
+      <form onSubmit={submit} className="space-y-6">
+        {/* Emotional state */}
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="font-serif text-lg">Como você está se sentindo?</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {EMOTIONAL_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, emotional_state: o.value }))}
+                className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+                  form.emotional_state === o.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-primary"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Vitals */}
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="font-serif text-lg">Medidas desta semana</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <Field label="Peso atual (kg)" type="number" value={form.weight} onChange={(v) => setForm((f) => ({ ...f, weight: v }))} />
+            <Field label="Pressão sistólica" type="number" value={form.systolic} onChange={(v) => setForm((f) => ({ ...f, systolic: v }))} />
+            <Field label="Pressão diastólica" type="number" value={form.diastolic} onChange={(v) => setForm((f) => ({ ...f, diastolic: v }))} />
+          </div>
+        </div>
+
+        {/* Symptoms */}
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="font-serif text-lg">Sintomas desde a última consulta</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {PRE_CONSULT_SYMPTOMS.map((s) => (
+              <label
+                key={s}
+                className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                  form.symptoms.includes(s) ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.symptoms.includes(s)}
+                  onChange={() => toggleSymptom(s)}
+                  className="h-4 w-4"
+                />
+                {s}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Open questions */}
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="font-serif text-lg">Medicamentos em uso</p>
+          <textarea
+            value={form.medications}
+            onChange={(e) => setForm((f) => ({ ...f, medications: e.target.value }))}
+            rows={2}
+            placeholder="Ex.: Sulfato ferroso, ácido fólico, vitamina D..."
+            className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="font-serif text-lg">Perguntas para o médico</p>
+          <textarea
+            value={form.questions}
+            onChange={(e) => setForm((f) => ({ ...f, questions: e.target.value }))}
+            rows={3}
+            placeholder="Anote suas dúvidas aqui — elas chegam direto para o Dr. Clóvis antes da consulta."
+            className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="font-serif text-lg">Algo mais a relatar?</p>
+          <textarea
+            value={form.other_notes}
+            onChange={(e) => setForm((f) => ({ ...f, other_notes: e.target.value }))}
+            rows={2}
+            placeholder="Algo incomum que notou, mudança no bebê, preocupação específica..."
+            className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        >
+          {loading ? "Enviando..." : "Enviar para o médico"}
+        </button>
+      </form>
+
+      {/* History */}
+      {history.length > 0 && (
+        <div className="mt-4">
+          <button
+            onClick={() => setShowHistory((v) => !v)}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            {showHistory ? "▲ Ocultar" : "▼ Ver"} formulários anteriores ({history.length})
+          </button>
+          {showHistory && (
+            <div className="mt-3 space-y-3">
+              {history.map((h) => (
+                <div key={h.id} className="rounded-2xl border border-border bg-card p-4 text-sm">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">
+                      Semana {h.weeks_at_submission ?? "—"} —{" "}
+                      {new Date(h.submitted_at).toLocaleDateString("pt-BR")}
+                    </p>
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${h.seen_by_doctor ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                      {h.seen_by_doctor ? "Visualizado ✓" : "Aguardando"}
+                    </span>
+                  </div>
+                  {h.questions && <p className="mt-2 text-muted-foreground">{h.questions}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

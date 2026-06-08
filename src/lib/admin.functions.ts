@@ -46,6 +46,36 @@ export type AdminQuestion = {
   patient: string;
 };
 
+export type PatientEngagement = {
+  id: string;
+  display_name: string | null;
+  baby_name: string | null;
+  lmp_date: string | null;
+  reference_date: string | null;
+  reference_weeks: number | null;
+  reference_days: number | null;
+  isActive: boolean;
+  lastActivityAt: string | null;
+  hasUnseenForm: boolean;
+};
+
+export type AdminPreConsulta = {
+  id: string;
+  user_id: string;
+  patient_name: string;
+  submitted_at: string;
+  weeks_at_submission: number | null;
+  current_weight: number | null;
+  systolic: number | null;
+  diastolic: number | null;
+  symptoms: string[];
+  medications: string | null;
+  questions: string | null;
+  emotional_state: string | null;
+  other_notes: string | null;
+  seen_by_doctor: boolean;
+};
+
 /** Carrega os dados do painel do médico (pedidos de consulta + perguntas). */
 export const getAdminData = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))
@@ -135,4 +165,151 @@ export const setQuestionAnswered = createServerFn({ method: "POST" })
       .update({ answered: data.answered })
       .eq("id", data.id);
     return { ok: !error };
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feature 46: Dashboard de Engajamento
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Retorna dados de engajamento de todas as pacientes (ativas/inativas na última semana). */
+export const getEngagementData = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [profiles, healthLogs, journals, kicks, qs, forms] = await Promise.all([
+      supabaseAdmin
+        .from("patient_profiles")
+        .select("id,display_name,baby_name,lmp_date,reference_date,reference_weeks,reference_days"),
+      supabaseAdmin.from("health_logs").select("user_id,created_at").gte("created_at", sevenDaysAgo),
+      supabaseAdmin.from("journal_entries").select("user_id,created_at").gte("created_at", sevenDaysAgo),
+      supabaseAdmin.from("kick_sessions").select("user_id,started_at").gte("started_at", sevenDaysAgo),
+      supabaseAdmin.from("doctor_questions").select("user_id,created_at").gte("created_at", sevenDaysAgo),
+      supabaseAdmin.from("preconsulta_forms").select("user_id,submitted_at,seen_by_doctor").order("submitted_at", { ascending: false }),
+    ]);
+
+    // Map userId → most recent activity timestamp
+    const activityMap = new Map<string, string>();
+    const record = (uid: string, ts: string) => {
+      const prev = activityMap.get(uid);
+      if (!prev || ts > prev) activityMap.set(uid, ts);
+    };
+    healthLogs.data?.forEach((r) => record(r.user_id, r.created_at));
+    journals.data?.forEach((r) => record(r.user_id, r.created_at));
+    kicks.data?.forEach((r) => record(r.user_id, r.started_at));
+    qs.data?.forEach((r) => record(r.user_id, r.created_at));
+
+    const unseenByUser = new Set<string>(
+      (forms.data ?? []).filter((f) => !f.seen_by_doctor).map((f) => f.user_id),
+    );
+
+    const patients: PatientEngagement[] = (profiles.data ?? []).map((p) => {
+      const lastAt = activityMap.get(p.id) ?? null;
+      const isActive = lastAt != null && lastAt >= sevenDaysAgo;
+      return {
+        id: p.id,
+        display_name: p.display_name,
+        baby_name: p.baby_name,
+        lmp_date: p.lmp_date,
+        reference_date: p.reference_date,
+        reference_weeks: p.reference_weeks,
+        reference_days: p.reference_days,
+        isActive,
+        lastActivityAt: lastAt,
+        hasUnseenForm: unseenByUser.has(p.id),
+      };
+    });
+
+    return {
+      ok: true as const,
+      patients,
+      totalPatients: patients.length,
+      activeLastWeek: patients.filter((p) => p.isActive).length,
+      inactiveLastWeek: patients.filter((p) => !p.isActive).length,
+      unseenPreConsultas: unseenByUser.size,
+    };
+  });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Feature 47: Pré-consultas no painel do médico
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lista todas as pré-consultas submetidas pelas pacientes. */
+export const getPreConsultaForms = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: forms } = await supabaseAdmin
+      .from("preconsulta_forms")
+      .select("*")
+      .order("submitted_at", { ascending: false })
+      .limit(100);
+
+    const { data: profiles } = await supabaseAdmin
+      .from("patient_profiles")
+      .select("id,display_name");
+
+    const nameById = new Map(
+      (profiles ?? []).map((p: { id: string; display_name: string | null }) => [p.id, p.display_name]),
+    );
+
+    const result: AdminPreConsulta[] = (forms ?? []).map((f: any) => ({
+      ...f,
+      patient_name: nameById.get(f.user_id) ?? "Paciente",
+    }));
+
+    return { ok: true as const, forms: result };
+  });
+
+const SeenSchema = z.object({ accessToken: z.string().min(10), id: z.string().uuid() });
+
+/** Marca uma pré-consulta como vista pelo médico. */
+export const markPreConsultaSeen = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => SeenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("preconsulta_forms").update({ seen_by_doctor: true }).eq("id", data.id);
+    return { ok: true as const };
+  });
+
+/** Gera relatório de uma paciente (últimas 2 semanas de registros). */
+export const getPatientReport = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), userId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const uid = data.userId;
+
+    const [profile, healthLogs, journals, kicks, questions, preConsultas] = await Promise.all([
+      supabaseAdmin.from("patient_profiles").select("*").eq("id", uid).maybeSingle(),
+      supabaseAdmin.from("health_logs").select("*").eq("user_id", uid).gte("created_at", twoWeeksAgo).order("log_date", { ascending: false }),
+      supabaseAdmin.from("journal_entries").select("*").eq("user_id", uid).gte("created_at", twoWeeksAgo).order("entry_date", { ascending: false }),
+      supabaseAdmin.from("kick_sessions").select("*").eq("user_id", uid).gte("started_at", twoWeeksAgo).order("started_at", { ascending: false }),
+      supabaseAdmin.from("doctor_questions").select("*").eq("user_id", uid).eq("answered", false).order("created_at", { ascending: false }),
+      supabaseAdmin.from("preconsulta_forms").select("*").eq("user_id", uid).order("submitted_at", { ascending: false }).limit(1),
+    ]);
+
+    return {
+      ok: true as const,
+      profile: profile.data,
+      healthLogs: healthLogs.data ?? [],
+      journals: journals.data ?? [],
+      kicks: kicks.data ?? [],
+      pendingQuestions: questions.data ?? [],
+      latestPreConsulta: preConsultas.data?.[0] ?? null,
+    };
   });
