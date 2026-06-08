@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import { babyForWeek, computeGestation, dueDateFromLmp } from "@/lib/gestacao";
+import { assessSymptoms } from "@/lib/triage.functions";
+import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
 
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
@@ -55,6 +57,7 @@ const TABS = [
   "Diário",
   "Chutes",
   "Saúde",
+  "Alertas",
   "Perguntas",
   "Checklist",
   "Acompanhante",
@@ -162,6 +165,7 @@ function MinhaContaPage() {
         {tab === "Diário" && <JournalTab />}
         {tab === "Chutes" && <KicksTab />}
         {tab === "Saúde" && <HealthTab />}
+        {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
         {tab === "Perguntas" && <QuestionsTab />}
         {tab === "Checklist" && <ChecklistTab />}
         {tab === "Acompanhante" && <CompanionTab />}
@@ -1197,6 +1201,151 @@ function CompanionTab() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Alertas / triagem de sintomas ---------- */
+function AlertsTab({ weeks }: { weeks: number | null }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sys, setSys] = useState("");
+  const [dia, setDia] = useState("");
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    level: RiskLevel;
+    reasons: string[];
+    message: string;
+  } | null>(null);
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function avaliar() {
+    setLoading(true);
+    setResult(null);
+    const res = await assessSymptoms({
+      data: {
+        symptoms: [...selected],
+        systolic: sys ? Number(sys) : null,
+        diastolic: dia ? Number(dia) : null,
+        note: note || undefined,
+        weeks,
+      },
+    });
+    setResult(res);
+    setLoading(false);
+  }
+
+  const styles: Record<RiskLevel, { box: string; dot: string; titulo: string }> = {
+    vermelho: {
+      box: "border-rose-300 bg-rose-50",
+      dot: "bg-rose-500",
+      titulo: "Procure atendimento agora",
+    },
+    amarelo: {
+      box: "border-amber-300 bg-amber-50",
+      dot: "bg-amber-500",
+      titulo: "Atenção — fale com o consultório",
+    },
+    verde: {
+      box: "border-emerald-300 bg-emerald-50",
+      dot: "bg-emerald-500",
+      titulo: "Sem sinais de alerta",
+    },
+  };
+
+  return (
+    <div className="max-w-2xl">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
+        Esta triagem é uma orientação e <strong>não substitui avaliação médica</strong>. Em
+        emergência, ligue <strong>192 (SAMU)</strong> ou vá ao pronto-socorro.
+      </div>
+
+      <p className="mt-6 text-sm font-medium">Marque o que você está sentindo:</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {[...RED_SYMPTOMS, ...YELLOW_SYMPTOMS].map((s) => (
+          <label
+            key={s.id}
+            className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
+              selected.has(s.id) ? "border-primary bg-primary/5" : "border-border bg-card"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={selected.has(s.id)}
+              onChange={() => toggle(s.id)}
+              className="accent-[oklch(0.5_0.11_18)]"
+            />
+            {s.label}
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground">Pressão (opcional):</label>
+          <input
+            value={sys}
+            onChange={(e) => setSys(e.target.value)}
+            inputMode="numeric"
+            placeholder="120"
+            className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+          />
+          <span>/</span>
+          <input
+            value={dia}
+            onChange={(e) => setDia(e.target.value)}
+            inputMode="numeric"
+            placeholder="80"
+            className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+          />
+        </div>
+      </div>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={2}
+        placeholder="Quer descrever algo? (opcional)"
+        className="mt-3 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+      />
+
+      <button
+        onClick={avaliar}
+        disabled={loading}
+        className="mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
+      >
+        {loading ? "Avaliando…" : "Avaliar sintomas"}
+      </button>
+
+      {result && (
+        <div className={`mt-6 rounded-2xl border p-5 ${styles[result.level].box}`}>
+          <div className="flex items-center gap-2">
+            <span className={`h-3 w-3 rounded-full ${styles[result.level].dot}`} />
+            <p className="font-serif text-lg">{styles[result.level].titulo}</p>
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-foreground">{result.message}</p>
+          {result.reasons.length > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Sinais considerados: {result.reasons.join(", ")}.
+            </p>
+          )}
+          {result.level === "vermelho" && (
+            <a
+              href="tel:192"
+              className="mt-4 inline-block rounded-full bg-rose-600 px-5 py-2 text-sm font-medium text-white"
+            >
+              Ligar 192 (SAMU)
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
