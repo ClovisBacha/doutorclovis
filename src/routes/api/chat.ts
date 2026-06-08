@@ -2,6 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 
+// Rate limit simples por IP (janela fixa, em memória). Em ambiente serverless
+// a memória não é compartilhada entre instâncias nem persiste entre cold starts,
+// então é uma proteção básica contra abuso/varredura — não uma garantia rígida.
+const RATE_LIMIT = 20; // mensagens
+const RATE_WINDOW_MS = 60_000; // por minuto
+const hits = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimited(ip: string) {
+  const now = Date.now();
+  const entry = hits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    hits.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > RATE_LIMIT;
+}
+
 const SYSTEM_PROMPT = `Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra brasileiro especialista em gestação de alto risco.
 
 Sobre o Dr. Clóvis:
@@ -29,6 +47,16 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const ip =
+          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          request.headers.get("x-real-ip") ||
+          "unknown";
+        if (rateLimited(ip)) {
+          return new Response("Muitas mensagens em pouco tempo. Aguarde um instante.", {
+            status: 429,
+          });
+        }
+
         const body = (await request.json()) as { messages?: unknown };
         if (!Array.isArray(body.messages)) {
           return new Response("Messages are required", { status: 400 });
