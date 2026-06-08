@@ -2,7 +2,13 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { checkIsAdmin } from "@/lib/admin.functions";
-import { babyForWeek, computeGestation, dueDateFromLmp } from "@/lib/gestacao";
+import {
+  babyForWeek,
+  computeGestation,
+  consultaForWeek,
+  dueDateFromLmp,
+  trimesterForWeek,
+} from "@/lib/gestacao";
 import { assessSymptoms } from "@/lib/triage.functions";
 import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
 
@@ -51,6 +57,8 @@ type HealthLog = {
 };
 type DoctorQ = { id: string; question: string; answered: boolean; created_at: string };
 type Invite = { id: string; token: string; companion_name: string | null; created_at: string };
+
+type Gest = ReturnType<typeof computeGestation>;
 
 const TABS = [
   "Bebê",
@@ -115,6 +123,8 @@ function MinhaContaPage() {
       })
     : null;
 
+  const firstName = profile?.display_name?.split(" ")[0] ?? "mamãe";
+
   return (
     <section className="mx-auto max-w-5xl px-5 py-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -123,10 +133,15 @@ function MinhaContaPage() {
             Minha conta
           </p>
           <h1 className="mt-2 font-serif text-3xl md:text-4xl">
-            Olá, {profile?.display_name ?? "mamãe"} 💛
+            Olá, {firstName} 💛
           </h1>
           {profile?.baby_name && (
             <p className="mt-1 text-sm text-muted-foreground">Acompanhando {profile.baby_name}</p>
+          )}
+          {gest && (
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {gest.weeks}s {gest.days}d de gestação
+            </p>
           )}
         </div>
         <div className="flex items-center gap-4">
@@ -162,15 +177,15 @@ function MinhaContaPage() {
 
       <div className="mt-8">
         {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
-        {tab === "Diário" && <JournalTab />}
-        {tab === "Chutes" && <KicksTab />}
-        {tab === "Saúde" && <HealthTab />}
+        {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
+        {tab === "Chutes" && <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />}
+        {tab === "Saúde" && <HealthTab gest={gest} />}
         {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
-        {tab === "Perguntas" && <QuestionsTab />}
-        {tab === "Checklist" && <ChecklistTab />}
-        {tab === "Acompanhante" && <CompanionTab />}
+        {tab === "Perguntas" && <QuestionsTab gest={gest} />}
+        {tab === "Checklist" && <ChecklistTab gest={gest} />}
+        {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
         {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
-        {tab === "Chat IA" && <ChatTab />}
+        {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
         {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
       </div>
     </section>
@@ -178,13 +193,7 @@ function MinhaContaPage() {
 }
 
 /* ---------- Bebê ---------- */
-function BabyTab({
-  profile,
-  gest,
-}: {
-  profile: Profile | null;
-  gest: ReturnType<typeof computeGestation>;
-}) {
+function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   if (!profile || !gest) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center">
@@ -203,6 +212,8 @@ function BabyTab({
   const daysToDue = due
     ? Math.max(0, Math.ceil((new Date(due + "T00:00:00").getTime() - Date.now()) / 86400000))
     : null;
+  const exam = consultaForWeek(gest.weeks);
+  const babyLabel = profile.baby_name ? profile.baby_name : "seu bebê";
 
   return (
     <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
@@ -225,7 +236,9 @@ function BabyTab({
         </p>
 
         <div className="mt-6 rounded-2xl bg-[var(--gradient-warm)] p-6">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Esta semana</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-primary">
+            {babyLabel} esta semana
+          </p>
           <p className="mt-2 font-serif text-2xl text-primary">{baby.size}</p>
           <p className="text-sm text-muted-foreground">Peso aproximado: {baby.weight}</p>
           <p className="mt-1 text-sm text-muted-foreground">Tamanho de: {baby.fruit}</p>
@@ -247,6 +260,15 @@ function BabyTab({
                 })
               : "—"}
           </p>
+          {daysToDue != null && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {daysToDue === 0
+                ? "É hoje! 🎉"
+                : daysToDue === 1
+                  ? "Amanhã!"
+                  : `Faltam ${daysToDue} dias`}
+            </p>
+          )}
         </div>
         <div className="rounded-3xl border border-border bg-card p-6">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Próxima consulta</p>
@@ -258,16 +280,48 @@ function BabyTab({
                 : "Consultas semanais — acompanhamento próximo."}
           </p>
         </div>
+        <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Exame desta semana
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-foreground">{exam}</p>
+        </div>
       </div>
     </div>
   );
 }
 
 /* ---------- Diário ---------- */
-function JournalTab() {
+
+const JOURNAL_PROMPTS: Record<1 | 2 | 3, string[]> = {
+  1: [
+    "Como estou me sentindo com esta gestação?",
+    "O que mais me emociona nesse início?",
+    "Quais são meus maiores medos agora?",
+    "Uma mensagem para o meu bebê hoje.",
+  ],
+  2: [
+    "Senti o bebê se mexer hoje?",
+    "O que estou preparando para receber o bebê?",
+    "Como está meu corpo nesta fase?",
+    "Uma memória especial desta semana.",
+  ],
+  3: [
+    "Estou pronta para o parto?",
+    "Como está minha ansiedade agora?",
+    "O que quero lembrar deste momento?",
+    "Uma mensagem para o bebê antes de nascer.",
+  ],
+};
+
+function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [content, setContent] = useState("");
   const [mood, setMood] = useState("😊");
+
+  const trimester = gest ? trimesterForWeek(gest.weeks) : 1;
+  const prompts = JOURNAL_PROMPTS[trimester];
+  const firstName = profile?.display_name?.split(" ")[0];
 
   async function load() {
     const { data } = await (supabase as any)
@@ -301,8 +355,29 @@ function JournalTab() {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="text-sm font-medium">Como você está se sentindo hoje?</p>
-        <div className="mt-3 flex gap-2">
+        <p className="font-serif text-lg">
+          {firstName ? `${firstName}, como você está se sentindo hoje?` : "Como você está se sentindo hoje?"}
+        </p>
+        {gest && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Semana {gest.weeks} — {trimester === 1 ? "1º trimestre" : trimester === 2 ? "2º trimestre" : "3º trimestre"}
+          </p>
+        )}
+
+        {/* Prompt suggestions */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {prompts.map((p) => (
+            <button
+              key={p}
+              onClick={() => setContent((c) => (c ? c + "\n" + p : p))}
+              className="rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs text-primary hover:bg-primary/10"
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 flex gap-2">
           {["😊", "🥰", "😴", "🤢", "😢", "😰"].map((m) => (
             <button
               key={m}
@@ -354,12 +429,15 @@ function JournalTab() {
 }
 
 /* ---------- Chutes ---------- */
-function KicksTab() {
+function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string | null }) {
   const [active, setActive] = useState<KickSession | null>(null);
   const [count, setCount] = useState(0);
   const [history, setHistory] = useState<KickSession[]>([]);
   const startRef = useRef<number>(0);
   const [elapsed, setElapsed] = useState(0);
+
+  const label = babyName ?? "o bebê";
+  const isMonitoringPhase = weeks != null && weeks >= 28;
 
   async function load() {
     const { data } = await (supabase as any)
@@ -417,12 +495,38 @@ function KicksTab() {
   const mins = Math.floor(elapsed / 60000);
   const secs = Math.floor((elapsed % 60000) / 1000);
 
+  // Stats from history
+  const completeSessions = history.filter((s) => s.kick_count >= 10);
+  const avgMins =
+    completeSessions.length > 0
+      ? Math.round(
+          completeSessions.reduce((acc, s) => {
+            const dur =
+              s.ended_at
+                ? (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000
+                : 0;
+            return acc + dur;
+          }, 0) / completeSessions.length,
+        )
+      : null;
+
   return (
     <div className="space-y-6">
+      {/* Context banner */}
+      {weeks != null && !isMonitoringPhase && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-sm text-blue-900">
+          {weeks < 20
+            ? `Você está na semana ${weeks}. Os movimentos começam a ser sentidos entre as semanas 18 e 25. Continue o pré-natal normalmente.`
+            : `Você está na semana ${weeks}. Já pode começar a perceber os movimentos de ${label}! A contagem formal de chutes começa na semana 28.`}
+        </div>
+      )}
+
       <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
         <p className="text-xs uppercase tracking-[0.22em] text-primary">Contador de chutes</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          A partir da 28ª semana, conte 10 movimentos. O ideal é sentir 10 em até 2 horas.
+          {isMonitoringPhase
+            ? `A partir da semana 28, conte 10 movimentos de ${label}. O ideal é sentir 10 em até 2 horas.`
+            : "A contagem de movimentos é recomendada a partir da 28ª semana de gestação."}
         </p>
         {!active ? (
           <button
@@ -455,6 +559,26 @@ function KicksTab() {
         )}
       </div>
 
+      {/* Stats */}
+      {history.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-card p-5 text-center">
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">Sessões registradas</p>
+            <p className="mt-2 font-serif text-3xl">{history.length}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-5 text-center">
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">Sessões completas</p>
+            <p className="mt-2 font-serif text-3xl">{completeSessions.length}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-5 text-center">
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">Tempo médio (10 chutes)</p>
+            <p className="mt-2 font-serif text-3xl">
+              {avgMins != null ? `${avgMins} min` : "—"}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div>
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
           Histórico
@@ -480,7 +604,12 @@ function KicksTab() {
                     timeStyle: "short",
                   })}
                 </span>
-                <span className="text-muted-foreground">
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  {s.kick_count >= 10 && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                      ✓ completo
+                    </span>
+                  )}
                   {s.kick_count} chutes · {dur} min
                 </span>
               </div>
@@ -509,10 +638,20 @@ const DEFAULT_ITEMS: { category: string; label: string }[] = [
   { category: "acompanhante", label: "Carregador de celular" },
 ];
 
-function ChecklistTab() {
+function ChecklistTab({ gest }: { gest: Gest }) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [label, setLabel] = useState("");
   const [category, setCategory] = useState("mae");
+
+  const weeks = gest?.weeks ?? 0;
+  const urgencyBanner =
+    weeks >= 37
+      ? { text: "Semana 37+ — Sua mala deve estar completamente pronta!", color: "rose" }
+      : weeks >= 34
+        ? { text: `Semana ${weeks} — É hora de preparar a mala da maternidade.`, color: "amber" }
+        : weeks >= 30
+          ? { text: `Semana ${weeks} — Comece a separar os itens aos poucos.`, color: "blue" }
+          : null;
 
   async function load() {
     const { data: u } = await supabase.auth.getUser();
@@ -522,7 +661,6 @@ function ChecklistTab() {
       .select("*")
       .order("created_at", { ascending: true });
     if (!data || data.length === 0) {
-      // seed defaults on first load
       const seed = DEFAULT_ITEMS.map((d) => ({ ...d, user_id: u.user!.id, done: false }));
       await (supabase as any).from("checklist_items").insert(seed);
       const { data: again } = await (supabase as any)
@@ -565,7 +703,7 @@ function ChecklistTab() {
     return g;
   }, [items]);
 
-  const labels: Record<string, string> = {
+  const groupLabels: Record<string, string> = {
     mae: "Para a mamãe",
     bebe: "Para o bebê",
     acompanhante: "Para o acompanhante",
@@ -575,6 +713,20 @@ function ChecklistTab() {
 
   return (
     <div className="space-y-6">
+      {urgencyBanner && (
+        <div
+          className={`rounded-2xl border p-4 text-sm font-medium ${
+            urgencyBanner.color === "rose"
+              ? "border-rose-300 bg-rose-50 text-rose-900"
+              : urgencyBanner.color === "amber"
+                ? "border-amber-300 bg-amber-50 text-amber-900"
+                : "border-blue-300 bg-blue-50 text-blue-900"
+          }`}
+        >
+          {urgencyBanner.text}
+        </div>
+      )}
+
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="text-xs uppercase tracking-[0.22em] text-primary">Mala da maternidade</p>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -586,11 +738,14 @@ function ChecklistTab() {
             style={{ width: total ? `${(done / total) * 100}%` : "0%" }}
           />
         </div>
+        {done === total && total > 0 && (
+          <p className="mt-2 text-sm font-medium text-emerald-600">Tudo pronto! 🎉</p>
+        )}
       </div>
 
       {Object.entries(groups).map(([cat, list]) => (
         <div key={cat} className="rounded-3xl border border-border bg-card p-6">
-          <p className="font-serif text-lg">{labels[cat] ?? cat}</p>
+          <p className="font-serif text-lg">{groupLabels[cat] ?? cat}</p>
           <ul className="mt-3 space-y-1">
             {list.map((it) => (
               <li
@@ -673,6 +828,17 @@ function ProfileTab({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
+  // Completion percentage
+  const completionFields = [
+    form.display_name,
+    form.lmp_date || form.reference_date,
+    form.blood_type,
+    form.emergency_contact,
+    form.emergency_phone,
+  ];
+  const completed = completionFields.filter(Boolean).length;
+  const completionPct = Math.round((completed / completionFields.length) * 100);
+
   async function save() {
     setSaving(true);
     setMsg(null);
@@ -709,6 +875,29 @@ function ProfileTab({
 
   return (
     <div className="space-y-6">
+      {/* Completion card */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">Perfil completo</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {completionPct < 100
+                ? "Complete seu perfil para aproveitar todas as funcionalidades."
+                : "Seu perfil está completo!"}
+            </p>
+          </div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-primary/20 text-sm font-bold text-primary">
+            {completionPct}%
+          </div>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${completionPct}%` }}
+          />
+        </div>
+      </div>
+
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Suas informações</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -830,7 +1019,7 @@ function Field({
 }
 
 /* ---------- Saúde (peso + pressão) ---------- */
-function HealthTab() {
+function HealthTab({ gest }: { gest: Gest }) {
   const [logs, setLogs] = useState<HealthLog[]>([]);
   const [form, setForm] = useState({ weight_kg: "", systolic: "", diastolic: "", notes: "" });
 
@@ -874,9 +1063,37 @@ function HealthTab() {
   const minW = Math.min(...weights.map((w) => Number(w.weight_kg)), maxW);
   const range = Math.max(maxW - minW, 1);
 
+  // Total weight gain
+  const firstWeight = weights[0]?.weight_kg ? Number(weights[0].weight_kg) : null;
+  const lastWeight = weights[weights.length - 1]?.weight_kg
+    ? Number(weights[weights.length - 1].weight_kg)
+    : null;
+  const totalGain =
+    firstWeight != null && lastWeight != null ? (lastWeight - firstWeight).toFixed(1) : null;
+
+  // BP status badge on last reading
+  const lastBp = logs.find((l) => l.systolic != null && l.diastolic != null);
+  const bpStatus =
+    lastBp?.systolic != null && lastBp?.diastolic != null
+      ? lastBp.systolic >= 160 || lastBp.diastolic >= 110
+        ? { label: "PA muito elevada", color: "rose" }
+        : lastBp.systolic >= 140 || lastBp.diastolic >= 90
+          ? { label: "PA elevada — fale com o consultório", color: "amber" }
+          : { label: "PA normal", color: "emerald" }
+      : null;
+
+  // Weight gain guide based on trimester
+  const weeks = gest?.weeks ?? 0;
+  const weightGuide =
+    weeks < 13
+      ? "1–2 kg no 1º trimestre é esperado."
+      : weeks < 28
+        ? "Ganho de ~0,4 kg/semana no 2º trimestre é comum."
+        : "Ganho de ~0,5 kg/semana no 3º trimestre — acompanhe com seu médico.";
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-3xl border border-border bg-card p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Último peso</p>
           <p className="mt-2 font-serif text-3xl">
@@ -884,16 +1101,51 @@ function HealthTab() {
           </p>
         </div>
         <div className="rounded-3xl border border-border bg-card p-5">
+          <p className="text-xs uppercase tracking-[0.22em] text-primary">Ganho total</p>
+          <p className="mt-2 font-serif text-3xl">
+            {totalGain != null ? `${Number(totalGain) > 0 ? "+" : ""}${totalGain} kg` : "—"}
+          </p>
+        </div>
+        <div
+          className={`rounded-3xl border p-5 ${
+            bpStatus?.color === "rose"
+              ? "border-rose-300 bg-rose-50"
+              : bpStatus?.color === "amber"
+                ? "border-amber-300 bg-amber-50"
+                : "border-border bg-card"
+          }`}
+        >
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Última PA</p>
           <p className="mt-2 font-serif text-3xl">
-            {last?.systolic && last?.diastolic ? `${last.systolic}/${last.diastolic}` : "—"}
+            {lastBp?.systolic && lastBp?.diastolic
+              ? `${lastBp.systolic}/${lastBp.diastolic}`
+              : "—"}
           </p>
+          {bpStatus && (
+            <p
+              className={`mt-1 text-xs font-medium ${
+                bpStatus.color === "rose"
+                  ? "text-rose-700"
+                  : bpStatus.color === "amber"
+                    ? "text-amber-700"
+                    : "text-emerald-700"
+              }`}
+            >
+              {bpStatus.label}
+            </p>
+          )}
         </div>
         <div className="rounded-3xl border border-border bg-card p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Registros</p>
           <p className="mt-2 font-serif text-3xl">{logs.length}</p>
         </div>
       </div>
+
+      {gest && (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
+          <span className="font-medium">Orientação de ganho de peso:</span> {weightGuide}
+        </div>
+      )}
 
       {weights.length > 1 && (
         <div className="rounded-3xl border border-border bg-card p-6">
@@ -983,9 +1235,35 @@ function HealthTab() {
 }
 
 /* ---------- Perguntas para o médico ---------- */
-function QuestionsTab() {
+
+const SUGGESTED_QUESTIONS: Record<1 | 2 | 3, string[]> = {
+  1: [
+    "Que suplementos devo tomar no 1º trimestre?",
+    "Quais alimentos devo evitar?",
+    "Posso fazer exercícios físicos?",
+    "O que é a translucência nucal?",
+  ],
+  2: [
+    "Como interpretar o resultado do ultrassom morfológico?",
+    "O que é o teste de glicose?",
+    "Posso viajar nesta fase?",
+    "Como posso estimular o bebê?",
+  ],
+  3: [
+    "Quando devo ir para a maternidade?",
+    "Quais são os sinais de trabalho de parto?",
+    "Como é decidido entre parto normal e cesárea?",
+    "O que é o plano de parto?",
+  ],
+};
+
+function QuestionsTab({ gest }: { gest: Gest }) {
   const [items, setItems] = useState<DoctorQ[]>([]);
   const [text, setText] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const trimester = gest ? trimesterForWeek(gest.weeks) : 1;
+  const suggestions = SUGGESTED_QUESTIONS[trimester];
 
   async function load() {
     const { data } = await (supabase as any)
@@ -998,13 +1276,14 @@ function QuestionsTab() {
     load();
   }, []);
 
-  async function add() {
-    if (!text.trim()) return;
+  async function add(question?: string) {
+    const q = (question ?? text).trim();
+    if (!q) return;
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     await (supabase as any)
       .from("doctor_questions")
-      .insert({ user_id: u.user.id, question: text.trim() });
+      .insert({ user_id: u.user.id, question: q });
     setText("");
     load();
   }
@@ -1034,15 +1313,39 @@ function QuestionsTab() {
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
             placeholder="Ex: posso fazer exercícios físicos?"
             className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
           <button
-            onClick={add}
+            onClick={() => add()}
             className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground"
           >
             Adicionar
           </button>
+        </div>
+
+        {/* Suggested questions by trimester */}
+        <div className="mt-4">
+          <button
+            onClick={() => setShowSuggestions((v) => !v)}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            {showSuggestions ? "▲ Ocultar sugestões" : "▼ Ver perguntas comuns do " + (trimester === 1 ? "1º" : trimester === 2 ? "2º" : "3º") + " trimestre"}
+          </button>
+          {showSuggestions && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => add(s)}
+                  className="rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs text-primary hover:bg-primary/10"
+                >
+                  + {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1111,7 +1414,7 @@ function QuestionsTab() {
 }
 
 /* ---------- Acompanhante ---------- */
-function CompanionTab() {
+function CompanionTab({ babyName }: { babyName: string | null }) {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [name, setName] = useState("");
 
@@ -1148,8 +1451,8 @@ function CompanionTab() {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Convidar acompanhante</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Gere um link para o papai, vovó ou alguém especial acompanhar a evolução do bebê
-          (visualização).
+          Gere um link para o papai, vovó ou alguém especial acompanhar a evolução
+          {babyName ? ` de ${babyName}` : " do bebê"} (visualização).
         </p>
         <div className="mt-4 flex gap-2">
           <input
@@ -1267,8 +1570,13 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
         Esta triagem é uma orientação e <strong>não substitui avaliação médica</strong>. Em
         emergência, ligue <strong>192 (SAMU)</strong> ou vá ao pronto-socorro.
       </div>
+      {weeks != null && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Avaliação para semana {weeks} de gestação.
+        </p>
+      )}
 
-      <p className="mt-6 text-sm font-medium">Marque o que você está sentindo:</p>
+      <p className="mt-5 text-sm font-medium">Marque o que você está sentindo:</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {[...RED_SYMPTOMS, ...YELLOW_SYMPTOMS].map((s) => (
           <label
@@ -1351,13 +1659,7 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
 }
 
 /* ---------- Carteirinha digital ---------- */
-function CardTab({
-  profile,
-  gest,
-}: {
-  profile: Profile | null;
-  gest: ReturnType<typeof computeGestation>;
-}) {
+function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   if (!profile)
     return <p className="text-sm text-muted-foreground">Preencha seu perfil primeiro.</p>;
   const due = profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
@@ -1414,13 +1716,34 @@ function Info({ label, value }: { label: string; value: string }) {
 
 /* ---------- Chat IA ---------- */
 type ChatMsg = { role: "user" | "assistant"; content: string };
-function ChatTab() {
+
+function buildPatientContext(profile: Profile | null, gest: Gest): string {
+  if (!profile) return "";
+  const parts: string[] = [];
+  if (profile.display_name) parts.push(`Meu nome é ${profile.display_name}.`);
+  if (gest) {
+    parts.push(`Estou na semana ${gest.weeks} e ${gest.days} dias de gestação.`);
+  }
+  if (profile.baby_name) parts.push(`O nome do meu bebê é ${profile.baby_name}.`);
+  return parts.join(" ");
+}
+
+function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  const ctx = buildPatientContext(profile, gest);
+  const firstName = profile?.display_name?.split(" ")[0];
+
+  const greeting = [
+    firstName ? `Olá, ${firstName}!` : "Olá!",
+    gest
+      ? `Você está na semana ${gest.weeks} — vou responder levando em conta sua gestação.`
+      : "",
+    "Sou o assistente virtual do consultório do Dr. Clóvis Bacha. Como posso ajudar?",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const [messages, setMessages] = useState<ChatMsg[]>([
-    {
-      role: "assistant",
-      content:
-        "Olá! Sou o assistente virtual do consultório. Posso ajudar com dúvidas gerais sobre gestação e agendamento. Como posso ajudar?",
-    },
+    { role: "assistant", content: greeting },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1428,12 +1751,20 @@ function ChatTab() {
   async function send() {
     const text = input.trim();
     if (!text || loading) return;
-    const next: ChatMsg[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
+
+    // Prepend patient context to first user message so the AI knows who she is
+    const enrichedText = ctx && messages.length === 1 ? `[Contexto: ${ctx}]\n\n${text}` : text;
+    const displayMsg: ChatMsg = { role: "user", content: text };
+    const apiMsg: ChatMsg = { role: "user", content: enrichedText };
+
+    const displayNext = [...messages, displayMsg];
+    const apiNext = [...messages, apiMsg];
+
+    setMessages(displayNext);
     setInput("");
     setLoading(true);
     try {
-      const uiMessages = next.map((m, i) => ({
+      const uiMessages = apiNext.map((m, i) => ({
         id: String(i),
         role: m.role,
         parts: [{ type: "text", text: m.content }],
@@ -1447,7 +1778,7 @@ function ChatTab() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let acc = "";
-      setMessages([...next, { role: "assistant", content: "" }]);
+      setMessages([...displayNext, { role: "assistant", content: "" }]);
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -1459,11 +1790,11 @@ function ChatTab() {
             if (json.type === "text-delta" && json.delta) acc += json.delta;
           } catch {}
         });
-        setMessages([...next, { role: "assistant", content: acc }]);
+        setMessages([...displayNext, { role: "assistant", content: acc }]);
       }
-    } catch (e) {
+    } catch {
       setMessages([
-        ...next,
+        ...displayNext,
         { role: "assistant", content: "Desculpe, ocorreu um erro. Tente novamente." },
       ]);
     } finally {
