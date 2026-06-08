@@ -30,10 +30,12 @@ import { Route as AgendamentoRouteImport } from './routes/agendamento'
 import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
+import { Route as AlbumTokenRouteImport } from './routes/album.$token'
 import { Route as AcompanharTokenRouteImport } from './routes/acompanhar.$token'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
@@ -142,6 +144,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
+  id: '/votar-nome/$token',
+  path: '/votar-nome/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
@@ -160,6 +167,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
 const ApiCartaSemanalRoute = ApiCartaSemanalRouteImport.update({
   id: '/api/carta-semanal',
   path: '/api/carta-semanal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlbumTokenRoute = AlbumTokenRouteImport.update({
+  id: '/album/$token',
+  path: '/album/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AcompanharTokenRoute = AcompanharTokenRouteImport.update({
@@ -202,10 +214,12 @@ export interface FileRoutesByFullPath {
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
+  '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -231,10 +245,12 @@ export interface FileRoutesByTo {
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
+  '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -262,10 +278,12 @@ export interface FileRoutesById {
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
   '/acompanhar/$token': typeof AcompanharTokenRoute
+  '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -293,10 +311,12 @@ export interface FileRouteTypes {
     | '/minha-conta'
     | '/painel'
     | '/acompanhar/$token'
+    | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
+    | '/votar-nome/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -322,10 +342,12 @@ export interface FileRouteTypes {
     | '/minha-conta'
     | '/painel'
     | '/acompanhar/$token'
+    | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
+    | '/votar-nome/$token'
   id:
     | '__root__'
     | '/'
@@ -352,10 +374,12 @@ export interface FileRouteTypes {
     | '/_authenticated/minha-conta'
     | '/_authenticated/painel'
     | '/acompanhar/$token'
+    | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
+    | '/votar-nome/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -381,10 +405,12 @@ export interface RootRouteChildren {
   SobreRoute: typeof SobreRoute
   TamanhoRealRoute: typeof TamanhoRealRoute
   AcompanharTokenRoute: typeof AcompanharTokenRoute
+  AlbumTokenRoute: typeof AlbumTokenRoute
   ApiCartaSemanalRoute: typeof ApiCartaSemanalRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  VotarNomeTokenRoute: typeof VotarNomeTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -536,6 +562,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/votar-nome/$token': {
+      id: '/votar-nome/$token'
+      path: '/votar-nome/$token'
+      fullPath: '/votar-nome/$token'
+      preLoaderRoute: typeof VotarNomeTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/transcribe': {
       id: '/api/transcribe'
       path: '/api/transcribe'
@@ -562,6 +595,13 @@ declare module '@tanstack/react-router' {
       path: '/api/carta-semanal'
       fullPath: '/api/carta-semanal'
       preLoaderRoute: typeof ApiCartaSemanalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/album/$token': {
+      id: '/album/$token'
+      path: '/album/$token'
+      fullPath: '/album/$token'
+      preLoaderRoute: typeof AlbumTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/acompanhar/$token': {
@@ -624,10 +664,12 @@ const rootRouteChildren: RootRouteChildren = {
   SobreRoute: SobreRoute,
   TamanhoRealRoute: TamanhoRealRoute,
   AcompanharTokenRoute: AcompanharTokenRoute,
+  AlbumTokenRoute: AlbumTokenRoute,
   ApiCartaSemanalRoute: ApiCartaSemanalRoute,
   ApiChatRoute: ApiChatRoute,
   ApiNutritionRoute: ApiNutritionRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  VotarNomeTokenRoute: VotarNomeTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

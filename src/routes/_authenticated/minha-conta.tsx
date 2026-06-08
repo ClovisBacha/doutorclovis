@@ -21,6 +21,18 @@ import {
   savePatientNotes,
   type TeleconsultaSession,
 } from "@/lib/teleconsulta.functions";
+import {
+  getMyAlbumPosts,
+  createAlbumPost,
+  deleteAlbumPost,
+  getOrCreateNameSession,
+  addNameByPatient,
+  toggleNameSession,
+  removeNameEntry,
+  type AlbumPost,
+  type NameEntry,
+  type NameSession,
+} from "@/lib/family.functions";
 
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
@@ -94,6 +106,9 @@ const TABS = [
   "Consultas",
   "Teleconsulta",
   "Acompanhante",
+  "Conta Regressiva",
+  "Álbum",
+  "Nome do Bebê",
   "Carteirinha",
   "Chat IA",
   "Perfil",
@@ -222,6 +237,9 @@ function MinhaContaPage() {
         {tab === "Consultas" && <ConsultasTab />}
         {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
         {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
+        {tab === "Conta Regressiva" && <CountdownTab profile={profile} gest={gest} />}
+        {tab === "Álbum" && <AlbumTab profile={profile} />}
+        {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
         {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
         {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
         {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
@@ -4931,6 +4949,540 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* ---------- Conta Regressiva ---------- */
+const MILESTONES = [
+  { week: 12, label: "Fim do 1º trimestre", emoji: "🌱" },
+  { week: 20, label: "Metade da gestação", emoji: "🌟" },
+  { week: 24, label: "Viabilidade fetal", emoji: "💪" },
+  { week: 28, label: "3º trimestre", emoji: "🌙" },
+  { week: 34, label: "Bebê já pode nascer", emoji: "🎉" },
+  { week: 37, label: "Gestação a termo", emoji: "✅" },
+  { week: 40, label: "Data provável do parto", emoji: "🍼" },
+];
+
+function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!profile || !gest) {
+    return (
+      <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground">
+        Configure seu perfil (DPP ou DUM) para ver a contagem regressiva.
+      </div>
+    );
+  }
+
+  const due = profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
+  if (!due) {
+    return (
+      <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground">
+        Adicione a data provável do parto em <strong>Perfil</strong>.
+      </div>
+    );
+  }
+
+  const dueMs = new Date(due + "T00:00:00").getTime();
+  const diffMs = Math.max(0, dueMs - now);
+  const totalSec = Math.floor(diffMs / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  const progress = Math.min(100, (gest.totalDays / 280) * 100);
+
+  const lmpMs = profile.lmp_date
+    ? new Date(profile.lmp_date + "T00:00:00").getTime()
+    : dueMs - 280 * 86400000;
+
+  return (
+    <div className="space-y-8">
+      <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+          Faltam para a DPP
+        </p>
+        <div className="mt-6 flex justify-center gap-4 sm:gap-8">
+          {[
+            { value: days, label: "dias" },
+            { value: hours, label: "horas" },
+            { value: mins, label: "min" },
+            { value: secs, label: "seg" },
+          ].map(({ value, label }) => (
+            <div key={label} className="flex flex-col items-center">
+              <span className="tabular-nums text-4xl font-bold text-primary sm:text-5xl">
+                {String(value).padStart(2, "0")}
+              </span>
+              <span className="mt-1 text-xs text-muted-foreground">{label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6">
+          <div className="mx-auto h-3 max-w-sm overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {progress.toFixed(1)}% da gestação completa
+          </p>
+        </div>
+        {diffMs === 0 && (
+          <p className="mt-4 text-lg font-semibold text-primary">
+            🎊 Hoje é a data provável do parto! Parabéns, mamãe!
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h3 className="mb-4 font-semibold">Marcos da gestação</h3>
+        <div className="space-y-3">
+          {MILESTONES.map((m) => {
+            const milestoneMs = lmpMs + m.week * 7 * 86400000;
+            const passed = now >= milestoneMs;
+            const isCurrent = gest.weeks === m.week;
+            const diffDays = Math.ceil((milestoneMs - now) / 86400000);
+
+            return (
+              <div
+                key={m.week}
+                className={`flex items-center gap-4 rounded-2xl border p-4 transition-all ${
+                  isCurrent
+                    ? "border-primary bg-primary/5"
+                    : passed
+                    ? "border-border bg-secondary/30 opacity-70"
+                    : "border-border bg-card"
+                }`}
+              >
+                <span className="text-2xl">{passed ? "✅" : m.emoji}</span>
+                <div className="flex-1">
+                  <p className={`font-medium ${passed ? "line-through text-muted-foreground" : ""}`}>
+                    {m.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Semana {m.week}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {passed
+                    ? "Conquistado! 🎉"
+                    : isCurrent
+                    ? "Esta semana!"
+                    : `Em ${diffDays} dias`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Álbum Familiar ---------- */
+function AlbumTab({ profile }: { profile: Profile | null }) {
+  const [posts, setPosts] = useState<AlbumPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [caption, setCaption] = useState("");
+  const [emoji, setEmoji] = useState("");
+  const [imageData, setImageData] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return;
+      const res = await getMyAlbumPosts({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setPosts(res.posts);
+
+      // Get companion invite token for sharing
+      const { data: invites } = await (supabase as any)
+        .from("companion_invites")
+        .select("token")
+        .eq("user_id", s.session.user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (invites?.[0]?.token) {
+        setInviteToken(invites[0].token);
+        setShareUrl(`${window.location.origin}/album/${invites[0].token}`);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxSize = 800;
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setImageData(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleSubmit() {
+    if (!caption && !imageData && !emoji) return;
+    setSubmitting(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) { setSubmitting(false); return; }
+    const displayName = profile?.display_name ?? "Mamãe";
+    const res = await createAlbumPost({
+      data: {
+        accessToken: s.session.access_token,
+        authorName: displayName,
+        caption: caption || null,
+        imageData,
+        emoji: emoji || null,
+      },
+    });
+    if (res.ok) {
+      const res2 = await getMyAlbumPosts({ data: { accessToken: s.session.access_token } });
+      if (res2.ok) setPosts(res2.posts);
+      setCaption("");
+      setEmoji("");
+      setImageData(null);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+    setSubmitting(false);
+  }
+
+  async function handleDelete(id: string) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    await deleteAlbumPost({ data: { accessToken: s.session.access_token, id } });
+    setPosts((p) => p.filter((x) => x.id !== id));
+  }
+
+  if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <h3 className="font-semibold mb-4">Adicionar ao álbum</h3>
+        <div className="space-y-3">
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileRef}
+            onChange={handleFileChange}
+            className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-full file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-xs file:font-medium file:text-primary"
+          />
+          {imageData && (
+            <div className="relative inline-block">
+              <img src={imageData} alt="preview" className="h-32 rounded-xl object-cover" />
+              <button
+                onClick={() => { setImageData(null); if (fileRef.current) fileRef.current.value = ""; }}
+                className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center"
+              >×</button>
+            </div>
+          )}
+          <input
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder="Legenda (opcional)..."
+            className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
+          />
+          <div className="flex gap-2">
+            {["💕", "🤰", "👶", "🌸", "⭐", "🎀", "💙", "🌈"].map((e) => (
+              <button
+                key={e}
+                onClick={() => setEmoji(emoji === e ? "" : e)}
+                className={`rounded-xl p-2 text-xl transition-colors ${emoji === e ? "bg-primary/10 ring-1 ring-primary" : "hover:bg-secondary"}`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || (!caption && !imageData && !emoji)}
+            className="rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
+          >
+            {submitting ? "Salvando..." : "Publicar no álbum"}
+          </button>
+        </div>
+      </div>
+
+      {shareUrl && (
+        <div className="rounded-2xl border border-border bg-secondary/30 p-4">
+          <p className="text-sm font-medium mb-2">Link para família ver o álbum:</p>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={shareUrl}
+              className="flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground"
+            />
+            <button
+              onClick={() => navigator.clipboard.writeText(shareUrl)}
+              className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white"
+            >
+              Copiar
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A família acessa o álbum com o mesmo link do acompanhante.
+          </p>
+        </div>
+      )}
+
+      {!inviteToken && (
+        <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+          Crie um convite de acompanhante na aba <strong>Acompanhante</strong> para compartilhar o álbum com a família.
+        </div>
+      )}
+
+      <div>
+        <h3 className="font-semibold mb-4">
+          Álbum ({posts.length} {posts.length === 1 ? "memória" : "memórias"})
+        </h3>
+        {posts.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
+            <p className="text-3xl mb-2">📷</p>
+            <p>Nenhuma memória ainda. Comece adicionando a primeira!</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {posts.map((post) => (
+              <div key={post.id} className="group relative rounded-2xl border border-border bg-card overflow-hidden">
+                {post.image_data && (
+                  <img
+                    src={post.image_data}
+                    alt={post.caption ?? "Foto do álbum"}
+                    className="w-full object-cover"
+                    style={{ maxHeight: 220 }}
+                  />
+                )}
+                <div className="p-4">
+                  {post.emoji && <span className="text-2xl">{post.emoji}</span>}
+                  {post.caption && (
+                    <p className="mt-1 text-sm">{post.caption}</p>
+                  )}
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {post.author_name} · {new Date(post.created_at).toLocaleDateString("pt-BR")}
+                    </p>
+                    <button
+                      onClick={() => handleDelete(post.id)}
+                      className="text-xs text-destructive opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Nome do Bebê ---------- */
+function NomeTab({ profile }: { profile: Profile | null }) {
+  const [session, setSession] = useState<NameSession | null>(null);
+  const [entries, setEntries] = useState<NameEntry[]>([]);
+  const [newName, setNewName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return;
+      const res = await getOrCreateNameSession({ data: { accessToken: s.session.access_token } });
+      if (res.ok) {
+        setSession(res.session);
+        setEntries(res.entries);
+        setShareUrl(`${window.location.origin}/votar-nome/${res.session.share_token}`);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  async function handleAddName() {
+    if (!newName.trim()) return;
+    setSaving(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) { setSaving(false); return; }
+    await addNameByPatient({
+      data: {
+        accessToken: s.session.access_token,
+        name: newName.trim(),
+        suggestedBy: "Mamãe",
+      },
+    });
+    const res = await getOrCreateNameSession({ data: { accessToken: s.session.access_token } });
+    if (res.ok) { setSession(res.session); setEntries(res.entries); }
+    setNewName("");
+    setSaving(false);
+  }
+
+  async function handleToggle(isActive: boolean, revealWinner: boolean) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    await toggleNameSession({ data: { accessToken: s.session.access_token, isActive, revealWinner } });
+    setSession((prev) => prev ? { ...prev, is_active: isActive, reveal_winner: revealWinner } : prev);
+  }
+
+  async function handleRemove(entryId: string) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    await removeNameEntry({ data: { accessToken: s.session.access_token, entryId } });
+    setEntries((e) => e.filter((x) => x.id !== entryId));
+  }
+
+  if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+  if (!session) return <div className="text-muted-foreground text-center py-12">Erro ao carregar sessão.</div>;
+
+  const sortedEntries = [...entries].sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
+  const maxVotes = sortedEntries[0]?.vote_count ?? 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-3 items-center justify-between rounded-3xl border border-border bg-card p-6">
+        <div>
+          <h3 className="font-semibold">Votação de nomes</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {session.is_active ? "Aberta para votos" : "Votação encerrada"}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => handleToggle(!session.is_active, session.reveal_winner)}
+            className={`rounded-full px-4 py-2 text-sm font-medium ${
+              session.is_active
+                ? "bg-secondary text-foreground"
+                : "bg-primary text-white"
+            }`}
+          >
+            {session.is_active ? "Encerrar votação" : "Reabrir votação"}
+          </button>
+          <button
+            onClick={() => handleToggle(session.is_active, !session.reveal_winner)}
+            className={`rounded-full px-4 py-2 text-sm font-medium ${
+              session.reveal_winner ? "bg-amber-500 text-white" : "bg-secondary text-foreground"
+            }`}
+          >
+            {session.reveal_winner ? "Revelar vencedor ✓" : "Revelar vencedor"}
+          </button>
+        </div>
+      </div>
+
+      {shareUrl && (
+        <div className="rounded-2xl border border-border bg-secondary/30 p-4">
+          <p className="text-sm font-medium mb-2">Link para a família votar:</p>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={shareUrl}
+              className="flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground"
+            />
+            <button
+              onClick={() => navigator.clipboard.writeText(shareUrl)}
+              className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white"
+            >
+              Copiar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <h3 className="font-semibold mb-3">Sugerir nome</h3>
+        <div className="flex gap-2">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddName()}
+            placeholder="Nome do bebê..."
+            className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
+          />
+          <button
+            onClick={handleAddName}
+            disabled={saving || !newName.trim()}
+            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-40"
+          >
+            {saving ? "..." : "Adicionar"}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-4">
+          Nomes ({entries.length}) {!session.reveal_winner && entries.length > 0 && (
+            <span className="text-xs font-normal text-muted-foreground ml-2">
+              — votos ocultos para a família
+            </span>
+          )}
+        </h3>
+        {entries.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
+            <p className="text-3xl mb-2">👶</p>
+            <p>Nenhum nome ainda. Adicione o primeiro ou compartilhe o link para a família sugerir!</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {sortedEntries.map((entry, i) => {
+              const votes = entry.vote_count ?? 0;
+              const pct = maxVotes > 0 ? (votes / maxVotes) * 100 : 0;
+              return (
+                <div
+                  key={entry.id}
+                  className={`flex items-center gap-4 rounded-2xl border p-4 ${
+                    i === 0 && votes > 0 ? "border-amber-300 bg-amber-50" : "border-border bg-card"
+                  }`}
+                >
+                  <span className="w-6 text-center text-sm font-bold text-muted-foreground">
+                    {i === 0 && votes > 0 ? "👑" : `${i + 1}°`}
+                  </span>
+                  <div className="flex-1">
+                    <p className="font-medium">{entry.name}</p>
+                    <p className="text-xs text-muted-foreground">por {entry.suggested_by}</p>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-primary">{votes}</p>
+                    <p className="text-xs text-muted-foreground">{votes === 1 ? "voto" : "votos"}</p>
+                  </div>
+                  <button
+                    onClick={() => handleRemove(entry.id)}
+                    className="text-xs text-destructive hover:opacity-80"
+                    title="Remover nome"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
