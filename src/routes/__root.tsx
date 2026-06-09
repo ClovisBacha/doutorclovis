@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -15,22 +16,39 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ChatbotWidget } from "@/components/chatbot-widget";
 import { WhatsAppFloating } from "@/components/whatsapp-button";
+import { DOCTOR } from "@/lib/doctor.config";
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Physician",
+  name: "Dr. Clóvis Bacha",
+  description:
+    "Ginecologista e Obstetra especialista em Gestação de Alto Risco. Mais de 20 anos de prática clínica acompanhando gestações de baixo e alto risco.",
+  medicalSpecialty: ["https://schema.org/Obstetrics", "https://schema.org/MidwiferyOrWomenSHealth"],
+  url: DOCTOR.siteUrl,
+  sameAs: [DOCTOR.instagram],
+  hasOfferCatalog: {
+    "@type": "OfferCatalog",
+    name: "Obstétrica by Dr. Clóvis — App de Saúde Gestacional",
+    url: DOCTOR.siteUrl,
+  },
+};
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <p className="font-serif text-8xl text-primary/30">404</p>
+        <h1 className="mt-4 font-serif text-2xl text-foreground">Página não encontrada</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+          O endereço que você acessou não existe ou foi movido.
         </p>
-        <div className="mt-6">
+        <div className="mt-8">
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
-            Go home
+            Voltar ao início
           </Link>
         </div>
       </div>
@@ -46,13 +64,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
+        <h1 className="font-serif text-2xl text-foreground">Algo deu errado</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          Ocorreu um erro inesperado. Tente novamente ou volte para o início.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -60,15 +76,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
-            Try again
+            Tentar novamente
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center rounded-full border border-border bg-background px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Go home
+            Ir para o início
           </a>
         </div>
       </div>
@@ -82,25 +98,44 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Obstétrica by Dr. Clóvis — App de Gestação e Saúde da Mulher" },
-      { name: "description", content: "Acompanhe sua gestação semana a semana, converse com IA especializada, agende consultas e muito mais. Desenvolvido com Dr. Clóvis Bacha, especialista em gestação de alto risco." },
+      {
+        name: "description",
+        content:
+          "Acompanhe sua gestação semana a semana, converse com IA especializada, agende consultas e muito mais. Desenvolvido com Dr. Clóvis Bacha, especialista em gestação de alto risco.",
+      },
       { name: "author", content: "Dr. Clóvis Bacha" },
       { name: "theme-color", content: "#8b5147" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "Obstétrica" },
       { property: "og:title", content: "Obstétrica by Dr. Clóvis" },
-      { property: "og:description", content: "O app completo para acompanhar sua gestação com segurança e cuidado." },
+      {
+        property: "og:description",
+        content: "O app completo para acompanhar sua gestação com segurança e cuidado.",
+      },
       { property: "og:type", content: "website" },
       { property: "og:locale", content: "pt_BR" },
+      { property: "og:url", content: DOCTOR.siteUrl },
+      { property: "og:image", content: `${DOCTOR.siteUrl}/og.svg` },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Obstétrica by Dr. Clóvis" },
-      { name: "twitter:description", content: "Acompanhe sua gestação semana a semana com o app desenvolvido pelo Dr. Clóvis Bacha." },
+      {
+        name: "twitter:description",
+        content:
+          "Acompanhe sua gestação semana a semana com o app desenvolvido pelo Dr. Clóvis Bacha.",
+      },
+      { name: "twitter:image", content: `${DOCTOR.siteUrl}/og.svg` },
     ],
     links: [
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -118,6 +153,10 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="pt-BR">
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body>
         {children}
@@ -137,9 +176,16 @@ function RootComponent() {
   );
 }
 
+function CanonicalLink() {
+  const { location } = useRouterState();
+  const canonical = `${DOCTOR.siteUrl}${location.pathname}`;
+  return <link rel="canonical" href={canonical} />;
+}
+
 function SiteShell() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <CanonicalLink />
       <SiteHeader />
       <main className="flex-1">
         <Outlet />

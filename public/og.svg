@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#faf7f5"/>
+
+  <!-- Left accent bar -->
+  <rect width="14" height="630" fill="#8b5147"/>
+
+  <!-- Decorative circle background -->
+  <circle cx="1050" cy="315" r="220" fill="#8b5147" opacity="0.06"/>
+  <circle cx="1050" cy="315" r="160" fill="#8b5147" opacity="0.06"/>
+
+  <!-- Heart symbol -->
+  <text x="1050" y="350" text-anchor="middle" font-size="120" fill="#8b5147" opacity="0.25">♡</text>
+
+  <!-- Top label -->
+  <text x="68" y="175" font-family="Arial, sans-serif" font-size="18" fill="#8b5147" letter-spacing="6" font-weight="600">GESTAÇÃO · SAÚDE · CUIDADO</text>
+
+  <!-- Main title -->
+  <text x="68" y="300" font-family="Georgia, 'Times New Roman', serif" font-size="108" fill="#1a0f0d" font-weight="400">Obstétrica</text>
+
+  <!-- Subtitle -->
+  <text x="72" y="370" font-family="Georgia, 'Times New Roman', serif" font-size="44" fill="#8b5147" font-weight="400">by Dr. Clóvis Bacha</text>
+
+  <!-- Divider -->
+  <rect x="68" y="410" width="120" height="3" fill="#8b5147" opacity="0.35"/>
+
+  <!-- Tagline -->
+  <text x="68" y="460" font-family="Arial, sans-serif" font-size="26" fill="#6b5550" font-weight="300">App de Gestação e Saúde da Mulher</text>
+
+  <!-- Bottom URL -->
+  <text x="68" y="560" font-family="Arial, sans-serif" font-size="20" fill="#9a7d76" opacity="0.8">obstetricia.drclovisbacha.com.br</text>
+</svg>

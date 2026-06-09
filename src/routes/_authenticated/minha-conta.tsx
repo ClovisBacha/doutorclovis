@@ -4461,8 +4461,7 @@ function HumorTab() {
     })();
   }, []);
 
-  if (loading)
-    return <p className="text-center text-sm text-muted-foreground py-10">Carregando...</p>;
+  if (loading) return <TabSkeleton />;
 
   if (entries.length === 0)
     return (
@@ -6692,7 +6691,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
     setPosts((p) => p.filter((x) => x.id !== id));
   }
 
-  if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+  if (loading) return <TabSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -6889,7 +6888,7 @@ function NomeTab({ profile }: { profile: Profile | null }) {
     setEntries((e) => e.filter((x) => x.id !== entryId));
   }
 
-  if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+  if (loading) return <TabSkeleton />;
   if (!session)
     return <div className="text-muted-foreground text-center py-12">Erro ao carregar sessão.</div>;
 
@@ -9040,7 +9039,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
     (m) => !isDone(m.key) && m.weekApprox > babyAgeWeeks,
   ).slice(0, 3);
 
-  if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+  if (loading) return <TabSkeleton />;
 
   return (
     <div className="max-w-xl space-y-6">
@@ -9180,7 +9179,7 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
   const done = vaccines.length;
   const total = VACCINE_SCHEDULE.length;
 
-  if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
+  if (loading) return <TabSkeleton />;
 
   return (
     <div className="max-w-xl space-y-5">
