@@ -1,20 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { Menu, X, MessageCircle, User } from "lucide-react";
+import { Menu, X, Smartphone, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { WHATSAPP_URL } from "@/components/whatsapp-button";
 
-const nav = [
-  { to: "/", label: "Início" },
-  { to: "/sobre", label: "Sobre" },
+const navPublic = [
   { to: "/gestacao", label: "Gestação" },
   { to: "/calculadora", label: "Calculadora" },
   { to: "/dpp", label: "DPP" },
   { to: "/batimentos", label: "Batimentos" },
-  { to: "/modo-acompanhante", label: "Acompanhante" },
-  { to: "/lives", label: "Lives" },
-  { to: "/mural", label: "Mural" },
-  { to: "/depoimentos", label: "Depoimentos" },
+  { to: "/agendamento", label: "Agendamento" },
+  { to: "/empresas", label: "Para Empresas" },
+] as const;
+
+const navAuth = [
+  { to: "/minha-conta", label: "Meu App" },
   { to: "/agendamento", label: "Agendamento" },
 ] as const;
 
@@ -26,47 +25,45 @@ export function SiteHeader() {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSignedIn(!!s));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  const nav = signedIn ? navAuth : navPublic;
+
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
         <Link to="/" className="group flex items-baseline gap-2">
-          <span className="font-serif text-xl font-semibold tracking-tight text-primary">Dr. Clóvis Bacha</span>
-          <span className="hidden text-xs uppercase tracking-[0.18em] text-muted-foreground sm:inline">
-            Ginecologia · Obstetrícia
+          <span className="font-serif text-xl font-semibold tracking-tight text-primary">Obstétrica</span>
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            by Dr. Clóvis
           </span>
         </Link>
-        <nav className="hidden items-center gap-7 md:flex">
+        <nav className="hidden items-center gap-6 md:flex">
           {nav.map((n) => (
             <Link
               key={n.to}
               to={n.to}
-              activeOptions={{ exact: n.to === "/" }}
+              activeOptions={{ exact: false }}
               activeProps={{ className: "text-primary" }}
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
             >
               {n.label}
             </Link>
           ))}
-          <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-sm font-medium text-[#128C7E] hover:opacity-80"
-          >
-            <MessageCircle className="h-4 w-4" /> WhatsApp
-          </a>
-          <Link
-            to="/agendamento"
-            className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
-          >
-            Marcar consulta
-          </Link>
-          <Link
-            to={signedIn ? "/minha-conta" : "/auth"}
-            className="flex items-center gap-1 text-sm font-medium text-primary hover:opacity-80"
-          >
-            <User className="h-4 w-4" /> {signedIn ? "Minha conta" : "Entrar"}
-          </Link>
+          {signedIn ? (
+            <Link
+              to="/minha-conta"
+              className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+            >
+              <Smartphone className="h-4 w-4" /> Abrir App
+            </Link>
+          ) : (
+            <Link
+              to="/auth"
+              className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+            >
+              <User className="h-4 w-4" /> Entrar no App
+            </Link>
+          )}
         </nav>
         <button
           onClick={() => setOpen((o) => !o)}
@@ -89,6 +86,13 @@ export function SiteHeader() {
                 {n.label}
               </Link>
             ))}
+            <Link
+              to={signedIn ? "/minha-conta" : "/auth"}
+              onClick={() => setOpen(false)}
+              className="mt-2 flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              {signedIn ? <><Smartphone className="h-4 w-4" /> Abrir App</> : <><User className="h-4 w-4" /> Entrar no App</>}
+            </Link>
           </div>
         </div>
       )}

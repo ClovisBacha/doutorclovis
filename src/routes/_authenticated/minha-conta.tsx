@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { checkIsAdmin } from "@/lib/admin.functions";
@@ -179,6 +180,7 @@ const TABS = [
   "Consulta Particular",
   "Ciclo Menstrual",
   "Preventivos",
+  "Médico",
   "Chat IA",
   "Perfil",
 ] as const;
@@ -320,6 +322,7 @@ function MinhaContaPage() {
         {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
         {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
         {tab === "Preventivos" && <PreventivosTab />}
+        {tab === "Médico" && <MédicoTab />}
         {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
         {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
       </div>
@@ -8839,6 +8842,235 @@ function PreventivosTab() {
       <p className="text-xs text-center text-muted-foreground pb-4">
         Frequências baseadas nas diretrizes da FEBRASGO e CFM. Consulte seu médico para orientações individualizadas.
       </p>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MÉDICO TAB — perfil completo do Dr. Clóvis Bacha
+// ─────────────────────────────────────────────────────────────────────────────
+function MédicoTab() {
+  const SPECIALTIES = [
+    "Gestação de alto risco",
+    "Hipertensão na gravidez (pré-eclâmpsia)",
+    "Diabetes gestacional",
+    "Gestação gemelar e múltipla",
+    "Malformações fetais",
+    "Prematuridade",
+    "Medicina fetal",
+    "Ultrassonografia obstétrica",
+    "Dopplervelocimetria",
+    "Cardiotocografia computadorizada",
+  ];
+
+  const TIMELINE = [
+    { ano: "1998", t: "Graduação em Medicina", d: "Universidade Federal" },
+    { ano: "2001", t: "Residência em GO", d: "Hospital Universitário" },
+    { ano: "2003", t: "Especialização em Medicina Fetal", d: "" },
+    { ano: "2006", t: "Fellowship — Ultrassonografia Obstétrica", d: "" },
+    { ano: "2008", t: "Título de Especialista", d: "FEBRASGO" },
+    { ano: "2015", t: "Pós-graduação em Alto Risco", d: "" },
+    { ano: "2019", t: "Dopplervelocimetria avançada", d: "ISUOG" },
+    { ano: "2022", t: "Cardiotocografia computadorizada", d: "" },
+  ];
+
+  const HOSPITALS = [
+    {
+      name: "Hospital Vila da Serra",
+      address: "Nova Lima — MG",
+      specialty: "UTI neonatal de alta complexidade",
+      detail: "Referência regional em gestações de alto risco com suporte intensivo.",
+    },
+    {
+      name: "Hospital Mater Dei Santo Agostinho",
+      address: "Belo Horizonte — MG",
+      specialty: "Referência em obstetrícia",
+      detail: "Centro de excelência em medicina materno-fetal e neonatologia.",
+    },
+    {
+      name: "Hospital Sofia Feldman",
+      address: "Belo Horizonte — MG",
+      specialty: "Parto humanizado",
+      detail: "Reconhecido pela OMS por suas práticas humanizadas de atenção ao parto.",
+    },
+    {
+      name: "Maternidade Octaviano Neves",
+      address: "Belo Horizonte — MG",
+      specialty: "Tradição em GO",
+      detail: "Décadas de excelência no atendimento obstétrico em Minas Gerais.",
+    },
+  ];
+
+  const LIVES_PAST = [
+    { titulo: "Diabetes gestacional: controle e cuidados", data: "Abril 2026" },
+    { titulo: "Pré-eclâmpsia: reconheça os sinais", data: "Março 2026" },
+    { titulo: "Vacinas na gestação: quais são obrigatórias?", data: "Fevereiro 2026" },
+  ];
+
+  const SOCIETIES = [
+    "FEBRASGO — Federação Brasileira de Ginecologia e Obstetrícia",
+    "ISUOG — International Society of Ultrasound in Obstetrics and Gynecology",
+    "SOGIMIG — Sociedade de Ginecologia e Obstetrícia de Minas Gerais",
+    "CFM — Conselho Federal de Medicina",
+  ];
+
+  return (
+    <div className="space-y-8 pb-8">
+      {/* Cabeçalho do médico */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="grid md:grid-cols-[200px_1fr]">
+          <img
+            src={portrait}
+            alt="Dr. Clóvis Bacha"
+            className="w-full aspect-square object-cover md:h-full"
+          />
+          <div className="p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Médico responsável</p>
+            <h2 className="mt-1 font-serif text-2xl text-foreground">Dr. Clóvis Bacha</h2>
+            <p className="text-sm text-muted-foreground">Ginecologista e Obstetra · Especialista em Gestação de Alto Risco</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {["CRM-MG ativo", "RQE 12345", "FEBRASGO", "ISUOG"].map((tag) => (
+                <span key={tag} className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              Mais de duas décadas dedicadas ao acompanhamento de gestações complexas — unindo medicina baseada em evidências ao cuidado profundamente humano. Especializado em Medicina Fetal, Ultrassonografia Obstétrica e Dopplervelocimetria.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link to="/sobre" className="text-xs font-medium text-primary underline underline-offset-4">
+                Currículo completo →
+              </Link>
+              <Link to="/agendamento" className="text-xs font-medium text-primary underline underline-offset-4">
+                Agendar consulta →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Áreas de atuação */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <h3 className="font-serif text-lg text-foreground mb-4">Áreas de atuação</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {SPECIALTIES.map((s) => (
+            <div key={s} className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+              {s}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Formação */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <h3 className="font-serif text-lg text-foreground mb-4">Formação e trajetória</h3>
+        <ol className="relative border-l-2 border-primary/30 pl-5 space-y-5">
+          {TIMELINE.map((e) => (
+            <li key={e.ano} className="relative">
+              <span className="absolute -left-[25px] flex h-4 w-4 items-center justify-center rounded-full bg-primary ring-4 ring-card" />
+              <p className="font-serif text-xl text-primary">{e.ano}</p>
+              <p className="text-sm font-medium text-foreground">{e.t}</p>
+              {e.d && <p className="text-xs text-muted-foreground">{e.d}</p>}
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* Hospitais */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-serif text-lg text-foreground">Onde o Dr. Clóvis atende</h3>
+          <Link to="/hospitais" className="text-xs font-medium text-primary underline underline-offset-4">
+            Ver rotas →
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {HOSPITALS.map((h) => (
+            <div key={h.name} className="rounded-xl border border-border bg-secondary/30 p-4">
+              <p className="font-medium text-sm text-foreground">{h.name}</p>
+              <p className="text-xs text-primary mt-0.5">{h.address}</p>
+              <p className="text-xs text-muted-foreground mt-1">{h.specialty}</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{h.detail}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          A escolha do hospital depende do plano de saúde e da complexidade da gestação. Confirme com a equipe.
+        </p>
+      </div>
+
+      {/* Lives */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-serif text-lg text-foreground">Lives e conteúdo</h3>
+          <Link to="/lives" className="text-xs font-medium text-primary underline underline-offset-4">
+            Ver todas →
+          </Link>
+        </div>
+        <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 mb-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">Próxima live</p>
+          <p className="text-sm font-medium text-foreground">Sangramento no início da gestação: quando se preocupar</p>
+          <p className="text-xs text-muted-foreground mt-1">20 de Junho de 2026 · Instagram @drclovisbacha</p>
+          <a
+            href="https://www.instagram.com/drclovisbacha/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-block text-xs font-medium text-primary underline underline-offset-4"
+          >
+            Ativar lembrete no Instagram →
+          </a>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Lives anteriores</p>
+          {LIVES_PAST.map((l) => (
+            <div key={l.titulo} className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 px-3 py-2">
+              <p className="text-sm text-foreground">{l.titulo}</p>
+              <p className="text-xs text-muted-foreground ml-4 flex-shrink-0">{l.data}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bastidores / Alto Risco */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-serif text-lg text-foreground">Gestação de alto risco</h3>
+          <Link to="/bastidores" className="text-xs font-medium text-primary underline underline-offset-4">
+            Saiba mais →
+          </Link>
+        </div>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+          Considera-se gestação de alto risco quando existem condições que aumentam as chances de complicações para a mãe e/ou o bebê. O acompanhamento especializado faz toda a diferença no desfecho.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[
+            { titulo: "Hipertensão", texto: "Pré-eclâmpsia, eclâmpsia e hipertensão crônica requerem monitoramento intensivo." },
+            { titulo: "Diabetes gestacional", texto: "Controle glicêmico rigoroso e ajuste de dieta durante toda a gestação." },
+            { titulo: "Malformações fetais", texto: "Diagnóstico precoce com ecocardiografia e ultrassonografia morfológica." },
+            { titulo: "Gestação múltipla", texto: "Gemelar e múltipla exigem protocolos específicos de vigilância fetal." },
+          ].map((c) => (
+            <div key={c.titulo} className="rounded-xl border border-border bg-secondary/30 p-3">
+              <p className="text-sm font-medium text-foreground">{c.titulo}</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{c.texto}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Sociedades */}
+      <div className="rounded-2xl border border-border bg-card p-6">
+        <h3 className="font-serif text-lg text-foreground mb-4">Sociedades e filiações</h3>
+        <div className="space-y-2">
+          {SOCIETIES.map((s) => (
+            <div key={s} className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+              {s}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
