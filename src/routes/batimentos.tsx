@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Heart, Pause, Play } from "lucide-react";
+import { AppCtaBanner } from "@/components/app-cta-banner";
 
 export const Route = createFileRoute("/batimentos")({
   head: () => ({
@@ -93,6 +94,7 @@ function BatimentosPage() {
       <p className="mt-8 text-xs text-muted-foreground">
         * Simulação educativa via síntese de áudio. Não substitui a ausculta clínica.
       </p>
+      <AppCtaBanner />
     </section>
   );
 }

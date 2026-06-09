@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { AppCtaBanner } from "@/components/app-cta-banner";
 
 export const Route = createFileRoute("/calculadora")({
   head: () => ({
@@ -73,6 +74,7 @@ function CalcPage() {
           * Estimativa baseada em ciclo regular de 28 dias. A confirmação clínica deve ser feita em consulta com ultrassom.
         </p>
       </div>
+      <AppCtaBanner />
     </section>
   );
 }

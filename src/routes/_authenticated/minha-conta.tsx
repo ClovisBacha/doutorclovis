@@ -186,6 +186,41 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number];
 
+const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
+  {
+    label: "Gestação",
+    tabs: ["Bebê", "Carta do Bebê", "Calendário", "Linha do Tempo", "Chutes", "Contrações", "Conta Regressiva", "Carteirinha"],
+  },
+  {
+    label: "Saúde",
+    tabs: ["Saúde", "Nutrição", "Meditações", "Sons", "Exercícios", "Clima", "Alertas", "Ciclo Menstrual", "Preventivos"],
+  },
+  {
+    label: "Família",
+    tabs: ["Diário", "Humor", "Acompanhante", "Quartinho", "Álbum", "Nome do Bebê", "Pós-parto"],
+  },
+  {
+    label: "Consultas",
+    tabs: ["Pré-consulta", "Perguntas", "Checklist", "Consultas", "Teleconsulta", "Consulta Particular"],
+  },
+  {
+    label: "Aprender",
+    tabs: ["Escola", "FAQ", "Pânico", "Conquistas", "Loja"],
+  },
+  {
+    label: "Médico",
+    tabs: ["Médico"],
+  },
+  {
+    label: "Conta",
+    tabs: ["Chat IA", "Perfil"],
+  },
+];
+
+function categoryOfTab(t: Tab): string {
+  return CATEGORIES.find((c) => (c.tabs as readonly string[]).includes(t))?.label ?? "Gestação";
+}
+
 function MinhaContaPage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -270,14 +305,37 @@ function MinhaContaPage() {
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2 border-b border-border">
-        {TABS.map((t) => (
+      {/* Category selector */}
+      <div className="mt-6 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {CATEGORIES.map((cat) => {
+          const active = categoryOfTab(tab) === cat.label;
+          return (
+            <button
+              key={cat.label}
+              onClick={() => {
+                if (!active) setTab(cat.tabs[0]);
+              }}
+              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+              }`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab row for current category */}
+      <div className="mt-2 flex gap-0.5 overflow-x-auto border-b border-border pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            className={`-mb-px flex-shrink-0 border-b-2 px-3 py-2 text-sm transition-colors ${
               tab === t
-                ? "border-primary text-primary"
+                ? "border-primary font-medium text-primary"
                 : "border-transparent text-muted-foreground hover:text-primary"
             }`}
           >

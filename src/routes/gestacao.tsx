@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { Baby, HeartPulse, Stethoscope } from "lucide-react";
+import { AppCtaBanner } from "@/components/app-cta-banner";
 
 export const Route = createFileRoute("/gestacao")({
   head: () => {
@@ -109,6 +110,7 @@ function GestacaoPage() {
           <Link to="/agendamento" className="mt-4 inline-block rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground">Agendar consulta</Link>
         </div>
       </section>
+      <AppCtaBanner />
     </>
   );
 }

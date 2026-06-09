@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { AppCtaBanner } from "@/components/app-cta-banner";
 
 export const Route = createFileRoute("/dpp")({
   head: () => ({
@@ -97,6 +98,7 @@ function DppPage() {
           </p>
         </div>
       )}
+      <AppCtaBanner />
     </section>
   );
 }
