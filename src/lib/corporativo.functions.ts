@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { typedDb } from "@/integrations/supabase/types.extended";
 
 export type CorporateLead = {
   id: string;
@@ -27,18 +28,20 @@ export type CorporateAccount = {
 
 export const submitCorporateLead = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      companyName: z.string().min(2),
-      contactName: z.string().min(2),
-      contactEmail: z.string().email(),
-      contactPhone: z.string().nullable(),
-      employeeCount: z.string().nullable(),
-      message: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        companyName: z.string().min(2),
+        contactName: z.string().min(2),
+        contactEmail: z.string().email(),
+        contactPhone: z.string().nullable(),
+        employeeCount: z.string().nullable(),
+        message: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { error } = await db.from("corporate_leads").insert({
       company_name: data.companyName,
       contact_name: data.contactName,
@@ -52,11 +55,11 @@ export const submitCorporateLead = createServerFn({ method: "POST" })
 
 export const joinCorporate = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), accessCode: z.string().min(4) }).parse(i)
+    z.object({ accessToken: z.string().min(10), accessCode: z.string().min(4) }).parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
     // Validate code
@@ -87,8 +90,11 @@ export const getCorporateLeadsAdmin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
-    const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const db = typedDb(supabaseAdmin);
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
     const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (!u.user?.email || !adminEmails.includes(u.user.email.toLowerCase()))
       return { ok: false as const, error: "Não autorizado" };
@@ -109,19 +115,24 @@ export const getCorporateLeadsAdmin = createServerFn({ method: "POST" })
 
 export const createCorporateAccountAdmin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      companyName: z.string().min(2),
-      contactEmail: z.string().email(),
-      planType: z.enum(["basico", "standard", "premium"]),
-      maxSeats: z.number().int().min(1),
-      notes: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        companyName: z.string().min(2),
+        contactEmail: z.string().email(),
+        planType: z.enum(["basico", "standard", "premium"]),
+        maxSeats: z.number().int().min(1),
+        notes: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
-    const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const db = typedDb(supabaseAdmin);
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
     const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (!u.user?.email || !adminEmails.includes(u.user.email.toLowerCase()))
       return { ok: false as const, error: "Não autorizado" };
@@ -142,12 +153,17 @@ export const createCorporateAccountAdmin = createServerFn({ method: "POST" })
 
 export const updateLeadStatusAdmin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), id: z.string().uuid(), status: z.string() }).parse(i)
+    z
+      .object({ accessToken: z.string().min(10), id: z.string().uuid(), status: z.string() })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
-    const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const db = typedDb(supabaseAdmin);
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
     const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (!u.user?.email || !adminEmails.includes(u.user.email.toLowerCase()))
       return { ok: false as const };

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { typedDb } from "@/integrations/supabase/types.extended";
 
 export type PrivateConsultation = {
   id: string;
@@ -34,16 +35,18 @@ export const CONSULT_TYPES = [
 
 export const requestPrivateConsultation = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      consultType: z.string(),
-      preferredDates: z.array(z.string()),
-      message: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        consultType: z.string(),
+        preferredDates: z.array(z.string()),
+        message: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
     const { data: row, error } = await db
@@ -64,7 +67,7 @@ export const getMyPrivateConsultations = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
     const { data: rows } = await db
@@ -77,11 +80,11 @@ export const getMyPrivateConsultations = createServerFn({ method: "POST" })
 
 export const markPaymentSent = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), id: z.string().uuid() }).parse(i)
+    z.object({ accessToken: z.string().min(10), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const };
     const { error } = await db
@@ -97,8 +100,11 @@ export const getPrivateConsultationsAdmin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
-    const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const db = typedDb(supabaseAdmin);
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
     const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (!u.user?.email || !adminEmails.includes(u.user.email.toLowerCase()))
       return { ok: false as const, error: "Não autorizado" };
@@ -111,16 +117,21 @@ export const getPrivateConsultationsAdmin = createServerFn({ method: "POST" })
 
 export const confirmPaymentAdmin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      id: z.string().uuid(),
-      status: z.enum(["confirmado", "cancelado", "realizado"]),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        id: z.string().uuid(),
+        status: z.enum(["confirmado", "cancelado", "realizado"]),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
-    const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const db = typedDb(supabaseAdmin);
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
     const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (!u.user?.email || !adminEmails.includes(u.user.email.toLowerCase()))
       return { ok: false as const };

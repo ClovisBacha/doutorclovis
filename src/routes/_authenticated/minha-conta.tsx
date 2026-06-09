@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { TabErrorBoundary } from "@/components/tab-error-boundary";
+import { TabSkeleton } from "@/components/tab-skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
@@ -189,11 +191,30 @@ type Tab = (typeof TABS)[number];
 const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   {
     label: "Gestação",
-    tabs: ["Bebê", "Carta do Bebê", "Calendário", "Linha do Tempo", "Chutes", "Contrações", "Conta Regressiva", "Carteirinha"],
+    tabs: [
+      "Bebê",
+      "Carta do Bebê",
+      "Calendário",
+      "Linha do Tempo",
+      "Chutes",
+      "Contrações",
+      "Conta Regressiva",
+      "Carteirinha",
+    ],
   },
   {
     label: "Saúde",
-    tabs: ["Saúde", "Nutrição", "Meditações", "Sons", "Exercícios", "Clima", "Alertas", "Ciclo Menstrual", "Preventivos"],
+    tabs: [
+      "Saúde",
+      "Nutrição",
+      "Meditações",
+      "Sons",
+      "Exercícios",
+      "Clima",
+      "Alertas",
+      "Ciclo Menstrual",
+      "Preventivos",
+    ],
   },
   {
     label: "Família",
@@ -201,7 +222,14 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Consultas",
-    tabs: ["Pré-consulta", "Perguntas", "Checklist", "Consultas", "Teleconsulta", "Consulta Particular"],
+    tabs: [
+      "Pré-consulta",
+      "Perguntas",
+      "Checklist",
+      "Consultas",
+      "Teleconsulta",
+      "Consulta Particular",
+    ],
   },
   {
     label: "Aprender",
@@ -278,9 +306,7 @@ function MinhaContaPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
             Minha conta
           </p>
-          <h1 className="mt-2 font-serif text-3xl md:text-4xl">
-            Olá, {firstName} 💛
-          </h1>
+          <h1 className="mt-2 font-serif text-3xl md:text-4xl">Olá, {firstName} 💛</h1>
           {profile?.baby_name && (
             <p className="mt-1 text-sm text-muted-foreground">Acompanhando {profile.baby_name}</p>
           )}
@@ -345,44 +371,48 @@ function MinhaContaPage() {
       </div>
 
       <div className="mt-8">
-        {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
-        {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
-        {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
-        {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
-        {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
-        {tab === "Humor" && <HumorTab />}
-        {tab === "Chutes" && <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />}
-        {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
-        {tab === "Saúde" && <HealthTab gest={gest} profile={profile} />}
-        {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
-        {tab === "Meditações" && <MeditacoesTab gest={gest} />}
-        {tab === "Sons" && <SonsBebêTab gest={gest} />}
-        {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
-        {tab === "Quartinho" && <QuartinhoTab gest={gest} />}
-        {tab === "Clima" && <ClimaTab gest={gest} />}
-        {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
-        {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
-        {tab === "Perguntas" && <QuestionsTab gest={gest} />}
-        {tab === "Checklist" && <ChecklistTab gest={gest} />}
-        {tab === "Consultas" && <ConsultasTab />}
-        {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
-        {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
-        {tab === "Conta Regressiva" && <CountdownTab profile={profile} gest={gest} />}
-        {tab === "Álbum" && <AlbumTab profile={profile} />}
-        {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
-        {tab === "Escola" && <EscolaBebêTab gest={gest} />}
-        {tab === "FAQ" && <FAQTab gest={gest} />}
-        {tab === "Pânico" && <PânicoTab profile={profile} />}
-        {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
-        {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
-        {tab === "Conquistas" && <ConquistasTab />}
-        {tab === "Loja" && <LojaTab gest={gest} />}
-        {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
-        {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
-        {tab === "Preventivos" && <PreventivosTab />}
-        {tab === "Médico" && <MédicoTab />}
-        {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
-        {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
+        <TabErrorBoundary tabName={tab}>
+          {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
+          {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
+          {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
+          {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
+          {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
+          {tab === "Humor" && <HumorTab />}
+          {tab === "Chutes" && (
+            <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
+          )}
+          {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
+          {tab === "Saúde" && <HealthTab gest={gest} profile={profile} />}
+          {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
+          {tab === "Meditações" && <MeditacoesTab gest={gest} />}
+          {tab === "Sons" && <SonsBebêTab gest={gest} />}
+          {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
+          {tab === "Quartinho" && <QuartinhoTab gest={gest} />}
+          {tab === "Clima" && <ClimaTab gest={gest} />}
+          {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
+          {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
+          {tab === "Perguntas" && <QuestionsTab gest={gest} />}
+          {tab === "Checklist" && <ChecklistTab gest={gest} />}
+          {tab === "Consultas" && <ConsultasTab />}
+          {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
+          {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
+          {tab === "Conta Regressiva" && <CountdownTab profile={profile} gest={gest} />}
+          {tab === "Álbum" && <AlbumTab profile={profile} />}
+          {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
+          {tab === "Escola" && <EscolaBebêTab gest={gest} />}
+          {tab === "FAQ" && <FAQTab gest={gest} />}
+          {tab === "Pânico" && <PânicoTab profile={profile} />}
+          {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
+          {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
+          {tab === "Conquistas" && <ConquistasTab />}
+          {tab === "Loja" && <LojaTab gest={gest} />}
+          {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
+          {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
+          {tab === "Preventivos" && <PreventivosTab />}
+          {tab === "Médico" && <MédicoTab />}
+          {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
+          {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
+        </TabErrorBoundary>
       </div>
     </section>
   );
@@ -506,8 +536,9 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
                 <span className="text-orange-500 text-base">🍬</span>
                 <p>
-                  Você teve <strong>diabetes gestacional</strong> anteriormente. O risco de recorrência é
-                  maior — converse com Dr. Clóvis sobre o teste de glicemia antecipado (semanas 20–24).
+                  Você teve <strong>diabetes gestacional</strong> anteriormente. O risco de
+                  recorrência é maior — converse com Dr. Clóvis sobre o teste de glicemia antecipado
+                  (semanas 20–24).
                 </p>
               </div>
             )}
@@ -515,8 +546,8 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
                 <span className="text-purple-500 text-base">👶</span>
                 <p>
-                  Histórico de <strong>parto prematuro</strong>. Dr. Clóvis acompanhará o comprimento
-                  cervical com mais frequência nesta gestação.
+                  Histórico de <strong>parto prematuro</strong>. Dr. Clóvis acompanhará o
+                  comprimento cervical com mais frequência nesta gestação.
                 </p>
               </div>
             )}
@@ -524,21 +555,26 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
                 <span className="text-blue-500 text-base">🏥</span>
                 <p>
-                  Cesariana anterior registrada. A via de parto desta gestação será planejada em conjunto
-                  com Dr. Clóvis.
+                  Cesariana anterior registrada. A via de parto desta gestação será planejada em
+                  conjunto com Dr. Clóvis.
                 </p>
               </div>
             )}
-            {!profile.prior_bp_elevated && !profile.prior_gestational_diabetes && !profile.prior_preterm && !profile.prior_cesarean && (
-              <p className="text-amber-700">
-                Nenhuma complicação registrada na gestação anterior. Continue preenchendo seu histórico
-                em <strong>Perfil → 2ª Gestação</strong>.
-              </p>
-            )}
+            {!profile.prior_bp_elevated &&
+              !profile.prior_gestational_diabetes &&
+              !profile.prior_preterm &&
+              !profile.prior_cesarean && (
+                <p className="text-amber-700">
+                  Nenhuma complicação registrada na gestação anterior. Continue preenchendo seu
+                  histórico em <strong>Perfil → 2ª Gestação</strong>.
+                </p>
+              )}
             {profile.prior_notes && (
               <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
                 <span className="text-base">📋</span>
-                <p><strong>Observações:</strong> {profile.prior_notes}</p>
+                <p>
+                  <strong>Observações:</strong> {profile.prior_notes}
+                </p>
               </div>
             )}
           </div>
@@ -613,11 +649,14 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
     <div className="space-y-6">
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">
-          {firstName ? `${firstName}, como você está se sentindo hoje?` : "Como você está se sentindo hoje?"}
+          {firstName
+            ? `${firstName}, como você está se sentindo hoje?`
+            : "Como você está se sentindo hoje?"}
         </p>
         {gest && (
           <p className="mt-1 text-xs text-muted-foreground">
-            Semana {gest.weeks} — {trimester === 1 ? "1º trimestre" : trimester === 2 ? "2º trimestre" : "3º trimestre"}
+            Semana {gest.weeks} —{" "}
+            {trimester === 1 ? "1º trimestre" : trimester === 2 ? "2º trimestre" : "3º trimestre"}
           </p>
         )}
 
@@ -758,10 +797,9 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
     completeSessions.length > 0
       ? Math.round(
           completeSessions.reduce((acc, s) => {
-            const dur =
-              s.ended_at
-                ? (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000
-                : 0;
+            const dur = s.ended_at
+              ? (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000
+              : 0;
             return acc + dur;
           }, 0) / completeSessions.length,
         )
@@ -828,10 +866,10 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
             <p className="mt-2 font-serif text-3xl">{completeSessions.length}</p>
           </div>
           <div className="rounded-2xl border border-border bg-card p-5 text-center">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Tempo médio (10 chutes)</p>
-            <p className="mt-2 font-serif text-3xl">
-              {avgMins != null ? `${avgMins} min` : "—"}
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+              Tempo médio (10 chutes)
             </p>
+            <p className="mt-2 font-serif text-3xl">{avgMins != null ? `${avgMins} min` : "—"}</p>
           </div>
         </div>
       )}
@@ -1137,7 +1175,9 @@ function ProfileTab({
       emergency_contact: form.emergency_contact || null,
       emergency_phone: form.emergency_phone || null,
       height_cm: form.height_cm ? Number(form.height_cm) : null,
-      pre_pregnancy_weight_kg: form.pre_pregnancy_weight_kg ? Number(form.pre_pregnancy_weight_kg) : null,
+      pre_pregnancy_weight_kg: form.pre_pregnancy_weight_kg
+        ? Number(form.pre_pregnancy_weight_kg)
+        : null,
       medications: form.medications || null,
       birth_date: form.birth_date || null,
       pregnancy_number: form.pregnancy_number ? Number(form.pregnancy_number) : 1,
@@ -1294,7 +1334,8 @@ function ProfileTab({
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Dados corporais</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Usados para calcular seu IMC pré-gestacional e a curva de ganho de peso recomendada (IOM 2009).
+          Usados para calcular seu IMC pré-gestacional e a curva de ganho de peso recomendada (IOM
+          2009).
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field
@@ -1316,7 +1357,8 @@ function ProfileTab({
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Histórico gestacional</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Se esta é sua segunda gestação (ou mais), registre as complicações anteriores para monitoramento personalizado.
+          Se esta é sua segunda gestação (ou mais), registre as complicações anteriores para
+          monitoramento personalizado.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
@@ -1335,7 +1377,9 @@ function ProfileTab({
         </div>
         {Number(form.pregnancy_number) >= 2 && (
           <div className="mt-4 space-y-3">
-            <p className="text-sm font-medium text-muted-foreground">Complicações na gestação anterior:</p>
+            <p className="text-sm font-medium text-muted-foreground">
+              Complicações na gestação anterior:
+            </p>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -1384,7 +1428,9 @@ function ProfileTab({
               <span className="text-sm">Cesárea anterior</span>
             </label>
             <div>
-              <label className="block text-sm font-medium mb-1">Outras observações (opcional)</label>
+              <label className="block text-sm font-medium mb-1">
+                Outras observações (opcional)
+              </label>
               <textarea
                 value={form.prior_notes}
                 onChange={(e) => setForm({ ...form, prior_notes: e.target.value })}
@@ -1409,13 +1455,15 @@ function ProfileTab({
               <span className="text-2xl">🔔</span>
               <div>
                 <p className="text-sm font-medium text-green-700">Notificações ativas</p>
-                <p className="text-xs text-green-600">Você receberá dicas semanais personalizadas.</p>
+                <p className="text-xs text-green-600">
+                  Você receberá dicas semanais personalizadas.
+                </p>
               </div>
             </div>
           ) : notifPermission === "denied" ? (
             <div className="rounded-2xl bg-secondary p-4 text-sm text-muted-foreground">
-              Notificações bloqueadas neste navegador. Para ativar, vá nas configurações do navegador
-              e permita notificações para este site.
+              Notificações bloqueadas neste navegador. Para ativar, vá nas configurações do
+              navegador e permita notificações para este site.
             </div>
           ) : (
             <button
@@ -1445,7 +1493,9 @@ function ProfileTab({
             <span className="text-2xl">🏢</span>
             <div>
               <p className="text-sm font-medium text-primary">Acesso corporativo ativo</p>
-              <p className="text-xs text-muted-foreground">Seu plano é custeado pela sua empresa.</p>
+              <p className="text-xs text-muted-foreground">
+                Seu plano é custeado pela sua empresa.
+              </p>
             </div>
           </div>
         ) : (
@@ -1467,12 +1517,17 @@ function ProfileTab({
                   setJoiningCorporate(true);
                   setCorporateMsg(null);
                   const { data: s } = await supabase.auth.getSession();
-                  if (!s.session?.access_token) { setJoiningCorporate(false); return; }
+                  if (!s.session?.access_token) {
+                    setJoiningCorporate(false);
+                    return;
+                  }
                   const res = await joinCorporate({
                     data: { accessToken: s.session.access_token, accessCode: corporateCode.trim() },
                   });
                   if (res.ok) {
-                    setCorporateMsg(`✅ Vinculado a ${res.companyName}! Salve o perfil para confirmar.`);
+                    setCorporateMsg(
+                      `✅ Vinculado a ${res.companyName}! Salve o perfil para confirmar.`,
+                    );
                     onSaved({ ...profile!, corporate_account_id: "pending" } as typeof profile);
                   } else {
                     setCorporateMsg(res.error ?? "Código inválido.");
@@ -1486,7 +1541,9 @@ function ProfileTab({
               </button>
             </div>
             {corporateMsg && (
-              <p className={`text-sm ${corporateMsg.startsWith("✅") ? "text-green-600" : "text-red-500"}`}>
+              <p
+                className={`text-sm ${corporateMsg.startsWith("✅") ? "text-green-600" : "text-red-500"}`}
+              >
                 {corporateMsg}
               </p>
             )}
@@ -1539,10 +1596,19 @@ function Field({
 // IOM 2009 expected weight gain corridor at gestational week w, given pre-pregnancy BMI
 function iomGain(week: number, bmi: number): { min: number; max: number } {
   let rMin: number, rMax: number;
-  if (bmi < 18.5) { rMin = 0.44; rMax = 0.58; }
-  else if (bmi < 25) { rMin = 0.35; rMax = 0.50; }
-  else if (bmi < 30) { rMin = 0.23; rMax = 0.33; }
-  else { rMin = 0.17; rMax = 0.27; }
+  if (bmi < 18.5) {
+    rMin = 0.44;
+    rMax = 0.58;
+  } else if (bmi < 25) {
+    rMin = 0.35;
+    rMax = 0.5;
+  } else if (bmi < 30) {
+    rMin = 0.23;
+    rMax = 0.33;
+  } else {
+    rMin = 0.17;
+    rMax = 0.27;
+  }
 
   if (week <= 12) {
     const f = week / 12;
@@ -1554,8 +1620,14 @@ function iomGain(week: number, bmi: number): { min: number; max: number } {
 function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
   const [logs, setLogs] = useState<HealthLog[]>([]);
   const [form, setForm] = useState({
-    weight_kg: "", systolic: "", diastolic: "",
-    spo2: "", heart_rate_bpm: "", steps: "", sleep_hours: "", notes: "",
+    weight_kg: "",
+    systolic: "",
+    diastolic: "",
+    spo2: "",
+    heart_rate_bpm: "",
+    steps: "",
+    sleep_hours: "",
+    notes: "",
   });
   const [showWearable, setShowWearable] = useState(false);
 
@@ -1567,7 +1639,9 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
       .limit(60);
     setLogs(data ?? []);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function add() {
     const { data: u } = await supabase.auth.getUser();
@@ -1584,7 +1658,16 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
       sleep_hours: form.sleep_hours ? Number(form.sleep_hours) : null,
       notes: form.notes || null,
     });
-    setForm({ weight_kg: "", systolic: "", diastolic: "", spo2: "", heart_rate_bpm: "", steps: "", sleep_hours: "", notes: "" });
+    setForm({
+      weight_kg: "",
+      systolic: "",
+      diastolic: "",
+      spo2: "",
+      heart_rate_bpm: "",
+      steps: "",
+      sleep_hours: "",
+      notes: "",
+    });
     load();
   }
   async function remove(id: string) {
@@ -1598,20 +1681,26 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
 
   // Stats
   const firstWeight = allWeightLogs[0]?.weight_kg ? Number(allWeightLogs[0].weight_kg) : null;
-  const lastWeight = allWeightLogs[allWeightLogs.length - 1]?.weight_kg ? Number(allWeightLogs[allWeightLogs.length - 1].weight_kg) : null;
-  const totalGain = firstWeight != null && lastWeight != null ? (lastWeight - firstWeight).toFixed(1) : null;
+  const lastWeight = allWeightLogs[allWeightLogs.length - 1]?.weight_kg
+    ? Number(allWeightLogs[allWeightLogs.length - 1].weight_kg)
+    : null;
+  const totalGain =
+    firstWeight != null && lastWeight != null ? (lastWeight - firstWeight).toFixed(1) : null;
 
   const lastBp = logs.find((l) => l.systolic != null && l.diastolic != null);
-  const bpStatus = lastBp?.systolic != null && lastBp?.diastolic != null
-    ? lastBp.systolic >= 160 || lastBp.diastolic >= 110
-      ? { label: "PA muito elevada", color: "rose" }
-      : lastBp.systolic >= 140 || lastBp.diastolic >= 90
-        ? { label: "PA elevada", color: "amber" }
-        : { label: "PA normal", color: "emerald" }
-    : null;
+  const bpStatus =
+    lastBp?.systolic != null && lastBp?.diastolic != null
+      ? lastBp.systolic >= 160 || lastBp.diastolic >= 110
+        ? { label: "PA muito elevada", color: "rose" }
+        : lastBp.systolic >= 140 || lastBp.diastolic >= 90
+          ? { label: "PA elevada", color: "amber" }
+          : { label: "PA normal", color: "emerald" }
+      : null;
 
   // IOM weight curve — Feature #9
-  const prePregW = profile?.pre_pregnancy_weight_kg ? Number(profile.pre_pregnancy_weight_kg) : null;
+  const prePregW = profile?.pre_pregnancy_weight_kg
+    ? Number(profile.pre_pregnancy_weight_kg)
+    : null;
   const heightM = profile?.height_cm ? profile.height_cm / 100 : null;
   const bmi = prePregW && heightM ? prePregW / (heightM * heightM) : null;
 
@@ -1635,7 +1724,8 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
 
   // Build SVG IOM chart
   const showIomChart = bmi != null && prePregW != null && weightByWeek.length > 0;
-  const iomChartW = 400, iomChartH = 180;
+  const iomChartW = 400,
+    iomChartH = 180;
   let iomMinY: number, iomMaxY: number;
   if (showIomChart) {
     const corridor = [0, 10, 20, 30, 40].map((w) => {
@@ -1646,23 +1736,45 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
     iomMinY = Math.min(...allY) - 1;
     iomMaxY = Math.max(...allY) + 1;
   } else {
-    iomMinY = 50; iomMaxY = 90;
+    iomMinY = 50;
+    iomMaxY = 90;
   }
   const yRange = Math.max(iomMaxY - iomMinY, 1);
 
-  function toSvgX(week: number) { return (week / 42) * iomChartW; }
-  function toSvgY(w: number) { return iomChartH - ((w - iomMinY) / yRange) * (iomChartH - 20) - 10; }
+  function toSvgX(week: number) {
+    return (week / 42) * iomChartW;
+  }
+  function toSvgY(w: number) {
+    return iomChartH - ((w - iomMinY) / yRange) * (iomChartH - 20) - 10;
+  }
 
-  const bandMinPts = Array.from({ length: 43 }, (_, i) => `${toSvgX(i)},${toSvgY(prePregW! + iomGain(i, bmi!).min)}`).join(" ");
-  const bandMaxPts = Array.from({ length: 43 }, (_, i) => `${toSvgX(i)},${toSvgY(prePregW! + iomGain(i, bmi!).max)}`).join(" ");
-  const bandPolygon = bandMinPts + " " + Array.from({ length: 43 }, (_, i) => `${toSvgX(42 - i)},${toSvgY(prePregW! + iomGain(42 - i, bmi!).max)}`).join(" ");
+  const bandMinPts = Array.from(
+    { length: 43 },
+    (_, i) => `${toSvgX(i)},${toSvgY(prePregW! + iomGain(i, bmi!).min)}`,
+  ).join(" ");
+  const bandMaxPts = Array.from(
+    { length: 43 },
+    (_, i) => `${toSvgX(i)},${toSvgY(prePregW! + iomGain(i, bmi!).max)}`,
+  ).join(" ");
+  const bandPolygon =
+    bandMinPts +
+    " " +
+    Array.from(
+      { length: 43 },
+      (_, i) => `${toSvgX(42 - i)},${toSvgY(prePregW! + iomGain(42 - i, bmi!).max)}`,
+    ).join(" ");
   const actualPts = weightByWeek.map((p) => `${toSvgX(p.week)},${toSvgY(p.weight)}`).join(" ");
 
-  const bmiLabel = bmi == null ? null
-    : bmi < 18.5 ? "abaixo do peso"
-    : bmi < 25 ? "peso normal"
-    : bmi < 30 ? "sobrepeso"
-    : "obesidade";
+  const bmiLabel =
+    bmi == null
+      ? null
+      : bmi < 18.5
+        ? "abaixo do peso"
+        : bmi < 25
+          ? "peso normal"
+          : bmi < 30
+            ? "sobrepeso"
+            : "obesidade";
 
   return (
     <div className="space-y-6">
@@ -1670,7 +1782,9 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-3xl border border-border bg-card p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Último peso</p>
-          <p className="mt-2 font-serif text-3xl">{last?.weight_kg ? `${last.weight_kg} kg` : "—"}</p>
+          <p className="mt-2 font-serif text-3xl">
+            {last?.weight_kg ? `${last.weight_kg} kg` : "—"}
+          </p>
         </div>
         <div className="rounded-3xl border border-border bg-card p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Ganho total</p>
@@ -1678,13 +1792,17 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
             {totalGain != null ? `${Number(totalGain) > 0 ? "+" : ""}${totalGain} kg` : "—"}
           </p>
         </div>
-        <div className={`rounded-3xl border p-5 ${bpStatus?.color === "rose" ? "border-rose-300 bg-rose-50" : bpStatus?.color === "amber" ? "border-amber-300 bg-amber-50" : "border-border bg-card"}`}>
+        <div
+          className={`rounded-3xl border p-5 ${bpStatus?.color === "rose" ? "border-rose-300 bg-rose-50" : bpStatus?.color === "amber" ? "border-amber-300 bg-amber-50" : "border-border bg-card"}`}
+        >
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Última PA</p>
           <p className="mt-2 font-serif text-3xl">
             {lastBp?.systolic && lastBp?.diastolic ? `${lastBp.systolic}/${lastBp.diastolic}` : "—"}
           </p>
           {bpStatus && (
-            <p className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-700" : bpStatus.color === "amber" ? "text-amber-700" : "text-emerald-700"}`}>
+            <p
+              className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-700" : bpStatus.color === "amber" ? "text-amber-700" : "text-emerald-700"}`}
+            >
               {bpStatus.label}
             </p>
           )}
@@ -1693,7 +1811,9 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
           <p className="text-xs uppercase tracking-[0.22em] text-primary">SpO₂ / FC</p>
           <p className="mt-2 font-serif text-2xl">
             {last?.spo2 ? `${last.spo2}%` : "—"}
-            {last?.heart_rate_bpm ? <span className="ml-1 text-lg text-muted-foreground"> {last.heart_rate_bpm}bpm</span> : null}
+            {last?.heart_rate_bpm ? (
+              <span className="ml-1 text-lg text-muted-foreground"> {last.heart_rate_bpm}bpm</span>
+            ) : null}
           </p>
         </div>
       </div>
@@ -1703,7 +1823,9 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
         <div className="rounded-3xl border border-border bg-card p-6">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-primary">Curva de ganho de peso (IOM 2009)</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-primary">
+                Curva de ganho de peso (IOM 2009)
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 IMC pré-gestacional: {bmi!.toFixed(1)} ({bmiLabel}) · Faixa recomendada em verde
               </p>
@@ -1713,32 +1835,69 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
             {/* Corridor band */}
             <polygon points={bandPolygon} fill="hsl(var(--primary))" fillOpacity="0.12" />
             {/* Min line */}
-            <polyline points={bandMinPts} fill="none" stroke="hsl(var(--primary))" strokeWidth="1" strokeDasharray="4 3" opacity="0.4" />
+            <polyline
+              points={bandMinPts}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="1"
+              strokeDasharray="4 3"
+              opacity="0.4"
+            />
             {/* Max line */}
-            <polyline points={bandMaxPts} fill="none" stroke="hsl(var(--primary))" strokeWidth="1" strokeDasharray="4 3" opacity="0.4" />
+            <polyline
+              points={bandMaxPts}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth="1"
+              strokeDasharray="4 3"
+              opacity="0.4"
+            />
             {/* Actual weight line */}
             {weightByWeek.length > 1 && (
-              <polyline points={actualPts} fill="none" stroke="hsl(var(--primary))" strokeWidth="2.5" strokeLinejoin="round" />
+              <polyline
+                points={actualPts}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth="2.5"
+                strokeLinejoin="round"
+              />
             )}
             {/* Data points */}
             {weightByWeek.map((p, i) => (
-              <circle key={i} cx={toSvgX(p.week)} cy={toSvgY(p.weight)} r="4" fill="hsl(var(--primary))" />
+              <circle
+                key={i}
+                cx={toSvgX(p.week)}
+                cy={toSvgY(p.weight)}
+                r="4"
+                fill="hsl(var(--primary))"
+              />
             ))}
             {/* X-axis labels */}
             {[0, 10, 20, 28, 36, 40].map((w) => (
-              <text key={w} x={toSvgX(w)} y={iomChartH - 1} fontSize="8" fill="hsl(var(--muted-foreground))" textAnchor="middle">
+              <text
+                key={w}
+                x={toSvgX(w)}
+                y={iomChartH - 1}
+                fontSize="8"
+                fill="hsl(var(--muted-foreground))"
+                textAnchor="middle"
+              >
                 {w}s
               </text>
             ))}
           </svg>
           <p className="mt-1 text-xs text-muted-foreground">
-            Linha sólida = seu peso · Faixa = zona saudável para seu IMC. Configure altura e peso pré-gestacional em <strong>Perfil</strong>.
+            Linha sólida = seu peso · Faixa = zona saudável para seu IMC. Configure altura e peso
+            pré-gestacional em <strong>Perfil</strong>.
           </p>
         </div>
-      ) : prePregW == null && (
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
-          Configure sua <strong>altura</strong> e <strong>peso pré-gestacional</strong> em <strong>Perfil</strong> para ver a curva de ganho de peso recomendada pelo IOM.
-        </div>
+      ) : (
+        prePregW == null && (
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
+            Configure sua <strong>altura</strong> e <strong>peso pré-gestacional</strong> em{" "}
+            <strong>Perfil</strong> para ver a curva de ganho de peso recomendada pelo IOM.
+          </div>
+        )
       )}
 
       {/* Wearable data summary — Feature #6 */}
@@ -1752,7 +1911,9 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
           ].map((m) => (
             <div key={m.label} className="rounded-2xl border border-border bg-card p-4 text-center">
               <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">{m.label}</p>
-              <p className="mt-1 font-serif text-2xl">{m.value != null ? `${m.value}${m.unit}` : "—"}</p>
+              <p className="mt-1 font-serif text-2xl">
+                {m.value != null ? `${m.value}${m.unit}` : "—"}
+              </p>
             </div>
           ))}
         </div>
@@ -1764,10 +1925,22 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
           📱 Como sincronizar com seu dispositivo
         </summary>
         <div className="space-y-2 px-5 pb-4 pt-2 text-sm text-muted-foreground">
-          <p><strong>Apple Health (iPhone):</strong> Abra o app Saúde → Resumo → veja SpO2, FC, Sono e Passos → registre manualmente os valores aqui.</p>
-          <p><strong>Google Fit (Android):</strong> Abra o Google Fit → Diário → copie os valores do dia → registre abaixo nos campos de wearable.</p>
-          <p><strong>Garmin / Fitbit / Samsung Health:</strong> Acesse o app do seu dispositivo → Dashboard → Atividade do Dia → copie os valores desejados.</p>
-          <p className="text-xs">A integração automática requer aplicativo nativo. Por ora, o registro manual mantém seu histórico no portal.</p>
+          <p>
+            <strong>Apple Health (iPhone):</strong> Abra o app Saúde → Resumo → veja SpO2, FC, Sono
+            e Passos → registre manualmente os valores aqui.
+          </p>
+          <p>
+            <strong>Google Fit (Android):</strong> Abra o Google Fit → Diário → copie os valores do
+            dia → registre abaixo nos campos de wearable.
+          </p>
+          <p>
+            <strong>Garmin / Fitbit / Samsung Health:</strong> Acesse o app do seu dispositivo →
+            Dashboard → Atividade do Dia → copie os valores desejados.
+          </p>
+          <p className="text-xs">
+            A integração automática requer aplicativo nativo. Por ora, o registro manual mantém seu
+            histórico no portal.
+          </p>
         </div>
       </details>
 
@@ -1775,10 +1948,29 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Novo registro</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-3 md:grid-cols-4">
-          <Field label="Peso (kg)" type="number" value={form.weight_kg} onChange={(v) => setForm({ ...form, weight_kg: v })} />
-          <Field label="Sistólica" type="number" value={form.systolic} onChange={(v) => setForm({ ...form, systolic: v })} />
-          <Field label="Diastólica" type="number" value={form.diastolic} onChange={(v) => setForm({ ...form, diastolic: v })} />
-          <Field label="Notas" value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
+          <Field
+            label="Peso (kg)"
+            type="number"
+            value={form.weight_kg}
+            onChange={(v) => setForm({ ...form, weight_kg: v })}
+          />
+          <Field
+            label="Sistólica"
+            type="number"
+            value={form.systolic}
+            onChange={(v) => setForm({ ...form, systolic: v })}
+          />
+          <Field
+            label="Diastólica"
+            type="number"
+            value={form.diastolic}
+            onChange={(v) => setForm({ ...form, diastolic: v })}
+          />
+          <Field
+            label="Notas"
+            value={form.notes}
+            onChange={(v) => setForm({ ...form, notes: v })}
+          />
         </div>
         <button
           onClick={() => setShowWearable((v) => !v)}
@@ -1788,10 +1980,30 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
         </button>
         {showWearable && (
           <div className="mt-3 grid gap-3 sm:grid-cols-4">
-            <Field label="SpO₂ (%)" type="number" value={form.spo2} onChange={(v) => setForm({ ...form, spo2: v })} />
-            <Field label="FC (bpm)" type="number" value={form.heart_rate_bpm} onChange={(v) => setForm({ ...form, heart_rate_bpm: v })} />
-            <Field label="Passos" type="number" value={form.steps} onChange={(v) => setForm({ ...form, steps: v })} />
-            <Field label="Sono (horas)" type="number" value={form.sleep_hours} onChange={(v) => setForm({ ...form, sleep_hours: v })} />
+            <Field
+              label="SpO₂ (%)"
+              type="number"
+              value={form.spo2}
+              onChange={(v) => setForm({ ...form, spo2: v })}
+            />
+            <Field
+              label="FC (bpm)"
+              type="number"
+              value={form.heart_rate_bpm}
+              onChange={(v) => setForm({ ...form, heart_rate_bpm: v })}
+            />
+            <Field
+              label="Passos"
+              type="number"
+              value={form.steps}
+              onChange={(v) => setForm({ ...form, steps: v })}
+            />
+            <Field
+              label="Sono (horas)"
+              type="number"
+              value={form.sleep_hours}
+              onChange={(v) => setForm({ ...form, sleep_hours: v })}
+            />
           </div>
         )}
         <button
@@ -1805,20 +2017,32 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
       {/* History list */}
       <div className="space-y-2">
         {logs.map((l) => (
-          <div key={l.id} className="flex items-start justify-between rounded-xl border border-border bg-card p-4 text-sm">
+          <div
+            key={l.id}
+            className="flex items-start justify-between rounded-xl border border-border bg-card p-4 text-sm"
+          >
             <span className="text-muted-foreground shrink-0">
               {new Date(l.log_date + "T00:00:00").toLocaleDateString("pt-BR")}
             </span>
             <span className="flex-1 px-3 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
               {l.weight_kg && <span>⚖️ {l.weight_kg} kg</span>}
-              {l.systolic && l.diastolic && <span>💓 {l.systolic}/{l.diastolic}</span>}
+              {l.systolic && l.diastolic && (
+                <span>
+                  💓 {l.systolic}/{l.diastolic}
+                </span>
+              )}
               {(l as any).spo2 && <span>🫁 {(l as any).spo2}% SpO₂</span>}
               {(l as any).heart_rate_bpm && <span>❤️ {(l as any).heart_rate_bpm}bpm</span>}
               {(l as any).steps && <span>🚶 {(l as any).steps} passos</span>}
               {(l as any).sleep_hours && <span>🌙 {(l as any).sleep_hours}h sono</span>}
               {l.notes && <span className="text-muted-foreground">{l.notes}</span>}
             </span>
-            <button onClick={() => remove(l.id)} className="text-xs text-muted-foreground hover:text-destructive shrink-0">×</button>
+            <button
+              onClick={() => remove(l.id)}
+              className="text-xs text-muted-foreground hover:text-destructive shrink-0"
+            >
+              ×
+            </button>
           </div>
         ))}
       </div>
@@ -1873,9 +2097,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
     if (!q) return;
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    await (supabase as any)
-      .from("doctor_questions")
-      .insert({ user_id: u.user.id, question: q });
+    await (supabase as any).from("doctor_questions").insert({ user_id: u.user.id, question: q });
     setText("");
     load();
   }
@@ -1923,7 +2145,11 @@ function QuestionsTab({ gest }: { gest: Gest }) {
             onClick={() => setShowSuggestions((v) => !v)}
             className="text-xs font-medium text-primary hover:underline"
           >
-            {showSuggestions ? "▲ Ocultar sugestões" : "▼ Ver perguntas comuns do " + (trimester === 1 ? "1º" : trimester === 2 ? "2º" : "3º") + " trimestre"}
+            {showSuggestions
+              ? "▲ Ocultar sugestões"
+              : "▼ Ver perguntas comuns do " +
+                (trimester === 1 ? "1º" : trimester === 2 ? "2º" : "3º") +
+                " trimestre"}
           </button>
           {showSuggestions && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -2289,7 +2515,9 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
       <div className="rounded-3xl bg-[var(--gradient-warm)] p-8 shadow-[var(--shadow-card)]">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Carteirinha de emergência</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+              Carteirinha de emergência
+            </p>
             <h2 className="mt-1.5 font-serif text-2xl">{profile.display_name ?? "—"}</h2>
             {profile.baby_name && (
               <p className="text-sm text-muted-foreground">Bebê: {profile.baby_name}</p>
@@ -2371,7 +2599,8 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Mantenha seus dados atualizados em <strong>Perfil</strong> — o QR Code atualiza automaticamente.
+        Mantenha seus dados atualizados em <strong>Perfil</strong> — o QR Code atualiza
+        automaticamente.
       </p>
     </div>
   );
@@ -2406,17 +2635,13 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
 
   const greeting = [
     firstName ? `Olá, ${firstName}!` : "Olá!",
-    gest
-      ? `Você está na semana ${gest.weeks} — vou responder levando em conta sua gestação.`
-      : "",
+    gest ? `Você está na semana ${gest.weeks} — vou responder levando em conta sua gestação.` : "",
     "Sou o assistente virtual do consultório do Dr. Clóvis Bacha. Como posso ajudar?",
   ]
     .filter(Boolean)
     .join(" ");
 
-  const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: "assistant", content: greeting },
-  ]);
+  const [messages, setMessages] = useState<ChatMsg[]>([{ role: "assistant", content: greeting }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -2525,25 +2750,95 @@ type Milestone = {
 };
 
 const PRENATAL_MILESTONES: Milestone[] = [
-  { week: 6, type: "consult", label: "1ª consulta pré-natal", detail: "Confirmação da gestação, exames iniciais e início do ácido fólico." },
-  { week: 8, type: "exam", label: "Exames iniciais (sangue e urina)", detail: "Hemograma, sorologias, tipagem sanguínea, urina EAS." },
-  { week: 11, type: "exam", label: "Translucência nucal", detail: "Ultrassom entre 11s–13s6d + PAPP-A e beta-hCG." },
-  { week: 12, type: "milestone", label: "Fim do 1º trimestre 🎉", detail: "Risco de aborto reduz significativamente." },
+  {
+    week: 6,
+    type: "consult",
+    label: "1ª consulta pré-natal",
+    detail: "Confirmação da gestação, exames iniciais e início do ácido fólico.",
+  },
+  {
+    week: 8,
+    type: "exam",
+    label: "Exames iniciais (sangue e urina)",
+    detail: "Hemograma, sorologias, tipagem sanguínea, urina EAS.",
+  },
+  {
+    week: 11,
+    type: "exam",
+    label: "Translucência nucal",
+    detail: "Ultrassom entre 11s–13s6d + PAPP-A e beta-hCG.",
+  },
+  {
+    week: 12,
+    type: "milestone",
+    label: "Fim do 1º trimestre 🎉",
+    detail: "Risco de aborto reduz significativamente.",
+  },
   { week: 14, type: "consult", label: "Consulta mensal" },
   { week: 16, type: "consult", label: "Consulta mensal" },
-  { week: 18, type: "exam", label: "Ultrassom morfológico", detail: "Avaliação detalhada da anatomia fetal. Entre 18–22 semanas." },
-  { week: 20, type: "milestone", label: "Metade da gestação! 🌟", detail: "Bebê começa a ser sentido com mais frequência." },
-  { week: 24, type: "exam", label: "Curva glicêmica (TOTG)", detail: "Rastreio de diabetes gestacional. Jejum de 8h." },
+  {
+    week: 18,
+    type: "exam",
+    label: "Ultrassom morfológico",
+    detail: "Avaliação detalhada da anatomia fetal. Entre 18–22 semanas.",
+  },
+  {
+    week: 20,
+    type: "milestone",
+    label: "Metade da gestação! 🌟",
+    detail: "Bebê começa a ser sentido com mais frequência.",
+  },
+  {
+    week: 24,
+    type: "exam",
+    label: "Curva glicêmica (TOTG)",
+    detail: "Rastreio de diabetes gestacional. Jejum de 8h.",
+  },
   { week: 26, type: "consult", label: "Consulta mensal" },
   { week: 26, type: "exam", label: "Hemograma e exames de rotina" },
-  { week: 28, type: "milestone", label: "Início do 3º trimestre", detail: "Conte os movimentos diariamente a partir de agora." },
-  { week: 30, type: "consult", label: "Consultas quinzenais", detail: "A partir da 30ª semana, consultas a cada 2 semanas." },
-  { week: 32, type: "exam", label: "Ultrassom de crescimento fetal", detail: "Avaliação de crescimento e Doppler quando indicado." },
+  {
+    week: 28,
+    type: "milestone",
+    label: "Início do 3º trimestre",
+    detail: "Conte os movimentos diariamente a partir de agora.",
+  },
+  {
+    week: 30,
+    type: "consult",
+    label: "Consultas quinzenais",
+    detail: "A partir da 30ª semana, consultas a cada 2 semanas.",
+  },
+  {
+    week: 32,
+    type: "exam",
+    label: "Ultrassom de crescimento fetal",
+    detail: "Avaliação de crescimento e Doppler quando indicado.",
+  },
   { week: 34, type: "consult", label: "Consulta quinzenal" },
-  { week: 35, type: "exam", label: "Cultura Streptococcus Grupo B", detail: "Swab vaginal/retal entre 35–37 semanas." },
-  { week: 36, type: "consult", label: "Consultas semanais", detail: "A partir da 36ª semana, consultas semanais." },
-  { week: 37, type: "milestone", label: "A TERMO! Bebê pronto para nascer 🎉", detail: "Semana 37 marca o início do período a termo." },
-  { week: 38, type: "exam", label: "Cardiotocografia (CTG)", detail: "Avaliação do bem-estar fetal e planejamento do parto." },
+  {
+    week: 35,
+    type: "exam",
+    label: "Cultura Streptococcus Grupo B",
+    detail: "Swab vaginal/retal entre 35–37 semanas.",
+  },
+  {
+    week: 36,
+    type: "consult",
+    label: "Consultas semanais",
+    detail: "A partir da 36ª semana, consultas semanais.",
+  },
+  {
+    week: 37,
+    type: "milestone",
+    label: "A TERMO! Bebê pronto para nascer 🎉",
+    detail: "Semana 37 marca o início do período a termo.",
+  },
+  {
+    week: 38,
+    type: "exam",
+    label: "Cardiotocografia (CTG)",
+    detail: "Avaliação do bem-estar fetal e planejamento do parto.",
+  },
   { week: 40, type: "milestone", label: "DPP — Data Provável do Parto 👶" },
 ];
 
@@ -2590,7 +2885,8 @@ function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest:
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Configure a DUM ou os dados do ultrassom em <strong>Perfil</strong> para gerar o calendário personalizado.
+          Configure a DUM ou os dados do ultrassom em <strong>Perfil</strong> para gerar o
+          calendário personalizado.
         </p>
       </div>
     );
@@ -2605,15 +2901,17 @@ function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest:
       const d = weekToDate(m.week, profile!);
       if (!d) return;
       const ymd = d.toISOString().slice(0, 10).replace(/-/g, "");
-      events.push(
-        "BEGIN:VEVENT",
-        `UID:prenatal-${m.week}-${m.label.slice(0,10).replace(/\s/g,"")}@doutorclovis`,
-        `DTSTART;VALUE=DATE:${ymd}`,
-        `DTEND;VALUE=DATE:${ymd}`,
-        `SUMMARY:Pré-natal S${m.week}: ${m.label}`,
-        m.detail ? `DESCRIPTION:${m.detail}` : "",
-        "END:VEVENT",
-      ).filter(Boolean);
+      events
+        .push(
+          "BEGIN:VEVENT",
+          `UID:prenatal-${m.week}-${m.label.slice(0, 10).replace(/\s/g, "")}@doutorclovis`,
+          `DTSTART;VALUE=DATE:${ymd}`,
+          `DTEND;VALUE=DATE:${ymd}`,
+          `SUMMARY:Pré-natal S${m.week}: ${m.label}`,
+          m.detail ? `DESCRIPTION:${m.detail}` : "",
+          "END:VEVENT",
+        )
+        .filter(Boolean);
     });
     const ics = [
       "BEGIN:VCALENDAR",
@@ -2634,7 +2932,9 @@ function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest:
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Calendário do Pré-natal</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-primary">
+            Calendário do Pré-natal
+          </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Todos os marcos, exames e consultas da sua gestação.
           </p>
@@ -2654,39 +2954,61 @@ function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest:
         {PRENATAL_MILESTONES.map((m, idx) => {
           const date = weekToDate(m.week, profile);
           const isPast = date != null && date < today;
-          const isCurrent = m.week === currentWeek || (m.week === Math.ceil(currentWeek / 2) * 2 && Math.abs(m.week - currentWeek) <= 1);
-          const isUpcoming = !isPast && date != null && date.getTime() - today.getTime() < 21 * 86400000;
+          const isCurrent =
+            m.week === currentWeek ||
+            (m.week === Math.ceil(currentWeek / 2) * 2 && Math.abs(m.week - currentWeek) <= 1);
+          const isUpcoming =
+            !isPast && date != null && date.getTime() - today.getTime() < 21 * 86400000;
 
           return (
-            <div key={idx} className={`relative rounded-2xl border p-4 transition-all ${
-              isPast ? "border-border bg-card opacity-60" :
-              isUpcoming ? "border-primary/40 bg-primary/5 shadow-sm" :
-              "border-border bg-card"
-            }`}>
+            <div
+              key={idx}
+              className={`relative rounded-2xl border p-4 transition-all ${
+                isPast
+                  ? "border-border bg-card opacity-60"
+                  : isUpcoming
+                    ? "border-primary/40 bg-primary/5 shadow-sm"
+                    : "border-border bg-card"
+              }`}
+            >
               {/* Timeline dot */}
-              <div className={`absolute -left-4 top-5 h-3 w-3 rounded-full border-2 ${
-                isPast ? "border-border bg-background" :
-                isUpcoming ? "border-primary bg-primary" :
-                "border-primary/40 bg-background"
-              }`} />
+              <div
+                className={`absolute -left-4 top-5 h-3 w-3 rounded-full border-2 ${
+                  isPast
+                    ? "border-border bg-background"
+                    : isUpcoming
+                      ? "border-primary bg-primary"
+                      : "border-primary/40 bg-background"
+                }`}
+              />
 
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
+                    >
                       {TYPE_LABEL[m.type]}
                     </span>
                     <span className="text-xs text-muted-foreground">Semana {m.week}</span>
                     {isPast && <span className="text-xs text-emerald-600">✓ concluído</span>}
-                    {isUpcoming && !isPast && <span className="text-xs font-medium text-primary">Em breve!</span>}
+                    {isUpcoming && !isPast && (
+                      <span className="text-xs font-medium text-primary">Em breve!</span>
+                    )}
                   </div>
-                  <p className={`mt-1 text-sm font-medium ${isPast ? "text-muted-foreground" : "text-foreground"}`}>
+                  <p
+                    className={`mt-1 text-sm font-medium ${isPast ? "text-muted-foreground" : "text-foreground"}`}
+                  >
                     {m.label}
                   </p>
                   {m.detail && <p className="mt-0.5 text-xs text-muted-foreground">{m.detail}</p>}
                   {date && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {date.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                      {date.toLocaleDateString("pt-BR", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
                     </p>
                   )}
                 </div>
@@ -2719,17 +3041,28 @@ type Contraction = {
 };
 
 const INTENSITY_LABEL = ["", "Leve", "Moderada", "Forte"];
-const INTENSITY_COLOR = ["", "bg-blue-100 text-blue-700", "bg-amber-100 text-amber-700", "bg-rose-100 text-rose-700"];
+const INTENSITY_COLOR = [
+  "",
+  "bg-blue-100 text-blue-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+];
 
 function analyzeContractions(list: Contraction[]): {
   status: "normal" | "atencao" | "alerta" | "urgente";
   label: string;
   detail: string;
 } {
-  if (list.length < 2) return { status: "normal", label: "Monitorando", detail: "Registre mais contrações para análise do padrão." };
+  if (list.length < 2)
+    return {
+      status: "normal",
+      label: "Monitorando",
+      detail: "Registre mais contrações para análise do padrão.",
+    };
 
   const completed = list.filter((c) => c.ended_at != null);
-  if (completed.length < 2) return { status: "normal", label: "Monitorando", detail: "Continue registrando." };
+  if (completed.length < 2)
+    return { status: "normal", label: "Monitorando", detail: "Continue registrando." };
 
   // Average duration (seconds)
   const avgDur =
@@ -2739,21 +3072,41 @@ function analyzeContractions(list: Contraction[]): {
     }, 0) / completed.length;
 
   // Average interval between contractions (minutes)
-  const sorted = [...list].sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
-  let intervals: number[] = [];
+  const sorted = [...list].sort(
+    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
+  );
+  const intervals: number[] = [];
   for (let i = 1; i < sorted.length; i++) {
-    const interval = (new Date(sorted[i].started_at).getTime() - new Date(sorted[i - 1].started_at).getTime()) / 60000;
+    const interval =
+      (new Date(sorted[i].started_at).getTime() - new Date(sorted[i - 1].started_at).getTime()) /
+      60000;
     intervals.push(interval);
   }
   const avgInterval = intervals.reduce((s, x) => s + x, 0) / intervals.length;
 
   if (avgInterval <= 3 && avgDur >= 60)
-    return { status: "urgente", label: "⚠️ Vá para a maternidade agora", detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — trabalho de parto avançado.` };
+    return {
+      status: "urgente",
+      label: "⚠️ Vá para a maternidade agora",
+      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — trabalho de parto avançado.`,
+    };
   if (avgInterval <= 5 && avgDur >= 45)
-    return { status: "alerta", label: "Trabalho de parto ativo", detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — ligue para o consultório.` };
+    return {
+      status: "alerta",
+      label: "Trabalho de parto ativo",
+      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — ligue para o consultório.`,
+    };
   if (avgInterval <= 10 && avgDur >= 30)
-    return { status: "atencao", label: "Atenção — padrão irregular", detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — monitore de perto.` };
-  return { status: "normal", label: "Padrão normal", detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s.` };
+    return {
+      status: "atencao",
+      label: "Atenção — padrão irregular",
+      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — monitore de perto.`,
+    };
+  return {
+    status: "normal",
+    label: "Padrão normal",
+    detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s.`,
+  };
 }
 
 function ContracoesTab({ weeks }: { weeks: number | null }) {
@@ -2778,7 +3131,9 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   useEffect(() => {
     if (!active) return;
@@ -2816,7 +3171,11 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
     if (!u.user) return;
     // Only remove last 6 hours of contractions
     const sixHoursAgo = new Date(Date.now() - 6 * 3600000).toISOString();
-    await (supabase as any).from("contraction_logs").delete().eq("user_id", u.user.id).gte("started_at", sixHoursAgo);
+    await (supabase as any)
+      .from("contraction_logs")
+      .delete()
+      .eq("user_id", u.user.id)
+      .gte("started_at", sixHoursAgo);
     setActive(null);
     load();
   }
@@ -2836,7 +3195,9 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
-        Use este diário se sentir contrações regulares. <strong>Em dúvida, ligue para o consultório.</strong> Em emergência, ligue <strong>192 (SAMU)</strong>.
+        Use este diário se sentir contrações regulares.{" "}
+        <strong>Em dúvida, ligue para o consultório.</strong> Em emergência, ligue{" "}
+        <strong>192 (SAMU)</strong>.
       </div>
 
       {/* Analysis banner */}
@@ -2845,7 +3206,10 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
           <p className="font-semibold">{analysis.label}</p>
           <p className="mt-0.5 text-sm">{analysis.detail}</p>
           {analysis.status === "urgente" && (
-            <a href="tel:192" className="mt-3 inline-block rounded-full bg-rose-600 px-5 py-2 text-sm font-medium text-white">
+            <a
+              href="tel:192"
+              className="mt-3 inline-block rounded-full bg-rose-600 px-5 py-2 text-sm font-medium text-white"
+            >
               Ligar 192 (SAMU)
             </a>
           )}
@@ -2884,12 +3248,17 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
               >
                 <div>
                   <div className="font-serif text-4xl">
-                    {String(elapsedMins).padStart(2, "0")}:{String(elapsedSecs % 60).padStart(2, "0")}
+                    {String(elapsedMins).padStart(2, "0")}:
+                    {String(elapsedSecs % 60).padStart(2, "0")}
                   </div>
-                  <div className="text-xs uppercase tracking-widest opacity-80 mt-1">Toque p/ parar</div>
+                  <div className="text-xs uppercase tracking-widest opacity-80 mt-1">
+                    Toque p/ parar
+                  </div>
                 </div>
               </button>
-              <p className="mt-3 text-sm font-medium text-rose-600 animate-pulse">Contração ativa...</p>
+              <p className="mt-3 text-sm font-medium text-rose-600 animate-pulse">
+                Contração ativa...
+              </p>
             </div>
           ) : (
             <button
@@ -2912,24 +3281,42 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               Últimas contrações
             </p>
-            <button onClick={clearSession} className="text-xs text-muted-foreground hover:text-destructive">
+            <button
+              onClick={clearSession}
+              className="text-xs text-muted-foreground hover:text-destructive"
+            >
               Limpar sessão
             </button>
           </div>
           <div className="mt-3 space-y-2">
             {recentContractions.map((c, idx) => {
               const dur = c.ended_at
-                ? Math.round((new Date(c.ended_at).getTime() - new Date(c.started_at).getTime()) / 1000)
+                ? Math.round(
+                    (new Date(c.ended_at).getTime() - new Date(c.started_at).getTime()) / 1000,
+                  )
                 : null;
-              const interval = idx < recentContractions.length - 1
-                ? Math.round((new Date(c.started_at).getTime() - new Date(recentContractions[idx + 1].started_at).getTime()) / 60000)
-                : null;
+              const interval =
+                idx < recentContractions.length - 1
+                  ? Math.round(
+                      (new Date(c.started_at).getTime() -
+                        new Date(recentContractions[idx + 1].started_at).getTime()) /
+                        60000,
+                    )
+                  : null;
               return (
-                <div key={c.id} className="flex items-center justify-between rounded-xl border border-border p-3 text-sm">
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between rounded-xl border border-border p-3 text-sm"
+                >
                   <span className="text-muted-foreground">
-                    {new Date(c.started_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(c.started_at).toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${INTENSITY_COLOR[c.intensity] ?? ""}`}>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs ${INTENSITY_COLOR[c.intensity] ?? ""}`}
+                  >
                     {INTENSITY_LABEL[c.intensity] ?? "—"}
                   </span>
                   <span className="text-muted-foreground">
@@ -2991,7 +3378,9 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
     const forms = await getMyPreConsultas({ data: { accessToken: s.session.access_token } });
     setHistory(forms);
   }
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => {
+    loadHistory();
+  }, []);
 
   function toggleSymptom(s: string) {
     setForm((f) => ({
@@ -3028,7 +3417,19 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
           O Dr. Clóvis receberá seu resumo antes da consulta. Pode chegar com tranquilidade!
         </p>
         <button
-          onClick={() => { setDone(false); setForm({ weight: "", systolic: "", diastolic: "", symptoms: [], medications: "", questions: "", emotional_state: "", other_notes: "" }); }}
+          onClick={() => {
+            setDone(false);
+            setForm({
+              weight: "",
+              systolic: "",
+              diastolic: "",
+              symptoms: [],
+              medications: "",
+              questions: "",
+              emotional_state: "",
+              other_notes: "",
+            });
+          }}
           className="mt-5 rounded-full bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white"
         >
           Preencher novamente
@@ -3040,7 +3441,8 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
-        <strong>Para o Dr. Clóvis Bacha:</strong> preencha antes de cada consulta. Seu resumo chega formatado para o médico — sem precisar lembrar de tudo na hora!
+        <strong>Para o Dr. Clóvis Bacha:</strong> preencha antes de cada consulta. Seu resumo chega
+        formatado para o médico — sem precisar lembrar de tudo na hora!
         {gest && (
           <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
             Semana {gest.weeks}
@@ -3074,9 +3476,24 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         <div className="rounded-3xl border border-border bg-card p-6">
           <p className="font-serif text-lg">Medidas desta semana</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <Field label="Peso atual (kg)" type="number" value={form.weight} onChange={(v) => setForm((f) => ({ ...f, weight: v }))} />
-            <Field label="Pressão sistólica" type="number" value={form.systolic} onChange={(v) => setForm((f) => ({ ...f, systolic: v }))} />
-            <Field label="Pressão diastólica" type="number" value={form.diastolic} onChange={(v) => setForm((f) => ({ ...f, diastolic: v }))} />
+            <Field
+              label="Peso atual (kg)"
+              type="number"
+              value={form.weight}
+              onChange={(v) => setForm((f) => ({ ...f, weight: v }))}
+            />
+            <Field
+              label="Pressão sistólica"
+              type="number"
+              value={form.systolic}
+              onChange={(v) => setForm((f) => ({ ...f, systolic: v }))}
+            />
+            <Field
+              label="Pressão diastólica"
+              type="number"
+              value={form.diastolic}
+              onChange={(v) => setForm((f) => ({ ...f, diastolic: v }))}
+            />
           </div>
         </div>
 
@@ -3164,7 +3581,9 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
                       Semana {h.weeks_at_submission ?? "—"} —{" "}
                       {new Date(h.submitted_at).toLocaleDateString("pt-BR")}
                     </p>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${h.seen_by_doctor ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${h.seen_by_doctor ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+                    >
                       {h.seen_by_doctor ? "Visualizado ✓" : "Aguardando"}
                     </span>
                   </div>
@@ -3183,22 +3602,66 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
 
 const NUTRIENT_TIPS: Record<1 | 2 | 3, { nutrient: string; why: string; foods: string }[]> = {
   1: [
-    { nutrient: "Ácido Fólico", why: "Previne defeitos do tubo neural", foods: "Feijão, lentilha, espinafre, brócolis" },
-    { nutrient: "Ferro", why: "Suporte ao volume de sangue", foods: "Carne vermelha magra, feijão + vitamina C" },
+    {
+      nutrient: "Ácido Fólico",
+      why: "Previne defeitos do tubo neural",
+      foods: "Feijão, lentilha, espinafre, brócolis",
+    },
+    {
+      nutrient: "Ferro",
+      why: "Suporte ao volume de sangue",
+      foods: "Carne vermelha magra, feijão + vitamina C",
+    },
     { nutrient: "Vitamina B6", why: "Alivia enjoo matinal", foods: "Banana, batata, frango, atum" },
-    { nutrient: "Água", why: "Hidratação e redução do enjoo", foods: "8–10 copos/dia; água de coco, chás claros" },
+    {
+      nutrient: "Água",
+      why: "Hidratação e redução do enjoo",
+      foods: "8–10 copos/dia; água de coco, chás claros",
+    },
   ],
   2: [
-    { nutrient: "Cálcio", why: "Formação óssea do bebê", foods: "Leite, iogurte, sardinha, brócolis" },
-    { nutrient: "Ômega-3", why: "Desenvolvimento do cérebro fetal", foods: "Salmão, sardinha, sementes de chia, linhaça" },
-    { nutrient: "Proteína", why: "Crescimento muscular e placentário", foods: "Ovos, frango, leguminosas, queijos pasteurizados" },
-    { nutrient: "Vitamina D", why: "Absorção de cálcio e imunidade", foods: "Ovos, cogumelos, exposição solar moderada" },
+    {
+      nutrient: "Cálcio",
+      why: "Formação óssea do bebê",
+      foods: "Leite, iogurte, sardinha, brócolis",
+    },
+    {
+      nutrient: "Ômega-3",
+      why: "Desenvolvimento do cérebro fetal",
+      foods: "Salmão, sardinha, sementes de chia, linhaça",
+    },
+    {
+      nutrient: "Proteína",
+      why: "Crescimento muscular e placentário",
+      foods: "Ovos, frango, leguminosas, queijos pasteurizados",
+    },
+    {
+      nutrient: "Vitamina D",
+      why: "Absorção de cálcio e imunidade",
+      foods: "Ovos, cogumelos, exposição solar moderada",
+    },
   ],
   3: [
-    { nutrient: "Fibras", why: "Combate a constipação", foods: "Aveia, ameixa, mamão, folhas verdes" },
-    { nutrient: "Magnésio", why: "Reduz câimbras nas pernas", foods: "Castanha-do-pará, banana, sementes de abóbora" },
-    { nutrient: "Ferro", why: "Preparo para o parto", foods: "Fígado (cozido), feijão preto, espinafre" },
-    { nutrient: "Vitamina C", why: "Aumenta absorção do ferro", foods: "Acerola, laranja, morango, kiwi" },
+    {
+      nutrient: "Fibras",
+      why: "Combate a constipação",
+      foods: "Aveia, ameixa, mamão, folhas verdes",
+    },
+    {
+      nutrient: "Magnésio",
+      why: "Reduz câimbras nas pernas",
+      foods: "Castanha-do-pará, banana, sementes de abóbora",
+    },
+    {
+      nutrient: "Ferro",
+      why: "Preparo para o parto",
+      foods: "Fígado (cozido), feijão preto, espinafre",
+    },
+    {
+      nutrient: "Vitamina C",
+      why: "Aumenta absorção do ferro",
+      foods: "Acerola, laranja, morango, kiwi",
+    },
   ],
 };
 
@@ -3283,7 +3746,10 @@ function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         setMessages([...next, { role: "assistant", content: acc }]);
       }
     } catch {
-      setMessages([...next, { role: "assistant", content: "Desculpe, ocorreu um erro. Tente novamente." }]);
+      setMessages([
+        ...next,
+        { role: "assistant", content: "Desculpe, ocorreu um erro. Tente novamente." },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -3306,11 +3772,15 @@ function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest })
       </div>
 
       {/* Chat */}
-      <div className="flex flex-col rounded-3xl border border-border bg-card" style={{ height: "55vh" }}>
+      <div
+        className="flex flex-col rounded-3xl border border-border bg-card"
+        style={{ height: "55vh" }}
+      >
         <div className="border-b border-border p-4">
           <p className="font-serif text-lg">Nutricionista Virtual</p>
           <p className="text-xs text-muted-foreground">
-            Orientações personalizadas para sua gestação — não substitui avaliação nutricional individual.
+            Orientações personalizadas para sua gestação — não substitui avaliação nutricional
+            individual.
           </p>
         </div>
 
@@ -3399,7 +3869,9 @@ function ConsultasTab() {
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [notes, setNotes] = useState<ConsultaNote[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
-  const [activeNoteTab, setActiveNoteTab] = useState<"transcript" | "orientacoes" | "medicamentos" | "exames">("transcript");
+  const [activeNoteTab, setActiveNoteTab] = useState<
+    "transcript" | "orientacoes" | "medicamentos" | "exames"
+  >("transcript");
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
@@ -3425,7 +3897,9 @@ function ConsultasTab() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
       chunksRef.current = [];
-      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setAudioBlob(blob);
@@ -3498,7 +3972,8 @@ function ConsultasTab() {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Gravar consulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Grave o áudio da consulta e a IA extrai orientações, medicamentos e exames automaticamente.
+          Grave o áudio da consulta e a IA extrai orientações, medicamentos e exames
+          automaticamente.
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -3580,8 +4055,8 @@ function ConsultasTab() {
                 {activeNoteTab === "transcript" && (
                   <p className="whitespace-pre-wrap">{result.transcript || "Sem transcrição."}</p>
                 )}
-                {activeNoteTab === "orientacoes" && (
-                  result.orientacoes?.length ? (
+                {activeNoteTab === "orientacoes" &&
+                  (result.orientacoes?.length ? (
                     <ul className="space-y-1.5">
                       {result.orientacoes.map((o, i) => (
                         <li key={i} className="flex items-start gap-2">
@@ -3590,10 +4065,11 @@ function ConsultasTab() {
                         </li>
                       ))}
                     </ul>
-                  ) : <p className="text-muted-foreground">Nenhuma orientação identificada.</p>
-                )}
-                {activeNoteTab === "medicamentos" && (
-                  result.medicamentos?.length ? (
+                  ) : (
+                    <p className="text-muted-foreground">Nenhuma orientação identificada.</p>
+                  ))}
+                {activeNoteTab === "medicamentos" &&
+                  (result.medicamentos?.length ? (
                     <ul className="space-y-1.5">
                       {result.medicamentos.map((m, i) => (
                         <li key={i} className="flex items-start gap-2">
@@ -3602,8 +4078,9 @@ function ConsultasTab() {
                         </li>
                       ))}
                     </ul>
-                  ) : <p className="text-muted-foreground">Nenhum medicamento mencionado.</p>
-                )}
+                  ) : (
+                    <p className="text-muted-foreground">Nenhum medicamento mencionado.</p>
+                  ))}
                 {activeNoteTab === "exames" && (
                   <>
                     {result.proximos_exames?.length ? (
@@ -3615,7 +4092,9 @@ function ConsultasTab() {
                           </li>
                         ))}
                       </ul>
-                    ) : <p className="text-muted-foreground">Nenhum exame solicitado.</p>}
+                    ) : (
+                      <p className="text-muted-foreground">Nenhum exame solicitado.</p>
+                    )}
                     {result.proxima_consulta && (
                       <p className="mt-3 rounded-lg border border-border bg-background p-2 text-xs">
                         📅 Próxima consulta: {result.proxima_consulta}
@@ -3675,11 +4154,15 @@ function ConsultasTab() {
                   {n.proximos_exames && (
                     <div>
                       <p className="font-medium text-primary">Exames</p>
-                      <p className="whitespace-pre-line text-muted-foreground">{n.proximos_exames}</p>
+                      <p className="whitespace-pre-line text-muted-foreground">
+                        {n.proximos_exames}
+                      </p>
                     </div>
                   )}
                   {n.proxima_consulta && (
-                    <p className="text-xs text-muted-foreground">Próxima consulta: {n.proxima_consulta}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Próxima consulta: {n.proxima_consulta}
+                    </p>
                   )}
                   {n.raw_transcript && (
                     <details className="mt-2">
@@ -3745,11 +4228,32 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
     if (!u.user) return;
 
     const [logsRes, journalRes, consultRes, kicksRes, preRes] = await Promise.all([
-      (supabase as any).from("health_logs").select("id, log_date, weight_kg, systolic, diastolic").eq("user_id", u.user.id).order("log_date", { ascending: false }),
-      (supabase as any).from("journal_entries").select("id, entry_date, mood, content").eq("user_id", u.user.id).order("entry_date", { ascending: false }),
-      (supabase as any).from("consultation_notes").select("id, recorded_at, title, orientacoes").eq("user_id", u.user.id).order("recorded_at", { ascending: false }),
-      (supabase as any).from("kick_sessions").select("id, started_at, kick_count").eq("user_id", u.user.id).not("ended_at", "is", null).order("started_at", { ascending: false }),
-      (supabase as any).from("preconsulta_forms").select("id, submitted_at, weeks_at_submission, emotional_state").eq("user_id", u.user.id).order("submitted_at", { ascending: false }),
+      (supabase as any)
+        .from("health_logs")
+        .select("id, log_date, weight_kg, systolic, diastolic")
+        .eq("user_id", u.user.id)
+        .order("log_date", { ascending: false }),
+      (supabase as any)
+        .from("journal_entries")
+        .select("id, entry_date, mood, content")
+        .eq("user_id", u.user.id)
+        .order("entry_date", { ascending: false }),
+      (supabase as any)
+        .from("consultation_notes")
+        .select("id, recorded_at, title, orientacoes")
+        .eq("user_id", u.user.id)
+        .order("recorded_at", { ascending: false }),
+      (supabase as any)
+        .from("kick_sessions")
+        .select("id, started_at, kick_count")
+        .eq("user_id", u.user.id)
+        .not("ended_at", "is", null)
+        .order("started_at", { ascending: false }),
+      (supabase as any)
+        .from("preconsulta_forms")
+        .select("id, submitted_at, weeks_at_submission, emotional_state")
+        .eq("user_id", u.user.id)
+        .order("submitted_at", { ascending: false }),
     ]);
 
     const all: TimelineEvent[] = [];
@@ -3758,24 +4262,55 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
       const parts = [];
       if (r.weight_kg) parts.push(`Peso: ${r.weight_kg} kg`);
       if (r.systolic && r.diastolic) parts.push(`PA: ${r.systolic}/${r.diastolic}`);
-      all.push({ id: r.id, date: r.log_date, type: "saude", title: "Registro de saúde", detail: parts.join(" · ") || undefined });
+      all.push({
+        id: r.id,
+        date: r.log_date,
+        type: "saude",
+        title: "Registro de saúde",
+        detail: parts.join(" · ") || undefined,
+      });
     }
     for (const r of journalRes.data ?? []) {
-      all.push({ id: r.id, date: r.entry_date, type: "diario", title: `Diário ${r.mood ?? ""}`.trim(), detail: r.content?.slice(0, 100) + (r.content?.length > 100 ? "..." : "") });
+      all.push({
+        id: r.id,
+        date: r.entry_date,
+        type: "diario",
+        title: `Diário ${r.mood ?? ""}`.trim(),
+        detail: r.content?.slice(0, 100) + (r.content?.length > 100 ? "..." : ""),
+      });
     }
     for (const r of consultRes.data ?? []) {
-      all.push({ id: r.id, date: r.recorded_at?.slice(0, 10), type: "consulta", title: r.title ?? "Consulta", detail: r.orientacoes?.split("\n")?.[0] });
+      all.push({
+        id: r.id,
+        date: r.recorded_at?.slice(0, 10),
+        type: "consulta",
+        title: r.title ?? "Consulta",
+        detail: r.orientacoes?.split("\n")?.[0],
+      });
     }
     for (const r of kicksRes.data ?? []) {
-      all.push({ id: r.id, date: r.started_at?.slice(0, 10), type: "chutes", title: `${r.kick_count ?? 0} chutes registrados` });
+      all.push({
+        id: r.id,
+        date: r.started_at?.slice(0, 10),
+        type: "chutes",
+        title: `${r.kick_count ?? 0} chutes registrados`,
+      });
     }
     for (const r of preRes.data ?? []) {
-      all.push({ id: r.id, date: r.submitted_at?.slice(0, 10), type: "preconsulta", title: `Pré-consulta — semana ${r.weeks_at_submission ?? "?"}`, detail: r.emotional_state ? `Humor: ${r.emotional_state}` : undefined });
+      all.push({
+        id: r.id,
+        date: r.submitted_at?.slice(0, 10),
+        type: "preconsulta",
+        title: `Pré-consulta — semana ${r.weeks_at_submission ?? "?"}`,
+        detail: r.emotional_state ? `Humor: ${r.emotional_state}` : undefined,
+      });
     }
 
     // Gestational milestones already passed
     if (gest) {
-      const { PRENATAL_MILESTONES } = await import("./minha-conta").catch(() => ({ PRENATAL_MILESTONES: [] as any[] }));
+      const { PRENATAL_MILESTONES } = await import("./minha-conta").catch(() => ({
+        PRENATAL_MILESTONES: [] as any[],
+      }));
       // Use hardcoded milestones since we can't import from same file
     }
 
@@ -3801,7 +4336,9 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
               key={f}
               onClick={() => setFilter(f)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                filter === f ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"
+                filter === f
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground hover:bg-secondary"
               }`}
             >
               {f === "todos" ? "Todos" : EV_LABEL[f]}
@@ -3814,7 +4351,9 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         <p className="text-center text-sm text-muted-foreground">Carregando...</p>
       ) : filtered.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-border p-10 text-center">
-          <p className="text-muted-foreground">Nenhum registro ainda. Comece usando as outras abas!</p>
+          <p className="text-muted-foreground">
+            Nenhum registro ainda. Comece usando as outras abas!
+          </p>
         </div>
       ) : (
         <div className="relative ml-4">
@@ -3827,18 +4366,26 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
               return (
                 <div key={ev.id} className="relative flex gap-4 pl-10">
                   {/* Dot */}
-                  <div className={`absolute left-0 top-4 h-6 w-6 rounded-full border-2 border-background ${s.dot} flex items-center justify-center`} />
+                  <div
+                    className={`absolute left-0 top-4 h-6 w-6 rounded-full border-2 border-background ${s.dot} flex items-center justify-center`}
+                  />
 
                   <div className="flex-1 rounded-2xl border border-border bg-card p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="text-sm font-medium">{ev.title}</p>
-                        {ev.detail && <p className="mt-0.5 text-xs text-muted-foreground">{ev.detail}</p>}
+                        {ev.detail && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">{ev.detail}</p>
+                        )}
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${s.badge}`}>{EV_LABEL[ev.type]}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${s.badge}`}>
+                          {EV_LABEL[ev.type]}
+                        </span>
                         <span className="text-xs text-muted-foreground">
-                          {ev.date ? new Date(ev.date + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+                          {ev.date
+                            ? new Date(ev.date + "T00:00:00").toLocaleDateString("pt-BR")
+                            : "—"}
                         </span>
                       </div>
                     </div>
@@ -3876,11 +4423,26 @@ const MOOD_LABEL: Record<string, string> = {
 const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 const MOOD_SUGGESTIONS: Record<number, string[]> = {
-  5: ["Que semana maravilhosa! Anote o que trouxe tanta alegria para se lembrar depois.", "Compartilhe sua energia com quem você ama."],
-  4: ["Você está indo muito bem! Uma caminhada leve pode ampliar ainda mais essa sensação.", "Pratique gratidão escrevendo 3 coisas boas do dia."],
-  3: ["O cansaço é parte normal da gestação. Descanse sem culpa e peça ajuda quando precisar.", "Hidrate-se bem e tente dormir mais cedo esta semana."],
-  2: ["Dias difíceis passam. Gentileza consigo mesma é o melhor remédio.", "Gengibre, torradas secas e pequenas refeições frequentes podem ajudar no mal-estar."],
-  1: ["Seus sentimentos são válidos. Se a tristeza ou ansiedade persistir, conversar com o Dr. Clóvis pode ajudar.", "Técnicas de respiração profunda e meditação guiada (aba Meditações) podem aliviar a ansiedade."],
+  5: [
+    "Que semana maravilhosa! Anote o que trouxe tanta alegria para se lembrar depois.",
+    "Compartilhe sua energia com quem você ama.",
+  ],
+  4: [
+    "Você está indo muito bem! Uma caminhada leve pode ampliar ainda mais essa sensação.",
+    "Pratique gratidão escrevendo 3 coisas boas do dia.",
+  ],
+  3: [
+    "O cansaço é parte normal da gestação. Descanse sem culpa e peça ajuda quando precisar.",
+    "Hidrate-se bem e tente dormir mais cedo esta semana.",
+  ],
+  2: [
+    "Dias difíceis passam. Gentileza consigo mesma é o melhor remédio.",
+    "Gengibre, torradas secas e pequenas refeições frequentes podem ajudar no mal-estar.",
+  ],
+  1: [
+    "Seus sentimentos são válidos. Se a tristeza ou ansiedade persistir, conversar com o Dr. Clóvis pode ajudar.",
+    "Técnicas de respiração profunda e meditação guiada (aba Meditações) podem aliviar a ansiedade.",
+  ],
 };
 
 function HumorTab() {
@@ -3899,13 +4461,17 @@ function HumorTab() {
     })();
   }, []);
 
-  if (loading) return <p className="text-center text-sm text-muted-foreground py-10">Carregando...</p>;
+  if (loading)
+    return <p className="text-center text-sm text-muted-foreground py-10">Carregando...</p>;
 
   if (entries.length === 0)
     return (
       <div className="rounded-3xl border border-dashed border-border p-10 text-center">
         <p className="font-serif text-xl">Nenhum registro ainda</p>
-        <p className="mt-2 text-sm text-muted-foreground">Use a aba <strong>Diário</strong> para registrar seu humor diariamente e ver as análises aqui.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Use a aba <strong>Diário</strong> para registrar seu humor diariamente e ver as análises
+          aqui.
+        </p>
       </div>
     );
 
@@ -3941,14 +4507,24 @@ function HumorTab() {
   // Overall trend
   const recent = entries.slice(0, 14);
   const recentAvg = recent.map((e) => MOOD_VALUE[e.mood ?? ""] ?? 3);
-  const overallAvg = recentAvg.length ? Math.round(recentAvg.reduce((a, b) => a + b, 0) / recentAvg.length) : 3;
+  const overallAvg = recentAvg.length
+    ? Math.round(recentAvg.reduce((a, b) => a + b, 0) / recentAvg.length)
+    : 3;
   const suggestions = MOOD_SUGGESTIONS[Math.min(5, Math.max(1, overallAvg))] ?? MOOD_SUGGESTIONS[3];
 
-  const bestDay = dayAvg.reduce((best, v, i) => (v !== null && (best === -1 || v > (dayAvg[best] ?? 0)) ? i : best), -1);
-  const hardDay = dayAvg.reduce((hard, v, i) => (v !== null && (hard === -1 || v < (dayAvg[hard] ?? 6)) ? i : hard), -1);
+  const bestDay = dayAvg.reduce(
+    (best, v, i) => (v !== null && (best === -1 || v > (dayAvg[best] ?? 0)) ? i : best),
+    -1,
+  );
+  const hardDay = dayAvg.reduce(
+    (hard, v, i) => (v !== null && (hard === -1 || v < (dayAvg[hard] ?? 6)) ? i : hard),
+    -1,
+  );
 
   // SVG chart dimensions
-  const W = 340, H = 100, pad = 10;
+  const W = 340,
+    H = 100,
+    pad = 10;
   const chartW = W - pad * 2;
   const chartH = H - pad * 2;
   const points = weeks.map((w, i) => ({
@@ -3957,12 +4533,19 @@ function HumorTab() {
     avg: w.avg,
     label: w.label,
   }));
-  const polyline = points.filter((p) => p.y !== null).map((p) => `${p.x},${p.y}`).join(" ");
+  const polyline = points
+    .filter((p) => p.y !== null)
+    .map((p) => `${p.x},${p.y}`)
+    .join(" ");
 
   // Mood frequency
   const moodCount: Record<string, number> = {};
-  entries.forEach((e) => { if (e.mood) moodCount[e.mood] = (moodCount[e.mood] ?? 0) + 1; });
-  const topMoods = Object.entries(moodCount).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  entries.forEach((e) => {
+    if (e.mood) moodCount[e.mood] = (moodCount[e.mood] ?? 0) + 1;
+  });
+  const topMoods = Object.entries(moodCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
 
   return (
     <div className="space-y-6">
@@ -3971,7 +4554,10 @@ function HumorTab() {
         <p className="font-serif text-lg">Resumo dos últimos 14 dias</p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-2xl bg-secondary/50 p-3 text-center">
-            <p className="text-2xl">{Object.entries(MOOD_VALUE).find(([, v]) => v === Math.round(overallAvg))?.[0] ?? "😊"}</p>
+            <p className="text-2xl">
+              {Object.entries(MOOD_VALUE).find(([, v]) => v === Math.round(overallAvg))?.[0] ??
+                "😊"}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">Humor médio</p>
           </div>
           <div className="rounded-2xl bg-secondary/50 p-3 text-center">
@@ -3996,23 +4582,56 @@ function HumorTab() {
       {/* Weekly mood chart */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Humor por semana</p>
-        <p className="text-xs text-muted-foreground mt-1">Média semanal das últimas 8 semanas (1=muito ruim · 5=ótimo)</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Média semanal das últimas 8 semanas (1=muito ruim · 5=ótimo)
+        </p>
         <div className="mt-4 overflow-x-auto">
           <svg viewBox={`0 0 ${W} ${H + 20}`} className="w-full max-w-sm">
             {/* Grid lines */}
             {[1, 2, 3, 4, 5].map((v) => {
               const y = pad + chartH - ((v - 1) / 4) * chartH;
-              return <line key={v} x1={pad} y1={y} x2={W - pad} y2={y} stroke="currentColor" strokeOpacity={0.08} strokeWidth={1} />;
+              return (
+                <line
+                  key={v}
+                  x1={pad}
+                  y1={y}
+                  x2={W - pad}
+                  y2={y}
+                  stroke="currentColor"
+                  strokeOpacity={0.08}
+                  strokeWidth={1}
+                />
+              );
             })}
             {/* Polyline */}
-            {polyline && <polyline points={polyline} fill="none" stroke="hsl(var(--primary))" strokeWidth={2} strokeLinejoin="round" />}
+            {polyline && (
+              <polyline
+                points={polyline}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                strokeLinejoin="round"
+              />
+            )}
             {/* Data points */}
-            {points.map((p, i) => p.y !== null && (
-              <g key={i}>
-                <circle cx={p.x} cy={p.y!} r={4} fill="hsl(var(--primary))" />
-                <text x={p.x} y={H + 18} textAnchor="middle" fontSize={8} fill="currentColor" opacity={0.5}>{p.label}</text>
-              </g>
-            ))}
+            {points.map(
+              (p, i) =>
+                p.y !== null && (
+                  <g key={i}>
+                    <circle cx={p.x} cy={p.y!} r={4} fill="hsl(var(--primary))" />
+                    <text
+                      x={p.x}
+                      y={H + 18}
+                      textAnchor="middle"
+                      fontSize={8}
+                      fill="currentColor"
+                      opacity={0.5}
+                    >
+                      {p.label}
+                    </text>
+                  </g>
+                ),
+            )}
           </svg>
         </div>
       </div>
@@ -4024,12 +4643,23 @@ function HumorTab() {
           {DAY_NAMES.map((name, i) => {
             const avg = dayAvg[i];
             const val = avg !== null ? Math.round(avg) : null;
-            const colors = ["", "bg-rose-200", "bg-orange-200", "bg-amber-100", "bg-emerald-100", "bg-emerald-300"];
+            const colors = [
+              "",
+              "bg-rose-200",
+              "bg-orange-200",
+              "bg-amber-100",
+              "bg-emerald-100",
+              "bg-emerald-300",
+            ];
             return (
               <div key={name} className="flex flex-1 flex-col items-center gap-1.5">
-                <div className={`h-10 w-full rounded-lg ${val !== null ? colors[val] : "bg-secondary"} flex items-center justify-center`}>
+                <div
+                  className={`h-10 w-full rounded-lg ${val !== null ? colors[val] : "bg-secondary"} flex items-center justify-center`}
+                >
                   {val !== null ? (
-                    <span className="text-lg">{Object.entries(MOOD_VALUE).find(([, v]) => v === val)?.[0] ?? "😐"}</span>
+                    <span className="text-lg">
+                      {Object.entries(MOOD_VALUE).find(([, v]) => v === val)?.[0] ?? "😐"}
+                    </span>
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
@@ -4054,7 +4684,10 @@ function HumorTab() {
                   <span className="text-muted-foreground">{count}×</span>
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((count / entries.length) * 100)}%` }} />
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.round((count / entries.length) * 100)}%` }}
+                  />
                 </div>
               </div>
             </div>
@@ -4165,9 +4798,16 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
     const durations = { inhale: 4000, hold: 4000, exhale: 6000 };
     setBreathPhase("inhale");
     breathRef.current = setInterval(() => {
-      if (phase === "inhale") { phase = "hold"; setBreathPhase("hold"); }
-      else if (phase === "hold") { phase = "exhale"; setBreathPhase("exhale"); }
-      else { phase = "inhale"; setBreathPhase("inhale"); }
+      if (phase === "inhale") {
+        phase = "hold";
+        setBreathPhase("hold");
+      } else if (phase === "hold") {
+        phase = "exhale";
+        setBreathPhase("exhale");
+      } else {
+        phase = "inhale";
+        setBreathPhase("inhale");
+      }
     }, durations[phase]);
   }
 
@@ -4178,7 +4818,9 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
 
   function speak(med: Meditation) {
     if (!("speechSynthesis" in window)) {
-      alert("Seu navegador não suporta síntese de voz. Use Chrome ou Edge para a melhor experiência.");
+      alert(
+        "Seu navegador não suporta síntese de voz. Use Chrome ou Edge para a melhor experiência.",
+      );
       return;
     }
     window.speechSynthesis.cancel();
@@ -4189,7 +4831,10 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
     const voices = window.speechSynthesis.getVoices();
     const ptVoice = voices.find((v) => v.lang.startsWith("pt")) || null;
     if (ptVoice) utter.voice = ptVoice;
-    utter.onend = () => { setPlaying(false); stopBreathing(); };
+    utter.onend = () => {
+      setPlaying(false);
+      stopBreathing();
+    };
     utterRef.current = utter;
     window.speechSynthesis.speak(utter);
     setPlaying(true);
@@ -4239,7 +4884,8 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
         <p className="font-serif text-lg">Meditações Guiadas</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Sessões de meditação narradas por voz, específicas para cada fase da gestação.
-          {currentTrimester && ` No ${currentTrimester}º trimestre, recomendamos as meditações destacadas.`}
+          {currentTrimester &&
+            ` No ${currentTrimester}º trimestre, recomendamos as meditações destacadas.`}
         </p>
         {!("speechSynthesis" in window) && (
           <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -4255,7 +4901,9 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
             key={t}
             onClick={() => setTopicFilter(t)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              topicFilter === t ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"
+              topicFilter === t
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-muted-foreground hover:bg-secondary"
             }`}
           >
             {t === "todos" ? "Todos os temas" : t}
@@ -4267,13 +4915,19 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
       {selected && (
         <div className="rounded-3xl border-2 border-primary/30 bg-primary/5 p-6">
           <p className="font-serif text-xl">{selected.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{selected.topic} · {selected.duration}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {selected.topic} · {selected.duration}
+          </p>
 
           {/* Breathing animation */}
           {breathPhase && (
             <div className="my-6 flex flex-col items-center gap-3">
-              <div className={`h-20 w-20 rounded-full bg-primary/30 transition-transform duration-[4000ms] ease-in-out ${breathScale[breathPhase]}`} />
-              <p className="text-sm font-medium text-primary animate-pulse">{breathLabel[breathPhase]}</p>
+              <div
+                className={`h-20 w-20 rounded-full bg-primary/30 transition-transform duration-[4000ms] ease-in-out ${breathScale[breathPhase]}`}
+              />
+              <p className="text-sm font-medium text-primary animate-pulse">
+                {breathLabel[breathPhase]}
+              </p>
             </div>
           )}
 
@@ -4286,7 +4940,10 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
               {playing ? "⏸ Pausar" : "▶ Iniciar meditação"}
             </button>
             {(playing || window.speechSynthesis?.paused) && (
-              <button onClick={stop} className="rounded-full border border-border px-4 py-2.5 text-sm text-muted-foreground hover:bg-secondary">
+              <button
+                onClick={stop}
+                className="rounded-full border border-border px-4 py-2.5 text-sm text-muted-foreground hover:bg-secondary"
+              >
                 ⏹ Parar
               </button>
             )}
@@ -4307,8 +4964,12 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
 
           {/* Script preview */}
           <details className="mt-4">
-            <summary className="cursor-pointer text-xs text-muted-foreground hover:underline">Ver script completo</summary>
-            <p className="mt-2 whitespace-pre-wrap rounded-2xl bg-background p-4 text-xs leading-relaxed text-muted-foreground">{selected.script}</p>
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:underline">
+              Ver script completo
+            </summary>
+            <p className="mt-2 whitespace-pre-wrap rounded-2xl bg-background p-4 text-xs leading-relaxed text-muted-foreground">
+              {selected.script}
+            </p>
           </details>
         </div>
       )}
@@ -4316,11 +4977,16 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
       {/* Meditation list */}
       <div className="grid gap-3 sm:grid-cols-2">
         {filtered.map((med) => {
-          const isRecommended = currentTrimester !== null && (med.trimester === 0 || med.trimester === currentTrimester);
+          const isRecommended =
+            currentTrimester !== null &&
+            (med.trimester === 0 || med.trimester === currentTrimester);
           return (
             <button
               key={med.id}
-              onClick={() => { setSelected(med); stop(); }}
+              onClick={() => {
+                setSelected(med);
+                stop();
+              }}
               className={`rounded-2xl border p-4 text-left transition-all hover:border-primary/50 ${
                 selected?.id === med.id ? "border-primary bg-primary/5" : "border-border bg-card"
               }`}
@@ -4375,7 +5041,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
     const tk = data.session?.access_token ?? "";
     await savePatientNotes({ data: { accessToken: tk, id, notes } });
     setSavingNotes(false);
-    setSessions((prev) => prev.map((s) => s.id === id ? { ...s, patient_notes: notes } : s));
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, patient_notes: notes } : s)));
   }
 
   const STATUS_LABEL_TC: Record<string, string> = {
@@ -4395,10 +5061,12 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Teleconsulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Quando o Dr. Clóvis abrir uma sala, você poderá entrar diretamente pelo portal — sem instalar nada.
+          Quando o Dr. Clóvis abrir uma sala, você poderá entrar diretamente pelo portal — sem
+          instalar nada.
         </p>
         <p className="mt-3 text-xs text-muted-foreground">
-          Para solicitar uma teleconsulta, entre em contato pelo WhatsApp ou pelo formulário de <strong>Agendamento</strong>.
+          Para solicitar uma teleconsulta, entre em contato pelo WhatsApp ou pelo formulário de{" "}
+          <strong>Agendamento</strong>.
         </p>
       </div>
 
@@ -4416,12 +5084,19 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
                 <div>
                   <p className="font-medium">
                     {s.scheduled_for
-                      ? new Date(s.scheduled_for).toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" })
+                      ? new Date(s.scheduled_for).toLocaleString("pt-BR", {
+                          dateStyle: "full",
+                          timeStyle: "short",
+                        })
                       : "Horário a definir"}
                   </p>
-                  {s.doctor_notes && <p className="mt-1 text-sm text-muted-foreground">{s.doctor_notes}</p>}
+                  {s.doctor_notes && (
+                    <p className="mt-1 text-sm text-muted-foreground">{s.doctor_notes}</p>
+                  )}
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLE_TC[s.status]}`}>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLE_TC[s.status]}`}
+                >
                   {STATUS_LABEL_TC[s.status]}
                 </span>
               </div>
@@ -4451,11 +5126,16 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
 
               {/* Patient notes */}
               <div className="mt-4 border-t border-border pt-4">
-                <p className="text-xs font-medium text-muted-foreground">Suas anotações da consulta</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Suas anotações da consulta
+                </p>
                 <textarea
                   value={s.id === activeSession?.id ? notes : (s.patient_notes ?? "")}
                   onChange={(e) => setNotes(e.target.value)}
-                  onFocus={() => { setActiveSession(s); setNotes(s.patient_notes ?? ""); }}
+                  onFocus={() => {
+                    setActiveSession(s);
+                    setNotes(s.patient_notes ?? "");
+                  }}
                   rows={2}
                   placeholder="Anote dúvidas antes ou orientações recebidas durante a consulta..."
                   className="mt-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
@@ -4541,7 +5221,10 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
   if (!gest || !week) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center">
-        <p className="text-muted-foreground">Configure sua gestação em <strong>Perfil</strong> para receber a carta semanal do seu bebê.</p>
+        <p className="text-muted-foreground">
+          Configure sua gestação em <strong>Perfil</strong> para receber a carta semanal do seu
+          bebê.
+        </p>
       </div>
     );
   }
@@ -4557,7 +5240,8 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
             <p className="text-xs uppercase tracking-[0.22em] text-primary">Semana {week}</p>
             <p className="mt-1 font-serif text-2xl">Carta do seu bebê</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Uma mensagem especial na perspectiva do {profile?.baby_name ?? "seu bebê"}, gerada por IA com base no desenvolvimento real desta semana.
+              Uma mensagem especial na perspectiva do {profile?.baby_name ?? "seu bebê"}, gerada por
+              IA com base no desenvolvimento real desta semana.
             </p>
           </div>
           <div className="text-4xl">{baby.fruit}</div>
@@ -4573,22 +5257,32 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
         <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-b from-primary/5 to-background p-8">
           {/* Decorative stamp */}
           <div className="absolute right-6 top-6 flex h-14 w-14 items-center justify-center rounded-full border-4 border-primary/20 text-xs font-bold uppercase tracking-wider text-primary/40">
-            Semana<br />{week}
+            Semana
+            <br />
+            {week}
           </div>
           <p className="mb-6 font-serif text-sm text-muted-foreground">
-            {new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}
+            {new Date().toLocaleDateString("pt-BR", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
           </p>
           <p className="whitespace-pre-line font-serif text-base leading-relaxed text-foreground">
             {letter}
           </p>
           {cachedWeek === week && (
-            <p className="mt-6 text-xs text-muted-foreground">Carta da semana {week} · salva automaticamente</p>
+            <p className="mt-6 text-xs text-muted-foreground">
+              Carta da semana {week} · salva automaticamente
+            </p>
           )}
         </div>
       ) : (
         <div className="rounded-3xl border border-dashed border-border p-10 text-center">
           <p className="font-serif text-xl text-muted-foreground">Sua carta ainda não foi gerada</p>
-          <p className="mt-2 text-sm text-muted-foreground">Clique abaixo para receber uma mensagem especial do seu bebê nesta semana.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Clique abaixo para receber uma mensagem especial do seu bebê nesta semana.
+          </p>
         </div>
       )}
 
@@ -4598,7 +5292,11 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
           disabled={loading}
           className="rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
         >
-          {loading ? "Gerando carta..." : letter ? "Gerar nova carta" : "✉️ Receber carta desta semana"}
+          {loading
+            ? "Gerando carta..."
+            : letter
+              ? "Gerar nova carta"
+              : "✉️ Receber carta desta semana"}
         </button>
         {letter && (
           <button
@@ -4613,7 +5311,10 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
         )}
       </div>
 
-      <p className="text-xs text-muted-foreground">A IA gera uma carta única por semana — clique em "Gerar nova carta" para criar uma versão diferente.</p>
+      <p className="text-xs text-muted-foreground">
+        A IA gera uma carta única por semana — clique em "Gerar nova carta" para criar uma versão
+        diferente.
+      </p>
     </div>
   );
 }
@@ -4622,7 +5323,10 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
 
 type SoundType = "heartbeat" | "pink-noise" | "binaural" | "lullaby" | "rain";
 
-const SOUND_INFO: Record<SoundType, { label: string; description: string; minWeek: number; icon: string }> = {
+const SOUND_INFO: Record<
+  SoundType,
+  { label: string; description: string; minWeek: number; icon: string }
+> = {
   heartbeat: {
     label: "Batimento cardíaco materno",
     description: "Sons do coração da mamãe — o primeiro som que o bebê ouve.",
@@ -4661,7 +5365,11 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
   const [volume, setVolume] = useState(0.5);
   const [playCount, setPlayCount] = useState<Partial<Record<SoundType, number>>>(() => {
     if (typeof window === "undefined") return {};
-    try { return JSON.parse(localStorage.getItem("sons_play_count") ?? "{}"); } catch { return {}; }
+    try {
+      return JSON.parse(localStorage.getItem("sons_play_count") ?? "{}");
+    } catch {
+      return {};
+    }
   });
   const ctxRef = useRef<AudioContext | null>(null);
   const nodesRef = useRef<AudioNode[]>([]);
@@ -4678,10 +5386,21 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
   }
 
   function stopAll() {
-    if (schedulerRef.current) { clearInterval(schedulerRef.current); schedulerRef.current = null; }
-    nodesRef.current.forEach((n) => { try { (n as any).stop?.(); n.disconnect(); } catch {} });
+    if (schedulerRef.current) {
+      clearInterval(schedulerRef.current);
+      schedulerRef.current = null;
+    }
+    nodesRef.current.forEach((n) => {
+      try {
+        (n as any).stop?.();
+        n.disconnect();
+      } catch {}
+    });
     nodesRef.current = [];
-    if (masterRef.current) { masterRef.current.disconnect(); masterRef.current = null; }
+    if (masterRef.current) {
+      masterRef.current.disconnect();
+      masterRef.current = null;
+    }
     setPlaying(null);
   }
 
@@ -4690,15 +5409,20 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
     const buffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
       const data = buffer.getChannelData(ch);
-      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
+      let b0 = 0,
+        b1 = 0,
+        b2 = 0,
+        b3 = 0,
+        b4 = 0,
+        b5 = 0;
       for (let i = 0; i < bufferSize; i++) {
         const white = Math.random() * 2 - 1;
         b0 = 0.99886 * b0 + white * 0.0555179;
         b1 = 0.99332 * b1 + white * 0.0750759;
-        b2 = 0.96900 * b2 + white * 0.1538520;
-        b3 = 0.86650 * b3 + white * 0.3104856;
-        b4 = 0.55000 * b4 + white * 0.5329522;
-        b5 = -0.7616 * b5 - white * 0.0168980;
+        b2 = 0.969 * b2 + white * 0.153852;
+        b3 = 0.8665 * b3 + white * 0.3104856;
+        b4 = 0.55 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.016898;
         data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + white * 0.5362) * 0.11;
       }
     }
@@ -4733,12 +5457,18 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
     merger.connect(master);
     const left = ctx.createOscillator();
     const right = ctx.createOscillator();
-    const gL = ctx.createGain(); gL.gain.value = 0.3;
-    const gR = ctx.createGain(); gR.gain.value = 0.3;
-    left.frequency.value = 200; right.frequency.value = 210;
-    left.connect(gL); gL.connect(merger, 0, 0);
-    right.connect(gR); gR.connect(merger, 0, 1);
-    left.start(); right.start();
+    const gL = ctx.createGain();
+    gL.gain.value = 0.3;
+    const gR = ctx.createGain();
+    gR.gain.value = 0.3;
+    left.frequency.value = 200;
+    right.frequency.value = 210;
+    left.connect(gL);
+    gL.connect(merger, 0, 0);
+    right.connect(gR);
+    gR.connect(merger, 0, 1);
+    left.start();
+    right.start();
     nodesRef.current.push(left, right);
   }
 
@@ -4749,29 +5479,37 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
       const t = nextBeatRef.current;
       if (t > ctx.currentTime + 0.3) return;
       // Lub
-      const o1 = ctx.createOscillator(); const g1 = ctx.createGain();
-      o1.type = "sine"; o1.frequency.value = 80;
+      const o1 = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      o1.type = "sine";
+      o1.frequency.value = 80;
       g1.gain.setValueAtTime(0, t);
       g1.gain.linearRampToValueAtTime(0.4, t + 0.02);
       g1.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-      o1.connect(g1); g1.connect(master);
-      o1.start(t); o1.stop(t + 0.14);
+      o1.connect(g1);
+      g1.connect(master);
+      o1.start(t);
+      o1.stop(t + 0.14);
       // Dub
-      const o2 = ctx.createOscillator(); const g2 = ctx.createGain();
-      o2.type = "sine"; o2.frequency.value = 65;
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.type = "sine";
+      o2.frequency.value = 65;
       const t2 = t + 0.13;
       g2.gain.setValueAtTime(0, t2);
       g2.gain.linearRampToValueAtTime(0.25, t2 + 0.02);
       g2.gain.exponentialRampToValueAtTime(0.001, t2 + 0.1);
-      o2.connect(g2); g2.connect(master);
-      o2.start(t2); o2.stop(t2 + 0.12);
+      o2.connect(g2);
+      g2.connect(master);
+      o2.start(t2);
+      o2.stop(t2 + 0.12);
       nextBeatRef.current = t + interval;
     }, 50) as ReturnType<typeof setInterval>;
   }
 
   function scheduleLullaby(ctx: AudioContext, master: GainNode) {
     // C major pentatonic: C4 D4 E4 G4 A4
-    const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 392.00, 329.63, 293.66];
+    const notes = [261.63, 293.66, 329.63, 392.0, 440.0, 392.0, 329.63, 293.66];
     const dur = 0.6;
     let idx = 0;
     let t = ctx.currentTime + 0.1;
@@ -4802,7 +5540,10 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
   }
 
   function play(type: SoundType) {
-    if (playing === type) { stopAll(); return; }
+    if (playing === type) {
+      stopAll();
+      return;
+    }
     stopAll();
     const ctx = getCtx();
     const master = ctx.createGain();
@@ -4827,7 +5568,7 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
   useEffect(() => () => stopAll(), []);
 
   const sortedByPlays = (Object.keys(SOUND_INFO) as SoundType[]).sort(
-    (a, b) => (playCount[b] ?? 0) - (playCount[a] ?? 0)
+    (a, b) => (playCount[b] ?? 0) - (playCount[a] ?? 0),
   );
 
   return (
@@ -4836,11 +5577,13 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Sons para o bebê</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          O bebê começa a ouvir sons por volta da semana 16–18. Sons reproduzidos regularmente durante a gestação são reconhecidos pelo recém-nascido.
+          O bebê começa a ouvir sons por volta da semana 16–18. Sons reproduzidos regularmente
+          durante a gestação são reconhecidos pelo recém-nascido.
         </p>
         {currentWeek > 0 && currentWeek < 16 && (
           <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            Na semana {currentWeek}, o bebê ainda não ouve sons externos. A partir da semana 16 o sistema auditivo começa a se desenvolver.
+            Na semana {currentWeek}, o bebê ainda não ouve sons externos. A partir da semana 16 o
+            sistema auditivo começa a se desenvolver.
           </p>
         )}
       </div>
@@ -4857,7 +5600,9 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
           onChange={(e) => setVolume(Number(e.target.value))}
           className="flex-1"
         />
-        <span className="w-10 text-right text-xs text-muted-foreground">{Math.round(volume * 100)}%</span>
+        <span className="w-10 text-right text-xs text-muted-foreground">
+          {Math.round(volume * 100)}%
+        </span>
       </div>
 
       {/* Sound cards */}
@@ -4875,8 +5620,8 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
                 isPlaying
                   ? "border-primary bg-primary/10 shadow-md"
                   : unlocked
-                  ? "border-border bg-card hover:border-primary/40"
-                  : "border-border bg-secondary/40 opacity-60"
+                    ? "border-border bg-card hover:border-primary/40"
+                    : "border-border bg-secondary/40 opacity-60"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -4908,7 +5653,9 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
                 </div>
               </div>
               {isPlaying && (
-                <p className="mt-3 text-xs font-medium text-primary">▶ Tocando — clique para pausar</p>
+                <p className="mt-3 text-xs font-medium text-primary">
+                  ▶ Tocando — clique para pausar
+                </p>
               )}
             </button>
           );
@@ -4920,27 +5667,31 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
         <div className="rounded-3xl border border-border bg-card p-6">
           <p className="font-serif text-lg">Sons favoritos do seu bebê</p>
           <div className="mt-4 space-y-2">
-            {sortedByPlays.filter((t) => (playCount[t] ?? 0) > 0).map((t) => (
-              <div key={t} className="flex items-center gap-3">
-                <span className="text-xl">{SOUND_INFO[t].icon}</span>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span>{SOUND_INFO[t].label}</span>
-                    <span className="text-muted-foreground">{playCount[t]}×</span>
-                  </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{
-                        width: `${Math.round(((playCount[t] ?? 0) / Math.max(...Object.values(playCount).map(v => v ?? 0))) * 100)}%`,
-                      }}
-                    />
+            {sortedByPlays
+              .filter((t) => (playCount[t] ?? 0) > 0)
+              .map((t) => (
+                <div key={t} className="flex items-center gap-3">
+                  <span className="text-xl">{SOUND_INFO[t].icon}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span>{SOUND_INFO[t].label}</span>
+                      <span className="text-muted-foreground">{playCount[t]}×</span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{
+                          width: `${Math.round(((playCount[t] ?? 0) / Math.max(...Object.values(playCount).map((v) => v ?? 0))) * 100)}%`,
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">Anote os sons favoritos — o bebê pode reconhecê-los após o nascimento 🌟</p>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Anote os sons favoritos — o bebê pode reconhecê-los após o nascimento 🌟
+          </p>
         </div>
       )}
     </div>
@@ -4972,7 +5723,8 @@ const EXERCISES: Exercise[] = [
     category: "Assoalho Pélvico",
     duration: "10 min",
     benefit: "Fortalece o assoalho pélvico, reduz risco de incontinência e facilita o parto",
-    description: "Contrações do assoalho pélvico — o exercício mais recomendado durante toda a gestação.",
+    description:
+      "Contrações do assoalho pélvico — o exercício mais recomendado durante toda a gestação.",
     steps: [
       "Sente-se ou deite-se confortavelmente",
       "Identifique os músculos do assoalho pélvico (como se fosse segurar a urina)",
@@ -4991,7 +5743,8 @@ const EXERCISES: Exercise[] = [
     category: "Fortalecimento",
     duration: "15 min",
     benefit: "Fortalece pernas e quadril, abre a pelve para o parto",
-    description: "Agachamento parcial apoiado na parede — excelente para preparar o corpo para o parto.",
+    description:
+      "Agachamento parcial apoiado na parede — excelente para preparar o corpo para o parto.",
     steps: [
       "Fique de costas para a parede, pés afastados na largura dos ombros",
       "Deslize as costas pela parede até os joelhos formarem ~90°",
@@ -5011,7 +5764,8 @@ const EXERCISES: Exercise[] = [
     category: "Respiração",
     duration: "10 min",
     benefit: "Reduz ansiedade, melhora oxigenação e prepara para o parto",
-    description: "Técnica de respiração profunda que acalma o sistema nervoso e aumenta a oxigenação.",
+    description:
+      "Técnica de respiração profunda que acalma o sistema nervoso e aumenta a oxigenação.",
     steps: [
       "Sente-se confortavelmente com uma mão na barriga",
       "Inspire pelo nariz contando até 4, sentindo a barriga subir",
@@ -5050,7 +5804,8 @@ const EXERCISES: Exercise[] = [
     category: "Yoga",
     duration: "10 min",
     benefit: "Alivia dor lombar, melhora postura e mobiliza a coluna vertebral",
-    description: "Movimento clássico de yoga — excelente para aliviar as dores lombares comuns na gestação.",
+    description:
+      "Movimento clássico de yoga — excelente para aliviar as dores lombares comuns na gestação.",
     steps: [
       "Ajoelhe-se em 4 apoios (mãos e joelhos)",
       "Inspire: arqueie as costas para baixo, levante a cabeça (posição vaca)",
@@ -5094,7 +5849,7 @@ const EXERCISES: Exercise[] = [
       "Junte as plantas dos pés, deixando os joelhos caírem para os lados",
       "Segure os pés com as mãos",
       "Mantenha a posição por 1–3 minutos respirando profundamente",
-      "Opcionalmente, mova os joelhos levemente para cima e para baixo (\"asa de borboleta\")",
+      'Opcionalmente, mova os joelhos levemente para cima e para baixo ("asa de borboleta")',
     ],
     trimester: [1, 2, 3],
     minWeek: 10,
@@ -5108,7 +5863,8 @@ const EXERCISES: Exercise[] = [
     category: "Cardio",
     duration: "30–45 min",
     benefit: "Baixo impacto, alivia inchaço e dores articulares, melhora circulação",
-    description: "A água reduz o impacto sobre as articulações — ideal especialmente no 3º trimestre.",
+    description:
+      "A água reduz o impacto sobre as articulações — ideal especialmente no 3º trimestre.",
     steps: [
       "Procure uma turma específica para gestantes",
       "Use roupa de banho confortável e óculos de natação",
@@ -5127,7 +5883,8 @@ const EXERCISES: Exercise[] = [
     category: "Yoga",
     duration: "20 min",
     benefit: "Prepara corpo e mente para o parto, alivia desconfortos do final da gestação",
-    description: "Sequência de yoga adaptada para o 3º trimestre com foco em abertura de quadril e relaxamento.",
+    description:
+      "Sequência de yoga adaptada para o 3º trimestre com foco em abertura de quadril e relaxamento.",
     steps: [
       "Postura do guerreiro modificada: apoie a mão na parede",
       "Postura da pomba: com apoios, abre quadril profundamente",
@@ -5151,14 +5908,17 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const available = EXERCISES.filter((ex) => {
-    const weekOk = currentWeek === 0 || (currentWeek >= ex.minWeek && (!ex.maxWeek || currentWeek <= ex.maxWeek));
+    const weekOk =
+      currentWeek === 0 ||
+      (currentWeek >= ex.minWeek && (!ex.maxWeek || currentWeek <= ex.maxWeek));
     const trimOk = currentTrimester === null || ex.trimester.includes(currentTrimester);
     const catOk = catFilter === "todos" || ex.category === catFilter;
     return catOk && weekOk && trimOk;
   });
 
   const locked = EXERCISES.filter((ex) => {
-    const weekOk = currentWeek > 0 && (currentWeek < ex.minWeek || (ex.maxWeek && currentWeek > ex.maxWeek));
+    const weekOk =
+      currentWeek > 0 && (currentWeek < ex.minWeek || (ex.maxWeek && currentWeek > ex.maxWeek));
     const catOk = catFilter === "todos" || ex.category === catFilter;
     return catOk && weekOk;
   });
@@ -5185,7 +5945,9 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
             key={cat}
             onClick={() => setCatFilter(cat)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              catFilter === cat ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"
+              catFilter === cat
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-muted-foreground hover:bg-secondary"
             }`}
           >
             {cat === "todos" ? "Todos" : cat}
@@ -5195,7 +5957,9 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
 
       {/* Exercise list */}
       {available.length === 0 && locked.length === 0 ? (
-        <p className="text-center text-sm text-muted-foreground py-8">Nenhum exercício encontrado para este filtro.</p>
+        <p className="text-center text-sm text-muted-foreground py-8">
+          Nenhum exercício encontrado para este filtro.
+        </p>
       ) : (
         <div className="space-y-3">
           {available.map((ex) => (
@@ -5207,11 +5971,15 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium">{ex.title}</p>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${ex.safetyLevel === "verde" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${ex.safetyLevel === "verde" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+                    >
                       {ex.safetyLevel === "verde" ? "✓ Liberado" : "⚠ Consulte médico"}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{ex.category} · {ex.duration} · {ex.benefit}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {ex.category} · {ex.duration} · {ex.benefit}
+                  </p>
                 </div>
                 <span className="text-muted-foreground">{expanded === ex.id ? "▲" : "▼"}</span>
               </button>
@@ -5220,14 +5988,20 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
                 <div className="border-t border-border px-5 pb-5">
                   <p className="mt-4 text-sm text-muted-foreground">{ex.description}</p>
                   {ex.caution && (
-                    <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">{ex.caution}</p>
+                    <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      {ex.caution}
+                    </p>
                   )}
                   <div className="mt-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Como fazer</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Como fazer
+                    </p>
                     <ol className="mt-2 space-y-1.5">
                       {ex.steps.map((step, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm">
-                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
+                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                            {i + 1}
+                          </span>
                           {step}
                         </li>
                       ))}
@@ -5253,7 +6027,10 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
               </summary>
               <div className="mt-3 space-y-2">
                 {locked.map((ex) => (
-                  <div key={ex.id} className="flex items-center justify-between rounded-xl bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+                  <div
+                    key={ex.id}
+                    className="flex items-center justify-between rounded-xl bg-secondary/40 px-3 py-2 text-xs text-muted-foreground"
+                  >
                     <span>{ex.title}</span>
                     <span>A partir da semana {ex.minWeek}</span>
                   </div>
@@ -5280,38 +6057,227 @@ type QuartinhoItem = {
 
 const QUARTO_ITEMS: QuartinhoItem[] = [
   // Sono
-  { id: "qb-bercinho", category: "Sono", label: "Berço ou mini berço", priority: "essencial", weekSuggested: 25, searchQuery: "berço bebê" },
-  { id: "qb-colchao", category: "Sono", label: "Colchão firminho para berço", priority: "essencial", weekSuggested: 25, searchQuery: "colchão berço bebê" },
-  { id: "qb-protetor", category: "Sono", label: "Protetor de berço respirável", priority: "recomendado", weekSuggested: 28, searchQuery: "protetor berço respirável" },
-  { id: "qb-mosquiteiro", category: "Sono", label: "Mosquiteiro para berço", priority: "recomendado", weekSuggested: 30, searchQuery: "mosquiteiro berço bebê" },
-  { id: "qb-baba", category: "Sono", label: "Babá eletrônica / monitor de bebê", priority: "recomendado", weekSuggested: 32, searchQuery: "babá eletrônica monitor bebê" },
-  { id: "qb-cortina", category: "Sono", label: "Cortina blackout", priority: "recomendado", weekSuggested: 30, searchQuery: "cortina blackout quarto bebê" },
+  {
+    id: "qb-bercinho",
+    category: "Sono",
+    label: "Berço ou mini berço",
+    priority: "essencial",
+    weekSuggested: 25,
+    searchQuery: "berço bebê",
+  },
+  {
+    id: "qb-colchao",
+    category: "Sono",
+    label: "Colchão firminho para berço",
+    priority: "essencial",
+    weekSuggested: 25,
+    searchQuery: "colchão berço bebê",
+  },
+  {
+    id: "qb-protetor",
+    category: "Sono",
+    label: "Protetor de berço respirável",
+    priority: "recomendado",
+    weekSuggested: 28,
+    searchQuery: "protetor berço respirável",
+  },
+  {
+    id: "qb-mosquiteiro",
+    category: "Sono",
+    label: "Mosquiteiro para berço",
+    priority: "recomendado",
+    weekSuggested: 30,
+    searchQuery: "mosquiteiro berço bebê",
+  },
+  {
+    id: "qb-baba",
+    category: "Sono",
+    label: "Babá eletrônica / monitor de bebê",
+    priority: "recomendado",
+    weekSuggested: 32,
+    searchQuery: "babá eletrônica monitor bebê",
+  },
+  {
+    id: "qb-cortina",
+    category: "Sono",
+    label: "Cortina blackout",
+    priority: "recomendado",
+    weekSuggested: 30,
+    searchQuery: "cortina blackout quarto bebê",
+  },
   // Troca
-  { id: "qb-trocador", category: "Troca", label: "Trocador com proteção lateral", priority: "essencial", weekSuggested: 28, searchQuery: "trocador bebê" },
-  { id: "qb-fraldas-rn", category: "Troca", label: "Fraldas descartáveis RN e P", priority: "essencial", weekSuggested: 34, searchQuery: "fralda descartável recém-nascido" },
-  { id: "qb-toalhinhas", category: "Troca", label: "Toalhinhas umedecidas sem álcool", priority: "essencial", weekSuggested: 34, searchQuery: "toalhinhas umedecidas bebê sem álcool" },
-  { id: "qb-pomada", category: "Troca", label: "Pomada para assadura", priority: "essencial", weekSuggested: 34, searchQuery: "pomada assadura bebê" },
-  { id: "qb-termometro", category: "Troca", label: "Termômetro digital axilar", priority: "essencial", weekSuggested: 32, searchQuery: "termômetro digital bebê" },
+  {
+    id: "qb-trocador",
+    category: "Troca",
+    label: "Trocador com proteção lateral",
+    priority: "essencial",
+    weekSuggested: 28,
+    searchQuery: "trocador bebê",
+  },
+  {
+    id: "qb-fraldas-rn",
+    category: "Troca",
+    label: "Fraldas descartáveis RN e P",
+    priority: "essencial",
+    weekSuggested: 34,
+    searchQuery: "fralda descartável recém-nascido",
+  },
+  {
+    id: "qb-toalhinhas",
+    category: "Troca",
+    label: "Toalhinhas umedecidas sem álcool",
+    priority: "essencial",
+    weekSuggested: 34,
+    searchQuery: "toalhinhas umedecidas bebê sem álcool",
+  },
+  {
+    id: "qb-pomada",
+    category: "Troca",
+    label: "Pomada para assadura",
+    priority: "essencial",
+    weekSuggested: 34,
+    searchQuery: "pomada assadura bebê",
+  },
+  {
+    id: "qb-termometro",
+    category: "Troca",
+    label: "Termômetro digital axilar",
+    priority: "essencial",
+    weekSuggested: 32,
+    searchQuery: "termômetro digital bebê",
+  },
   // Banho
-  { id: "qb-banheira", category: "Banho", label: "Banheira plástica com suporte", priority: "essencial", weekSuggested: 28, searchQuery: "banheira bebê plástica" },
-  { id: "qb-sabonete", category: "Banho", label: "Sabonete líquido neutro para bebê", priority: "essencial", weekSuggested: 34, searchQuery: "sabonete líquido neutro bebê" },
-  { id: "qb-shampoo", category: "Banho", label: "Shampoo para bebê sem lágrimas", priority: "essencial", weekSuggested: 34, searchQuery: "shampoo bebê sem lágrimas" },
-  { id: "qb-toalha", category: "Banho", label: "Toalhas com capuz (mín. 3)", priority: "essencial", weekSuggested: 32, searchQuery: "toalha capuz bebê" },
-  { id: "qb-algodao", category: "Banho", label: "Algodão hidrófilo e cotonete bebê", priority: "essencial", weekSuggested: 34, searchQuery: "algodão hidrófilo bebê cotonete" },
+  {
+    id: "qb-banheira",
+    category: "Banho",
+    label: "Banheira plástica com suporte",
+    priority: "essencial",
+    weekSuggested: 28,
+    searchQuery: "banheira bebê plástica",
+  },
+  {
+    id: "qb-sabonete",
+    category: "Banho",
+    label: "Sabonete líquido neutro para bebê",
+    priority: "essencial",
+    weekSuggested: 34,
+    searchQuery: "sabonete líquido neutro bebê",
+  },
+  {
+    id: "qb-shampoo",
+    category: "Banho",
+    label: "Shampoo para bebê sem lágrimas",
+    priority: "essencial",
+    weekSuggested: 34,
+    searchQuery: "shampoo bebê sem lágrimas",
+  },
+  {
+    id: "qb-toalha",
+    category: "Banho",
+    label: "Toalhas com capuz (mín. 3)",
+    priority: "essencial",
+    weekSuggested: 32,
+    searchQuery: "toalha capuz bebê",
+  },
+  {
+    id: "qb-algodao",
+    category: "Banho",
+    label: "Algodão hidrófilo e cotonete bebê",
+    priority: "essencial",
+    weekSuggested: 34,
+    searchQuery: "algodão hidrófilo bebê cotonete",
+  },
   // Alimentação
-  { id: "qb-almofada", category: "Alimentação", label: "Almofada de amamentação", priority: "essencial", weekSuggested: 30, searchQuery: "almofada amamentação" },
-  { id: "qb-bomba", category: "Alimentação", label: "Bomba de leite (manual ou elétrica)", priority: "recomendado", weekSuggested: 32, searchQuery: "bomba de leite materno" },
-  { id: "qb-mamadeiras", category: "Alimentação", label: "Mamadeiras anticolica (caso necessário)", priority: "opcional", weekSuggested: 35, searchQuery: "mamadeira anticólica bebê" },
-  { id: "qb-creme", category: "Alimentação", label: "Lanolina para mamilos", priority: "recomendado", weekSuggested: 34, searchQuery: "lanolina mamilo amamentação" },
+  {
+    id: "qb-almofada",
+    category: "Alimentação",
+    label: "Almofada de amamentação",
+    priority: "essencial",
+    weekSuggested: 30,
+    searchQuery: "almofada amamentação",
+  },
+  {
+    id: "qb-bomba",
+    category: "Alimentação",
+    label: "Bomba de leite (manual ou elétrica)",
+    priority: "recomendado",
+    weekSuggested: 32,
+    searchQuery: "bomba de leite materno",
+  },
+  {
+    id: "qb-mamadeiras",
+    category: "Alimentação",
+    label: "Mamadeiras anticolica (caso necessário)",
+    priority: "opcional",
+    weekSuggested: 35,
+    searchQuery: "mamadeira anticólica bebê",
+  },
+  {
+    id: "qb-creme",
+    category: "Alimentação",
+    label: "Lanolina para mamilos",
+    priority: "recomendado",
+    weekSuggested: 34,
+    searchQuery: "lanolina mamilo amamentação",
+  },
   // Transporte
-  { id: "qb-carrinho", category: "Transporte", label: "Carrinho de bebê", priority: "essencial", weekSuggested: 28, searchQuery: "carrinho de bebê" },
-  { id: "qb-bebe-conforto", category: "Transporte", label: "Bebê conforto (obrigatório por lei)", priority: "essencial", weekSuggested: 26, searchQuery: "bebê conforto cadeirinha carro" },
-  { id: "qb-sling", category: "Transporte", label: "Sling ou canguru ergonômico", priority: "recomendado", weekSuggested: 30, searchQuery: "sling ergonômico bebê" },
+  {
+    id: "qb-carrinho",
+    category: "Transporte",
+    label: "Carrinho de bebê",
+    priority: "essencial",
+    weekSuggested: 28,
+    searchQuery: "carrinho de bebê",
+  },
+  {
+    id: "qb-bebe-conforto",
+    category: "Transporte",
+    label: "Bebê conforto (obrigatório por lei)",
+    priority: "essencial",
+    weekSuggested: 26,
+    searchQuery: "bebê conforto cadeirinha carro",
+  },
+  {
+    id: "qb-sling",
+    category: "Transporte",
+    label: "Sling ou canguru ergonômico",
+    priority: "recomendado",
+    weekSuggested: 30,
+    searchQuery: "sling ergonômico bebê",
+  },
   // Segurança e conforto
-  { id: "qb-aspirador", category: "Saúde", label: "Aspirador nasal", priority: "essencial", weekSuggested: 35, searchQuery: "aspirador nasal bebê" },
-  { id: "qb-cortador-unhas", category: "Saúde", label: "Kit manicure para bebê", priority: "essencial", weekSuggested: 35, searchQuery: "kit manicure cortador unhas bebê" },
-  { id: "qb-cadeira", category: "Conforto", label: "Cadeira de amamentação/poltrona", priority: "recomendado", weekSuggested: 30, searchQuery: "cadeira amamentação poltrona" },
-  { id: "qb-humidificador", category: "Conforto", label: "Umidificador de ar", priority: "opcional", weekSuggested: 32, searchQuery: "umidificador ar quarto bebê" },
+  {
+    id: "qb-aspirador",
+    category: "Saúde",
+    label: "Aspirador nasal",
+    priority: "essencial",
+    weekSuggested: 35,
+    searchQuery: "aspirador nasal bebê",
+  },
+  {
+    id: "qb-cortador-unhas",
+    category: "Saúde",
+    label: "Kit manicure para bebê",
+    priority: "essencial",
+    weekSuggested: 35,
+    searchQuery: "kit manicure cortador unhas bebê",
+  },
+  {
+    id: "qb-cadeira",
+    category: "Conforto",
+    label: "Cadeira de amamentação/poltrona",
+    priority: "recomendado",
+    weekSuggested: 30,
+    searchQuery: "cadeira amamentação poltrona",
+  },
+  {
+    id: "qb-humidificador",
+    category: "Conforto",
+    label: "Umidificador de ar",
+    priority: "opcional",
+    weekSuggested: 32,
+    searchQuery: "umidificador ar quarto bebê",
+  },
 ];
 
 const PRIORITY_STYLE: Record<QuartinhoItem["priority"], { badge: string; label: string }> = {
@@ -5325,7 +6291,11 @@ const QUARTO_CATEGORIES = [...new Set(QUARTO_ITEMS.map((i) => i.category))];
 function QuartinhoTab({ gest }: { gest: Gest }) {
   const [checked, setChecked] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set<string>();
-    try { return new Set(JSON.parse(localStorage.getItem("quartinho_checked") ?? "[]")); } catch { return new Set<string>(); }
+    try {
+      return new Set(JSON.parse(localStorage.getItem("quartinho_checked") ?? "[]"));
+    } catch {
+      return new Set<string>();
+    }
   });
   const [catFilter, setCatFilter] = useState<string>("todos");
   const [priorityFilter, setPriorityFilter] = useState<string>("todos");
@@ -5333,7 +6303,8 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
 
   function toggle(id: string) {
     const next = new Set(checked);
-    if (next.has(id)) next.delete(id); else next.add(id);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     setChecked(next);
     localStorage.setItem("quartinho_checked", JSON.stringify([...next]));
   }
@@ -5350,11 +6321,17 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
   const completionPct = Math.round((totalChecked / QUARTO_ITEMS.length) * 100);
 
   // Items to focus this week
-  const upcoming = currentWeek > 0
-    ? QUARTO_ITEMS.filter((i) => !checked.has(i.id) && i.weekSuggested <= currentWeek + 4 && i.weekSuggested >= currentWeek - 1)
-        .sort((a, b) => a.weekSuggested - b.weekSuggested)
-        .slice(0, 5)
-    : [];
+  const upcoming =
+    currentWeek > 0
+      ? QUARTO_ITEMS.filter(
+          (i) =>
+            !checked.has(i.id) &&
+            i.weekSuggested <= currentWeek + 4 &&
+            i.weekSuggested >= currentWeek - 1,
+        )
+          .sort((a, b) => a.weekSuggested - b.weekSuggested)
+          .slice(0, 5)
+      : [];
 
   return (
     <div className="space-y-6">
@@ -5364,7 +6341,8 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
           <div>
             <p className="font-serif text-lg">Preparação do quartinho</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {doneEssential}/{essentialItems.length} itens essenciais adquiridos · {totalChecked}/{QUARTO_ITEMS.length} total
+              {doneEssential}/{essentialItems.length} itens essenciais adquiridos · {totalChecked}/
+              {QUARTO_ITEMS.length} total
             </p>
           </div>
           <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-primary/20 text-sm font-bold text-primary">
@@ -5372,7 +6350,10 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
           </div>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${completionPct}%` }} />
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${completionPct}%` }}
+          />
         </div>
       </div>
 
@@ -5382,7 +6363,10 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
           <p className="text-sm font-semibold text-amber-800">⏰ Comprar nas próximas semanas</p>
           <div className="mt-3 space-y-2">
             {upcoming.map((item) => (
-              <div key={item.id} className="flex items-center justify-between text-xs text-amber-700">
+              <div
+                key={item.id}
+                className="flex items-center justify-between text-xs text-amber-700"
+              >
                 <span>{item.label}</span>
                 <span>Sem. {item.weekSuggested}</span>
               </div>
@@ -5395,16 +6379,22 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
       <div className="space-y-2">
         <div className="flex flex-wrap gap-2">
           {["todos", ...QUARTO_CATEGORIES].map((c) => (
-            <button key={c} onClick={() => setCatFilter(c)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${catFilter === c ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"}`}>
+            <button
+              key={c}
+              onClick={() => setCatFilter(c)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${catFilter === c ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"}`}
+            >
               {c === "todos" ? "Todas as categorias" : c}
             </button>
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
           {["todos", "essencial", "recomendado", "opcional"].map((p) => (
-            <button key={p} onClick={() => setPriorityFilter(p)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${priorityFilter === p ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"}`}>
+            <button
+              key={p}
+              onClick={() => setPriorityFilter(p)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${priorityFilter === p ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"}`}
+            >
               {p === "todos" ? "Todas as prioridades" : p.charAt(0).toUpperCase() + p.slice(1)}
             </button>
           ))}
@@ -5420,7 +6410,9 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
           <div key={cat} className="rounded-3xl border border-border bg-card overflow-hidden">
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
               <p className="font-medium">{cat}</p>
-              <span className="text-xs text-muted-foreground">{doneCat}/{items.length}</span>
+              <span className="text-xs text-muted-foreground">
+                {doneCat}/{items.length}
+              </span>
             </div>
             <div className="divide-y divide-border">
               {items.map((item) => {
@@ -5436,14 +6428,24 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
                       onClick={() => toggle(item.id)}
                       className={`h-5 w-5 shrink-0 rounded border-2 transition-colors ${isChecked ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground"}`}
                     >
-                      {isChecked && <span className="flex items-center justify-center text-xs">✓</span>}
+                      {isChecked && (
+                        <span className="flex items-center justify-center text-xs">✓</span>
+                      )}
                     </button>
                     <div className="flex-1">
-                      <p className={`text-sm ${isChecked ? "line-through text-muted-foreground" : ""}`}>{item.label}</p>
+                      <p
+                        className={`text-sm ${isChecked ? "line-through text-muted-foreground" : ""}`}
+                      >
+                        {item.label}
+                      </p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${pStyle.badge}`}>{pStyle.label}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${pStyle.badge}`}>
+                          {pStyle.label}
+                        </span>
                         {currentWeek > 0 && (
-                          <span className={`rounded-full px-2 py-0.5 text-xs ${isTimely ? "bg-amber-100 text-amber-700" : "bg-secondary text-muted-foreground"}`}>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs ${isTimely ? "bg-amber-100 text-amber-700" : "bg-secondary text-muted-foreground"}`}
+                          >
                             Sem. {item.weekSuggested}
                           </span>
                         )}
@@ -5573,23 +6575,21 @@ function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }
                   isCurrent
                     ? "border-primary bg-primary/5"
                     : passed
-                    ? "border-border bg-secondary/30 opacity-70"
-                    : "border-border bg-card"
+                      ? "border-border bg-secondary/30 opacity-70"
+                      : "border-border bg-card"
                 }`}
               >
                 <span className="text-2xl">{passed ? "✅" : m.emoji}</span>
                 <div className="flex-1">
-                  <p className={`font-medium ${passed ? "line-through text-muted-foreground" : ""}`}>
+                  <p
+                    className={`font-medium ${passed ? "line-through text-muted-foreground" : ""}`}
+                  >
                     {m.label}
                   </p>
                   <p className="text-xs text-muted-foreground">Semana {m.week}</p>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {passed
-                    ? "Conquistado! 🎉"
-                    : isCurrent
-                    ? "Esta semana!"
-                    : `Em ${diffDays} dias`}
+                  {passed ? "Conquistado! 🎉" : isCurrent ? "Esta semana!" : `Em ${diffDays} dias`}
                 </span>
               </div>
             );
@@ -5660,7 +6660,10 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
     if (!caption && !imageData && !emoji) return;
     setSubmitting(true);
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session) { setSubmitting(false); return; }
+    if (!s.session) {
+      setSubmitting(false);
+      return;
+    }
     const displayName = profile?.display_name ?? "Mamãe";
     const res = await createAlbumPost({
       data: {
@@ -5707,9 +6710,14 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
             <div className="relative inline-block">
               <img src={imageData} alt="preview" className="h-32 rounded-xl object-cover" />
               <button
-                onClick={() => { setImageData(null); if (fileRef.current) fileRef.current.value = ""; }}
+                onClick={() => {
+                  setImageData(null);
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
                 className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center"
-              >×</button>
+              >
+                ×
+              </button>
             </div>
           )}
           <input
@@ -5763,7 +6771,8 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
 
       {!inviteToken && (
         <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
-          Crie um convite de acompanhante na aba <strong>Acompanhante</strong> para compartilhar o álbum com a família.
+          Crie um convite de acompanhante na aba <strong>Acompanhante</strong> para compartilhar o
+          álbum com a família.
         </div>
       )}
 
@@ -5779,7 +6788,10 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
-              <div key={post.id} className="group relative rounded-2xl border border-border bg-card overflow-hidden">
+              <div
+                key={post.id}
+                className="group relative rounded-2xl border border-border bg-card overflow-hidden"
+              >
                 {post.image_data && (
                   <img
                     src={post.image_data}
@@ -5790,9 +6802,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
                 )}
                 <div className="p-4">
                   {post.emoji && <span className="text-2xl">{post.emoji}</span>}
-                  {post.caption && (
-                    <p className="mt-1 text-sm">{post.caption}</p>
-                  )}
+                  {post.caption && <p className="mt-1 text-sm">{post.caption}</p>}
                   <div className="mt-2 flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
                       {post.author_name} · {new Date(post.created_at).toLocaleDateString("pt-BR")}
@@ -5841,7 +6851,10 @@ function NomeTab({ profile }: { profile: Profile | null }) {
     if (!newName.trim()) return;
     setSaving(true);
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session) { setSaving(false); return; }
+    if (!s.session) {
+      setSaving(false);
+      return;
+    }
     await addNameByPatient({
       data: {
         accessToken: s.session.access_token,
@@ -5850,7 +6863,10 @@ function NomeTab({ profile }: { profile: Profile | null }) {
       },
     });
     const res = await getOrCreateNameSession({ data: { accessToken: s.session.access_token } });
-    if (res.ok) { setSession(res.session); setEntries(res.entries); }
+    if (res.ok) {
+      setSession(res.session);
+      setEntries(res.entries);
+    }
     setNewName("");
     setSaving(false);
   }
@@ -5858,8 +6874,12 @@ function NomeTab({ profile }: { profile: Profile | null }) {
   async function handleToggle(isActive: boolean, revealWinner: boolean) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    await toggleNameSession({ data: { accessToken: s.session.access_token, isActive, revealWinner } });
-    setSession((prev) => prev ? { ...prev, is_active: isActive, reveal_winner: revealWinner } : prev);
+    await toggleNameSession({
+      data: { accessToken: s.session.access_token, isActive, revealWinner },
+    });
+    setSession((prev) =>
+      prev ? { ...prev, is_active: isActive, reveal_winner: revealWinner } : prev,
+    );
   }
 
   async function handleRemove(entryId: string) {
@@ -5870,7 +6890,8 @@ function NomeTab({ profile }: { profile: Profile | null }) {
   }
 
   if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
-  if (!session) return <div className="text-muted-foreground text-center py-12">Erro ao carregar sessão.</div>;
+  if (!session)
+    return <div className="text-muted-foreground text-center py-12">Erro ao carregar sessão.</div>;
 
   const sortedEntries = [...entries].sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
   const maxVotes = sortedEntries[0]?.vote_count ?? 0;
@@ -5888,9 +6909,7 @@ function NomeTab({ profile }: { profile: Profile | null }) {
           <button
             onClick={() => handleToggle(!session.is_active, session.reveal_winner)}
             className={`rounded-full px-4 py-2 text-sm font-medium ${
-              session.is_active
-                ? "bg-secondary text-foreground"
-                : "bg-primary text-white"
+              session.is_active ? "bg-secondary text-foreground" : "bg-primary text-white"
             }`}
           >
             {session.is_active ? "Encerrar votação" : "Reabrir votação"}
@@ -5947,7 +6966,8 @@ function NomeTab({ profile }: { profile: Profile | null }) {
 
       <div>
         <h3 className="font-semibold mb-4">
-          Nomes ({entries.length}) {!session.reveal_winner && entries.length > 0 && (
+          Nomes ({entries.length}){" "}
+          {!session.reveal_winner && entries.length > 0 && (
             <span className="text-xs font-normal text-muted-foreground ml-2">
               — votos ocultos para a família
             </span>
@@ -5956,7 +6976,9 @@ function NomeTab({ profile }: { profile: Profile | null }) {
         {entries.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
             <p className="text-3xl mb-2">👶</p>
-            <p>Nenhum nome ainda. Adicione o primeiro ou compartilhe o link para a família sugerir!</p>
+            <p>
+              Nenhum nome ainda. Adicione o primeiro ou compartilhe o link para a família sugerir!
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -5985,7 +7007,9 @@ function NomeTab({ profile }: { profile: Profile | null }) {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-primary">{votes}</p>
-                    <p className="text-xs text-muted-foreground">{votes === 1 ? "voto" : "votos"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {votes === 1 ? "voto" : "votos"}
+                    </p>
                   </div>
                   <button
                     onClick={() => handleRemove(entry.id)}
@@ -6022,144 +7046,360 @@ const COURSE_MODULES: CourseModule[] = [
     week: 6,
     title: "O coração começa a bater",
     theme: "Sistema cardiovascular",
-    content: "Na semana 6, o coração do seu bebê já bate cerca de 100-160 vezes por minuto — é o som mais emocionante da gestação! O embrião mede cerca de 5mm e está se formando rapidamente. O tubo neural, que dará origem ao cérebro e medula espinhal, está se fechando. Os brotos dos braços e pernas também começam a aparecer. Nessa fase é fundamental a suplementação de ácido fólico para prevenir defeitos do tubo neural.",
+    content:
+      "Na semana 6, o coração do seu bebê já bate cerca de 100-160 vezes por minuto — é o som mais emocionante da gestação! O embrião mede cerca de 5mm e está se formando rapidamente. O tubo neural, que dará origem ao cérebro e medula espinhal, está se fechando. Os brotos dos braços e pernas também começam a aparecer. Nessa fase é fundamental a suplementação de ácido fólico para prevenir defeitos do tubo neural.",
     videoSearch: "Dr Clóvis Bacha semana 6 gestação desenvolvimento embrião",
     quiz: [
-      { question: "Quantas vezes por minuto bate o coração fetal na semana 6?", options: ["40-60 bpm", "100-160 bpm", "200-240 bpm", "60-80 bpm"], correct: 1 },
-      { question: "Qual suplemento é essencial para fechar o tubo neural?", options: ["Vitamina C", "Ferro", "Ácido fólico", "Cálcio"], correct: 2 },
-      { question: "O que está se formando na semana 6?", options: ["Dentes e cabelos", "Brotos de braços e pernas", "Pulmões completos", "Sistema imune"], correct: 1 },
+      {
+        question: "Quantas vezes por minuto bate o coração fetal na semana 6?",
+        options: ["40-60 bpm", "100-160 bpm", "200-240 bpm", "60-80 bpm"],
+        correct: 1,
+      },
+      {
+        question: "Qual suplemento é essencial para fechar o tubo neural?",
+        options: ["Vitamina C", "Ferro", "Ácido fólico", "Cálcio"],
+        correct: 2,
+      },
+      {
+        question: "O que está se formando na semana 6?",
+        options: [
+          "Dentes e cabelos",
+          "Brotos de braços e pernas",
+          "Pulmões completos",
+          "Sistema imune",
+        ],
+        correct: 1,
+      },
     ],
   },
   {
     week: 8,
     title: "De embrião a feto",
     theme: "Transição embrião→feto",
-    content: "A semana 8 marca uma virada: seu bebê passa a ser chamado de feto! Mede cerca de 1,6cm e todos os órgãos vitais estão formados — agora vêm amadurecer. Os dedos das mãos começam a se separar, os olhos migram para a frente do rosto, e o rabo embrionário desaparece. O cérebro está se desenvolvendo rapidamente com divisões específicas. Você provavelmente já está sentindo as náuseas do 1º trimestre, causadas pelo hormônio hCG.",
+    content:
+      "A semana 8 marca uma virada: seu bebê passa a ser chamado de feto! Mede cerca de 1,6cm e todos os órgãos vitais estão formados — agora vêm amadurecer. Os dedos das mãos começam a se separar, os olhos migram para a frente do rosto, e o rabo embrionário desaparece. O cérebro está se desenvolvendo rapidamente com divisões específicas. Você provavelmente já está sentindo as náuseas do 1º trimestre, causadas pelo hormônio hCG.",
     videoSearch: "Dr Clóvis Bacha semana 8 feto náuseas primeiro trimestre",
     quiz: [
-      { question: "Como o bebê é chamado a partir da semana 8?", options: ["Zigoto", "Embrião", "Feto", "Neonato"], correct: 2 },
-      { question: "O que causa as náuseas do 1º trimestre?", options: ["Progesterona", "hCG", "Estrogênio", "Oxitocina"], correct: 1 },
-      { question: "Quanto mede o feto na semana 8?", options: ["0,5 cm", "1,6 cm", "5 cm", "10 cm"], correct: 1 },
+      {
+        question: "Como o bebê é chamado a partir da semana 8?",
+        options: ["Zigoto", "Embrião", "Feto", "Neonato"],
+        correct: 2,
+      },
+      {
+        question: "O que causa as náuseas do 1º trimestre?",
+        options: ["Progesterona", "hCG", "Estrogênio", "Oxitocina"],
+        correct: 1,
+      },
+      {
+        question: "Quanto mede o feto na semana 8?",
+        options: ["0,5 cm", "1,6 cm", "5 cm", "10 cm"],
+        correct: 1,
+      },
     ],
   },
   {
     week: 10,
     title: "Movimentos e reflexos",
     theme: "Sistema nervoso",
-    content: "Na semana 10, o feto já faz movimentos espontâneos — mas você ainda não os sente! Mede cerca de 3cm. Os dedos dos pés e das mãos estão completamente separados. O cérebro está produzindo neurônios a uma velocidade incrível: 250.000 por minuto! Os testículos ou ovários já estão se formando. A placenta está assumindo a produção de hormônios, o que geralmente marca o fim das náuseas mais intensas para muitas gestantes.",
+    content:
+      "Na semana 10, o feto já faz movimentos espontâneos — mas você ainda não os sente! Mede cerca de 3cm. Os dedos dos pés e das mãos estão completamente separados. O cérebro está produzindo neurônios a uma velocidade incrível: 250.000 por minuto! Os testículos ou ovários já estão se formando. A placenta está assumindo a produção de hormônios, o que geralmente marca o fim das náuseas mais intensas para muitas gestantes.",
     videoSearch: "Dr Clóvis Bacha semana 10 movimentos feto placenta",
     quiz: [
-      { question: "Quantos neurônios por minuto são produzidos na semana 10?", options: ["10.000", "100.000", "250.000", "1.000.000"], correct: 2 },
-      { question: "Quando a placenta assume a produção hormonal?", options: ["Semana 4", "Semana 10", "Semana 20", "Semana 30"], correct: 1 },
-      { question: "O feto já se movimenta na semana 10?", options: ["Não, só na semana 20", "Sim, mas a mãe ainda não sente", "Sim, e a mãe já sente", "Não, só após o nascimento"], correct: 1 },
+      {
+        question: "Quantos neurônios por minuto são produzidos na semana 10?",
+        options: ["10.000", "100.000", "250.000", "1.000.000"],
+        correct: 2,
+      },
+      {
+        question: "Quando a placenta assume a produção hormonal?",
+        options: ["Semana 4", "Semana 10", "Semana 20", "Semana 30"],
+        correct: 1,
+      },
+      {
+        question: "O feto já se movimenta na semana 10?",
+        options: [
+          "Não, só na semana 20",
+          "Sim, mas a mãe ainda não sente",
+          "Sim, e a mãe já sente",
+          "Não, só após o nascimento",
+        ],
+        correct: 1,
+      },
     ],
   },
   {
     week: 12,
     title: "Fim do 1º trimestre — Grande conquista!",
     theme: "Marco gestacional",
-    content: "Parabéns! O 1º trimestre é considerado o mais crítico e você chegou ao final dele. O risco de abortamento espontâneo cai significativamente. O bebê mede cerca de 5,5cm e pesa 14g. Todos os órgãos estão formados e agora crescem e amadurecem. O bebê já pode chupar o dedo, abrir a boca e fazer movimentos de respiração. A morfológica do 1º trimestre avalia a translucência nucal (risco de síndrome de Down) e é realizada entre as semanas 11 e 14.",
+    content:
+      "Parabéns! O 1º trimestre é considerado o mais crítico e você chegou ao final dele. O risco de abortamento espontâneo cai significativamente. O bebê mede cerca de 5,5cm e pesa 14g. Todos os órgãos estão formados e agora crescem e amadurecem. O bebê já pode chupar o dedo, abrir a boca e fazer movimentos de respiração. A morfológica do 1º trimestre avalia a translucência nucal (risco de síndrome de Down) e é realizada entre as semanas 11 e 14.",
     videoSearch: "Dr Clóvis Bacha semana 12 morfológica primeiro trimestre translucência nucal",
     quiz: [
-      { question: "O que avalia a translucência nucal?", options: ["Posição do bebê", "Risco de síndrome de Down", "Peso fetal", "Batimentos cardíacos"], correct: 1 },
-      { question: "Quanto mede o bebê na semana 12?", options: ["1 cm", "3 cm", "5,5 cm", "12 cm"], correct: 2 },
-      { question: "Quando é feita a morfológica do 1º trimestre?", options: ["Semanas 6-8", "Semanas 11-14", "Semanas 18-22", "Semanas 28-32"], correct: 1 },
+      {
+        question: "O que avalia a translucência nucal?",
+        options: [
+          "Posição do bebê",
+          "Risco de síndrome de Down",
+          "Peso fetal",
+          "Batimentos cardíacos",
+        ],
+        correct: 1,
+      },
+      {
+        question: "Quanto mede o bebê na semana 12?",
+        options: ["1 cm", "3 cm", "5,5 cm", "12 cm"],
+        correct: 2,
+      },
+      {
+        question: "Quando é feita a morfológica do 1º trimestre?",
+        options: ["Semanas 6-8", "Semanas 11-14", "Semanas 18-22", "Semanas 28-32"],
+        correct: 1,
+      },
     ],
   },
   {
     week: 16,
     title: "Primeiros movimentos sentidos",
     theme: "Movimentos fetais",
-    content: "Por volta da semana 16-18, a maioria das mães primíparas começa a sentir os primeiros movimentos do bebê — chamados de 'perceptio'. Parece um borbulhar ou borboleta no abdômen. O bebê mede cerca de 11,6cm e pesa 100g. O sistema auditivo está bem desenvolvido: o bebê pode ouvir sua voz! Sua pele ainda é transparente. É a época ideal para a amniocentese, se indicada. O bebê tem padrões de sono e vigília.",
+    content:
+      "Por volta da semana 16-18, a maioria das mães primíparas começa a sentir os primeiros movimentos do bebê — chamados de 'perceptio'. Parece um borbulhar ou borboleta no abdômen. O bebê mede cerca de 11,6cm e pesa 100g. O sistema auditivo está bem desenvolvido: o bebê pode ouvir sua voz! Sua pele ainda é transparente. É a época ideal para a amniocentese, se indicada. O bebê tem padrões de sono e vigília.",
     videoSearch: "Dr Clóvis Bacha semana 16 primeiros movimentos bebê percepção",
     quiz: [
-      { question: "Como se chama a primeira percepção dos movimentos fetais?", options: ["Quickening/Perceptio", "Braxton Hicks", "Expulsão", "Versão"], correct: 0 },
-      { question: "O bebê consegue ouvir na semana 16?", options: ["Não, só na semana 30", "Sim, o sistema auditivo já está desenvolvido", "Só após o nascimento", "Apenas sons muito altos"], correct: 1 },
-      { question: "Qual exame pode ser feito com segurança entre as semanas 15-18?", options: ["Ecocardiograma", "Amniocentese", "Cordocentese", "Biópsia de vilo corial"], correct: 1 },
+      {
+        question: "Como se chama a primeira percepção dos movimentos fetais?",
+        options: ["Quickening/Perceptio", "Braxton Hicks", "Expulsão", "Versão"],
+        correct: 0,
+      },
+      {
+        question: "O bebê consegue ouvir na semana 16?",
+        options: [
+          "Não, só na semana 30",
+          "Sim, o sistema auditivo já está desenvolvido",
+          "Só após o nascimento",
+          "Apenas sons muito altos",
+        ],
+        correct: 1,
+      },
+      {
+        question: "Qual exame pode ser feito com segurança entre as semanas 15-18?",
+        options: ["Ecocardiograma", "Amniocentese", "Cordocentese", "Biópsia de vilo corial"],
+        correct: 1,
+      },
     ],
   },
   {
     week: 20,
     title: "Metade da jornada — Morfológica do 2º tri",
     theme: "Anatomia fetal",
-    content: "Metade da gestação! O bebê mede cerca de 25cm e pesa 300g. A morfológica do 2º trimestre (semanas 20-24) é o exame mais completo: avalia todos os órgãos, face, coluna, coração em detalhes. Você já deve estar sentindo os chutes claramente. O bebê cobre-se de vernix caseosa (substância branca protetora). Os neurônios continuam se multiplicando. É nessa época que muitas famílias descobrem o sexo do bebê.",
+    content:
+      "Metade da gestação! O bebê mede cerca de 25cm e pesa 300g. A morfológica do 2º trimestre (semanas 20-24) é o exame mais completo: avalia todos os órgãos, face, coluna, coração em detalhes. Você já deve estar sentindo os chutes claramente. O bebê cobre-se de vernix caseosa (substância branca protetora). Os neurônios continuam se multiplicando. É nessa época que muitas famílias descobrem o sexo do bebê.",
     videoSearch: "Dr Clóvis Bacha semana 20 morfológica segundo trimestre anatomia fetal",
     quiz: [
-      { question: "O que é vernix caseosa?", options: ["Líquido amniótico", "Substância branca que protege a pele fetal", "Placenta prévia", "Tampão mucoso"], correct: 1 },
-      { question: "Quando é feita a morfológica do 2º trimestre?", options: ["Semanas 10-12", "Semanas 16-18", "Semanas 20-24", "Semanas 32-36"], correct: 2 },
-      { question: "Quanto pesa o bebê na semana 20?", options: ["100g", "300g", "800g", "1.500g"], correct: 1 },
+      {
+        question: "O que é vernix caseosa?",
+        options: [
+          "Líquido amniótico",
+          "Substância branca que protege a pele fetal",
+          "Placenta prévia",
+          "Tampão mucoso",
+        ],
+        correct: 1,
+      },
+      {
+        question: "Quando é feita a morfológica do 2º trimestre?",
+        options: ["Semanas 10-12", "Semanas 16-18", "Semanas 20-24", "Semanas 32-36"],
+        correct: 2,
+      },
+      {
+        question: "Quanto pesa o bebê na semana 20?",
+        options: ["100g", "300g", "800g", "1.500g"],
+        correct: 1,
+      },
     ],
   },
   {
     week: 24,
     title: "Viabilidade fetal",
     theme: "Desenvolvimento pulmonar",
-    content: "A semana 24 é um marco: o bebê atinge a chamada viabilidade fetal — com cuidados intensivos neonatais, tem chances de sobreviver fora do útero. Os pulmões começam a produzir surfactante, essencial para a respiração após o nascimento. O bebê abre e fecha os olhos. Pesa cerca de 600g e mede 30cm. O exame de glicemia (TOTG) para detectar diabetes gestacional é realizado entre 24-28 semanas.",
+    content:
+      "A semana 24 é um marco: o bebê atinge a chamada viabilidade fetal — com cuidados intensivos neonatais, tem chances de sobreviver fora do útero. Os pulmões começam a produzir surfactante, essencial para a respiração após o nascimento. O bebê abre e fecha os olhos. Pesa cerca de 600g e mede 30cm. O exame de glicemia (TOTG) para detectar diabetes gestacional é realizado entre 24-28 semanas.",
     videoSearch: "Dr Clóvis Bacha semana 24 viabilidade fetal pulmões surfactante",
     quiz: [
-      { question: "O que é surfactante?", options: ["Hormônio da gravidez", "Substância que amadurece os pulmões fetais", "Tipo de antibiótico", "Proteína do cordão umbilical"], correct: 1 },
-      { question: "Quando é feito o exame de diabetes gestacional (TOTG)?", options: ["8-10 semanas", "14-16 semanas", "24-28 semanas", "36-38 semanas"], correct: 2 },
-      { question: "A partir de qual semana o bebê tem chance de sobreviver com suporte intensivo?", options: ["Semana 18", "Semana 24", "Semana 30", "Semana 36"], correct: 1 },
+      {
+        question: "O que é surfactante?",
+        options: [
+          "Hormônio da gravidez",
+          "Substância que amadurece os pulmões fetais",
+          "Tipo de antibiótico",
+          "Proteína do cordão umbilical",
+        ],
+        correct: 1,
+      },
+      {
+        question: "Quando é feito o exame de diabetes gestacional (TOTG)?",
+        options: ["8-10 semanas", "14-16 semanas", "24-28 semanas", "36-38 semanas"],
+        correct: 2,
+      },
+      {
+        question: "A partir de qual semana o bebê tem chance de sobreviver com suporte intensivo?",
+        options: ["Semana 18", "Semana 24", "Semana 30", "Semana 36"],
+        correct: 1,
+      },
     ],
   },
   {
     week: 28,
     title: "Início do 3º trimestre",
     theme: "Crescimento cerebral",
-    content: "Bem-vinda ao 3º trimestre! O bebê pesa cerca de 1kg e mede 37cm. O cérebro está se desenvolvendo intensamente — as dobras e sulcos do córtex estão se formando. Os olhos respondem à luz. O bebê pode ter soluços que você sente. É hora de começar a contar os chutes (10 movimentos em 2 horas). O exame de streptococo B (GBS) será feito mais adiante. As consultas pré-natais ficam mais frequentes.",
+    content:
+      "Bem-vinda ao 3º trimestre! O bebê pesa cerca de 1kg e mede 37cm. O cérebro está se desenvolvendo intensamente — as dobras e sulcos do córtex estão se formando. Os olhos respondem à luz. O bebê pode ter soluços que você sente. É hora de começar a contar os chutes (10 movimentos em 2 horas). O exame de streptococo B (GBS) será feito mais adiante. As consultas pré-natais ficam mais frequentes.",
     videoSearch: "Dr Clóvis Bacha semana 28 terceiro trimestre crescimento cerebral",
     quiz: [
-      { question: "Quanto pesa o bebê na semana 28?", options: ["300g", "600g", "1kg", "2kg"], correct: 2 },
-      { question: "Quantos movimentos fetais em 2 horas são considerados normais?", options: ["2 movimentos", "5 movimentos", "10 movimentos", "20 movimentos"], correct: 2 },
-      { question: "O que está se formando intensamente no cérebro fetal no 3º trimestre?", options: ["Neurônios", "Sulcos e dobras do córtex", "Nervos ópticos", "Hipófise"], correct: 1 },
+      {
+        question: "Quanto pesa o bebê na semana 28?",
+        options: ["300g", "600g", "1kg", "2kg"],
+        correct: 2,
+      },
+      {
+        question: "Quantos movimentos fetais em 2 horas são considerados normais?",
+        options: ["2 movimentos", "5 movimentos", "10 movimentos", "20 movimentos"],
+        correct: 2,
+      },
+      {
+        question: "O que está se formando intensamente no cérebro fetal no 3º trimestre?",
+        options: ["Neurônios", "Sulcos e dobras do córtex", "Nervos ópticos", "Hipófise"],
+        correct: 1,
+      },
     ],
   },
   {
     week: 32,
     title: "Posicionamento e preparação",
     theme: "Posição fetal",
-    content: "Na semana 32, o bebê pesa cerca de 1,7kg. A maioria já se vira para a posição cefálica (cabeça para baixo). As contrações de Braxton-Hicks ficam mais frequentes — são ensaios do útero para o parto. O bebê dorme 90% do tempo, com ciclos de sono REM. A gordura subcutânea está se depositando — o bebê está ficando menos enrugado. O ecocardiograma fetal avalia o coração com detalhes e geralmente é feito nessa época.",
+    content:
+      "Na semana 32, o bebê pesa cerca de 1,7kg. A maioria já se vira para a posição cefálica (cabeça para baixo). As contrações de Braxton-Hicks ficam mais frequentes — são ensaios do útero para o parto. O bebê dorme 90% do tempo, com ciclos de sono REM. A gordura subcutânea está se depositando — o bebê está ficando menos enrugado. O ecocardiograma fetal avalia o coração com detalhes e geralmente é feito nessa época.",
     videoSearch: "Dr Clóvis Bacha semana 32 posição fetal Braxton Hicks ecocardiograma",
     quiz: [
-      { question: "O que são contrações de Braxton-Hicks?", options: ["Contrações de trabalho de parto", "Ensaios do útero, sem dor intensa regular", "Sinal de pré-eclâmpsia", "Contrações do diafragma"], correct: 1 },
-      { question: "Qual é a posição ideal do bebê para o parto vaginal?", options: ["Pélvica (nádegas para baixo)", "Transversa", "Cefálica (cabeça para baixo)", "Oblíqua"], correct: 2 },
-      { question: "Quando é realizado o ecocardiograma fetal?", options: ["Semana 6", "Semana 14", "Semanas 28-32", "Semana 38"], correct: 2 },
+      {
+        question: "O que são contrações de Braxton-Hicks?",
+        options: [
+          "Contrações de trabalho de parto",
+          "Ensaios do útero, sem dor intensa regular",
+          "Sinal de pré-eclâmpsia",
+          "Contrações do diafragma",
+        ],
+        correct: 1,
+      },
+      {
+        question: "Qual é a posição ideal do bebê para o parto vaginal?",
+        options: [
+          "Pélvica (nádegas para baixo)",
+          "Transversa",
+          "Cefálica (cabeça para baixo)",
+          "Oblíqua",
+        ],
+        correct: 2,
+      },
+      {
+        question: "Quando é realizado o ecocardiograma fetal?",
+        options: ["Semana 6", "Semana 14", "Semanas 28-32", "Semana 38"],
+        correct: 2,
+      },
     ],
   },
   {
     week: 36,
     title: "Pré-termo tardio — Preparação final",
     theme: "Maturidade fetal",
-    content: "Na semana 36, o bebê pesa cerca de 2,6kg e está quase pronto. Os pulmões estão maduros na maioria dos casos. A cabeça geralmente encaixa na pelve materna (insinuação). O teste de estreptococo B (GBS) é feito entre as semanas 35-37 — se positivo, você receberá antibióticos durante o parto. O médico avaliará o colo do útero. Bebês nascidos entre 34-36 semanas são chamados de pré-termos tardios e podem precisar de cuidados especiais.",
+    content:
+      "Na semana 36, o bebê pesa cerca de 2,6kg e está quase pronto. Os pulmões estão maduros na maioria dos casos. A cabeça geralmente encaixa na pelve materna (insinuação). O teste de estreptococo B (GBS) é feito entre as semanas 35-37 — se positivo, você receberá antibióticos durante o parto. O médico avaliará o colo do útero. Bebês nascidos entre 34-36 semanas são chamados de pré-termos tardios e podem precisar de cuidados especiais.",
     videoSearch: "Dr Clóvis Bacha semana 36 pré-termo tardio estreptococo B parto",
     quiz: [
-      { question: "Quando é feito o exame de estreptococo B (GBS)?", options: ["Semanas 12-14", "Semanas 20-22", "Semanas 35-37", "No dia do parto"], correct: 2 },
-      { question: "O que é insinuação fetal?", options: ["Bebê virado de ponta-cabeça", "Encaixamento da cabeça na pelve materna", "Posição transversa", "Bebê com soluço"], correct: 1 },
-      { question: "Bebês de que semanas são chamados pré-termos tardios?", options: ["20-28 semanas", "28-32 semanas", "34-36 semanas", "37-39 semanas"], correct: 2 },
+      {
+        question: "Quando é feito o exame de estreptococo B (GBS)?",
+        options: ["Semanas 12-14", "Semanas 20-22", "Semanas 35-37", "No dia do parto"],
+        correct: 2,
+      },
+      {
+        question: "O que é insinuação fetal?",
+        options: [
+          "Bebê virado de ponta-cabeça",
+          "Encaixamento da cabeça na pelve materna",
+          "Posição transversa",
+          "Bebê com soluço",
+        ],
+        correct: 1,
+      },
+      {
+        question: "Bebês de que semanas são chamados pré-termos tardios?",
+        options: ["20-28 semanas", "28-32 semanas", "34-36 semanas", "37-39 semanas"],
+        correct: 2,
+      },
     ],
   },
   {
     week: 38,
     title: "Gestação a termo — Sinais do parto",
     theme: "Sinais de trabalho de parto",
-    content: "A partir de 37 semanas, a gestação é considerada a termo. Agora é esperar os sinais do parto! Perda do tampão mucoso (rolha de muco com sangue — pode sair dias antes). Contrações regulares e progressivas (regra 5-1-1: a cada 5 min, duração de 1 min, por 1 hora). Ruptura da bolsa (líquido claro, inodoro — vá para o hospital). O bebê pesa em média 3,1kg. Fique atenta a movimentos reduzidos — relate ao médico imediatamente.",
+    content:
+      "A partir de 37 semanas, a gestação é considerada a termo. Agora é esperar os sinais do parto! Perda do tampão mucoso (rolha de muco com sangue — pode sair dias antes). Contrações regulares e progressivas (regra 5-1-1: a cada 5 min, duração de 1 min, por 1 hora). Ruptura da bolsa (líquido claro, inodoro — vá para o hospital). O bebê pesa em média 3,1kg. Fique atenta a movimentos reduzidos — relate ao médico imediatamente.",
     videoSearch: "Dr Clóvis Bacha semana 38 sinais trabalho de parto tampão mucoso contrações",
     quiz: [
-      { question: "O que é a regra 5-1-1 das contrações?", options: ["5 respirações, 1 push, 1 hora", "Contrações a cada 5 min, com 1 min de duração, por 1 hora", "5 horas de trabalho, 1 médico, 1 hospital", "Nenhuma das anteriores"], correct: 1 },
-      { question: "Se a bolsa rompeu, o líquido deve ser:", options: ["Verde ou com sangue", "Claro e inodoro", "Espesso e rosado", "Amarelo e com odor"], correct: 1 },
-      { question: "Movimentos fetais reduzidos exigem:", options: ["Esperar 24 horas", "Tomar líquidos e descansar", "Contato imediato com o médico", "Fazer exercícios"], correct: 2 },
+      {
+        question: "O que é a regra 5-1-1 das contrações?",
+        options: [
+          "5 respirações, 1 push, 1 hora",
+          "Contrações a cada 5 min, com 1 min de duração, por 1 hora",
+          "5 horas de trabalho, 1 médico, 1 hospital",
+          "Nenhuma das anteriores",
+        ],
+        correct: 1,
+      },
+      {
+        question: "Se a bolsa rompeu, o líquido deve ser:",
+        options: [
+          "Verde ou com sangue",
+          "Claro e inodoro",
+          "Espesso e rosado",
+          "Amarelo e com odor",
+        ],
+        correct: 1,
+      },
+      {
+        question: "Movimentos fetais reduzidos exigem:",
+        options: [
+          "Esperar 24 horas",
+          "Tomar líquidos e descansar",
+          "Contato imediato com o médico",
+          "Fazer exercícios",
+        ],
+        correct: 2,
+      },
     ],
   },
   {
     week: 40,
     title: "Pré-natal completo — Você chegou!",
     theme: "Pós-parto e amamentação",
-    content: "Parabéns! Você completou as semanas essenciais do pré-natal. Esteja preparada: o parto pode acontecer em qualquer momento. O bebê pesa em média 3,4kg e mede 51cm. Nas semanas após o parto, você passará pelos lóquios (sangramento pós-parto normal), cuidados com a cicatriz (cesárea ou episiotomia), e início da amamentação. O leite materno exclusivo pelos primeiros 6 meses é a melhor nutrição para o bebê. Cuide de você também — o puerpério pode trazer desafios emocionais.",
+    content:
+      "Parabéns! Você completou as semanas essenciais do pré-natal. Esteja preparada: o parto pode acontecer em qualquer momento. O bebê pesa em média 3,4kg e mede 51cm. Nas semanas após o parto, você passará pelos lóquios (sangramento pós-parto normal), cuidados com a cicatriz (cesárea ou episiotomia), e início da amamentação. O leite materno exclusivo pelos primeiros 6 meses é a melhor nutrição para o bebê. Cuide de você também — o puerpério pode trazer desafios emocionais.",
     videoSearch: "Dr Clóvis Bacha semana 40 parto pós-parto amamentação puerpério",
     quiz: [
-      { question: "Como se chama o sangramento normal após o parto?", options: ["Menstruação", "Lóquios", "Epistaxis", "Metrorragia"], correct: 1 },
-      { question: "Até quando é recomendado o aleitamento materno exclusivo?", options: ["2 meses", "4 meses", "6 meses", "12 meses"], correct: 2 },
-      { question: "Quanto pesa o bebê na semana 40?", options: ["2,2kg", "2,8kg", "3,4kg", "4,2kg"], correct: 2 },
+      {
+        question: "Como se chama o sangramento normal após o parto?",
+        options: ["Menstruação", "Lóquios", "Epistaxis", "Metrorragia"],
+        correct: 1,
+      },
+      {
+        question: "Até quando é recomendado o aleitamento materno exclusivo?",
+        options: ["2 meses", "4 meses", "6 meses", "12 meses"],
+        correct: 2,
+      },
+      {
+        question: "Quanto pesa o bebê na semana 40?",
+        options: ["2,2kg", "2,8kg", "3,4kg", "4,2kg"],
+        correct: 2,
+      },
     ],
   },
 ];
@@ -6177,7 +7417,10 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
   useEffect(() => {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
-      if (!s.session) { setLoading(false); return; }
+      if (!s.session) {
+        setLoading(false);
+        return;
+      }
       const res = await getCourseProgress({ data: { accessToken: s.session.access_token } });
       if (res.ok) setProgress(res.progress);
       setLoading(false);
@@ -6208,11 +7451,14 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
           quizScore: score,
         },
       });
-      setProgress((p) => [...p.filter((x) => x.module_week !== activeModule.week), {
-        module_week: activeModule.week,
-        quiz_score: score,
-        completed_at: new Date().toISOString(),
-      }]);
+      setProgress((p) => [
+        ...p.filter((x) => x.module_week !== activeModule.week),
+        {
+          module_week: activeModule.week,
+          quiz_score: score,
+          completed_at: new Date().toISOString(),
+        },
+      ]);
     }
     setSaving(false);
   }
@@ -6256,13 +7502,16 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
           <h3 className="font-semibold mb-4">Quiz — Semana {activeModule.week}</h3>
           {activeModule.quiz.map((q, qi) => (
             <div key={qi} className="mb-5">
-              <p className="text-sm font-medium mb-2">{qi + 1}. {q.question}</p>
+              <p className="text-sm font-medium mb-2">
+                {qi + 1}. {q.question}
+              </p>
               <div className="space-y-2">
                 {q.options.map((opt, oi) => {
                   let style = "border-border bg-background text-foreground";
                   if (quizState.answered) {
                     if (oi === q.correct) style = "border-green-400 bg-green-50 text-green-800";
-                    else if (oi === quizState.answers[qi] && oi !== q.correct) style = "border-red-300 bg-red-50 text-red-700";
+                    else if (oi === quizState.answers[qi] && oi !== q.correct)
+                      style = "border-red-300 bg-red-50 text-red-700";
                     else style = "border-border bg-background text-muted-foreground";
                   } else if (quizState.answers[qi] === oi) {
                     style = "border-primary bg-primary/5 text-primary";
@@ -6295,7 +7544,7 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
                 const score = Math.round(
                   (activeModule.quiz.filter((q, i) => quizState.answers[i] === q.correct).length /
                     activeModule.quiz.length) *
-                    100
+                    100,
                 );
                 setQuizState((prev) => ({ ...prev, answered: true, score }));
                 if (!done) await finishQuiz(score);
@@ -6347,7 +7596,9 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
         <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
           <div
             className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${COURSE_MODULES.length > 0 ? (completedCount / COURSE_MODULES.length) * 100 : 0}%` }}
+            style={{
+              width: `${COURSE_MODULES.length > 0 ? (completedCount / COURSE_MODULES.length) * 100 : 0}%`,
+            }}
           />
         </div>
       </div>
@@ -6359,7 +7610,9 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
           <p className="mt-2 text-amber-700">
             Parabéns! Você concluiu o curso de pré-natal da Escola do Bebê.
           </p>
-          <p className="mt-1 text-sm text-amber-600">Dr. Clóvis Bacha — Ginecologia & Obstetrícia</p>
+          <p className="mt-1 text-sm text-amber-600">
+            Dr. Clóvis Bacha — Ginecologia & Obstetrícia
+          </p>
         </div>
       )}
 
@@ -6378,29 +7631,23 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
                 done
                   ? "border-green-300 bg-green-50"
                   : unlocked
-                  ? "border-border bg-card hover:border-primary/50 hover:bg-primary/5"
-                  : "border-border bg-secondary/30 opacity-50 cursor-not-allowed"
+                    ? "border-border bg-card hover:border-primary/50 hover:bg-primary/5"
+                    : "border-border bg-secondary/30 opacity-50 cursor-not-allowed"
               }`}
             >
               <div className="flex items-start justify-between">
                 <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                   Semana {m.week}
                 </span>
-                <span className="text-lg">
-                  {done ? "✅" : unlocked ? "▶" : "🔒"}
-                </span>
+                <span className="text-lg">{done ? "✅" : unlocked ? "▶" : "🔒"}</span>
               </div>
               <p className="mt-2 font-medium text-sm">{m.title}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{m.theme}</p>
               {done && prog && (
-                <p className="mt-1.5 text-xs text-green-600">
-                  Quiz: {prog.quiz_score}% de acerto
-                </p>
+                <p className="mt-1.5 text-xs text-green-600">Quiz: {prog.quiz_score}% de acerto</p>
               )}
               {!unlocked && (
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Libera na semana {m.week}
-                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">Libera na semana {m.week}</p>
               )}
             </button>
           );
@@ -6423,31 +7670,136 @@ type FAQItem = {
 
 const FAQ_ITEMS: FAQItem[] = [
   // 1º Trimestre
-  { q: "Náuseas e vômitos são normais?", a: "Sim, afetam até 80% das gestantes, especialmente no 1º trimestre. São causadas pelo hCG. Coma pequenas porções frequentes, evite odores fortes, prefira alimentos secos pela manhã. Converse com seu médico se vomitar mais de 3-4 vezes ao dia (hiperemese).", weeks: [4, 14], tags: ["náuseas", "sintomas"] },
-  { q: "Posso sangrar no início da gravidez?", a: "Um pequeno sangramento na implantação (por volta de 6-10 dias após a fecundação) pode ocorrer e é normal. Porém, qualquer sangramento deve ser comunicado ao médico. Ele avaliará se é necessário ultrassom para verificar a vitalidade do embrião.", weeks: [4, 12], tags: ["sangramento"] },
-  { q: "Cólicas leves são normais?", a: "Cólicas leves e ocasionais no início da gestação são comuns — o útero está se expandindo. Mas dor intensa, contínua ou acompanhada de sangramento exige avaliação médica urgente.", weeks: [4, 14], tags: ["cólicas", "dor"] },
-  { q: "Posso continuar tomando meus remédios habituais?", a: "Não tome nenhum medicamento sem orientação médica durante a gestação. Alguns são seguros, outros são contraindicados. Leve uma lista de todos os seus medicamentos para o pré-natal.", weeks: [4, 42], tags: ["medicamentos"] },
-  { q: "Com que frequência preciso consultar o Dr. Clóvis?", a: "O calendário mínimo do pré-natal: mensal até 32 semanas, quinzenal até 36, e semanal a partir daí. Gestações de alto risco têm consultas mais frequentes. Não pule nenhuma — cada consulta tem um objetivo específico.", weeks: [4, 40], tags: ["consultas", "pré-natal"] },
-  { q: "É seguro ter relações sexuais na gestação?", a: "Em gestações sem complicações, o sexo é completamente seguro. O bebê está protegido pelo líquido amniótico e tampão mucoso. Evite posições que pressionem a barriga. Em caso de sangramento, placenta prévia ou ameaça de parto prematuro, pode ser contraindicado.", weeks: [4, 38], tags: ["sexo", "relações"] },
+  {
+    q: "Náuseas e vômitos são normais?",
+    a: "Sim, afetam até 80% das gestantes, especialmente no 1º trimestre. São causadas pelo hCG. Coma pequenas porções frequentes, evite odores fortes, prefira alimentos secos pela manhã. Converse com seu médico se vomitar mais de 3-4 vezes ao dia (hiperemese).",
+    weeks: [4, 14],
+    tags: ["náuseas", "sintomas"],
+  },
+  {
+    q: "Posso sangrar no início da gravidez?",
+    a: "Um pequeno sangramento na implantação (por volta de 6-10 dias após a fecundação) pode ocorrer e é normal. Porém, qualquer sangramento deve ser comunicado ao médico. Ele avaliará se é necessário ultrassom para verificar a vitalidade do embrião.",
+    weeks: [4, 12],
+    tags: ["sangramento"],
+  },
+  {
+    q: "Cólicas leves são normais?",
+    a: "Cólicas leves e ocasionais no início da gestação são comuns — o útero está se expandindo. Mas dor intensa, contínua ou acompanhada de sangramento exige avaliação médica urgente.",
+    weeks: [4, 14],
+    tags: ["cólicas", "dor"],
+  },
+  {
+    q: "Posso continuar tomando meus remédios habituais?",
+    a: "Não tome nenhum medicamento sem orientação médica durante a gestação. Alguns são seguros, outros são contraindicados. Leve uma lista de todos os seus medicamentos para o pré-natal.",
+    weeks: [4, 42],
+    tags: ["medicamentos"],
+  },
+  {
+    q: "Com que frequência preciso consultar o Dr. Clóvis?",
+    a: "O calendário mínimo do pré-natal: mensal até 32 semanas, quinzenal até 36, e semanal a partir daí. Gestações de alto risco têm consultas mais frequentes. Não pule nenhuma — cada consulta tem um objetivo específico.",
+    weeks: [4, 40],
+    tags: ["consultas", "pré-natal"],
+  },
+  {
+    q: "É seguro ter relações sexuais na gestação?",
+    a: "Em gestações sem complicações, o sexo é completamente seguro. O bebê está protegido pelo líquido amniótico e tampão mucoso. Evite posições que pressionem a barriga. Em caso de sangramento, placenta prévia ou ameaça de parto prematuro, pode ser contraindicado.",
+    weeks: [4, 38],
+    tags: ["sexo", "relações"],
+  },
   // 1º-2º Trimestre
-  { q: "Quais exames são feitos na semana 11-14?", a: "A morfológica do 1º trimestre avalia a translucência nucal (rastreamento de síndrome de Down), batimentos cardíacos e anatomia inicial. Junto com exames de sangue (PAPP-A e beta-hCG livre), compõe o rastreamento combinado do 1º trimestre.", weeks: [10, 16], tags: ["exames", "morfológica"] },
-  { q: "O que é síndrome de Down e como é o rastreamento?", a: "A síndrome de Down (trissomia 21) ocorre em 1 a cada 800 nascimentos. O rastreamento combinado do 1º trimestre (translucência nucal + exames de sangue) estima o risco. Se alto, pode ser indicada amniocentese ou biopsia de vilosidade corial para diagnóstico definitivo.", weeks: [10, 20], tags: ["Down", "rastreamento"] },
+  {
+    q: "Quais exames são feitos na semana 11-14?",
+    a: "A morfológica do 1º trimestre avalia a translucência nucal (rastreamento de síndrome de Down), batimentos cardíacos e anatomia inicial. Junto com exames de sangue (PAPP-A e beta-hCG livre), compõe o rastreamento combinado do 1º trimestre.",
+    weeks: [10, 16],
+    tags: ["exames", "morfológica"],
+  },
+  {
+    q: "O que é síndrome de Down e como é o rastreamento?",
+    a: "A síndrome de Down (trissomia 21) ocorre em 1 a cada 800 nascimentos. O rastreamento combinado do 1º trimestre (translucência nucal + exames de sangue) estima o risco. Se alto, pode ser indicada amniocentese ou biopsia de vilosidade corial para diagnóstico definitivo.",
+    weeks: [10, 20],
+    tags: ["Down", "rastreamento"],
+  },
   // 2º Trimestre
-  { q: "Quando sentirei os primeiros movimentos?", a: "Primíparas geralmente sentem entre 18-22 semanas. Quem já teve filhos pode perceber antes, entre 16-18 semanas. No início parece um borbulhar ou 'borboletas'. Não ficou preocupada se demorar — cada corpo é diferente.", weeks: [14, 22], tags: ["movimentos", "chutes"] },
-  { q: "Posso viajar de avião grávida?", a: "Até 28 semanas, viagens aéreas são geralmente seguras com autorização médica. Entre 28-36 semanas, algumas companhias exigem atestado médico. Após 36 semanas, a maioria das companhias não aceita. Levante a cada hora, hidrate-se bem e use meia de compressão.", weeks: [14, 36], tags: ["viagem", "avião"] },
-  { q: "O que é o exame morfológico do 2º trimestre?", a: "A morfológica do 2º trimestre (20-24 semanas) avalia detalhadamente a anatomia fetal: cabeça, coração (4 câmaras), pulmões, rins, fígado, coluna, membros e face. É o exame mais completo da gestação. Um especialista em medicina fetal realiza o exame.", weeks: [18, 26], tags: ["morfológica", "exames"] },
-  { q: "Preciso fazer o teste de diabetes gestacional?", a: "Sim, o TOTG (teste oral de tolerância à glicose) é feito entre 24-28 semanas para todas as gestantes. Se você tem fatores de risco (obesidade, histórico familiar, bebê grande), pode ser feito antes. O diabetes gestacional tem tratamento eficaz.", weeks: [22, 30], tags: ["diabetes", "TOTG", "exames"] },
+  {
+    q: "Quando sentirei os primeiros movimentos?",
+    a: "Primíparas geralmente sentem entre 18-22 semanas. Quem já teve filhos pode perceber antes, entre 16-18 semanas. No início parece um borbulhar ou 'borboletas'. Não ficou preocupada se demorar — cada corpo é diferente.",
+    weeks: [14, 22],
+    tags: ["movimentos", "chutes"],
+  },
+  {
+    q: "Posso viajar de avião grávida?",
+    a: "Até 28 semanas, viagens aéreas são geralmente seguras com autorização médica. Entre 28-36 semanas, algumas companhias exigem atestado médico. Após 36 semanas, a maioria das companhias não aceita. Levante a cada hora, hidrate-se bem e use meia de compressão.",
+    weeks: [14, 36],
+    tags: ["viagem", "avião"],
+  },
+  {
+    q: "O que é o exame morfológico do 2º trimestre?",
+    a: "A morfológica do 2º trimestre (20-24 semanas) avalia detalhadamente a anatomia fetal: cabeça, coração (4 câmaras), pulmões, rins, fígado, coluna, membros e face. É o exame mais completo da gestação. Um especialista em medicina fetal realiza o exame.",
+    weeks: [18, 26],
+    tags: ["morfológica", "exames"],
+  },
+  {
+    q: "Preciso fazer o teste de diabetes gestacional?",
+    a: "Sim, o TOTG (teste oral de tolerância à glicose) é feito entre 24-28 semanas para todas as gestantes. Se você tem fatores de risco (obesidade, histórico familiar, bebê grande), pode ser feito antes. O diabetes gestacional tem tratamento eficaz.",
+    weeks: [22, 30],
+    tags: ["diabetes", "TOTG", "exames"],
+  },
   // 2º-3º Trimestre
-  { q: "O que são contrações de Braxton Hicks?", a: "São contrações irregulares, sem dor intensa, que preparam o útero para o parto. São normais a partir do 2º trimestre. Diferem do trabalho de parto por serem irregulares, curtas e cessam com mudança de posição. Se ficarem regulares e progressivas, ligue para o médico.", weeks: [20, 40], tags: ["contrações", "Braxton Hicks"] },
-  { q: "O bebê está em posição correta para o parto?", a: "A maioria dos bebês se vira para a posição cefálica (cabeça para baixo) entre as semanas 32-36. Se ainda estiver pélvico (nádegas para baixo) na semana 36, o médico pode tentar uma versão cefálica externa ou planejar a cesárea.", weeks: [28, 38], tags: ["posição fetal", "pélvico"] },
-  { q: "Posso continuar trabalhando durante a gravidez?", a: "Na maioria dos casos sim, até próximo ao parto. A licença-maternidade no Brasil começa a partir de 28 semanas, mas muitas mulheres trabalham até 37-38 semanas. Em gestações de alto risco, o afastamento pode ser necessário antes.", weeks: [4, 38], tags: ["trabalho", "licença"] },
+  {
+    q: "O que são contrações de Braxton Hicks?",
+    a: "São contrações irregulares, sem dor intensa, que preparam o útero para o parto. São normais a partir do 2º trimestre. Diferem do trabalho de parto por serem irregulares, curtas e cessam com mudança de posição. Se ficarem regulares e progressivas, ligue para o médico.",
+    weeks: [20, 40],
+    tags: ["contrações", "Braxton Hicks"],
+  },
+  {
+    q: "O bebê está em posição correta para o parto?",
+    a: "A maioria dos bebês se vira para a posição cefálica (cabeça para baixo) entre as semanas 32-36. Se ainda estiver pélvico (nádegas para baixo) na semana 36, o médico pode tentar uma versão cefálica externa ou planejar a cesárea.",
+    weeks: [28, 38],
+    tags: ["posição fetal", "pélvico"],
+  },
+  {
+    q: "Posso continuar trabalhando durante a gravidez?",
+    a: "Na maioria dos casos sim, até próximo ao parto. A licença-maternidade no Brasil começa a partir de 28 semanas, mas muitas mulheres trabalham até 37-38 semanas. Em gestações de alto risco, o afastamento pode ser necessário antes.",
+    weeks: [4, 38],
+    tags: ["trabalho", "licença"],
+  },
   // 3º Trimestre
-  { q: "O que é pré-eclâmpsia e como identificar?", a: "Pré-eclâmpsia é pressão alta na gestação acompanhada de proteína na urina, geralmente após 20 semanas. Sinais: pressão ≥140x90, inchaço súbito de mãos e rosto, dor de cabeça intensa, visão turva, dor no estômago. Procure o médico imediatamente.", weeks: [20, 42], tags: ["pré-eclâmpsia", "pressão alta", "urgência"] },
-  { q: "Quanto líquido amniótico é normal?", a: "O volume de líquido amniótico é avaliado no ultrassom (ILA — índice de líquido amniótico). Oligoâmnio (pouco líquido) e polidrâmnio (muito líquido) precisam de avaliação. O bebê engole o líquido e urina dentro do útero, mantendo o equilíbrio.", weeks: [16, 42], tags: ["líquido amniótico"] },
-  { q: "Quais são os sinais de parto prematuro?", a: "Contrações regulares antes de 37 semanas, pressão pélvica intensa, dor lombar nova, sangramento, perda de líquido ou muco. Na dúvida, vá ao hospital. Não espere: cada semana dentro do útero conta muito para o bebê prematuro.", weeks: [20, 37], tags: ["parto prematuro", "urgência"] },
-  { q: "Como saber se é trabalho de parto verdadeiro?", a: "Trabalho de parto verdadeiro: contrações regulares a cada 5 minutos, duração de 1 minuto, por 1 hora (regra 5-1-1), que não cessam com mudança de posição e ficam progressivamente mais fortes e frequentes. Falso trabalho: irregular, cessa com repouso.", weeks: [36, 42], tags: ["parto", "contrações"] },
-  { q: "Posso ter epidural?", a: "A anestesia peridural (epidural) é segura e muito usada no parto. Reduz a dor sem impedir os movimentos. Pode ser administrada em qualquer fase do trabalho de parto ativo. Converse com Dr. Clóvis sobre seu plano de parto.", weeks: [34, 42], tags: ["parto", "epidural", "dor"] },
-  { q: "O que levar para a maternidade?", a: "Para a mãe: documentos (RG, carteirinha, pré-natal), roupas confortáveis, itens de higiene, calcinha descartável, sutiã de amamentação, absorvente pós-parto. Para o bebê: roupinhas, fraldas, manta, cadeirinha de carro (obrigatória para ir embora). Monte a bolsa a partir de 34 semanas.", weeks: [32, 42], tags: ["maternidade", "parto", "preparação"] },
+  {
+    q: "O que é pré-eclâmpsia e como identificar?",
+    a: "Pré-eclâmpsia é pressão alta na gestação acompanhada de proteína na urina, geralmente após 20 semanas. Sinais: pressão ≥140x90, inchaço súbito de mãos e rosto, dor de cabeça intensa, visão turva, dor no estômago. Procure o médico imediatamente.",
+    weeks: [20, 42],
+    tags: ["pré-eclâmpsia", "pressão alta", "urgência"],
+  },
+  {
+    q: "Quanto líquido amniótico é normal?",
+    a: "O volume de líquido amniótico é avaliado no ultrassom (ILA — índice de líquido amniótico). Oligoâmnio (pouco líquido) e polidrâmnio (muito líquido) precisam de avaliação. O bebê engole o líquido e urina dentro do útero, mantendo o equilíbrio.",
+    weeks: [16, 42],
+    tags: ["líquido amniótico"],
+  },
+  {
+    q: "Quais são os sinais de parto prematuro?",
+    a: "Contrações regulares antes de 37 semanas, pressão pélvica intensa, dor lombar nova, sangramento, perda de líquido ou muco. Na dúvida, vá ao hospital. Não espere: cada semana dentro do útero conta muito para o bebê prematuro.",
+    weeks: [20, 37],
+    tags: ["parto prematuro", "urgência"],
+  },
+  {
+    q: "Como saber se é trabalho de parto verdadeiro?",
+    a: "Trabalho de parto verdadeiro: contrações regulares a cada 5 minutos, duração de 1 minuto, por 1 hora (regra 5-1-1), que não cessam com mudança de posição e ficam progressivamente mais fortes e frequentes. Falso trabalho: irregular, cessa com repouso.",
+    weeks: [36, 42],
+    tags: ["parto", "contrações"],
+  },
+  {
+    q: "Posso ter epidural?",
+    a: "A anestesia peridural (epidural) é segura e muito usada no parto. Reduz a dor sem impedir os movimentos. Pode ser administrada em qualquer fase do trabalho de parto ativo. Converse com Dr. Clóvis sobre seu plano de parto.",
+    weeks: [34, 42],
+    tags: ["parto", "epidural", "dor"],
+  },
+  {
+    q: "O que levar para a maternidade?",
+    a: "Para a mãe: documentos (RG, carteirinha, pré-natal), roupas confortáveis, itens de higiene, calcinha descartável, sutiã de amamentação, absorvente pós-parto. Para o bebê: roupinhas, fraldas, manta, cadeirinha de carro (obrigatória para ir embora). Monte a bolsa a partir de 34 semanas.",
+    weeks: [32, 42],
+    tags: ["maternidade", "parto", "preparação"],
+  },
 ];
 
 function FAQTab({ gest }: { gest: Gest }) {
@@ -6457,9 +7809,10 @@ function FAQTab({ gest }: { gest: Gest }) {
   const [showAll, setShowAll] = useState(currentWeek === 0);
 
   const filtered = FAQ_ITEMS.filter((item) => {
-    const matchesWeek = showAll || currentWeek === 0
-      ? true
-      : currentWeek >= item.weeks[0] && currentWeek <= item.weeks[1];
+    const matchesWeek =
+      showAll || currentWeek === 0
+        ? true
+        : currentWeek >= item.weeks[0] && currentWeek <= item.weeks[1];
     const matchesSearch =
       !search ||
       item.q.toLowerCase().includes(search.toLowerCase()) ||
@@ -6517,7 +7870,10 @@ function FAQTab({ gest }: { gest: Gest }) {
                   <p className="text-sm leading-relaxed text-muted-foreground">{item.a}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {item.tags.map((t) => (
-                      <span key={t} className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                      <span
+                        key={t}
+                        className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground"
+                      >
                         {t}
                       </span>
                     ))}
@@ -6537,7 +7893,9 @@ function FAQTab({ gest }: { gest: Gest }) {
         <button
           onClick={() => {
             const tabBtns = document.querySelectorAll<HTMLButtonElement>("button");
-            tabBtns.forEach((btn) => { if (btn.textContent === "Chat IA") btn.click(); });
+            tabBtns.forEach((btn) => {
+              if (btn.textContent === "Chat IA") btn.click();
+            });
           }}
           className="text-primary font-medium hover:underline"
         >
@@ -6554,7 +7912,9 @@ function FAQTab({ gest }: { gest: Gest }) {
 
 function PânicoTab({ profile }: { profile: Profile | null }) {
   const [status, setStatus] = useState<"idle" | "locating" | "sent" | "error">("idle");
-  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
+  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(
+    null,
+  );
   const [lastSent, setLastSent] = useState<Date | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
@@ -6576,7 +7936,7 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
 
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
       );
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
@@ -6584,7 +7944,7 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
       let address: string | null = null;
       try {
         const resp = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
         );
         const json = await resp.json();
         address = json.display_name ?? null;
@@ -6630,8 +7990,8 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
             cooldown > 0
               ? "bg-gray-400 cursor-not-allowed"
               : status === "sent"
-              ? "bg-green-500"
-              : "bg-red-600 hover:bg-red-700 active:scale-95"
+                ? "bg-green-500"
+                : "bg-red-600 hover:bg-red-700 active:scale-95"
           }`}
         >
           {status === "locating" ? (
@@ -6677,7 +8037,10 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
         {status === "error" && (
           <div className="mt-3 rounded-xl bg-white p-3 text-sm text-amber-700">
             <p className="font-medium">Não foi possível obter localização.</p>
-            <p className="text-xs mt-1">Permita o acesso à localização no navegador e tente novamente. Mesmo assim, os números abaixo estão disponíveis.</p>
+            <p className="text-xs mt-1">
+              Permita o acesso à localização no navegador e tente novamente. Mesmo assim, os números
+              abaixo estão disponíveis.
+            </p>
           </div>
         )}
       </div>
@@ -6689,8 +8052,18 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
         </p>
         <div className="space-y-2">
           {[
-            { label: "SAMU", subtitle: "Serviço de Atendimento Móvel de Urgência", number: "192", color: "bg-red-600" },
-            { label: "Bombeiros / Resgate", subtitle: "Resgate de emergência", number: "193", color: "bg-orange-500" },
+            {
+              label: "SAMU",
+              subtitle: "Serviço de Atendimento Móvel de Urgência",
+              number: "192",
+              color: "bg-red-600",
+            },
+            {
+              label: "Bombeiros / Resgate",
+              subtitle: "Resgate de emergência",
+              number: "193",
+              color: "bg-orange-500",
+            },
             { label: "CVV", subtitle: "Apoio emocional 24h", number: "188", color: "bg-blue-600" },
           ].map(({ label, subtitle, number, color }) => (
             <a
@@ -6713,7 +8086,9 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
             >
               <span className="text-2xl">📞</span>
               <div>
-                <p className="font-semibold">{profile.emergency_contact ?? "Contato de emergência"}</p>
+                <p className="font-semibold">
+                  {profile.emergency_contact ?? "Contato de emergência"}
+                </p>
                 <p className="text-xs opacity-90">{profile.emergency_phone}</p>
               </div>
             </a>
@@ -6744,8 +8119,8 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       <p className="text-center text-xs text-muted-foreground px-4">
-        O botão registra sua localização GPS e alerta seu acompanhante designado.
-        Configure o contato de emergência em <strong>Perfil</strong>.
+        O botão registra sua localização GPS e alerta seu acompanhante designado. Configure o
+        contato de emergência em <strong>Perfil</strong>.
       </p>
     </div>
   );
@@ -6810,17 +8185,19 @@ function ClimaTab({ gest }: { gest: Gest }) {
     }
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
       );
       const { latitude: lat, longitude: lon } = pos.coords;
 
       const [wx, aq] = await Promise.all([
         fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code&timezone=auto`
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code&timezone=auto`,
         ).then((r) => r.json()),
         fetch(
-          `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=european_aqi,pm2_5&timezone=auto`
-        ).then((r) => r.json()).catch(() => null),
+          `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=european_aqi,pm2_5&timezone=auto`,
+        )
+          .then((r) => r.json())
+          .catch(() => null),
       ]);
 
       setWeather({
@@ -6833,7 +8210,9 @@ function ClimaTab({ gest }: { gest: Gest }) {
       });
       setLastUpdate(new Date());
     } catch (e) {
-      setError("Não foi possível obter sua localização. Permita o acesso no navegador e tente novamente.");
+      setError(
+        "Não foi possível obter sua localização. Permita o acesso no navegador e tente novamente.",
+      );
     }
     setLoading(false);
   }
@@ -6871,7 +8250,9 @@ function ClimaTab({ gest }: { gest: Gest }) {
         )}
 
         {loading && (
-          <div className="py-6 text-center text-muted-foreground text-sm">Obtendo localização...</div>
+          <div className="py-6 text-center text-muted-foreground text-sm">
+            Obtendo localização...
+          </div>
         )}
 
         {error && (
@@ -6885,7 +8266,9 @@ function ClimaTab({ gest }: { gest: Gest }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-2xl bg-secondary/40 p-4">
                 <p className="text-4xl text-center">{weatherEmoji(weather.weatherCode)}</p>
-                <p className={`mt-2 text-center text-3xl font-bold ${isVeryHot ? "text-red-600" : isHot ? "text-orange-500" : ""}`}>
+                <p
+                  className={`mt-2 text-center text-3xl font-bold ${isVeryHot ? "text-red-600" : isHot ? "text-orange-500" : ""}`}
+                >
                   {weather.temp}°C
                 </p>
                 <p className="text-center text-xs text-muted-foreground mt-0.5">
@@ -6902,7 +8285,9 @@ function ClimaTab({ gest }: { gest: Gest }) {
                 </div>
                 {weather.aqi != null && (
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase">Qualidade do ar</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase">
+                      Qualidade do ar
+                    </p>
                     <p className={`text-xl font-semibold ${aqiLabel(weather.aqi).color}`}>
                       {aqiLabel(weather.aqi).label}
                     </p>
@@ -6931,7 +8316,9 @@ function ClimaTab({ gest }: { gest: Gest }) {
                 ⚠️ Onda de calor — Risco alto para gestantes
               </p>
               <ul className="space-y-1.5 text-sm text-red-800">
-                <li>🌡️ Temperatura extrema ({weather.temp}°C) — superaquecimento fetal é perigoso</li>
+                <li>
+                  🌡️ Temperatura extrema ({weather.temp}°C) — superaquecimento fetal é perigoso
+                </li>
                 <li>💧 Beba pelo menos 3L de água ao longo do dia</li>
                 <li>❄️ Fique em ambientes refrigerados (ar-condicionado ou ventilador)</li>
                 <li>🚫 Evite sol das 10h às 17h sem necessidade</li>
@@ -7024,7 +8411,12 @@ const EPDS_QUESTIONS = [
   },
   {
     q: "Tenho aguardado com satisfação as coisas boas que estavam por acontecer",
-    opts: ["Sim, tanto quanto antes", "Um pouco menos que antes", "Definitivamente menos", "Quase nada"],
+    opts: [
+      "Sim, tanto quanto antes",
+      "Um pouco menos que antes",
+      "Definitivamente menos",
+      "Quase nada",
+    ],
     reverse: true,
   },
   {
@@ -7044,7 +8436,12 @@ const EPDS_QUESTIONS = [
   },
   {
     q: "As coisas têm me oprimido",
-    opts: ["Tenho lidado tão bem quanto antes", "Tenho lidado na maioria das vezes", "Às vezes não consigo lidar", "Não tenho conseguido lidar"],
+    opts: [
+      "Tenho lidado tão bem quanto antes",
+      "Tenho lidado na maioria das vezes",
+      "Às vezes não consigo lidar",
+      "Não tenho conseguido lidar",
+    ],
     reverse: false,
   },
   {
@@ -7085,14 +8482,39 @@ const VACCINE_SCHEDULE = [
   { key: "penta_3", name: "Pentavalente (3ª)", disease: "DTP + Hib + HepB", ageLabel: "6 meses" },
   { key: "vip_3", name: "VIP (3ª)", disease: "Poliomielite", ageLabel: "6 meses" },
   { key: "fa_1", name: "Febre Amarela", disease: "Febre Amarela", ageLabel: "9 meses" },
-  { key: "scr_1", name: "Tríplice Viral (1ª)", disease: "Sarampo/Caxumba/Rubéola", ageLabel: "12 meses" },
+  {
+    key: "scr_1",
+    name: "Tríplice Viral (1ª)",
+    disease: "Sarampo/Caxumba/Rubéola",
+    ageLabel: "12 meses",
+  },
   { key: "hepa_1", name: "Hepatite A (1ª)", disease: "Hepatite A", ageLabel: "12 meses" },
-  { key: "meningo_ref", name: "Meningocócica C (reforço)", disease: "Meningite C", ageLabel: "12 meses" },
+  {
+    key: "meningo_ref",
+    name: "Meningocócica C (reforço)",
+    disease: "Meningite C",
+    ageLabel: "12 meses",
+  },
   { key: "varicela_1", name: "Varicela (1ª)", disease: "Catapora", ageLabel: "12 meses" },
-  { key: "dtp_ref1", name: "DTP (1º reforço)", disease: "Difteria/Tétano/Coqueluche", ageLabel: "15 meses" },
+  {
+    key: "dtp_ref1",
+    name: "DTP (1º reforço)",
+    disease: "Difteria/Tétano/Coqueluche",
+    ageLabel: "15 meses",
+  },
   { key: "vop_1", name: "VOP (1ª)", disease: "Poliomielite", ageLabel: "15 meses" },
-  { key: "pneumo_ref", name: "Pneumocócica (reforço)", disease: "Pneumococo", ageLabel: "15 meses" },
-  { key: "scr_2", name: "Tríplice Viral (2ª)", disease: "Sarampo/Caxumba/Rubéola", ageLabel: "15 meses" },
+  {
+    key: "pneumo_ref",
+    name: "Pneumocócica (reforço)",
+    disease: "Pneumococo",
+    ageLabel: "15 meses",
+  },
+  {
+    key: "scr_2",
+    name: "Tríplice Viral (2ª)",
+    disease: "Sarampo/Caxumba/Rubéola",
+    ageLabel: "15 meses",
+  },
 ];
 
 const MILESTONES_DEF = [
@@ -7111,7 +8533,9 @@ const MILESTONES_DEF = [
 ];
 
 function PosPartoTab({ profile }: { profile: Profile | null }) {
-  const [subTab, setSubTab] = useState<"saúde" | "amamentação" | "marcos" | "vacinas" | "retorno">("saúde");
+  const [subTab, setSubTab] = useState<"saúde" | "amamentação" | "marcos" | "vacinas" | "retorno">(
+    "saúde",
+  );
 
   if (!profile?.birth_date) {
     return (
@@ -7153,7 +8577,11 @@ function PosPartoTab({ profile }: { profile: Profile | null }) {
         <span className="text-4xl">🍼</span>
         <div>
           <p className="font-semibold">
-            {babyName} nasceu! {babyAgeWeeks > 0 ? `${babyAgeWeeks} semana${babyAgeWeeks > 1 ? "s" : ""}` : `${babyAgeDays} dia${babyAgeDays !== 1 ? "s" : ""}`} de vida
+            {babyName} nasceu!{" "}
+            {babyAgeWeeks > 0
+              ? `${babyAgeWeeks} semana${babyAgeWeeks > 1 ? "s" : ""}`
+              : `${babyAgeDays} dia${babyAgeDays !== 1 ? "s" : ""}`}{" "}
+            de vida
           </p>
           <p className="text-xs text-muted-foreground">
             Nascimento: {birthDate.toLocaleDateString("pt-BR")}
@@ -7167,7 +8595,9 @@ function PosPartoTab({ profile }: { profile: Profile | null }) {
             key={st.key}
             onClick={() => setSubTab(st.key)}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              subTab === st.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-primary"
+              subTab === st.key
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-primary"
             }`}
           >
             {st.label}
@@ -7196,7 +8626,10 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
   useEffect(() => {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
-      if (!s.session) { setLoadingHistory(false); return; }
+      if (!s.session) {
+        setLoadingHistory(false);
+        return;
+      }
       const res = await getMyPpdScreenings({ data: { accessToken: s.session.access_token } });
       if (res.ok) setHistory(res.screenings);
       setLoadingHistory(false);
@@ -7251,12 +8684,14 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
           <div className="space-y-6">
             {EPDS_QUESTIONS.map((q, qi) => (
               <div key={qi}>
-                <p className="text-sm font-medium mb-2">{qi + 1}. {q.q}</p>
+                <p className="text-sm font-medium mb-2">
+                  {qi + 1}. {q.q}
+                </p>
                 <div className="space-y-1.5">
                   {q.opts.map((opt, oi) => (
                     <button
                       key={oi}
-                      onClick={() => setAnswers((prev) => prev.map((a, i) => i === qi ? oi : a))}
+                      onClick={() => setAnswers((prev) => prev.map((a, i) => (i === qi ? oi : a)))}
                       className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${
                         answers[qi] === oi
                           ? "border-primary bg-primary/5 text-primary"
@@ -7291,7 +8726,10 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
               <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-4">
                 <p className="font-semibold text-red-700 mb-2">Apoio disponível agora:</p>
                 <div className="space-y-2">
-                  <a href="tel:188" className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-sm">
+                  <a
+                    href="tel:188"
+                    className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-sm"
+                  >
                     <span className="text-xl">📞</span>
                     <div>
                       <p className="font-semibold text-sm">CVV — Centro de Valorização da Vida</p>
@@ -7309,13 +8747,18 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
               <div className="rounded-2xl border-2 border-red-500 bg-red-50 p-4">
                 <p className="font-bold text-red-700">🚨 Resposta à questão 10</p>
                 <p className="text-sm text-red-700 mt-1">
-                  Você indicou ter pensamentos de se machucar. Por favor, ligue imediatamente para o CVV (188) ou vá ao pronto-socorro mais próximo.
+                  Você indicou ter pensamentos de se machucar. Por favor, ligue imediatamente para o
+                  CVV (188) ou vá ao pronto-socorro mais próximo.
                 </p>
               </div>
             )}
 
             <button
-              onClick={() => { setAnswers(Array(10).fill(null)); setSubmitted(false); setScore(null); }}
+              onClick={() => {
+                setAnswers(Array(10).fill(null));
+                setSubmitted(false);
+                setScore(null);
+              }}
               className="w-full rounded-xl border border-border py-2.5 text-sm text-muted-foreground hover:bg-secondary"
             >
               Refazer o rastreio
@@ -7329,10 +8772,17 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
           <h3 className="font-semibold mb-3">Histórico</h3>
           <div className="space-y-2">
             {history.map((h) => (
-              <div key={h.id} className="flex items-center justify-between rounded-xl bg-secondary/30 px-4 py-3">
-                <span className="text-sm">{new Date(h.screened_at).toLocaleDateString("pt-BR")}</span>
+              <div
+                key={h.id}
+                className="flex items-center justify-between rounded-xl bg-secondary/30 px-4 py-3"
+              >
+                <span className="text-sm">
+                  {new Date(h.screened_at).toLocaleDateString("pt-BR")}
+                </span>
                 <span className={`font-semibold ${scoreColor(h.score)}`}>{h.score}/30</span>
-                <span className="text-xs text-muted-foreground">{scoreLabel(h.score).split(" — ")[0]}</span>
+                <span className="text-xs text-muted-foreground">
+                  {scoreLabel(h.score).split(" — ")[0]}
+                </span>
               </div>
             ))}
           </div>
@@ -7340,9 +8790,11 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
       )}
 
       <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-xs text-muted-foreground">
-        A EPDS é um rastreio, não um diagnóstico. Apenas um profissional de saúde pode diagnosticar depressão pós-parto.
-        O resultado deve ser compartilhado com o Dr. Clóvis.
-        {babyAgeDays < 42 && <span> Recomenda-se repetir o rastreio com 6 semanas após o parto.</span>}
+        A EPDS é um rastreio, não um diagnóstico. Apenas um profissional de saúde pode diagnosticar
+        depressão pós-parto. O resultado deve ser compartilhado com o Dr. Clóvis.
+        {babyAgeDays < 42 && (
+          <span> Recomenda-se repetir o rastreio com 6 semanas após o parto.</span>
+        )}
       </div>
     </div>
   );
@@ -7371,7 +8823,10 @@ function BreastfeedingSection() {
 
   async function loadLogs() {
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session) { setLoading(false); return; }
+    if (!s.session) {
+      setLoading(false);
+      return;
+    }
     const res = await getBreastfeedingLogs({ data: { accessToken: s.session.access_token } });
     if (res.ok) setLogs(res.logs);
     setLoading(false);
@@ -7380,7 +8835,9 @@ function BreastfeedingSection() {
   async function handleStart() {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    const res = await startBreastfeeding({ data: { accessToken: s.session.access_token, side: activeSide } });
+    const res = await startBreastfeeding({
+      data: { accessToken: s.session.access_token, side: activeSide },
+    });
     if (res.ok && res.id) {
       setActiveLog(res.id);
       setActiveStart(new Date());
@@ -7392,7 +8849,9 @@ function BreastfeedingSection() {
     if (!activeLog) return;
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    await endBreastfeeding({ data: { accessToken: s.session.access_token, id: activeLog, notes: notes || null } });
+    await endBreastfeeding({
+      data: { accessToken: s.session.access_token, id: activeLog, notes: notes || null },
+    });
     setActiveLog(null);
     setActiveStart(null);
     setElapsed(0);
@@ -7400,11 +8859,15 @@ function BreastfeedingSection() {
     await loadLogs();
   }
 
-  const todayLogs = logs.filter((l) => l.started_at.startsWith(new Date().toISOString().slice(0, 10)));
+  const todayLogs = logs.filter((l) =>
+    l.started_at.startsWith(new Date().toISOString().slice(0, 10)),
+  );
   const todayCount = todayLogs.length;
   const todayMinutes = todayLogs.reduce((sum, l) => {
     if (!l.ended_at) return sum;
-    return sum + Math.round((new Date(l.ended_at).getTime() - new Date(l.started_at).getTime()) / 60000);
+    return (
+      sum + Math.round((new Date(l.ended_at).getTime() - new Date(l.started_at).getTime()) / 60000)
+    );
   }, 0);
 
   return (
@@ -7432,10 +8895,18 @@ function BreastfeedingSection() {
                   key={side}
                   onClick={() => setActiveSide(side)}
                   className={`flex-1 rounded-xl py-2 text-xs font-medium capitalize transition-colors ${
-                    activeSide === side ? "bg-primary text-white" : "bg-secondary text-muted-foreground"
+                    activeSide === side
+                      ? "bg-primary text-white"
+                      : "bg-secondary text-muted-foreground"
                   }`}
                 >
-                  {side === "esquerdo" ? "🤱 Esq." : side === "direito" ? "🤱 Dir." : side === "ambos" ? "🤱 Ambos" : "🍼 Mamadeira"}
+                  {side === "esquerdo"
+                    ? "🤱 Esq."
+                    : side === "direito"
+                      ? "🤱 Dir."
+                      : side === "ambos"
+                        ? "🤱 Ambos"
+                        : "🍼 Mamadeira"}
                 </button>
               ))}
             </div>
@@ -7448,9 +8919,12 @@ function BreastfeedingSection() {
           </div>
         ) : (
           <div className="space-y-4 text-center">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Em andamento — {activeSide}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Em andamento — {activeSide}
+            </p>
             <p className="text-5xl font-bold tabular-nums text-primary">
-              {String(Math.floor(elapsed / 60)).padStart(2, "0")}:{String(elapsed % 60).padStart(2, "0")}
+              {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
+              {String(elapsed % 60).padStart(2, "0")}
             </p>
             <input
               value={notes}
@@ -7475,15 +8949,25 @@ function BreastfeedingSection() {
           <div className="space-y-2">
             {logs.slice(0, 20).map((log) => {
               const dur = log.ended_at
-                ? Math.round((new Date(log.ended_at).getTime() - new Date(log.started_at).getTime()) / 60000)
+                ? Math.round(
+                    (new Date(log.ended_at).getTime() - new Date(log.started_at).getTime()) / 60000,
+                  )
                 : null;
               return (
-                <div key={log.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                <div
+                  key={log.id}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3"
+                >
                   <span className="text-xl">{log.side === "mamadeira" ? "🍼" : "🤱"}</span>
                   <div className="flex-1">
                     <p className="text-sm font-medium capitalize">{log.side}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(log.started_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(log.started_at).toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </p>
                   </div>
                   {dur != null && (
@@ -7513,7 +8997,10 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
   useEffect(() => {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
-      if (!s.session) { setLoading(false); return; }
+      if (!s.session) {
+        setLoading(false);
+        return;
+      }
       const res = await getMilestones({ data: { accessToken: s.session.access_token } });
       if (res.ok) setMilestones(res.milestones);
       setLoading(false);
@@ -7532,15 +9019,26 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
       setMilestones((m) => m.filter((x) => x.milestone_key !== key));
     } else {
       await setMilestone({
-        data: { accessToken: s.session.access_token, milestoneKey: key, achievedAt: dateInput, notes: null, customLabel: null },
+        data: {
+          accessToken: s.session.access_token,
+          milestoneKey: key,
+          achievedAt: dateInput,
+          notes: null,
+          customLabel: null,
+        },
       });
-      setMilestones((m) => [...m, { id: "", milestone_key: key, custom_label: null, achieved_at: dateInput, notes: null }]);
+      setMilestones((m) => [
+        ...m,
+        { id: "", milestone_key: key, custom_label: null, achieved_at: dateInput, notes: null },
+      ]);
     }
     setMarking(null);
   }
 
   const doneMilestones = MILESTONES_DEF.filter((m) => isDone(m.key));
-  const upcoming = MILESTONES_DEF.filter((m) => !isDone(m.key) && m.weekApprox > babyAgeWeeks).slice(0, 3);
+  const upcoming = MILESTONES_DEF.filter(
+    (m) => !isDone(m.key) && m.weekApprox > babyAgeWeeks,
+  ).slice(0, 3);
 
   if (loading) return <div className="text-muted-foreground text-center py-12">Carregando...</div>;
 
@@ -7553,7 +9051,10 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
           </p>
           <div className="flex flex-wrap gap-2">
             {doneMilestones.map((m) => (
-              <span key={m.key} className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800">
+              <span
+                key={m.key}
+                className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800"
+              >
                 {m.emoji} {m.label}
               </span>
             ))}
@@ -7571,7 +9072,9 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
               <div key={m.key} className="flex items-center gap-3 text-sm">
                 <span className="text-xl">{m.emoji}</span>
                 <span>{m.label}</span>
-                <span className="ml-auto text-xs text-muted-foreground">~{m.weekApprox}ª semana</span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  ~{m.weekApprox}ª semana
+                </span>
               </div>
             ))}
           </div>
@@ -7588,7 +9091,9 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
             className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs"
           />
         </div>
-        <p className="text-xs text-muted-foreground mb-3">Selecione a data e clique para marcar como conquistado</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          Selecione a data e clique para marcar como conquistado
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {MILESTONES_DEF.map((m) => {
             const done = isDone(m.key);
@@ -7598,7 +9103,9 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
                 key={m.key}
                 onClick={() => toggleMilestone(m.key)}
                 className={`rounded-2xl border p-4 text-left transition-all ${
-                  done ? "border-amber-300 bg-amber-50" : "border-border bg-card hover:border-primary/40"
+                  done
+                    ? "border-amber-300 bg-amber-50"
+                    : "border-border bg-card hover:border-primary/40"
                 }`}
               >
                 <div className="flex items-center gap-2">
@@ -7634,7 +9141,10 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
   useEffect(() => {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
-      if (!s.session) { setLoading(false); return; }
+      if (!s.session) {
+        setLoading(false);
+        return;
+      }
       const res = await getBabyVaccines({ data: { accessToken: s.session.access_token } });
       if (res.ok) setVaccines(res.vaccines);
       setLoading(false);
@@ -7652,8 +9162,18 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
       await removeVaccine({ data: { accessToken: s.session.access_token, vaccineKey: key } });
       setVaccines((v) => v.filter((x) => x.vaccine_key !== key));
     } else {
-      await markVaccineGiven({ data: { accessToken: s.session.access_token, vaccineKey: key, administeredAt: dateInput, batch: null } });
-      setVaccines((v) => [...v, { id: "", vaccine_key: key, administered_at: dateInput, batch: null }]);
+      await markVaccineGiven({
+        data: {
+          accessToken: s.session.access_token,
+          vaccineKey: key,
+          administeredAt: dateInput,
+          batch: null,
+        },
+      });
+      setVaccines((v) => [
+        ...v,
+        { id: "", vaccine_key: key, administered_at: dateInput, batch: null },
+      ]);
     }
   }
 
@@ -7670,10 +9190,15 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
             <h3 className="font-semibold">Calendário de vacinas</h3>
             <p className="text-xs text-muted-foreground">Calendário Nacional de Vacinação (SUS)</p>
           </div>
-          <span className="text-sm font-semibold text-primary">{done}/{total}</span>
+          <span className="text-sm font-semibold text-primary">
+            {done}/{total}
+          </span>
         </div>
         <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(done / total) * 100}%` }} />
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${(done / total) * 100}%` }}
+          />
         </div>
         <div className="mt-3 flex items-center gap-2">
           <label className="text-xs text-muted-foreground">Data de aplicação:</label>
@@ -7695,10 +9220,14 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
               key={v.key}
               onClick={() => toggleVaccine(v.key)}
               className={`w-full flex items-center gap-4 rounded-2xl border p-4 text-left transition-all ${
-                done ? "border-green-300 bg-green-50" : "border-border bg-card hover:border-primary/40"
+                done
+                  ? "border-green-300 bg-green-50"
+                  : "border-border bg-card hover:border-primary/40"
               }`}
             >
-              <span className={`h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center text-xs ${done ? "border-green-500 bg-green-500 text-white" : "border-muted-foreground"}`}>
+              <span
+                className={`h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center text-xs ${done ? "border-green-500 bg-green-500 text-white" : "border-muted-foreground"}`}
+              >
                 {done ? "✓" : ""}
               </span>
               <div className="flex-1">
@@ -7706,7 +9235,8 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
                 <p className="text-xs text-muted-foreground">{v.disease}</p>
                 {done && rec && (
                   <p className="text-xs text-green-700">
-                    Aplicada em {new Date(rec.administered_at + "T00:00:00").toLocaleDateString("pt-BR")}
+                    Aplicada em{" "}
+                    {new Date(rec.administered_at + "T00:00:00").toLocaleDateString("pt-BR")}
                   </p>
                 )}
               </div>
@@ -7744,7 +9274,9 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
     const { data: s } = await supabase.auth.getSession();
     if (s.session) {
       const weightG = Math.round(parseFloat(babyWeight) * 1000);
-      await addBabyWeight({ data: { accessToken: s.session.access_token, measuredAt: weightDate, weightG } });
+      await addBabyWeight({
+        data: { accessToken: s.session.access_token, measuredAt: weightDate, weightG },
+      });
       const res = await getBabyWeights({ data: { accessToken: s.session.access_token } });
       if (res.ok) setWeights(res.weights);
       setBabyWeight("");
@@ -7753,13 +9285,21 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
   }
 
   const returnVisits = [
-    { label: "Revisão pós-parto (mãe)", daysAfter: 7, note: "Verificar cicatriz, pressão, involução uterina" },
+    {
+      label: "Revisão pós-parto (mãe)",
+      daysAfter: 7,
+      note: "Verificar cicatriz, pressão, involução uterina",
+    },
     { label: "Consulta pediátrica (bebê)", daysAfter: 15, note: "Peso, reflexos, icterícia" },
     { label: "Revisão 40 dias (mãe)", daysAfter: 40, note: "Consulta completa de puerpério" },
     { label: "Consulta 1 mês (bebê)", daysAfter: 30, note: "Desenvolvimento, vacinas" },
     { label: "Consulta 2 meses (bebê)", daysAfter: 60, note: "Vacinas do 2º mês" },
     { label: "Consulta 4 meses (bebê)", daysAfter: 120, note: "Vacinas do 4º mês" },
-    { label: "Consulta 6 meses (bebê)", daysAfter: 180, note: "Início da alimentação complementar" },
+    {
+      label: "Consulta 6 meses (bebê)",
+      daysAfter: 180,
+      note: "Início da alimentação complementar",
+    },
   ];
 
   return (
@@ -7822,16 +9362,18 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
               const prev = weights[i - 1];
               const gain = prev ? w.weight_g - prev.weight_g : null;
               return (
-                <div key={w.id} className="flex items-center justify-between rounded-xl bg-secondary/30 px-4 py-2.5">
+                <div
+                  key={w.id}
+                  className="flex items-center justify-between rounded-xl bg-secondary/30 px-4 py-2.5"
+                >
                   <span className="text-xs text-muted-foreground">
                     {new Date(w.measured_at + "T00:00:00").toLocaleDateString("pt-BR")}
                   </span>
-                  <span className="font-semibold">
-                    {(w.weight_g / 1000).toFixed(2)} kg
-                  </span>
+                  <span className="font-semibold">{(w.weight_g / 1000).toFixed(2)} kg</span>
                   {gain != null && (
                     <span className={`text-xs ${gain >= 0 ? "text-green-600" : "text-red-500"}`}>
-                      {gain >= 0 ? "+" : ""}{gain}g
+                      {gain >= 0 ? "+" : ""}
+                      {gain}g
                     </span>
                   )}
                 </div>
@@ -7855,8 +9397,13 @@ function ConquistasTab() {
   useEffect(() => {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) { setLoading(false); return; }
-      const res = await checkAndAwardAchievements({ data: { accessToken: s.session.access_token } });
+      if (!s.session?.access_token) {
+        setLoading(false);
+        return;
+      }
+      const res = await checkAndAwardAchievements({
+        data: { accessToken: s.session.access_token },
+      });
       if (res.ok) {
         setUnlocked(res.unlocked);
         const recent = res.unlocked
@@ -7868,8 +9415,7 @@ function ConquistasTab() {
     })();
   }, []);
 
-  if (loading)
-    return <div className="py-16 text-center text-muted-foreground">Verificando conquistas...</div>;
+  if (loading) return <TabSkeleton />;
 
   const unlockedKeys = new Set(unlocked.map((u) => u.achievement_key));
   const unlockedCount = ACHIEVEMENT_DEFS.filter((d) => unlockedKeys.has(d.key)).length;
@@ -7890,7 +9436,9 @@ function ConquistasTab() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-primary">Suas conquistas</p>
-            <p className="mt-1 font-serif text-2xl">{unlockedCount} de {totalCount}</p>
+            <p className="mt-1 font-serif text-2xl">
+              {unlockedCount} de {totalCount}
+            </p>
             <p className="text-sm text-muted-foreground">badges desbloqueadas</p>
           </div>
           <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-primary/20 text-base font-bold text-primary">
@@ -7898,7 +9446,10 @@ function ConquistasTab() {
           </div>
         </div>
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary">
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${pct}%` }}
+          />
         </div>
       </div>
 
@@ -7906,7 +9457,9 @@ function ConquistasTab() {
         <div className="rounded-3xl border border-amber-300 bg-amber-50 p-5 text-center">
           <p className="text-2xl mb-1">🎉</p>
           <p className="font-semibold text-amber-800">
-            {newBadges.length === 1 ? "Nova conquista desbloqueada!" : `${newBadges.length} novas conquistas!`}
+            {newBadges.length === 1
+              ? "Nova conquista desbloqueada!"
+              : `${newBadges.length} novas conquistas!`}
           </p>
         </div>
       )}
@@ -7930,13 +9483,15 @@ function ConquistasTab() {
                       isNew
                         ? "border-amber-300 bg-amber-50 shadow-md"
                         : isUnlocked
-                        ? "border-primary/30 bg-primary/5"
-                        : "border-border bg-secondary/20 opacity-50"
+                          ? "border-primary/30 bg-primary/5"
+                          : "border-border bg-secondary/20 opacity-50"
                     }`}
                   >
                     <div className={`text-3xl mb-2 ${!isUnlocked && "grayscale"}`}>{def.emoji}</div>
                     <p className="text-xs font-semibold">{def.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground leading-tight">{def.description}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground leading-tight">
+                      {def.description}
+                    </p>
                     {isUnlocked && unlockedAt && (
                       <p className="mt-1.5 text-xs text-primary">
                         {new Date(unlockedAt).toLocaleDateString("pt-BR")}
@@ -7973,21 +9528,144 @@ type ShopProduct = {
 };
 
 const CURATED_PRODUCTS: ShopProduct[] = [
-  { id: "p1", name: "Ácido Fólico 5mg", description: "Essencial no 1º trimestre para prevenção de defeitos do tubo neural. Indicado por Dr. Clóvis.", category: "suplementos", price: "A partir de R$ 18", link: "https://www.amazon.com.br/s?k=acido+folico+gestante", weeks_min: 1, weeks_max: 20, badge: "Essencial" },
-  { id: "p2", name: "Sulfato Ferroso + Vitamina C", description: "Combo para absorção ideal do ferro, prevenindo anemia gestacional.", category: "suplementos", price: "A partir de R$ 22", link: "https://www.amazon.com.br/s?k=sulfato+ferroso+vitamina+c", weeks_min: 16 },
-  { id: "p3", name: "DHA / Ômega-3 Gestante", description: "Desenvolvimento cerebral do bebê. Dose mínima recomendada: 200mg/dia de DHA.", category: "suplementos", price: "A partir de R$ 45", link: "https://www.amazon.com.br/s?k=dha+omega3+gestante" },
-  { id: "p4", name: "Travesseiro de Gestante (U-shape)", description: "Apoio lombar, pélvico e para os joelhos. Fundamental após a semana 20.", category: "conforto", price: "A partir de R$ 130", link: "https://www.amazon.com.br/s?k=travesseiro+gestante+formato+u", weeks_min: 20, badge: "Mais vendido" },
-  { id: "p5", name: "Cinta de Suporte Gestacional", description: "Alivia dores lombares e suporta o abdômen no 3º trimestre.", category: "conforto", price: "A partir de R$ 60", link: "https://www.amazon.com.br/s?k=cinta+abdominal+gestante", weeks_min: 28 },
-  { id: "p6", name: "Meias de Compressão Gestante", description: "Previnem varizes e edemas — problema comum na gravidez.", category: "conforto", price: "A partir de R$ 35", link: "https://www.amazon.com.br/s?k=meias+compressao+gestante", weeks_min: 14 },
-  { id: "p7", name: "Sutiã de Amamentação", description: "Alças largas, abertura fácil e tecido respirável para o pós-parto.", category: "amamentacao", price: "A partir de R$ 45", link: "https://www.amazon.com.br/s?k=sutia+amamentacao+confortavel", weeks_min: 30 },
-  { id: "p8", name: "Almofada de Amamentação", description: "Posiciona o bebê corretamente durante a mamada, aliviando tensão nas costas.", category: "amamentacao", price: "A partir de R$ 70", link: "https://www.amazon.com.br/s?k=almofada+amamentacao", weeks_min: 30 },
-  { id: "p9", name: "Absorvente para Seios (lavável)", description: "Para vazamentos de colostro no final da gestação e durante a amamentação.", category: "amamentacao", price: "A partir de R$ 20", link: "https://www.amazon.com.br/s?k=absorvente+seios+amamentacao+lavavel", weeks_min: 34 },
-  { id: "p10", name: "Kit Enxoval Recém-nascido", description: "Body, mijão e macacão em algodão orgânico para o RN.", category: "enxoval", price: "A partir de R$ 80", link: "https://www.amazon.com.br/s?k=kit+enxoval+recem+nascido+algodao", weeks_min: 20, badge: "Prepare-se" },
-  { id: "p11", name: "Banheirinha Dobrável para Bebê", description: "Ergonômica, anti-escorregante, economiza espaço.", category: "enxoval", price: "A partir de R$ 90", link: "https://www.amazon.com.br/s?k=banheira+bebe+dobravel", weeks_min: 24 },
-  { id: "p12", name: "Monitor de Batimentos Fetais (Doppler)", description: "Ouça o coração do seu bebê em casa entre as consultas.", category: "enxoval", price: "A partir de R$ 150", link: "https://www.amazon.com.br/s?k=doppler+fetal+caseiro", weeks_min: 12, badge: "Tecnologia" },
-  { id: "p13", name: '"Gravidez Semana a Semana" — Livro', description: "O guia mais completo em português, com fotos e explicações médicas.", category: "livros", price: "A partir de R$ 55", link: "https://www.amazon.com.br/s?k=gravidez+semana+a+semana+livro" },
-  { id: "p14", name: '"O Bebê da Barriga" — Livro', description: "Leitura afetiva sobre o desenvolvimento fetal, ideal para compartilhar com o parceiro.", category: "livros", price: "A partir de R$ 40", link: "https://www.amazon.com.br/s?k=bebe+da+barriga+livro+gestacao" },
-  { id: "p15", name: "Protetor Solar FPS 50+ (gestante)", description: "Fórmula sem oxi-benzona, segura para a gestação e para manchas de melasma.", category: "suplementos", price: "A partir de R$ 35", link: "https://www.amazon.com.br/s?k=protetor+solar+gestante+fps50" },
+  {
+    id: "p1",
+    name: "Ácido Fólico 5mg",
+    description:
+      "Essencial no 1º trimestre para prevenção de defeitos do tubo neural. Indicado por Dr. Clóvis.",
+    category: "suplementos",
+    price: "A partir de R$ 18",
+    link: "https://www.amazon.com.br/s?k=acido+folico+gestante",
+    weeks_min: 1,
+    weeks_max: 20,
+    badge: "Essencial",
+  },
+  {
+    id: "p2",
+    name: "Sulfato Ferroso + Vitamina C",
+    description: "Combo para absorção ideal do ferro, prevenindo anemia gestacional.",
+    category: "suplementos",
+    price: "A partir de R$ 22",
+    link: "https://www.amazon.com.br/s?k=sulfato+ferroso+vitamina+c",
+    weeks_min: 16,
+  },
+  {
+    id: "p3",
+    name: "DHA / Ômega-3 Gestante",
+    description: "Desenvolvimento cerebral do bebê. Dose mínima recomendada: 200mg/dia de DHA.",
+    category: "suplementos",
+    price: "A partir de R$ 45",
+    link: "https://www.amazon.com.br/s?k=dha+omega3+gestante",
+  },
+  {
+    id: "p4",
+    name: "Travesseiro de Gestante (U-shape)",
+    description: "Apoio lombar, pélvico e para os joelhos. Fundamental após a semana 20.",
+    category: "conforto",
+    price: "A partir de R$ 130",
+    link: "https://www.amazon.com.br/s?k=travesseiro+gestante+formato+u",
+    weeks_min: 20,
+    badge: "Mais vendido",
+  },
+  {
+    id: "p5",
+    name: "Cinta de Suporte Gestacional",
+    description: "Alivia dores lombares e suporta o abdômen no 3º trimestre.",
+    category: "conforto",
+    price: "A partir de R$ 60",
+    link: "https://www.amazon.com.br/s?k=cinta+abdominal+gestante",
+    weeks_min: 28,
+  },
+  {
+    id: "p6",
+    name: "Meias de Compressão Gestante",
+    description: "Previnem varizes e edemas — problema comum na gravidez.",
+    category: "conforto",
+    price: "A partir de R$ 35",
+    link: "https://www.amazon.com.br/s?k=meias+compressao+gestante",
+    weeks_min: 14,
+  },
+  {
+    id: "p7",
+    name: "Sutiã de Amamentação",
+    description: "Alças largas, abertura fácil e tecido respirável para o pós-parto.",
+    category: "amamentacao",
+    price: "A partir de R$ 45",
+    link: "https://www.amazon.com.br/s?k=sutia+amamentacao+confortavel",
+    weeks_min: 30,
+  },
+  {
+    id: "p8",
+    name: "Almofada de Amamentação",
+    description: "Posiciona o bebê corretamente durante a mamada, aliviando tensão nas costas.",
+    category: "amamentacao",
+    price: "A partir de R$ 70",
+    link: "https://www.amazon.com.br/s?k=almofada+amamentacao",
+    weeks_min: 30,
+  },
+  {
+    id: "p9",
+    name: "Absorvente para Seios (lavável)",
+    description: "Para vazamentos de colostro no final da gestação e durante a amamentação.",
+    category: "amamentacao",
+    price: "A partir de R$ 20",
+    link: "https://www.amazon.com.br/s?k=absorvente+seios+amamentacao+lavavel",
+    weeks_min: 34,
+  },
+  {
+    id: "p10",
+    name: "Kit Enxoval Recém-nascido",
+    description: "Body, mijão e macacão em algodão orgânico para o RN.",
+    category: "enxoval",
+    price: "A partir de R$ 80",
+    link: "https://www.amazon.com.br/s?k=kit+enxoval+recem+nascido+algodao",
+    weeks_min: 20,
+    badge: "Prepare-se",
+  },
+  {
+    id: "p11",
+    name: "Banheirinha Dobrável para Bebê",
+    description: "Ergonômica, anti-escorregante, economiza espaço.",
+    category: "enxoval",
+    price: "A partir de R$ 90",
+    link: "https://www.amazon.com.br/s?k=banheira+bebe+dobravel",
+    weeks_min: 24,
+  },
+  {
+    id: "p12",
+    name: "Monitor de Batimentos Fetais (Doppler)",
+    description: "Ouça o coração do seu bebê em casa entre as consultas.",
+    category: "enxoval",
+    price: "A partir de R$ 150",
+    link: "https://www.amazon.com.br/s?k=doppler+fetal+caseiro",
+    weeks_min: 12,
+    badge: "Tecnologia",
+  },
+  {
+    id: "p13",
+    name: '"Gravidez Semana a Semana" — Livro',
+    description: "O guia mais completo em português, com fotos e explicações médicas.",
+    category: "livros",
+    price: "A partir de R$ 55",
+    link: "https://www.amazon.com.br/s?k=gravidez+semana+a+semana+livro",
+  },
+  {
+    id: "p14",
+    name: '"O Bebê da Barriga" — Livro',
+    description:
+      "Leitura afetiva sobre o desenvolvimento fetal, ideal para compartilhar com o parceiro.",
+    category: "livros",
+    price: "A partir de R$ 40",
+    link: "https://www.amazon.com.br/s?k=bebe+da+barriga+livro+gestacao",
+  },
+  {
+    id: "p15",
+    name: "Protetor Solar FPS 50+ (gestante)",
+    description: "Fórmula sem oxi-benzona, segura para a gestação e para manchas de melasma.",
+    category: "suplementos",
+    price: "A partir de R$ 35",
+    link: "https://www.amazon.com.br/s?k=protetor+solar+gestante+fps50",
+  },
 ];
 
 const SHOP_CATEGORIES = [
@@ -8017,10 +9695,13 @@ function LojaTab({ gest }: { gest: Gest }) {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">Produtos selecionados</p>
+        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
+          Produtos selecionados
+        </p>
         <h2 className="font-serif text-2xl">Loja Curada</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Produtos indicados por Dr. Clóvis Bacha para cada fase da gestação. Os links levam ao Amazon.com.br.
+          Produtos indicados por Dr. Clóvis Bacha para cada fase da gestação. Os links levam ao
+          Amazon.com.br.
         </p>
         <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-xs font-medium text-primary">
           ✅ Todos revisados e aprovados pelo Dr. Clóvis
@@ -8060,14 +9741,20 @@ function LojaTab({ gest }: { gest: Gest }) {
         <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
           <p className="text-3xl mb-2">🔍</p>
           <p>Nenhum produto encontrado para este filtro.</p>
-          <button onClick={() => setWeekFilter(false)} className="mt-3 text-sm text-primary underline">
+          <button
+            onClick={() => setWeekFilter(false)}
+            className="mt-3 text-sm text-primary underline"
+          >
             Mostrar todos
           </button>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((product) => (
-            <div key={product.id} className="rounded-2xl border border-border bg-card p-5 flex flex-col">
+            <div
+              key={product.id}
+              className="rounded-2xl border border-border bg-card p-5 flex flex-col"
+            >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <p className="font-semibold text-sm leading-snug">{product.name}</p>
                 {product.badge && (
@@ -8076,7 +9763,9 @@ function LojaTab({ gest }: { gest: Gest }) {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground flex-1 leading-relaxed">{product.description}</p>
+              <p className="text-xs text-muted-foreground flex-1 leading-relaxed">
+                {product.description}
+              </p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-sm font-medium text-primary">{product.price}</span>
                 <a
@@ -8100,7 +9789,8 @@ function LojaTab({ gest }: { gest: Gest }) {
       )}
 
       <p className="text-xs text-center text-muted-foreground pb-4">
-        Links de afiliado (Amazon Associates). Comprar pelo link apoia o portal sem custo extra para você.
+        Links de afiliado (Amazon Associates). Comprar pelo link apoia o portal sem custo extra para
+        você.
       </p>
     </div>
   );
@@ -8125,18 +9815,26 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) { setLoading(false); return; }
+    if (!s.session?.access_token) {
+      setLoading(false);
+      return;
+    }
     const res = await getMyPrivateConsultations({ data: { accessToken: s.session.access_token } });
     if (res.ok) setConsultations(res.consultations);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function handleRequest() {
     setSubmitting(true);
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) { setSubmitting(false); return; }
+    if (!s.session?.access_token) {
+      setSubmitting(false);
+      return;
+    }
     const res = await requestPrivateConsultation({
       data: {
         accessToken: s.session.access_token,
@@ -8156,7 +9854,10 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   async function handleMarkPayment(id: string) {
     setMarkingId(id);
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) { setMarkingId(null); return; }
+    if (!s.session?.access_token) {
+      setMarkingId(null);
+      return;
+    }
     await markPaymentSent({ data: { accessToken: s.session.access_token, id } });
     await load();
     setMarkingId(null);
@@ -8165,19 +9866,33 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   const selectedConsultType = CONSULT_TYPES.find((c) => c.key === selectedType) ?? CONSULT_TYPES[0];
 
   const statusConfig: Record<string, { label: string; color: string; emoji: string }> = {
-    pendente_pagamento: { label: "Aguardando pagamento", color: "border-amber-200 bg-amber-50", emoji: "⏳" },
-    pagamento_enviado: { label: "Pagamento enviado — aguardando confirmação", color: "border-blue-200 bg-blue-50", emoji: "💸" },
-    confirmado: { label: "Confirmado — aguardando agendamento", color: "border-green-200 bg-green-50", emoji: "✅" },
+    pendente_pagamento: {
+      label: "Aguardando pagamento",
+      color: "border-amber-200 bg-amber-50",
+      emoji: "⏳",
+    },
+    pagamento_enviado: {
+      label: "Pagamento enviado — aguardando confirmação",
+      color: "border-blue-200 bg-blue-50",
+      emoji: "💸",
+    },
+    confirmado: {
+      label: "Confirmado — aguardando agendamento",
+      color: "border-green-200 bg-green-50",
+      emoji: "✅",
+    },
     realizado: { label: "Consulta realizada", color: "border-border bg-secondary/30", emoji: "🏁" },
     cancelado: { label: "Cancelado", color: "border-red-200 bg-red-50", emoji: "❌" },
   };
 
-  if (loading) return <div className="py-16 text-center text-muted-foreground">Carregando...</div>;
+  if (loading) return <TabSkeleton />;
 
   if (step === "new") {
     return (
       <div className="max-w-xl space-y-6">
-        <button onClick={() => setStep("list")} className="text-sm text-primary">← Voltar</button>
+        <button onClick={() => setStep("list")} className="text-sm text-primary">
+          ← Voltar
+        </button>
 
         <div className="rounded-3xl border border-border bg-card p-6">
           <h2 className="font-serif text-xl mb-4">Nova consulta particular</h2>
@@ -8210,7 +9925,9 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Datas e horários preferidos (opcional)</label>
+              <label className="block text-sm font-medium mb-2">
+                Datas e horários preferidos (opcional)
+              </label>
               <div className="space-y-2">
                 {preferredDates.map((d, i) => (
                   <input
@@ -8226,7 +9943,9 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                   />
                 ))}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Informe até 3 opções — Dr. Clóvis confirmará a disponibilidade.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Informe até 3 opções — Dr. Clóvis confirmará a disponibilidade.
+              </p>
             </div>
 
             <div>
@@ -8245,7 +9964,8 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
           <p className="font-semibold mb-3">💳 Pagamento via PIX</p>
           <p className="text-sm text-muted-foreground mb-3">
-            Após solicitar, efetue o pagamento via PIX e marque como pago. Dr. Clóvis confirmará e entrará em contato.
+            Após solicitar, efetue o pagamento via PIX e marque como pago. Dr. Clóvis confirmará e
+            entrará em contato.
           </p>
           <div className="space-y-2">
             <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
@@ -8258,7 +9978,9 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
             </div>
             <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
               <span className="text-xs text-muted-foreground">Valor</span>
-              <span className="text-sm font-semibold text-primary">{selectedConsultType.price}</span>
+              <span className="text-sm font-semibold text-primary">
+                {selectedConsultType.price}
+              </span>
             </div>
           </div>
         </div>
@@ -8277,7 +9999,9 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">Consultas particulares</p>
+        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
+          Consultas particulares
+        </p>
         <h2 className="font-serif text-2xl">Consulta com Dr. Clóvis</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Videochamadas particulares sem intermediário. Pagamento via PIX direto ao médico.
@@ -8331,20 +10055,31 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                     </p>
                     {c.preferred_dates.length > 0 && (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Datas sugeridas: {c.preferred_dates.map((d) => new Date(d).toLocaleString("pt-BR")).join(", ")}
+                        Datas sugeridas:{" "}
+                        {c.preferred_dates
+                          .map((d) => new Date(d).toLocaleString("pt-BR"))
+                          .join(", ")}
                       </p>
                     )}
                     {c.message && (
                       <p className="text-xs mt-1 italic text-muted-foreground">"{c.message}"</p>
                     )}
                   </div>
-                  {typeInfo && <span className="shrink-0 font-bold text-sm text-primary">{typeInfo.price}</span>}
+                  {typeInfo && (
+                    <span className="shrink-0 font-bold text-sm text-primary">
+                      {typeInfo.price}
+                    </span>
+                  )}
                 </div>
                 {c.status === "pendente_pagamento" && (
                   <div className="mt-4 space-y-3">
                     <div className="rounded-xl bg-white/70 border border-border p-3 text-xs space-y-1">
-                      <p className="font-medium">Chave PIX: <span className="font-mono">{PIX_KEY}</span></p>
-                      <p>Favorecido: {PIX_NAME} · Valor: {typeInfo?.price ?? "—"}</p>
+                      <p className="font-medium">
+                        Chave PIX: <span className="font-mono">{PIX_KEY}</span>
+                      </p>
+                      <p>
+                        Favorecido: {PIX_NAME} · Valor: {typeInfo?.price ?? "—"}
+                      </p>
                     </div>
                     <button
                       onClick={() => handleMarkPayment(c.id)}
@@ -8373,9 +10108,16 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
 ───────────────────────────────────────────────────────── */
 
 const TPM_SYMPTOMS = [
-  "Cólicas", "Dor de cabeça", "Irritabilidade", "Inchaço",
-  "Fadiga", "Acne", "Sensibilidade nos seios", "Insônia",
-  "Desejos alimentares", "Ansiedade",
+  "Cólicas",
+  "Dor de cabeça",
+  "Irritabilidade",
+  "Inchaço",
+  "Fadiga",
+  "Acne",
+  "Sensibilidade nos seios",
+  "Insônia",
+  "Desejos alimentares",
+  "Ansiedade",
 ];
 
 function cycleLengthDays(cycle: MenstrualCycle): number | null {
@@ -8410,18 +10152,26 @@ function CicloMenstrualTab() {
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) { setLoading(false); return; }
+    if (!s.session?.access_token) {
+      setLoading(false);
+      return;
+    }
     const res = await getRecentCycles({ data: { accessToken: s.session.access_token } });
     if (res.ok) setCycles(res.cycles);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function handleLogStart() {
     setSubmitting(true);
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) { setSubmitting(false); return; }
+    if (!s.session?.access_token) {
+      setSubmitting(false);
+      return;
+    }
     const res = await logCycleStart({
       data: {
         accessToken: s.session.access_token,
@@ -8460,17 +10210,11 @@ function CicloMenstrualTab() {
   const nextPeriod = lastCycle
     ? new Date(new Date(lastCycle.start_date + "T00:00:00").getTime() + avgLen * 86400000)
     : null;
-  const fertileWindowStart = nextPeriod
-    ? new Date(nextPeriod.getTime() - 16 * 86400000)
-    : null;
-  const fertileWindowEnd = nextPeriod
-    ? new Date(nextPeriod.getTime() - 10 * 86400000)
-    : null;
-  const daysToNext = nextPeriod
-    ? Math.round((nextPeriod.getTime() - Date.now()) / 86400000)
-    : null;
+  const fertileWindowStart = nextPeriod ? new Date(nextPeriod.getTime() - 16 * 86400000) : null;
+  const fertileWindowEnd = nextPeriod ? new Date(nextPeriod.getTime() - 10 * 86400000) : null;
+  const daysToNext = nextPeriod ? Math.round((nextPeriod.getTime() - Date.now()) / 86400000) : null;
 
-  if (loading) return <div className="py-16 text-center text-muted-foreground">Carregando...</div>;
+  if (loading) return <TabSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -8487,31 +10231,35 @@ function CicloMenstrualTab() {
                 {daysToNext !== null && daysToNext > 0
                   ? `em ${daysToNext} dias`
                   : daysToNext === 0
-                  ? "pode ser hoje"
-                  : `${Math.abs(daysToNext ?? 0)} dias atrás`}
+                    ? "pode ser hoje"
+                    : `${Math.abs(daysToNext ?? 0)} dias atrás`}
               </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Ciclo médio: {avgLen} dias
-              </p>
+              <p className="text-xs text-muted-foreground mt-2">Ciclo médio: {avgLen} dias</p>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground mt-2">Registre pelo menos 2 ciclos para calcular.</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Registre pelo menos 2 ciclos para calcular.
+            </p>
           )}
         </div>
         <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">Janela fértil estimada</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
+            Janela fértil estimada
+          </p>
           {fertileWindowStart && fertileWindowEnd ? (
             <>
               <p className="font-serif text-lg mt-1">
-                {fertileWindowStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} —{" "}
-                {fertileWindowEnd.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                {fertileWindowStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}{" "}
+                — {fertileWindowEnd.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
                 Baseado no ciclo médio. Para concepção, use métodos mais precisos.
               </p>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground mt-2">Disponível após 2 ciclos registrados.</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Disponível após 2 ciclos registrados.
+            </p>
           )}
         </div>
       </div>
@@ -8556,9 +10304,11 @@ function CicloMenstrualTab() {
               {TPM_SYMPTOMS.map((s) => (
                 <button
                   key={s}
-                  onClick={() => setNewSymptoms((prev) =>
-                    prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-                  )}
+                  onClick={() =>
+                    setNewSymptoms((prev) =>
+                      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
+                    )
+                  }
                   className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                     newSymptoms.includes(s)
                       ? "bg-primary text-white"
@@ -8608,12 +10358,14 @@ function CicloMenstrualTab() {
           <h3 className="font-semibold">Histórico de ciclos</h3>
           {cycles.map((cycle, i) => {
             const duration = cycleLengthDays(cycle);
-            const gapToNext = i > 0
-              ? Math.round(
-                  (new Date(cycle.start_date + "T00:00:00").getTime() -
-                    new Date(cycles[i - 1].start_date + "T00:00:00").getTime()) / 86400000
-                )
-              : null;
+            const gapToNext =
+              i > 0
+                ? Math.round(
+                    (new Date(cycle.start_date + "T00:00:00").getTime() -
+                      new Date(cycles[i - 1].start_date + "T00:00:00").getTime()) /
+                      86400000,
+                  )
+                : null;
             const isActive = !cycle.end_date;
             return (
               <div
@@ -8630,9 +10382,12 @@ function CicloMenstrualTab() {
                       )}
                       <p className="font-medium text-sm">
                         {new Date(cycle.start_date + "T00:00:00").toLocaleDateString("pt-BR", {
-                          day: "2-digit", month: "long", year: "numeric",
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
                         })}
-                        {cycle.end_date && ` — ${new Date(cycle.end_date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}`}
+                        {cycle.end_date &&
+                          ` — ${new Date(cycle.end_date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}`}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
@@ -8643,14 +10398,16 @@ function CicloMenstrualTab() {
                     {cycle.symptoms.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {cycle.symptoms.map((s) => (
-                          <span key={s} className="rounded-full bg-secondary px-2 py-0.5 text-xs">{s}</span>
+                          <span key={s} className="rounded-full bg-secondary px-2 py-0.5 text-xs">
+                            {s}
+                          </span>
                         ))}
                       </div>
                     )}
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    {isActive && (
-                      endingId === cycle.id ? (
+                    {isActive &&
+                      (endingId === cycle.id ? (
                         <div className="flex items-center gap-1">
                           <input
                             type="date"
@@ -8672,8 +10429,7 @@ function CicloMenstrualTab() {
                         >
                           Encerrar
                         </button>
-                      )
-                    )}
+                      ))}
                     <button
                       onClick={() => handleDelete(cycle.id)}
                       className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground hover:border-red-300 hover:text-red-500"
@@ -8706,16 +10462,93 @@ type ExamDef = {
 };
 
 const PREVENTIVE_EXAMS: ExamDef[] = [
-  { key: "papanicolau", name: "Papanicolau", emoji: "🔬", frequency: "Anual", frequencyMonths: 12, description: "Rastreamento do câncer de colo do útero. Após 2 exames normais seguidos, pode ser feito a cada 3 anos." },
-  { key: "mamografia", name: "Mamografia", emoji: "🩻", frequency: "Anual (40+)", frequencyMonths: 12, description: "Rastreamento do câncer de mama. A partir de 40 anos ou 35 anos em caso de histórico familiar.", ageFrom: 40 },
-  { key: "ultrassom_tv", name: "Ultrassom Pélvico", emoji: "📡", frequency: "Anual", frequencyMonths: 12, description: "Avaliação dos ovários, útero e endométrio. Detecta cistos, miomas e outras alterações." },
-  { key: "glicemia", name: "Glicemia em Jejum", emoji: "🩸", frequency: "Anual", frequencyMonths: 12, description: "Rastreamento de diabetes e pré-diabetes." },
-  { key: "colesterol", name: "Perfil Lipídico", emoji: "💉", frequency: "A cada 5 anos", frequencyMonths: 60, description: "Colesterol total, HDL, LDL e triglicérides. Risco cardiovascular." },
-  { key: "tsh", name: "TSH / T4 Livre", emoji: "🦋", frequency: "A cada 2 anos", frequencyMonths: 24, description: "Função da tireoide. Importante para mulheres em idade fértil.", ageFrom: 35 },
-  { key: "pressao_arterial", name: "Pressão Arterial", emoji: "💊", frequency: "Semestral", frequencyMonths: 6, description: "Controle da pressão arterial. Hipertensão é silenciosa — medir regularmente é fundamental." },
-  { key: "dentista", name: "Dentista", emoji: "🦷", frequency: "Semestral", frequencyMonths: 6, description: "Saúde bucal com impacto direto na saúde geral. Cáries e inflamações gengivas elevam risco sistêmico." },
-  { key: "dermatologista", name: "Mapeamento de Pintas", emoji: "☀️", frequency: "Anual", frequencyMonths: 12, description: "Dermatoscopia para rastreamento do melanoma e outros cânceres de pele." },
-  { key: "oftalmologista", name: "Oftalmologista", emoji: "👁️", frequency: "A cada 2 anos", frequencyMonths: 24, description: "Avaliação da visão, pressão intraocular e saúde ocular." },
+  {
+    key: "papanicolau",
+    name: "Papanicolau",
+    emoji: "🔬",
+    frequency: "Anual",
+    frequencyMonths: 12,
+    description:
+      "Rastreamento do câncer de colo do útero. Após 2 exames normais seguidos, pode ser feito a cada 3 anos.",
+  },
+  {
+    key: "mamografia",
+    name: "Mamografia",
+    emoji: "🩻",
+    frequency: "Anual (40+)",
+    frequencyMonths: 12,
+    description:
+      "Rastreamento do câncer de mama. A partir de 40 anos ou 35 anos em caso de histórico familiar.",
+    ageFrom: 40,
+  },
+  {
+    key: "ultrassom_tv",
+    name: "Ultrassom Pélvico",
+    emoji: "📡",
+    frequency: "Anual",
+    frequencyMonths: 12,
+    description:
+      "Avaliação dos ovários, útero e endométrio. Detecta cistos, miomas e outras alterações.",
+  },
+  {
+    key: "glicemia",
+    name: "Glicemia em Jejum",
+    emoji: "🩸",
+    frequency: "Anual",
+    frequencyMonths: 12,
+    description: "Rastreamento de diabetes e pré-diabetes.",
+  },
+  {
+    key: "colesterol",
+    name: "Perfil Lipídico",
+    emoji: "💉",
+    frequency: "A cada 5 anos",
+    frequencyMonths: 60,
+    description: "Colesterol total, HDL, LDL e triglicérides. Risco cardiovascular.",
+  },
+  {
+    key: "tsh",
+    name: "TSH / T4 Livre",
+    emoji: "🦋",
+    frequency: "A cada 2 anos",
+    frequencyMonths: 24,
+    description: "Função da tireoide. Importante para mulheres em idade fértil.",
+    ageFrom: 35,
+  },
+  {
+    key: "pressao_arterial",
+    name: "Pressão Arterial",
+    emoji: "💊",
+    frequency: "Semestral",
+    frequencyMonths: 6,
+    description:
+      "Controle da pressão arterial. Hipertensão é silenciosa — medir regularmente é fundamental.",
+  },
+  {
+    key: "dentista",
+    name: "Dentista",
+    emoji: "🦷",
+    frequency: "Semestral",
+    frequencyMonths: 6,
+    description:
+      "Saúde bucal com impacto direto na saúde geral. Cáries e inflamações gengivas elevam risco sistêmico.",
+  },
+  {
+    key: "dermatologista",
+    name: "Mapeamento de Pintas",
+    emoji: "☀️",
+    frequency: "Anual",
+    frequencyMonths: 12,
+    description: "Dermatoscopia para rastreamento do melanoma e outros cânceres de pele.",
+  },
+  {
+    key: "oftalmologista",
+    name: "Oftalmologista",
+    emoji: "👁️",
+    frequency: "A cada 2 anos",
+    frequencyMonths: 24,
+    description: "Avaliação da visão, pressão intraocular e saúde ocular.",
+  },
 ];
 
 function nextDueDate(lastDone: string | null, frequencyMonths: number): Date | null {
@@ -8735,19 +10568,27 @@ function PreventivosTab() {
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) { setLoading(false); return; }
+    if (!s.session?.access_token) {
+      setLoading(false);
+      return;
+    }
     const res = await getPreventiveReminders({ data: { accessToken: s.session.access_token } });
     if (res.ok) setReminders(res.reminders);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function handleSave() {
     if (!editingKey) return;
     setSaving(true);
     const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) { setSaving(false); return; }
+    if (!s.session?.access_token) {
+      setSaving(false);
+      return;
+    }
     await setPreventiveReminder({
       data: {
         accessToken: s.session.access_token,
@@ -8761,7 +10602,7 @@ function PreventivosTab() {
     setSaving(false);
   }
 
-  if (loading) return <div className="py-16 text-center text-muted-foreground">Carregando...</div>;
+  if (loading) return <TabSkeleton />;
 
   const reminderMap = Object.fromEntries(reminders.map((r) => [r.exam_key, r]));
   const today = new Date();
@@ -8770,9 +10611,7 @@ function PreventivosTab() {
   const examGroups = PREVENTIVE_EXAMS.map((exam) => {
     const r = reminderMap[exam.key];
     const nextDue = r?.last_done_date ? nextDueDate(r.last_done_date, exam.frequencyMonths) : null;
-    const daysUntil = nextDue
-      ? Math.round((nextDue.getTime() - today.getTime()) / 86400000)
-      : null;
+    const daysUntil = nextDue ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null;
     let status: "overdue" | "soon" | "ok" | "never" = "never";
     if (r?.last_done_date) {
       if (daysUntil !== null) {
@@ -8793,9 +10632,21 @@ function PreventivosTab() {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Em atraso", value: overdueCount, color: "text-red-600 bg-red-50 border-red-200" },
-          { label: "Em breve", value: soonCount, color: "text-amber-700 bg-amber-50 border-amber-200" },
-          { label: "Não registrado", value: neverCount, color: "text-muted-foreground bg-secondary border-border" },
+          {
+            label: "Em atraso",
+            value: overdueCount,
+            color: "text-red-600 bg-red-50 border-red-200",
+          },
+          {
+            label: "Em breve",
+            value: soonCount,
+            color: "text-amber-700 bg-amber-50 border-amber-200",
+          },
+          {
+            label: "Não registrado",
+            value: neverCount,
+            color: "text-muted-foreground bg-secondary border-border",
+          },
         ].map((s) => (
           <div key={s.label} className={`rounded-2xl border p-4 text-center ${s.color}`}>
             <p className="text-2xl font-bold">{s.value}</p>
@@ -8809,14 +10660,15 @@ function PreventivosTab() {
         {examGroups.map(({ exam, r, nextDue, daysUntil, status }) => {
           const isEditing = editingKey === exam.key;
           const statusColor =
-            status === "overdue" ? "border-red-200 bg-red-50" :
-            status === "soon" ? "border-amber-200 bg-amber-50" :
-            status === "ok" ? "border-green-200 bg-green-50" :
-            "border-border bg-card";
+            status === "overdue"
+              ? "border-red-200 bg-red-50"
+              : status === "soon"
+                ? "border-amber-200 bg-amber-50"
+                : status === "ok"
+                  ? "border-green-200 bg-green-50"
+                  : "border-border bg-card";
           const statusEmoji =
-            status === "overdue" ? "⚠️" :
-            status === "soon" ? "🔔" :
-            status === "ok" ? "✅" : "📋";
+            status === "overdue" ? "⚠️" : status === "soon" ? "🔔" : status === "ok" ? "✅" : "📋";
 
           return (
             <div key={exam.key} className={`rounded-2xl border p-4 ${statusColor}`}>
@@ -8834,13 +10686,24 @@ function PreventivosTab() {
                     </p>
                     {r?.last_done_date && (
                       <p className="text-xs mt-1">
-                        Último: {new Date(r.last_done_date + "T00:00:00").toLocaleDateString("pt-BR")}
+                        Último:{" "}
+                        {new Date(r.last_done_date + "T00:00:00").toLocaleDateString("pt-BR")}
                         {nextDue && ` · Próximo: ${nextDue.toLocaleDateString("pt-BR")} `}
                         {daysUntil !== null && (
-                          <span className={daysUntil < 0 ? "text-red-600 font-medium" : daysUntil <= 60 ? "text-amber-700 font-medium" : "text-green-600"}>
-                            {daysUntil < 0 ? `(${Math.abs(daysUntil)} dias em atraso)` :
-                             daysUntil === 0 ? "(hoje)" :
-                             `(em ${daysUntil} dias)`}
+                          <span
+                            className={
+                              daysUntil < 0
+                                ? "text-red-600 font-medium"
+                                : daysUntil <= 60
+                                  ? "text-amber-700 font-medium"
+                                  : "text-green-600"
+                            }
+                          >
+                            {daysUntil < 0
+                              ? `(${Math.abs(daysUntil)} dias em atraso)`
+                              : daysUntil === 0
+                                ? "(hoje)"
+                                : `(em ${daysUntil} dias)`}
                           </span>
                         )}
                       </p>
@@ -8898,7 +10761,8 @@ function PreventivosTab() {
       </div>
 
       <p className="text-xs text-center text-muted-foreground pb-4">
-        Frequências baseadas nas diretrizes da FEBRASGO e CFM. Consulte seu médico para orientações individualizadas.
+        Frequências baseadas nas diretrizes da FEBRASGO e CFM. Consulte seu médico para orientações
+        individualizadas.
       </p>
     </div>
   );
@@ -8983,24 +10847,39 @@ function MédicoTab() {
             className="w-full aspect-square object-cover md:h-full"
           />
           <div className="p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Médico responsável</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+              Médico responsável
+            </p>
             <h2 className="mt-1 font-serif text-2xl text-foreground">Dr. Clóvis Bacha</h2>
-            <p className="text-sm text-muted-foreground">Ginecologista e Obstetra · Especialista em Gestação de Alto Risco</p>
+            <p className="text-sm text-muted-foreground">
+              Ginecologista e Obstetra · Especialista em Gestação de Alto Risco
+            </p>
             <div className="mt-4 flex flex-wrap gap-2">
               {["CRM-MG", "FEBRASGO", "ISUOG", "SOGIMIG"].map((tag) => (
-                <span key={tag} className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                <span
+                  key={tag}
+                  className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+                >
                   {tag}
                 </span>
               ))}
             </div>
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Mais de duas décadas dedicadas ao acompanhamento de gestações complexas — unindo medicina baseada em evidências ao cuidado profundamente humano. Especializado em Medicina Fetal, Ultrassonografia Obstétrica e Dopplervelocimetria.
+              Mais de duas décadas dedicadas ao acompanhamento de gestações complexas — unindo
+              medicina baseada em evidências ao cuidado profundamente humano. Especializado em
+              Medicina Fetal, Ultrassonografia Obstétrica e Dopplervelocimetria.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link to="/sobre" className="text-xs font-medium text-primary underline underline-offset-4">
+              <Link
+                to="/sobre"
+                className="text-xs font-medium text-primary underline underline-offset-4"
+              >
                 Currículo completo →
               </Link>
-              <Link to="/agendamento" className="text-xs font-medium text-primary underline underline-offset-4">
+              <Link
+                to="/agendamento"
+                className="text-xs font-medium text-primary underline underline-offset-4"
+              >
                 Agendar consulta →
               </Link>
             </div>
@@ -9040,7 +10919,10 @@ function MédicoTab() {
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-serif text-lg text-foreground">Onde o Dr. Clóvis atende</h3>
-          <Link to="/hospitais" className="text-xs font-medium text-primary underline underline-offset-4">
+          <Link
+            to="/hospitais"
+            className="text-xs font-medium text-primary underline underline-offset-4"
+          >
             Ver rotas →
           </Link>
         </div>
@@ -9055,7 +10937,8 @@ function MédicoTab() {
           ))}
         </div>
         <p className="text-xs text-muted-foreground mt-3">
-          A escolha do hospital depende do plano de saúde e da complexidade da gestação. Confirme com a equipe.
+          A escolha do hospital depende do plano de saúde e da complexidade da gestação. Confirme
+          com a equipe.
         </p>
       </div>
 
@@ -9063,14 +10946,23 @@ function MédicoTab() {
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-serif text-lg text-foreground">Lives e conteúdo</h3>
-          <Link to="/lives" className="text-xs font-medium text-primary underline underline-offset-4">
+          <Link
+            to="/lives"
+            className="text-xs font-medium text-primary underline underline-offset-4"
+          >
             Ver todas →
           </Link>
         </div>
         <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 mb-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">Próxima live</p>
-          <p className="text-sm font-medium text-foreground">Sangramento no início da gestação: quando se preocupar</p>
-          <p className="text-xs text-muted-foreground mt-1">20 de Junho de 2026 · Instagram @drclovisbacha</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">
+            Próxima live
+          </p>
+          <p className="text-sm font-medium text-foreground">
+            Sangramento no início da gestação: quando se preocupar
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            20 de Junho de 2026 · Instagram @drclovisbacha
+          </p>
           <a
             href="https://www.instagram.com/drclovisbacha/"
             target="_blank"
@@ -9081,9 +10973,14 @@ function MédicoTab() {
           </a>
         </div>
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Lives anteriores</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Lives anteriores
+          </p>
           {LIVES_PAST.map((l) => (
-            <div key={l.titulo} className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 px-3 py-2">
+            <div
+              key={l.titulo}
+              className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 px-3 py-2"
+            >
               <p className="text-sm text-foreground">{l.titulo}</p>
               <p className="text-xs text-muted-foreground ml-4 flex-shrink-0">{l.data}</p>
             </div>
@@ -9095,19 +10992,37 @@ function MédicoTab() {
       <div className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-serif text-lg text-foreground">Gestação de alto risco</h3>
-          <Link to="/bastidores" className="text-xs font-medium text-primary underline underline-offset-4">
+          <Link
+            to="/bastidores"
+            className="text-xs font-medium text-primary underline underline-offset-4"
+          >
             Saiba mais →
           </Link>
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-          Considera-se gestação de alto risco quando existem condições que aumentam as chances de complicações para a mãe e/ou o bebê. O acompanhamento especializado faz toda a diferença no desfecho.
+          Considera-se gestação de alto risco quando existem condições que aumentam as chances de
+          complicações para a mãe e/ou o bebê. O acompanhamento especializado faz toda a diferença
+          no desfecho.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {[
-            { titulo: "Hipertensão", texto: "Pré-eclâmpsia, eclâmpsia e hipertensão crônica requerem monitoramento intensivo." },
-            { titulo: "Diabetes gestacional", texto: "Controle glicêmico rigoroso e ajuste de dieta durante toda a gestação." },
-            { titulo: "Malformações fetais", texto: "Diagnóstico precoce com ecocardiografia e ultrassonografia morfológica." },
-            { titulo: "Gestação múltipla", texto: "Gemelar e múltipla exigem protocolos específicos de vigilância fetal." },
+            {
+              titulo: "Hipertensão",
+              texto:
+                "Pré-eclâmpsia, eclâmpsia e hipertensão crônica requerem monitoramento intensivo.",
+            },
+            {
+              titulo: "Diabetes gestacional",
+              texto: "Controle glicêmico rigoroso e ajuste de dieta durante toda a gestação.",
+            },
+            {
+              titulo: "Malformações fetais",
+              texto: "Diagnóstico precoce com ecocardiografia e ultrassonografia morfológica.",
+            },
+            {
+              titulo: "Gestação múltipla",
+              texto: "Gemelar e múltipla exigem protocolos específicos de vigilância fetal.",
+            },
           ].map((c) => (
             <div key={c.titulo} className="rounded-xl border border-border bg-secondary/30 p-3">
               <p className="text-sm font-medium text-foreground">{c.titulo}</p>

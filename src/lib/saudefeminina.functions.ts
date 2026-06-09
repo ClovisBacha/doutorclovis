@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { typedDb } from "@/integrations/supabase/types.extended";
 
 export type MenstrualCycle = {
   id: string;
@@ -22,28 +23,33 @@ export type PreventiveReminder = {
 
 export const logCycleStart = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      startDate: z.string(),
-      flowIntensity: z.string().nullable(),
-      symptoms: z.array(z.string()),
-      notes: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        startDate: z.string(),
+        flowIntensity: z.string().nullable(),
+        symptoms: z.array(z.string()),
+        notes: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const };
     const { data: row, error } = await db
       .from("menstrual_cycles")
-      .upsert({
-        user_id: u.user.id,
-        start_date: data.startDate,
-        flow_intensity: data.flowIntensity,
-        symptoms: data.symptoms,
-        notes: data.notes,
-      }, { onConflict: "user_id,start_date" })
+      .upsert(
+        {
+          user_id: u.user.id,
+          start_date: data.startDate,
+          flow_intensity: data.flowIntensity,
+          symptoms: data.symptoms,
+          notes: data.notes,
+        },
+        { onConflict: "user_id,start_date" },
+      )
       .select()
       .single();
     if (error) return { ok: false as const, error: error.message };
@@ -52,15 +58,17 @@ export const logCycleStart = createServerFn({ method: "POST" })
 
 export const updateCycleEnd = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      cycleId: z.string().uuid(),
-      endDate: z.string(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        cycleId: z.string().uuid(),
+        endDate: z.string(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const };
     const { error } = await db
@@ -73,11 +81,11 @@ export const updateCycleEnd = createServerFn({ method: "POST" })
 
 export const deleteCycle = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), cycleId: z.string().uuid() }).parse(i)
+    z.object({ accessToken: z.string().min(10), cycleId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const };
     const { error } = await db
@@ -92,7 +100,7 @@ export const getRecentCycles = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, cycles: [] as MenstrualCycle[] };
     const { data: rows } = await db
@@ -106,26 +114,29 @@ export const getRecentCycles = createServerFn({ method: "POST" })
 
 export const setPreventiveReminder = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      examKey: z.string(),
-      lastDoneDate: z.string().nullable(),
-      notes: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        examKey: z.string(),
+        lastDoneDate: z.string().nullable(),
+        notes: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const };
-    const { error } = await db
-      .from("preventive_reminders")
-      .upsert({
+    const { error } = await db.from("preventive_reminders").upsert(
+      {
         user_id: u.user.id,
         exam_key: data.examKey,
         last_done_date: data.lastDoneDate,
         notes: data.notes,
-      }, { onConflict: "user_id,exam_key" });
+      },
+      { onConflict: "user_id,exam_key" },
+    );
     return { ok: !error };
   });
 
@@ -133,7 +144,7 @@ export const getPreventiveReminders = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = supabaseAdmin as any;
+    const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, reminders: [] as PreventiveReminder[] };
     const { data: rows } = await db
