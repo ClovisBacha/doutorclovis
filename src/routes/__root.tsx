@@ -127,9 +127,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Acompanhe sua gestação semana a semana com o app desenvolvido pelo Dr. Clóvis Bacha.",
       },
       { name: "twitter:image", content: `${DOCTOR.siteUrl}/og.svg` },
+      {
+        name: "robots",
+        content: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1",
+      },
     ],
     links: [
       { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.svg" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -182,12 +187,27 @@ function CanonicalLink() {
   return <link rel="canonical" href={canonical} />;
 }
 
+function useSWRegistration() {
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+}
+
 function SiteShell() {
+  useSWRegistration();
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+      >
+        Pular para o conteúdo principal
+      </a>
       <CanonicalLink />
       <SiteHeader />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1">
         <Outlet />
       </main>
       <SiteFooter />

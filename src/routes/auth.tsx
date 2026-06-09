@@ -42,6 +42,8 @@ function AuthPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [showResend, setShowResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -66,6 +68,7 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     setMsg(null);
+    setShowResend(false);
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
@@ -89,8 +92,34 @@ function AuthPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "";
       setMsg({ text: translateAuthError(message), type: "error" });
+      setShowResend(message.includes("Email not confirmed"));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (!email) return;
+    setResendLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/minha-conta` },
+      });
+      if (error) throw error;
+      setMsg({
+        text: "E-mail de confirmação reenviado! Verifique sua caixa de entrada.",
+        type: "success",
+      });
+      setShowResend(false);
+    } catch {
+      setMsg({
+        text: "Não foi possível reenviar. Tente novamente em alguns minutos.",
+        type: "error",
+      });
+    } finally {
+      setResendLoading(false);
     }
   }
 
@@ -356,6 +385,17 @@ function AuthPage() {
             >
               {msg.text}
             </p>
+          )}
+
+          {showResend && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendLoading}
+              className="w-full rounded-full border border-primary px-5 py-2 text-sm font-medium text-primary transition-opacity disabled:opacity-60 hover:bg-primary/5"
+            >
+              {resendLoading ? "Enviando..." : "Reenviar e-mail de confirmação"}
+            </button>
           )}
 
           <button

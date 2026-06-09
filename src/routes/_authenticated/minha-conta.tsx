@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { DOCTOR } from "@/lib/doctor.config";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
   babyForWeek,
@@ -9809,8 +9810,8 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   const [newId, setNewId] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
 
-  const PIX_KEY = "bachaclovis@gmail.com";
-  const PIX_NAME = "Dr. Clóvis Bacha";
+  const PIX_KEY = DOCTOR.pixKey;
+  const PIX_NAME = DOCTOR.pixName;
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
