@@ -84,16 +84,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Obstétrica by Dr. Clóvis — App de Gestação e Saúde da Mulher" },
       { name: "description", content: "Acompanhe sua gestação semana a semana, converse com IA especializada, agende consultas e muito mais. Desenvolvido com Dr. Clóvis Bacha, especialista em gestação de alto risco." },
       { name: "author", content: "Dr. Clóvis Bacha" },
+      { name: "theme-color", content: "#8b5147" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-title", content: "Obstétrica" },
       { property: "og:title", content: "Obstétrica by Dr. Clóvis" },
       { property: "og:description", content: "O app completo para acompanhar sua gestação com segurança e cuidado." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Dr. Clóvis Bacha — Ginecologia e Obstetrícia de Alto Risco" },
-      { name: "twitter:description", content: "Dr. Clóvis Bacha, ginecologista e obstetra especialista em gestação de alto risco. Acolhimento, segurança e cuidado em cada etapa." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/61cab0bf-ff3d-4cb1-9625-9d6b61b51f41/id-preview-fec0bca5--93840587-fecb-4d08-aeac-3321628e517e.lovable.app-1780586074675.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/61cab0bf-ff3d-4cb1-9625-9d6b61b51f41/id-preview-fec0bca5--93840587-fecb-4d08-aeac-3321628e517e.lovable.app-1780586074675.png" },
+      { property: "og:locale", content: "pt_BR" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Obstétrica by Dr. Clóvis" },
+      { name: "twitter:description", content: "Acompanhe sua gestação semana a semana com o app desenvolvido pelo Dr. Clóvis Bacha." },
     ],
     links: [
+      { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" },
@@ -111,7 +115,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>

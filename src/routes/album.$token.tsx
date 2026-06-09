@@ -5,7 +5,7 @@ import { getAlbumByToken, addAlbumPostPublic, type AlbumPost } from "@/lib/famil
 export const Route = createFileRoute("/album/$token")({
   head: () => ({
     meta: [
-      { title: "Álbum Familiar — Dr. Clóvis Bacha" },
+      { title: "Álbum Familiar — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Álbum de memórias da gestação." },
     ],
   }),

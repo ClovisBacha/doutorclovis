@@ -87,7 +87,7 @@ import {
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
     meta: [
-      { title: "Minha Conta — Dr. Clóvis Bacha" },
+      { title: "Minha Conta — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Acompanhe semana a semana o desenvolvimento do seu bebê." },
     ],
   }),
@@ -2270,7 +2270,7 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
     `Alergias: ${profile.allergies ?? "Nenhuma"}`,
     `Medicamentos: ${profile.medications ?? "Nenhum"}`,
     `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
-    `Médico: Dr. Clóvis Bacha | CRM-SP`,
+    `Médico: Dr. Clóvis Bacha | CRM-MG`,
     `Atualizado: ${updatedAt}`,
   ].join("\n");
 
@@ -2580,7 +2580,7 @@ function toGoogleCalUrl(label: string, date: Date) {
     action: "TEMPLATE",
     text: `Pré-natal: ${label}`,
     dates: `${ymd}/${ymd}`,
-    details: "Acompanhamento pré-natal — Dr. Clóvis Bacha",
+    details: "Acompanhamento pré-natal — Obstétrica by Dr. Clóvis",
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
@@ -8987,7 +8987,7 @@ function MédicoTab() {
             <h2 className="mt-1 font-serif text-2xl text-foreground">Dr. Clóvis Bacha</h2>
             <p className="text-sm text-muted-foreground">Ginecologista e Obstetra · Especialista em Gestação de Alto Risco</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              {["CRM-MG ativo", "RQE 12345", "FEBRASGO", "ISUOG"].map((tag) => (
+              {["CRM-MG", "FEBRASGO", "ISUOG", "SOGIMIG"].map((tag) => (
                 <span key={tag} className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                   {tag}
                 </span>

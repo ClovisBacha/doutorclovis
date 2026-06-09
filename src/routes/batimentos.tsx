@@ -6,7 +6,7 @@ import { AppCtaBanner } from "@/components/app-cta-banner";
 export const Route = createFileRoute("/batimentos")({
   head: () => ({
     meta: [
-      { title: "Som do coração do bebê — Dr. Clóvis Bacha" },
+      { title: "Som do coração do bebê — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Ouça uma simulação dos batimentos cardíacos do bebê em cada trimestre da gestação." },
       { property: "og:title", content: "Som do coração do bebê" },
       { property: "og:description", content: "Simulação dos batimentos cardíacos fetais por trimestre." },

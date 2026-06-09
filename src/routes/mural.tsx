@@ -4,7 +4,7 @@ import { Heart } from "lucide-react";
 export const Route = createFileRoute("/mural")({
   head: () => ({
     meta: [
-      { title: "Mural dos bebês — Dr. Clóvis Bacha" },
+      { title: "Mural dos bebês — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Galeria de bebês nascidos sob nossos cuidados. Compartilhada com autorização das famílias." },
     ],
   }),

@@ -36,7 +36,7 @@ import {
 } from "@/lib/consultaparticular.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
-  head: () => ({ meta: [{ title: "Painel do médico — Dr. Clóvis Bacha" }] }),
+  head: () => ({ meta: [{ title: "Painel do médico — Obstétrica by Dr. Clóvis" }] }),
   component: PainelPage,
 });
 

@@ -52,13 +52,13 @@ function downloadIcs(b: Booked) {
 export const Route = createFileRoute("/agendamento")({
   head: () => ({
     meta: [
-      { title: "Agendar consulta — Dr. Clóvis Bacha" },
+      { title: "Agendar consulta — Obstétrica by Dr. Clóvis" },
       {
         name: "description",
         content:
           "Solicite seu horário com o Dr. Clóvis Bacha. Nossa equipe confirma a consulta em até 1 dia útil.",
       },
-      { property: "og:title", content: "Agendar consulta — Dr. Clóvis Bacha" },
+      { property: "og:title", content: "Agendar consulta — Obstétrica by Dr. Clóvis" },
       { property: "og:description", content: "Solicite seu horário com o Dr. Clóvis Bacha." },
     ],
   }),

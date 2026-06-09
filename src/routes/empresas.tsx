@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { submitCorporateLead } from "@/lib/corporativo.functions";
+import { DOCTOR } from "@/lib/doctor.config";
 
 export const Route = createFileRoute("/empresas")({
   head: () => ({
     meta: [
-      { title: "Benefício Corporativo — Dr. Clóvis Bacha" },
+      { title: "Benefício Corporativo — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Ofereça acompanhamento pré-natal de excelência como benefício para suas funcionárias grávidas." },
     ],
   }),
@@ -356,7 +357,7 @@ function EmpresasPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-8 px-5 text-center text-xs text-muted-foreground">
-        <p>© 2026 Dr. Clóvis Bacha · Ginecologista e Obstetra · CRM-SP 12345</p>
+        <p>© {new Date().getFullYear()} {DOCTOR.name} · {DOCTOR.title} · {DOCTOR.crm}</p>
         <Link to="/" className="mt-2 block text-primary hover:underline">Voltar ao site</Link>
       </footer>
     </div>

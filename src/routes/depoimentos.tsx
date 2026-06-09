@@ -4,9 +4,9 @@ import { Quote, Star } from "lucide-react";
 export const Route = createFileRoute("/depoimentos")({
   head: () => ({
     meta: [
-      { title: "Depoimentos de pacientes — Dr. Clóvis Bacha" },
+      { title: "Depoimentos de pacientes — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Relatos reais de pacientes acompanhadas pelo Dr. Clóvis Bacha em gestações de alto risco." },
-      { property: "og:title", content: "Depoimentos — Dr. Clóvis Bacha" },
+      { property: "og:title", content: "Depoimentos — Obstétrica by Dr. Clóvis" },
       { property: "og:description", content: "Experiências de pacientes durante o pré-natal e a gestação de alto risco." },
     ],
   }),

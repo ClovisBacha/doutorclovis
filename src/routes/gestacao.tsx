@@ -7,7 +7,7 @@ export const Route = createFileRoute("/gestacao")({
   head: () => {
     return {
       meta: [
-        { title: "Sua gestação semana a semana — Dr. Clóvis Bacha" },
+        { title: "Sua gestação semana a semana — Obstétrica by Dr. Clóvis" },
         { name: "description", content: "Linha do tempo da gestação e conteúdo educativo por trimestre, com orientação especializada do Dr. Clóvis Bacha." },
         { property: "og:title", content: "Sua gestação semana a semana" },
         { property: "og:description", content: "Linha do tempo e conteúdo por trimestre." },

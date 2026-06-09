@@ -5,7 +5,7 @@ import { babyForWeek, computeGestation, dueDateFromLmp, trimesterForWeek } from 
 import { getRecentPanicByToken } from "@/lib/escola.functions";
 
 export const Route = createFileRoute("/acompanhar/$token")({
-  head: () => ({ meta: [{ title: "Painel do Papai — Dr. Clóvis Bacha" }] }),
+  head: () => ({ meta: [{ title: "Painel do Papai — Obstétrica by Dr. Clóvis" }] }),
   component: CompanionView,
 });
 

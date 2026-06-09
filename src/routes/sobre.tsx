@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
+import { DOCTOR } from "@/lib/doctor.config";
 
 export const Route = createFileRoute("/sobre")({
   head: () => ({
@@ -60,7 +61,7 @@ function SobrePage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Sobre o doutor</p>
           <h1 className="mt-3 font-serif text-4xl md:text-5xl">Dr. Clóvis Bacha</h1>
-          <p className="mt-4 text-sm uppercase tracking-wider text-muted-foreground">CRM 00000-00 · RQE 0000</p>
+          <p className="mt-4 text-sm uppercase tracking-wider text-muted-foreground">{DOCTOR.crm} · {DOCTOR.rqe}</p>
           <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
             Há mais de 20 anos dedicado à saúde da mulher, com atuação central em gestação de alto risco. Acredita que a escuta cuidadosa é parte do tratamento — e que cada gestação merece protocolo individualizado.
           </p>

@@ -4,7 +4,7 @@ import { useState } from "react";
 export const Route = createFileRoute("/tamanho-real")({
   head: () => ({
     meta: [
-      { title: "Tamanho real do bebê na tela — Dr. Clóvis Bacha" },
+      { title: "Tamanho real do bebê na tela — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Veja o tamanho real do seu bebê na tela do celular, calibrado com um cartão de crédito." },
       { property: "og:title", content: "Tamanho real do bebê" },
       { property: "og:description", content: "Calibre a tela e visualize o bebê em escala real." },

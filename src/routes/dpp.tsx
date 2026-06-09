@@ -5,7 +5,7 @@ import { AppCtaBanner } from "@/components/app-cta-banner";
 export const Route = createFileRoute("/dpp")({
   head: () => ({
     meta: [
-      { title: "Previsão da DPP com faixa probabilística — Dr. Clóvis Bacha" },
+      { title: "Previsão da DPP com faixa probabilística — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Estimativa probabilística da data provável do parto baseada em DUM, ciclo e USG." },
       { property: "og:title", content: "Previsão da DPP" },
       { property: "og:description", content: "Distribuição probabilística da data do parto." },

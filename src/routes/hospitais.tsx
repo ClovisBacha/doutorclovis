@@ -5,7 +5,7 @@ import { useState } from "react";
 export const Route = createFileRoute("/hospitais")({
   head: () => ({
     meta: [
-      { title: "Hospitais e maternidades — Dr. Clóvis Bacha" },
+      { title: "Hospitais e maternidades — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Maternidades e hospitais conveniados, com rota e tempo de trajeto a partir do seu endereço." },
       { property: "og:title", content: "Hospitais conveniados" },
       { property: "og:description", content: "Encontre rotas até as maternidades atendidas pelo Dr. Clóvis Bacha." },

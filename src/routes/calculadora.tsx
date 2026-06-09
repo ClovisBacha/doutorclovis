@@ -5,7 +5,7 @@ import { AppCtaBanner } from "@/components/app-cta-banner";
 export const Route = createFileRoute("/calculadora")({
   head: () => ({
     meta: [
-      { title: "Calculadora gestacional — Dr. Clóvis Bacha" },
+      { title: "Calculadora gestacional — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Calcule sua idade gestacional, data provável do parto e próximos exames a partir da DUM." },
     ],
   }),

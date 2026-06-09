@@ -4,7 +4,7 @@ import { Check, X } from "lucide-react";
 export const Route = createFileRoute("/mitos")({
   head: () => ({
     meta: [
-      { title: "Mitos x Verdades na gestação — Dr. Clóvis Bacha" },
+      { title: "Mitos x Verdades na gestação — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Desfazendo crenças comuns sobre a gestação com base em evidências científicas." },
     ],
   }),

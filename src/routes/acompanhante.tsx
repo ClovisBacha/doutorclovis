@@ -4,7 +4,7 @@ import { HeartHandshake, Users, BookOpen, Phone, Shield, Sparkles } from "lucide
 export const Route = createFileRoute("/acompanhante")({
   head: () => ({
     meta: [
-      { title: "Programa do Acompanhante — Dr. Clóvis Bacha" },
+      { title: "Programa do Acompanhante — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Orientações e suporte para parceiros, familiares e doulas que acompanham a gestação." },
     ],
   }),

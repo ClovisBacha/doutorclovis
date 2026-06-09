@@ -11,7 +11,7 @@ import {
 export const Route = createFileRoute("/votar-nome/$token")({
   head: () => ({
     meta: [
-      { title: "Votação de Nomes — Dr. Clóvis Bacha" },
+      { title: "Votação de Nomes — Obstétrica by Dr. Clóvis" },
       { name: "description", content: "Sugira e vote no nome do bebê!" },
     ],
   }),

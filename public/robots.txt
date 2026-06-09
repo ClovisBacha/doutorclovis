@@ -1,2 +1,10 @@
 User-agent: *
 Allow: /
+
+# Não indexar rotas de API, autenticação e painel
+Disallow: /api/
+Disallow: /auth
+Disallow: /painel
+Disallow: /minha-conta
+
+Sitemap: https://obstetricia.drclovisbacha.com.br/sitemap.xml
