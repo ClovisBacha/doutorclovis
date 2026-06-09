@@ -40,6 +40,18 @@ import {
   type CourseProgress,
 } from "@/lib/escola.functions";
 import {
+  checkAndAwardAchievements,
+  ACHIEVEMENT_DEFS,
+  type AchievementDef,
+} from "@/lib/achievements.functions";
+import {
+  requestPrivateConsultation,
+  getMyPrivateConsultations,
+  markPaymentSent,
+  CONSULT_TYPES,
+  type PrivateConsultation,
+} from "@/lib/consultaparticular.functions";
+import {
   savePpdScreening,
   getMyPpdScreenings,
   startBreastfeeding,
@@ -87,6 +99,13 @@ type Profile = {
   pre_pregnancy_weight_kg?: number | null;
   medications?: string | null;
   birth_date?: string | null;
+  pregnancy_number?: number | null;
+  prior_bp_elevated?: boolean | null;
+  prior_bp_week?: number | null;
+  prior_gestational_diabetes?: boolean | null;
+  prior_preterm?: boolean | null;
+  prior_cesarean?: boolean | null;
+  prior_notes?: string | null;
 };
 
 type JournalEntry = {
@@ -143,6 +162,9 @@ const TABS = [
   "Pânico",
   "Carteirinha",
   "Pós-parto",
+  "Conquistas",
+  "Loja",
+  "Consulta Particular",
   "Chat IA",
   "Perfil",
 ] as const;
@@ -279,6 +301,9 @@ function MinhaContaPage() {
         {tab === "Pânico" && <PânicoTab profile={profile} />}
         {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
         {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
+        {tab === "Conquistas" && <ConquistasTab />}
+        {tab === "Loja" && <LojaTab gest={gest} />}
+        {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
         {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
         {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
       </div>
@@ -381,6 +406,67 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           <p className="mt-2 text-sm leading-relaxed text-foreground">{exam}</p>
         </div>
       </div>
+      {/* Segunda gestação: historical alerts */}
+      {(profile.pregnancy_number ?? 1) >= 2 && (
+        <div className="col-span-full rounded-3xl border border-amber-300 bg-amber-50 p-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 mb-3">
+            🔁 2ª Gestação — Histórico da anterior
+          </p>
+          <div className="space-y-2 text-sm">
+            {profile.prior_bp_elevated && (
+              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+                <span className="text-red-500 text-base">⚠️</span>
+                <p>
+                  Na gestação anterior, você teve <strong>pressão elevada</strong>
+                  {profile.prior_bp_week ? ` a partir da semana ${profile.prior_bp_week}` : ""}.
+                  {gest.weeks >= (profile.prior_bp_week ?? 28) - 2
+                    ? " Estamos nessa janela — monitore sua pressão com mais frequência."
+                    : " Vamos monitorar de perto conforme a semana se aproxima."}
+                </p>
+              </div>
+            )}
+            {profile.prior_gestational_diabetes && (
+              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+                <span className="text-orange-500 text-base">🍬</span>
+                <p>
+                  Você teve <strong>diabetes gestacional</strong> anteriormente. O risco de recorrência é
+                  maior — converse com Dr. Clóvis sobre o teste de glicemia antecipado (semanas 20–24).
+                </p>
+              </div>
+            )}
+            {profile.prior_preterm && (
+              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+                <span className="text-purple-500 text-base">👶</span>
+                <p>
+                  Histórico de <strong>parto prematuro</strong>. Dr. Clóvis acompanhará o comprimento
+                  cervical com mais frequência nesta gestação.
+                </p>
+              </div>
+            )}
+            {profile.prior_cesarean && (
+              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+                <span className="text-blue-500 text-base">🏥</span>
+                <p>
+                  Cesariana anterior registrada. A via de parto desta gestação será planejada em conjunto
+                  com Dr. Clóvis.
+                </p>
+              </div>
+            )}
+            {!profile.prior_bp_elevated && !profile.prior_gestational_diabetes && !profile.prior_preterm && !profile.prior_cesarean && (
+              <p className="text-amber-700">
+                Nenhuma complicação registrada na gestação anterior. Continue preenchendo seu histórico
+                em <strong>Perfil → 2ª Gestação</strong>.
+              </p>
+            )}
+            {profile.prior_notes && (
+              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+                <span className="text-base">📋</span>
+                <p><strong>Observações:</strong> {profile.prior_notes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -922,9 +1008,22 @@ function ProfileTab({
     pre_pregnancy_weight_kg: profile?.pre_pregnancy_weight_kg?.toString() ?? "",
     medications: profile?.medications ?? "",
     birth_date: profile?.birth_date ?? "",
+    pregnancy_number: profile?.pregnancy_number?.toString() ?? "1",
+    prior_bp_elevated: profile?.prior_bp_elevated ?? false,
+    prior_bp_week: profile?.prior_bp_week?.toString() ?? "",
+    prior_gestational_diabetes: profile?.prior_gestational_diabetes ?? false,
+    prior_preterm: profile?.prior_preterm ?? false,
+    prior_cesarean: profile?.prior_cesarean ?? false,
+    prior_notes: profile?.prior_notes ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [notifPermission, setNotifPermission] = useState<string>("default");
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotifPermission(Notification.permission);
+    }
+  }, []);
 
   // Completion percentage
   const completionFields = [
@@ -961,6 +1060,13 @@ function ProfileTab({
       pre_pregnancy_weight_kg: form.pre_pregnancy_weight_kg ? Number(form.pre_pregnancy_weight_kg) : null,
       medications: form.medications || null,
       birth_date: form.birth_date || null,
+      pregnancy_number: form.pregnancy_number ? Number(form.pregnancy_number) : 1,
+      prior_bp_elevated: form.prior_bp_elevated,
+      prior_bp_week: form.prior_bp_week ? Number(form.prior_bp_week) : null,
+      prior_gestational_diabetes: form.prior_gestational_diabetes,
+      prior_preterm: form.prior_preterm,
+      prior_cesarean: form.prior_cesarean,
+      prior_notes: form.prior_notes || null,
       updated_at: new Date().toISOString(),
     };
     const { data, error } = await (supabase as any)
@@ -1123,6 +1229,131 @@ function ProfileTab({
             value={form.pre_pregnancy_weight_kg}
             onChange={(v) => setForm({ ...form, pre_pregnancy_weight_kg: v })}
           />
+        </div>
+      </div>
+
+      {/* Feature 19: Second pregnancy */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Histórico gestacional</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Se esta é sua segunda gestação (ou mais), registre as complicações anteriores para monitoramento personalizado.
+        </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium mb-1">Nº desta gestação</label>
+            <select
+              value={form.pregnancy_number}
+              onChange={(e) => setForm({ ...form, pregnancy_number: e.target.value })}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="1">1ª gestação</option>
+              <option value="2">2ª gestação</option>
+              <option value="3">3ª gestação</option>
+              <option value="4">4ª gestação ou mais</option>
+            </select>
+          </div>
+        </div>
+        {Number(form.pregnancy_number) >= 2 && (
+          <div className="mt-4 space-y-3">
+            <p className="text-sm font-medium text-muted-foreground">Complicações na gestação anterior:</p>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.prior_bp_elevated}
+                onChange={(e) => setForm({ ...form, prior_bp_elevated: e.target.checked })}
+                className="h-4 w-4 rounded accent-primary"
+              />
+              <span className="text-sm">Pressão arterial elevada / pré-eclâmpsia</span>
+            </label>
+            {form.prior_bp_elevated && (
+              <div className="ml-7">
+                <Field
+                  label="A partir de qual semana?"
+                  type="number"
+                  value={form.prior_bp_week}
+                  onChange={(v) => setForm({ ...form, prior_bp_week: v })}
+                  placeholder="Ex: 32"
+                />
+              </div>
+            )}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.prior_gestational_diabetes}
+                onChange={(e) => setForm({ ...form, prior_gestational_diabetes: e.target.checked })}
+                className="h-4 w-4 rounded accent-primary"
+              />
+              <span className="text-sm">Diabetes gestacional</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.prior_preterm}
+                onChange={(e) => setForm({ ...form, prior_preterm: e.target.checked })}
+                className="h-4 w-4 rounded accent-primary"
+              />
+              <span className="text-sm">Parto prematuro (antes de 37 semanas)</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.prior_cesarean}
+                onChange={(e) => setForm({ ...form, prior_cesarean: e.target.checked })}
+                className="h-4 w-4 rounded accent-primary"
+              />
+              <span className="text-sm">Cesárea anterior</span>
+            </label>
+            <div>
+              <label className="block text-sm font-medium mb-1">Outras observações (opcional)</label>
+              <textarea
+                value={form.prior_notes}
+                onChange={(e) => setForm({ ...form, prior_notes: e.target.value })}
+                rows={2}
+                placeholder="Ex: bebê GIG, internação por DPP..."
+                className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm resize-none"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Feature 17: Push notifications */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Dicas semanais</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Receba uma dica personalizada baseada na sua semana gestacional toda segunda-feira.
+        </p>
+        <div className="mt-4">
+          {notifPermission === "granted" ? (
+            <div className="flex items-center gap-3 rounded-2xl bg-green-50 border border-green-200 p-4">
+              <span className="text-2xl">🔔</span>
+              <div>
+                <p className="text-sm font-medium text-green-700">Notificações ativas</p>
+                <p className="text-xs text-green-600">Você receberá dicas semanais personalizadas.</p>
+              </div>
+            </div>
+          ) : notifPermission === "denied" ? (
+            <div className="rounded-2xl bg-secondary p-4 text-sm text-muted-foreground">
+              Notificações bloqueadas neste navegador. Para ativar, vá nas configurações do navegador
+              e permita notificações para este site.
+            </div>
+          ) : (
+            <button
+              onClick={async () => {
+                if (!("Notification" in window)) return;
+                const perm = await Notification.requestPermission();
+                setNotifPermission(perm);
+                if (perm === "granted") {
+                  if ("serviceWorker" in navigator) {
+                    navigator.serviceWorker.register("/sw.js").catch(() => {});
+                  }
+                }
+              }}
+              className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white"
+            >
+              🔔 Ativar dicas semanais
+            </button>
+          )}
         </div>
       </div>
 
@@ -7472,6 +7703,530 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   Feature 16 — Conquistas
+───────────────────────────────────────────────────────── */
+function ConquistasTab() {
+  const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newBadges, setNewBadges] = useState<string[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) { setLoading(false); return; }
+      const res = await checkAndAwardAchievements({ data: { accessToken: s.session.access_token } });
+      if (res.ok) {
+        setUnlocked(res.unlocked);
+        const recent = res.unlocked
+          .filter((a) => Date.now() - new Date(a.unlocked_at).getTime() < 30000)
+          .map((a) => a.achievement_key);
+        setNewBadges(recent);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading)
+    return <div className="py-16 text-center text-muted-foreground">Verificando conquistas...</div>;
+
+  const unlockedKeys = new Set(unlocked.map((u) => u.achievement_key));
+  const unlockedCount = ACHIEVEMENT_DEFS.filter((d) => unlockedKeys.has(d.key)).length;
+  const totalCount = ACHIEVEMENT_DEFS.length;
+  const pct = Math.round((unlockedCount / totalCount) * 100);
+
+  const categories = [
+    { key: "bebe", label: "Bebê", emoji: "👶" },
+    { key: "saude", label: "Saúde", emoji: "❤️" },
+    { key: "diario", label: "Diário", emoji: "📝" },
+    { key: "educacao", label: "Educação", emoji: "🎓" },
+    { key: "familia", label: "Família", emoji: "👨‍👩‍👧" },
+  ] as const;
+
+  return (
+    <div className="space-y-8">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">Suas conquistas</p>
+            <p className="mt-1 font-serif text-2xl">{unlockedCount} de {totalCount}</p>
+            <p className="text-sm text-muted-foreground">badges desbloqueadas</p>
+          </div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-primary/20 text-base font-bold text-primary">
+            {pct}%
+          </div>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      {newBadges.length > 0 && (
+        <div className="rounded-3xl border border-amber-300 bg-amber-50 p-5 text-center">
+          <p className="text-2xl mb-1">🎉</p>
+          <p className="font-semibold text-amber-800">
+            {newBadges.length === 1 ? "Nova conquista desbloqueada!" : `${newBadges.length} novas conquistas!`}
+          </p>
+        </div>
+      )}
+
+      {categories.map((cat) => {
+        const defs = ACHIEVEMENT_DEFS.filter((d) => d.category === cat.key);
+        return (
+          <div key={cat.key}>
+            <h3 className="mb-3 flex items-center gap-2 font-semibold">
+              <span>{cat.emoji}</span> {cat.label}
+            </h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {defs.map((def) => {
+                const isUnlocked = unlockedKeys.has(def.key);
+                const unlockedAt = unlocked.find((u) => u.achievement_key === def.key)?.unlocked_at;
+                const isNew = newBadges.includes(def.key);
+                return (
+                  <div
+                    key={def.key}
+                    className={`rounded-2xl border p-4 text-center transition-all ${
+                      isNew
+                        ? "border-amber-300 bg-amber-50 shadow-md"
+                        : isUnlocked
+                        ? "border-primary/30 bg-primary/5"
+                        : "border-border bg-secondary/20 opacity-50"
+                    }`}
+                  >
+                    <div className={`text-3xl mb-2 ${!isUnlocked && "grayscale"}`}>{def.emoji}</div>
+                    <p className="text-xs font-semibold">{def.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground leading-tight">{def.description}</p>
+                    {isUnlocked && unlockedAt && (
+                      <p className="mt-1.5 text-xs text-primary">
+                        {new Date(unlockedAt).toLocaleDateString("pt-BR")}
+                      </p>
+                    )}
+                    {!isUnlocked && (
+                      <p className="mt-1.5 text-xs text-muted-foreground">🔒 bloqueada</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   Feature 13 — Loja Curada
+───────────────────────────────────────────────────────── */
+
+type ShopProduct = {
+  id: string;
+  name: string;
+  description: string;
+  category: "suplementos" | "conforto" | "amamentacao" | "enxoval" | "livros";
+  price: string;
+  link: string;
+  weeks_min?: number;
+  weeks_max?: number;
+  badge?: string;
+};
+
+const CURATED_PRODUCTS: ShopProduct[] = [
+  { id: "p1", name: "Ácido Fólico 5mg", description: "Essencial no 1º trimestre para prevenção de defeitos do tubo neural. Indicado por Dr. Clóvis.", category: "suplementos", price: "A partir de R$ 18", link: "https://www.amazon.com.br/s?k=acido+folico+gestante", weeks_min: 1, weeks_max: 20, badge: "Essencial" },
+  { id: "p2", name: "Sulfato Ferroso + Vitamina C", description: "Combo para absorção ideal do ferro, prevenindo anemia gestacional.", category: "suplementos", price: "A partir de R$ 22", link: "https://www.amazon.com.br/s?k=sulfato+ferroso+vitamina+c", weeks_min: 16 },
+  { id: "p3", name: "DHA / Ômega-3 Gestante", description: "Desenvolvimento cerebral do bebê. Dose mínima recomendada: 200mg/dia de DHA.", category: "suplementos", price: "A partir de R$ 45", link: "https://www.amazon.com.br/s?k=dha+omega3+gestante" },
+  { id: "p4", name: "Travesseiro de Gestante (U-shape)", description: "Apoio lombar, pélvico e para os joelhos. Fundamental após a semana 20.", category: "conforto", price: "A partir de R$ 130", link: "https://www.amazon.com.br/s?k=travesseiro+gestante+formato+u", weeks_min: 20, badge: "Mais vendido" },
+  { id: "p5", name: "Cinta de Suporte Gestacional", description: "Alivia dores lombares e suporta o abdômen no 3º trimestre.", category: "conforto", price: "A partir de R$ 60", link: "https://www.amazon.com.br/s?k=cinta+abdominal+gestante", weeks_min: 28 },
+  { id: "p6", name: "Meias de Compressão Gestante", description: "Previnem varizes e edemas — problema comum na gravidez.", category: "conforto", price: "A partir de R$ 35", link: "https://www.amazon.com.br/s?k=meias+compressao+gestante", weeks_min: 14 },
+  { id: "p7", name: "Sutiã de Amamentação", description: "Alças largas, abertura fácil e tecido respirável para o pós-parto.", category: "amamentacao", price: "A partir de R$ 45", link: "https://www.amazon.com.br/s?k=sutia+amamentacao+confortavel", weeks_min: 30 },
+  { id: "p8", name: "Almofada de Amamentação", description: "Posiciona o bebê corretamente durante a mamada, aliviando tensão nas costas.", category: "amamentacao", price: "A partir de R$ 70", link: "https://www.amazon.com.br/s?k=almofada+amamentacao", weeks_min: 30 },
+  { id: "p9", name: "Absorvente para Seios (lavável)", description: "Para vazamentos de colostro no final da gestação e durante a amamentação.", category: "amamentacao", price: "A partir de R$ 20", link: "https://www.amazon.com.br/s?k=absorvente+seios+amamentacao+lavavel", weeks_min: 34 },
+  { id: "p10", name: "Kit Enxoval Recém-nascido", description: "Body, mijão e macacão em algodão orgânico para o RN.", category: "enxoval", price: "A partir de R$ 80", link: "https://www.amazon.com.br/s?k=kit+enxoval+recem+nascido+algodao", weeks_min: 20, badge: "Prepare-se" },
+  { id: "p11", name: "Banheirinha Dobrável para Bebê", description: "Ergonômica, anti-escorregante, economiza espaço.", category: "enxoval", price: "A partir de R$ 90", link: "https://www.amazon.com.br/s?k=banheira+bebe+dobravel", weeks_min: 24 },
+  { id: "p12", name: "Monitor de Batimentos Fetais (Doppler)", description: "Ouça o coração do seu bebê em casa entre as consultas.", category: "enxoval", price: "A partir de R$ 150", link: "https://www.amazon.com.br/s?k=doppler+fetal+caseiro", weeks_min: 12, badge: "Tecnologia" },
+  { id: "p13", name: '"Gravidez Semana a Semana" — Livro', description: "O guia mais completo em português, com fotos e explicações médicas.", category: "livros", price: "A partir de R$ 55", link: "https://www.amazon.com.br/s?k=gravidez+semana+a+semana+livro" },
+  { id: "p14", name: '"O Bebê da Barriga" — Livro', description: "Leitura afetiva sobre o desenvolvimento fetal, ideal para compartilhar com o parceiro.", category: "livros", price: "A partir de R$ 40", link: "https://www.amazon.com.br/s?k=bebe+da+barriga+livro+gestacao" },
+  { id: "p15", name: "Protetor Solar FPS 50+ (gestante)", description: "Fórmula sem oxi-benzona, segura para a gestação e para manchas de melasma.", category: "suplementos", price: "A partir de R$ 35", link: "https://www.amazon.com.br/s?k=protetor+solar+gestante+fps50" },
+];
+
+const SHOP_CATEGORIES = [
+  { key: "all", label: "Todos" },
+  { key: "suplementos", label: "💊 Suplementos" },
+  { key: "conforto", label: "😌 Conforto" },
+  { key: "amamentacao", label: "🤱 Amamentação" },
+  { key: "enxoval", label: "🍼 Enxoval" },
+  { key: "livros", label: "📚 Livros" },
+];
+
+function LojaTab({ gest }: { gest: Gest }) {
+  const [category, setCategory] = useState("all");
+  const [weekFilter, setWeekFilter] = useState(true);
+  const currentWeek = gest?.weeks ?? null;
+
+  const filtered = CURATED_PRODUCTS.filter((p) => {
+    if (category !== "all" && p.category !== category) return false;
+    if (weekFilter && currentWeek !== null) {
+      const afterMin = p.weeks_min == null || currentWeek >= p.weeks_min - 2;
+      const beforeMax = p.weeks_max == null || currentWeek <= p.weeks_max + 2;
+      if (!afterMin || !beforeMax) return false;
+    }
+    return true;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">Produtos selecionados</p>
+        <h2 className="font-serif text-2xl">Loja Curada</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Produtos indicados por Dr. Clóvis Bacha para cada fase da gestação. Os links levam ao Amazon.com.br.
+        </p>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-xs font-medium text-primary">
+          ✅ Todos revisados e aprovados pelo Dr. Clóvis
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap gap-2">
+          {SHOP_CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setCategory(c.key)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                category === c.key
+                  ? "bg-primary text-white"
+                  : "bg-secondary text-muted-foreground hover:text-primary"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        {currentWeek !== null && (
+          <label className="ml-auto flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={weekFilter}
+              onChange={(e) => setWeekFilter(e.target.checked)}
+              className="h-4 w-4 rounded accent-primary"
+            />
+            <span>Filtrar para semana {currentWeek}</span>
+          </label>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
+          <p className="text-3xl mb-2">🔍</p>
+          <p>Nenhum produto encontrado para este filtro.</p>
+          <button onClick={() => setWeekFilter(false)} className="mt-3 text-sm text-primary underline">
+            Mostrar todos
+          </button>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((product) => (
+            <div key={product.id} className="rounded-2xl border border-border bg-card p-5 flex flex-col">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <p className="font-semibold text-sm leading-snug">{product.name}</p>
+                {product.badge && (
+                  <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    {product.badge}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground flex-1 leading-relaxed">{product.description}</p>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-sm font-medium text-primary">{product.price}</span>
+                <a
+                  href={product.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                >
+                  Ver na Amazon →
+                </a>
+              </div>
+              {product.weeks_min && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  A partir da semana {product.weeks_min}
+                  {product.weeks_max ? ` — até semana ${product.weeks_max}` : ""}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs text-center text-muted-foreground pb-4">
+        Links de afiliado (Amazon Associates). Comprar pelo link apoia o portal sem custo extra para você.
+      </p>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   Feature 11 — Consulta Particular
+───────────────────────────────────────────────────────── */
+function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
+  const [consultations, setConsultations] = useState<PrivateConsultation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState<"list" | "new">("list");
+  const [selectedType, setSelectedType] = useState(CONSULT_TYPES[0].key);
+  const [preferredDates, setPreferredDates] = useState(["", "", ""]);
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [newId, setNewId] = useState<string | null>(null);
+  const [markingId, setMarkingId] = useState<string | null>(null);
+
+  const PIX_KEY = "bachaclovis@gmail.com";
+  const PIX_NAME = "Dr. Clóvis Bacha";
+
+  async function load() {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) { setLoading(false); return; }
+    const res = await getMyPrivateConsultations({ data: { accessToken: s.session.access_token } });
+    if (res.ok) setConsultations(res.consultations);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleRequest() {
+    setSubmitting(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) { setSubmitting(false); return; }
+    const res = await requestPrivateConsultation({
+      data: {
+        accessToken: s.session.access_token,
+        consultType: selectedType,
+        preferredDates: preferredDates.filter(Boolean),
+        message: message || null,
+      },
+    });
+    if (res.ok) {
+      setNewId(res.consultation.id);
+      setStep("list");
+      await load();
+    }
+    setSubmitting(false);
+  }
+
+  async function handleMarkPayment(id: string) {
+    setMarkingId(id);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) { setMarkingId(null); return; }
+    await markPaymentSent({ data: { accessToken: s.session.access_token, id } });
+    await load();
+    setMarkingId(null);
+  }
+
+  const selectedConsultType = CONSULT_TYPES.find((c) => c.key === selectedType) ?? CONSULT_TYPES[0];
+
+  const statusConfig: Record<string, { label: string; color: string; emoji: string }> = {
+    pendente_pagamento: { label: "Aguardando pagamento", color: "border-amber-200 bg-amber-50", emoji: "⏳" },
+    pagamento_enviado: { label: "Pagamento enviado — aguardando confirmação", color: "border-blue-200 bg-blue-50", emoji: "💸" },
+    confirmado: { label: "Confirmado — aguardando agendamento", color: "border-green-200 bg-green-50", emoji: "✅" },
+    realizado: { label: "Consulta realizada", color: "border-border bg-secondary/30", emoji: "🏁" },
+    cancelado: { label: "Cancelado", color: "border-red-200 bg-red-50", emoji: "❌" },
+  };
+
+  if (loading) return <div className="py-16 text-center text-muted-foreground">Carregando...</div>;
+
+  if (step === "new") {
+    return (
+      <div className="max-w-xl space-y-6">
+        <button onClick={() => setStep("list")} className="text-sm text-primary">← Voltar</button>
+
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <h2 className="font-serif text-xl mb-4">Nova consulta particular</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Tipo de consulta</label>
+              <div className="space-y-3">
+                {CONSULT_TYPES.map((ct) => (
+                  <label
+                    key={ct.key}
+                    className={`flex items-start gap-3 rounded-2xl border p-4 cursor-pointer transition-all ${
+                      selectedType === ct.key ? "border-primary bg-primary/5" : "border-border"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      value={ct.key}
+                      checked={selectedType === ct.key}
+                      onChange={() => setSelectedType(ct.key)}
+                      className="mt-1 accent-primary"
+                    />
+                    <div>
+                      <p className="font-medium text-sm">{ct.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{ct.desc}</p>
+                      <p className="text-sm font-semibold text-primary mt-1">{ct.price}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Datas e horários preferidos (opcional)</label>
+              <div className="space-y-2">
+                {preferredDates.map((d, i) => (
+                  <input
+                    key={i}
+                    type="datetime-local"
+                    value={d}
+                    onChange={(e) => {
+                      const next = [...preferredDates];
+                      next[i] = e.target.value;
+                      setPreferredDates(next);
+                    }}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  />
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Informe até 3 opções — Dr. Clóvis confirmará a disponibilidade.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Mensagem (opcional)</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={3}
+                placeholder="Descreva brevemente o motivo da consulta..."
+                className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm resize-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
+          <p className="font-semibold mb-3">💳 Pagamento via PIX</p>
+          <p className="text-sm text-muted-foreground mb-3">
+            Após solicitar, efetue o pagamento via PIX e marque como pago. Dr. Clóvis confirmará e entrará em contato.
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
+              <span className="text-xs text-muted-foreground">Chave PIX</span>
+              <span className="font-mono text-sm font-medium">{PIX_KEY}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
+              <span className="text-xs text-muted-foreground">Favorecido</span>
+              <span className="text-sm font-medium">{PIX_NAME}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
+              <span className="text-xs text-muted-foreground">Valor</span>
+              <span className="text-sm font-semibold text-primary">{selectedConsultType.price}</span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handleRequest}
+          disabled={submitting}
+          className="w-full rounded-full bg-primary px-6 py-3 text-sm font-medium text-white disabled:opacity-40"
+        >
+          {submitting ? "Solicitando..." : "Solicitar consulta"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">Consultas particulares</p>
+        <h2 className="font-serif text-2xl">Consulta com Dr. Clóvis</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Videochamadas particulares sem intermediário. Pagamento via PIX direto ao médico.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {CONSULT_TYPES.map((ct) => (
+            <div key={ct.key} className="rounded-2xl border border-border bg-secondary/20 p-4">
+              <p className="text-sm font-medium">{ct.label}</p>
+              <p className="text-xs text-muted-foreground mt-1">{ct.desc}</p>
+              <p className="mt-2 font-bold text-primary">{ct.price}</p>
+            </div>
+          ))}
+        </div>
+        <button
+          onClick={() => setStep("new")}
+          className="mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-white"
+        >
+          + Solicitar consulta
+        </button>
+      </div>
+
+      {newId && (
+        <div className="rounded-3xl border border-green-200 bg-green-50 p-5">
+          <p className="font-semibold text-green-700">✅ Solicitação enviada!</p>
+          <p className="text-sm text-green-600 mt-1">
+            Efetue o pagamento via PIX e clique em "Marquei o pagamento" abaixo.
+          </p>
+        </div>
+      )}
+
+      {consultations.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
+          <p className="text-3xl mb-2">📋</p>
+          <p>Nenhuma consulta solicitada ainda.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {consultations.map((c) => {
+            const st = statusConfig[c.status] ?? statusConfig["pendente_pagamento"];
+            const typeInfo = CONSULT_TYPES.find((t) => t.key === c.consult_type);
+            return (
+              <div key={c.id} className={`rounded-2xl border p-5 ${st.color}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-sm">
+                      {st.emoji} {typeInfo?.label ?? c.consult_type}
+                    </p>
+                    <p className="text-xs mt-0.5 text-muted-foreground">{st.label}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Solicitado em {new Date(c.created_at).toLocaleDateString("pt-BR")}
+                    </p>
+                    {c.preferred_dates.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Datas sugeridas: {c.preferred_dates.map((d) => new Date(d).toLocaleString("pt-BR")).join(", ")}
+                      </p>
+                    )}
+                    {c.message && (
+                      <p className="text-xs mt-1 italic text-muted-foreground">"{c.message}"</p>
+                    )}
+                  </div>
+                  {typeInfo && <span className="shrink-0 font-bold text-sm text-primary">{typeInfo.price}</span>}
+                </div>
+                {c.status === "pendente_pagamento" && (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl bg-white/70 border border-border p-3 text-xs space-y-1">
+                      <p className="font-medium">Chave PIX: <span className="font-mono">{PIX_KEY}</span></p>
+                      <p>Favorecido: {PIX_NAME} · Valor: {typeInfo?.price ?? "—"}</p>
+                    </div>
+                    <button
+                      onClick={() => handleMarkPayment(c.id)}
+                      disabled={markingId === c.id}
+                      className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
+                    >
+                      {markingId === c.id ? "..." : "✓ Marquei o pagamento"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-xs text-center text-muted-foreground">
+        Após confirmar o pagamento, Dr. Clóvis entrará em contato para confirmar o horário.
+      </p>
     </div>
   );
 }
