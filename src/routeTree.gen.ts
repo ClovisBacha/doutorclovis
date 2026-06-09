@@ -28,6 +28,7 @@ import { Route as BastidoresRouteImport } from './routes/bastidores'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AgendamentoRouteImport } from './routes/agendamento'
 import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
+import { Route as EmpresasRouteImport } from './routes/empresas'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
@@ -135,6 +136,11 @@ const AcompanhanteRoute = AcompanhanteRouteImport.update({
   path: '/acompanhante',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmpresasRoute = EmpresasRouteImport.update({
+  id: '/empresas',
+  path: '/empresas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/cards': typeof CardsRoute
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
+  '/empresas': typeof EmpresasRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/cards': typeof CardsRoute
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
+  '/empresas': typeof EmpresasRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -265,6 +273,7 @@ export interface FileRoutesById {
   '/cards': typeof CardsRoute
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
+  '/empresas': typeof EmpresasRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -298,6 +307,7 @@ export interface FileRouteTypes {
     | '/cards'
     | '/depoimentos'
     | '/dpp'
+    | '/empresas'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -329,6 +339,7 @@ export interface FileRouteTypes {
     | '/cards'
     | '/depoimentos'
     | '/dpp'
+    | '/empresas'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -361,6 +372,7 @@ export interface FileRouteTypes {
     | '/cards'
     | '/depoimentos'
     | '/dpp'
+    | '/empresas'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -394,6 +406,7 @@ export interface RootRouteChildren {
   CardsRoute: typeof CardsRoute
   DepoimentosRoute: typeof DepoimentosRoute
   DppRoute: typeof DppRoute
+  EmpresasRoute: typeof EmpresasRoute
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
   LivesRoute: typeof LivesRoute
@@ -490,6 +503,13 @@ declare module '@tanstack/react-router' {
       path: '/dpp'
       fullPath: '/dpp'
       preLoaderRoute: typeof DppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/empresas': {
+      id: '/empresas'
+      path: '/empresas'
+      fullPath: '/empresas'
+      preLoaderRoute: typeof EmpresasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/depoimentos': {
@@ -653,6 +673,7 @@ const rootRouteChildren: RootRouteChildren = {
   CardsRoute: CardsRoute,
   DepoimentosRoute: DepoimentosRoute,
   DppRoute: DppRoute,
+  EmpresasRoute: EmpresasRoute,
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,
   LivesRoute: LivesRoute,

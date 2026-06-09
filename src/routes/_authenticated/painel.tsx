@@ -21,6 +21,19 @@ import {
   updateTeleconsultaStatus,
   type TeleconsultaSession,
 } from "@/lib/teleconsulta.functions";
+import {
+  getCorporateLeadsAdmin,
+  createCorporateAccountAdmin,
+  updateLeadStatusAdmin,
+  type CorporateLead,
+  type CorporateAccount,
+} from "@/lib/corporativo.functions";
+import {
+  getPrivateConsultationsAdmin,
+  confirmPaymentAdmin,
+  CONSULT_TYPES as PRIVATE_CONSULT_TYPES,
+  type PrivateConsultation,
+} from "@/lib/consultaparticular.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({ meta: [{ title: "Painel do médico — Dr. Clóvis Bacha" }] }),
@@ -40,7 +53,7 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: "bg-rose-100 text-rose-700",
 };
 
-const PANEL_TABS = ["Agendamentos", "Perguntas", "Pré-consultas", "Teleconsultas", "Engajamento"] as const;
+const PANEL_TABS = ["Agendamentos", "Perguntas", "Pré-consultas", "Teleconsultas", "Consultas Pagas", "Empresas", "Engajamento"] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 
 async function token() {
@@ -56,6 +69,9 @@ function PainelPage() {
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [preForms, setPreForms] = useState<AdminPreConsulta[]>([]);
   const [teleconsultas, setTeleconsultas] = useState<TeleconsultaSession[]>([]);
+  const [privateConsults, setPrivateConsults] = useState<any[]>([]);
+  const [corporateLeads, setCorporateLeads] = useState<CorporateLead[]>([]);
+  const [corporateAccounts, setCorporateAccounts] = useState<CorporateAccount[]>([]);
   const [engagement, setEngagement] = useState<{
     totalPatients: number;
     activeLastWeek: number;
@@ -96,6 +112,21 @@ function PainelPage() {
     if (res.ok) setTeleconsultas(res.sessions);
   }
 
+  async function loadPrivateConsults() {
+    const tk = await token();
+    const res = await getPrivateConsultationsAdmin({ data: { accessToken: tk } });
+    if (res.ok) setPrivateConsults(res.consultations);
+  }
+
+  async function loadCorporate() {
+    const tk = await token();
+    const res = await getCorporateLeadsAdmin({ data: { accessToken: tk } });
+    if (res.ok) {
+      setCorporateLeads(res.leads);
+      setCorporateAccounts(res.accounts);
+    }
+  }
+
   useEffect(() => {
     load();
   }, []);
@@ -105,6 +136,8 @@ function PainelPage() {
     if (tab === "Engajamento" && !engagement) loadEngagement();
     if (tab === "Pré-consultas") loadPreForms();
     if (tab === "Teleconsultas") loadTeleconsultas();
+    if (tab === "Consultas Pagas") loadPrivateConsults();
+    if (tab === "Empresas") loadCorporate();
   }, [tab, allowed]);
 
   async function changeStatus(id: string, status: AdminAppointment["status"]) {
@@ -216,6 +249,21 @@ function PainelPage() {
         )}
         {tab === "Engajamento" && (
           <EngagementSection engagement={engagement} onRefresh={loadEngagement} tokenFn={token} />
+        )}
+        {tab === "Consultas Pagas" && (
+          <ConsultasPagasSection
+            consultations={privateConsults}
+            onRefresh={loadPrivateConsults}
+            tokenFn={token}
+          />
+        )}
+        {tab === "Empresas" && (
+          <EmpresasSection
+            leads={corporateLeads}
+            accounts={corporateAccounts}
+            onRefresh={loadCorporate}
+            tokenFn={token}
+          />
         )}
       </div>
     </section>
@@ -946,6 +994,313 @@ function TeleconsultasSection({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------- Consultas Pagas ---------- */
+function ConsultasPagasSection({
+  consultations,
+  onRefresh,
+  tokenFn,
+}: {
+  consultations: any[];
+  onRefresh: () => void;
+  tokenFn: () => Promise<string>;
+}) {
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  async function handleConfirm(id: string, status: "confirmado" | "realizado" | "cancelado") {
+    setUpdatingId(id);
+    const tk = await tokenFn();
+    await confirmPaymentAdmin({ data: { accessToken: tk, id, status } });
+    onRefresh();
+    setUpdatingId(null);
+  }
+
+  const statusColors: Record<string, string> = {
+    pendente_pagamento: "bg-amber-50 border-amber-200",
+    pagamento_enviado: "bg-blue-50 border-blue-200",
+    confirmado: "bg-green-50 border-green-200",
+    realizado: "bg-secondary border-border",
+    cancelado: "bg-red-50 border-red-200",
+  };
+  const statusLabels: Record<string, string> = {
+    pendente_pagamento: "⏳ Aguardando pagamento",
+    pagamento_enviado: "💸 Pagamento enviado",
+    confirmado: "✅ Confirmado",
+    realizado: "🏁 Realizado",
+    cancelado: "❌ Cancelado",
+  };
+
+  if (consultations.length === 0)
+    return <p className="text-sm text-muted-foreground">Nenhuma consulta particular solicitada ainda.</p>;
+
+  return (
+    <div className="space-y-3">
+      {consultations.map((c: any) => {
+        const typeInfo = PRIVATE_CONSULT_TYPES.find((t) => t.key === c.consult_type);
+        const color = statusColors[c.status] ?? "bg-card border-border";
+        return (
+          <div key={c.id} className={`rounded-2xl border p-5 ${color}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold text-sm">
+                  {c.patient_profiles?.display_name ?? "Paciente"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {typeInfo?.label ?? c.consult_type} · {typeInfo?.price ?? ""}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {new Date(c.created_at).toLocaleDateString("pt-BR")}
+                </p>
+                <p className="text-xs mt-1">{statusLabels[c.status] ?? c.status}</p>
+                {c.preferred_dates?.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Datas sugeridas: {c.preferred_dates.map((d: string) => new Date(d).toLocaleString("pt-BR")).join(", ")}
+                  </p>
+                )}
+                {c.message && <p className="text-xs mt-0.5 italic text-muted-foreground">"{c.message}"</p>}
+              </div>
+              {c.status === "pagamento_enviado" && (
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handleConfirm(c.id, "confirmado")}
+                    disabled={updatingId === c.id}
+                    className="rounded-full bg-green-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                  >
+                    ✓ Confirmar
+                  </button>
+                  <button
+                    onClick={() => handleConfirm(c.id, "cancelado")}
+                    disabled={updatingId === c.id}
+                    className="rounded-full border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-40"
+                  >
+                    × Cancelar
+                  </button>
+                </div>
+              )}
+              {c.status === "confirmado" && (
+                <button
+                  onClick={() => handleConfirm(c.id, "realizado")}
+                  disabled={updatingId === c.id}
+                  className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                >
+                  Marcar realizada
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- Empresas ---------- */
+function EmpresasSection({
+  leads,
+  accounts,
+  onRefresh,
+  tokenFn,
+}: {
+  leads: CorporateLead[];
+  accounts: CorporateAccount[];
+  onRefresh: () => void;
+  tokenFn: () => Promise<string>;
+}) {
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newCompany, setNewCompany] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPlan, setNewPlan] = useState<"basico" | "standard" | "premium">("basico");
+  const [newSeats, setNewSeats] = useState("10");
+  const [newNotes, setNewNotes] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
+
+  const PLANS = { basico: "Básico (10)", standard: "Standard (50)", premium: "Premium (100)" };
+
+  async function handleCreateAccount() {
+    setCreating(true);
+    const tk = await tokenFn();
+    await createCorporateAccountAdmin({
+      data: {
+        accessToken: tk,
+        companyName: newCompany,
+        contactEmail: newEmail,
+        planType: newPlan,
+        maxSeats: Number(newSeats) || 10,
+        notes: newNotes || null,
+      },
+    });
+    setShowCreateForm(false);
+    setNewCompany(""); setNewEmail(""); setNewNotes("");
+    onRefresh();
+    setCreating(false);
+  }
+
+  async function handleLeadStatus(id: string, status: string) {
+    setUpdatingLeadId(id);
+    const tk = await tokenFn();
+    await updateLeadStatusAdmin({ data: { accessToken: tk, id, status } });
+    onRefresh();
+    setUpdatingLeadId(null);
+  }
+
+  const leadStatusColors: Record<string, string> = {
+    novo: "bg-blue-50 border-blue-200",
+    em_contato: "bg-amber-50 border-amber-200",
+    convertido: "bg-green-50 border-green-200",
+    descartado: "bg-secondary border-border opacity-60",
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Active accounts */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">Contas corporativas ativas</h3>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white"
+          >
+            + Nova conta
+          </button>
+        </div>
+
+        {showCreateForm && (
+          <div className="rounded-2xl border border-border bg-card p-5 mb-4 space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium mb-1">Empresa *</label>
+                <input value={newCompany} onChange={(e) => setNewCompany(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">E-mail de contato *</label>
+                <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Plano</label>
+                <select value={newPlan} onChange={(e) => setNewPlan(e.target.value as any)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm">
+                  {Object.entries(PLANS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Vagas (max)</label>
+                <input type="number" value={newSeats} onChange={(e) => setNewSeats(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Notas internas</label>
+              <input value={newNotes} onChange={(e) => setNewNotes(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={handleCreateAccount} disabled={creating || !newCompany || !newEmail}
+                className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white disabled:opacity-40">
+                {creating ? "Criando..." : "Criar conta"}
+              </button>
+              <button onClick={() => setShowCreateForm(false)}
+                className="rounded-full border border-border px-4 py-1.5 text-xs font-medium">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {accounts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma conta corporativa criada ainda.</p>
+        ) : (
+          <div className="space-y-2">
+            {accounts.map((acc) => (
+              <div key={acc.id} className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-sm">{acc.company_name}</p>
+                    <p className="text-xs text-muted-foreground">{acc.contact_email} · {PLANS[acc.plan_type as keyof typeof PLANS] ?? acc.plan_type}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Vagas: {acc.max_seats}</p>
+                    {acc.notes && <p className="text-xs text-muted-foreground mt-0.5 italic">{acc.notes}</p>}
+                  </div>
+                  <div className="text-right">
+                    <div className="rounded-full bg-primary/10 px-3 py-1 text-xs font-mono font-bold text-primary">
+                      {acc.access_code}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">código de acesso</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Leads */}
+      <div>
+        <h3 className="font-semibold mb-4">Leads / Solicitações de demonstração ({leads.length})</h3>
+        {leads.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma solicitação ainda.</p>
+        ) : (
+          <div className="space-y-2">
+            {leads.map((lead) => (
+              <div key={lead.id} className={`rounded-2xl border p-4 ${leadStatusColors[lead.status] ?? "bg-card border-border"}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-sm">{lead.company_name}</p>
+                    <p className="text-xs">{lead.contact_name} · {lead.contact_email}</p>
+                    {lead.contact_phone && <p className="text-xs text-muted-foreground">{lead.contact_phone}</p>}
+                    {lead.employee_count && <p className="text-xs text-muted-foreground">{lead.employee_count}</p>}
+                    {lead.message && <p className="text-xs mt-1 italic">"{lead.message}"</p>}
+                    <p className="text-xs text-muted-foreground mt-1">{new Date(lead.created_at).toLocaleDateString("pt-BR")}</p>
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    {lead.status === "novo" && (
+                      <>
+                        <button
+                          onClick={() => handleLeadStatus(lead.id, "em_contato")}
+                          disabled={updatingLeadId === lead.id}
+                          className="rounded-full bg-amber-500 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
+                        >
+                          Em contato
+                        </button>
+                        <button
+                          onClick={() => handleLeadStatus(lead.id, "convertido")}
+                          disabled={updatingLeadId === lead.id}
+                          className="rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
+                        >
+                          Convertido
+                        </button>
+                        <button
+                          onClick={() => handleLeadStatus(lead.id, "descartado")}
+                          disabled={updatingLeadId === lead.id}
+                          className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground disabled:opacity-40"
+                        >
+                          Descartar
+                        </button>
+                      </>
+                    )}
+                    {lead.status === "em_contato" && (
+                      <button
+                        onClick={() => handleLeadStatus(lead.id, "convertido")}
+                        disabled={updatingLeadId === lead.id}
+                        className="rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
+                      >
+                        Marcar convertido
+                      </button>
+                    )}
+                    {(lead.status === "convertido" || lead.status === "descartado") && (
+                      <span className="text-xs font-medium capitalize">{lead.status === "convertido" ? "✅ Convertido" : "✗ Descartado"}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

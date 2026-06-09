@@ -52,6 +52,17 @@ import {
   type PrivateConsultation,
 } from "@/lib/consultaparticular.functions";
 import {
+  logCycleStart,
+  updateCycleEnd,
+  deleteCycle,
+  getRecentCycles,
+  setPreventiveReminder,
+  getPreventiveReminders,
+  type MenstrualCycle,
+  type PreventiveReminder,
+} from "@/lib/saudefeminina.functions";
+import { joinCorporate } from "@/lib/corporativo.functions";
+import {
   savePpdScreening,
   getMyPpdScreenings,
   startBreastfeeding,
@@ -106,6 +117,7 @@ type Profile = {
   prior_preterm?: boolean | null;
   prior_cesarean?: boolean | null;
   prior_notes?: string | null;
+  corporate_account_id?: string | null;
 };
 
 type JournalEntry = {
@@ -165,6 +177,8 @@ const TABS = [
   "Conquistas",
   "Loja",
   "Consulta Particular",
+  "Ciclo Menstrual",
+  "Preventivos",
   "Chat IA",
   "Perfil",
 ] as const;
@@ -304,6 +318,8 @@ function MinhaContaPage() {
         {tab === "Conquistas" && <ConquistasTab />}
         {tab === "Loja" && <LojaTab gest={gest} />}
         {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
+        {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
+        {tab === "Preventivos" && <PreventivosTab />}
         {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
         {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
       </div>
@@ -1019,6 +1035,9 @@ function ProfileTab({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [notifPermission, setNotifPermission] = useState<string>("default");
+  const [corporateCode, setCorporateCode] = useState("");
+  const [corporateMsg, setCorporateMsg] = useState<string | null>(null);
+  const [joiningCorporate, setJoiningCorporate] = useState(false);
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
       setNotifPermission(Notification.permission);
@@ -1355,6 +1374,63 @@ function ProfileTab({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Feature 50: Corporate */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-lg">Benefício Corporativo</p>
+        {profile?.corporate_account_id ? (
+          <div className="mt-3 flex items-center gap-3 rounded-2xl bg-primary/5 border border-primary/20 p-4">
+            <span className="text-2xl">🏢</span>
+            <div>
+              <p className="text-sm font-medium text-primary">Acesso corporativo ativo</p>
+              <p className="text-xs text-muted-foreground">Seu plano é custeado pela sua empresa.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Sua empresa oferece o portal como benefício? Insira o código fornecido pelo RH.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={corporateCode}
+                onChange={(e) => setCorporateCode(e.target.value.toUpperCase())}
+                placeholder="Código da empresa (ex: ABC123)"
+                className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm font-mono uppercase tracking-wider"
+                maxLength={12}
+              />
+              <button
+                onClick={async () => {
+                  if (!corporateCode.trim()) return;
+                  setJoiningCorporate(true);
+                  setCorporateMsg(null);
+                  const { data: s } = await supabase.auth.getSession();
+                  if (!s.session?.access_token) { setJoiningCorporate(false); return; }
+                  const res = await joinCorporate({
+                    data: { accessToken: s.session.access_token, accessCode: corporateCode.trim() },
+                  });
+                  if (res.ok) {
+                    setCorporateMsg(`✅ Vinculado a ${res.companyName}! Salve o perfil para confirmar.`);
+                    onSaved({ ...profile!, corporate_account_id: "pending" } as typeof profile);
+                  } else {
+                    setCorporateMsg(res.error ?? "Código inválido.");
+                  }
+                  setJoiningCorporate(false);
+                }}
+                disabled={joiningCorporate || !corporateCode.trim()}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+              >
+                {joiningCorporate ? "..." : "Aplicar"}
+              </button>
+            </div>
+            {corporateMsg && (
+              <p className={`text-sm ${corporateMsg.startsWith("✅") ? "text-green-600" : "text-red-500"}`}>
+                {corporateMsg}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {msg && <p className="text-sm text-primary">{msg}</p>}
@@ -8226,6 +8302,542 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
 
       <p className="text-xs text-center text-muted-foreground">
         Após confirmar o pagamento, Dr. Clóvis entrará em contato para confirmar o horário.
+      </p>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   Feature 40a — Ciclo Menstrual
+───────────────────────────────────────────────────────── */
+
+const TPM_SYMPTOMS = [
+  "Cólicas", "Dor de cabeça", "Irritabilidade", "Inchaço",
+  "Fadiga", "Acne", "Sensibilidade nos seios", "Insônia",
+  "Desejos alimentares", "Ansiedade",
+];
+
+function cycleLengthDays(cycle: MenstrualCycle): number | null {
+  if (!cycle.end_date) return null;
+  const start = new Date(cycle.start_date + "T00:00:00");
+  const end = new Date(cycle.end_date + "T00:00:00");
+  return Math.round((end.getTime() - start.getTime()) / 86400000);
+}
+
+function avgCycleLength(cycles: MenstrualCycle[]): number {
+  if (cycles.length < 2) return 28;
+  const gaps: number[] = [];
+  for (let i = 0; i < cycles.length - 1; i++) {
+    const a = new Date(cycles[i + 1].start_date + "T00:00:00").getTime();
+    const b = new Date(cycles[i].start_date + "T00:00:00").getTime();
+    gaps.push(Math.round((b - a) / 86400000));
+  }
+  return Math.round(gaps.reduce((s, v) => s + v, 0) / gaps.length);
+}
+
+function CicloMenstrualTab() {
+  const [cycles, setCycles] = useState<MenstrualCycle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newFlow, setNewFlow] = useState("normal");
+  const [newSymptoms, setNewSymptoms] = useState<string[]>([]);
+  const [newNotes, setNewNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [endingId, setEndingId] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
+
+  async function load() {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) { setLoading(false); return; }
+    const res = await getRecentCycles({ data: { accessToken: s.session.access_token } });
+    if (res.ok) setCycles(res.cycles);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleLogStart() {
+    setSubmitting(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) { setSubmitting(false); return; }
+    const res = await logCycleStart({
+      data: {
+        accessToken: s.session.access_token,
+        startDate: newStartDate,
+        flowIntensity: newFlow,
+        symptoms: newSymptoms,
+        notes: newNotes || null,
+      },
+    });
+    if (res.ok) {
+      setShowForm(false);
+      setNewSymptoms([]);
+      setNewNotes("");
+      await load();
+    }
+    setSubmitting(false);
+  }
+
+  async function handleMarkEnd(cycleId: string) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) return;
+    await updateCycleEnd({ data: { accessToken: s.session.access_token, cycleId, endDate } });
+    setEndingId(null);
+    await load();
+  }
+
+  async function handleDelete(cycleId: string) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) return;
+    await deleteCycle({ data: { accessToken: s.session.access_token, cycleId } });
+    await load();
+  }
+
+  const avgLen = avgCycleLength(cycles);
+  const lastCycle = cycles[0] ?? null;
+  const nextPeriod = lastCycle
+    ? new Date(new Date(lastCycle.start_date + "T00:00:00").getTime() + avgLen * 86400000)
+    : null;
+  const fertileWindowStart = nextPeriod
+    ? new Date(nextPeriod.getTime() - 16 * 86400000)
+    : null;
+  const fertileWindowEnd = nextPeriod
+    ? new Date(nextPeriod.getTime() - 10 * 86400000)
+    : null;
+  const daysToNext = nextPeriod
+    ? Math.round((nextPeriod.getTime() - Date.now()) / 86400000)
+    : null;
+
+  if (loading) return <div className="py-16 text-center text-muted-foreground">Carregando...</div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Header + predictions */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">Próximo período</p>
+          {nextPeriod ? (
+            <>
+              <p className="font-serif text-2xl mt-1">
+                {nextPeriod.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {daysToNext !== null && daysToNext > 0
+                  ? `em ${daysToNext} dias`
+                  : daysToNext === 0
+                  ? "pode ser hoje"
+                  : `${Math.abs(daysToNext ?? 0)} dias atrás`}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Ciclo médio: {avgLen} dias
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2">Registre pelo menos 2 ciclos para calcular.</p>
+          )}
+        </div>
+        <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
+          <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">Janela fértil estimada</p>
+          {fertileWindowStart && fertileWindowEnd ? (
+            <>
+              <p className="font-serif text-lg mt-1">
+                {fertileWindowStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} —{" "}
+                {fertileWindowEnd.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Baseado no ciclo médio. Para concepção, use métodos mais precisos.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2">Disponível após 2 ciclos registrados.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Log button */}
+      {!showForm ? (
+        <button
+          onClick={() => setShowForm(true)}
+          className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-white"
+        >
+          + Registrar período
+        </button>
+      ) : (
+        <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+          <h3 className="font-semibold">Novo registro de período</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Data de início *</label>
+              <input
+                type="date"
+                value={newStartDate}
+                onChange={(e) => setNewStartDate(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Intensidade do fluxo</label>
+              <select
+                value={newFlow}
+                onChange={(e) => setNewFlow(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="leve">Leve</option>
+                <option value="normal">Normal</option>
+                <option value="intenso">Intenso</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Sintomas</label>
+            <div className="flex flex-wrap gap-2">
+              {TPM_SYMPTOMS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setNewSymptoms((prev) =>
+                    prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+                  )}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    newSymptoms.includes(s)
+                      ? "bg-primary text-white"
+                      : "bg-secondary text-muted-foreground hover:text-primary"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Observações</label>
+            <textarea
+              value={newNotes}
+              onChange={(e) => setNewNotes(e.target.value)}
+              rows={2}
+              className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm resize-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleLogStart}
+              disabled={submitting}
+              className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-40"
+            >
+              {submitting ? "Salvando..." : "Salvar"}
+            </button>
+            <button
+              onClick={() => setShowForm(false)}
+              className="rounded-full border border-border px-5 py-2 text-sm font-medium"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cycle history */}
+      {cycles.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
+          <p className="text-3xl mb-2">📅</p>
+          <p>Nenhum ciclo registrado ainda.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <h3 className="font-semibold">Histórico de ciclos</h3>
+          {cycles.map((cycle, i) => {
+            const duration = cycleLengthDays(cycle);
+            const gapToNext = i > 0
+              ? Math.round(
+                  (new Date(cycle.start_date + "T00:00:00").getTime() -
+                    new Date(cycles[i - 1].start_date + "T00:00:00").getTime()) / 86400000
+                )
+              : null;
+            const isActive = !cycle.end_date;
+            return (
+              <div
+                key={cycle.id}
+                className={`rounded-2xl border p-4 ${isActive ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      {isActive && (
+                        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">
+                          Ativo
+                        </span>
+                      )}
+                      <p className="font-medium text-sm">
+                        {new Date(cycle.start_date + "T00:00:00").toLocaleDateString("pt-BR", {
+                          day: "2-digit", month: "long", year: "numeric",
+                        })}
+                        {cycle.end_date && ` — ${new Date(cycle.end_date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}`}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
+                      {duration !== null && <span>Duração: {duration} dias</span>}
+                      {gapToNext !== null && <span>Ciclo: {gapToNext} dias</span>}
+                      {cycle.flow_intensity && <span>Fluxo: {cycle.flow_intensity}</span>}
+                    </div>
+                    {cycle.symptoms.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {cycle.symptoms.map((s) => (
+                          <span key={s} className="rounded-full bg-secondary px-2 py-0.5 text-xs">{s}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    {isActive && (
+                      endingId === cycle.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="rounded-xl border border-border bg-background px-2 py-1 text-xs"
+                          />
+                          <button
+                            onClick={() => handleMarkEnd(cycle.id)}
+                            className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white"
+                          >
+                            Ok
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setEndingId(cycle.id)}
+                          className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary hover:text-primary"
+                        >
+                          Encerrar
+                        </button>
+                      )
+                    )}
+                    <button
+                      onClick={() => handleDelete(cycle.id)}
+                      className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground hover:border-red-300 hover:text-red-500"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────
+   Feature 40b — Preventivos
+───────────────────────────────────────────────────────── */
+
+type ExamDef = {
+  key: string;
+  name: string;
+  emoji: string;
+  frequency: string;
+  frequencyMonths: number;
+  description: string;
+  ageFrom?: number;
+};
+
+const PREVENTIVE_EXAMS: ExamDef[] = [
+  { key: "papanicolau", name: "Papanicolau", emoji: "🔬", frequency: "Anual", frequencyMonths: 12, description: "Rastreamento do câncer de colo do útero. Após 2 exames normais seguidos, pode ser feito a cada 3 anos." },
+  { key: "mamografia", name: "Mamografia", emoji: "🩻", frequency: "Anual (40+)", frequencyMonths: 12, description: "Rastreamento do câncer de mama. A partir de 40 anos ou 35 anos em caso de histórico familiar.", ageFrom: 40 },
+  { key: "ultrassom_tv", name: "Ultrassom Pélvico", emoji: "📡", frequency: "Anual", frequencyMonths: 12, description: "Avaliação dos ovários, útero e endométrio. Detecta cistos, miomas e outras alterações." },
+  { key: "glicemia", name: "Glicemia em Jejum", emoji: "🩸", frequency: "Anual", frequencyMonths: 12, description: "Rastreamento de diabetes e pré-diabetes." },
+  { key: "colesterol", name: "Perfil Lipídico", emoji: "💉", frequency: "A cada 5 anos", frequencyMonths: 60, description: "Colesterol total, HDL, LDL e triglicérides. Risco cardiovascular." },
+  { key: "tsh", name: "TSH / T4 Livre", emoji: "🦋", frequency: "A cada 2 anos", frequencyMonths: 24, description: "Função da tireoide. Importante para mulheres em idade fértil.", ageFrom: 35 },
+  { key: "pressao_arterial", name: "Pressão Arterial", emoji: "💊", frequency: "Semestral", frequencyMonths: 6, description: "Controle da pressão arterial. Hipertensão é silenciosa — medir regularmente é fundamental." },
+  { key: "dentista", name: "Dentista", emoji: "🦷", frequency: "Semestral", frequencyMonths: 6, description: "Saúde bucal com impacto direto na saúde geral. Cáries e inflamações gengivas elevam risco sistêmico." },
+  { key: "dermatologista", name: "Mapeamento de Pintas", emoji: "☀️", frequency: "Anual", frequencyMonths: 12, description: "Dermatoscopia para rastreamento do melanoma e outros cânceres de pele." },
+  { key: "oftalmologista", name: "Oftalmologista", emoji: "👁️", frequency: "A cada 2 anos", frequencyMonths: 24, description: "Avaliação da visão, pressão intraocular e saúde ocular." },
+];
+
+function nextDueDate(lastDone: string | null, frequencyMonths: number): Date | null {
+  if (!lastDone) return null;
+  const d = new Date(lastDone + "T00:00:00");
+  d.setMonth(d.getMonth() + frequencyMonths);
+  return d;
+}
+
+function PreventivosTab() {
+  const [reminders, setReminders] = useState<PreventiveReminder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) { setLoading(false); return; }
+    const res = await getPreventiveReminders({ data: { accessToken: s.session.access_token } });
+    if (res.ok) setReminders(res.reminders);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleSave() {
+    if (!editingKey) return;
+    setSaving(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) { setSaving(false); return; }
+    await setPreventiveReminder({
+      data: {
+        accessToken: s.session.access_token,
+        examKey: editingKey,
+        lastDoneDate: editDate || null,
+        notes: editNotes || null,
+      },
+    });
+    setEditingKey(null);
+    await load();
+    setSaving(false);
+  }
+
+  if (loading) return <div className="py-16 text-center text-muted-foreground">Carregando...</div>;
+
+  const reminderMap = Object.fromEntries(reminders.map((r) => [r.exam_key, r]));
+  const today = new Date();
+
+  // Group: overdue, due soon (within 60 days), ok
+  const examGroups = PREVENTIVE_EXAMS.map((exam) => {
+    const r = reminderMap[exam.key];
+    const nextDue = r?.last_done_date ? nextDueDate(r.last_done_date, exam.frequencyMonths) : null;
+    const daysUntil = nextDue
+      ? Math.round((nextDue.getTime() - today.getTime()) / 86400000)
+      : null;
+    let status: "overdue" | "soon" | "ok" | "never" = "never";
+    if (r?.last_done_date) {
+      if (daysUntil !== null) {
+        if (daysUntil < 0) status = "overdue";
+        else if (daysUntil <= 60) status = "soon";
+        else status = "ok";
+      }
+    }
+    return { exam, r, nextDue, daysUntil, status };
+  });
+
+  const overdueCount = examGroups.filter((e) => e.status === "overdue").length;
+  const soonCount = examGroups.filter((e) => e.status === "soon").length;
+  const neverCount = examGroups.filter((e) => e.status === "never").length;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Em atraso", value: overdueCount, color: "text-red-600 bg-red-50 border-red-200" },
+          { label: "Em breve", value: soonCount, color: "text-amber-700 bg-amber-50 border-amber-200" },
+          { label: "Não registrado", value: neverCount, color: "text-muted-foreground bg-secondary border-border" },
+        ].map((s) => (
+          <div key={s.label} className={`rounded-2xl border p-4 text-center ${s.color}`}>
+            <p className="text-2xl font-bold">{s.value}</p>
+            <p className="text-xs mt-1">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Exam list */}
+      <div className="space-y-3">
+        {examGroups.map(({ exam, r, nextDue, daysUntil, status }) => {
+          const isEditing = editingKey === exam.key;
+          const statusColor =
+            status === "overdue" ? "border-red-200 bg-red-50" :
+            status === "soon" ? "border-amber-200 bg-amber-50" :
+            status === "ok" ? "border-green-200 bg-green-50" :
+            "border-border bg-card";
+          const statusEmoji =
+            status === "overdue" ? "⚠️" :
+            status === "soon" ? "🔔" :
+            status === "ok" ? "✅" : "📋";
+
+          return (
+            <div key={exam.key} className={`rounded-2xl border p-4 ${statusColor}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-3 flex-1">
+                  <span className="text-xl shrink-0 mt-0.5">{exam.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm">{exam.name}</p>
+                      <span className="text-sm">{statusEmoji}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{exam.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Frequência recomendada: {exam.frequency}
+                    </p>
+                    {r?.last_done_date && (
+                      <p className="text-xs mt-1">
+                        Último: {new Date(r.last_done_date + "T00:00:00").toLocaleDateString("pt-BR")}
+                        {nextDue && ` · Próximo: ${nextDue.toLocaleDateString("pt-BR")} `}
+                        {daysUntil !== null && (
+                          <span className={daysUntil < 0 ? "text-red-600 font-medium" : daysUntil <= 60 ? "text-amber-700 font-medium" : "text-green-600"}>
+                            {daysUntil < 0 ? `(${Math.abs(daysUntil)} dias em atraso)` :
+                             daysUntil === 0 ? "(hoje)" :
+                             `(em ${daysUntil} dias)`}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                    {r?.notes && (
+                      <p className="text-xs text-muted-foreground mt-0.5 italic">"{r.notes}"</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingKey(isEditing ? null : exam.key);
+                    setEditDate(r?.last_done_date ?? "");
+                    setEditNotes(r?.notes ?? "");
+                  }}
+                  className="shrink-0 rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary hover:text-primary"
+                >
+                  {isEditing ? "Fechar" : r?.last_done_date ? "Atualizar" : "Registrar"}
+                </button>
+              </div>
+              {isEditing && (
+                <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Data do último exame</label>
+                      <input
+                        type="date"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Observações</label>
+                      <input
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        placeholder="Resultado, local, médico..."
+                        className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                  >
+                    {saving ? "Salvando..." : "Salvar"}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-center text-muted-foreground pb-4">
+        Frequências baseadas nas diretrizes da FEBRASGO e CFM. Consulte seu médico para orientações individualizadas.
       </p>
     </div>
   );
