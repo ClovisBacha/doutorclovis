@@ -5,6 +5,7 @@ import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
+import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
   babyForWeek,
@@ -333,7 +334,7 @@ function MinhaContaPage() {
       </div>
 
       {/* Category selector */}
-      <div className="mt-6 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="print:hidden mt-6 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {CATEGORIES.map((cat) => {
           const active = categoryOfTab(tab) === cat.label;
           return (
@@ -355,7 +356,7 @@ function MinhaContaPage() {
       </div>
 
       {/* Tab row for current category */}
-      <div className="mt-2 flex gap-0.5 overflow-x-auto border-b border-border pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="print:hidden mt-2 flex gap-0.5 overflow-x-auto border-b border-border pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => (
           <button
             key={t}
@@ -1201,6 +1202,7 @@ function ProfileTab({
     } else {
       onSaved(data);
       setMsg("Salvo com sucesso ✓");
+      toast.success("Perfil salvo com sucesso!");
     }
   }
 
@@ -2597,6 +2599,13 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         className="w-full rounded-2xl bg-primary py-3 text-sm font-medium text-white"
       >
         {copied ? "✓ Copiado!" : "Copiar dados para enviar por WhatsApp"}
+      </button>
+
+      <button
+        onClick={() => window.print()}
+        className="print:hidden w-full rounded-2xl border border-border py-3 text-sm font-medium text-muted-foreground hover:bg-accent transition-colors"
+      >
+        🖨️ Imprimir carteirinha
       </button>
 
       <p className="text-center text-xs text-muted-foreground">

@@ -29,6 +29,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AgendamentoRouteImport } from './routes/agendamento'
 import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as EmpresasRouteImport } from './routes/empresas'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
@@ -141,6 +142,11 @@ const EmpresasRoute = EmpresasRouteImport.update({
   path: '/empresas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -208,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -240,6 +247,7 @@ export interface FileRoutesByTo {
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -274,6 +282,7 @@ export interface FileRoutesById {
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -308,6 +317,7 @@ export interface FileRouteTypes {
     | '/depoimentos'
     | '/dpp'
     | '/empresas'
+    | '/privacidade'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/depoimentos'
     | '/dpp'
     | '/empresas'
+    | '/privacidade'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -373,6 +384,7 @@ export interface FileRouteTypes {
     | '/depoimentos'
     | '/dpp'
     | '/empresas'
+    | '/privacidade'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -407,6 +419,7 @@ export interface RootRouteChildren {
   DepoimentosRoute: typeof DepoimentosRoute
   DppRoute: typeof DppRoute
   EmpresasRoute: typeof EmpresasRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
   LivesRoute: typeof LivesRoute
@@ -674,6 +687,7 @@ const rootRouteChildren: RootRouteChildren = {
   DepoimentosRoute: DepoimentosRoute,
   DppRoute: DppRoute,
   EmpresasRoute: EmpresasRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,
   LivesRoute: LivesRoute,

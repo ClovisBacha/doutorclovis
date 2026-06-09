@@ -13,7 +13,9 @@ export function SiteFooter() {
           <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
             {DOCTOR.title} · {DOCTOR.specialty}
           </p>
-          <p className="mt-2 text-xs text-muted-foreground">{DOCTOR.crm} · {DOCTOR.rqe}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {DOCTOR.crm} · {DOCTOR.rqe}
+          </p>
           <a
             href={DOCTOR.instagram}
             target="_blank"
@@ -26,17 +28,27 @@ export function SiteFooter() {
 
         {/* Contato */}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Contato</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Contato
+          </p>
           <ul className="mt-3 space-y-2 text-sm text-foreground">
             <li className="flex items-center gap-2">
               <Phone className="h-4 w-4 flex-shrink-0 text-primary" />
-              <a href={DOCTOR.whatsappUrl} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                {DOCTOR.whatsappDisplay} <span className="text-xs text-muted-foreground">(WhatsApp)</span>
+              <a
+                href={DOCTOR.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                {DOCTOR.whatsappDisplay}{" "}
+                <span className="text-xs text-muted-foreground">(WhatsApp)</span>
               </a>
             </li>
             <li className="flex items-center gap-2">
               <Mail className="h-4 w-4 flex-shrink-0 text-primary" />
-              <a href={`mailto:${DOCTOR.email}`} className="hover:text-primary transition-colors">{DOCTOR.email}</a>
+              <a href={`mailto:${DOCTOR.email}`} className="hover:text-primary transition-colors">
+                {DOCTOR.email}
+              </a>
             </li>
             {DOCTOR.address && (
               <li className="flex items-start gap-2">
@@ -49,25 +61,99 @@ export function SiteFooter() {
 
         {/* Navegação */}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">App</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            App
+          </p>
           <ul className="mt-3 space-y-2 text-sm">
-            <li><Link to="/auth" className="text-muted-foreground hover:text-primary transition-colors">Entrar / Criar conta</Link></li>
-            <li><Link to="/agendamento" className="text-muted-foreground hover:text-primary transition-colors">Agendar consulta</Link></li>
-            <li><Link to="/gestacao" className="text-muted-foreground hover:text-primary transition-colors">Gestação semana a semana</Link></li>
-            <li><Link to="/calculadora" className="text-muted-foreground hover:text-primary transition-colors">Calculadora gestacional</Link></li>
-            <li><Link to="/empresas" className="text-muted-foreground hover:text-primary transition-colors">Para empresas</Link></li>
+            <li>
+              <Link
+                to="/auth"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Entrar / Criar conta
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/agendamento"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Agendar consulta
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/gestacao"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Gestação semana a semana
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/calculadora"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Calculadora gestacional
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/empresas"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Para empresas
+              </Link>
+            </li>
           </ul>
         </div>
 
         {/* Sobre */}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Doutor</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Doutor
+          </p>
           <ul className="mt-3 space-y-2 text-sm">
-            <li><Link to="/sobre" className="text-muted-foreground hover:text-primary transition-colors">Currículo e formação</Link></li>
-            <li><Link to="/hospitais" className="text-muted-foreground hover:text-primary transition-colors">Hospitais de atendimento</Link></li>
-            <li><Link to="/lives" className="text-muted-foreground hover:text-primary transition-colors">Lives e conteúdo</Link></li>
-            <li><Link to="/depoimentos" className="text-muted-foreground hover:text-primary transition-colors">Depoimentos</Link></li>
-            <li><Link to="/bastidores" className="text-muted-foreground hover:text-primary transition-colors">Gestação de alto risco</Link></li>
+            <li>
+              <Link
+                to="/sobre"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Currículo e formação
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/hospitais"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Hospitais de atendimento
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/lives"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Lives e conteúdo
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/depoimentos"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Depoimentos
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/bastidores"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Gestação de alto risco
+              </Link>
+            </li>
           </ul>
         </div>
       </div>
@@ -79,8 +165,12 @@ export function SiteFooter() {
             © {new Date().getFullYear()} {DOCTOR.name} · {DOCTOR.crm} · Todos os direitos reservados
           </p>
           <p className="max-w-sm">
-            Os dados inseridos no app são protegidos pela{" "}
-            <strong>LGPD (Lei 13.709/2018)</strong> e utilizados exclusivamente para acompanhamento de saúde. Não compartilhamos informações com terceiros.
+            Os dados inseridos no app são protegidos pela <strong>LGPD (Lei 13.709/2018)</strong> e
+            utilizados exclusivamente para acompanhamento de saúde. Não compartilhamos informações
+            com terceiros.{" "}
+            <Link to="/privacidade" className="underline hover:text-primary transition-colors">
+              Política de Privacidade
+            </Link>
           </p>
         </div>
       </div>

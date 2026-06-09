@@ -6,7 +6,11 @@ export const Route = createFileRoute("/sobre")({
   head: () => ({
     meta: [
       { title: "Sobre o Dr. Clóvis Bacha — Currículo e formação" },
-      { name: "description", content: "Currículo, formação e trajetória do Dr. Clóvis Bacha em ginecologia, obstetrícia e gestação de alto risco." },
+      {
+        name: "description",
+        content:
+          "Currículo, formação e trajetória do Dr. Clóvis Bacha em ginecologia, obstetrícia e gestação de alto risco.",
+      },
       { property: "og:title", content: "Sobre o Dr. Clóvis Bacha" },
       { property: "og:description", content: "Currículo, formação e trajetória." },
     ],
@@ -53,17 +57,47 @@ const associacoes = [
   "SOGIMIG — Associação de Ginecologistas e Obstetras de Minas Gerais",
 ];
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Início", item: DOCTOR.siteUrl },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "Sobre o Dr. Clóvis Bacha",
+      item: `${DOCTOR.siteUrl}/sobre`,
+    },
+  ],
+};
+
 function SobrePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
+      />
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-[1fr_1.3fr] md:py-24">
-        <img src={portrait} alt="Dr. Clóvis Bacha" width={1024} height={1024} className="aspect-square w-full rounded-[2rem] object-cover shadow-[var(--shadow-card)]" />
+        <img
+          src={portrait}
+          alt="Dr. Clóvis Bacha"
+          width={1024}
+          height={1024}
+          className="aspect-square w-full rounded-[2rem] object-cover shadow-[var(--shadow-card)]"
+        />
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Sobre o doutor</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Sobre o doutor
+          </p>
           <h1 className="mt-3 font-serif text-4xl md:text-5xl">Dr. Clóvis Bacha</h1>
-          <p className="mt-4 text-sm uppercase tracking-wider text-muted-foreground">{DOCTOR.crm} · {DOCTOR.rqe}</p>
+          <p className="mt-4 text-sm uppercase tracking-wider text-muted-foreground">
+            {DOCTOR.crm} · {DOCTOR.rqe}
+          </p>
           <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-            Há mais de 20 anos dedicado à saúde da mulher, com atuação central em gestação de alto risco. Acredita que a escuta cuidadosa é parte do tratamento — e que cada gestação merece protocolo individualizado.
+            Há mais de 20 anos dedicado à saúde da mulher, com atuação central em gestação de alto
+            risco. Acredita que a escuta cuidadosa é parte do tratamento — e que cada gestação
+            merece protocolo individualizado.
           </p>
         </div>
       </section>
@@ -85,7 +119,12 @@ function SobrePage() {
             <h2 className="font-serif text-3xl">Áreas de atuação</h2>
             <ul className="mt-6 grid gap-3 sm:grid-cols-2">
               {atuacao.map((a) => (
-                <li key={a} className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-card)]">{a}</li>
+                <li
+                  key={a}
+                  className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-card)]"
+                >
+                  {a}
+                </li>
               ))}
             </ul>
           </div>
@@ -96,7 +135,10 @@ function SobrePage() {
         <h2 className="font-serif text-3xl">Em números</h2>
         <div className="mt-8 grid gap-6 sm:grid-cols-2 md:grid-cols-4">
           {numeros.map((n) => (
-            <div key={n.l} className="rounded-2xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)]">
+            <div
+              key={n.l}
+              className="rounded-2xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)]"
+            >
               <p className="font-serif text-4xl text-primary">{n.v}</p>
               <p className="mt-2 text-sm text-muted-foreground">{n.l}</p>
             </div>
@@ -109,11 +151,18 @@ function SobrePage() {
           <h2 className="font-serif text-3xl">Sociedades e filiações</h2>
           <ul className="mt-6 grid gap-3 md:grid-cols-2">
             {associacoes.map((a) => (
-              <li key={a} className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-card)]">{a}</li>
+              <li
+                key={a}
+                className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-card)]"
+              >
+                {a}
+              </li>
             ))}
           </ul>
           <p className="mt-8 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-            Atua com docência ocasional em cursos de atualização para residentes e participa de congressos nacionais e internacionais de medicina fetal anualmente, mantendo a prática alinhada às mais recentes evidências científicas.
+            Atua com docência ocasional em cursos de atualização para residentes e participa de
+            congressos nacionais e internacionais de medicina fetal anualmente, mantendo a prática
+            alinhada às mais recentes evidências científicas.
           </p>
         </div>
       </section>

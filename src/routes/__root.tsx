@@ -17,6 +17,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { ChatbotWidget } from "@/components/chatbot-widget";
 import { WhatsAppFloating } from "@/components/whatsapp-button";
 import { DOCTOR } from "@/lib/doctor.config";
+import { Toaster } from "@/components/ui/sonner";
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -138,6 +139,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
+        rel: "preload",
+        as: "style",
+        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap",
+      },
+      {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap",
       },
@@ -195,8 +201,16 @@ function useSWRegistration() {
   }, []);
 }
 
+function useScrollToTop() {
+  const { location } = useRouterState();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [location.pathname]);
+}
+
 function SiteShell() {
   useSWRegistration();
+  useScrollToTop();
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <a
@@ -206,13 +220,22 @@ function SiteShell() {
         Pular para o conteúdo principal
       </a>
       <CanonicalLink />
-      <SiteHeader />
+      <div className="print:hidden">
+        <SiteHeader />
+      </div>
       <main id="main-content" className="flex-1">
         <Outlet />
       </main>
-      <SiteFooter />
-      <ChatbotWidget />
-      <WhatsAppFloating />
+      <div className="print:hidden">
+        <SiteFooter />
+      </div>
+      <div className="print:hidden">
+        <ChatbotWidget />
+      </div>
+      <div className="print:hidden">
+        <WhatsAppFloating />
+      </div>
+      <Toaster position="bottom-right" richColors />
     </div>
   );
 }

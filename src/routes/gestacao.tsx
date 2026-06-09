@@ -2,13 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { Baby, HeartPulse, Stethoscope } from "lucide-react";
 import { AppCtaBanner } from "@/components/app-cta-banner";
+import { DOCTOR } from "@/lib/doctor.config";
 
 export const Route = createFileRoute("/gestacao")({
   head: () => {
     return {
       meta: [
         { title: "Sua gestação semana a semana — Obstétrica by Dr. Clóvis" },
-        { name: "description", content: "Linha do tempo da gestação e conteúdo educativo por trimestre, com orientação especializada do Dr. Clóvis Bacha." },
+        {
+          name: "description",
+          content:
+            "Linha do tempo da gestação e conteúdo educativo por trimestre, com orientação especializada do Dr. Clóvis Bacha.",
+        },
         { property: "og:title", content: "Sua gestação semana a semana" },
         { property: "og:description", content: "Linha do tempo e conteúdo por trimestre." },
       ],
@@ -18,14 +23,46 @@ export const Route = createFileRoute("/gestacao")({
 });
 
 const semanas = [
-  { sem: "4–8", titulo: "Confirmação e primeiros exames", texto: "Beta-hCG, ultrassom transvaginal e início do ácido fólico." },
-  { sem: "9–13", titulo: "1º trimestre — translucência nucal", texto: "Avaliação morfológica precoce e rastreio de cromossomopatias." },
-  { sem: "14–20", titulo: "Início do 2º trimestre", texto: "Sexagem, exames laboratoriais e acompanhamento de pressão e glicemia." },
-  { sem: "20–24", titulo: "Morfológico de 2º trimestre", texto: "Avaliação detalhada da anatomia fetal e do colo uterino." },
-  { sem: "24–28", titulo: "Teste de tolerância à glicose", texto: "Rastreamento de diabetes gestacional e ajuste nutricional." },
-  { sem: "28–34", titulo: "Acompanhamento intensivo", texto: "Ultrassom de crescimento, dopplervelocimetria quando indicado." },
-  { sem: "34–37", titulo: "Preparação para o parto", texto: "Plano de parto, avaliação de via de parto e maturidade fetal." },
-  { sem: "37–40+", titulo: "Termo e nascimento", texto: "Monitorização semanal, cardiotocografia e definição da indução se necessário." },
+  {
+    sem: "4–8",
+    titulo: "Confirmação e primeiros exames",
+    texto: "Beta-hCG, ultrassom transvaginal e início do ácido fólico.",
+  },
+  {
+    sem: "9–13",
+    titulo: "1º trimestre — translucência nucal",
+    texto: "Avaliação morfológica precoce e rastreio de cromossomopatias.",
+  },
+  {
+    sem: "14–20",
+    titulo: "Início do 2º trimestre",
+    texto: "Sexagem, exames laboratoriais e acompanhamento de pressão e glicemia.",
+  },
+  {
+    sem: "20–24",
+    titulo: "Morfológico de 2º trimestre",
+    texto: "Avaliação detalhada da anatomia fetal e do colo uterino.",
+  },
+  {
+    sem: "24–28",
+    titulo: "Teste de tolerância à glicose",
+    texto: "Rastreamento de diabetes gestacional e ajuste nutricional.",
+  },
+  {
+    sem: "28–34",
+    titulo: "Acompanhamento intensivo",
+    texto: "Ultrassom de crescimento, dopplervelocimetria quando indicado.",
+  },
+  {
+    sem: "34–37",
+    titulo: "Preparação para o parto",
+    texto: "Plano de parto, avaliação de via de parto e maturidade fetal.",
+  },
+  {
+    sem: "37–40+",
+    titulo: "Termo e nascimento",
+    texto: "Monitorização semanal, cardiotocografia e definição da indução se necessário.",
+  },
 ];
 
 const trimestres = [
@@ -58,14 +95,37 @@ const trimestres = [
   },
 ];
 
+const breadcrumb = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Início", item: DOCTOR.siteUrl },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "Gestação semana a semana",
+      item: `${DOCTOR.siteUrl}/gestacao`,
+    },
+  ],
+};
+
 function GestacaoPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
+      />
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Sua gestação</p>
-        <h1 className="mt-3 font-serif text-4xl md:text-5xl">Da concepção ao parto, semana a semana.</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+          Sua gestação
+        </p>
+        <h1 className="mt-3 font-serif text-4xl md:text-5xl">
+          Da concepção ao parto, semana a semana.
+        </h1>
         <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-          Um guia visual com os principais marcos e exames de uma gestação acompanhada. Cada caso é único — esta linha do tempo é informativa e não substitui a avaliação clínica.
+          Um guia visual com os principais marcos e exames de uma gestação acompanhada. Cada caso é
+          único — esta linha do tempo é informativa e não substitui a avaliação clínica.
         </p>
       </section>
 
@@ -74,9 +134,14 @@ function GestacaoPage() {
           <h2 className="font-serif text-3xl">Linha do tempo</h2>
           <ol className="mt-10 space-y-6">
             {semanas.map((s) => (
-              <li key={s.sem} className="grid gap-3 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] md:grid-cols-[140px_1fr]">
+              <li
+                key={s.sem}
+                className="grid gap-3 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] md:grid-cols-[140px_1fr]"
+              >
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Semanas</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Semanas
+                  </p>
                   <p className="font-serif text-3xl text-primary">{s.sem}</p>
                 </div>
                 <div>
@@ -91,15 +156,22 @@ function GestacaoPage() {
 
       <section className="mx-auto max-w-6xl px-5 py-20">
         <h2 className="font-serif text-3xl">Conteúdo por trimestre</h2>
-        <p className="mt-3 max-w-2xl text-muted-foreground">Conteúdo educativo curado pelo Dr. Clóvis para cada fase da gestação.</p>
+        <p className="mt-3 max-w-2xl text-muted-foreground">
+          Conteúdo educativo curado pelo Dr. Clóvis para cada fase da gestação.
+        </p>
         <div className="mt-10 grid gap-6 md:grid-cols-3">
           {trimestres.map(({ nome, icon: Icon, bullets }) => (
-            <article key={nome} className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+            <article
+              key={nome}
+              className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+            >
               <Icon className="h-7 w-7 text-primary" />
               <h3 className="mt-3 font-serif text-2xl">{nome}</h3>
               <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
                 {bullets.map((b) => (
-                  <li key={b} className="border-l-2 border-primary/40 pl-3">{b}</li>
+                  <li key={b} className="border-l-2 border-primary/40 pl-3">
+                    {b}
+                  </li>
                 ))}
               </ul>
             </article>
@@ -107,7 +179,12 @@ function GestacaoPage() {
         </div>
         <div className="mt-12 rounded-2xl bg-[var(--gradient-warm)] p-8 text-center">
           <p className="font-serif text-2xl text-foreground">Quer conversar sobre a sua fase?</p>
-          <Link to="/agendamento" className="mt-4 inline-block rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground">Agendar consulta</Link>
+          <Link
+            to="/agendamento"
+            className="mt-4 inline-block rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground"
+          >
+            Agendar consulta
+          </Link>
         </div>
       </section>
       <AppCtaBanner />
