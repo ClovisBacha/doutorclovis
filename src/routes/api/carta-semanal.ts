@@ -41,7 +41,11 @@ export const Route = createFileRoute("/api/carta-semanal")({
           });
         }
 
-        const body = (await request.json()) as { week?: number; babyName?: string; babyDesc?: string };
+        const body = (await request.json()) as {
+          week?: number;
+          babyName?: string;
+          babyDesc?: string;
+        };
         const week = body.week;
         if (!week || week < 4 || week > 42) {
           return new Response(JSON.stringify({ error: "Semana inválida." }), {

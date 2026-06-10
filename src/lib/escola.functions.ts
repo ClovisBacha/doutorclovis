@@ -22,11 +22,13 @@ export const getCourseProgress = createServerFn({ method: "POST" })
 
 export const markModuleComplete = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      moduleWeek: z.number().int().min(4).max(42),
-      quizScore: z.number().int().min(0).max(100),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        moduleWeek: z.number().int().min(4).max(42),
+        quizScore: z.number().int().min(0).max(100),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -43,12 +45,14 @@ export const markModuleComplete = createServerFn({ method: "POST" })
 
 export const savePanicEvent = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      latitude: z.number().nullable(),
-      longitude: z.number().nullable(),
-      address: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        latitude: z.number().nullable(),
+        longitude: z.number().nullable(),
+        address: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

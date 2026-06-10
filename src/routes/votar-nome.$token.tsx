@@ -58,7 +58,11 @@ function VotarNomePage() {
   async function load() {
     setLoading(true);
     const res = await getPublicNameSession({ data: { shareToken } });
-    if (!res.ok) { setError(res.error ?? "Erro desconhecido."); setLoading(false); return; }
+    if (!res.ok) {
+      setError(res.error ?? "Erro desconhecido.");
+      setLoading(false);
+      return;
+    }
     setSession(res.session);
     setEntries(res.entries);
     setMotherName(res.motherName ?? null);
@@ -122,9 +126,7 @@ function VotarNomePage() {
     : entries;
 
   const maxVotes = Math.max(...entries.map((e) => e.vote_count ?? 0), 0);
-  const winner = session.reveal_winner && sortedEntries[0]?.vote_count
-    ? sortedEntries[0]
-    : null;
+  const winner = session.reveal_winner && sortedEntries[0]?.vote_count ? sortedEntries[0] : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50/60 to-background px-4 py-12">
@@ -226,8 +228,8 @@ function VotarNomePage() {
                       isFirst
                         ? "border-amber-300 bg-amber-50"
                         : isMyVote
-                        ? "border-primary/40 bg-primary/5"
-                        : "border-border bg-card"
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-border bg-card"
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -251,7 +253,9 @@ function VotarNomePage() {
                       {session.reveal_winner && (
                         <div className="text-right shrink-0">
                           <p className="text-sm font-semibold text-primary">{votes}</p>
-                          <p className="text-xs text-muted-foreground">{votes === 1 ? "voto" : "votos"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {votes === 1 ? "voto" : "votos"}
+                          </p>
                         </div>
                       )}
                       {session.is_active && (
@@ -262,15 +266,11 @@ function VotarNomePage() {
                             isMyVote
                               ? "bg-primary text-white"
                               : hasVoted
-                              ? "bg-secondary text-muted-foreground cursor-not-allowed"
-                              : "bg-primary/10 text-primary hover:bg-primary hover:text-white disabled:opacity-40"
+                                ? "bg-secondary text-muted-foreground cursor-not-allowed"
+                                : "bg-primary/10 text-primary hover:bg-primary hover:text-white disabled:opacity-40"
                           }`}
                         >
-                          {submittingVote === entry.id
-                            ? "..."
-                            : isMyVote
-                            ? "✓ Votei"
-                            : "Votar"}
+                          {submittingVote === entry.id ? "..." : isMyVote ? "✓ Votei" : "Votar"}
                         </button>
                       )}
                     </div>
@@ -285,9 +285,7 @@ function VotarNomePage() {
             </p>
           )}
           {!voterName.trim() && session.is_active && entries.length > 0 && (
-            <p className="mt-3 text-xs text-center text-amber-600">
-              Preencha seu nome para votar.
-            </p>
+            <p className="mt-3 text-xs text-center text-amber-600">Preencha seu nome para votar.</p>
           )}
         </div>
       </div>

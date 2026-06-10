@@ -36,7 +36,8 @@ export function ChatbotWidget() {
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {messages.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                Olá! Posso ajudar com informações sobre o Dr. Clóvis, gestação de alto risco, agendamento e mais.
+                Olá! Posso ajudar com informações sobre o Dr. Clóvis, gestação de alto risco,
+                agendamento e mais.
               </p>
             )}
             {messages.map((m) => {
@@ -51,14 +52,18 @@ export function ChatbotWidget() {
                         : "max-w-[90%] text-sm leading-relaxed text-foreground"
                     }
                   >
-                    {isUser ? text : <div className="prose prose-sm max-w-none [&_p]:my-1"><ReactMarkdown>{text}</ReactMarkdown></div>}
+                    {isUser ? (
+                      text
+                    ) : (
+                      <div className="prose prose-sm max-w-none [&_p]:my-1">
+                        <ReactMarkdown>{text}</ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
-            {loading && (
-              <p className="text-xs italic text-muted-foreground">digitando…</p>
-            )}
+            {loading && <p className="text-xs italic text-muted-foreground">digitando…</p>}
           </div>
           <form
             onSubmit={(e) => {

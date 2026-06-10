@@ -32,12 +32,14 @@ const AdminTk = z.object({ accessToken: z.string().min(10) });
 
 export const createTeleconsulta = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      patientUserId: z.string().uuid(),
-      scheduledFor: z.string().nullable(),
-      doctorNotes: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        patientUserId: z.string().uuid(),
+        scheduledFor: z.string().nullable(),
+        doctorNotes: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const admin = await requireAdmin(data.accessToken);
@@ -77,11 +79,13 @@ export const getTeleconsultasAdmin = createServerFn({ method: "POST" })
 
 export const updateTeleconsultaStatus = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      id: z.string().uuid(),
-      status: z.enum(["agendada", "sala_aberta", "encerrada"]),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        id: z.string().uuid(),
+        status: z.enum(["agendada", "sala_aberta", "encerrada"]),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const admin = await requireAdmin(data.accessToken);
@@ -112,11 +116,13 @@ export const getMyTeleconsultas = createServerFn({ method: "POST" })
 
 export const savePatientNotes = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      id: z.string().uuid(),
-      notes: z.string(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        id: z.string().uuid(),
+        notes: z.string(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

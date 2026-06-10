@@ -9,7 +9,10 @@ export const Route = createFileRoute("/acompanhar/$token")({
   component: CompanionView,
 });
 
-const SUPPORT_TIPS: Record<1 | 2 | 3, { tasks: string[]; emotional: string[]; physical: string[] }> = {
+const SUPPORT_TIPS: Record<
+  1 | 2 | 3,
+  { tasks: string[]; emotional: string[]; physical: string[] }
+> = {
   1: {
     tasks: [
       "Acompanhe às consultas do pré-natal e ao primeiro ultrassom",
@@ -92,7 +95,12 @@ function CompanionView() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PapaiTab>("bebe");
-  const [panicEvent, setPanicEvent] = useState<{ latitude: number | null; longitude: number | null; address: string | null; created_at: string } | null>(null);
+  const [panicEvent, setPanicEvent] = useState<{
+    latitude: number | null;
+    longitude: number | null;
+    address: string | null;
+    created_at: string;
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -115,9 +123,17 @@ function CompanionView() {
   }, [token]);
 
   if (loading)
-    return <div className="mx-auto max-w-2xl px-5 py-20 text-center text-muted-foreground">Carregando...</div>;
+    return (
+      <div className="mx-auto max-w-2xl px-5 py-20 text-center text-muted-foreground">
+        Carregando...
+      </div>
+    );
   if (err || !profile)
-    return <div className="mx-auto max-w-2xl px-5 py-20 text-center text-muted-foreground">{err ?? "Não encontrado."}</div>;
+    return (
+      <div className="mx-auto max-w-2xl px-5 py-20 text-center text-muted-foreground">
+        {err ?? "Não encontrado."}
+      </div>
+    );
 
   const gest = computeGestation({
     lmp: profile.lmp_date,
@@ -132,7 +148,9 @@ function CompanionView() {
 
   const dueDate = due ? new Date(due + "T00:00:00") : null;
   const today = new Date();
-  const daysLeft = dueDate ? Math.max(0, Math.ceil((dueDate.getTime() - today.getTime()) / 86_400_000)) : null;
+  const daysLeft = dueDate
+    ? Math.max(0, Math.ceil((dueDate.getTime() - today.getTime()) / 86_400_000))
+    : null;
 
   const TABS: { id: PapaiTab; label: string }[] = [
     { id: "bebe", label: "Bebê" },
@@ -148,7 +166,10 @@ function CompanionView() {
           <p className="text-lg font-bold text-red-700">🚨 ALERTA DE EMERGÊNCIA</p>
           <p className="text-sm text-red-700 mt-1">
             {profile.display_name ?? "A gestante"} acionou o botão de pânico às{" "}
-            {new Date(panicEvent.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            {new Date(panicEvent.created_at).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </p>
           {panicEvent.address && (
             <p className="text-xs text-red-600 mt-1">📍 {panicEvent.address}</p>
@@ -164,17 +185,25 @@ function CompanionView() {
             </a>
           )}
           <div className="mt-3 flex gap-2">
-            <a href="tel:192" className="rounded-full bg-red-700 px-4 py-1.5 text-sm font-semibold text-white">
+            <a
+              href="tel:192"
+              className="rounded-full bg-red-700 px-4 py-1.5 text-sm font-semibold text-white"
+            >
               📞 SAMU 192
             </a>
-            <button onClick={() => setPanicEvent(null)} className="rounded-full bg-secondary px-4 py-1.5 text-xs text-muted-foreground">
+            <button
+              onClick={() => setPanicEvent(null)}
+              className="rounded-full bg-secondary px-4 py-1.5 text-xs text-muted-foreground"
+            >
               Dispensar
             </button>
           </div>
         </div>
       )}
       {/* Header */}
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Painel do Papai</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+        Painel do Papai
+      </p>
       <h1 className="mt-2 font-serif text-3xl">
         {profile.baby_name ? `${profile.baby_name} de` : "Bebê de"}{" "}
         <span className="text-primary">{profile.display_name ?? "—"}</span>
@@ -184,7 +213,10 @@ function CompanionView() {
           Semana <strong className="text-foreground">{gest.weeks}</strong>
           {gest.days > 0 && ` e ${gest.days} dias`}
           {daysLeft !== null && (
-            <> · <strong className="text-foreground">{daysLeft} dias</strong> para a DPP</>
+            <>
+              {" "}
+              · <strong className="text-foreground">{daysLeft} dias</strong> para a DPP
+            </>
           )}
         </p>
       )}
@@ -196,7 +228,9 @@ function CompanionView() {
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             className={`flex-1 rounded-xl py-2 text-xs font-medium transition-colors ${
-              activeTab === t.id ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              activeTab === t.id
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {t.label}
@@ -212,7 +246,10 @@ function CompanionView() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-primary">Esta semana</p>
-                  <p className="mt-1 font-serif text-4xl">{gest.weeks}<span className="ml-1 text-xl text-muted-foreground">sem</span></p>
+                  <p className="mt-1 font-serif text-4xl">
+                    {gest.weeks}
+                    <span className="ml-1 text-xl text-muted-foreground">sem</span>
+                  </p>
                 </div>
                 <div className="text-5xl">{baby.fruit}</div>
               </div>
@@ -232,7 +269,12 @@ function CompanionView() {
               <div className="rounded-2xl border border-border bg-card p-4 text-sm">
                 <p className="text-muted-foreground">Data Provável do Parto</p>
                 <p className="mt-1 font-serif text-xl">
-                  {new Date(due + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                  {new Date(due + "T00:00:00").toLocaleDateString("pt-BR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
                 </p>
                 {daysLeft !== null && (
                   <p className="mt-1 text-xs text-primary font-medium">Faltam {daysLeft} dias 🎉</p>
@@ -250,7 +292,8 @@ function CompanionView() {
               <ul className="mt-3 space-y-2">
                 {tips.emotional.map((tip, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <span className="mt-0.5 text-primary">💛</span>{tip}
+                    <span className="mt-0.5 text-primary">💛</span>
+                    {tip}
                   </li>
                 ))}
               </ul>
@@ -260,7 +303,8 @@ function CompanionView() {
               <ul className="mt-3 space-y-2">
                 {tips.physical.map((tip, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <span className="mt-0.5 text-primary">🤝</span>{tip}
+                    <span className="mt-0.5 text-primary">🤝</span>
+                    {tip}
                   </li>
                 ))}
               </ul>
@@ -271,7 +315,9 @@ function CompanionView() {
         {/* Tab: Tarefas */}
         {activeTab === "tarefas" && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Tarefas práticas recomendadas para o {trimester}º trimestre.</p>
+            <p className="text-sm text-muted-foreground">
+              Tarefas práticas recomendadas para o {trimester}º trimestre.
+            </p>
             <div className="space-y-2">
               {tips.tasks.map((task, i) => (
                 <TaskItem key={i} label={task} />
@@ -288,7 +334,9 @@ function CompanionView() {
               <ul className="mt-3 space-y-3">
                 {PARTO_TIPS.map((tip, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      {i + 1}
+                    </span>
                     {tip}
                   </li>
                 ))}
@@ -320,10 +368,14 @@ function TaskItem({ label }: { label: string }) {
     <button
       onClick={() => setDone((v) => !v)}
       className={`flex w-full items-start gap-3 rounded-2xl border p-4 text-left text-sm transition-all ${
-        done ? "border-emerald-200 bg-emerald-50 text-muted-foreground line-through" : "border-border bg-card hover:border-primary/30"
+        done
+          ? "border-emerald-200 bg-emerald-50 text-muted-foreground line-through"
+          : "border-border bg-card hover:border-primary/30"
       }`}
     >
-      <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${done ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground"}`}>
+      <span
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${done ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground"}`}
+      >
         {done && "✓"}
       </span>
       {label}

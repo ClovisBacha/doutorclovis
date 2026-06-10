@@ -15,13 +15,15 @@ export type AlbumPost = {
 
 export const createAlbumPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      accessToken: z.string().min(10),
-      authorName: z.string().min(1),
-      caption: z.string().nullable(),
-      imageData: z.string().nullable(),
-      emoji: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        accessToken: z.string().min(10),
+        authorName: z.string().min(1),
+        caption: z.string().nullable(),
+        imageData: z.string().nullable(),
+        emoji: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -55,18 +57,24 @@ export const getAlbumByToken = createServerFn({ method: "POST" })
       .select("*")
       .eq("patient_user_id", invite.user_id)
       .order("created_at", { ascending: false });
-    return { ok: true as const, posts: (posts ?? []) as AlbumPost[], patientUserId: invite.user_id };
+    return {
+      ok: true as const,
+      posts: (posts ?? []) as AlbumPost[],
+      patientUserId: invite.user_id,
+    };
   });
 
 export const addAlbumPostPublic = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      token: z.string(),
-      authorName: z.string().min(1),
-      caption: z.string().nullable(),
-      imageData: z.string().nullable(),
-      emoji: z.string().nullable(),
-    }).parse(i)
+    z
+      .object({
+        token: z.string(),
+        authorName: z.string().min(1),
+        caption: z.string().nullable(),
+        imageData: z.string().nullable(),
+        emoji: z.string().nullable(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -90,7 +98,7 @@ export const addAlbumPostPublic = createServerFn({ method: "POST" })
 
 export const deleteAlbumPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), id: z.string().uuid() }).parse(i)
+    z.object({ accessToken: z.string().min(10), id: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -158,7 +166,11 @@ export const getOrCreateNameSession = createServerFn({ method: "POST" })
         ...e,
         vote_count: e.baby_name_votes?.[0]?.count ?? 0,
       }));
-      return { ok: true as const, session: existing as NameSession, entries: enriched as NameEntry[] };
+      return {
+        ok: true as const,
+        session: existing as NameSession,
+        entries: enriched as NameEntry[],
+      };
     }
     // Create new
     const { data: created, error } = await supabaseAdmin
@@ -172,7 +184,9 @@ export const getOrCreateNameSession = createServerFn({ method: "POST" })
 
 export const addNameByPatient = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), name: z.string().min(1), suggestedBy: z.string() }).parse(i)
+    z
+      .object({ accessToken: z.string().min(10), name: z.string().min(1), suggestedBy: z.string() })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -194,7 +208,9 @@ export const addNameByPatient = createServerFn({ method: "POST" })
 
 export const toggleNameSession = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), isActive: z.boolean(), revealWinner: z.boolean() }).parse(i)
+    z
+      .object({ accessToken: z.string().min(10), isActive: z.boolean(), revealWinner: z.boolean() })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -209,7 +225,7 @@ export const toggleNameSession = createServerFn({ method: "POST" })
 
 export const removeNameEntry = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), entryId: z.string().uuid() }).parse(i)
+    z.object({ accessToken: z.string().min(10), entryId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -268,7 +284,9 @@ export const getPublicNameSession = createServerFn({ method: "POST" })
 
 export const addPublicNameEntry = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ shareToken: z.string(), name: z.string().min(1), suggestedBy: z.string().min(1) }).parse(i)
+    z
+      .object({ shareToken: z.string(), name: z.string().min(1), suggestedBy: z.string().min(1) })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -288,12 +306,14 @@ export const addPublicNameEntry = createServerFn({ method: "POST" })
 
 export const voteForName = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({
-      shareToken: z.string(),
-      entryId: z.string().uuid(),
-      voterName: z.string().min(1),
-      voterToken: z.string(),
-    }).parse(i)
+    z
+      .object({
+        shareToken: z.string(),
+        entryId: z.string().uuid(),
+        voterName: z.string().min(1),
+        voterToken: z.string(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

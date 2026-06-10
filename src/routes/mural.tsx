@@ -5,7 +5,11 @@ export const Route = createFileRoute("/mural")({
   head: () => ({
     meta: [
       { title: "Mural dos bebês — Obstétrica by Dr. Clóvis" },
-      { name: "description", content: "Galeria de bebês nascidos sob nossos cuidados. Compartilhada com autorização das famílias." },
+      {
+        name: "description",
+        content:
+          "Galeria de bebês nascidos sob nossos cuidados. Compartilhada com autorização das famílias.",
+      },
     ],
   }),
   component: MuralPage,
@@ -38,10 +42,13 @@ const cores = [
 function MuralPage() {
   return (
     <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Histórias reais</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+        Histórias reais
+      </p>
       <h1 className="mt-3 font-serif text-4xl md:text-5xl">Mural dos nossos bebês</h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">
-        Cada rostinho aqui é uma história de amor e cuidado. Publicado com a autorização das famílias.
+        Cada rostinho aqui é uma história de amor e cuidado. Publicado com a autorização das
+        famílias.
       </p>
 
       <div className="mt-12 grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -50,7 +57,9 @@ function MuralPage() {
             key={b.nome}
             className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]"
           >
-            <div className={`flex aspect-square items-center justify-center bg-gradient-to-br ${cores[i % cores.length]}`}>
+            <div
+              className={`flex aspect-square items-center justify-center bg-gradient-to-br ${cores[i % cores.length]}`}
+            >
               <Heart className="h-12 w-12 text-primary/60" fill="currentColor" />
             </div>
             <figcaption className="p-4">
@@ -63,7 +72,8 @@ function MuralPage() {
       </div>
 
       <p className="mt-10 text-center text-sm text-muted-foreground">
-        Quer que seu bebê apareça aqui? Envie a foto pelo WhatsApp após o parto com autorização de uso.
+        Quer que seu bebê apareça aqui? Envie a foto pelo WhatsApp após o parto com autorização de
+        uso.
       </p>
     </section>
   );

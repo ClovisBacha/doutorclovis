@@ -13,10 +13,8 @@ export function TechGrid({ className = "" }: { className?: string }) {
           backgroundImage:
             "linear-gradient(to right, color-mix(in oklab, var(--primary) 14%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--primary) 14%, transparent) 1px, transparent 1px)",
           backgroundSize: "44px 44px",
-          maskImage:
-            "radial-gradient(ellipse at 50% 30%, black 35%, transparent 75%)",
-          WebkitMaskImage:
-            "radial-gradient(ellipse at 50% 30%, black 35%, transparent 75%)",
+          maskImage: "radial-gradient(ellipse at 50% 30%, black 35%, transparent 75%)",
+          WebkitMaskImage: "radial-gradient(ellipse at 50% 30%, black 35%, transparent 75%)",
         }}
       />
       <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl animate-pulse" />
@@ -115,7 +113,13 @@ export function Particles({ density = 36 }: { density?: number }) {
 }
 
 /** Gradient text shimmer for headlines. */
-export function ShimmerText({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+export function ShimmerText({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <span
       className={`bg-clip-text text-transparent ${className}`}

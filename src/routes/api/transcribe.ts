@@ -125,7 +125,15 @@ export const Route = createFileRoute("/api/transcribe")({
           });
         } catch {
           return new Response(
-            JSON.stringify({ ok: true, transcript: raw, titulo: "Consulta", orientacoes: [], medicamentos: [], proximos_exames: [], proxima_consulta: null }),
+            JSON.stringify({
+              ok: true,
+              transcript: raw,
+              titulo: "Consulta",
+              orientacoes: [],
+              medicamentos: [],
+              proximos_exames: [],
+              proxima_consulta: null,
+            }),
             { headers: { "Content-Type": "application/json" } },
           );
         }

@@ -6,7 +6,11 @@ export const Route = createFileRoute("/lives")({
   head: () => ({
     meta: [
       { title: "Lives e encontros com Dr. Clóvis Bacha" },
-      { name: "description", content: "Próximas lives no Instagram, calendário de encontros gratuitos e gravações anteriores." },
+      {
+        name: "description",
+        content:
+          "Próximas lives no Instagram, calendário de encontros gratuitos e gravações anteriores.",
+      },
       { property: "og:title", content: "Lives e encontros" },
       { property: "og:description", content: "Participe das lives gratuitas no Instagram." },
     ],
@@ -45,10 +49,13 @@ function LivesPage() {
 
   return (
     <section className="mx-auto max-w-4xl px-5 py-16">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Encontros gratuitos</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+        Encontros gratuitos
+      </p>
       <h1 className="mt-3 font-serif text-4xl">Lives no Instagram</h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">
-        Uma vez por mês, o Dr. Clóvis abre uma conversa ao vivo para tirar dúvidas reais. Gratuito, sem inscrição.
+        Uma vez por mês, o Dr. Clóvis abre uma conversa ao vivo para tirar dúvidas reais. Gratuito,
+        sem inscrição.
       </p>
 
       <div className="mt-10 rounded-3xl border border-primary/20 bg-primary/5 p-8">
@@ -56,7 +63,13 @@ function LivesPage() {
         <p className="mt-3 text-xs uppercase tracking-[0.22em] text-primary">Próxima live</p>
         <p className="mt-2 font-serif text-2xl">{proximaLive.titulo}</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          {new Date(proximaLive.data).toLocaleString("pt-BR", { weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}
+          {new Date(proximaLive.data).toLocaleString("pt-BR", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </p>
         <p className="mt-4 font-serif text-3xl text-primary">{restante}</p>
         <a
@@ -81,7 +94,9 @@ function LivesPage() {
               className="group rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] transition-transform hover:-translate-y-1"
             >
               <Instagram className="h-5 w-5 text-primary" />
-              <p className="mt-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">{a.data}</p>
+              <p className="mt-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                {a.data}
+              </p>
               <p className="mt-1 font-serif text-lg">{a.titulo}</p>
             </a>
           ))}

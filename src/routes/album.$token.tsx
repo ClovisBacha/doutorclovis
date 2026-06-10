@@ -33,7 +33,11 @@ function AlbumPage() {
   async function load() {
     setLoading(true);
     const res = await getAlbumByToken({ data: { token } });
-    if (!res.ok) { setError(res.error ?? "Erro desconhecido."); setLoading(false); return; }
+    if (!res.ok) {
+      setError(res.error ?? "Erro desconhecido.");
+      setLoading(false);
+      return;
+    }
     setPosts(res.posts);
     setLoading(false);
   }
@@ -136,9 +140,14 @@ function AlbumPage() {
               <div className="relative inline-block">
                 <img src={imageData} alt="preview" className="h-32 rounded-xl object-cover" />
                 <button
-                  onClick={() => { setImageData(null); if (fileRef.current) fileRef.current.value = ""; }}
+                  onClick={() => {
+                    setImageData(null);
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
                   className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center"
-                >×</button>
+                >
+                  ×
+                </button>
               </div>
             )}
             <input
@@ -159,7 +168,9 @@ function AlbumPage() {
               ))}
             </div>
             {submitted && (
-              <p className="text-sm text-green-600 font-medium">✓ Memória adicionada com sucesso!</p>
+              <p className="text-sm text-green-600 font-medium">
+                ✓ Memória adicionada com sucesso!
+              </p>
             )}
             <button
               onClick={handleSubmit}
@@ -184,7 +195,10 @@ function AlbumPage() {
           ) : (
             <div className="space-y-4">
               {posts.map((post) => (
-                <div key={post.id} className="rounded-2xl border border-border bg-card overflow-hidden">
+                <div
+                  key={post.id}
+                  className="rounded-2xl border border-border bg-card overflow-hidden"
+                >
                   {post.image_data && (
                     <img
                       src={post.image_data}

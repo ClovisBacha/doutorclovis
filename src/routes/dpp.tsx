@@ -6,7 +6,10 @@ export const Route = createFileRoute("/dpp")({
   head: () => ({
     meta: [
       { title: "Previsão da DPP com faixa probabilística — Obstétrica by Dr. Clóvis" },
-      { name: "description", content: "Estimativa probabilística da data provável do parto baseada em DUM, ciclo e USG." },
+      {
+        name: "description",
+        content: "Estimativa probabilística da data provável do parto baseada em DUM, ciclo e USG.",
+      },
       { property: "og:title", content: "Previsão da DPP" },
       { property: "og:description", content: "Distribuição probabilística da data do parto." },
     ],
@@ -19,7 +22,8 @@ function addDays(d: Date, days: number) {
   r.setDate(r.getDate() + days);
   return r;
 }
-const fmt = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+const fmt = (d: Date) =>
+  d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 function DppPage() {
   const [dum, setDum] = useState("");
@@ -52,28 +56,54 @@ function DppPage() {
 
   return (
     <section className="mx-auto max-w-4xl px-5 py-16">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Previsão científica</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+        Previsão científica
+      </p>
       <h1 className="mt-3 font-serif text-4xl">Quando seu bebê deve nascer?</h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">
-        Apenas 5% dos bebês nascem exatamente na DPP. Veja a faixa real de probabilidade combinando DUM, duração do ciclo e (se houver) USG.
+        Apenas 5% dos bebês nascem exatamente na DPP. Veja a faixa real de probabilidade combinando
+        DUM, duração do ciclo e (se houver) USG.
       </p>
 
       <div className="mt-8 grid gap-5 rounded-3xl border border-border bg-card p-6 md:grid-cols-2">
         <label className="text-sm">
           <span className="font-medium">DUM (1º dia da última menstruação)</span>
-          <input type="date" value={dum} onChange={(e) => setDum(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2" />
+          <input
+            type="date"
+            value={dum}
+            onChange={(e) => setDum(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2"
+          />
         </label>
         <label className="text-sm">
           <span className="font-medium">Duração do ciclo: {ciclo} dias</span>
-          <input type="range" min={21} max={40} value={ciclo} onChange={(e) => setCiclo(Number(e.target.value))} className="mt-3 w-full" />
+          <input
+            type="range"
+            min={21}
+            max={40}
+            value={ciclo}
+            onChange={(e) => setCiclo(Number(e.target.value))}
+            className="mt-3 w-full"
+          />
         </label>
         <label className="text-sm">
           <span className="font-medium">USG — semanas (opcional)</span>
-          <input type="number" step="0.1" value={usgSemanas} onChange={(e) => setUsgSemanas(e.target.value ? Number(e.target.value) : "")} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2" />
+          <input
+            type="number"
+            step="0.1"
+            value={usgSemanas}
+            onChange={(e) => setUsgSemanas(e.target.value ? Number(e.target.value) : "")}
+            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2"
+          />
         </label>
         <label className="text-sm">
           <span className="font-medium">USG — data do exame</span>
-          <input type="date" value={usgData} onChange={(e) => setUsgData(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2" />
+          <input
+            type="date"
+            value={usgData}
+            onChange={(e) => setUsgData(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2"
+          />
         </label>
       </div>
 
@@ -82,19 +112,26 @@ function DppPage() {
           <p className="text-sm text-muted-foreground">Data mais provável</p>
           <p className="mt-1 font-serif text-4xl text-primary">{fmt(result.dpp)}</p>
           <p className="mt-4 text-sm text-foreground">
-            Faixa de 95% de confiança: <strong>{fmt(result.buckets[0].date)}</strong> a <strong>{fmt(result.buckets[result.buckets.length - 1].date)}</strong>
+            Faixa de 95% de confiança: <strong>{fmt(result.buckets[0].date)}</strong> a{" "}
+            <strong>{fmt(result.buckets[result.buckets.length - 1].date)}</strong>
           </p>
 
           <div className="mt-6 flex items-end justify-between gap-2">
             {result.buckets.map((b) => (
               <div key={b.dia} className="flex flex-1 flex-col items-center">
-                <div className="w-full rounded-t-md bg-primary" style={{ height: `${b.h * 1.2 + 10}px`, opacity: 0.4 + b.p * 0.6 }} />
-                <p className="mt-2 text-[10px] text-muted-foreground">{b.dia > 0 ? `+${b.dia}` : b.dia}d</p>
+                <div
+                  className="w-full rounded-t-md bg-primary"
+                  style={{ height: `${b.h * 1.2 + 10}px`, opacity: 0.4 + b.p * 0.6 }}
+                />
+                <p className="mt-2 text-[10px] text-muted-foreground">
+                  {b.dia > 0 ? `+${b.dia}` : b.dia}d
+                </p>
               </div>
             ))}
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            * Estimativa estatística. Apenas a avaliação clínica do Dr. Clóvis confirma a melhor janela para o parto.
+            * Estimativa estatística. Apenas a avaliação clínica do Dr. Clóvis confirma a melhor
+            janela para o parto.
           </p>
         </div>
       )}

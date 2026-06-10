@@ -7,7 +7,11 @@ export const Route = createFileRoute("/empresas")({
   head: () => ({
     meta: [
       { title: "Benefício Corporativo — Obstétrica by Dr. Clóvis" },
-      { name: "description", content: "Ofereça acompanhamento pré-natal de excelência como benefício para suas funcionárias grávidas." },
+      {
+        name: "description",
+        content:
+          "Ofereça acompanhamento pré-natal de excelência como benefício para suas funcionárias grávidas.",
+      },
     ],
   }),
   component: EmpresasPage,
@@ -112,7 +116,10 @@ function EmpresasPage() {
           <Link to="/" className="font-serif text-lg font-semibold text-primary">
             Dr. Clóvis Bacha
           </Link>
-          <a href="#contato" className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white">
+          <a
+            href="#contato"
+            className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
+          >
             Solicitar proposta
           </a>
         </div>
@@ -128,8 +135,9 @@ function EmpresasPage() {
             Cuide de quem cuida da empresa
           </h1>
           <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-            Ofereça às suas funcionárias grávidas o acompanhamento pré-natal mais completo do Brasil,
-            com tecnologia e a expertise do Dr. Clóvis Bacha — especialista em gestação de alto risco.
+            Ofereça às suas funcionárias grávidas o acompanhamento pré-natal mais completo do
+            Brasil, com tecnologia e a expertise do Dr. Clóvis Bacha — especialista em gestação de
+            alto risco.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a
@@ -151,7 +159,9 @@ function EmpresasPage() {
       {/* Benefits */}
       <section className="py-20 px-5">
         <div className="mx-auto max-w-5xl">
-          <h2 className="font-serif text-3xl text-center mb-12">Por que oferecer este benefício?</h2>
+          <h2 className="font-serif text-3xl text-center mb-12">
+            Por que oferecer este benefício?
+          </h2>
           <div className="grid gap-6 md:grid-cols-3">
             {[
               {
@@ -199,7 +209,9 @@ function EmpresasPage() {
       <section id="planos" className="py-20 px-5 bg-secondary/20">
         <div className="mx-auto max-w-5xl">
           <h2 className="font-serif text-3xl text-center mb-3">Planos</h2>
-          <p className="text-center text-muted-foreground mb-12">Preços mensais com faturamento anual. Todos os planos incluem onboarding gratuito.</p>
+          <p className="text-center text-muted-foreground mb-12">
+            Preços mensais com faturamento anual. Todos os planos incluem onboarding gratuito.
+          </p>
           <div className="grid gap-6 md:grid-cols-3">
             {PLANS.map((plan) => (
               <div
@@ -236,7 +248,8 @@ function EmpresasPage() {
             ))}
           </div>
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            Precisa de mais vagas ou plano personalizado? Entre em contato — temos soluções sob medida.
+            Precisa de mais vagas ou plano personalizado? Entre em contato — temos soluções sob
+            medida.
           </p>
         </div>
       </section>
@@ -246,8 +259,8 @@ function EmpresasPage() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-5xl mb-6">💛</p>
           <blockquote className="font-serif text-xl text-foreground leading-relaxed">
-            "Acompanhar a gestação das nossas colaboradoras com suporte médico especializado de qualidade
-            não é só um benefício — é um investimento no futuro da empresa."
+            "Acompanhar a gestação das nossas colaboradoras com suporte médico especializado de
+            qualidade não é só um benefício — é um investimento no futuro da empresa."
           </blockquote>
           <p className="mt-4 text-sm text-muted-foreground">— Gestora de RH, cliente corporativo</p>
         </div>
@@ -266,11 +279,15 @@ function EmpresasPage() {
               <p className="text-4xl mb-4">🎉</p>
               <h3 className="font-serif text-xl font-semibold mb-2">Recebemos seu contato!</h3>
               <p className="text-sm text-green-700">
-                Em até 24 horas úteis nossa equipe entrará em contato com a proposta para {form.companyName}.
+                Em até 24 horas úteis nossa equipe entrará em contato com a proposta para{" "}
+                {form.companyName}.
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="rounded-3xl border border-border bg-card p-8 space-y-4">
+            <form
+              onSubmit={handleSubmit}
+              className="rounded-3xl border border-border bg-card p-8 space-y-4"
+            >
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Nome da empresa *</label>
@@ -322,7 +339,11 @@ function EmpresasPage() {
                   className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
                 >
                   <option value="">Selecione...</option>
-                  {EMPLOYEE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  {EMPLOYEE_OPTIONS.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -341,7 +362,9 @@ function EmpresasPage() {
 
               <button
                 type="submit"
-                disabled={submitting || !form.companyName || !form.contactName || !form.contactEmail}
+                disabled={
+                  submitting || !form.companyName || !form.contactName || !form.contactEmail
+                }
                 className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-white disabled:opacity-40"
               >
                 {submitting ? "Enviando..." : "Solicitar demonstração gratuita"}
@@ -357,8 +380,12 @@ function EmpresasPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-8 px-5 text-center text-xs text-muted-foreground">
-        <p>© {new Date().getFullYear()} {DOCTOR.name} · {DOCTOR.title} · {DOCTOR.crm}</p>
-        <Link to="/" className="mt-2 block text-primary hover:underline">Voltar ao site</Link>
+        <p>
+          © {new Date().getFullYear()} {DOCTOR.name} · {DOCTOR.title} · {DOCTOR.crm}
+        </p>
+        <Link to="/" className="mt-2 block text-primary hover:underline">
+          Voltar ao site
+        </Link>
       </footer>
     </div>
   );

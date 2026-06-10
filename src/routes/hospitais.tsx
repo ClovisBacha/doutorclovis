@@ -6,19 +6,42 @@ export const Route = createFileRoute("/hospitais")({
   head: () => ({
     meta: [
       { title: "Hospitais e maternidades — Obstétrica by Dr. Clóvis" },
-      { name: "description", content: "Maternidades e hospitais conveniados, com rota e tempo de trajeto a partir do seu endereço." },
+      {
+        name: "description",
+        content:
+          "Maternidades e hospitais conveniados, com rota e tempo de trajeto a partir do seu endereço.",
+      },
       { property: "og:title", content: "Hospitais conveniados" },
-      { property: "og:description", content: "Encontre rotas até as maternidades atendidas pelo Dr. Clóvis Bacha." },
+      {
+        property: "og:description",
+        content: "Encontre rotas até as maternidades atendidas pelo Dr. Clóvis Bacha.",
+      },
     ],
   }),
   component: HospitaisPage,
 });
 
 const hospitais = [
-  { nome: "Hospital Vila da Serra", end: "Alameda da Serra, 500 - Nova Lima, MG", obs: "UTI neonatal de alta complexidade" },
-  { nome: "Hospital Mater Dei Santo Agostinho", end: "Av. do Contorno, 9000 - Belo Horizonte, MG", obs: "Referência em obstetrícia" },
-  { nome: "Hospital Sofia Feldman", end: "Rua Maranhão, 1631 - Belo Horizonte, MG", obs: "Humanização do parto" },
-  { nome: "Maternidade Octaviano Neves", end: "Av. do Contorno, 4747 - Belo Horizonte, MG", obs: "Tradição em GO" },
+  {
+    nome: "Hospital Vila da Serra",
+    end: "Alameda da Serra, 500 - Nova Lima, MG",
+    obs: "UTI neonatal de alta complexidade",
+  },
+  {
+    nome: "Hospital Mater Dei Santo Agostinho",
+    end: "Av. do Contorno, 9000 - Belo Horizonte, MG",
+    obs: "Referência em obstetrícia",
+  },
+  {
+    nome: "Hospital Sofia Feldman",
+    end: "Rua Maranhão, 1631 - Belo Horizonte, MG",
+    obs: "Humanização do parto",
+  },
+  {
+    nome: "Maternidade Octaviano Neves",
+    end: "Av. do Contorno, 4747 - Belo Horizonte, MG",
+    obs: "Tradição em GO",
+  },
 ];
 
 function HospitaisPage() {
@@ -34,10 +57,13 @@ function HospitaisPage() {
 
   return (
     <section className="mx-auto max-w-4xl px-5 py-16">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Onde nascem os nossos bebês</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+        Onde nascem os nossos bebês
+      </p>
       <h1 className="mt-3 font-serif text-4xl">Maternidades e hospitais</h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">
-        Saber o caminho com antecedência reduz a ansiedade. Digite seu endereço ou CEP e veja a rota até cada maternidade.
+        Saber o caminho com antecedência reduz a ansiedade. Digite seu endereço ou CEP e veja a rota
+        até cada maternidade.
       </p>
 
       <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 sm:flex-row">
@@ -53,7 +79,10 @@ function HospitaisPage() {
 
       <div className="mt-8 grid gap-5 md:grid-cols-2">
         {hospitais.map((h) => (
-          <div key={h.nome} className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+          <div
+            key={h.nome}
+            className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+          >
             <p className="font-serif text-xl text-primary">{h.nome}</p>
             <p className="mt-2 text-sm text-muted-foreground">{h.end}</p>
             <p className="mt-2 text-xs text-foreground/80">{h.obs}</p>
@@ -68,7 +97,8 @@ function HospitaisPage() {
         ))}
       </div>
       <p className="mt-6 text-xs text-muted-foreground">
-        * Sempre confirme a maternidade da sua escolha com a equipe na consulta. Cobertura pode variar por convênio.
+        * Sempre confirme a maternidade da sua escolha com a equipe na consulta. Cobertura pode
+        variar por convênio.
       </p>
     </section>
   );

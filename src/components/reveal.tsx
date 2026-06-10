@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type ElementType } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+  type ElementType,
+} from "react";
 
 type Variant = "up" | "fade" | "scale" | "left" | "right" | "blur";
 

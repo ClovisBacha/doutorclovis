@@ -5,7 +5,11 @@ export const Route = createFileRoute("/tamanho-real")({
   head: () => ({
     meta: [
       { title: "Tamanho real do bebê na tela — Obstétrica by Dr. Clóvis" },
-      { name: "description", content: "Veja o tamanho real do seu bebê na tela do celular, calibrado com um cartão de crédito." },
+      {
+        name: "description",
+        content:
+          "Veja o tamanho real do seu bebê na tela do celular, calibrado com um cartão de crédito.",
+      },
       { property: "og:title", content: "Tamanho real do bebê" },
       { property: "og:description", content: "Calibre a tela e visualize o bebê em escala real." },
     ],
@@ -14,9 +18,15 @@ export const Route = createFileRoute("/tamanho-real")({
 });
 
 const tamanhos = [
-  { mes: 1, cm: 0.4 }, { mes: 2, cm: 1.6 }, { mes: 3, cm: 7.4 },
-  { mes: 4, cm: 13 }, { mes: 5, cm: 19 }, { mes: 6, cm: 32 },
-  { mes: 7, cm: 38 }, { mes: 8, cm: 45 }, { mes: 9, cm: 50 },
+  { mes: 1, cm: 0.4 },
+  { mes: 2, cm: 1.6 },
+  { mes: 3, cm: 7.4 },
+  { mes: 4, cm: 13 },
+  { mes: 5, cm: 19 },
+  { mes: 6, cm: 32 },
+  { mes: 7, cm: 38 },
+  { mes: 8, cm: 45 },
+  { mes: 9, cm: 50 },
 ];
 
 // Cartão padrão ISO/IEC 7810 ID-1: 85.6mm largura
@@ -38,10 +48,13 @@ function TamanhoRealPage() {
 
   return (
     <section className="mx-auto max-w-4xl px-5 py-16">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Visualização real</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+        Visualização real
+      </p>
       <h1 className="mt-3 font-serif text-4xl">Tamanho real do bebê na sua tela</h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">
-        Calibre a tela colocando um cartão de crédito sobre o retângulo abaixo e ajustando até encaixar perfeitamente. Depois, escolha o mês e veja o bebê em tamanho real.
+        Calibre a tela colocando um cartão de crédito sobre o retângulo abaixo e ajustando até
+        encaixar perfeitamente. Depois, escolha o mês e veja o bebê em tamanho real.
       </p>
 
       <div className="mt-10 rounded-3xl border border-border bg-card p-6">
@@ -60,7 +73,9 @@ function TamanhoRealPage() {
           onChange={(e) => recalibrar(Number(e.target.value))}
           className="mt-4 w-full"
         />
-        <p className="mt-1 text-xs text-muted-foreground">Largura: {cardWidthPx}px ({pxPerCm.toFixed(1)} px/cm)</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Largura: {cardWidthPx}px ({pxPerCm.toFixed(1)} px/cm)
+        </p>
       </div>
 
       <div className="mt-8 rounded-3xl border border-border bg-card p-6">
@@ -71,7 +86,9 @@ function TamanhoRealPage() {
               key={t.mes}
               onClick={() => setMes(t.mes)}
               className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                mes === t.mes ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground"
+                mes === t.mes
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground"
               }`}
             >
               Mês {t.mes}

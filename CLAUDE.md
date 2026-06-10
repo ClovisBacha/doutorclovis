@@ -26,7 +26,7 @@ bun run format         # prettier --write
 
 > **Ambiente sandbox (Claude Code na web):** o Vite tenta escutar em IPv6
 > (`:::8080`), que não é suportado aqui. Rode com `bun run dev --host
-> 127.0.0.1 --port 8080`.
+127.0.0.1 --port 8080`.
 
 ## Variáveis de ambiente
 
@@ -60,6 +60,7 @@ API), que a Vercel detecta automaticamente. Configurado em `vite.config.ts` e
 `vercel.json` (`buildCommand: bun run build`).
 
 Passo a passo (uma vez):
+
 1. Acesse https://vercel.com e entre com o GitHub
 2. **Add New → Project** e importe `clovisbacha/doutorclovis`
 3. Em **Environment Variables**, adicione as chaves do `.env` (todas as

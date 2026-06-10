@@ -185,11 +185,26 @@ export const getEngagementData = createServerFn({ method: "POST" })
       supabaseAdmin
         .from("patient_profiles")
         .select("id,display_name,baby_name,lmp_date,reference_date,reference_weeks,reference_days"),
-      supabaseAdmin.from("health_logs").select("user_id,created_at").gte("created_at", sevenDaysAgo),
-      supabaseAdmin.from("journal_entries").select("user_id,created_at").gte("created_at", sevenDaysAgo),
-      supabaseAdmin.from("kick_sessions").select("user_id,started_at").gte("started_at", sevenDaysAgo),
-      supabaseAdmin.from("doctor_questions").select("user_id,created_at").gte("created_at", sevenDaysAgo),
-      supabaseAdmin.from("preconsulta_forms").select("user_id,submitted_at,seen_by_doctor").order("submitted_at", { ascending: false }),
+      supabaseAdmin
+        .from("health_logs")
+        .select("user_id,created_at")
+        .gte("created_at", sevenDaysAgo),
+      supabaseAdmin
+        .from("journal_entries")
+        .select("user_id,created_at")
+        .gte("created_at", sevenDaysAgo),
+      supabaseAdmin
+        .from("kick_sessions")
+        .select("user_id,started_at")
+        .gte("started_at", sevenDaysAgo),
+      supabaseAdmin
+        .from("doctor_questions")
+        .select("user_id,created_at")
+        .gte("created_at", sevenDaysAgo),
+      supabaseAdmin
+        .from("preconsulta_forms")
+        .select("user_id,submitted_at,seen_by_doctor")
+        .order("submitted_at", { ascending: false }),
     ]);
 
     // Map userId → most recent activity timestamp
@@ -257,7 +272,10 @@ export const getPreConsultaForms = createServerFn({ method: "POST" })
       .select("id,display_name");
 
     const nameById = new Map(
-      (profiles ?? []).map((p: { id: string; display_name: string | null }) => [p.id, p.display_name]),
+      (profiles ?? []).map((p: { id: string; display_name: string | null }) => [
+        p.id,
+        p.display_name,
+      ]),
     );
 
     const result: AdminPreConsulta[] = (forms ?? []).map((f: any) => ({
@@ -277,7 +295,10 @@ export const markPreConsultaSeen = createServerFn({ method: "POST" })
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("preconsulta_forms").update({ seen_by_doctor: true }).eq("id", data.id);
+    await supabaseAdmin
+      .from("preconsulta_forms")
+      .update({ seen_by_doctor: true })
+      .eq("id", data.id);
     return { ok: true as const };
   });
 
@@ -296,11 +317,36 @@ export const getPatientReport = createServerFn({ method: "POST" })
 
     const [profile, healthLogs, journals, kicks, questions, preConsultas] = await Promise.all([
       supabaseAdmin.from("patient_profiles").select("*").eq("id", uid).maybeSingle(),
-      supabaseAdmin.from("health_logs").select("*").eq("user_id", uid).gte("created_at", twoWeeksAgo).order("log_date", { ascending: false }),
-      supabaseAdmin.from("journal_entries").select("*").eq("user_id", uid).gte("created_at", twoWeeksAgo).order("entry_date", { ascending: false }),
-      supabaseAdmin.from("kick_sessions").select("*").eq("user_id", uid).gte("started_at", twoWeeksAgo).order("started_at", { ascending: false }),
-      supabaseAdmin.from("doctor_questions").select("*").eq("user_id", uid).eq("answered", false).order("created_at", { ascending: false }),
-      supabaseAdmin.from("preconsulta_forms").select("*").eq("user_id", uid).order("submitted_at", { ascending: false }).limit(1),
+      supabaseAdmin
+        .from("health_logs")
+        .select("*")
+        .eq("user_id", uid)
+        .gte("created_at", twoWeeksAgo)
+        .order("log_date", { ascending: false }),
+      supabaseAdmin
+        .from("journal_entries")
+        .select("*")
+        .eq("user_id", uid)
+        .gte("created_at", twoWeeksAgo)
+        .order("entry_date", { ascending: false }),
+      supabaseAdmin
+        .from("kick_sessions")
+        .select("*")
+        .eq("user_id", uid)
+        .gte("started_at", twoWeeksAgo)
+        .order("started_at", { ascending: false }),
+      supabaseAdmin
+        .from("doctor_questions")
+        .select("*")
+        .eq("user_id", uid)
+        .eq("answered", false)
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("preconsulta_forms")
+        .select("*")
+        .eq("user_id", uid)
+        .order("submitted_at", { ascending: false })
+        .limit(1),
     ]);
 
     return {
