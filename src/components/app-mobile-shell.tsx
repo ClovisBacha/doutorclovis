@@ -1,9 +1,13 @@
 /**
  * Componentes da experiência mobile do app autenticado:
- *   - AppBottomNav   – barra inferior com 5 abas de ícones
- *   - AppHomeScreen  – tela inicial estilo dashboard de app nativo
+ *   - AppBottomNav   – barra inferior com 5 abas e indicador pill ativo (#5)
+ *   - AppHomeScreen  – dashboard com clima em tempo real, semana Apple Fitness,
+ *                      modo madrugada, próxima consulta e coração pulsante (#6–10)
  *   - SectionHeader  – cabeçalho de categoria com botão voltar
+ *
+ * Clima via Open-Meteo (gratuito, sem API key) com recomendações para gestantes.
  */
+import { useState, useEffect } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -136,7 +140,127 @@ export function tabToSection(t: AppTab): BottomSection {
 }
 
 /* ================================================================
-   AppBottomNav
+   Clima em tempo real — Open-Meteo (gratuito, sem API key)
+   ================================================================ */
+
+type WeatherState = {
+  temp: number;
+  code: number;
+  condition: string;
+  emoji: string;
+  overlay: string;
+  tip: string;
+  tipEmoji: string;
+};
+
+function wmoToInfo(code: number): { condition: string; emoji: string } {
+  if (code === 0) return { condition: "Céu limpo", emoji: "☀️" };
+  if (code === 1) return { condition: "Predominante claro", emoji: "🌤️" };
+  if (code === 2) return { condition: "Parcialmente nublado", emoji: "⛅" };
+  if (code === 3) return { condition: "Nublado", emoji: "☁️" };
+  if (code >= 45 && code <= 48) return { condition: "Névoa", emoji: "🌫️" };
+  if (code >= 51 && code <= 55) return { condition: "Garoa", emoji: "🌦️" };
+  if (code >= 61 && code <= 65) return { condition: "Chuva", emoji: "🌧️" };
+  if (code >= 71 && code <= 75) return { condition: "Neve", emoji: "❄️" };
+  if (code >= 80 && code <= 82) return { condition: "Pancadas de chuva", emoji: "🌧️" };
+  if (code >= 95) return { condition: "Trovoada", emoji: "⛈️" };
+  return { condition: "Parcialmente nublado", emoji: "⛅" };
+}
+
+/** Gradiente radial sobreposto ao hero — muda a "vibe" visual do card conforme o clima. */
+function weatherOverlay(code: number, temp: number): string {
+  if (code >= 95)
+    return "radial-gradient(ellipse at 30% 0%, oklch(0.38 0.05 255 / 0.55), transparent 68%)";
+  if (code >= 80)
+    return "radial-gradient(ellipse at 20% 0%, oklch(0.58 0.04 222 / 0.45), transparent 68%)";
+  if (code >= 61)
+    return "radial-gradient(ellipse at 15% 0%, oklch(0.65 0.035 220 / 0.4), transparent 68%)";
+  if (code >= 51)
+    return "radial-gradient(ellipse at 20% 0%, oklch(0.72 0.02 215 / 0.32), transparent 68%)";
+  if (code >= 45)
+    return "radial-gradient(ellipse at 20% 0%, oklch(0.75 0.018 285 / 0.32), transparent 68%)";
+  if (code === 3)
+    return "radial-gradient(ellipse at 30% 0%, oklch(0.8 0.01 240 / 0.28), transparent 68%)";
+  if (code === 0 && temp > 28)
+    return "radial-gradient(ellipse at 72% 8%, oklch(0.88 0.14 72 / 0.48), transparent 55%)";
+  if (code <= 1)
+    return "radial-gradient(ellipse at 72% 5%, oklch(0.92 0.09 68 / 0.38), transparent 60%)";
+  return "radial-gradient(ellipse at 60% 5%, oklch(0.94 0.045 55 / 0.28), transparent 62%)";
+}
+
+/** Dica contextual de bem-estar para gestantes baseada no clima atual. */
+function weatherTip(code: number, temp: number): { tip: string; tipEmoji: string } {
+  if (code >= 95)
+    return { tipEmoji: "⛈️", tip: "Fique em casa — ótimo para ouvir os batimentos do bebê." };
+  if (code >= 80)
+    return {
+      tipEmoji: "🌧️",
+      tip: "Pancadas — relaxe com música calma para vocês duas.",
+    };
+  if (code >= 61)
+    return { tipEmoji: "🌧️", tip: "Dia de chuva — chá quentinho e descanso fazem muito bem." };
+  if (code >= 51)
+    return {
+      tipEmoji: "🌦️",
+      tip: "Garoa hoje. Um bom livro sobre maternidade combina perfeitamente.",
+    };
+  if (code >= 45)
+    return { tipEmoji: "🌫️", tip: "Névoa — prefira indoor. Meditação guiada é ótima opção." };
+  if (temp > 35)
+    return { tipEmoji: "🥵", tip: "Calor extremo! Ambiente climatizado e água a cada 30 min." };
+  if (temp > 30)
+    return { tipEmoji: "☀️", tip: "Calor forte — hidrate-se bastante! Protetor FPS 50+ se sair." };
+  if (code === 3)
+    return { tipEmoji: "☁️", tip: "Nublado e fresco — ótimo para uma caminhada leve de 20 min." };
+  if (code === 2)
+    return { tipEmoji: "⛅", tip: "Parcialmente nublado — clima agradável para uma saída curta." };
+  if (code <= 1 && temp > 22)
+    return { tipEmoji: "☀️", tip: "Dia lindo! Caminhada de manhã com protetor FPS 50+ e chapéu." };
+  if (code <= 1)
+    return { tipEmoji: "🌤️", tip: "Céu aberto — perfeito para respirar ar fresco. Beba água!" };
+  if (temp < 10)
+    return { tipEmoji: "🧣", tip: "Frio intenso — agasalhe bem a barriga e prefira indoor." };
+  if (temp < 15) return { tipEmoji: "🧥", tip: "Frio hoje — vista camadas e cuide da barriga." };
+  return { tipEmoji: "🌸", tip: "Clima tranquilo — momento perfeito para descansar com o bebê." };
+}
+
+function useWeather(): WeatherState | null {
+  const [weather, setWeather] = useState<WeatherState | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res = await fetch(
+            `https://api.open-meteo.com/v1/forecast` +
+              `?latitude=${coords.latitude.toFixed(4)}` +
+              `&longitude=${coords.longitude.toFixed(4)}` +
+              `&current=temperature_2m,weather_code` +
+              `&timezone=auto&forecast_days=1`,
+          );
+          if (!res.ok) return;
+          const data = (await res.json()) as {
+            current: { temperature_2m: number; weather_code: number };
+          };
+          const temp = Math.round(data.current.temperature_2m);
+          const code = data.current.weather_code;
+          const { condition, emoji } = wmoToInfo(code);
+          const overlay = weatherOverlay(code, temp);
+          const { tip, tipEmoji } = weatherTip(code, temp);
+          setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji });
+        } catch {
+          /* clima é enhancement — falha silenciosa */
+        }
+      },
+      () => {},
+      { timeout: 8000, maximumAge: 300_000 },
+    );
+  }, []);
+  return weather;
+}
+
+/* ================================================================
+   AppBottomNav — indicador pill ativo estilo iOS (#5)
    ================================================================ */
 
 const NAV_ITEMS: { id: BottomSection; Icon: LucideIcon; label: string }[] = [
@@ -167,15 +291,26 @@ export function AppBottomNav({
             key={id}
             onClick={() => onSelect(id)}
             aria-current={active ? "page" : undefined}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors duration-200 ${
-              active ? "text-primary" : "text-muted-foreground"
-            }`}
+            className="flex flex-1 flex-col items-center gap-0.5 py-2 transition-colors duration-200"
           >
-            <Icon
-              className={`h-6 w-6 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${active ? "scale-110" : "scale-100"}`}
-              strokeWidth={active ? 2.5 : 1.8}
-            />
-            <span className={`text-[10px] font-medium ${active ? "text-primary" : ""}`}>
+            {/* Pill de fundo — expande quando ativo, desaparece quando inativo */}
+            <div
+              className={`flex h-8 w-14 items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                active ? "bg-primary/12 scale-105" : "scale-100"
+              }`}
+            >
+              <Icon
+                className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                  active ? "text-primary scale-110" : "text-muted-foreground scale-100"
+                }`}
+                strokeWidth={active ? 2.5 : 1.8}
+              />
+            </div>
+            <span
+              className={`text-[9px] font-medium transition-colors duration-200 ${
+                active ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
               {label}
             </span>
           </button>
@@ -191,13 +326,10 @@ export function AppBottomNav({
 
 type GestInfo = { weeks: number; days: number; totalDays: number } | null;
 
+export type NextAppointment = { dateLabel: string; typeLabel: string };
+
 const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = [
-  {
-    Icon: Baby,
-    label: "Bebê",
-    tab: "Bebê",
-    color: "bg-pink-50 text-pink-600 ring-pink-200",
-  },
+  { Icon: Baby, label: "Bebê", tab: "Bebê", color: "bg-pink-50 text-pink-600 ring-pink-200" },
   {
     Icon: Footprints,
     label: "Chutes",
@@ -266,16 +398,26 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
   },
 ];
 
-/** Gradiente contextual baseado na hora do dia — transmite presença. */
+/**
+ * Gradiente base do hero card — responde à hora do dia.
+ * Madrugada (0–5h): paleta escura quente para modo noturno (#9).
+ */
 function timeGradient(): string {
   const h = new Date().getHours();
-  if (h >= 5 && h < 10)
-    return "linear-gradient(148deg, oklch(0.99 0.012 68), oklch(0.975 0.04 42), oklch(0.968 0.025 35))"; // amanhecer — âmbar rosado
-  if (h >= 10 && h < 15)
-    return "linear-gradient(148deg, oklch(0.992 0.008 52), oklch(0.975 0.032 32), oklch(0.965 0.022 40))"; // dia — creme pêssego
-  if (h >= 15 && h < 19)
-    return "linear-gradient(148deg, oklch(0.988 0.015 45), oklch(0.972 0.038 28), oklch(0.96 0.028 38))"; // tarde — blush âmbar
-  return "linear-gradient(148deg, oklch(0.985 0.012 38), oklch(0.965 0.025 25), oklch(0.955 0.02 40))"; // noite — malva suave
+  if (h < 5)
+    // madrugada — malva escuro profundo
+    return "linear-gradient(148deg, oklch(0.24 0.04 32), oklch(0.2 0.032 24), oklch(0.18 0.026 18))";
+  if (h < 10)
+    // amanhecer — âmbar rosado
+    return "linear-gradient(148deg, oklch(0.99 0.012 68), oklch(0.975 0.04 42), oklch(0.968 0.025 35))";
+  if (h < 15)
+    // dia — creme pêssego
+    return "linear-gradient(148deg, oklch(0.992 0.008 52), oklch(0.975 0.032 32), oklch(0.965 0.022 40))";
+  if (h < 19)
+    // tarde — blush âmbar
+    return "linear-gradient(148deg, oklch(0.988 0.015 45), oklch(0.972 0.038 28), oklch(0.96 0.028 38))";
+  // noite — malva suave
+  return "linear-gradient(148deg, oklch(0.985 0.012 38), oklch(0.965 0.025 25), oklch(0.955 0.02 40))";
 }
 
 export function AppHomeScreen({
@@ -283,104 +425,221 @@ export function AppHomeScreen({
   babyName,
   gest,
   onNavigate,
+  nextAppointment,
 }: {
   firstName: string;
   babyName: string | null;
   gest: GestInfo;
   onNavigate: (tab: AppTab) => void;
+  nextAppointment?: NextAppointment | null;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
+  const weather = useWeather();
+
+  const h = new Date().getHours();
+  const isMadrugada = h < 5;
+
+  // Cores de texto adaptadas ao modo madrugada (fundo escuro)
+  const heroText = isMadrugada ? "text-white/90" : "text-foreground";
+  const heroMuted = isMadrugada ? "text-white/55" : "text-muted-foreground";
+  const heroBadge = isMadrugada ? "bg-white/15 text-white/85" : "bg-card/80 text-foreground";
+  const heroLabel = isMadrugada ? "text-white/45" : "text-primary";
 
   return (
-    <div className="space-y-5 pb-2">
-      {/* Cabeçalho de boas-vindas */}
-      <div className="rounded-3xl p-5" style={{ background: timeGradient() }}>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-          Olá, {firstName} 💛
-        </p>
-        {gest && baby ? (
-          <>
-            <div className="mt-3 flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="font-serif text-3xl leading-none text-foreground">
-                  Semana {gest.weeks}
-                  <span className="ml-1 text-lg text-muted-foreground">e {gest.days}d</span>
-                </p>
-                {babyName && (
-                  <p className="mt-1 text-sm text-muted-foreground">Acompanhando {babyName}</p>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-card/80 px-3 py-1 text-xs font-medium text-foreground shadow-sm">
-                    {baby.size}
-                  </span>
-                  <span className="rounded-full bg-card/80 px-3 py-1 text-xs font-medium text-foreground shadow-sm">
-                    {baby.weight}
-                  </span>
-                  <span className="rounded-full bg-card/80 px-3 py-1 text-xs font-medium text-foreground shadow-sm">
-                    🍓 {baby.fruit}
-                  </span>
+    <div className="space-y-4 pb-2">
+      {/* ── Hero card: semana + bebê + clima ───────────────────────── */}
+      <div
+        className="rounded-3xl relative overflow-hidden p-5"
+        style={{ background: timeGradient() }}
+      >
+        {/* Overlay de clima — muda a "vibe" visual conforme a meteorologia */}
+        {!isMadrugada && weather && (
+          <div
+            className="absolute inset-0 rounded-3xl pointer-events-none transition-opacity duration-1000"
+            style={{ background: weather.overlay }}
+            aria-hidden
+          />
+        )}
+
+        <div className="relative">
+          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${heroLabel}`}>
+            Olá, {firstName} 💛
+          </p>
+
+          {isMadrugada && (
+            <p className="mt-1 text-[11px] text-white/40">
+              🌙 Madrugada — tente descansar um pouco
+            </p>
+          )}
+
+          {gest && baby ? (
+            <>
+              <div className="mt-3 flex items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  {/* Número de semana estilo Apple Fitness — grande e impactante (#7) */}
+                  <div className="flex items-baseline gap-1.5">
+                    <p
+                      className={`font-serif text-[3.8rem] leading-none tracking-tight ${heroText}`}
+                    >
+                      {gest.weeks}
+                    </p>
+                    <div className="mb-1">
+                      <p className={`text-xs font-semibold leading-tight ${heroMuted}`}>semanas</p>
+                      <p className={`text-xs ${heroMuted}`}>{gest.days} dias</p>
+                    </div>
+                  </div>
+
+                  {babyName && (
+                    <p className={`mt-0.5 text-xs ${heroMuted}`}>Acompanhando {babyName}</p>
+                  )}
+
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
+                    >
+                      {baby.size}
+                    </span>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
+                    >
+                      {baby.weight}
+                    </span>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
+                    >
+                      🍓 {baby.fruit}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="w-24 shrink-0 mt-1">
+                  <BabyIllustration week={gest.weeks} />
                 </div>
               </div>
-              <div className="w-24 shrink-0">
-                <BabyIllustration week={gest.weeks} />
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="mb-1 flex justify-between text-[10px] text-muted-foreground">
-                <span>Início</span>
-                <span>{Math.round(progress ?? 0)}% concluído</span>
-                <span>Parto</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-border/60">
+
+              {/* Barra de progresso */}
+              <div className="mt-4">
+                <div className={`mb-1 flex justify-between text-[10px] ${heroMuted}`}>
+                  <span>Início</span>
+                  <span>{Math.round(progress ?? 0)}% concluído</span>
+                  <span>Parto</span>
+                </div>
                 <div
-                  className="h-2 rounded-full bg-primary transition-all duration-700"
-                  style={{ width: `${progress ?? 0}%` }}
-                />
+                  className={`h-2 w-full rounded-full ${isMadrugada ? "bg-white/15" : "bg-border/60"}`}
+                >
+                  <div
+                    className={`h-2 rounded-full transition-all duration-700 ${isMadrugada ? "bg-white/60" : "bg-primary"}`}
+                    style={{ width: `${progress ?? 0}%` }}
+                  />
+                </div>
               </div>
+
+              {/* Strip de clima — só aparece quando dados chegam */}
+              {!isMadrugada && weather && (
+                <div className="mt-3 rounded-2xl bg-white/30 backdrop-blur-sm px-3 py-2 flex items-start gap-2.5">
+                  <span className="text-lg leading-none mt-0.5">{weather.emoji}</span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-foreground/80">
+                      {weather.temp}°C · {weather.condition}
+                    </p>
+                    <p className="text-[11px] text-foreground/65 mt-0.5 leading-snug">
+                      {weather.tipEmoji} {weather.tip}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="mt-3">
+              <p className={`text-sm ${heroMuted}`}>
+                Configure sua data de gestação em <strong>Perfil</strong> para ver o
+                desenvolvimento.
+              </p>
+              <button
+                onClick={() => onNavigate("Perfil")}
+                className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              >
+                Configurar perfil
+              </button>
             </div>
-          </>
-        ) : (
-          <div className="mt-3">
-            <p className="text-sm text-muted-foreground">
-              Configure sua data de gestação em <strong>Perfil</strong> para ver o desenvolvimento.
-            </p>
-            <button
-              onClick={() => onNavigate("Perfil")}
-              className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
-              Configurar perfil
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Grade de ícones */}
+      {/* ── Próxima consulta (#10) ──────────────────────────────────── */}
+      {nextAppointment ? (
+        <button
+          onClick={() => onNavigate("Consultas")}
+          className="group w-full rounded-3xl border border-blue-100 bg-blue-50/60 text-left transition-all duration-300 active:scale-[0.98]"
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+              <CalendarDays className="h-5 w-5" strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-500">
+                Próxima consulta
+              </p>
+              <p className="mt-0.5 text-sm font-medium text-foreground">
+                {nextAppointment.dateLabel}
+              </p>
+              <p className="text-xs text-muted-foreground">{nextAppointment.typeLabel}</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-blue-400 transition-transform duration-300 group-hover:translate-x-1" />
+          </div>
+        </button>
+      ) : (
+        <button
+          onClick={() => onNavigate("Consultas")}
+          className="group w-full rounded-3xl border border-dashed border-border bg-card/50 text-left transition-all duration-300 active:scale-[0.98]"
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
+              <CalendarDays className="h-5 w-5" strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Agendar consulta</p>
+              <p className="text-xs text-muted-foreground">Nenhuma consulta agendada</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
+          </div>
+        </button>
+      )}
+
+      {/* ── Grade de ícones ─────────────────────────────────────────── */}
       <div>
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           Acesso rápido
         </p>
         <div className="grid grid-cols-4 gap-2">
-          {GRID.map(({ Icon, label, tab, color }) => (
-            <button
-              key={tab}
-              onClick={() => onNavigate(tab)}
-              className="group flex flex-col items-center gap-1.5 rounded-2xl p-2.5 transition-all duration-200 active:scale-95 hover:bg-secondary"
-            >
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-active:scale-90 ${color}`}
+          {GRID.map(({ Icon, label, tab, color }) => {
+            const isHeartIcon = Icon === Heart;
+            return (
+              <button
+                key={tab}
+                onClick={() => onNavigate(tab)}
+                className="group flex flex-col items-center gap-1.5 rounded-2xl p-2.5 transition-all duration-200 active:scale-95 hover:bg-secondary"
               >
-                <Icon className="h-5 w-5" strokeWidth={1.8} />
-              </div>
-              <span className="text-[10px] font-medium leading-tight text-center text-foreground/80">
-                {label}
-              </span>
-            </button>
-          ))}
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-active:scale-90 ${color}`}
+                >
+                  {/* Coração pulsa em ritmo cardíaco real — 72bpm (#6) */}
+                  <Icon
+                    className={`h-5 w-5 ${isHeartIcon ? "heartbeat-icon" : ""}`}
+                    strokeWidth={1.8}
+                  />
+                </div>
+                <span className="text-[10px] font-medium leading-tight text-center text-foreground/80">
+                  {label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Card do médico */}
+      {/* ── Card do médico ──────────────────────────────────────────── */}
       <button
         onClick={() => onNavigate("Médico")}
         className="group w-full rounded-3xl border border-border bg-card overflow-hidden text-left shadow-[var(--shadow-card)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98]"
@@ -403,7 +662,7 @@ export function AppHomeScreen({
         </div>
       </button>
 
-      {/* Chat IA destaque */}
+      {/* ── Chat IA destaque ─────────────────────────────────────────── */}
       <button
         onClick={() => onNavigate("Chat IA")}
         className="group w-full rounded-3xl bg-[var(--gradient-primary)] p-5 text-left transition-all duration-300 active:scale-[0.98]"
