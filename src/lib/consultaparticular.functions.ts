@@ -9,6 +9,10 @@ export type PrivateConsultation = {
   preferred_dates: string[];
   message: string | null;
   status: "pendente_pagamento" | "pagamento_enviado" | "confirmado" | "realizado" | "cancelado";
+  mp_payment_id: string | null;
+  pix_qr_code: string | null;
+  pix_qr_code_base64: string | null;
+  amount_cents: number | null;
   created_at: string;
 };
 
@@ -17,18 +21,21 @@ export const CONSULT_TYPES = [
     key: "plantao_30",
     label: "Plantão de Dúvidas (30 min)",
     price: "R$ 150",
+    priceNumber: 150,
     desc: "Tire dúvidas pontuais por videochamada. Ideal para resultados de exames ou sintomas não urgentes.",
   },
   {
     key: "consulta_60",
     label: "Consulta Completa (60 min)",
     price: "R$ 280",
+    priceNumber: 280,
     desc: "Consulta completa de pré-natal particular, com revisão do histórico, exames e orientações.",
   },
   {
     key: "revisao_resultados",
     label: "Revisão de Exames (20 min)",
     price: "R$ 100",
+    priceNumber: 100,
     desc: "Análise detalhada de exames laboratoriais ou de imagem com explicação personalizada.",
   },
 ];
@@ -49,6 +56,48 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
     const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
+
+    const consultType = CONSULT_TYPES.find((ct) => ct.key === data.consultType);
+    const amount = consultType?.priceNumber ?? 0;
+
+    // Try to create PIX charge via Mercado Pago
+    let mpPaymentId: string | null = null;
+    let pixQrCode: string | null = null;
+    let pixQrCodeBase64: string | null = null;
+
+    const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    if (mpToken && amount > 0 && u.user.email) {
+      try {
+        const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${mpToken}`,
+            "Content-Type": "application/json",
+            "X-Idempotency-Key": `${u.user.id}-${Date.now()}`,
+          },
+          body: JSON.stringify({
+            transaction_amount: amount,
+            description: `${consultType?.label ?? data.consultType} — Dr. Clóvis Bacha`,
+            payment_method_id: "pix",
+            payer: { email: u.user.email },
+          }),
+        });
+        if (mpRes.ok) {
+          const mp = (await mpRes.json()) as {
+            id?: number;
+            point_of_interaction?: {
+              transaction_data?: { qr_code?: string; qr_code_base64?: string };
+            };
+          };
+          mpPaymentId = mp.id ? String(mp.id) : null;
+          pixQrCode = mp.point_of_interaction?.transaction_data?.qr_code ?? null;
+          pixQrCodeBase64 = mp.point_of_interaction?.transaction_data?.qr_code_base64 ?? null;
+        }
+      } catch {
+        // non-fatal — fall back to manual PIX
+      }
+    }
+
     const { data: row, error } = await db
       .from("private_consultations")
       .insert({
@@ -56,6 +105,10 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
         consult_type: data.consultType,
         preferred_dates: data.preferredDates,
         message: data.message,
+        mp_payment_id: mpPaymentId,
+        pix_qr_code: pixQrCode,
+        pix_qr_code_base64: pixQrCodeBase64,
+        amount_cents: Math.round(amount * 100),
       })
       .select()
       .single();

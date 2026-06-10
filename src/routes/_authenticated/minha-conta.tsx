@@ -10422,7 +10422,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         <div className="rounded-3xl border border-green-200 bg-green-50 p-5">
           <p className="font-semibold text-green-700">✅ Solicitação enviada!</p>
           <p className="text-sm text-green-600 mt-1">
-            Efetue o pagamento via PIX e clique em "Marquei o pagamento" abaixo.
+            Escaneie o QR Code PIX abaixo ou copie o código para pagar. A confirmação é automática.
           </p>
         </div>
       )}
@@ -10468,21 +10468,50 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                 </div>
                 {c.status === "pendente_pagamento" && (
                   <div className="mt-4 space-y-3">
-                    <div className="rounded-xl bg-white/70 border border-border p-3 text-xs space-y-1">
-                      <p className="font-medium">
-                        Chave PIX: <span className="font-mono">{PIX_KEY}</span>
-                      </p>
-                      <p>
-                        Favorecido: {PIX_NAME} · Valor: {typeInfo?.price ?? "—"}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleMarkPayment(c.id)}
-                      disabled={markingId === c.id}
-                      className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
-                    >
-                      {markingId === c.id ? "..." : "✓ Marquei o pagamento"}
-                    </button>
+                    {c.pix_qr_code_base64 ? (
+                      <>
+                        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white/80 p-4">
+                          <img
+                            src={`data:image/png;base64,${c.pix_qr_code_base64}`}
+                            alt="QR Code PIX"
+                            className="h-44 w-44 rounded-xl"
+                          />
+                          <p className="text-xs text-center text-muted-foreground">
+                            Escaneie com o app do seu banco ou copie o código abaixo
+                          </p>
+                        </div>
+                        {c.pix_qr_code && (
+                          <button
+                            onClick={() => navigator.clipboard.writeText(c.pix_qr_code!)}
+                            className="w-full rounded-full border border-primary px-4 py-2 text-xs font-medium text-primary hover:bg-primary/5"
+                          >
+                            📋 Copiar código PIX (copia e cola)
+                          </button>
+                        )}
+                        <p className="text-xs text-center text-muted-foreground">
+                          A confirmação é automática — assim que o PIX for processado você receberá
+                          a confirmação.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="rounded-xl bg-white/70 border border-border p-3 text-xs space-y-1">
+                          <p className="font-medium">
+                            Chave PIX: <span className="font-mono">{PIX_KEY}</span>
+                          </p>
+                          <p>
+                            Favorecido: {PIX_NAME} · Valor: {typeInfo?.price ?? "—"}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleMarkPayment(c.id)}
+                          disabled={markingId === c.id}
+                          className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
+                        >
+                          {markingId === c.id ? "..." : "✓ Marquei o pagamento"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
