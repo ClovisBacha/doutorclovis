@@ -19,6 +19,8 @@ import {
   getTeleconsultasAdmin,
   createTeleconsulta,
   updateTeleconsultaStatus,
+  saveDoctorClinicalNote,
+  generateClinicalNote,
   type TeleconsultaSession,
 } from "@/lib/teleconsulta.functions";
 import {
@@ -57,6 +59,7 @@ const PANEL_TABS = [
   "Calendário",
   "Agendamentos",
   "Agenda",
+  "Ferramentas",
   "Perguntas",
   "Pré-consultas",
   "Teleconsultas",
@@ -145,7 +148,10 @@ function PainelPage() {
     if (!allowed) return;
     if (tab === "Engajamento" && !engagement) loadEngagement();
     if (tab === "Pré-consultas") loadPreForms();
-    if (tab === "Teleconsultas") loadTeleconsultas();
+    if (tab === "Teleconsultas") {
+      loadTeleconsultas();
+      loadPreForms();
+    }
     if (tab === "Consultas Pagas") loadPrivateConsults();
     if (tab === "Empresas") loadCorporate();
   }, [tab, allowed]);
@@ -255,9 +261,11 @@ function PainelPage() {
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
         )}
+        {tab === "Ferramentas" && <FerramentasSection />}
         {tab === "Teleconsultas" && (
           <TeleconsultasSection
             sessions={teleconsultas}
+            preForms={preForms}
             onRefresh={loadTeleconsultas}
             tokenFn={token}
             patients={engagement?.patients ?? []}
@@ -1152,11 +1160,13 @@ function InfoBox({ label, value }: { label: string; value: string }) {
 
 function TeleconsultasSection({
   sessions,
+  preForms,
   onRefresh,
   tokenFn,
   patients,
 }: {
   sessions: TeleconsultaSession[];
+  preForms: AdminPreConsulta[];
   onRefresh: () => void;
   tokenFn: () => Promise<string>;
   patients: import("@/lib/admin.functions").PatientEngagement[];
@@ -1164,10 +1174,15 @@ function TeleconsultasSection({
   const [form, setForm] = useState({ patientUserId: "", scheduledFor: "", doctorNotes: "" });
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
+  const [noteBullets, setNoteBullets] = useState<Record<string, string>>({});
+  const [generatedNote, setGeneratedNote] = useState<Record<string, string>>({});
+  const [generatingNote, setGeneratingNote] = useState<string | null>(null);
+  const [savingNote, setSavingNote] = useState<string | null>(null);
 
   const STATUS_LABEL_TC: Record<string, string> = {
     agendada: "Agendada",
-    sala_aberta: "Sala aberta",
+    sala_aberta: "Sala aberta ✅",
     encerrada: "Encerrada",
   };
   const STATUS_STYLE_TC: Record<string, string> = {
@@ -1179,12 +1194,14 @@ function TeleconsultasSection({
   async function openRoom(id: string) {
     const tk = await tokenFn();
     await updateTeleconsultaStatus({ data: { accessToken: tk, id, status: "sala_aberta" } });
+    setActiveVideoId(id);
     onRefresh();
   }
 
   async function closeRoom(id: string) {
     const tk = await tokenFn();
     await updateTeleconsultaStatus({ data: { accessToken: tk, id, status: "encerrada" } });
+    setActiveVideoId(null);
     onRefresh();
   }
 
@@ -1206,13 +1223,50 @@ function TeleconsultasSection({
     onRefresh();
   }
 
+  async function doGenerateNote(s: TeleconsultaSession) {
+    const pre = preForms.find((f) => f.user_id === s.patient_user_id);
+    const bullets = noteBullets[s.id] ?? "";
+    if (!bullets.trim()) return;
+    setGeneratingNote(s.id);
+    const tk = await tokenFn();
+    const res = await generateClinicalNote({
+      data: {
+        accessToken: tk,
+        bullets,
+        patient: {
+          name: s.patient_name ?? "Paciente",
+          weeksAtSubmission: pre?.weeks_at_submission ?? null,
+          weight: pre?.current_weight ?? null,
+          systolic: pre?.systolic ?? null,
+          diastolic: pre?.diastolic ?? null,
+          symptoms: pre?.symptoms ?? [],
+          medications: pre?.medications ?? null,
+          questions: pre?.questions ?? null,
+          emotionalState: pre?.emotional_state ?? null,
+        },
+      },
+    });
+    setGeneratingNote(null);
+    if (res.ok) setGeneratedNote((p) => ({ ...p, [s.id]: res.note }));
+  }
+
+  async function doSaveNote(id: string) {
+    const note = generatedNote[id] ?? noteBullets[id] ?? "";
+    if (!note.trim()) return;
+    setSavingNote(id);
+    const tk = await tokenFn();
+    await saveDoctorClinicalNote({ data: { accessToken: tk, id, clinicalNote: note } });
+    setSavingNote(null);
+    onRefresh();
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="font-serif text-2xl">Teleconsultas</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie salas de teleconsulta e abra a sala para as pacientes entrarem.
+            Abra a sala de vídeo, veja a pré-consulta da paciente e gere a nota clínica com IA.
           </p>
         </div>
         <button
@@ -1283,66 +1337,222 @@ function TeleconsultasSection({
           <p className="text-muted-foreground">Nenhuma teleconsulta cadastrada ainda.</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {sessions.map((s) => (
-            <div key={s.id} className="rounded-3xl border border-border bg-card p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{s.patient_name ?? "Paciente"}</p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    {s.scheduled_for
-                      ? new Date(s.scheduled_for).toLocaleString("pt-BR", {
-                          dateStyle: "long",
-                          timeStyle: "short",
-                        })
-                      : "Horário a definir"}
-                  </p>
-                  {s.doctor_notes && (
-                    <p className="mt-1 text-xs text-muted-foreground">{s.doctor_notes}</p>
-                  )}
+        <div className="space-y-6">
+          {sessions.map((s) => {
+            const pre = preForms.find((f) => f.user_id === s.patient_user_id);
+            const isVideoOpen = activeVideoId === s.id;
+            return (
+              <div key={s.id} className="rounded-3xl border border-border bg-card overflow-hidden">
+                {/* Header */}
+                <div className="p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-lg">{s.patient_name ?? "Paciente"}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {s.scheduled_for
+                          ? new Date(s.scheduled_for).toLocaleString("pt-BR", {
+                              dateStyle: "long",
+                              timeStyle: "short",
+                            })
+                          : "Horário a definir"}
+                      </p>
+                      {s.doctor_notes && (
+                        <p className="mt-1 text-xs text-muted-foreground">{s.doctor_notes}</p>
+                      )}
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLE_TC[s.status]}`}
+                    >
+                      {STATUS_LABEL_TC[s.status]}
+                    </span>
+                  </div>
+
+                  {/* Patient notes */}
                   {s.patient_notes && (
-                    <p className="mt-2 rounded-xl bg-secondary/50 px-3 py-2 text-xs italic text-muted-foreground">
-                      Notas da paciente: {s.patient_notes}
+                    <p className="mt-3 rounded-xl bg-secondary/50 px-3 py-2 text-xs italic text-muted-foreground">
+                      <span className="font-medium not-italic">Notas da paciente: </span>
+                      {s.patient_notes}
                     </p>
                   )}
-                </div>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLE_TC[s.status]}`}
-                >
-                  {STATUS_LABEL_TC[s.status]}
-                </span>
-              </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {s.status === "agendada" && (
-                  <button
-                    onClick={() => openRoom(s.id)}
-                    className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700"
-                  >
-                    🟢 Abrir sala agora
-                  </button>
+                  {/* Pre-consultation summary */}
+                  {pre && s.status !== "encerrada" && (
+                    <div className="mt-4 rounded-2xl bg-primary/5 border border-primary/10 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">
+                        Pré-consulta preenchida pela paciente
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-foreground sm:grid-cols-4">
+                        {pre.weeks_at_submission && (
+                          <span>
+                            <span className="text-muted-foreground">IG: </span>
+                            {pre.weeks_at_submission}s
+                          </span>
+                        )}
+                        {pre.current_weight && (
+                          <span>
+                            <span className="text-muted-foreground">Peso: </span>
+                            {pre.current_weight} kg
+                          </span>
+                        )}
+                        {pre.systolic && pre.diastolic && (
+                          <span>
+                            <span className="text-muted-foreground">PA: </span>
+                            {pre.systolic}/{pre.diastolic} mmHg
+                          </span>
+                        )}
+                        {pre.emotional_state && (
+                          <span>
+                            <span className="text-muted-foreground">Emocional: </span>
+                            {pre.emotional_state}
+                          </span>
+                        )}
+                      </div>
+                      {pre.symptoms.length > 0 && (
+                        <p className="mt-1 text-xs">
+                          <span className="text-muted-foreground">Sintomas: </span>
+                          {pre.symptoms.join(", ")}
+                        </p>
+                      )}
+                      {pre.medications && (
+                        <p className="mt-1 text-xs">
+                          <span className="text-muted-foreground">Medicamentos: </span>
+                          {pre.medications}
+                        </p>
+                      )}
+                      {pre.questions && (
+                        <p className="mt-1 text-xs">
+                          <span className="text-muted-foreground">Dúvidas: </span>
+                          {pre.questions}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {s.status === "agendada" && (
+                      <button
+                        onClick={() => openRoom(s.id)}
+                        className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+                      >
+                        🟢 Abrir sala agora
+                      </button>
+                    )}
+                    {s.status === "sala_aberta" && (
+                      <>
+                        <button
+                          onClick={() => setActiveVideoId(isVideoOpen ? null : s.id)}
+                          className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+                        >
+                          🎥 {isVideoOpen ? "Minimizar vídeo" : "Entrar na sala"}
+                        </button>
+                        <a
+                          href={`https://meet.jit.si/drclovis-${s.room_name}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:bg-secondary"
+                        >
+                          ↗ Abrir em nova aba
+                        </a>
+                        <button
+                          onClick={() => closeRoom(s.id)}
+                          className="rounded-full border border-destructive/30 px-4 py-2 text-xs text-destructive hover:bg-destructive/5"
+                        >
+                          Encerrar consulta
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Inline Jitsi video */}
+                {isVideoOpen && s.status === "sala_aberta" && (
+                  <div className="border-t border-border">
+                    <iframe
+                      src={`https://meet.jit.si/drclovis-${s.room_name}#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&userInfo.displayName=Dr.%20Cl%C3%B3vis`}
+                      allow="camera; microphone; fullscreen; display-capture"
+                      className="h-[520px] w-full"
+                      title={`Teleconsulta — ${s.patient_name ?? "Paciente"}`}
+                    />
+                  </div>
                 )}
-                {s.status === "sala_aberta" && (
-                  <>
-                    <a
-                      href={`https://meet.jit.si/drclovis-${s.room_name}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
-                    >
-                      🎥 Entrar na sala
-                    </a>
-                    <button
-                      onClick={() => closeRoom(s.id)}
-                      className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:bg-secondary"
-                    >
-                      Encerrar
-                    </button>
-                  </>
+
+                {/* AI Note generator (available when sala_aberta or encerrada) */}
+                {(s.status === "sala_aberta" || s.status === "encerrada") && (
+                  <div className="border-t border-border p-6 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      🤖 Nota clínica IA — Gerador SOAP
+                    </p>
+
+                    {s.clinical_note && !generatedNote[s.id] ? (
+                      <div className="rounded-2xl bg-muted/40 p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                          Nota salva:
+                        </p>
+                        <pre className="whitespace-pre-wrap text-xs text-foreground font-sans leading-relaxed">
+                          {s.clinical_note}
+                        </pre>
+                        <button
+                          onClick={() =>
+                            setGeneratedNote((p) => ({ ...p, [s.id]: s.clinical_note! }))
+                          }
+                          className="mt-3 text-xs text-primary underline"
+                        >
+                          Editar nota
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <textarea
+                          value={noteBullets[s.id] ?? ""}
+                          onChange={(e) =>
+                            setNoteBullets((p) => ({ ...p, [s.id]: e.target.value }))
+                          }
+                          rows={4}
+                          placeholder={`Ex:\n- Paciente refere dor em baixo ventre leve\n- MF presentes, BCF 148bpm\n- PA 120/80, sem edema\n- USG: crescimento adequado, LA normal`}
+                          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => doGenerateNote(s)}
+                            disabled={generatingNote === s.id || !(noteBullets[s.id] ?? "").trim()}
+                            className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                          >
+                            {generatingNote === s.id ? "Gerando..." : "✨ Gerar nota SOAP"}
+                          </button>
+                        </div>
+
+                        {generatedNote[s.id] && (
+                          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                            <pre className="whitespace-pre-wrap text-xs text-foreground font-sans leading-relaxed">
+                              {generatedNote[s.id]}
+                            </pre>
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                onClick={() => doSaveNote(s.id)}
+                                disabled={savingNote === s.id}
+                                className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-60"
+                              >
+                                {savingNote === s.id ? "Salvando..." : "💾 Salvar nota"}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  navigator.clipboard.writeText(generatedNote[s.id] ?? "")
+                                }
+                                className="rounded-full border border-border px-4 py-1.5 text-xs text-muted-foreground hover:bg-secondary"
+                              >
+                                Copiar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1707,6 +1917,258 @@ function EmpresasSection({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Ferramentas clínicas ---------- */
+
+const PRESCRIPTIONS = [
+  {
+    title: "Suplementação pré-natal padrão",
+    icon: "💊",
+    text: `Sulfato ferroso 40mg (elementar) — 1 comprimido VO 1x/dia, em jejum
+Ácido fólico 5mg — 1 comprimido VO 1x/dia`,
+  },
+  {
+    title: "Suplementação de cálcio",
+    icon: "🦴",
+    text: `Carbonato de cálcio 1250mg (= 500mg Ca elementar) — 2 comprimidos VO/dia, fracionados às refeições`,
+  },
+  {
+    title: "Náuseas e vômitos (1º tri)",
+    icon: "🤢",
+    text: `Opção 1: Ondansetrona 4mg — 1 cp VO 8/8h (máx 12mg/dia)
+Opção 2: Metoclopramida 10mg — 1 cp VO 3x/dia antes das refeições
+Opção 3: Dimenidrinato 50mg — 1 cp VO 3x/dia`,
+  },
+  {
+    title: "Hipertensão gestacional / pré-eclâmpsia",
+    icon: "🫀",
+    text: `Metildopa 250mg — 1 cp VO 3x/dia (dose inicial; pode aumentar até 3g/dia)
+Alternativa: Nifedipino ação prolongada 30mg VO 1x/dia
+
+Urgência hipertensiva (PA ≥ 160/110):
+Nifedipino 10mg VO 1 cp — repetir em 30 min se necessário`,
+  },
+  {
+    title: "Profilaxia pré-eclâmpsia (AAS)",
+    icon: "💉",
+    text: `AAS 100–150mg VO 1x/dia (à noite)
+Início: 11–16 semanas | Duração: até 36 semanas
++ Carbonato de cálcio 1–2g/dia se ingesta baixa`,
+  },
+  {
+    title: "Diabetes gestacional — Metformina",
+    icon: "🩸",
+    text: `Metformina 500mg VO 2x/dia às refeições (dose inicial)
+Aumentar para 1g VO 2x/dia após 1 semana se tolerado
+Monitorar: glicemia jejum e pós-prandial 1h e 2h`,
+  },
+  {
+    title: "ITU na gestante (1ª linha)",
+    icon: "🦠",
+    text: `Cefalexina 500mg VO 6/6h por 7 dias
+OU Nitrofurantoína 100mg VO 6/6h por 5–7 dias (evitar no 3º tri)
+OU Amoxicilina-clavulanato 875/125mg VO 12/12h por 7 dias
+
+Pielonefrite: internação + Ceftriaxone 1–2g EV/dia`,
+  },
+  {
+    title: "Profilaxia TVP / TEV",
+    icon: "🩻",
+    text: `Enoxaparina 40mg SC 1x/dia (dose profilática, peso < 80kg)
+Enoxaparina 60mg SC 1x/dia (peso 80–120kg)
+Início: 12h após parto vaginal | 24h após cesárea
+Duração: mínimo 10 dias pós-parto; ampliar em alto risco`,
+  },
+];
+
+const EXAM_PANELS = [
+  {
+    title: "1º Trimestre — 8 a 13 semanas",
+    icon: "🔬",
+    exams: [
+      "Hemograma completo",
+      "Grupo sanguíneo e fator Rh",
+      "Coombs indireto (se Rh negativo)",
+      "Glicemia de jejum",
+      "Urina tipo 1 + urocultura",
+      "TSH",
+      "Sorologias: Toxoplasmose IgG/IgM, Rubéola IgG/IgM, CMV IgG/IgM",
+      "Sífilis (VDRL + FTA-ABS)",
+      "HIV 1 e 2 (anti-HIV)",
+      "HBsAg, Anti-HBs, Anti-HCV",
+      "Eletroforese de hemoglobinas",
+      "Ultrassom obstétrico — datação + translucência nucal (11s–13s6d)",
+      "PAPP-A + β-hCG livre (rastreio aneuploidias, junto com TN)",
+    ],
+  },
+  {
+    title: "2º Trimestre — 18 a 28 semanas",
+    icon: "📋",
+    exams: [
+      "Ultrassom morfológico (18–22 semanas) — obrigatório",
+      "TOTG 75g: glicemia jejum, 1h e 2h (24–28 semanas)",
+      "Hemograma",
+      "Urina tipo 1 + urocultura",
+      "Sorologias de controle (toxo, sífilis, HIV — se negativas no 1º tri)",
+      "Ultrassom + Doppler uterino (24–28 sem, se risco de pré-eclâmpsia)",
+    ],
+  },
+  {
+    title: "3º Trimestre — 32 a 37 semanas",
+    icon: "🏥",
+    exams: [
+      "Hemograma",
+      "Coagulograma: TP, TTPA, fibrinogênio",
+      "Urina tipo 1",
+      "Pesquisa de Streptococcus agalactiae (SGB) — 35–37 semanas",
+      "Cardiotocografia basal (a partir de 32 semanas)",
+      "Ultrassom de crescimento fetal",
+      "Dopplervelocimetria (artéria umbilical e cerebral média)",
+      "Coombs indireto (repetir se Rh negativo)",
+      "Classificação sanguínea (repetir se Rh negativo)",
+    ],
+  },
+];
+
+function FerramentasSection() {
+  const [openRx, setOpenRx] = useState<number | null>(null);
+  const [openExam, setOpenExam] = useState<number | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  function copyText(text: string, key: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  }
+
+  function printText(title: string, text: string) {
+    const w = window.open("", "_blank", "width=600,height=700");
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>${title}</title>
+      <style>
+        body { font-family: Georgia, serif; padding: 40px; color: #111; }
+        h2 { font-size: 18px; margin-bottom: 24px; }
+        pre { font-family: inherit; font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
+        .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 12px; font-size: 12px; color: #666; }
+      </style></head><body>
+      <h2>${title}</h2><pre>${text}</pre>
+      <div class="footer">Emitido em ${new Date().toLocaleDateString("pt-BR")}</div>
+      <script>window.print();</script></body></html>`);
+  }
+
+  return (
+    <div className="space-y-10">
+      {/* Receituário */}
+      <div>
+        <p className="font-serif text-2xl">Receituário Rápido</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Prescrições comuns de obstetrícia. Clique para expandir, copiar ou imprimir.
+        </p>
+        <div className="mt-5 space-y-2">
+          {PRESCRIPTIONS.map((rx, i) => (
+            <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
+              <button
+                onClick={() => setOpenRx(openRx === i ? null : i)}
+                className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30"
+              >
+                <span className="flex items-center gap-3 font-medium">
+                  <span className="text-xl">{rx.icon}</span>
+                  {rx.title}
+                </span>
+                <span className="text-muted-foreground text-sm">{openRx === i ? "▲" : "▼"}</span>
+              </button>
+              {openRx === i && (
+                <div className="border-t border-border px-5 py-4 space-y-3">
+                  <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">
+                    {rx.text}
+                  </pre>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => copyText(rx.text, `rx-${i}`)}
+                      className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
+                    >
+                      {copied === `rx-${i}` ? "✅ Copiado!" : "Copiar"}
+                    </button>
+                    <button
+                      onClick={() => printText(rx.title, rx.text)}
+                      className="rounded-full bg-primary px-4 py-1.5 text-xs text-primary-foreground"
+                    >
+                      🖨️ Imprimir
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Solicitações de exame */}
+      <div>
+        <p className="font-serif text-2xl">Solicitação de Exames</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Painéis padrão por trimestre. Copie ou imprima em um clique.
+        </p>
+        <div className="mt-5 space-y-2">
+          {EXAM_PANELS.map((panel, i) => {
+            const examText = panel.exams.join("\n");
+            return (
+              <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
+                <button
+                  onClick={() => setOpenExam(openExam === i ? null : i)}
+                  className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30"
+                >
+                  <span className="flex items-center gap-3 font-medium">
+                    <span className="text-xl">{panel.icon}</span>
+                    {panel.title}
+                  </span>
+                  <span className="text-muted-foreground text-sm">
+                    {openExam === i ? "▲" : `${panel.exams.length} exames ▼`}
+                  </span>
+                </button>
+                {openExam === i && (
+                  <div className="border-t border-border px-5 py-4 space-y-3">
+                    <ul className="space-y-1">
+                      {panel.exams.map((e, j) => (
+                        <li key={j} className="flex items-start gap-2 text-sm text-foreground">
+                          <span className="mt-0.5 text-primary shrink-0">•</span>
+                          {e}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => copyText(examText, `exam-${i}`)}
+                        className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
+                      >
+                        {copied === `exam-${i}` ? "✅ Copiado!" : "Copiar lista"}
+                      </button>
+                      <button
+                        onClick={() =>
+                          printText(`Solicitação de Exames — ${panel.title}`, examText)
+                        }
+                        className="rounded-full bg-primary px-4 py-1.5 text-xs text-primary-foreground"
+                      >
+                        🖨️ Imprimir solicitação
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground border-t border-border pt-4">
+        ⚕️ Prescrições e painéis baseados nos protocolos FEBRASGO/SBD/SBH 2022–2024. Sempre confirme
+        com o protocolo vigente da sua instituição e ajuste conforme o quadro clínico da paciente.
+      </p>
     </div>
   );
 }
