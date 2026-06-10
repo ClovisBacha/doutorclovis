@@ -5463,8 +5463,8 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Teleconsulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Quando o Dr. Clóvis abrir uma sala, você poderá entrar diretamente pelo portal — sem
-          instalar nada.
+          Quando o Dr. Clóvis abrir a sala, você receberá um e-mail com o link do Google Meet e
+          poderá entrar também por aqui com um clique.
         </p>
         <p className="mt-3 text-xs text-muted-foreground">
           Para solicitar uma teleconsulta, entre em contato pelo WhatsApp ou pelo formulário de{" "}
@@ -5503,26 +5503,19 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
                 </span>
               </div>
 
-              {s.status === "sala_aberta" && (
-                <div className="mt-4">
-                  <button
-                    onClick={() => setActiveSession(activeSession?.id === s.id ? null : s)}
+              {s.status === "sala_aberta" && s.meet_url && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <a
+                    href={s.meet_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-2 rounded-full bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
                   >
-                    🎥 {activeSession?.id === s.id ? "Fechar sala" : "Entrar na sala"}
-                  </button>
-                </div>
-              )}
-
-              {/* Jitsi embed */}
-              {activeSession?.id === s.id && s.status === "sala_aberta" && (
-                <div className="mt-4 overflow-hidden rounded-2xl border border-border">
-                  <iframe
-                    src={`https://meet.jit.si/drclovis-${s.room_name}#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinPageEnabled=true&userInfo.displayName=${encodeURIComponent(profile?.display_name ?? "Paciente")}`}
-                    allow="camera; microphone; fullscreen; display-capture"
-                    className="h-[480px] w-full"
-                    title="Teleconsulta"
-                  />
+                    🎥 Entrar na teleconsulta
+                  </a>
+                  <p className="self-center text-xs text-muted-foreground">
+                    Abre o Google Meet em nova aba
+                  </p>
                 </div>
               )}
 

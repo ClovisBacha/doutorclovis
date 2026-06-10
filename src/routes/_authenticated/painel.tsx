@@ -18,6 +18,7 @@ import { computeGestation } from "@/lib/gestacao";
 import {
   getTeleconsultasAdmin,
   createTeleconsulta,
+  openTeleconsultaRoom,
   updateTeleconsultaStatus,
   saveDoctorClinicalNote,
   generateClinicalNote,
@@ -1175,6 +1176,8 @@ function TeleconsultasSection({
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
+  const [openingRoom, setOpeningRoom] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState<string | null>(null);
   const [noteBullets, setNoteBullets] = useState<Record<string, string>>({});
   const [generatedNote, setGeneratedNote] = useState<Record<string, string>>({});
   const [generatingNote, setGeneratingNote] = useState<string | null>(null);
@@ -1191,10 +1194,22 @@ function TeleconsultasSection({
     encerrada: "bg-secondary text-muted-foreground",
   };
 
-  async function openRoom(id: string) {
+  async function openRoom(s: TeleconsultaSession) {
+    setOpeningRoom(s.id);
     const tk = await tokenFn();
-    await updateTeleconsultaStatus({ data: { accessToken: tk, id, status: "sala_aberta" } });
-    setActiveVideoId(id);
+    const res = await openTeleconsultaRoom({
+      data: {
+        accessToken: tk,
+        id: s.id,
+        patientUserId: s.patient_user_id,
+        scheduledFor: s.scheduled_for,
+      },
+    });
+    setOpeningRoom(null);
+    if (res.ok) {
+      setEmailSent(s.id);
+      setTimeout(() => setEmailSent(null), 4000);
+    }
     onRefresh();
   }
 
@@ -1429,31 +1444,37 @@ function TeleconsultasSection({
                   )}
 
                   {/* Actions */}
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
                     {s.status === "agendada" && (
                       <button
-                        onClick={() => openRoom(s.id)}
-                        className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+                        onClick={() => openRoom(s)}
+                        disabled={openingRoom === s.id}
+                        className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
                       >
-                        🟢 Abrir sala agora
+                        {openingRoom === s.id ? "Criando sala…" : "🟢 Abrir sala agora"}
                       </button>
                     )}
-                    {s.status === "sala_aberta" && (
+                    {emailSent === s.id && (
+                      <span className="text-xs text-emerald-700 font-medium">
+                        ✓ Email enviado ao paciente
+                      </span>
+                    )}
+                    {s.status === "sala_aberta" && s.meet_url && (
                       <>
-                        <button
-                          onClick={() => setActiveVideoId(isVideoOpen ? null : s.id)}
-                          className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
-                        >
-                          🎥 {isVideoOpen ? "Minimizar vídeo" : "Entrar na sala"}
-                        </button>
                         <a
-                          href={`https://meet.jit.si/drclovis-${s.room_name}`}
+                          href={s.meet_url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground"
+                        >
+                          🎥 Entrar no Google Meet
+                        </a>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(s.meet_url!)}
                           className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:bg-secondary"
                         >
-                          ↗ Abrir em nova aba
-                        </a>
+                          Copiar link
+                        </button>
                         <button
                           onClick={() => closeRoom(s.id)}
                           className="rounded-full border border-destructive/30 px-4 py-2 text-xs text-destructive hover:bg-destructive/5"
@@ -1464,18 +1485,6 @@ function TeleconsultasSection({
                     )}
                   </div>
                 </div>
-
-                {/* Inline Jitsi video */}
-                {isVideoOpen && s.status === "sala_aberta" && (
-                  <div className="border-t border-border">
-                    <iframe
-                      src={`https://meet.jit.si/drclovis-${s.room_name}#config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.prejoinPageEnabled=false&config.disableDeepLinking=true&userInfo.displayName=Dr.%20Cl%C3%B3vis`}
-                      allow="camera; microphone; fullscreen; display-capture"
-                      className="h-[520px] w-full"
-                      title={`Teleconsulta — ${s.patient_name ?? "Paciente"}`}
-                    />
-                  </div>
-                )}
 
                 {/* AI Note generator (available when sala_aberta or encerrada) */}
                 {(s.status === "sala_aberta" || s.status === "encerrada") && (
