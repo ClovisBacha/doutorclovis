@@ -17,6 +17,7 @@ import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
 import { Route as MitosRouteImport } from './routes/mitos'
+import { Route as MedicosRouteImport } from './routes/medicos'
 import { Route as LivesRouteImport } from './routes/lives'
 import { Route as HospitaisRouteImport } from './routes/hospitais'
 import { Route as GestacaoRouteImport } from './routes/gestacao'
@@ -33,6 +34,7 @@ import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
+import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -80,6 +82,11 @@ const ModoAcompanhanteRoute = ModoAcompanhanteRouteImport.update({
 const MitosRoute = MitosRouteImport.update({
   id: '/mitos',
   path: '/mitos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MedicosRoute = MedicosRouteImport.update({
+  id: '/medicos',
+  path: '/medicos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LivesRoute = LivesRouteImport.update({
@@ -161,6 +168,11 @@ const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
   path: '/votar-nome/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
+  id: '/api/whatsapp',
+  path: '/api/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
@@ -217,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
+  '/medicos': typeof MedicosRoute
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
@@ -233,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesByTo {
@@ -250,6 +264,7 @@ export interface FileRoutesByTo {
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
+  '/medicos': typeof MedicosRoute
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
@@ -266,6 +281,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesById {
@@ -285,6 +301,7 @@ export interface FileRoutesById {
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
+  '/medicos': typeof MedicosRoute
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
@@ -301,6 +318,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRouteTypes {
@@ -320,6 +338,7 @@ export interface FileRouteTypes {
     | '/gestacao'
     | '/hospitais'
     | '/lives'
+    | '/medicos'
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
@@ -336,6 +355,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
+    | '/api/whatsapp'
     | '/votar-nome/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -353,6 +373,7 @@ export interface FileRouteTypes {
     | '/gestacao'
     | '/hospitais'
     | '/lives'
+    | '/medicos'
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
@@ -369,6 +390,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
+    | '/api/whatsapp'
     | '/votar-nome/$token'
   id:
     | '__root__'
@@ -387,6 +409,7 @@ export interface FileRouteTypes {
     | '/gestacao'
     | '/hospitais'
     | '/lives'
+    | '/medicos'
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
@@ -403,6 +426,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/nutrition'
     | '/api/transcribe'
+    | '/api/whatsapp'
     | '/votar-nome/$token'
   fileRoutesById: FileRoutesById
 }
@@ -422,6 +446,7 @@ export interface RootRouteChildren {
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
   LivesRoute: typeof LivesRoute
+  MedicosRoute: typeof MedicosRoute
   MitosRoute: typeof MitosRoute
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
@@ -436,6 +461,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  ApiWhatsappRoute: typeof ApiWhatsappRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
 }
 
@@ -495,6 +521,13 @@ declare module '@tanstack/react-router' {
       path: '/mitos'
       fullPath: '/mitos'
       preLoaderRoute: typeof MitosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/medicos': {
+      id: '/medicos'
+      path: '/medicos'
+      fullPath: '/medicos'
+      preLoaderRoute: typeof MedicosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lives': {
@@ -609,6 +642,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VotarNomeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/whatsapp': {
+      id: '/api/whatsapp'
+      path: '/api/whatsapp'
+      fullPath: '/api/whatsapp'
+      preLoaderRoute: typeof ApiWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/transcribe': {
       id: '/api/transcribe'
       path: '/api/transcribe'
@@ -697,6 +737,7 @@ const rootRouteChildren: RootRouteChildren = {
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,
   LivesRoute: LivesRoute,
+  MedicosRoute: MedicosRoute,
   MitosRoute: MitosRoute,
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
@@ -711,6 +752,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiNutritionRoute: ApiNutritionRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  ApiWhatsappRoute: ApiWhatsappRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
 }
 export const routeTree = rootRouteImport
