@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
+import { Reveal } from "@/components/reveal";
+import { TiltCard, SpotlightCard, Magnetic } from "@/components/motion-fx";
 
 export const Route = createFileRoute("/sobre")({
   head: () => ({
@@ -78,92 +80,114 @@ function SobrePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
       />
+
+      {/* Hero — retrato + texto */}
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-[1fr_1.3fr] md:py-24">
-        <img
-          src={portrait}
-          alt="Dr. Clóvis Bacha"
-          width={1024}
-          height={1024}
-          className="aspect-square w-full rounded-[2rem] object-cover shadow-[var(--shadow-card)]"
-        />
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Sobre o doutor
-          </p>
-          <h1 className="mt-3 font-serif text-4xl md:text-5xl">Dr. Clóvis Bacha</h1>
-          <p className="mt-4 text-sm uppercase tracking-wider text-muted-foreground">
-            {DOCTOR.crm} · {DOCTOR.rqe}
-          </p>
-          <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-            Há mais de 20 anos dedicado à saúde da mulher, com atuação central em gestação de alto
-            risco. Acredita que a escuta cuidadosa é parte do tratamento — e que cada gestação
-            merece protocolo individualizado.
-          </p>
-        </div>
+        <Reveal variant="left">
+          <TiltCard max={4}>
+            <img
+              src={portrait}
+              alt="Dr. Clóvis Bacha"
+              width={1024}
+              height={1024}
+              className="aspect-square w-full rounded-[2rem] object-cover shadow-[var(--shadow-card)]"
+            />
+          </TiltCard>
+        </Reveal>
+
+        <Reveal variant="right" delay={120}>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              Sobre o doutor
+            </p>
+            <h1 className="mt-3 font-serif text-4xl md:text-5xl">Dr. Clóvis Bacha</h1>
+            <p className="mt-4 text-sm uppercase tracking-wider text-muted-foreground">
+              {DOCTOR.crm} · {DOCTOR.rqe}
+            </p>
+            <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
+              Há mais de 20 anos dedicado à saúde da mulher, com atuação central em gestação de alto
+              risco. Acredita que a escuta cuidadosa é parte do tratamento — e que cada gestação
+              merece protocolo individualizado.
+            </p>
+          </div>
+        </Reveal>
       </section>
 
+      {/* Formação + Áreas de atuação */}
       <section className="border-t border-border/60 bg-secondary/40">
         <div className="mx-auto grid max-w-6xl gap-12 px-5 py-16 md:grid-cols-2">
           <div>
-            <h2 className="font-serif text-3xl">Formação</h2>
+            <Reveal variant="up">
+              <h2 className="font-serif text-3xl">Formação</h2>
+            </Reveal>
             <ul className="mt-6 space-y-4">
-              {formacao.map((f) => (
-                <li key={f.ano} className="flex gap-4 border-l-2 border-primary/40 pl-4">
-                  <span className="font-serif text-xl text-primary">{f.ano}</span>
-                  <span className="text-foreground">{f.item}</span>
-                </li>
+              {formacao.map((f, i) => (
+                <Reveal key={f.ano} variant="left" delay={i * 50}>
+                  <li className="flex gap-4 border-l-2 border-primary/40 pl-4">
+                    <span className="font-serif text-xl text-primary">{f.ano}</span>
+                    <span className="text-foreground">{f.item}</span>
+                  </li>
+                </Reveal>
               ))}
             </ul>
           </div>
+
           <div>
-            <h2 className="font-serif text-3xl">Áreas de atuação</h2>
+            <Reveal variant="up" delay={80}>
+              <h2 className="font-serif text-3xl">Áreas de atuação</h2>
+            </Reveal>
             <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-              {atuacao.map((a) => (
-                <li
-                  key={a}
-                  className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-card)]"
-                >
-                  {a}
-                </li>
+              {atuacao.map((a, i) => (
+                <Reveal key={a} variant="up" delay={80 + i * 45}>
+                  <SpotlightCard className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-card)]">
+                    {a}
+                  </SpotlightCard>
+                </Reveal>
               ))}
             </ul>
           </div>
         </div>
       </section>
 
+      {/* Em números */}
       <section className="mx-auto max-w-6xl px-5 py-16">
-        <h2 className="font-serif text-3xl">Em números</h2>
+        <Reveal variant="up">
+          <h2 className="font-serif text-3xl">Em números</h2>
+        </Reveal>
         <div className="mt-8 grid gap-6 sm:grid-cols-2 md:grid-cols-4">
-          {numeros.map((n) => (
-            <div
-              key={n.l}
-              className="rounded-2xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)]"
-            >
-              <p className="font-serif text-4xl text-primary">{n.v}</p>
-              <p className="mt-2 text-sm text-muted-foreground">{n.l}</p>
-            </div>
+          {numeros.map((n, i) => (
+            <Reveal key={n.l} variant="scale" delay={i * 80}>
+              <SpotlightCard className="rounded-2xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)]">
+                <p className="font-serif text-4xl text-primary">{n.v}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{n.l}</p>
+              </SpotlightCard>
+            </Reveal>
           ))}
         </div>
       </section>
 
+      {/* Sociedades e filiações */}
       <section className="border-t border-border/60 bg-secondary/40">
         <div className="mx-auto max-w-6xl px-5 py-16">
-          <h2 className="font-serif text-3xl">Sociedades e filiações</h2>
+          <Reveal variant="up">
+            <h2 className="font-serif text-3xl">Sociedades e filiações</h2>
+          </Reveal>
           <ul className="mt-6 grid gap-3 md:grid-cols-2">
-            {associacoes.map((a) => (
-              <li
-                key={a}
-                className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-card)]"
-              >
-                {a}
-              </li>
+            {associacoes.map((a, i) => (
+              <Reveal key={a} variant="up" delay={i * 70}>
+                <SpotlightCard className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground shadow-[var(--shadow-card)]">
+                  {a}
+                </SpotlightCard>
+              </Reveal>
             ))}
           </ul>
-          <p className="mt-8 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-            Atua com docência ocasional em cursos de atualização para residentes e participa de
-            congressos nacionais e internacionais de medicina fetal anualmente, mantendo a prática
-            alinhada às mais recentes evidências científicas.
-          </p>
+          <Reveal variant="up" delay={320}>
+            <p className="mt-8 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+              Atua com docência ocasional em cursos de atualização para residentes e participa de
+              congressos nacionais e internacionais de medicina fetal anualmente, mantendo a prática
+              alinhada às mais recentes evidências científicas.
+            </p>
+          </Reveal>
         </div>
       </section>
     </>

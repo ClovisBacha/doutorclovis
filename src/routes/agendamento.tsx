@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CalendarPlus, Check, Loader2 } from "lucide-react";
 import { submitAppointmentRequest } from "@/lib/appointments.functions";
 import { DOCTOR } from "@/lib/doctor.config";
+import { Reveal } from "@/components/reveal";
 
 type Booked = { name: string; date: string; time: string; reason: string };
 
@@ -131,111 +132,121 @@ function AgendamentoPage() {
         }}
       />
       <section className="mx-auto max-w-3xl px-5 py-16 md:py-24">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-          Agendamento
-        </p>
-        <h1 className="mt-3 font-serif text-4xl md:text-5xl">Solicite seu horário</h1>
-        <p className="mt-4 max-w-xl text-muted-foreground">
-          Preencha seus dados e a data desejada. Nossa equipe confirma o horário disponível com o
-          doutor por telefone ou e-mail.
-        </p>
+        <Reveal variant="blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Agendamento
+          </p>
+        </Reveal>
+        <Reveal variant="up" delay={60}>
+          <h1 className="mt-3 font-serif text-4xl md:text-5xl">Solicite seu horário</h1>
+        </Reveal>
+        <Reveal variant="up" delay={120}>
+          <p className="mt-4 max-w-xl text-muted-foreground">
+            Preencha seus dados e a data desejada. Nossa equipe confirma o horário disponível com o
+            doutor por telefone ou e-mail.
+          </p>
+        </Reveal>
 
         {done ? (
-          <div className="mt-10 flex flex-col items-center rounded-2xl border border-primary/30 bg-card p-10 text-center shadow-[var(--shadow-card)]">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <Check className="h-7 w-7" />
-            </div>
-            <h2 className="mt-5 font-serif text-2xl">Solicitação enviada!</h2>
-            <p className="mt-2 max-w-md text-muted-foreground">
-              Recebemos seu pedido e enviamos uma confirmação para o seu e-mail. A equipe entrará em
-              contato em até 1 dia útil para confirmar seu horário com o Dr. Clóvis.
-            </p>
-            {booked && (
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <a
-                  href={googleCalUrl(booked)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground"
-                >
-                  <CalendarPlus className="h-4 w-4" /> Google Agenda
-                </a>
-                <button
-                  onClick={() => downloadIcs(booked)}
-                  className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:text-primary"
-                >
-                  <CalendarPlus className="h-4 w-4" /> Baixar .ics
-                </button>
+          <Reveal variant="scale" delay={100}>
+            <div className="mt-10 flex flex-col items-center rounded-2xl border border-primary/30 bg-card p-10 text-center shadow-[var(--shadow-card)]">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <Check className="h-7 w-7" />
               </div>
-            )}
-            <p className="mt-4 text-xs text-muted-foreground">
-              O horário no calendário é uma lembrança da sua preferência — a confirmação final vem
-              do consultório.
-            </p>
-          </div>
+              <h2 className="mt-5 font-serif text-2xl">Solicitação enviada!</h2>
+              <p className="mt-2 max-w-md text-muted-foreground">
+                Recebemos seu pedido e enviamos uma confirmação para o seu e-mail. A equipe entrará
+                em contato em até 1 dia útil para confirmar seu horário com o Dr. Clóvis.
+              </p>
+              {booked && (
+                <div className="mt-6 flex flex-wrap justify-center gap-3">
+                  <a
+                    href={googleCalUrl(booked)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground"
+                  >
+                    <CalendarPlus className="h-4 w-4" /> Google Agenda
+                  </a>
+                  <button
+                    onClick={() => downloadIcs(booked)}
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:text-primary"
+                  >
+                    <CalendarPlus className="h-4 w-4" /> Baixar .ics
+                  </button>
+                </div>
+              )}
+              <p className="mt-4 text-xs text-muted-foreground">
+                O horário no calendário é uma lembrança da sua preferência — a confirmação final vem
+                do consultório.
+              </p>
+            </div>
+          </Reveal>
         ) : (
-          <form
-            onSubmit={onSubmit}
-            className="mt-10 grid gap-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] sm:p-8"
-          >
-            <Field label="Nome completo" name="name" required />
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="E-mail" type="email" name="email" required />
-              <Field
-                label="Telefone / WhatsApp"
-                name="phone"
-                required
-                placeholder="(00) 00000-0000"
-              />
-            </div>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Data preferida" type="date" name="date" min={today} required />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium">Horário preferido</label>
-                <select
-                  name="time"
-                  required
-                  defaultValue=""
-                  className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-                >
-                  <option value="" disabled>
-                    Selecione…
-                  </option>
-                  {horarios.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <Field
-              label="Motivo da consulta"
-              name="reason"
-              required
-              placeholder="Ex.: pré-natal, gestação de alto risco, primeira consulta…"
-            />
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Observações (opcional)</label>
-              <textarea
-                name="notes"
-                rows={4}
-                className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-                placeholder="Conte algo que ajude o doutor a se preparar para a consulta."
-              />
-            </div>
-
-            {error && <p className="text-sm text-destructive">{error}</p>}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90 disabled:opacity-60"
+          <Reveal variant="up" delay={160}>
+            <form
+              onSubmit={onSubmit}
+              className="mt-10 grid gap-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] sm:p-8"
             >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? "Enviando…" : "Enviar solicitação"}
-            </button>
-          </form>
+              <Field label="Nome completo" name="name" required />
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="E-mail" type="email" name="email" required />
+                <Field
+                  label="Telefone / WhatsApp"
+                  name="phone"
+                  required
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field label="Data preferida" type="date" name="date" min={today} required />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium">Horário preferido</label>
+                  <select
+                    name="time"
+                    required
+                    defaultValue=""
+                    className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                  >
+                    <option value="" disabled>
+                      Selecione…
+                    </option>
+                    {horarios.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <Field
+                label="Motivo da consulta"
+                name="reason"
+                required
+                placeholder="Ex.: pré-natal, gestação de alto risco, primeira consulta…"
+              />
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Observações (opcional)</label>
+                <textarea
+                  name="notes"
+                  rows={4}
+                  className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                  placeholder="Conte algo que ajude o doutor a se preparar para a consulta."
+                />
+              </div>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {loading ? "Enviando…" : "Enviar solicitação"}
+              </button>
+            </form>
+          </Reveal>
         )}
       </section>
     </>

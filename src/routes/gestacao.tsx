@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { Baby, HeartPulse, Stethoscope } from "lucide-react";
 import { AppCtaBanner } from "@/components/app-cta-banner";
 import { DOCTOR } from "@/lib/doctor.config";
+import { Reveal } from "@/components/reveal";
+import { SpotlightCard, Magnetic } from "@/components/motion-fx";
 
 export const Route = createFileRoute("/gestacao")({
   head: () => {
@@ -116,77 +118,97 @@ function GestacaoPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
       />
+
+      {/* Hero */}
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-          Sua gestação
-        </p>
-        <h1 className="mt-3 font-serif text-4xl md:text-5xl">
-          Da concepção ao parto, semana a semana.
-        </h1>
-        <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-          Um guia visual com os principais marcos e exames de uma gestação acompanhada. Cada caso é
-          único — esta linha do tempo é informativa e não substitui a avaliação clínica.
-        </p>
+        <Reveal variant="blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Sua gestação
+          </p>
+        </Reveal>
+        <Reveal variant="up" delay={60}>
+          <h1 className="mt-3 font-serif text-4xl md:text-5xl">
+            Da concepção ao parto, semana a semana.
+          </h1>
+        </Reveal>
+        <Reveal variant="up" delay={120}>
+          <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
+            Um guia visual com os principais marcos e exames de uma gestação acompanhada. Cada caso
+            é único — esta linha do tempo é informativa e não substitui a avaliação clínica.
+          </p>
+        </Reveal>
       </section>
 
+      {/* Linha do tempo */}
       <section className="border-y border-border/60 bg-secondary/40">
         <div className="mx-auto max-w-6xl px-5 py-16">
-          <h2 className="font-serif text-3xl">Linha do tempo</h2>
+          <Reveal variant="up">
+            <h2 className="font-serif text-3xl">Linha do tempo</h2>
+          </Reveal>
           <ol className="mt-10 space-y-6">
-            {semanas.map((s) => (
-              <li
-                key={s.sem}
-                className="grid gap-3 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] md:grid-cols-[140px_1fr]"
-              >
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Semanas
-                  </p>
-                  <p className="font-serif text-3xl text-primary">{s.sem}</p>
-                </div>
-                <div>
-                  <p className="font-serif text-xl text-foreground">{s.titulo}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{s.texto}</p>
-                </div>
-              </li>
+            {semanas.map((s, i) => (
+              <Reveal key={s.sem} variant="left" delay={i * 55}>
+                <li className="grid gap-3 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] md:grid-cols-[140px_1fr]">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Semanas
+                    </p>
+                    <p className="font-serif text-3xl text-primary">{s.sem}</p>
+                  </div>
+                  <div>
+                    <p className="font-serif text-xl text-foreground">{s.titulo}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{s.texto}</p>
+                  </div>
+                </li>
+              </Reveal>
             ))}
           </ol>
         </div>
       </section>
 
+      {/* Conteúdo por trimestre */}
       <section className="mx-auto max-w-6xl px-5 py-20">
-        <h2 className="font-serif text-3xl">Conteúdo por trimestre</h2>
-        <p className="mt-3 max-w-2xl text-muted-foreground">
-          Conteúdo educativo curado pelo Dr. Clóvis para cada fase da gestação.
-        </p>
+        <Reveal variant="up">
+          <h2 className="font-serif text-3xl">Conteúdo por trimestre</h2>
+        </Reveal>
+        <Reveal variant="up" delay={60}>
+          <p className="mt-3 max-w-2xl text-muted-foreground">
+            Conteúdo educativo curado pelo Dr. Clóvis para cada fase da gestação.
+          </p>
+        </Reveal>
         <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {trimestres.map(({ nome, icon: Icon, bullets }) => (
-            <article
-              key={nome}
-              className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
-            >
-              <Icon className="h-7 w-7 text-primary" />
-              <h3 className="mt-3 font-serif text-2xl">{nome}</h3>
-              <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
-                {bullets.map((b) => (
-                  <li key={b} className="border-l-2 border-primary/40 pl-3">
-                    {b}
-                  </li>
-                ))}
-              </ul>
-            </article>
+          {trimestres.map(({ nome, icon: Icon, bullets }, i) => (
+            <Reveal key={nome} variant="up" delay={i * 100}>
+              <SpotlightCard className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+                <Icon className="h-7 w-7 text-primary" />
+                <h3 className="mt-3 font-serif text-2xl">{nome}</h3>
+                <ul className="mt-4 space-y-2 text-sm leading-relaxed text-muted-foreground">
+                  {bullets.map((b) => (
+                    <li key={b} className="border-l-2 border-primary/40 pl-3">
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+              </SpotlightCard>
+            </Reveal>
           ))}
         </div>
-        <div className="mt-12 rounded-2xl bg-[var(--gradient-warm)] p-8 text-center">
-          <p className="font-serif text-2xl text-foreground">Quer conversar sobre a sua fase?</p>
-          <Link
-            to="/agendamento"
-            className="mt-4 inline-block rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground"
-          >
-            Agendar consulta
-          </Link>
-        </div>
+
+        <Reveal variant="up" delay={200}>
+          <div className="mt-12 rounded-2xl bg-[var(--gradient-warm)] p-8 text-center">
+            <p className="font-serif text-2xl text-foreground">Quer conversar sobre a sua fase?</p>
+            <Magnetic>
+              <Link
+                to="/agendamento"
+                className="press mt-4 inline-block rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
+              >
+                Agendar consulta
+              </Link>
+            </Magnetic>
+          </div>
+        </Reveal>
       </section>
+
       <AppCtaBanner />
     </>
   );
