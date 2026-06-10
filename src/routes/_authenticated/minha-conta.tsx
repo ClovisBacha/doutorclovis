@@ -22,6 +22,7 @@ import {
   dueDateFromLmp,
   trimesterForWeek,
 } from "@/lib/gestacao";
+import { BabyIllustration } from "@/components/baby-illustration";
 import { assessSymptoms } from "@/lib/triage.functions";
 import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
 import {
@@ -606,10 +607,15 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           <p className="text-xs uppercase tracking-[0.22em] text-primary">
             {babyLabel} esta semana
           </p>
-          <p className="mt-2 font-serif text-2xl text-primary">{baby.size}</p>
-          <p className="text-sm text-muted-foreground">Peso aproximado: {baby.weight}</p>
-          <p className="mt-1 text-sm text-muted-foreground">Tamanho de: {baby.fruit}</p>
-          <p className="mt-4 text-sm leading-relaxed text-foreground">{baby.desc}</p>
+          {/* Baby illustration — grows week-by-week */}
+          <div className="my-3 flex justify-center">
+            <BabyIllustration week={gest.weeks} />
+          </div>
+          <p className="mt-1 font-serif text-xl text-primary">{baby.size}</p>
+          <p className="text-sm text-muted-foreground">
+            Peso: {baby.weight} · {baby.fruit}
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-foreground">{baby.desc}</p>
         </div>
       </div>
 
@@ -1059,19 +1065,49 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
 
 /* ---------- Checklist ---------- */
 const DEFAULT_ITEMS: { category: string; label: string }[] = [
-  { category: "mae", label: "Documentos (RG, CPF, cartão SUS)" },
-  { category: "mae", label: "Carteira da gestante" },
-  { category: "mae", label: "Camisola com abertura frontal" },
-  { category: "mae", label: "Roupão e chinelos" },
-  { category: "mae", label: "Itens de higiene pessoal" },
-  { category: "bebe", label: "5 bodies tamanho RN" },
-  { category: "bebe", label: "5 macacões / mijões" },
-  { category: "bebe", label: "Fraldas RN (1 pacote)" },
-  { category: "bebe", label: "Manta de algodão" },
-  { category: "bebe", label: "Saída de maternidade" },
-  { category: "acompanhante", label: "Trocas de roupa" },
-  { category: "acompanhante", label: "Lanches e água" },
-  { category: "acompanhante", label: "Carregador de celular" },
+  // Mamãe — documentos e identificação
+  { category: "mae", label: "RG e CPF (originais)" },
+  { category: "mae", label: "Cartão do convênio / SUS" },
+  { category: "mae", label: "Carteira da gestante (pré-natal)" },
+  { category: "mae", label: "Plano de parto impresso" },
+  { category: "mae", label: "Exames recentes (ultrassom, sangue)" },
+  // Mamãe — roupas e conforto
+  { category: "mae", label: "2–3 camisolas com abertura frontal" },
+  { category: "mae", label: "Roupão de algodão" },
+  { category: "mae", label: "Chinelos fechados antiderrapantes" },
+  { category: "mae", label: "Meias confortáveis (3 pares)" },
+  { category: "mae", label: "Sutiã de amamentação (2 peças)" },
+  { category: "mae", label: "Absorventes pós-parto (pacote)" },
+  { category: "mae", label: "Calcinha descartável (pós-parto)" },
+  // Mamãe — higiene e conforto
+  { category: "mae", label: "Escova de dente e pasta" },
+  { category: "mae", label: "Shampoo, sabonete e desodorante" },
+  { category: "mae", label: "Creme para mamilos (lanolina)" },
+  { category: "mae", label: "Protetor de seios (for breastfeeding)" },
+  { category: "mae", label: "Travesseiro extra de amamentação" },
+  { category: "mae", label: "Fones de ouvido + playlist relaxante" },
+  { category: "mae", label: "Bolacha de água e sal / lanche leve" },
+  // Bebê — roupas
+  { category: "bebe", label: "5 bodies manga curta tamanho RN" },
+  { category: "bebe", label: "5 macacões / mijões tamanho RN" },
+  { category: "bebe", label: "2–3 mesinhas de algodão" },
+  { category: "bebe", label: "2 toucas de RN" },
+  { category: "bebe", label: "2 luvinhas para RN" },
+  // Bebê — cuidados
+  { category: "bebe", label: "Fraldas RN (1 pacote pequeno)" },
+  { category: "bebe", label: "Lenços umedecidos sem perfume" },
+  { category: "bebe", label: "Manta de algodão (2 peças)" },
+  { category: "bebe", label: "Saída de maternidade (roupa especial)" },
+  { category: "bebe", label: "Bebê conforto / cadeirinha de carro" },
+  { category: "bebe", label: "Creme para assaduras" },
+  // Acompanhante
+  { category: "acompanhante", label: "2 trocas de roupa confortável" },
+  { category: "acompanhante", label: "Itens de higiene pessoal" },
+  { category: "acompanhante", label: "Lanches e snacks energéticos" },
+  { category: "acompanhante", label: "Garrafa d'água" },
+  { category: "acompanhante", label: "Carregador de celular + cabo" },
+  { category: "acompanhante", label: "Cartão de crédito / dinheiro" },
+  { category: "acompanhante", label: "Câmera ou celular com boa câmera" },
 ];
 
 function ChecklistTab({ gest }: { gest: Gest }) {
@@ -11943,7 +11979,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
             },
             {
               name: "CVV — Centro de Valorização da Vida",
-              desc: "Apoio emocional 24h pelo telefone 188 ou chat online.",
+              desc: "Apoio emocional 24h — ligue 188 (gratuito) ou acesse o chat online.",
               url: "https://www.cvv.org.br",
             },
             {
@@ -11952,10 +11988,16 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
               url: "https://www.febrasgo.org.br",
             },
           ].map((r) => (
-            <div key={r.name} className="rounded-2xl border border-border p-4">
-              <p className="font-medium text-sm text-foreground">{r.name}</p>
+            <a
+              key={r.name}
+              href={r.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-2xl border border-border p-4 hover:border-primary/40 hover:bg-primary/5 transition-colors"
+            >
+              <p className="font-medium text-sm text-foreground">{r.name} ↗</p>
               <p className="mt-1 text-xs text-muted-foreground">{r.desc}</p>
-            </div>
+            </a>
           ))}
         </div>
       </div>
