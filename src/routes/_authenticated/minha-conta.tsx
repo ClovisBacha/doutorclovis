@@ -1,6 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AppBottomNav,
+  AppHomeScreen,
+  SectionHeader,
+  tabToSection,
+  type AppTab,
+  type BottomSection,
+} from "@/components/app-mobile-shell";
 import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -257,6 +265,8 @@ function MinhaContaPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("Bebê");
   const [isAdmin, setIsAdmin] = useState(false);
+  // Mobile-only: true = dashboard home screen
+  const [mobileHome, setMobileHome] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -301,122 +311,206 @@ function MinhaContaPage() {
 
   const firstName = profile?.display_name?.split(" ")[0] ?? "mamãe";
 
+  // Mobile navigation helpers
+  const activeSection: BottomSection = mobileHome ? "home" : tabToSection(tab as AppTab);
+
+  function mobileNavigate(t: AppTab) {
+    setTab(t as Tab);
+    setMobileHome(false);
+  }
+
+  function handleBottomNav(section: BottomSection) {
+    if (section === "home") {
+      setMobileHome(true);
+      return;
+    }
+    setMobileHome(false);
+    const sectionMap: Record<Exclude<BottomSection, "home">, Tab> = {
+      gestacao: "Bebê",
+      saude: "Saúde",
+      consultas: "Consultas",
+      eu: "Perfil",
+    };
+    setTab(sectionMap[section]);
+  }
+
+  const SECTION_TITLES: Record<BottomSection, string> = {
+    home: "Início",
+    gestacao: "Gestação",
+    saude: "Saúde",
+    consultas: "Consultas",
+    eu: "Eu",
+  };
+
   return (
-    <section className="mx-auto max-w-5xl px-5 py-12">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Minha conta
-          </p>
-          <h1 className="mt-2 font-serif text-3xl md:text-4xl">Olá, {firstName} 💛</h1>
-          {profile?.baby_name && (
-            <p className="mt-1 text-sm text-muted-foreground">Acompanhando {profile.baby_name}</p>
-          )}
-          {gest && (
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {gest.weeks}s {gest.days}d de gestação
+    <>
+      {/* ── App bottom nav (mobile only) ─────────────────────── */}
+      <AppBottomNav activeSection={activeSection} onSelect={handleBottomNav} />
+
+      <section className="mx-auto max-w-5xl px-5 py-6 md:py-12">
+        {/* ── Desktop header ───────────────────────────────────── */}
+        <div className="hidden md:flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              Minha conta
             </p>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          {isAdmin && (
-            <Link
-              to="/painel"
-              className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-            >
-              Painel do médico
-            </Link>
-          )}
-          <button onClick={signOut} className="text-xs text-muted-foreground hover:text-primary">
-            Sair
-          </button>
-        </div>
-      </div>
-
-      {/* Category selector */}
-      <div className="print:hidden mt-6 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        {CATEGORIES.map((cat) => {
-          const active = categoryOfTab(tab) === cat.label;
-          return (
-            <button
-              key={cat.label}
-              onClick={() => {
-                if (!active) setTab(cat.tabs[0]);
-              }}
-              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
-              }`}
-            >
-              {cat.label}
+            <h1 className="mt-2 font-serif text-3xl md:text-4xl">Olá, {firstName} 💛</h1>
+            {profile?.baby_name && (
+              <p className="mt-1 text-sm text-muted-foreground">Acompanhando {profile.baby_name}</p>
+            )}
+            {gest && (
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {gest.weeks}s {gest.days}d de gestação
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            {isAdmin && (
+              <Link
+                to="/painel"
+                className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+              >
+                Painel do médico
+              </Link>
+            )}
+            <button onClick={signOut} className="text-xs text-muted-foreground hover:text-primary">
+              Sair
             </button>
-          );
-        })}
-      </div>
+          </div>
+        </div>
 
-      {/* Tab row for current category */}
-      <div className="print:hidden mt-2 flex gap-0.5 overflow-x-auto border-b border-border pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`-mb-px flex-shrink-0 border-b-2 px-3 py-2 text-sm transition-colors ${
-              tab === t
-                ? "border-primary font-medium text-primary"
-                : "border-transparent text-muted-foreground hover:text-primary"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+        {/* ── Mobile top bar ───────────────────────────────────── */}
+        <div className="flex md:hidden items-center justify-between mb-4">
+          <p className="font-serif text-xl text-foreground">
+            {mobileHome ? `Olá, ${firstName} 💛` : SECTION_TITLES[activeSection]}
+          </p>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link
+                to="/painel"
+                className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+              >
+                Painel
+              </Link>
+            )}
+            <button onClick={signOut} className="text-xs text-muted-foreground hover:text-primary">
+              Sair
+            </button>
+          </div>
+        </div>
 
-      <div className="mt-8">
-        <TabErrorBoundary tabName={tab}>
-          {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
-          {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
-          {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
-          {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
-          {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
-          {tab === "Humor" && <HumorTab />}
-          {tab === "Chutes" && (
-            <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
+        {/* ── Mobile: home screen ──────────────────────────────── */}
+        {mobileHome && (
+          <div className="md:hidden">
+            <AppHomeScreen
+              firstName={firstName}
+              babyName={profile?.baby_name ?? null}
+              gest={gest}
+              onNavigate={mobileNavigate}
+            />
+          </div>
+        )}
+
+        {/* ── Desktop & mobile (when tab selected): category nav + tabs ── */}
+        <div className={mobileHome ? "hidden md:block" : "block"}>
+          {/* Section back-button on mobile */}
+          {!mobileHome && (
+            <SectionHeader
+              title={SECTION_TITLES[activeSection]}
+              onHome={() => setMobileHome(true)}
+            />
           )}
-          {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
-          {tab === "Saúde" && <HealthTab gest={gest} profile={profile} />}
-          {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
-          {tab === "Meditações" && <MeditacoesTab gest={gest} />}
-          {tab === "Sons" && <SonsBebêTab gest={gest} />}
-          {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
-          {tab === "Quartinho" && <QuartinhoTab gest={gest} />}
-          {tab === "Clima" && <ClimaTab gest={gest} />}
-          {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
-          {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
-          {tab === "Perguntas" && <QuestionsTab gest={gest} />}
-          {tab === "Checklist" && <ChecklistTab gest={gest} />}
-          {tab === "Consultas" && <ConsultasTab />}
-          {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
-          {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
-          {tab === "Conta Regressiva" && <CountdownTab profile={profile} gest={gest} />}
-          {tab === "Álbum" && <AlbumTab profile={profile} />}
-          {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
-          {tab === "Escola" && <EscolaBebêTab gest={gest} />}
-          {tab === "FAQ" && <FAQTab gest={gest} />}
-          {tab === "Pânico" && <PânicoTab profile={profile} />}
-          {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
-          {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
-          {tab === "Conquistas" && <ConquistasTab />}
-          {tab === "Loja" && <LojaTab gest={gest} />}
-          {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
-          {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
-          {tab === "Preventivos" && <PreventivosTab />}
-          {tab === "Médico" && <MédicoTab />}
-          {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
-          {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
-        </TabErrorBoundary>
-      </div>
-    </section>
+
+          {/* Category selector */}
+          <div className="print:hidden mt-2 md:mt-6 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {CATEGORIES.map((cat) => {
+              const active = categoryOfTab(tab) === cat.label;
+              return (
+                <button
+                  key={cat.label}
+                  onClick={() => {
+                    if (!active) setTab(cat.tabs[0]);
+                    setMobileHome(false);
+                  }}
+                  className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tab row */}
+          <div className="print:hidden mt-2 flex gap-0.5 overflow-x-auto border-b border-border pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => (
+              <button
+                key={t}
+                onClick={() => {
+                  setTab(t);
+                  setMobileHome(false);
+                }}
+                className={`-mb-px flex-shrink-0 border-b-2 px-3 py-2 text-sm transition-colors ${
+                  tab === t
+                    ? "border-primary font-medium text-primary"
+                    : "border-transparent text-muted-foreground hover:text-primary"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-8">
+            <TabErrorBoundary tabName={tab}>
+              {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
+              {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
+              {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
+              {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
+              {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
+              {tab === "Humor" && <HumorTab />}
+              {tab === "Chutes" && (
+                <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
+              )}
+              {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
+              {tab === "Saúde" && <HealthTab gest={gest} profile={profile} />}
+              {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
+              {tab === "Meditações" && <MeditacoesTab gest={gest} />}
+              {tab === "Sons" && <SonsBebêTab gest={gest} />}
+              {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
+              {tab === "Quartinho" && <QuartinhoTab gest={gest} />}
+              {tab === "Clima" && <ClimaTab gest={gest} />}
+              {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
+              {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
+              {tab === "Perguntas" && <QuestionsTab gest={gest} />}
+              {tab === "Checklist" && <ChecklistTab gest={gest} />}
+              {tab === "Consultas" && <ConsultasTab />}
+              {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
+              {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
+              {tab === "Conta Regressiva" && <CountdownTab profile={profile} gest={gest} />}
+              {tab === "Álbum" && <AlbumTab profile={profile} />}
+              {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
+              {tab === "Escola" && <EscolaBebêTab gest={gest} />}
+              {tab === "FAQ" && <FAQTab gest={gest} />}
+              {tab === "Pânico" && <PânicoTab profile={profile} />}
+              {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
+              {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
+              {tab === "Conquistas" && <ConquistasTab />}
+              {tab === "Loja" && <LojaTab gest={gest} />}
+              {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
+              {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
+              {tab === "Preventivos" && <PreventivosTab />}
+              {tab === "Médico" && <MédicoTab />}
+              {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
+              {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
+            </TabErrorBoundary>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
 

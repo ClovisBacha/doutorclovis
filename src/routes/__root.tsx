@@ -19,6 +19,7 @@ import { WhatsAppFloating } from "@/components/whatsapp-button";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Toaster } from "@/components/ui/sonner";
 import { ScrollProgress } from "@/components/motion-fx";
+import { PublicBottomNav } from "@/components/public-bottom-nav";
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -225,7 +226,7 @@ function SiteShell() {
         <ScrollProgress />
         <SiteHeader />
       </div>
-      <main id="main-content" className="flex-1">
+      <main id="main-content" className="flex-1 pb-[72px] md:pb-0">
         <Outlet />
       </main>
       <div className="print:hidden">
@@ -236,6 +237,9 @@ function SiteShell() {
       </div>
       <div className="print:hidden">
         <WhatsAppFloating />
+      </div>
+      <div className="print:hidden">
+        <PublicBottomNav />
       </div>
       <Toaster position="bottom-right" richColors />
     </div>
