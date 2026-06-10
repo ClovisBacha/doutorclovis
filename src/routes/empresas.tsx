@@ -254,18 +254,6 @@ function EmpresasPage() {
         </div>
       </section>
 
-      {/* Testimonial / social proof */}
-      <section className="py-20 px-5">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-5xl mb-6">💛</p>
-          <blockquote className="font-serif text-xl text-foreground leading-relaxed">
-            "Acompanhar a gestação das nossas colaboradoras com suporte médico especializado de
-            qualidade não é só um benefício — é um investimento no futuro da empresa."
-          </blockquote>
-          <p className="mt-4 text-sm text-muted-foreground">— Gestora de RH, cliente corporativo</p>
-        </div>
-      </section>
-
       {/* Contact form */}
       <section id="contato" className="py-20 px-5 bg-secondary/20">
         <div className="mx-auto max-w-xl">

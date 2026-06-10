@@ -1,9 +1,3 @@
-/**
- * Configuração central do Dr. Clóvis Bacha.
- * Preencha os valores reais aqui — são usados em rodapé, sobre, empresas e app.
- *
- * TODO: substituir pelos valores reais antes do go-live de produção.
- */
 export const DOCTOR = {
   name: "Dr. Clóvis Bacha",
   title: "Ginecologista e Obstetra",
@@ -26,3 +20,9 @@ export const DOCTOR = {
   pixKey: "bachaclovis@gmail.com",
   pixName: "Dr. Clóvis Bacha",
 };
+
+if (import.meta.env.DEV && (DOCTOR.crm.includes("●") || DOCTOR.whatsappUrl.includes("99999999"))) {
+  console.warn(
+    "[doctor.config] Valores placeholder detectados (CRM, WhatsApp). Preencha antes do go-live.",
+  );
+}

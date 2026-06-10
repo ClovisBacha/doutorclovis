@@ -5,11 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 const navPublic = [
   { to: "/gestacao", label: "Gestação" },
-  { to: "/calculadora", label: "Calculadoras" },
-  { to: "/epds", label: "EPDS" },
   { to: "/dpp", label: "DPP" },
   { to: "/batimentos", label: "Batimentos" },
-  { to: "/agendamento", label: "Agendamento" },
+  { to: "/agendamento", label: "Agendar" },
   { to: "/medicos", label: "Para Médicos" },
 ] as const;
 

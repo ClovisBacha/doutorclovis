@@ -30,17 +30,26 @@ const anteriores = [
   { titulo: "Vacinas seguras na gestação", data: "Mar/26" },
 ];
 
+type LiveStatus = "countdown" | "ao_vivo" | "encerrada";
+
 function LivesPage() {
-  const [restante, setRestante] = useState("");
+  const [timeLeft, setTimeLeft] = useState("");
+  const [status, setStatus] = useState<LiveStatus>("countdown");
 
   useEffect(() => {
     const tick = () => {
       const diff = new Date(proximaLive.data).getTime() - Date.now();
-      if (diff <= 0) return setRestante("Estamos ao vivo!");
-      const d = Math.floor(diff / 86400000);
-      const h = Math.floor((diff / 3600000) % 24);
-      const m = Math.floor((diff / 60000) % 60);
-      setRestante(`${d}d ${h}h ${m}min`);
+      if (diff > 0) {
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff / 3600000) % 24);
+        const m = Math.floor((diff / 60000) % 60);
+        setTimeLeft(`${d}d ${h}h ${m}min`);
+        setStatus("countdown");
+      } else if (diff > -2 * 3600 * 1000) {
+        setStatus("ao_vivo");
+      } else {
+        setStatus("encerrada");
+      }
     };
     tick();
     const i = setInterval(tick, 60000);
@@ -71,14 +80,32 @@ function LivesPage() {
             minute: "2-digit",
           })}
         </p>
-        <p className="mt-4 font-serif text-3xl text-primary">{restante}</p>
+        {status === "countdown" && (
+          <p className="mt-4 font-serif text-3xl text-primary">{timeLeft}</p>
+        )}
+        {status === "ao_vivo" && (
+          <p className="mt-4 inline-flex items-center gap-2 font-serif text-2xl text-red-500">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+            Estamos ao vivo agora!
+          </p>
+        )}
+        {status === "encerrada" && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Esta live já foi encerrada. Confira o perfil do Instagram para o replay.
+          </p>
+        )}
         <a
           href={proximaLive.link}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground"
         >
-          <Instagram className="h-4 w-4" /> Ativar lembrete no Instagram
+          <Instagram className="h-4 w-4" />
+          {status === "ao_vivo"
+            ? "Entrar na live"
+            : status === "encerrada"
+              ? "Ver no Instagram"
+              : "Ativar lembrete no Instagram"}
         </a>
       </div>
 
