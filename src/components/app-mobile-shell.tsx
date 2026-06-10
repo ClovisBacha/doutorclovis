@@ -266,6 +266,18 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
   },
 ];
 
+/** Gradiente contextual baseado na hora do dia — transmite presença. */
+function timeGradient(): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 10)
+    return "linear-gradient(148deg, oklch(0.99 0.012 68), oklch(0.975 0.04 42), oklch(0.968 0.025 35))"; // amanhecer — âmbar rosado
+  if (h >= 10 && h < 15)
+    return "linear-gradient(148deg, oklch(0.992 0.008 52), oklch(0.975 0.032 32), oklch(0.965 0.022 40))"; // dia — creme pêssego
+  if (h >= 15 && h < 19)
+    return "linear-gradient(148deg, oklch(0.988 0.015 45), oklch(0.972 0.038 28), oklch(0.96 0.028 38))"; // tarde — blush âmbar
+  return "linear-gradient(148deg, oklch(0.985 0.012 38), oklch(0.965 0.025 25), oklch(0.955 0.02 40))"; // noite — malva suave
+}
+
 export function AppHomeScreen({
   firstName,
   babyName,
@@ -283,7 +295,7 @@ export function AppHomeScreen({
   return (
     <div className="space-y-5 pb-2">
       {/* Cabeçalho de boas-vindas */}
-      <div className="rounded-3xl bg-[var(--gradient-warm)] p-5">
+      <div className="rounded-3xl p-5" style={{ background: timeGradient() }}>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
           Olá, {firstName} 💛
         </p>

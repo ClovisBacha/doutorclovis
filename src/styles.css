@@ -64,32 +64,53 @@
 }
 
 :root {
-  --radius: 0.75rem;
-  /* Light cream + soft wine palette */
-  --background: oklch(0.985 0.008 60);
-  --foreground: oklch(0.25 0.04 20);
-  --card: oklch(0.99 0.006 60);
-  --card-foreground: oklch(0.25 0.04 20);
-  --popover: oklch(0.99 0.006 60);
-  --popover-foreground: oklch(0.25 0.04 20);
-  --primary: oklch(0.5 0.11 18);
-  --primary-foreground: oklch(0.99 0.005 60);
-  --primary-soft: oklch(0.72 0.08 18);
-  --secondary: oklch(0.95 0.02 30);
-  --secondary-foreground: oklch(0.35 0.07 18);
-  --muted: oklch(0.95 0.012 50);
-  --muted-foreground: oklch(0.5 0.03 25);
-  --accent: oklch(0.92 0.04 22);
-  --accent-foreground: oklch(0.35 0.09 18);
+  /* ── Paleta "Camélia Quente" ──────────────────────────────────────────
+     Primary mais luminoso e acolhedor (L 0.50 → 0.57), background com
+     leve pêssego, sombras neutras e difusas em vez de coloridas.
+     Raio global 12px → 16px para sensação tátil de app nativo.         */
+  --radius: 1rem;
+
+  --background: oklch(0.989 0.009 52); /* creme pêssego muito suave */
+  --foreground: oklch(0.22 0.035 22); /* marrom-vinho escuro, não preto frio */
+  --card: oklch(0.997 0.004 52); /* quase branco, porém quente */
+  --card-foreground: oklch(0.22 0.035 22);
+  --popover: oklch(0.997 0.004 52);
+  --popover-foreground: oklch(0.22 0.035 22);
+
+  /* Primary: rosé mais luminoso — passa AA (≥4.5:1) em fundo claro */
+  --primary: oklch(0.57 0.1 22);
+  --primary-foreground: oklch(0.99 0.004 52);
+  --primary-soft: oklch(0.75 0.07 22);
+
+  --secondary: oklch(0.96 0.022 38); /* creme levemente pêssego */
+  --secondary-foreground: oklch(0.34 0.07 22);
+  --muted: oklch(0.955 0.014 48);
+  --muted-foreground: oklch(0.48 0.028 28);
+  --accent: oklch(0.94 0.038 26);
+  --accent-foreground: oklch(0.32 0.09 22);
   --destructive: oklch(0.55 0.22 27);
-  --destructive-foreground: oklch(0.99 0.005 60);
-  --border: oklch(0.9 0.018 35);
-  --input: oklch(0.92 0.015 35);
-  --ring: oklch(0.5 0.11 18);
-  --gradient-warm: linear-gradient(135deg, oklch(0.985 0.008 60), oklch(0.95 0.025 25));
-  --gradient-primary: linear-gradient(135deg, oklch(0.55 0.12 18), oklch(0.42 0.09 15));
-  --shadow-soft: 0 10px 40px -12px oklch(0.5 0.11 18 / 0.18);
-  --shadow-card: 0 4px 24px -8px oklch(0.4 0.08 18 / 0.12);
+  --destructive-foreground: oklch(0.99 0.004 52);
+  --border: oklch(0.915 0.016 38); /* linha mais suave, menos cinza */
+  --input: oklch(0.935 0.014 38);
+  --ring: oklch(0.57 0.1 22);
+
+  /* Gradientes acolhedores — três passos para profundidade suave */
+  --gradient-warm: linear-gradient(
+    148deg,
+    oklch(0.992 0.008 55),
+    oklch(0.975 0.032 32),
+    oklch(0.965 0.022 40)
+  );
+  --gradient-primary: linear-gradient(148deg, oklch(0.6 0.11 22), oklch(0.46 0.09 18));
+
+  /* Sombras etéreas — neutras e em duas camadas, sem cor de marca */
+  --shadow-card:
+    0 2px 16px -4px oklch(0.3 0.02 35 / 0.08), 0 1px 3px -1px oklch(0.3 0.02 35 / 0.05);
+  --shadow-soft:
+    0 12px 48px -16px oklch(0.3 0.02 35 / 0.12), 0 4px 12px -6px oklch(0.3 0.02 35 / 0.07);
+  --shadow-float:
+    0 20px 60px -20px oklch(0.3 0.02 35 / 0.14), 0 8px 24px -8px oklch(0.3 0.02 35 / 0.08);
+
   --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -156,6 +177,12 @@
     font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* ── Tipografia com respiro ───────────────────────────────────
+       line-height generoso transmite calma e facilita a leitura em
+       momentos de estresse. Em vez de 1.5 (padrão browser), usamos
+       1.65 no corpo e 1.8 em parágrafos longos.                  */
+    line-height: 1.65;
+    font-size: 1rem; /* 16px — nunca menos que isso em mobile */
   }
 
   h1,
@@ -163,7 +190,8 @@
   h3,
   .font-serif {
     font-family: var(--font-serif);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
+    line-height: 1.12; /* títulos compactos, corpo arejado */
   }
 
   h1,
@@ -171,8 +199,15 @@
     text-wrap: balance;
   }
 
+  /* Parágrafos com o maior respiro — eles são o coração do conteúdo */
   p {
     text-wrap: pretty;
+    line-height: 1.75;
+  }
+
+  /* Listas também ganham espaço entre itens */
+  li {
+    line-height: 1.65;
   }
 
   ::selection {
@@ -194,6 +229,22 @@
     ::-webkit-scrollbar-thumb:hover {
       background: color-mix(in oklab, var(--primary) 45%, transparent);
     }
+  }
+
+  /* ── Textura "papel de seda" ──────────────────────────────────────────
+     Grain SVG ultra-sutil (2% opacidade) aquece a superfície sem
+     ser percebido conscientemente — o cérebro lê como "orgânico e
+     caloroso" em vez de "tela de computador fria".               */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.022;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 180px;
   }
 }
 
