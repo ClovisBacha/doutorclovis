@@ -7,7 +7,7 @@
  *  - Subsurface scattering nas bordas (calor vermelho em pele fina)
  *  - Saco amniótico com glow interno e reflexo especular
  */
-import { babyStage, WEEK_MIN, WEEK_MAX, type BabyStage } from "@/lib/gestacao";
+import { babyStage, babyForWeek, WEEK_MIN, WEEK_MAX, type BabyStage } from "@/lib/gestacao";
 
 const STAGE_LABEL: Record<BabyStage, string> = {
   embriao: "Embrião",
@@ -15,6 +15,24 @@ const STAGE_LABEL: Record<BabyStage, string> = {
   feto: "Feto",
   tardio: "Feto (reta final)",
   termo: "Bebê a termo",
+};
+
+// Faixa de semanas de cada estágio
+const STAGE_RANGES: Record<BabyStage, [number, number]> = {
+  embriao: [4, 9],
+  inicial: [10, 15],
+  feto: [16, 27],
+  tardio: [28, 36],
+  termo: [37, 42],
+};
+
+// Escala inicial de cada estágio (cresce até 1.0 no final do estágio)
+const STAGE_BASE_SCALE: Record<BabyStage, number> = {
+  embriao: 0.38,
+  inicial: 0.5,
+  feto: 0.46,
+  tardio: 0.68,
+  termo: 0.84,
 };
 
 function growth(week: number) {
@@ -25,6 +43,15 @@ export function BabyIllustration({ week }: { week: number }) {
   const stage = babyStage(week);
   const g = growth(week);
   const sacR = 72 + g * 16;
+  const info = babyForWeek(week);
+
+  // Progresso dentro do estágio atual (0 = início, 1 = fim)
+  const [sMin, sMax] = STAGE_RANGES[stage];
+  const t = Math.max(0, Math.min(1, (week - sMin) / (sMax - sMin)));
+  const baseScale = STAGE_BASE_SCALE[stage];
+  const bodyScale = baseScale + t * (1 - baseScale);
+  // translate(tx, tx) scale(bodyScale) = escalar em torno do centro (100,100)
+  const tx = 100 * (1 - bodyScale);
 
   return (
     <div className="flex flex-col items-center">
@@ -125,17 +152,35 @@ export function BabyIllustration({ week }: { week: number }) {
           transform={`rotate(-19 ${100 - sacR * 0.19} ${100 - sacR * 0.41})`}
         />
 
-        {/* ── Estágio ──────────────────────────────────────────── */}
-        {stage === "embriao" && <Embryo />}
-        {stage === "inicial" && <FetoInicial />}
-        {stage === "feto" && <FetoMedio plump={1} />}
-        {stage === "tardio" && <FetoMedio plump={1.07} />}
-        {stage === "termo" && <BebeTermo />}
+        {/* ── Estágio — escala contínua semana a semana ─────────── */}
+        <g transform={`translate(${tx} ${tx}) scale(${bodyScale})`}>
+          {stage === "embriao" && <Embryo />}
+          {stage === "inicial" && <FetoInicial />}
+          {stage === "feto" && <FetoMedio plump={1} />}
+          {stage === "tardio" && <FetoMedio plump={1.07} />}
+          {stage === "termo" && <BebeTermo />}
+        </g>
       </svg>
 
-      <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-primary/80">
-        {STAGE_LABEL[stage]}
-      </p>
+      {/* ── Informações da semana (todas as 42 semanas) ─────────── */}
+      <div className="mt-2 w-full text-center">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary/80">
+          {STAGE_LABEL[stage]}
+        </p>
+        <div className="mt-1.5 flex items-center justify-center gap-2 text-xs font-semibold text-foreground">
+          <span>{info.size}</span>
+          {info.weight !== "—" && (
+            <>
+              <span className="text-border">·</span>
+              <span>{info.weight}</span>
+            </>
+          )}
+        </div>
+        <p className="mt-0.5 text-[11px] text-primary/70">{info.fruit}</p>
+        <p className="mx-auto mt-1 max-w-[220px] text-[11px] leading-snug text-muted-foreground">
+          {info.desc}
+        </p>
+      </div>
     </div>
   );
 }
