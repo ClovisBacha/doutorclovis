@@ -21,8 +21,10 @@ import { Route as MedicosRouteImport } from './routes/medicos'
 import { Route as LivesRouteImport } from './routes/lives'
 import { Route as HospitaisRouteImport } from './routes/hospitais'
 import { Route as GestacaoRouteImport } from './routes/gestacao'
+import { Route as EpdsRouteImport } from './routes/epds'
 import { Route as EmpresasRouteImport } from './routes/empresas'
 import { Route as DppRouteImport } from './routes/dpp'
+import { Route as DiabetesGestacionalRouteImport } from './routes/diabetes-gestacional'
 import { Route as DepoimentosRouteImport } from './routes/depoimentos'
 import { Route as CardsRouteImport } from './routes/cards'
 import { Route as CalculadoraRouteImport } from './routes/calculadora'
@@ -104,6 +106,11 @@ const GestacaoRoute = GestacaoRouteImport.update({
   path: '/gestacao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EpdsRoute = EpdsRouteImport.update({
+  id: '/epds',
+  path: '/epds',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmpresasRoute = EmpresasRouteImport.update({
   id: '/empresas',
   path: '/empresas',
@@ -112,6 +119,11 @@ const EmpresasRoute = EmpresasRouteImport.update({
 const DppRoute = DppRouteImport.update({
   id: '/dpp',
   path: '/dpp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiabetesGestacionalRoute = DiabetesGestacionalRouteImport.update({
+  id: '/diabetes-gestacional',
+  path: '/diabetes-gestacional',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DepoimentosRoute = DepoimentosRouteImport.update({
@@ -224,8 +236,10 @@ export interface FileRoutesByFullPath {
   '/calculadora': typeof CalculadoraRoute
   '/cards': typeof CardsRoute
   '/depoimentos': typeof DepoimentosRoute
+  '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -259,8 +273,10 @@ export interface FileRoutesByTo {
   '/calculadora': typeof CalculadoraRoute
   '/cards': typeof CardsRoute
   '/depoimentos': typeof DepoimentosRoute
+  '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -296,8 +312,10 @@ export interface FileRoutesById {
   '/calculadora': typeof CalculadoraRoute
   '/cards': typeof CardsRoute
   '/depoimentos': typeof DepoimentosRoute
+  '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -333,8 +351,10 @@ export interface FileRouteTypes {
     | '/calculadora'
     | '/cards'
     | '/depoimentos'
+    | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/epds'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -368,8 +388,10 @@ export interface FileRouteTypes {
     | '/calculadora'
     | '/cards'
     | '/depoimentos'
+    | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/epds'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -404,8 +426,10 @@ export interface FileRouteTypes {
     | '/calculadora'
     | '/cards'
     | '/depoimentos'
+    | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/epds'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -441,8 +465,10 @@ export interface RootRouteChildren {
   CalculadoraRoute: typeof CalculadoraRoute
   CardsRoute: typeof CardsRoute
   DepoimentosRoute: typeof DepoimentosRoute
+  DiabetesGestacionalRoute: typeof DiabetesGestacionalRoute
   DppRoute: typeof DppRoute
   EmpresasRoute: typeof EmpresasRoute
+  EpdsRoute: typeof EpdsRoute
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
   LivesRoute: typeof LivesRoute
@@ -551,6 +577,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GestacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/epds': {
+      id: '/epds'
+      path: '/epds'
+      fullPath: '/epds'
+      preLoaderRoute: typeof EpdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/empresas': {
       id: '/empresas'
       path: '/empresas'
@@ -563,6 +596,13 @@ declare module '@tanstack/react-router' {
       path: '/dpp'
       fullPath: '/dpp'
       preLoaderRoute: typeof DppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/diabetes-gestacional': {
+      id: '/diabetes-gestacional'
+      path: '/diabetes-gestacional'
+      fullPath: '/diabetes-gestacional'
+      preLoaderRoute: typeof DiabetesGestacionalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/depoimentos': {
@@ -732,8 +772,10 @@ const rootRouteChildren: RootRouteChildren = {
   CalculadoraRoute: CalculadoraRoute,
   CardsRoute: CardsRoute,
   DepoimentosRoute: DepoimentosRoute,
+  DiabetesGestacionalRoute: DiabetesGestacionalRoute,
   DppRoute: DppRoute,
   EmpresasRoute: EmpresasRoute,
+  EpdsRoute: EpdsRoute,
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,
   LivesRoute: LivesRoute,

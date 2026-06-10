@@ -35,6 +35,10 @@ const PLANS = [
       "Prontuário gestacional simplificado",
       "App para a paciente (portal pré-natal)",
       "Painel de agendamentos",
+      "📊 Biometria fetal + percentil Intergrowth-21",
+      "🧠 EPDS digital (rastreio depressão perinatal)",
+      "🩸 Protocolo DMG + calculadora de insulina",
+      "🫀 Rastreio de risco pré-eclâmpsia (ACOG/SBH)",
       "Exportação .ics (Google / Apple Calendar)",
       "Até 50 pacientes ativas/mês",
     ],
@@ -356,6 +360,112 @@ function MedicosPage() {
               </div>
             </Reveal>
           </div>
+        </div>
+      </section>
+
+      {/* ── Clinical Tools ────────────────────────────────────── */}
+      <section className="px-6 py-20">
+        <div className="mx-auto max-w-5xl">
+          <Reveal>
+            <p className="text-center text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+              Exclusivo para GO
+            </p>
+            <h2 className="mt-3 text-center font-serif text-3xl md:text-4xl">
+              Ferramentas clínicas que você não encontra em nenhum outro sistema
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-center text-muted-foreground">
+              Calculadoras e protocolos específicos para obstetrícia e ginecologia — integrados ao
+              prontuário, não num app separado.
+            </p>
+          </Reveal>
+
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                icon: "⚖️",
+                title: "Biometria Fetal",
+                desc: "Peso fetal estimado (Hadlock) + percentil Intergrowth-21 em segundos. Sem calculadora física.",
+                badge: "Todo dia",
+                link: "/calculadora",
+              },
+              {
+                icon: "🧠",
+                title: "EPDS Digital",
+                desc: "Escala de Edinburgh para rastreio de depressão perinatal. A paciente preenche no celular antes da consulta.",
+                badge: "SUS exige",
+                link: "/epds",
+              },
+              {
+                icon: "🩸",
+                title: "Protocolo DMG",
+                desc: "Critérios TOTG 75g, metas glicêmicas SBD 2022, calculadora de dose de insulina e ganho de peso IOM.",
+                badge: "18% das gestantes",
+                link: "/diabetes-gestacional",
+              },
+              {
+                icon: "🫀",
+                title: "Risco Pré-eclâmpsia",
+                desc: "Checklist ACOG/SBH com recomendação automática de aspirina profilática (150 mg). Nenhum fator esquecido.",
+                badge: "Prevenção",
+                link: "/calculadora",
+              },
+            ].map((tool, i) => (
+              <Reveal key={tool.title} delay={i * 0.06}>
+                <a
+                  href={tool.link}
+                  className="group flex flex-col rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition-all hover:border-primary/40 hover:shadow-[var(--shadow-soft)]"
+                >
+                  <span className="text-3xl">{tool.icon}</span>
+                  <span className="mt-3 inline-block self-start rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                    {tool.badge}
+                  </span>
+                  <p className="mt-2 font-semibold text-foreground group-hover:text-primary transition-colors">
+                    {tool.title}
+                  </p>
+                  <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+                    {tool.desc}
+                  </p>
+                </a>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal>
+            <div className="mt-10 rounded-3xl border border-primary/20 bg-primary/5 p-6 md:p-8">
+              <div className="grid gap-6 md:grid-cols-2 md:items-center">
+                <div>
+                  <p className="font-semibold text-foreground text-lg">Por que isso importa?</p>
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                    A revisão de biometria fetal durante ultrassom consome{" "}
+                    <strong className="text-foreground">5–10 minutos</strong> buscando tabelas. O
+                    EPDS em papel precisa ser pontuado manualmente. O protocolo de DM gestacional é
+                    consultado em PDF separado.
+                  </p>
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                    Com essas ferramentas integradas, estimamos{" "}
+                    <strong className="text-foreground">40–60 minutos salvos por dia</strong> de
+                    consulta — tempo que volta para seus pacientes.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    { label: "Biometria fetal por USG", saved: "5–10 min salvos/consulta" },
+                    { label: "EPDS manual pontuado", saved: "8 min salvos/paciente" },
+                    { label: "Protocolo DMG consultado", saved: "3–5 min salvos/consulta" },
+                    { label: "Checklist pré-eclâmpsia", saved: "Zero fatores esquecidos" },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex items-center justify-between rounded-xl bg-background/80 px-4 py-3 text-sm"
+                    >
+                      <span className="text-muted-foreground">{item.label}</span>
+                      <span className="font-medium text-primary">{item.saved}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
