@@ -75,7 +75,10 @@ export type AppTab =
   | "Preventivos"
   | "Médico"
   | "Chat IA"
-  | "Perfil";
+  | "Perfil"
+  | "Exames"
+  | "Plano de Parto"
+  | "Apoio Emocional";
 
 export type BottomSection = "home" | "gestacao" | "saude" | "consultas" | "eu";
 
@@ -93,6 +96,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   ],
   saude: [
     "Saúde",
+    "Exames",
     "Nutrição",
     "Meditações",
     "Sons",
@@ -104,6 +108,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   ],
   consultas: [
     "Pré-consulta",
+    "Plano de Parto",
     "Perguntas",
     "Checklist",
     "Consultas",
@@ -118,6 +123,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
     "Álbum",
     "Nome do Bebê",
     "Pós-parto",
+    "Apoio Emocional",
     "Escola",
     "FAQ",
     "Pânico",

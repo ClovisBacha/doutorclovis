@@ -149,7 +149,33 @@ type HealthLog = {
   weight_kg: number | null;
   systolic: number | null;
   diastolic: number | null;
+  glucose_mg_dl: number | null;
+  spo2: number | null;
+  heart_rate_bpm: number | null;
+  steps: number | null;
+  sleep_hours: number | null;
   notes: string | null;
+};
+type ExamFile = {
+  id: string;
+  name: string;
+  category: string;
+  week: number | null;
+  notes: string | null;
+  image_data: string | null;
+  created_at: string;
+};
+type BirthPlan = {
+  id?: string;
+  birth_type: string;
+  pain_relief: string[];
+  who_present: string;
+  cord_cutting: string;
+  skin_to_skin: boolean;
+  breastfeeding: string;
+  lighting: string;
+  music: string;
+  notes: string;
 };
 type DoctorQ = { id: string; question: string; answered: boolean; created_at: string };
 type Invite = { id: string; token: string; companion_name: string | null; created_at: string };
@@ -195,6 +221,9 @@ const TABS = [
   "Médico",
   "Chat IA",
   "Perfil",
+  "Exames",
+  "Plano de Parto",
+  "Apoio Emocional",
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -216,6 +245,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
     label: "Saúde",
     tabs: [
       "Saúde",
+      "Exames",
       "Nutrição",
       "Meditações",
       "Sons",
@@ -228,12 +258,22 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Família",
-    tabs: ["Diário", "Humor", "Acompanhante", "Quartinho", "Álbum", "Nome do Bebê", "Pós-parto"],
+    tabs: [
+      "Diário",
+      "Humor",
+      "Acompanhante",
+      "Quartinho",
+      "Álbum",
+      "Nome do Bebê",
+      "Pós-parto",
+      "Apoio Emocional",
+    ],
   },
   {
     label: "Consultas",
     tabs: [
       "Pré-consulta",
+      "Plano de Parto",
       "Perguntas",
       "Checklist",
       "Consultas",
@@ -504,6 +544,11 @@ function MinhaContaPage() {
               {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
               {tab === "Preventivos" && <PreventivosTab />}
               {tab === "Médico" && <MédicoTab />}
+              {tab === "Exames" && <ExamesTab gest={gest} />}
+              {tab === "Plano de Parto" && <PlanoPártoTab profile={profile} />}
+              {tab === "Apoio Emocional" && (
+                <ApoioEmocionalTab onNavigate={(t) => setTab(t as Tab)} />
+              )}
               {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
               {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
             </TabErrorBoundary>
@@ -1720,6 +1765,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
     weight_kg: "",
     systolic: "",
     diastolic: "",
+    glucose_mg_dl: "",
     spo2: "",
     heart_rate_bpm: "",
     steps: "",
@@ -1743,12 +1789,20 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
   async function add() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    if (!form.weight_kg && !form.systolic && !form.spo2 && !form.heart_rate_bpm) return;
+    if (
+      !form.weight_kg &&
+      !form.systolic &&
+      !form.glucose_mg_dl &&
+      !form.spo2 &&
+      !form.heart_rate_bpm
+    )
+      return;
     await (supabase as any).from("health_logs").insert({
       user_id: u.user.id,
       weight_kg: form.weight_kg ? Number(form.weight_kg) : null,
       systolic: form.systolic ? Number(form.systolic) : null,
       diastolic: form.diastolic ? Number(form.diastolic) : null,
+      glucose_mg_dl: form.glucose_mg_dl ? Number(form.glucose_mg_dl) : null,
       spo2: form.spo2 ? Number(form.spo2) : null,
       heart_rate_bpm: form.heart_rate_bpm ? Number(form.heart_rate_bpm) : null,
       steps: form.steps ? Number(form.steps) : null,
@@ -1759,6 +1813,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
       weight_kg: "",
       systolic: "",
       diastolic: "",
+      glucose_mg_dl: "",
       spo2: "",
       heart_rate_bpm: "",
       steps: "",
@@ -1876,7 +1931,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
   return (
     <div className="space-y-6">
       {/* Stats row */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
         <div className="rounded-3xl border border-border bg-card p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Último peso</p>
           <p className="mt-2 font-serif text-3xl">
@@ -1904,6 +1959,28 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
             </p>
           )}
         </div>
+        {(() => {
+          const lastGlucose = logs.find((l) => l.glucose_mg_dl != null);
+          const gv = lastGlucose?.glucose_mg_dl;
+          const gColor = gv == null ? null : gv > 140 ? "rose" : gv > 95 ? "amber" : "emerald";
+          const gLabel =
+            gv == null ? null : gv > 140 ? "Atenção: elevada" : gv > 95 ? "Limite" : "Normal";
+          return (
+            <div
+              className={`rounded-3xl border p-5 ${gColor === "rose" ? "border-rose-300 bg-rose-50" : gColor === "amber" ? "border-amber-300 bg-amber-50" : "border-border bg-card"}`}
+            >
+              <p className="text-xs uppercase tracking-[0.22em] text-primary">Glicemia</p>
+              <p className="mt-2 font-serif text-3xl">{gv != null ? `${gv} mg/dL` : "—"}</p>
+              {gLabel && (
+                <p
+                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-amber-700" : "text-emerald-700"}`}
+                >
+                  {gLabel}
+                </p>
+              )}
+            </div>
+          );
+        })()}
         <div className="rounded-3xl border border-border bg-card p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">SpO₂ / FC</p>
           <p className="mt-2 font-serif text-2xl">
@@ -1997,14 +2074,193 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
         )
       )}
 
+      {/* Gráfico histórico de PA */}
+      {(() => {
+        const bpHistory = logs
+          .filter((l) => l.systolic != null && l.diastolic != null)
+          .reverse()
+          .slice(-15);
+        if (bpHistory.length < 2) return null;
+        const W = 400,
+          H = 140;
+        const allY = bpHistory.flatMap((l) => [l.systolic!, l.diastolic!]);
+        const minY = Math.min(...allY, 50) - 5;
+        const maxY = Math.max(...allY, 160) + 5;
+        const sy = (v: number) => H - 10 - ((v - minY) / (maxY - minY)) * (H - 20);
+        const sx = (i: number) => 10 + (i / (bpHistory.length - 1)) * (W - 20);
+        const systPts = bpHistory.map((l, i) => `${sx(i)},${sy(l.systolic!)}`).join(" ");
+        const diasPts = bpHistory.map((l, i) => `${sx(i)},${sy(l.diastolic!)}`).join(" ");
+        return (
+          <div className="rounded-3xl border border-border bg-card p-6">
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+              Histórico de pressão arterial
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Linha vermelha = sistólica · Linha azul = diastólica · Limite em tracejado
+            </p>
+            <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 h-36 w-full">
+              {/* threshold 140 sistólica */}
+              <line
+                x1="10"
+                y1={sy(140)}
+                x2={W - 10}
+                y2={sy(140)}
+                stroke="#f87171"
+                strokeWidth="1"
+                strokeDasharray="4 3"
+                opacity="0.6"
+              />
+              <text x="12" y={sy(140) - 3} fontSize="7" fill="#f87171" opacity="0.8">
+                140
+              </text>
+              {/* threshold 90 diastólica */}
+              <line
+                x1="10"
+                y1={sy(90)}
+                x2={W - 10}
+                y2={sy(90)}
+                stroke="#60a5fa"
+                strokeWidth="1"
+                strokeDasharray="4 3"
+                opacity="0.6"
+              />
+              <text x="12" y={sy(90) - 3} fontSize="7" fill="#60a5fa" opacity="0.8">
+                90
+              </text>
+              <polyline
+                points={systPts}
+                fill="none"
+                stroke="#f87171"
+                strokeWidth="2.2"
+                strokeLinejoin="round"
+              />
+              <polyline
+                points={diasPts}
+                fill="none"
+                stroke="#60a5fa"
+                strokeWidth="2.2"
+                strokeLinejoin="round"
+              />
+              {bpHistory.map((l, i) => (
+                <g key={i}>
+                  <circle cx={sx(i)} cy={sy(l.systolic!)} r="3.5" fill="#f87171" />
+                  <circle cx={sx(i)} cy={sy(l.diastolic!)} r="3.5" fill="#60a5fa" />
+                </g>
+              ))}
+            </svg>
+          </div>
+        );
+      })()}
+
+      {/* Gráfico histórico de glicemia */}
+      {(() => {
+        const glHistory = logs
+          .filter((l) => l.glucose_mg_dl != null)
+          .reverse()
+          .slice(-15);
+        if (glHistory.length < 2) return null;
+        const W = 400,
+          H = 130;
+        const allY = glHistory.map((l) => l.glucose_mg_dl!);
+        const minY = Math.min(...allY, 70) - 5;
+        const maxY = Math.max(...allY, 180) + 5;
+        const sy = (v: number) => H - 10 - ((v - minY) / (maxY - minY)) * (H - 20);
+        const sx = (i: number) => 10 + (i / (glHistory.length - 1)) * (W - 20);
+        const pts = glHistory.map((l, i) => `${sx(i)},${sy(l.glucose_mg_dl!)}`).join(" ");
+        return (
+          <div className="rounded-3xl border border-border bg-card p-6">
+            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+              Histórico de glicemia
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Referência em jejum: &lt; 95 mg/dL · Pós-prandial: &lt; 140 mg/dL
+            </p>
+            <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 h-32 w-full">
+              {/* zona verde < 95 */}
+              <rect
+                x="10"
+                y={sy(95)}
+                width={W - 20}
+                height={sy(minY) - sy(95)}
+                fill="#4ade80"
+                opacity="0.08"
+              />
+              <line
+                x1="10"
+                y1={sy(95)}
+                x2={W - 10}
+                y2={sy(95)}
+                stroke="#4ade80"
+                strokeWidth="1"
+                strokeDasharray="4 3"
+                opacity="0.7"
+              />
+              <text x="12" y={sy(95) - 3} fontSize="7" fill="#4ade80" opacity="0.9">
+                95
+              </text>
+              {/* threshold 140 */}
+              <line
+                x1="10"
+                y1={sy(140)}
+                x2={W - 10}
+                y2={sy(140)}
+                stroke="#fb923c"
+                strokeWidth="1"
+                strokeDasharray="4 3"
+                opacity="0.7"
+              />
+              <text x="12" y={sy(140) - 3} fontSize="7" fill="#fb923c" opacity="0.9">
+                140
+              </text>
+              <polyline
+                points={pts}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth="2.2"
+                strokeLinejoin="round"
+              />
+              {glHistory.map((l, i) => (
+                <circle
+                  key={i}
+                  cx={sx(i)}
+                  cy={sy(l.glucose_mg_dl!)}
+                  r="3.5"
+                  fill={
+                    l.glucose_mg_dl! > 140
+                      ? "#f87171"
+                      : l.glucose_mg_dl! > 95
+                        ? "#fb923c"
+                        : "hsl(var(--primary))"
+                  }
+                />
+              ))}
+            </svg>
+          </div>
+        );
+      })()}
+
       {/* Wearable data summary — Feature #6 */}
-      {logs.some((l) => l.spo2 || l.heart_rate_bpm || l.steps || l.sleep_hours) && (
+      {logs.some(
+        (l) =>
+          (l as any).spo2 ||
+          (l as any).heart_rate_bpm ||
+          (l as any).steps ||
+          (l as any).sleep_hours,
+      ) && (
         <div className="grid gap-4 sm:grid-cols-4">
           {[
-            { label: "SpO₂", value: logs.find((l) => l.spo2)?.spo2, unit: "%" },
-            { label: "FC", value: logs.find((l) => l.heart_rate_bpm)?.heart_rate_bpm, unit: "bpm" },
-            { label: "Passos", value: logs.find((l) => l.steps)?.steps, unit: "" },
-            { label: "Sono", value: logs.find((l) => l.sleep_hours)?.sleep_hours, unit: "h" },
+            { label: "SpO₂", value: logs.find((l) => (l as any).spo2)?.spo2, unit: "%" },
+            {
+              label: "FC",
+              value: logs.find((l) => (l as any).heart_rate_bpm)?.heart_rate_bpm,
+              unit: "bpm",
+            },
+            { label: "Passos", value: logs.find((l) => (l as any).steps)?.steps, unit: "" },
+            {
+              label: "Sono",
+              value: logs.find((l) => (l as any).sleep_hours)?.sleep_hours,
+              unit: "h",
+            },
           ].map((m) => (
             <div key={m.label} className="rounded-2xl border border-border bg-card p-4 text-center">
               <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">{m.label}</p>
@@ -2062,6 +2318,12 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
             type="number"
             value={form.diastolic}
             onChange={(v) => setForm({ ...form, diastolic: v })}
+          />
+          <Field
+            label="Glicemia (mg/dL)"
+            type="number"
+            value={form.glucose_mg_dl}
+            onChange={(v) => setForm({ ...form, glucose_mg_dl: v })}
           />
           <Field
             label="Notas"
@@ -2128,10 +2390,11 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
                   💓 {l.systolic}/{l.diastolic}
                 </span>
               )}
-              {(l as any).spo2 && <span>🫁 {(l as any).spo2}% SpO₂</span>}
-              {(l as any).heart_rate_bpm && <span>❤️ {(l as any).heart_rate_bpm}bpm</span>}
-              {(l as any).steps && <span>🚶 {(l as any).steps} passos</span>}
-              {(l as any).sleep_hours && <span>🌙 {(l as any).sleep_hours}h sono</span>}
+              {l.glucose_mg_dl && <span>🩸 {l.glucose_mg_dl} mg/dL</span>}
+              {l.spo2 && <span>🫁 {l.spo2}% SpO₂</span>}
+              {l.heart_rate_bpm && <span>❤️ {l.heart_rate_bpm}bpm</span>}
+              {l.steps && <span>🚶 {l.steps} passos</span>}
+              {l.sleep_hours && <span>🌙 {l.sleep_hours}h sono</span>}
               {l.notes && <span className="text-muted-foreground">{l.notes}</span>}
             </span>
             <button
@@ -11146,6 +11409,569 @@ function MédicoTab() {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Exames ---------- */
+const EXAM_CATEGORIES = [
+  { value: "ultrassom", label: "Ultrassom" },
+  { value: "laboratorial", label: "Laboratorial" },
+  { value: "cardiotocografia", label: "Cardiotocografia" },
+  { value: "outros", label: "Outros" },
+];
+
+function ExamesTab({ gest }: { gest: Gest }) {
+  const [exams, setExams] = useState<ExamFile[]>([]);
+  const [filter, setFilter] = useState("todos");
+  const [form, setForm] = useState({ name: "", category: "ultrassom", week: "", notes: "" });
+  const [imageData, setImageData] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [preview, setPreview] = useState<ExamFile | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function load() {
+    const { data } = await (supabase as any)
+      .from("exam_files")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setExams(data ?? []);
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxSize = 1200;
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setImageData(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function save() {
+    if (!form.name) return;
+    setSubmitting(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) {
+      setSubmitting(false);
+      return;
+    }
+    await (supabase as any).from("exam_files").insert({
+      user_id: u.user.id,
+      name: form.name,
+      category: form.category,
+      week: form.week ? Number(form.week) : null,
+      notes: form.notes || null,
+      image_data: imageData,
+    });
+    setForm({ name: "", category: "ultrassom", week: "", notes: "" });
+    setImageData(null);
+    if (fileRef.current) fileRef.current.value = "";
+    setSubmitting(false);
+    load();
+  }
+
+  async function remove(id: string) {
+    await (supabase as any).from("exam_files").delete().eq("id", id);
+    load();
+  }
+
+  const filtered = filter === "todos" ? exams : exams.filter((e) => e.category === filter);
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-xl">Adicionar exame</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Fotografe ou importe a imagem do laudo para guardar no seu histórico.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Nome do exame *
+            </label>
+            <input
+              className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              placeholder="Ex.: Morfológico 2º trimestre"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Categoria
+            </label>
+            <select
+              className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            >
+              {EXAM_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Semana gestacional
+            </label>
+            <input
+              type="number"
+              className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              placeholder="Ex.: 20"
+              value={form.week}
+              onChange={(e) => setForm({ ...form, week: e.target.value })}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Observações
+            </label>
+            <input
+              className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              placeholder="Médico, clínica, resultado..."
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary hover:text-primary"
+          >
+            {imageData ? "Trocar foto" : "Adicionar foto do laudo"}
+          </button>
+          {imageData && (
+            <img
+              src={imageData}
+              alt="preview"
+              className="h-12 w-12 rounded-lg object-cover ring-2 ring-primary/40"
+            />
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFile}
+          />
+        </div>
+        <button
+          onClick={save}
+          disabled={submitting || !form.name}
+          className="mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          {submitting ? "Salvando…" : "Salvar exame"}
+        </button>
+      </div>
+
+      {/* Filter */}
+      <div className="flex flex-wrap gap-2">
+        {[{ value: "todos", label: "Todos" }, ...EXAM_CATEGORIES].map((c) => (
+          <button
+            key={c.value}
+            onClick={() => setFilter(c.value)}
+            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${filter === c.value ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:text-foreground"}`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* List */}
+      {filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhum exame registrado ainda.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filtered.map((exam) => (
+            <div key={exam.id} className="flex gap-3 rounded-2xl border border-border bg-card p-4">
+              {exam.image_data ? (
+                <button onClick={() => setPreview(exam)} className="flex-shrink-0">
+                  <img
+                    src={exam.image_data}
+                    alt={exam.name}
+                    className="h-16 w-16 rounded-xl object-cover ring-1 ring-border"
+                  />
+                </button>
+              ) : (
+                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-secondary text-2xl">
+                  📄
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-foreground truncate">{exam.name}</p>
+                <p className="text-xs text-primary mt-0.5">
+                  {EXAM_CATEGORIES.find((c) => c.value === exam.category)?.label ?? exam.category}
+                  {exam.week ? ` · Sem. ${exam.week}` : ""}
+                </p>
+                {exam.notes && (
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{exam.notes}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(exam.created_at).toLocaleDateString("pt-BR")}
+                </p>
+              </div>
+              <button
+                onClick={() => remove(exam.id)}
+                className="text-muted-foreground hover:text-destructive text-lg flex-shrink-0"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Lightbox preview */}
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div className="relative max-h-[90vh] max-w-2xl overflow-auto rounded-2xl bg-white p-2">
+            <img src={preview.image_data!} alt={preview.name} className="max-w-full rounded-xl" />
+            <p className="mt-2 text-center text-sm font-medium text-foreground">{preview.name}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Plano de Parto ---------- */
+const PAIN_RELIEF_OPTIONS = [
+  "Epidural / peridural",
+  "Técnicas de respiração",
+  "Banho quente / banheira",
+  "Massagem",
+  "Óxido nitroso (gás)",
+  "Sem medicação — quero tentar natural",
+];
+
+function PlanoPártoTab({ profile }: { profile: Profile | null }) {
+  const DEFAULTS: BirthPlan = {
+    birth_type: "",
+    pain_relief: [],
+    who_present: "",
+    cord_cutting: "",
+    skin_to_skin: true,
+    breastfeeding: "",
+    lighting: "",
+    music: "",
+    notes: "",
+  };
+  const [plan, setPlan] = useState<BirthPlan>(DEFAULTS);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any).from("birth_plans").select("*").maybeSingle();
+      if (data) setPlan(data as BirthPlan);
+      setLoading(false);
+    })();
+  }, []);
+
+  async function savePlan() {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    await (supabase as any)
+      .from("birth_plans")
+      .upsert(
+        { ...plan, user_id: u.user.id, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" },
+      );
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  function toggleRelief(opt: string) {
+    setPlan((p) => ({
+      ...p,
+      pain_relief: p.pain_relief.includes(opt)
+        ? p.pain_relief.filter((x) => x !== opt)
+        : [...p.pain_relief, opt],
+    }));
+  }
+
+  if (loading)
+    return <div className="py-12 text-center text-muted-foreground text-sm">Carregando…</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-2xl">Plano de parto</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Registre suas preferências para compartilhar com o Dr. Clóvis e a equipe da maternidade. O
+          plano é um ponto de partida — decisões clínicas sempre prevalecem.
+        </p>
+      </div>
+
+      {/* Tipo de parto */}
+      <div className="rounded-3xl border border-border bg-card p-6 space-y-3">
+        <p className="font-serif text-lg">Tipo de parto desejado</p>
+        {[
+          { value: "normal", label: "Parto normal / vaginal" },
+          { value: "cesarea", label: "Cesárea" },
+          { value: "sem_preferencia", label: "Sem preferência — confio na decisão médica" },
+        ].map((opt) => (
+          <label key={opt.value} className="flex cursor-pointer items-center gap-3">
+            <input
+              type="radio"
+              name="birth_type"
+              value={opt.value}
+              checked={plan.birth_type === opt.value}
+              onChange={() => setPlan({ ...plan, birth_type: opt.value })}
+              className="accent-primary"
+            />
+            <span className="text-sm text-foreground">{opt.label}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* Alívio da dor */}
+      <div className="rounded-3xl border border-border bg-card p-6 space-y-3">
+        <p className="font-serif text-lg">Alívio da dor (marque os que aceitar)</p>
+        {PAIN_RELIEF_OPTIONS.map((opt) => (
+          <label key={opt} className="flex cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
+              checked={plan.pain_relief.includes(opt)}
+              onChange={() => toggleRelief(opt)}
+              className="accent-primary"
+            />
+            <span className="text-sm text-foreground">{opt}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* Presença e procedimentos */}
+      <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+        <p className="font-serif text-lg">Presença e procedimentos</p>
+        <PlanoField
+          label="Quem você quer presente no parto"
+          value={plan.who_present}
+          onChange={(v) => setPlan({ ...plan, who_present: v })}
+          placeholder="Ex.: meu parceiro, minha mãe"
+        />
+        <PlanoField
+          label="Clampeamento do cordão umbilical"
+          value={plan.cord_cutting}
+          onChange={(v) => setPlan({ ...plan, cord_cutting: v })}
+          placeholder="Ex.: tardio, meu parceiro quer cortar"
+        />
+        <label className="flex cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            checked={plan.skin_to_skin}
+            onChange={() => setPlan({ ...plan, skin_to_skin: !plan.skin_to_skin })}
+            className="accent-primary"
+          />
+          <span className="text-sm text-foreground">
+            Contato pele a pele imediato após o nascimento
+          </span>
+        </label>
+        <PlanoField
+          label="Amamentação na sala de parto"
+          value={plan.breastfeeding}
+          onChange={(v) => setPlan({ ...plan, breastfeeding: v })}
+          placeholder="Ex.: quero tentar na primeira hora"
+        />
+      </div>
+
+      {/* Ambiente */}
+      <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+        <p className="font-serif text-lg">Ambiente</p>
+        <PlanoField
+          label="Iluminação"
+          value={plan.lighting}
+          onChange={(v) => setPlan({ ...plan, lighting: v })}
+          placeholder="Ex.: luz baixa, sem refletores diretos"
+        />
+        <PlanoField
+          label="Música / som"
+          value={plan.music}
+          onChange={(v) => setPlan({ ...plan, music: v })}
+          placeholder="Ex.: playlist pessoal, silêncio"
+        />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Observações gerais
+          </label>
+          <textarea
+            className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            rows={4}
+            placeholder="Alergias, medo específico, pedidos especiais..."
+            value={plan.notes}
+            onChange={(e) => setPlan({ ...plan, notes: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={savePlan}
+          className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground"
+        >
+          {saved ? "Salvo ✓" : "Salvar plano"}
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="rounded-full border border-border px-6 py-2.5 text-sm font-medium text-foreground hover:text-primary"
+        >
+          Imprimir / salvar PDF
+        </button>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Imprima ou tire um print para levar à maternidade. Leve também uma cópia para a consulta com
+        o Dr. Clóvis.
+      </p>
+    </div>
+  );
+}
+
+function PlanoField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
+      <input
+        className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+/* ---------- Apoio Emocional ---------- */
+function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-primary/20 bg-[var(--gradient-warm)] p-8">
+        <p className="font-serif text-2xl text-foreground">Você não está sozinha.</p>
+        <p className="mt-3 text-muted-foreground leading-relaxed">
+          Perdas gestacionais, diagnósticos difíceis e momentos de medo fazem parte da jornada de
+          muitas mulheres — e cada uma delas merece acolhimento, não silêncio.
+        </p>
+        <p className="mt-3 text-sm italic text-muted-foreground">
+          "Cada gestação tem sua própria história. Cuidar de você é tão importante quanto cuidar do
+          bebê." — Dr. Clóvis Bacha
+        </p>
+      </div>
+
+      {/* O que é normal sentir */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-xl">O que é normal sentir</p>
+        <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
+          {[
+            "Medo intenso antes de cada ultrassom após uma perda anterior",
+            "Sensação de que não pode comemorar antes do bebê nascer",
+            "Ansiedade e tristeza coexistindo com alegria — tudo ao mesmo tempo",
+            "Raiva, culpa e vazio depois de uma perda gestacional",
+            "Dificuldade de vínculo durante a gestação por medo de perder novamente",
+          ].map((item) => (
+            <li key={item} className="flex gap-3">
+              <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Quando buscar ajuda */}
+      <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-6">
+        <p className="font-serif text-lg text-amber-900">Quando buscar ajuda profissional</p>
+        <ul className="mt-3 space-y-2 text-sm text-amber-800">
+          {[
+            "Tristeza profunda por mais de 2 semanas que não passa",
+            "Dificuldade de cuidar de si mesma ou de outras responsabilidades",
+            "Pensamentos de não querer continuar a gravidez por medo",
+            "Ansiedade que impede o sono ou as atividades do dia a dia",
+          ].map((item) => (
+            <li key={item} className="flex gap-2">
+              <span className="mt-1">•</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs text-amber-700">
+          Converse com o Dr. Clóvis na sua próxima consulta. Ele pode indicar acompanhamento
+          psicológico especializado em gestação.
+        </p>
+      </div>
+
+      {/* Redes de apoio */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <p className="font-serif text-xl">Redes de apoio</p>
+        <div className="mt-4 space-y-3">
+          {[
+            {
+              name: "ALMA — Apoio em Luto Materno",
+              desc: "Comunidade de apoio para mães que vivenciaram perdas gestacionais. Grupos online e presenciais.",
+              url: "https://www.almaluto.com.br",
+            },
+            {
+              name: "CVV — Centro de Valorização da Vida",
+              desc: "Apoio emocional 24h pelo telefone 188 ou chat online.",
+              url: "https://www.cvv.org.br",
+            },
+            {
+              name: "FEBRASGO — Saúde Mental na Gestação",
+              desc: "Informações sobre depressão perinatal e ansiedade na gestação.",
+              url: "https://www.febrasgo.org.br",
+            },
+          ].map((r) => (
+            <div key={r.name} className="rounded-2xl border border-border p-4">
+              <p className="font-medium text-sm text-foreground">{r.name}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{r.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Escrever no diário */}
+      <div className="rounded-3xl bg-secondary/40 p-6 text-center">
+        <p className="font-serif text-xl">Escreva o que sente</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          O diário é um espaço só seu — sem julgamentos, sem respostas certas.
+        </p>
+        <button
+          onClick={() => onNavigate("Diário")}
+          className="mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground"
+        >
+          Abrir meu diário
+        </button>
       </div>
     </div>
   );
