@@ -1,0 +1,122 @@
+/**
+ * WhatsApp Cloud API (Meta) — cliente server-side.
+ * Docs: https://developers.facebook.com/docs/whatsapp/cloud-api
+ *
+ * Variáveis necessárias:
+ *   WHATSAPP_PHONE_NUMBER_ID  — ID do número no Meta Business (ex: "123456789")
+ *   WHATSAPP_ACCESS_TOKEN     — Token permanente (System User) do Meta Business
+ *   WHATSAPP_VERIFY_TOKEN     — String secreta para verificação do webhook
+ */
+
+const GRAPH = "https://graph.facebook.com/v21.0";
+
+function phoneId() {
+  const id = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!id) throw new Error("WHATSAPP_PHONE_NUMBER_ID não configurado");
+  return id;
+}
+
+function token() {
+  const t = process.env.WHATSAPP_ACCESS_TOKEN;
+  if (!t) throw new Error("WHATSAPP_ACCESS_TOKEN não configurado");
+  return t;
+}
+
+/** Envia mensagem de texto simples */
+export async function waSendText(to: string, text: string): Promise<void> {
+  const res = await fetch(`${GRAPH}/${phoneId()}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "text",
+      text: { body: text, preview_url: false },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("[WhatsApp] Erro ao enviar:", err);
+    throw new Error(`WhatsApp API error ${res.status}: ${err}`);
+  }
+}
+
+/** Marca mensagem como lida (fire-and-forget) */
+export function waMarkRead(messageId: string): void {
+  fetch(`${GRAPH}/${phoneId()}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId,
+    }),
+  }).catch(() => {});
+}
+
+/** Envia botões de resposta rápida (até 3) */
+export async function waSendButtons(
+  to: string,
+  body: string,
+  buttons: { id: string; title: string }[],
+): Promise<void> {
+  const res = await fetch(`${GRAPH}/${phoneId()}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: { text: body },
+        action: {
+          buttons: buttons.map((b) => ({
+            type: "reply",
+            reply: { id: b.id, title: b.title },
+          })),
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    // fallback to text
+    await waSendText(to, body);
+  }
+}
+
+/**
+ * Extrai o texto da mensagem recebida.
+ * Suporta text, interactive (button_reply, list_reply) e audio (retorna null).
+ */
+export function extractMessageText(message: Record<string, unknown>): string | null {
+  const type = message.type as string;
+  if (type === "text") {
+    return (message.text as { body: string })?.body ?? null;
+  }
+  if (type === "interactive") {
+    const ia = message.interactive as Record<string, unknown>;
+    if (ia?.type === "button_reply") {
+      return (ia.button_reply as { title: string })?.title ?? null;
+    }
+    if (ia?.type === "list_reply") {
+      return (ia.list_reply as { title: string })?.title ?? null;
+    }
+  }
+  return null;
+}
+
+/** Verifica se o webhook está configurado corretamente */
+export function waConfigured(): boolean {
+  return !!(process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_ACCESS_TOKEN);
+}

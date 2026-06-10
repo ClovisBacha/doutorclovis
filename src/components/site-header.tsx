@@ -10,6 +10,7 @@ const navPublic = [
   { to: "/batimentos", label: "Batimentos" },
   { to: "/agendamento", label: "Agendamento" },
   { to: "/empresas", label: "Para Empresas" },
+  { to: "/medicos", label: "Para Médicos" },
 ] as const;
 
 const navAuth = [
