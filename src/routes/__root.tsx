@@ -18,6 +18,7 @@ import { ChatbotWidget } from "@/components/chatbot-widget";
 import { WhatsAppFloating } from "@/components/whatsapp-button";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Toaster } from "@/components/ui/sonner";
+import { ScrollProgress } from "@/components/motion-fx";
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -221,6 +222,7 @@ function SiteShell() {
       </a>
       <CanonicalLink />
       <div className="print:hidden">
+        <ScrollProgress />
         <SiteHeader />
       </div>
       <main id="main-content" className="flex-1">

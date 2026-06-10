@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TamanhoRealRouteImport } from './routes/tamanho-real'
 import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
@@ -19,6 +20,7 @@ import { Route as MitosRouteImport } from './routes/mitos'
 import { Route as LivesRouteImport } from './routes/lives'
 import { Route as HospitaisRouteImport } from './routes/hospitais'
 import { Route as GestacaoRouteImport } from './routes/gestacao'
+import { Route as EmpresasRouteImport } from './routes/empresas'
 import { Route as DppRouteImport } from './routes/dpp'
 import { Route as DepoimentosRouteImport } from './routes/depoimentos'
 import { Route as CardsRouteImport } from './routes/cards'
@@ -28,8 +30,6 @@ import { Route as BastidoresRouteImport } from './routes/bastidores'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AgendamentoRouteImport } from './routes/agendamento'
 import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
-import { Route as EmpresasRouteImport } from './routes/empresas'
-import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
@@ -55,6 +55,11 @@ const SobreRoute = SobreRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrimeiraConsultaRoute = PrimeiraConsultaRouteImport.update({
@@ -90,6 +95,11 @@ const HospitaisRoute = HospitaisRouteImport.update({
 const GestacaoRoute = GestacaoRouteImport.update({
   id: '/gestacao',
   path: '/gestacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmpresasRoute = EmpresasRouteImport.update({
+  id: '/empresas',
+  path: '/empresas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DppRoute = DppRouteImport.update({
@@ -135,16 +145,6 @@ const AgendamentoRoute = AgendamentoRouteImport.update({
 const AcompanhanteRoute = AcompanhanteRouteImport.update({
   id: '/acompanhante',
   path: '/acompanhante',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmpresasRoute = EmpresasRouteImport.update({
-  id: '/empresas',
-  path: '/empresas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacidadeRoute = PrivacidadeRouteImport.update({
-  id: '/privacidade',
-  path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -214,7 +214,6 @@ export interface FileRoutesByFullPath {
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
-  '/privacidade': typeof PrivacidadeRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -222,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
@@ -247,7 +247,6 @@ export interface FileRoutesByTo {
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
-  '/privacidade': typeof PrivacidadeRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -255,6 +254,7 @@ export interface FileRoutesByTo {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
@@ -282,7 +282,6 @@ export interface FileRoutesById {
   '/depoimentos': typeof DepoimentosRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
-  '/privacidade': typeof PrivacidadeRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -290,6 +289,7 @@ export interface FileRoutesById {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
@@ -317,7 +317,6 @@ export interface FileRouteTypes {
     | '/depoimentos'
     | '/dpp'
     | '/empresas'
-    | '/privacidade'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -325,6 +324,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/primeira-consulta'
+    | '/privacidade'
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
@@ -350,7 +350,6 @@ export interface FileRouteTypes {
     | '/depoimentos'
     | '/dpp'
     | '/empresas'
-    | '/privacidade'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -358,6 +357,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/primeira-consulta'
+    | '/privacidade'
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
@@ -384,7 +384,6 @@ export interface FileRouteTypes {
     | '/depoimentos'
     | '/dpp'
     | '/empresas'
-    | '/privacidade'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -392,6 +391,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/primeira-consulta'
+    | '/privacidade'
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
@@ -419,7 +419,6 @@ export interface RootRouteChildren {
   DepoimentosRoute: typeof DepoimentosRoute
   DppRoute: typeof DppRoute
   EmpresasRoute: typeof EmpresasRoute
-  PrivacidadeRoute: typeof PrivacidadeRoute
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
   LivesRoute: typeof LivesRoute
@@ -427,6 +426,7 @@ export interface RootRouteChildren {
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
   PrimeiraConsultaRoute: typeof PrimeiraConsultaRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SobreRoute: typeof SobreRoute
   TamanhoRealRoute: typeof TamanhoRealRoute
@@ -460,6 +460,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/primeira-consulta': {
@@ -511,18 +518,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GestacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dpp': {
-      id: '/dpp'
-      path: '/dpp'
-      fullPath: '/dpp'
-      preLoaderRoute: typeof DppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/empresas': {
       id: '/empresas'
       path: '/empresas'
       fullPath: '/empresas'
       preLoaderRoute: typeof EmpresasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dpp': {
+      id: '/dpp'
+      path: '/dpp'
+      fullPath: '/dpp'
+      preLoaderRoute: typeof DppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/depoimentos': {
@@ -687,7 +694,6 @@ const rootRouteChildren: RootRouteChildren = {
   DepoimentosRoute: DepoimentosRoute,
   DppRoute: DppRoute,
   EmpresasRoute: EmpresasRoute,
-  PrivacidadeRoute: PrivacidadeRoute,
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,
   LivesRoute: LivesRoute,
@@ -695,6 +701,7 @@ const rootRouteChildren: RootRouteChildren = {
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
   PrimeiraConsultaRoute: PrimeiraConsultaRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SobreRoute: SobreRoute,
   TamanhoRealRoute: TamanhoRealRoute,
