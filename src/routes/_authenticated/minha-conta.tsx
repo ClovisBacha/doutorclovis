@@ -9916,6 +9916,8 @@ type ShopProduct = {
   description: string;
   category: "suplementos" | "conforto" | "amamentacao" | "enxoval" | "livros";
   price: string;
+  originalPrice: string;
+  discount: number;
   link: string;
   weeks_min?: number;
   weeks_max?: number;
@@ -9926,48 +9928,57 @@ const CURATED_PRODUCTS: ShopProduct[] = [
   {
     id: "p1",
     name: "Ácido Fólico 5mg",
-    description:
-      "Essencial no 1º trimestre para prevenção de defeitos do tubo neural. Indicado por Dr. Clóvis.",
+    description: "Essencial no 1º trimestre para prevenção de defeitos do tubo neural.",
     category: "suplementos",
-    price: "A partir de R$ 18",
+    originalPrice: "R$ 24,00",
+    price: "R$ 18,00",
+    discount: 25,
     link: "https://www.amazon.com.br/s?k=acido+folico+gestante",
     weeks_min: 1,
     weeks_max: 20,
-    badge: "Essencial",
+    badge: "MAIS VENDIDO",
   },
   {
     id: "p2",
     name: "Sulfato Ferroso + Vitamina C",
     description: "Combo para absorção ideal do ferro, prevenindo anemia gestacional.",
     category: "suplementos",
-    price: "A partir de R$ 22",
+    originalPrice: "R$ 28,00",
+    price: "R$ 22,00",
+    discount: 21,
     link: "https://www.amazon.com.br/s?k=sulfato+ferroso+vitamina+c",
     weeks_min: 16,
   },
   {
     id: "p3",
     name: "DHA / Ômega-3 Gestante",
-    description: "Desenvolvimento cerebral do bebê. Dose mínima recomendada: 200mg/dia de DHA.",
+    description: "Desenvolvimento cerebral do bebê. 200mg/dia de DHA recomendado.",
     category: "suplementos",
-    price: "A partir de R$ 45",
+    originalPrice: "R$ 55,00",
+    price: "R$ 45,00",
+    discount: 18,
     link: "https://www.amazon.com.br/s?k=dha+omega3+gestante",
   },
   {
     id: "p4",
-    name: "Travesseiro de Gestante (U-shape)",
+    name: "Travesseiro de Gestante Formato U",
     description: "Apoio lombar, pélvico e para os joelhos. Fundamental após a semana 20.",
     category: "conforto",
-    price: "A partir de R$ 130",
+    originalPrice: "R$ 159,00",
+    price: "R$ 130,00",
+    discount: 18,
     link: "https://www.amazon.com.br/s?k=travesseiro+gestante+formato+u",
     weeks_min: 20,
-    badge: "Mais vendido",
+    badge: "MAIS VENDIDO",
   },
   {
     id: "p5",
     name: "Cinta de Suporte Gestacional",
     description: "Alivia dores lombares e suporta o abdômen no 3º trimestre.",
     category: "conforto",
-    price: "A partir de R$ 60",
+    originalPrice: "R$ 75,00",
+    price: "R$ 60,00",
+    discount: 20,
     link: "https://www.amazon.com.br/s?k=cinta+abdominal+gestante",
     weeks_min: 28,
   },
@@ -9976,7 +9987,9 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Meias de Compressão Gestante",
     description: "Previnem varizes e edemas — problema comum na gravidez.",
     category: "conforto",
-    price: "A partir de R$ 35",
+    originalPrice: "R$ 45,00",
+    price: "R$ 35,00",
+    discount: 22,
     link: "https://www.amazon.com.br/s?k=meias+compressao+gestante",
     weeks_min: 14,
   },
@@ -9985,25 +9998,31 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Sutiã de Amamentação",
     description: "Alças largas, abertura fácil e tecido respirável para o pós-parto.",
     category: "amamentacao",
-    price: "A partir de R$ 45",
+    originalPrice: "R$ 57,00",
+    price: "R$ 45,00",
+    discount: 21,
     link: "https://www.amazon.com.br/s?k=sutia+amamentacao+confortavel",
     weeks_min: 30,
   },
   {
     id: "p8",
     name: "Almofada de Amamentação",
-    description: "Posiciona o bebê corretamente durante a mamada, aliviando tensão nas costas.",
+    description: "Posiciona o bebê corretamente durante a mamada, aliviando tensão.",
     category: "amamentacao",
-    price: "A partir de R$ 70",
+    originalPrice: "R$ 88,00",
+    price: "R$ 70,00",
+    discount: 20,
     link: "https://www.amazon.com.br/s?k=almofada+amamentacao",
     weeks_min: 30,
   },
   {
     id: "p9",
-    name: "Absorvente para Seios (lavável)",
-    description: "Para vazamentos de colostro no final da gestação e durante a amamentação.",
+    name: "Absorvente para Seios Lavável",
+    description: "Para vazamentos de colostro no final da gestação e na amamentação.",
     category: "amamentacao",
-    price: "A partir de R$ 20",
+    originalPrice: "R$ 25,00",
+    price: "R$ 20,00",
+    discount: 20,
     link: "https://www.amazon.com.br/s?k=absorvente+seios+amamentacao+lavavel",
     weeks_min: 34,
   },
@@ -10012,53 +10031,64 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Kit Enxoval Recém-nascido",
     description: "Body, mijão e macacão em algodão orgânico para o RN.",
     category: "enxoval",
-    price: "A partir de R$ 80",
+    originalPrice: "R$ 99,00",
+    price: "R$ 80,00",
+    discount: 19,
     link: "https://www.amazon.com.br/s?k=kit+enxoval+recem+nascido+algodao",
     weeks_min: 20,
-    badge: "Prepare-se",
+    badge: "PREPARE-SE",
   },
   {
     id: "p11",
     name: "Banheirinha Dobrável para Bebê",
     description: "Ergonômica, anti-escorregante, economiza espaço.",
     category: "enxoval",
-    price: "A partir de R$ 90",
+    originalPrice: "R$ 112,00",
+    price: "R$ 90,00",
+    discount: 20,
     link: "https://www.amazon.com.br/s?k=banheira+bebe+dobravel",
     weeks_min: 24,
   },
   {
     id: "p12",
-    name: "Monitor de Batimentos Fetais (Doppler)",
+    name: "Monitor Doppler Fetal",
     description: "Ouça o coração do seu bebê em casa entre as consultas.",
     category: "enxoval",
-    price: "A partir de R$ 150",
+    originalPrice: "R$ 189,00",
+    price: "R$ 150,00",
+    discount: 21,
     link: "https://www.amazon.com.br/s?k=doppler+fetal+caseiro",
     weeks_min: 12,
-    badge: "Tecnologia",
+    badge: "OFERTA",
   },
   {
     id: "p13",
-    name: '"Gravidez Semana a Semana" — Livro',
+    name: "Gravidez Semana a Semana — Livro",
     description: "O guia mais completo em português, com fotos e explicações médicas.",
     category: "livros",
-    price: "A partir de R$ 55",
+    originalPrice: "R$ 69,00",
+    price: "R$ 55,00",
+    discount: 20,
     link: "https://www.amazon.com.br/s?k=gravidez+semana+a+semana+livro",
   },
   {
     id: "p14",
-    name: '"O Bebê da Barriga" — Livro',
-    description:
-      "Leitura afetiva sobre o desenvolvimento fetal, ideal para compartilhar com o parceiro.",
+    name: "O Bebê da Barriga — Livro",
+    description: "Leitura afetiva sobre desenvolvimento fetal, ideal para o casal.",
     category: "livros",
-    price: "A partir de R$ 40",
+    originalPrice: "R$ 50,00",
+    price: "R$ 40,00",
+    discount: 20,
     link: "https://www.amazon.com.br/s?k=bebe+da+barriga+livro+gestacao",
   },
   {
     id: "p15",
-    name: "Protetor Solar FPS 50+ (gestante)",
-    description: "Fórmula sem oxi-benzona, segura para a gestação e para manchas de melasma.",
+    name: "Protetor Solar FPS 50+ Gestante",
+    description: "Fórmula sem oxi-benzona, segura para a gestação e contra melasma.",
     category: "suplementos",
-    price: "A partir de R$ 35",
+    originalPrice: "R$ 44,00",
+    price: "R$ 35,00",
+    discount: 20,
     link: "https://www.amazon.com.br/s?k=protetor+solar+gestante+fps50",
   },
 ];
@@ -10153,8 +10183,18 @@ function LojaTab({ gest }: { gest: Gest }) {
                 >
                   <span className="text-2xl">{vis.emoji}</span>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold leading-tight line-clamp-1">{p.name}</p>
-                    <p className="text-xs font-bold text-primary mt-0.5">{p.price}</p>
+                    <p className="text-[12px] font-medium leading-tight line-clamp-1 text-gray-800">
+                      {p.name}
+                    </p>
+                    <p className="text-[11px] text-gray-400 line-through leading-none mt-0.5">
+                      {p.originalPrice}
+                    </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <p className="text-[13px] font-semibold text-gray-900 leading-none">
+                        {p.price}
+                      </p>
+                      <span className="text-[9px] font-bold text-[#00a650]">{p.discount}% OFF</span>
+                    </div>
                   </div>
                 </a>
               );
@@ -10193,7 +10233,7 @@ function LojaTab({ gest }: { gest: Gest }) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-[1px] border border-gray-200 rounded-xl overflow-hidden bg-gray-200">
           {filtered.map((product) => {
             const vis = CAT_VISUAL[product.category];
             return (
@@ -10202,39 +10242,43 @@ function LojaTab({ gest }: { gest: Gest }) {
                 href={product.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden active:scale-[0.97] transition-transform"
+                className="flex flex-col bg-white active:bg-gray-50 transition-colors"
               >
-                {/* Imagem placeholder */}
+                {/* Imagem — proporção quadrada */}
                 <div
-                  className={`relative bg-gradient-to-br ${vis.bg} flex items-center justify-center`}
-                  style={{ height: 130 }}
+                  className={`relative w-full bg-gradient-to-br ${vis.bg} flex items-center justify-center`}
+                  style={{ aspectRatio: "1 / 1" }}
                 >
                   <span className="text-5xl drop-shadow-sm select-none">{vis.emoji}</span>
+
+                  {/* Oferta principal badge */}
                   {product.badge && (
-                    <span className="absolute bottom-2 left-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                    <span className="absolute top-1.5 left-1.5 bg-[#ff7733] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
                       {product.badge}
                     </span>
                   )}
-                  {product.weeks_min && !product.badge && (
-                    <span className="absolute bottom-2 left-2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
-                      Sem. {product.weeks_min}+
-                    </span>
-                  )}
-                  {/* Cart icon */}
-                  <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-md text-primary text-sm">
-                    🛒
-                  </div>
+
+                  {/* % OFF badge — sempre visível */}
+                  <span className="absolute bottom-1.5 left-1.5 bg-[#00a650] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none">
+                    {product.discount}% OFF
+                  </span>
                 </div>
 
-                {/* Info */}
-                <div className="flex flex-1 flex-col p-3 gap-1">
-                  <p className="text-[12px] font-semibold leading-snug line-clamp-2 text-foreground">
+                {/* Info — layout ML */}
+                <div className="flex flex-col px-2 pt-1.5 pb-2 gap-0">
+                  <p className="text-[12px] leading-snug line-clamp-2 text-gray-800">
                     {product.name}
                   </p>
-                  <p className="mt-auto text-sm font-bold text-primary pt-1">{product.price}</p>
-                  <div className="mt-1.5 w-full rounded-lg bg-primary py-1.5 text-center text-[11px] font-bold text-white">
-                    Ver produto →
-                  </div>
+                  <p className="text-[11px] text-gray-400 line-through mt-1 leading-none">
+                    {product.originalPrice}
+                  </p>
+                  <p className="text-[15px] font-semibold text-gray-900 leading-tight mt-0.5">
+                    {product.price}
+                  </p>
+                  <p className="text-[10px] font-medium text-[#00a650] mt-0.5 leading-none">
+                    Envio grátis
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-none">✓ Dr. Clóvis</p>
                 </div>
               </a>
             );
