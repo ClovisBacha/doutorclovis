@@ -3078,10 +3078,10 @@ function WABubble({ msg }: { msg: WAMsg }) {
         style={
           isUser
             ? {
-                background: "rgba(180,120,255,0.22)",
+                background: "rgba(180,75,65,0.30)",
                 backdropFilter: "blur(18px) saturate(1.4)",
-                border: "1px solid rgba(255,255,255,0.28)",
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.35), 0 4px 16px rgba(0,0,0,0.3)",
+                border: "1px solid rgba(255,180,160,0.28)",
+                boxShadow: "inset 0 1px 1px rgba(255,200,180,0.3), 0 4px 16px rgba(0,0,0,0.3)",
               }
             : {
                 background: "rgba(255,255,255,0.12)",
@@ -3372,7 +3372,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
 
   const recDisplay = `${Math.floor(recSec / 60)}:${String(recSec % 60).padStart(2, "0")}`;
 
-  const chatBg = "linear-gradient(160deg, #0d0720 0%, #1a0535 35%, #3b1040 65%, #4d1835 100%)";
+  const chatBg = "linear-gradient(160deg, #150608 0%, #280d10 35%, #3d1218 65%, #521a20 100%)";
 
   return (
     <div
@@ -3473,10 +3473,10 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             <div
               className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
               style={{
-                background: "rgba(167,139,250,0.35)",
+                background: "rgba(230,100,110,0.38)",
                 backdropFilter: "blur(8px)",
-                border: "1px solid rgba(167,139,250,0.4)",
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3)",
+                border: "1px solid rgba(240,140,140,0.42)",
+                boxShadow: "inset 0 1px 1px rgba(255,220,210,0.3)",
               }}
             >
               🖼️
@@ -3492,10 +3492,10 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             <div
               className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
               style={{
-                background: "rgba(96,165,250,0.35)",
+                background: "rgba(160,70,55,0.38)",
                 backdropFilter: "blur(8px)",
-                border: "1px solid rgba(96,165,250,0.4)",
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3)",
+                border: "1px solid rgba(210,120,100,0.42)",
+                boxShadow: "inset 0 1px 1px rgba(255,200,180,0.3)",
               }}
             >
               📄
@@ -3625,8 +3625,8 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             disabled={loading}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95 disabled:opacity-60"
             style={{
-              background: "linear-gradient(135deg, #a855f7, #8b5147)",
-              boxShadow: "0 4px 18px rgba(168,85,247,0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
+              background: "linear-gradient(135deg, #e05a6a, #8b5147)",
+              boxShadow: "0 4px 18px rgba(220,80,90,0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
             }}
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 translate-x-0.5">
