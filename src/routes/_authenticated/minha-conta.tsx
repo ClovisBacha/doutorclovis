@@ -10064,13 +10064,22 @@ const CURATED_PRODUCTS: ShopProduct[] = [
 ];
 
 const SHOP_CATEGORIES = [
-  { key: "all", label: "Todos" },
-  { key: "suplementos", label: "💊 Suplementos" },
-  { key: "conforto", label: "😌 Conforto" },
-  { key: "amamentacao", label: "🤱 Amamentação" },
-  { key: "enxoval", label: "🍼 Enxoval" },
-  { key: "livros", label: "📚 Livros" },
+  { key: "all", label: "Tudo" },
+  { key: "suplementos", label: "Suplementos" },
+  { key: "conforto", label: "Conforto" },
+  { key: "amamentacao", label: "Amamentação" },
+  { key: "enxoval", label: "Enxoval" },
+  { key: "livros", label: "Livros" },
 ];
+
+// Placeholder visual por categoria (simula foto do produto)
+const CAT_VISUAL: Record<ShopProduct["category"], { bg: string; emoji: string }> = {
+  suplementos: { bg: "from-emerald-50 to-teal-100", emoji: "💊" },
+  conforto: { bg: "from-violet-50 to-purple-100", emoji: "🛏️" },
+  amamentacao: { bg: "from-rose-50 to-pink-100", emoji: "🤱" },
+  enxoval: { bg: "from-sky-50 to-blue-100", emoji: "🍼" },
+  livros: { bg: "from-amber-50 to-orange-100", emoji: "📖" },
+};
 
 function LojaTab({ gest }: { gest: Gest }) {
   const [category, setCategory] = useState("all");
@@ -10087,105 +10096,154 @@ function LojaTab({ gest }: { gest: Gest }) {
     return true;
   });
 
-  return (
-    <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
-          Produtos selecionados
-        </p>
-        <h2 className="font-serif text-2xl">Loja Curada</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Produtos indicados por Dr. Clóvis Bacha para cada fase da gestação. Os links levam ao
-          Amazon.com.br.
-        </p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-xs font-medium text-primary">
-          ✅ Todos revisados e aprovados pelo Dr. Clóvis
-        </div>
-      </div>
+  // Produtos em destaque desta semana
+  const weekHighlights =
+    currentWeek !== null
+      ? CURATED_PRODUCTS.filter((p) => {
+          const afterMin = p.weeks_min == null || currentWeek >= p.weeks_min;
+          const beforeMax = p.weeks_max == null || currentWeek <= p.weeks_max;
+          return afterMin && beforeMax;
+        }).slice(0, 2)
+      : [];
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-wrap gap-2">
-          {SHOP_CATEGORIES.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => setCategory(c.key)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                category === c.key
-                  ? "bg-primary text-white"
-                  : "bg-secondary text-muted-foreground hover:text-primary"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+  return (
+    <div className="space-y-5 pb-6">
+      {/* ── Header ──────────────────────────────── */}
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
+            Loja Curada
+          </p>
+          <h2 className="font-serif text-xl leading-tight">
+            Recomendado pelo
+            <br />
+            Dr. Clóvis
+          </h2>
         </div>
         {currentWeek !== null && (
-          <label className="ml-auto flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={weekFilter}
-              onChange={(e) => setWeekFilter(e.target.checked)}
-              className="h-4 w-4 rounded accent-primary"
-            />
-            <span>Filtrar para semana {currentWeek}</span>
-          </label>
+          <button
+            onClick={() => setWeekFilter((v) => !v)}
+            className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+              weekFilter
+                ? "bg-primary text-white"
+                : "border border-border bg-background text-muted-foreground"
+            }`}
+          >
+            📅 Sem. {currentWeek}
+          </button>
         )}
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
-          <p className="text-3xl mb-2">🔍</p>
-          <p>Nenhum produto encontrado para este filtro.</p>
-          <button
-            onClick={() => setWeekFilter(false)}
-            className="mt-3 text-sm text-primary underline"
-          >
-            Mostrar todos
-          </button>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((product) => (
-            <div
-              key={product.id}
-              className="rounded-2xl border border-border bg-card p-5 flex flex-col"
-            >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <p className="font-semibold text-sm leading-snug">{product.name}</p>
-                {product.badge && (
-                  <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                    {product.badge}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground flex-1 leading-relaxed">
-                {product.description}
-              </p>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm font-medium text-primary">{product.price}</span>
+      {/* ── Destaque da semana ───────────────────── */}
+      {weekFilter && weekHighlights.length > 0 && (
+        <div className="rounded-2xl bg-primary/6 border border-primary/15 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary mb-2">
+            ✨ Para você esta semana
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {weekHighlights.map((p) => {
+              const vis = CAT_VISUAL[p.category];
+              return (
                 <a
-                  href={product.link}
+                  key={p.id}
+                  href={p.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                  className="flex shrink-0 items-center gap-3 rounded-xl bg-white border border-border px-3 py-2 min-w-[200px]"
                 >
-                  Ver na Amazon →
+                  <span className="text-2xl">{vis.emoji}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold leading-tight line-clamp-1">{p.name}</p>
+                    <p className="text-xs font-bold text-primary mt-0.5">{p.price}</p>
+                  </div>
                 </a>
-              </div>
-              {product.weeks_min && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  A partir da semana {product.weeks_min}
-                  {product.weeks_max ? ` — até semana ${product.weeks_max}` : ""}
-                </p>
-              )}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       )}
 
-      <p className="text-xs text-center text-muted-foreground pb-4">
-        Links de afiliado (Amazon Associates). Comprar pelo link apoia o portal sem custo extra para
-        você.
+      {/* ── Filtros de categoria ─────────────────── */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {SHOP_CATEGORIES.map((c) => (
+          <button
+            key={c.key}
+            onClick={() => setCategory(c.key)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
+              category === c.key
+                ? "bg-foreground text-background"
+                : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Grid de produtos ─────────────────────── */}
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border py-12 text-center text-muted-foreground">
+          <p className="text-3xl mb-2">🔍</p>
+          <p className="text-sm">Nenhum produto neste filtro.</p>
+          <button
+            onClick={() => setWeekFilter(false)}
+            className="mt-2 text-xs text-primary underline"
+          >
+            Ver todos
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {filtered.map((product) => {
+            const vis = CAT_VISUAL[product.category];
+            return (
+              <a
+                key={product.id}
+                href={product.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-col rounded-2xl bg-card border border-border overflow-hidden active:scale-[0.97] transition-transform"
+              >
+                {/* Imagem placeholder */}
+                <div
+                  className={`relative bg-gradient-to-br ${vis.bg} flex items-center justify-center`}
+                  style={{ height: 130 }}
+                >
+                  <span className="text-5xl drop-shadow-sm select-none">{vis.emoji}</span>
+                  {product.badge && (
+                    <span className="absolute bottom-2 left-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                      {product.badge}
+                    </span>
+                  )}
+                  {product.weeks_min && !product.badge && (
+                    <span className="absolute bottom-2 left-2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                      Sem. {product.weeks_min}+
+                    </span>
+                  )}
+                  {/* Cart icon */}
+                  <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-md text-primary text-sm">
+                    🛒
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="flex flex-1 flex-col p-3 gap-1">
+                  <p className="text-[12px] font-semibold leading-snug line-clamp-2 text-foreground">
+                    {product.name}
+                  </p>
+                  <p className="mt-auto text-sm font-bold text-primary pt-1">{product.price}</p>
+                  <div className="mt-1.5 w-full rounded-lg bg-primary py-1.5 text-center text-[11px] font-bold text-white">
+                    Ver produto →
+                  </div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-center text-[10px] text-muted-foreground">
+        Links de afiliado · Comprar pelo link apoia o portal sem custo extra
       </p>
     </div>
   );
