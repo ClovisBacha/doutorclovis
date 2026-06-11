@@ -3799,7 +3799,7 @@ const PRENATAL_MILESTONES: Milestone[] = [
 const TYPE_COLOR: Record<Milestone["type"], string> = {
   exam: "bg-secondary text-primary border-border",
   consult: "bg-primary/10 text-primary border-primary/20",
-  vaccine: "bg-amber-100 text-primary border-primary/20",
+  vaccine: "bg-primary/10 text-primary border-primary/20",
   milestone: "bg-primary/10 text-primary border-primary/20",
 };
 const TYPE_LABEL: Record<Milestone["type"], string> = {
@@ -3998,7 +3998,7 @@ const INTENSITY_LABEL = ["", "Leve", "Moderada", "Forte"];
 const INTENSITY_COLOR = [
   "",
   "bg-secondary text-primary",
-  "bg-amber-100 text-primary",
+  "bg-primary/10 text-primary",
   "bg-rose-100 text-rose-700",
 ];
 
@@ -4536,7 +4536,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
                       {new Date(h.submitted_at).toLocaleDateString("pt-BR")}
                     </p>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${h.seen_by_doctor ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-primary"}`}
+                      className={`rounded-full px-2 py-0.5 text-xs ${h.seen_by_doctor ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary"}`}
                     >
                       {h.seen_by_doctor ? "Visualizado ✓" : "Aguardando"}
                     </span>
@@ -5150,10 +5150,10 @@ type TimelineEvent = {
 };
 
 const EV_STYLE: Record<TimelineEvent["type"], { dot: string; badge: string }> = {
-  saude: { dot: "bg-sky-400", badge: "bg-sky-100 text-sky-700" },
+  saude: { dot: "bg-primary/50", badge: "bg-primary/10 text-primary" },
   diario: { dot: "bg-primary/60", badge: "bg-primary/10 text-primary" },
   consulta: { dot: "bg-emerald-400", badge: "bg-emerald-100 text-emerald-700" },
-  chutes: { dot: "bg-primary", badge: "bg-amber-100 text-primary" },
+  chutes: { dot: "bg-primary", badge: "bg-primary/10 text-primary" },
   preconsulta: { dot: "bg-rose-400", badge: "bg-rose-100 text-rose-700" },
   marco: { dot: "bg-primary", badge: "bg-primary/10 text-primary" },
 };
@@ -6003,7 +6003,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
     encerrada: "Encerrada",
   };
   const STATUS_STYLE_TC: Record<string, string> = {
-    agendada: "bg-amber-100 text-primary",
+    agendada: "bg-primary/10 text-primary",
     sala_aberta: "bg-emerald-100 text-emerald-700",
     encerrada: "bg-secondary text-muted-foreground",
   };
@@ -6918,7 +6918,7 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium">{ex.title}</p>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${ex.safetyLevel === "verde" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-primary"}`}
+                      className={`rounded-full px-2 py-0.5 text-xs ${ex.safetyLevel === "verde" ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary"}`}
                     >
                       {ex.safetyLevel === "verde" ? "✓ Liberado" : "⚠ Consulte médico"}
                     </span>
@@ -7228,8 +7228,8 @@ const QUARTO_ITEMS: QuartinhoItem[] = [
 
 const PRIORITY_STYLE: Record<QuartinhoItem["priority"], { badge: string; label: string }> = {
   essencial: { badge: "bg-rose-100 text-rose-700", label: "Essencial" },
-  recomendado: { badge: "bg-amber-100 text-primary", label: "Recomendado" },
-  opcional: { badge: "bg-sky-100 text-sky-700", label: "Opcional" },
+  recomendado: { badge: "bg-primary/10 text-primary", label: "Recomendado" },
+  opcional: { badge: "bg-secondary text-muted-foreground", label: "Opcional" },
 };
 
 const QUARTO_CATEGORIES = [...new Set(QUARTO_ITEMS.map((i) => i.category))];
@@ -7387,7 +7387,7 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
                         </span>
                         {currentWeek > 0 && (
                           <span
-                            className={`rounded-full px-2 py-0.5 text-xs ${isTimely ? "bg-amber-100 text-primary" : "bg-secondary text-muted-foreground"}`}
+                            className={`rounded-full px-2 py-0.5 text-xs ${isTimely ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}
                           >
                             Sem. {item.weekSuggested}
                           </span>
@@ -8551,7 +8551,7 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
       </div>
 
       {hasCertificate && (
-        <div className="rounded-3xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-yellow-50 p-8 text-center">
+        <div className="rounded-3xl border-2 border-primary/30 bg-gradient-to-br from-primary/6 to-primary/12 p-8 text-center">
           <p className="text-4xl mb-2">🎓</p>
           <h3 className="font-serif text-2xl font-bold text-foreground">
             Certificado de Pré-natal
@@ -8559,9 +8559,7 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
           <p className="mt-2 text-primary">
             Parabéns! Você concluiu o curso de pré-natal da Escola do Bebê.
           </p>
-          <p className="mt-1 text-sm text-amber-600">
-            Dr. Clóvis Bacha — Ginecologia & Obstetrícia
-          </p>
+          <p className="mt-1 text-sm text-primary">Dr. Clóvis Bacha — Ginecologia & Obstetrícia</p>
         </div>
       )}
 
@@ -10002,7 +10000,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
             {doneMilestones.map((m) => (
               <span
                 key={m.key}
-                className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-medium text-foreground"
+                className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary"
               >
                 {m.emoji} {m.label}
               </span>
