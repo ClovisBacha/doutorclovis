@@ -390,31 +390,37 @@ function MinhaContaPage() {
 
       <section className="mx-auto max-w-5xl px-5 py-6 md:py-12">
         {/* ── Desktop header ───────────────────────────────────── */}
-        <div className="hidden md:flex flex-wrap items-end justify-between gap-3">
+        <div className="hidden md:flex flex-wrap items-end justify-between gap-3 mb-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
               Minha conta
             </p>
             <h1 className="mt-2 font-serif text-3xl md:text-4xl">Olá, {firstName} 💛</h1>
-            {profile?.baby_name && (
-              <p className="mt-1 text-sm text-muted-foreground">Acompanhando {profile.baby_name}</p>
-            )}
-            {gest && (
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {gest.weeks}s {gest.days}d de gestação
+            {(profile?.baby_name || gest) && (
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {profile?.baby_name && <>Acompanhando {profile.baby_name}</>}
+                {profile?.baby_name && gest && <span className="mx-2 opacity-40">·</span>}
+                {gest && (
+                  <>
+                    {gest.weeks}s {gest.days}d de gestação
+                  </>
+                )}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {isAdmin && (
               <Link
                 to="/painel"
-                className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
               >
                 Painel do médico
               </Link>
             )}
-            <button onClick={signOut} className="text-xs text-muted-foreground hover:text-primary">
+            <button
+              onClick={signOut}
+              className="rounded-full border border-border/70 px-4 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+            >
               Sair
             </button>
           </div>
@@ -422,19 +428,22 @@ function MinhaContaPage() {
 
         {/* ── Mobile top bar ───────────────────────────────────── */}
         <div className="flex md:hidden items-center justify-between mb-4">
-          <p className="font-serif text-xl text-foreground">
+          <p className="font-serif text-xl leading-tight text-foreground">
             {mobileHome ? `Olá, ${firstName} 💛` : SECTION_TITLES[activeSection]}
           </p>
           <div className="flex items-center gap-2">
             {isAdmin && (
               <Link
                 to="/painel"
-                className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
               >
                 Painel
               </Link>
             )}
-            <button onClick={signOut} className="text-xs text-muted-foreground hover:text-primary">
+            <button
+              onClick={signOut}
+              className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+            >
               Sair
             </button>
           </div>
@@ -473,10 +482,10 @@ function MinhaContaPage() {
                     if (!active) setTab(cat.tabs[0]);
                     setMobileHome(false);
                   }}
-                  className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
                     active
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+                      ? "bg-primary text-primary-foreground shadow-[0_2px_12px_var(--color-primary)/0.35]"
+                      : "border border-border/70 bg-card text-muted-foreground hover:border-primary/30 hover:text-primary hover:bg-primary/5"
                   }`}
                 >
                   {cat.label}
@@ -486,26 +495,28 @@ function MinhaContaPage() {
           </div>
 
           {/* Tab row */}
-          <div className="print:hidden mt-2 flex gap-0.5 overflow-x-auto border-b border-border pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => (
-              <button
-                key={t}
-                onClick={() => {
-                  setTab(t);
-                  setMobileHome(false);
-                }}
-                className={`-mb-px flex-shrink-0 border-b-2 px-3 py-2 text-sm transition-colors ${
-                  tab === t
-                    ? "border-primary font-medium text-primary"
-                    : "border-transparent text-muted-foreground hover:text-primary"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+          <div className="print:hidden mt-3 flex gap-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="flex min-w-full gap-0 border-b border-border/60">
+              {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => {
+                    setTab(t);
+                    setMobileHome(false);
+                  }}
+                  className={`-mb-px flex-shrink-0 border-b-2 px-3 py-2 text-sm transition-all duration-200 [transition-timing-function:var(--ease-out-expo)] ${
+                    tab === t
+                      ? "border-primary font-semibold text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-6">
             <TabErrorBoundary tabName={tab}>
               {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
               {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}

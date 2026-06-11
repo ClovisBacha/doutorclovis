@@ -566,14 +566,14 @@ export function AppHomeScreen({
       {nextAppointment ? (
         <button
           onClick={() => onNavigate("Consultas")}
-          className="group w-full rounded-3xl border border-blue-100 bg-blue-50/60 text-left transition-all duration-300 active:scale-[0.98]"
+          className="group w-full rounded-3xl border border-primary/20 bg-primary/6 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/35 hover:bg-primary/10 shadow-[var(--shadow-card)]"
         >
           <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
-              <CalendarDays className="h-5 w-5" strokeWidth={1.8} />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-105 group-hover:-rotate-3">
+              <CalendarDays className="h-5 w-5 text-primary" strokeWidth={1.8} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-500">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
                 Próxima consulta
               </p>
               <p className="mt-0.5 text-sm font-medium text-foreground">
@@ -581,30 +581,30 @@ export function AppHomeScreen({
               </p>
               <p className="text-xs text-muted-foreground">{nextAppointment.typeLabel}</p>
             </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-blue-400 transition-transform duration-300 group-hover:translate-x-1" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-primary/50 transition-transform duration-300 group-hover:translate-x-1" />
           </div>
         </button>
       ) : (
         <button
           onClick={() => onNavigate("Consultas")}
-          className="group w-full rounded-3xl border border-dashed border-border bg-card/50 text-left transition-all duration-300 active:scale-[0.98]"
+          className="group w-full rounded-3xl border border-dashed border-primary/25 bg-primary/4 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/40 hover:bg-primary/8"
         >
           <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15 text-primary transition-transform duration-300 group-hover:scale-105">
               <CalendarDays className="h-5 w-5" strokeWidth={1.8} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-foreground">Agendar consulta</p>
               <p className="text-xs text-muted-foreground">Nenhuma consulta agendada</p>
             </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
+            <ChevronRight className="h-4 w-4 shrink-0 text-primary/40 transition-transform duration-300 group-hover:translate-x-1" />
           </div>
         </button>
       )}
 
       {/* ── Grade de ícones ─────────────────────────────────────────── */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
           Acesso rápido
         </p>
         <div className="grid grid-cols-4 gap-2">
@@ -614,12 +614,11 @@ export function AppHomeScreen({
               <button
                 key={tab}
                 onClick={() => onNavigate(tab)}
-                className="group flex flex-col items-center gap-1.5 rounded-2xl p-2.5 transition-all duration-200 active:scale-95 hover:bg-secondary"
+                className="spotlight-card group flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-card p-2.5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-95 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-card)]"
               >
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-active:scale-90 ${color}`}
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-110 group-hover:-rotate-3 group-active:scale-90 ${color}`}
                 >
-                  {/* Coração pulsa em ritmo cardíaco real — 72bpm (#6) */}
                   <Icon
                     className={`h-5 w-5 ${isHeartIcon ? "heartbeat-icon" : ""}`}
                     strokeWidth={1.8}
@@ -694,7 +693,7 @@ export function SectionHeader({
     <div className="mb-5 flex items-center gap-3 md:hidden">
       <button
         onClick={onHome}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:text-primary active:scale-95"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-all duration-200 hover:bg-primary/15 active:scale-95"
         aria-label="Voltar ao início"
       >
         <ChevronLeft className="h-4 w-4" />
