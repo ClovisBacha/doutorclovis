@@ -3060,17 +3060,36 @@ function WABubble({ msg }: { msg: WAMsg }) {
   return (
     <div className={`flex items-end gap-1.5 mb-0.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
       {!isUser && (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white self-end mb-0.5">
+        <div
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white self-end mb-0.5"
+          style={{
+            background: "rgba(255,255,255,0.18)",
+            backdropFilter: "blur(12px)",
+            boxShadow: "inset 0 1px 1px rgba(255,255,255,0.35), 0 2px 8px rgba(0,0,0,0.25)",
+            border: "1px solid rgba(255,255,255,0.22)",
+          }}
+        >
           IA
         </div>
       )}
 
       <div
-        className={`max-w-[75%] shadow-sm overflow-hidden ${
+        className={`max-w-[75%] overflow-hidden ${isUser ? "rounded-2xl rounded-tr-none" : "rounded-2xl rounded-tl-none"}`}
+        style={
           isUser
-            ? "bg-[#d9fdd3] rounded-2xl rounded-tr-none"
-            : "bg-white rounded-2xl rounded-tl-none"
-        }`}
+            ? {
+                background: "rgba(180,120,255,0.22)",
+                backdropFilter: "blur(18px) saturate(1.4)",
+                border: "1px solid rgba(255,255,255,0.28)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.35), 0 4px 16px rgba(0,0,0,0.3)",
+              }
+            : {
+                background: "rgba(255,255,255,0.12)",
+                backdropFilter: "blur(18px) saturate(1.4)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 4px 16px rgba(0,0,0,0.25)",
+              }
+        }
       >
         {/* Imagem */}
         {msg.image && <img src={msg.image} alt="" className="block w-full max-h-52 object-cover" />}
@@ -3088,7 +3107,12 @@ function WABubble({ msg }: { msg: WAMsg }) {
                   audioRef.current.play().then(() => setPlaying(true));
                 }
               }}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white text-[13px]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-[13px]"
+              style={{
+                background: "rgba(255,255,255,0.22)",
+                backdropFilter: "blur(8px)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.4)",
+              }}
             >
               {playing ? "⏸" : "▶"}
             </button>
@@ -3096,12 +3120,12 @@ function WABubble({ msg }: { msg: WAMsg }) {
               {[3, 6, 4, 9, 5, 7, 4, 8, 6, 5, 9, 4, 7, 5, 8].map((h, i) => (
                 <div
                   key={i}
-                  className="w-[2px] rounded-full bg-primary/35 shrink-0"
-                  style={{ height: h }}
+                  className="w-[2px] rounded-full shrink-0"
+                  style={{ height: h, background: "rgba(255,255,255,0.5)" }}
                 />
               ))}
             </div>
-            <span className="text-[11px] text-gray-500 shrink-0">
+            <span className="text-[11px] shrink-0" style={{ color: "rgba(255,255,255,0.6)" }}>
               {msg.audioDuration ?? "0:00"}
             </span>
             <audio
@@ -3116,28 +3140,48 @@ function WABubble({ msg }: { msg: WAMsg }) {
         {/* Arquivo */}
         {msg.fileName && (
           <div className="flex items-center gap-3 px-3 py-2.5" style={{ minWidth: 180 }}>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl"
+              style={{
+                background: "rgba(255,255,255,0.18)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
               📄
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-semibold text-gray-900 line-clamp-1">{msg.fileName}</p>
-              {msg.fileSize && <p className="text-[10px] text-gray-400 mt-0.5">{msg.fileSize}</p>}
+              <p
+                className="text-[12px] font-semibold line-clamp-1"
+                style={{ color: "rgba(255,255,255,0.92)" }}
+              >
+                {msg.fileName}
+              </p>
+              {msg.fileSize && (
+                <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  {msg.fileSize}
+                </p>
+              )}
             </div>
           </div>
         )}
 
         {/* Texto */}
         {msg.content && (
-          <p className="px-3 pt-2 text-[14px] leading-snug text-gray-800 whitespace-pre-wrap">
+          <p
+            className="px-3 pt-2 text-[14px] leading-snug whitespace-pre-wrap"
+            style={{ color: "rgba(255,255,255,0.92)" }}
+          >
             {msg.content}
           </p>
         )}
 
         {/* Timestamp */}
         <div className="flex items-center justify-end gap-1 px-2.5 pb-1.5 pt-0.5">
-          <span className="text-[10px] leading-none text-gray-400">{timeStr}</span>
+          <span className="text-[10px] leading-none" style={{ color: "rgba(255,255,255,0.45)" }}>
+            {timeStr}
+          </span>
           {isUser && (
-            <span className="text-[10px] leading-none" style={{ color: "#53bdeb" }}>
+            <span className="text-[10px] leading-none" style={{ color: "rgba(130,210,255,0.9)" }}>
               ✓✓
             </span>
           )}
@@ -3328,27 +3372,49 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
 
   const recDisplay = `${Math.floor(recSec / 60)}:${String(recSec % 60).padStart(2, "0")}`;
 
+  const chatBg = "linear-gradient(160deg, #0d0720 0%, #1a0535 35%, #3b1040 65%, #4d1835 100%)";
+
   return (
-    <div className="-mx-4 flex flex-col overflow-hidden rounded-t-none" style={{ height: "72vh" }}>
-      {/* Header estilo WhatsApp */}
-      <div className="flex items-center gap-3 bg-primary px-4 py-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-[11px] font-bold text-white">
+    <div
+      className="-mx-4 flex flex-col overflow-hidden rounded-t-none"
+      style={{ height: "72vh", background: chatBg }}
+    >
+      {/* Header — glass */}
+      <div
+        className="flex items-center gap-3 px-4 py-3"
+        style={{
+          background: "rgba(255,255,255,0.08)",
+          backdropFilter: "blur(20px) saturate(1.6)",
+          borderBottom: "1px solid rgba(255,255,255,0.12)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.15)",
+        }}
+      >
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+          style={{
+            background: "rgba(255,255,255,0.18)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.28)",
+            boxShadow: "inset 0 1px 1px rgba(255,255,255,0.4)",
+          }}
+        >
           IA
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold leading-tight text-white">
+          <p
+            className="text-[15px] font-semibold leading-tight"
+            style={{ color: "rgba(255,255,255,0.95)" }}
+          >
             Assistente Dr. Clóvis
           </p>
-          <p className="text-[11px] text-white/70">Dúvidas gerais sobre gestação</p>
+          <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
+            Dúvidas gerais sobre gestação
+          </p>
         </div>
       </div>
 
       {/* Área de mensagens */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto space-y-0.5 px-3 py-3"
-        style={{ background: "#e9ddd4" }}
-      >
+      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-0.5 px-3 py-3">
         {messages.map((m, i) => (
           <WABubble key={i} msg={m} />
         ))}
@@ -3356,16 +3422,32 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         {/* Indicador digitando */}
         {loading && (
           <div className="flex items-end gap-1.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
+            <div
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+              style={{
+                background: "rgba(255,255,255,0.18)",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(255,255,255,0.22)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.35)",
+              }}
+            >
               IA
             </div>
-            <div className="rounded-2xl rounded-tl-none bg-white px-4 py-3 shadow-sm">
+            <div
+              className="rounded-2xl rounded-tl-none px-4 py-3"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                backdropFilter: "blur(18px)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3), 0 4px 16px rgba(0,0,0,0.25)",
+              }}
+            >
               <div className="flex items-center gap-1">
                 {[0, 1, 2].map((j) => (
                   <div
                     key={j}
-                    className="h-2 w-2 animate-bounce rounded-full bg-gray-400"
-                    style={{ animationDelay: `${j * 0.15}s` }}
+                    className="h-2 w-2 animate-bounce rounded-full"
+                    style={{ background: "rgba(255,255,255,0.55)", animationDelay: `${j * 0.15}s` }}
                   />
                 ))}
               </div>
@@ -3374,57 +3456,112 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         )}
       </div>
 
-      {/* Menu de anexos */}
+      {/* Menu de anexos — glass dark */}
       {showAttach && (
-        <div className="grid grid-cols-3 gap-3 border-t border-gray-100 bg-white px-4 py-4">
+        <div
+          className="grid grid-cols-3 gap-3 px-4 py-4"
+          style={{
+            background: "rgba(255,255,255,0.07)",
+            backdropFilter: "blur(24px)",
+            borderTop: "1px solid rgba(255,255,255,0.12)",
+          }}
+        >
           <button
             onClick={() => fileImageRef.current?.click()}
             className="flex flex-col items-center gap-1.5"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500 text-2xl text-white shadow-sm">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+              style={{
+                background: "rgba(167,139,250,0.35)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(167,139,250,0.4)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3)",
+              }}
+            >
               🖼️
             </div>
-            <span className="text-[11px] font-medium text-gray-600">Galeria</span>
+            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+              Galeria
+            </span>
           </button>
           <button
             onClick={() => fileDocRef.current?.click()}
             className="flex flex-col items-center gap-1.5"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500 text-2xl text-white shadow-sm">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
+              style={{
+                background: "rgba(96,165,250,0.35)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(96,165,250,0.4)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.3)",
+              }}
+            >
               📄
             </div>
-            <span className="text-[11px] font-medium text-gray-600">Documento</span>
+            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+              Documento
+            </span>
           </button>
           <button
             onClick={() => setShowAttach(false)}
             className="flex flex-col items-center gap-1.5"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-500 shadow-sm">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-full text-xl"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(255,255,255,0.18)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.25)",
+                color: "rgba(255,255,255,0.7)",
+              }}
+            >
               ✕
             </div>
-            <span className="text-[11px] font-medium text-gray-600">Fechar</span>
+            <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+              Fechar
+            </span>
           </button>
         </div>
       )}
 
-      {/* Barra de gravação */}
+      {/* Barra de gravação — glass */}
       {recording && (
-        <div className="flex items-center gap-3 border-t border-red-100 bg-red-50 px-4 py-2">
-          <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
-          <span className="text-[13px] font-semibold text-red-600">{recDisplay}</span>
-          <span className="flex-1 text-[12px] text-red-400">Gravando...</span>
-          <button onClick={cancelRecording} className="text-[12px] font-medium text-red-400">
+        <div
+          className="flex items-center gap-3 px-4 py-2"
+          style={{
+            background: "rgba(255,60,60,0.15)",
+            backdropFilter: "blur(16px)",
+            borderTop: "1px solid rgba(255,80,80,0.25)",
+          }}
+        >
+          <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-400" />
+          <span className="text-[13px] font-semibold text-red-300">{recDisplay}</span>
+          <span className="flex-1 text-[12px]" style={{ color: "rgba(255,150,150,0.8)" }}>
+            Gravando...
+          </span>
+          <button onClick={cancelRecording} className="text-[12px] font-medium text-red-300">
             Cancelar
           </button>
         </div>
       )}
 
-      {/* Barra de input estilo WhatsApp */}
-      <div className="flex items-end gap-2 border-t border-gray-200 bg-[#f0f2f5] px-2 py-2">
+      {/* Barra de input — glass floating */}
+      <div
+        className="flex items-end gap-2 px-2 py-2"
+        style={{
+          background: "rgba(255,255,255,0.06)",
+          backdropFilter: "blur(24px) saturate(1.5)",
+          borderTop: "1px solid rgba(255,255,255,0.1)",
+        }}
+      >
         {/* Botão + (anexar) */}
         <button
           onClick={() => setShowAttach((v) => !v)}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-200"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-opacity active:opacity-60"
+          style={{ color: "rgba(255,255,255,0.6)" }}
         >
           <svg
             viewBox="0 0 24 24"
@@ -3439,7 +3576,15 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         </button>
 
         {/* Campo de texto */}
-        <div className="flex min-h-[40px] flex-1 items-end rounded-3xl bg-white px-4 py-2">
+        <div
+          className="flex min-h-[40px] flex-1 items-end rounded-3xl px-4 py-2"
+          style={{
+            background: "rgba(255,255,255,0.13)",
+            backdropFilter: "blur(16px)",
+            border: "1px solid rgba(255,255,255,0.22)",
+            boxShadow: "inset 0 1px 1px rgba(255,255,255,0.18)",
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={input}
@@ -3456,13 +3601,17 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             }}
             placeholder="Mensagem"
             rows={1}
-            className="flex-1 resize-none bg-transparent text-[15px] leading-[1.45] text-gray-800 placeholder-gray-400 outline-none"
-            style={{ maxHeight: 100 }}
+            className="flex-1 resize-none bg-transparent text-[15px] leading-[1.45] outline-none placeholder:text-white/40"
+            style={{
+              maxHeight: 100,
+              color: "rgba(255,255,255,0.92)",
+            }}
           />
           {!input.trim() && !recording && (
             <button
               onClick={() => fileImageRef.current?.click()}
-              className="ml-1 shrink-0 self-end text-xl text-gray-400"
+              className="ml-1 shrink-0 self-end text-xl"
+              style={{ color: "rgba(255,255,255,0.45)" }}
             >
               📷
             </button>
@@ -3474,7 +3623,11 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           <button
             onClick={() => sendText()}
             disabled={loading}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-md transition-transform active:scale-95 disabled:opacity-60"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95 disabled:opacity-60"
+            style={{
+              background: "linear-gradient(135deg, #a855f7, #8b5147)",
+              boxShadow: "0 4px 18px rgba(168,85,247,0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
+            }}
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 translate-x-0.5">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
@@ -3483,9 +3636,20 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         ) : (
           <button
             onClick={toggleRecording}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md transition-all active:scale-95 ${
-              recording ? "bg-red-500" : "bg-primary"
-            } text-white`}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-all active:scale-95"
+            style={
+              recording
+                ? {
+                    background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                    boxShadow:
+                      "0 4px 18px rgba(239,68,68,0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
+                  }
+                : {
+                    background: "linear-gradient(135deg, #a855f7, #8b5147)",
+                    boxShadow:
+                      "0 4px 18px rgba(168,85,247,0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
+                  }
+            }
           >
             {recording ? (
               <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
