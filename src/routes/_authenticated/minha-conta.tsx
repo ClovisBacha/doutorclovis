@@ -10103,12 +10103,40 @@ const SHOP_CATEGORIES = [
 ];
 
 // Placeholder visual por categoria (simula foto do produto)
-const CAT_VISUAL: Record<ShopProduct["category"], { bg: string; emoji: string }> = {
-  suplementos: { bg: "from-emerald-50 to-teal-100", emoji: "💊" },
-  conforto: { bg: "from-violet-50 to-purple-100", emoji: "🛏️" },
-  amamentacao: { bg: "from-rose-50 to-pink-100", emoji: "🤱" },
-  enxoval: { bg: "from-sky-50 to-blue-100", emoji: "🍼" },
-  livros: { bg: "from-amber-50 to-orange-100", emoji: "📖" },
+const CAT_VISUAL: Record<
+  ShopProduct["category"],
+  { bg: string; dark: string; emoji: string; label: string }
+> = {
+  suplementos: {
+    bg: "from-emerald-50 to-teal-100",
+    dark: "from-[#0d3322] to-[#1a5c3a]",
+    emoji: "💊",
+    label: "Suplementos",
+  },
+  conforto: {
+    bg: "from-violet-50 to-purple-100",
+    dark: "from-[#1e0b3d] to-[#3b1a6b]",
+    emoji: "🛏️",
+    label: "Conforto",
+  },
+  amamentacao: {
+    bg: "from-rose-50 to-pink-100",
+    dark: "from-[#3d0b1a] to-[#6b1a32]",
+    emoji: "🤱",
+    label: "Amamentação",
+  },
+  enxoval: {
+    bg: "from-sky-50 to-blue-100",
+    dark: "from-[#0b1e3d] to-[#1a3a6b]",
+    emoji: "🍼",
+    label: "Enxoval",
+  },
+  livros: {
+    bg: "from-amber-50 to-orange-100",
+    dark: "from-[#2d1800] to-[#5c3300]",
+    emoji: "📖",
+    label: "Livros",
+  },
 };
 
 function ProductSheet({
@@ -10326,75 +10354,70 @@ function LojaTab({ gest }: { gest: Gest }) {
       : [];
 
   return (
-    <div className="space-y-5 pb-6">
+    <div className="-mx-4 bg-white px-4 pb-8 pt-4 space-y-4">
       {/* ── Header ──────────────────────────────── */}
-      <div className="flex items-end justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
-            Loja Curada
+          <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-primary/70">
+            Curado por Dr. Clóvis
           </p>
-          <h2 className="font-serif text-xl leading-tight">
-            Recomendado pelo
-            <br />
-            Dr. Clóvis
+          <h2 className="font-serif text-[22px] font-medium leading-tight text-gray-900 mt-0.5">
+            Seleção da semana
           </h2>
         </div>
         {currentWeek !== null && (
           <button
             onClick={() => setWeekFilter((v) => !v)}
-            className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-              weekFilter
-                ? "bg-primary text-white"
-                : "border border-border bg-background text-muted-foreground"
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+              weekFilter ? "bg-primary text-white" : "border border-primary/30 text-primary"
             }`}
           >
-            📅 Sem. {currentWeek}
+            <span className="text-[10px]">⬤</span> Sem. {currentWeek}
           </button>
         )}
       </div>
 
-      {/* ── Destaque da semana ───────────────────── */}
+      {/* ── Destaque da semana — cards horizontais premium ── */}
       {weekFilter && weekHighlights.length > 0 && (
-        <div className="rounded-2xl bg-primary/6 border border-primary/15 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary mb-2">
-            ✨ Para você esta semana
-          </p>
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {weekHighlights.map((p) => {
-              const vis = CAT_VISUAL[p.category];
-              return (
-                <a
-                  key={p.id}
-                  href={p.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex shrink-0 items-center gap-3 rounded-xl bg-white border border-border px-3 py-2 min-w-[200px]"
+        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
+          {weekHighlights.map((p) => {
+            const vis = CAT_VISUAL[p.category];
+            return (
+              <button
+                key={p.id}
+                onClick={() => setSelectedProduct(p)}
+                className="flex shrink-0 overflow-hidden rounded-2xl shadow-sm text-left active:scale-[0.97] transition-transform"
+                style={{ width: 220 }}
+              >
+                <div
+                  className={`bg-gradient-to-br ${vis.dark} flex items-center justify-center`}
+                  style={{ width: 72, flexShrink: 0 }}
                 >
-                  <span className="text-2xl">{vis.emoji}</span>
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-medium leading-tight line-clamp-1 text-gray-800">
-                      {p.name}
-                    </p>
-                    <p className="text-[11px] text-gray-400 line-through leading-none mt-0.5">
+                  <span className="text-[36px]">{vis.emoji}</span>
+                </div>
+                <div className="flex flex-col justify-center bg-white px-3 py-3 flex-1 min-w-0">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">
+                    {vis.label}
+                  </span>
+                  <p className="text-[11px] font-medium leading-tight line-clamp-2 text-gray-800">
+                    {p.name}
+                  </p>
+                  <div className="flex items-baseline gap-1.5 mt-1.5">
+                    <span className="text-[10px] text-gray-400 line-through">
                       {p.originalPrice}
-                    </p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <p className="text-[13px] font-semibold text-gray-900 leading-none">
-                        {p.price}
-                      </p>
-                      <span className="text-[9px] font-bold text-[#00a650]">{p.discount}% OFF</span>
-                    </div>
+                    </span>
+                    <span className="text-[14px] font-bold text-gray-900">{p.price}</span>
                   </div>
-                </a>
-              );
-            })}
-          </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {/* ── Filtros de categoria — sticky com hide/show no scroll ── */}
+      {/* ── Filtros — sticky, some on scroll down ── */}
       <div
-        className={`sticky top-0 z-20 -mx-4 px-4 py-2 bg-background/95 backdrop-blur-sm border-b border-border/40 transition-transform duration-200 ease-in-out ${
+        className={`sticky top-0 z-20 -mx-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm border-b border-gray-100 transition-transform duration-200 ease-in-out ${
           filtersHidden ? "-translate-y-[130%]" : "translate-y-0"
         }`}
       >
@@ -10403,10 +10426,10 @@ function LojaTab({ gest }: { gest: Gest }) {
             <button
               key={c.key}
               onClick={() => setCategory(c.key)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
+              className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-all ${
                 category === c.key
-                  ? "bg-foreground text-background"
-                  : "bg-secondary text-muted-foreground"
+                  ? "bg-primary text-white shadow-sm"
+                  : "border border-primary/25 text-primary/80"
               }`}
             >
               {c.label}
@@ -10435,45 +10458,57 @@ function LojaTab({ gest }: { gest: Gest }) {
               <button
                 key={product.id}
                 onClick={() => setSelectedProduct(product)}
-                className="flex flex-col bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm active:scale-[0.96] transition-transform text-left"
+                className="flex flex-col bg-white rounded-2xl overflow-hidden shadow-[0_2px_16px_rgba(0,0,0,0.09)] active:scale-[0.96] transition-transform text-left"
               >
-                {/* Imagem — proporção quadrada */}
+                {/* Imagem escura — premium */}
                 <div
-                  className={`relative w-full bg-gradient-to-br ${vis.bg} flex items-center justify-center`}
+                  className={`relative w-full bg-gradient-to-br ${vis.dark} flex items-center justify-center`}
                   style={{ aspectRatio: "1 / 1" }}
                 >
-                  <span className="text-[60px] drop-shadow select-none leading-none">
+                  <span
+                    className="text-[62px] select-none leading-none"
+                    style={{ filter: "drop-shadow(0 0 18px rgba(255,255,255,0.25))" }}
+                  >
                     {vis.emoji}
                   </span>
 
-                  {/* Badge de destaque */}
+                  {/* Label categoria — canto superior direito */}
+                  <span className="absolute top-2 right-2 text-[9px] font-semibold uppercase tracking-widest text-white/50">
+                    {vis.label}
+                  </span>
+
+                  {/* Badge destaque — canto superior esquerdo */}
                   {product.badge && (
-                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
+                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[8px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
                       {product.badge}
                     </span>
                   )}
 
-                  {/* % OFF sempre visível */}
-                  <span className="absolute bottom-2 left-2 bg-[#00a650] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none">
-                    {product.discount}% OFF
-                  </span>
+                  {/* Faixa de desconto no rodapé da imagem */}
+                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-2.5 pt-6 pb-2">
+                    <span className="text-white text-[12px] font-bold">−{product.discount}%</span>
+                  </div>
                 </div>
 
                 {/* Info */}
-                <div className="flex flex-col px-2.5 pt-2 pb-2.5 gap-0">
-                  <p className="text-[12px] leading-snug line-clamp-2 text-gray-800">
+                <div className="flex flex-col px-2.5 pt-2.5 pb-3">
+                  <p className="text-[12px] font-medium leading-snug line-clamp-2 text-gray-800">
                     {product.name}
                   </p>
-                  <p className="text-[11px] text-gray-400 line-through mt-1.5 leading-none">
-                    {product.originalPrice}
-                  </p>
-                  <p className="text-[16px] font-semibold text-gray-900 leading-tight mt-0.5">
-                    {product.price}
-                  </p>
-                  <p className="text-[10px] font-medium text-[#00a650] mt-1 leading-none">
-                    Envio grátis
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-1.5 leading-none">✓ Dr. Clóvis</p>
+                  <div className="flex items-baseline gap-1.5 mt-2">
+                    <span className="text-[10px] text-gray-400 line-through leading-none">
+                      {product.originalPrice}
+                    </span>
+                    <span className="text-[17px] font-bold text-gray-900 leading-none">
+                      {product.price}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] font-medium text-[#00a650]">Envio grátis</span>
+                    <span className="text-[9px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
+                      ✓ Dr. Clóvis
+                    </span>
+                  </div>
                 </div>
               </button>
             );
@@ -10481,8 +10516,8 @@ function LojaTab({ gest }: { gest: Gest }) {
         </div>
       )}
 
-      <p className="text-center text-[10px] text-muted-foreground">
-        Links de afiliado · Comprar pelo link apoia o portal sem custo extra
+      <p className="text-center text-[10px] text-gray-400 pb-4">
+        Seleção curada · comprar pelo link apoia o portal
       </p>
 
       <ProductSheet
