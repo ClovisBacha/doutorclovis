@@ -74,13 +74,14 @@ function gradientFor(period: SkyTheme["period"], code: number): string {
   }
 }
 
-export function useWeatherSky(): SkyTheme {
+export function useWeatherSky(override?: SkyTheme["period"] | null): SkyTheme {
   // Período calculado só no cliente para evitar mismatch SSR (servidor usa UTC).
   // Antes da montagem, renderiza o céu de "dia" neutro.
-  const [period, setPeriod] = useState<SkyTheme["period"]>("dia");
+  const [autoPeriod, setAutoPeriod] = useState<SkyTheme["period"]>("dia");
   useEffect(() => {
-    setPeriod(periodFor(new Date().getHours()));
+    setAutoPeriod(periodFor(new Date().getHours()));
   }, []);
+  const period = override ?? autoPeriod;
   const isDark = period === "madrugada" || period === "noite";
 
   const [weather, setWeather] = useState<SkyTheme["weather"]>(null);
@@ -239,6 +240,34 @@ function Rain() {
           }}
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * Camadas de clima reutilizáveis (sem gradiente de fundo) — para usar
+ * dentro de cards menores, como o hero do app. `mini` reduz a escala.
+ */
+export function SkyLayers({
+  code,
+  isDark,
+  mini = false,
+}: {
+  code: number;
+  isDark: boolean;
+  mini?: boolean;
+}) {
+  const rainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 99);
+  const heavyClouds = code === 3 || code === 45 || code === 48 || rainy;
+  const someClouds = code >= 1 && code <= 2;
+  return (
+    <div
+      className={`pointer-events-none absolute inset-0 overflow-hidden ${mini ? "opacity-60" : ""}`}
+      aria-hidden
+    >
+      {isDark && <Stars />}
+      {(someClouds || heavyClouds) && <Clouds density={heavyClouds ? "heavy" : "light"} />}
+      {rainy && <Rain />}
     </div>
   );
 }

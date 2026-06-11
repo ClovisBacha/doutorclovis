@@ -31,6 +31,7 @@ import {
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
+import { SkyLayers } from "@/components/weather-sky";
 import { babyForWeek } from "@/lib/gestacao";
 
 /* ================================================================
@@ -468,6 +469,9 @@ export function AppHomeScreen({
           />
         )}
 
+        {/* Camadas vivas de clima: estrelas à noite, nuvens, chuva */}
+        <SkyLayers code={weather?.code ?? 1} isDark={isMadrugada || h >= 19} mini />
+
         <div className="relative">
           <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${heroLabel}`}>
             Olá, {firstName} 💛
@@ -481,47 +485,47 @@ export function AppHomeScreen({
 
           {gest && baby ? (
             <>
-              <div className="mt-3 flex items-start gap-4">
-                <div className="flex-1 min-w-0">
-                  {/* Número de semana estilo Apple Fitness — grande e impactante (#7) */}
-                  <div className="flex items-baseline gap-1.5">
-                    <p
-                      className={`font-serif text-[3.8rem] leading-none tracking-tight ${heroText}`}
-                    >
-                      {gest.weeks}
-                    </p>
-                    <div className="mb-1">
-                      <p className={`text-xs font-semibold leading-tight ${heroMuted}`}>semanas</p>
-                      <p className={`text-xs ${heroMuted}`}>{gest.days} dias</p>
-                    </div>
-                  </div>
+              {/* Bebê protagonista — centralizado, sem o círculo do saco */}
+              <div className="mt-1 flex justify-center">
+                <BabyIllustration
+                  week={gest.weeks}
+                  showSac={false}
+                  showInfo={false}
+                  className="h-40 w-40 drop-shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+                />
+              </div>
 
-                  {babyName && (
-                    <p className={`mt-0.5 text-xs ${heroMuted}`}>Acompanhando {babyName}</p>
-                  )}
-
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
-                    >
-                      {baby.size}
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
-                    >
-                      {baby.weight}
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
-                    >
-                      🍓 {baby.fruit}
-                    </span>
-                  </div>
+              {/* Número de semana estilo Apple Fitness — centralizado sob o bebê */}
+              <div className="mt-1 flex items-baseline justify-center gap-1.5">
+                <p className={`font-serif text-[3.4rem] leading-none tracking-tight ${heroText}`}>
+                  {gest.weeks}
+                </p>
+                <div className="mb-1">
+                  <p className={`text-xs font-semibold leading-tight ${heroMuted}`}>semanas</p>
+                  <p className={`text-xs ${heroMuted}`}>{gest.days} dias</p>
                 </div>
+              </div>
 
-                <div className="w-24 shrink-0 mt-1">
-                  <BabyIllustration week={gest.weeks} />
-                </div>
+              {babyName && (
+                <p className={`mt-0.5 text-center text-xs ${heroMuted}`}>Acompanhando {babyName}</p>
+              )}
+
+              <div className="mt-2.5 flex flex-wrap justify-center gap-1.5">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
+                >
+                  {baby.size}
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
+                >
+                  {baby.weight}
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
+                >
+                  🍓 {baby.fruit}
+                </span>
               </div>
 
               {/* Barra de progresso */}

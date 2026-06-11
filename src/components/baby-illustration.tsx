@@ -39,7 +39,20 @@ function growth(week: number) {
   return Math.max(0, Math.min(1, (week - WEEK_MIN) / (WEEK_MAX - WEEK_MIN)));
 }
 
-export function BabyIllustration({ week }: { week: number }) {
+export function BabyIllustration({
+  week,
+  showSac = true,
+  showInfo = true,
+  className,
+}: {
+  week: number;
+  /** false = bebê "livre", sem o círculo do saco amniótico */
+  showSac?: boolean;
+  /** false = oculta a legenda de estágio/tamanho/peso abaixo do SVG */
+  showInfo?: boolean;
+  /** classes do <svg> — sobrescreve o tamanho padrão */
+  className?: string;
+}) {
   const stage = babyStage(week);
   const g = growth(week);
   const sacR = 72 + g * 16;
@@ -49,7 +62,9 @@ export function BabyIllustration({ week }: { week: number }) {
   const [sMin, sMax] = STAGE_RANGES[stage];
   const t = Math.max(0, Math.min(1, (week - sMin) / (sMax - sMin)));
   const baseScale = STAGE_BASE_SCALE[stage];
-  const bodyScale = baseScale + t * (1 - baseScale);
+  // Sem o saco, o bebê pode ocupar mais da viewBox
+  const freeBoost = showSac ? 1 : 1.18;
+  const bodyScale = Math.min(1.1, (baseScale + t * (1 - baseScale)) * freeBoost);
   // translate(tx, tx) scale(bodyScale) = escalar em torno do centro (100,100)
   const tx = 100 * (1 - bodyScale);
 
@@ -59,7 +74,7 @@ export function BabyIllustration({ week }: { week: number }) {
         viewBox="0 0 200 200"
         role="img"
         aria-label={`Ilustração — ${STAGE_LABEL[stage]}, semana ${week}`}
-        className="h-48 w-48 md:h-56 md:w-56"
+        className={className ?? "h-48 w-48 md:h-56 md:w-56"}
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
@@ -119,38 +134,42 @@ export function BabyIllustration({ week }: { week: number }) {
           </filter>
         </defs>
 
-        {/* ── Saco amniótico ────────────────────────────────────── */}
-        <circle cx="100" cy="100" r={sacR} fill="url(#sac)" />
-        <circle cx="100" cy="100" r={sacR} fill="url(#sac-glow)" />
-        <circle
-          cx="100"
-          cy="100"
-          r={sacR}
-          fill="none"
-          stroke="#d08860"
-          strokeWidth="2.2"
-          strokeOpacity="0.26"
-        />
-        {/* Reflexo principal */}
-        <ellipse
-          cx={100 - sacR * 0.29}
-          cy={100 - sacR * 0.31}
-          rx={sacR * 0.25}
-          ry={sacR * 0.12}
-          fill="white"
-          fillOpacity="0.3"
-          transform={`rotate(-24 ${100 - sacR * 0.29} ${100 - sacR * 0.31})`}
-        />
-        {/* Reflexo secundário */}
-        <ellipse
-          cx={100 - sacR * 0.19}
-          cy={100 - sacR * 0.41}
-          rx={sacR * 0.09}
-          ry={sacR * 0.05}
-          fill="white"
-          fillOpacity="0.52"
-          transform={`rotate(-19 ${100 - sacR * 0.19} ${100 - sacR * 0.41})`}
-        />
+        {/* ── Saco amniótico (opcional) ─────────────────────────── */}
+        {showSac && (
+          <>
+            <circle cx="100" cy="100" r={sacR} fill="url(#sac)" />
+            <circle cx="100" cy="100" r={sacR} fill="url(#sac-glow)" />
+            <circle
+              cx="100"
+              cy="100"
+              r={sacR}
+              fill="none"
+              stroke="#d08860"
+              strokeWidth="2.2"
+              strokeOpacity="0.26"
+            />
+            {/* Reflexo principal */}
+            <ellipse
+              cx={100 - sacR * 0.29}
+              cy={100 - sacR * 0.31}
+              rx={sacR * 0.25}
+              ry={sacR * 0.12}
+              fill="white"
+              fillOpacity="0.3"
+              transform={`rotate(-24 ${100 - sacR * 0.29} ${100 - sacR * 0.31})`}
+            />
+            {/* Reflexo secundário */}
+            <ellipse
+              cx={100 - sacR * 0.19}
+              cy={100 - sacR * 0.41}
+              rx={sacR * 0.09}
+              ry={sacR * 0.05}
+              fill="white"
+              fillOpacity="0.52"
+              transform={`rotate(-19 ${100 - sacR * 0.19} ${100 - sacR * 0.41})`}
+            />
+          </>
+        )}
 
         {/* ── Estágio — escala contínua semana a semana ─────────── */}
         <g transform={`translate(${tx} ${tx}) scale(${bodyScale})`}>
@@ -163,24 +182,26 @@ export function BabyIllustration({ week }: { week: number }) {
       </svg>
 
       {/* ── Informações da semana (todas as 42 semanas) ─────────── */}
-      <div className="mt-2 w-full text-center">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary/80">
-          {STAGE_LABEL[stage]}
-        </p>
-        <div className="mt-1.5 flex items-center justify-center gap-2 text-xs font-semibold text-foreground">
-          <span>{info.size}</span>
-          {info.weight !== "—" && (
-            <>
-              <span className="text-border">·</span>
-              <span>{info.weight}</span>
-            </>
-          )}
+      {showInfo && (
+        <div className="mt-2 w-full text-center">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary/80">
+            {STAGE_LABEL[stage]}
+          </p>
+          <div className="mt-1.5 flex items-center justify-center gap-2 text-xs font-semibold text-foreground">
+            <span>{info.size}</span>
+            {info.weight !== "—" && (
+              <>
+                <span className="text-border">·</span>
+                <span>{info.weight}</span>
+              </>
+            )}
+          </div>
+          <p className="mt-0.5 text-[11px] text-primary/70">{info.fruit}</p>
+          <p className="mx-auto mt-1 max-w-[220px] text-[11px] leading-snug text-muted-foreground">
+            {info.desc}
+          </p>
         </div>
-        <p className="mt-0.5 text-[11px] text-primary/70">{info.fruit}</p>
-        <p className="mx-auto mt-1 max-w-[220px] text-[11px] leading-snug text-muted-foreground">
-          {info.desc}
-        </p>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   Activity,
   Baby,
@@ -133,8 +134,18 @@ const SHOWCASE = [
   },
 ];
 
+const PERIODS = [
+  { key: "manha", label: "Amanhecer", emoji: "🌅" },
+  { key: "dia", label: "Tarde", emoji: "☀️" },
+  { key: "entardecer", label: "Entardecer", emoji: "🌇" },
+  { key: "noite", label: "Noite", emoji: "🌙" },
+] as const;
+
 function Index() {
-  const sky = useWeatherSky();
+  const [periodOverride, setPeriodOverride] = useState<
+    "manha" | "dia" | "entardecer" | "noite" | null
+  >(null);
+  const sky = useWeatherSky(periodOverride);
   const heroText = sky.isDark ? "text-white" : "text-foreground";
   const heroMuted = sky.isDark ? "text-white/70" : "text-muted-foreground";
 
@@ -214,6 +225,30 @@ function Index() {
                 ) : (
                   <span>☁️ Este céu muda com o clima real — como dentro do app</span>
                 )}
+              </div>
+            </Reveal>
+            {/* Seletor dos 4 períodos — experimente o céu de cada hora do dia */}
+            <Reveal variant="fade" delay={620}>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className={`text-xs ${heroMuted}`}>Experimente:</span>
+                {PERIODS.map((p) => {
+                  const active = periodOverride === p.key;
+                  return (
+                    <button
+                      key={p.key}
+                      onClick={() => setPeriodOverride(active ? null : p.key)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium backdrop-blur-md transition-all ${
+                        active
+                          ? "bg-primary text-primary-foreground shadow-[var(--shadow-soft)] scale-105"
+                          : sky.isDark
+                            ? "border border-white/20 bg-white/10 text-white/80 hover:bg-white/20"
+                            : "border border-border/60 bg-white/60 text-muted-foreground hover:text-primary"
+                      }`}
+                    >
+                      {p.emoji} {p.label}
+                    </button>
+                  );
+                })}
               </div>
             </Reveal>
           </div>

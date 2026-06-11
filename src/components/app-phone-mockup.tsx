@@ -79,33 +79,26 @@ export function AppHomeMockupScreen() {
         <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-primary">
           Olá, Mariana 💛
         </p>
-        <div className="mt-1.5 flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-1">
-              <p className="font-serif text-[2.6rem] leading-none tracking-tight text-foreground">
-                24
-              </p>
-              <div>
-                <p className="text-[9px] font-semibold leading-tight text-muted-foreground">
-                  semanas
-                </p>
-                <p className="text-[9px] text-muted-foreground">3 dias</p>
-              </div>
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {["30 cm", "600 g", "🌽 espiga de milho"].map((b) => (
-                <span
-                  key={b}
-                  className="rounded-full bg-card/80 px-1.5 py-0.5 text-[8px] font-medium text-foreground shadow-sm"
-                >
-                  {b}
-                </span>
-              ))}
-            </div>
+        {/* Bebê protagonista — centralizado, sem o círculo do saco */}
+        <div className="flex justify-center">
+          <BabyIllustration week={24} showSac={false} showInfo={false} className="h-24 w-24" />
+        </div>
+        <div className="flex items-baseline justify-center gap-1">
+          <p className="font-serif text-[2.2rem] leading-none tracking-tight text-foreground">24</p>
+          <div>
+            <p className="text-[9px] font-semibold leading-tight text-muted-foreground">semanas</p>
+            <p className="text-[9px] text-muted-foreground">3 dias</p>
           </div>
-          <div className="w-16 shrink-0 scale-[0.45] origin-top-right">
-            <BabyIllustration week={24} />
-          </div>
+        </div>
+        <div className="mt-1.5 flex flex-wrap justify-center gap-1">
+          {["30 cm", "600 g", "🌽 espiga de milho"].map((b) => (
+            <span
+              key={b}
+              className="rounded-full bg-card/80 px-1.5 py-0.5 text-[8px] font-medium text-foreground shadow-sm"
+            >
+              {b}
+            </span>
+          ))}
         </div>
         {/* progresso */}
         <div className="mt-2">
