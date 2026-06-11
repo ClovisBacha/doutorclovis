@@ -383,6 +383,56 @@
   }
 }
 
+/* ── Céu dinâmico (WeatherSky) ─────────────────────────────── */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes cloudDrift {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(160vw);
+  }
+}
+@keyframes rainFall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh);
+    opacity: 0.3;
+  }
+}
+@keyframes sunPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 60px 20px rgba(255, 213, 79, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 80px 32px rgba(255, 213, 79, 0.5);
+  }
+}
+@keyframes phoneFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
 .gradient-animated {
   background-size: 200% 200%;
   animation: gradientShift 8s ease infinite;

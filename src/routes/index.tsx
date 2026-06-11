@@ -6,24 +6,27 @@ import {
   BookOpen,
   BrainCircuit,
   Calendar,
-  Clock,
-  Heart,
-  HeartPulse,
-  MessageSquare,
+  CloudSun,
   ShieldCheck,
   Smartphone,
   Sparkles,
-  Star,
   Users,
+  Video,
 } from "lucide-react";
-import heroImg from "@/assets/hero-pregnancy.jpg";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { AnimatedCounter } from "@/components/animated-counter";
 import { BabyEvolution } from "@/components/baby-evolution";
 import { Reveal } from "@/components/reveal";
-import { Magnetic, Parallax, SpotlightCard, TiltCard } from "@/components/motion-fx";
-import { TechGrid, FloatingOrbs, Particles, ShimmerText } from "@/components/tech-fx";
+import { Magnetic, SpotlightCard } from "@/components/motion-fx";
+import { ShimmerText } from "@/components/tech-fx";
 import { TestimonialsSection } from "@/components/testimonials-section";
+import { SkyCanvas, useWeatherSky } from "@/components/weather-sky";
+import {
+  AppChatMockupScreen,
+  AppHomeMockupScreen,
+  AppSaudeMockupScreen,
+  PhoneFrame,
+} from "@/components/app-phone-mockup";
 
 export const Route = createFileRoute("/")({
   head: () => {
@@ -33,9 +36,9 @@ export const Route = createFileRoute("/")({
         {
           name: "description",
           content:
-            "Acompanhe sua gestação semana a semana, converse com IA especializada, agende consultas e muito mais. Desenvolvido com Dr. Clóvis Bacha.",
+            "O app que acompanha sua gestação semana a semana: clima em tempo real, IA obstétrica 24h, monitoramento de saúde, teleconsulta e o cuidado do Dr. Clóvis Bacha.",
         },
-        { property: "og:title", content: "Obstétrica by Dr. Clóvis" },
+        { property: "og:title", content: "Obstétrica by Dr. Clóvis — o app da sua gestação" },
         {
           property: "og:description",
           content: "O app completo para acompanhar sua gestação com segurança e cuidado.",
@@ -50,76 +53,119 @@ const APP_FEATURES = [
   {
     icon: Baby,
     title: "Gestação semana a semana",
-    text: "Acompanhe o desenvolvimento do bebê, exames programados e marcos importantes da gravidez.",
+    text: "Desenvolvimento do bebê, tamanho, peso e os exames de cada fase — atualizado todo dia.",
+  },
+  {
+    icon: CloudSun,
+    title: "Clima em tempo real",
+    text: "A tela do app muda com o céu da sua cidade e sugere cuidados para gestantes conforme o tempo.",
   },
   {
     icon: BrainCircuit,
-    title: "Chat com IA especializada",
-    text: "Tire dúvidas a qualquer hora com nossa IA treinada em obstetrícia e ginecologia de alto risco.",
+    title: "IA obstétrica 24h",
+    text: "Dúvida às 3h da manhã? A IA treinada em obstetrícia responde na hora, com triagem de sintomas.",
+  },
+  {
+    icon: Video,
+    title: "Teleconsulta integrada",
+    text: "Consultas por vídeo com o Dr. Clóvis sem sair do app — link automático no seu e-mail.",
+  },
+  {
+    icon: Activity,
+    title: "Monitoramento completo",
+    text: "Peso, pressão, chutes do bebê e sintomas em gráficos que o médico acompanha de perto.",
   },
   {
     icon: Calendar,
     title: "Agendamento integrado",
-    text: "Solicite consultas, acompanhe horários e receba lembretes da sua equipe médica.",
-  },
-  {
-    icon: Activity,
-    title: "Monitoramento da saúde",
-    text: "Registre peso, pressão, batimentos do bebê e sintomas. Visualize sua evolução em gráficos.",
-  },
-  {
-    icon: Heart,
-    title: "Ciclo menstrual e preventivos",
-    text: "Controle seu ciclo, receba previsões e lembretes para exames preventivos do calendário FEBRASGO.",
+    text: "Solicite consultas, receba confirmação e lembretes direto no app.",
   },
   {
     icon: Users,
     title: "Modo acompanhante",
-    text: "Inclua seu parceiro ou familiar para que todos estejam preparados para o grande momento.",
+    text: "Inclua parceiro ou familiar para que todos vivam a gestação junto com você.",
   },
   {
     icon: BookOpen,
     title: "Escola do bebê",
-    text: "Módulos educativos sobre amamentação, cuidados neonatais, parto e muito mais.",
-  },
-  {
-    icon: MessageSquare,
-    title: "Diário e perguntas",
-    text: "Registre seus sentimentos, anote dúvidas para a consulta e mantenha um histórico completo.",
+    text: "Módulos sobre amamentação, cuidados neonatais, parto e pós-parto.",
   },
   {
     icon: ShieldCheck,
     title: "Alertas de segurança",
-    text: "Triagem inteligente de sintomas com orientação rápida sobre quando buscar atendimento urgente.",
+    text: "Triagem inteligente avisa quando um sintoma merece atenção médica urgente.",
+  },
+];
+
+const SHOWCASE = [
+  {
+    badge: "Tela inicial",
+    title: "Um app que vive o seu momento",
+    text: "A home muda com a hora do dia e o clima da sua cidade: amanhecer dourado, tarde azul, noite estrelada. O bebê cresce na tela junto com a sua gestação — semana a semana, com tamanho, peso e progresso até o parto.",
+    bullets: [
+      "Clima e dicas em tempo real",
+      "Bebê ilustrado por semana",
+      "Progresso estilo fitness",
+    ],
+    screen: "home" as const,
+  },
+  {
+    badge: "Chat IA",
+    title: "Respostas na hora, a qualquer hora",
+    text: "A IA treinada em obstetrícia responde dúvidas com base em protocolos médicos e sabe quando acionar o alerta: se o sintoma for sério, ela orienta você a procurar atendimento — e avisa o médico.",
+    bullets: [
+      "Disponível 24h, inclusive feriados",
+      "Triagem inteligente de sintomas",
+      "Histórico vai para o médico",
+    ],
+    screen: "chat" as const,
+  },
+  {
+    badge: "Saúde",
+    title: "Seus números, acompanhados de perto",
+    text: "Registre peso, pressão e os chutes do bebê. O app monta os gráficos e o Dr. Clóvis acompanha tudo do painel médico — sua consulta começa antes de você chegar.",
+    bullets: [
+      "Gráficos de evolução automáticos",
+      "Contador de chutes do bebê",
+      "Médico vê tudo antes da consulta",
+    ],
+    screen: "saude" as const,
   },
 ];
 
 function Index() {
+  const sky = useWeatherSky();
+  const heroText = sky.isDark ? "text-white" : "text-foreground";
+  const heroMuted = sky.isDark ? "text-white/70" : "text-muted-foreground";
+
   return (
     <>
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <TechGrid />
-        <FloatingOrbs />
-        <Particles density={28} />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pt-16 pb-20 md:grid-cols-[1.05fr_1fr] md:pt-24 md:pb-28">
+      {/* ── Hero: céu dinâmico + telefone ─────────────────────────── */}
+      <section className="relative -mt-[73px] overflow-hidden pt-[73px]">
+        <SkyCanvas sky={sky} />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pt-12 pb-24 md:grid-cols-[1.1fr_1fr] md:pt-20 md:pb-32">
           <div>
             <Reveal variant="blur">
-              <p className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
-                <Sparkles className="h-3 w-3 animate-[sparkle_2.4s_ease-in-out_infinite]" />
-                App de gestação · Saúde da mulher
+              <p
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] backdrop-blur-md ${
+                  sky.isDark
+                    ? "border border-white/20 bg-white/10 text-white"
+                    : "border border-primary/20 bg-white/60 text-primary"
+                }`}
+              >
+                <Sparkles className="h-3 w-3 animate-[sparkle_2.4s_ease-in-out_infinite]" />O app da
+                sua gestação
               </p>
             </Reveal>
             <Reveal variant="up" delay={120}>
-              <h1 className="mt-4 font-serif text-4xl leading-[1.05] text-foreground md:text-6xl">
-                Sua gestação acompanhada com{" "}
-                <ShimmerText className="not-italic">presença</ShimmerText> e tecnologia.
+              <h1 className={`mt-4 font-serif text-4xl leading-[1.05] md:text-6xl ${heroText}`}>
+                A gestação inteira <ShimmerText className="not-italic">no seu bolso</ShimmerText>.
               </h1>
             </Reveal>
             <Reveal variant="up" delay={240}>
-              <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted-foreground">
-                Obstétrica é o app criado com o Dr. Clóvis Bacha para você acompanhar sua gestação
-                semana a semana, monitorar sua saúde, tirar dúvidas com IA e muito mais.
+              <p className={`mt-6 max-w-lg text-lg leading-relaxed ${heroMuted}`}>
+                Acompanhamento semana a semana, IA obstétrica 24h, teleconsulta e monitoramento de
+                saúde — criado pelo Dr. Clóvis Bacha, especialista em gestação de alto risco.
               </p>
             </Reveal>
             <Reveal variant="up" delay={360}>
@@ -127,78 +173,127 @@ function Index() {
                 <Magnetic>
                   <Link
                     to="/auth"
-                    className="press group relative block overflow-hidden rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)]"
+                    className="press group relative block overflow-hidden rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-float)]"
                   >
                     <span className="relative z-10 flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" /> Entrar no App
+                      <Smartphone className="h-4 w-4" /> Criar conta grátis
                     </span>
                     <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
                   </Link>
                 </Magnetic>
                 <Link
                   to="/agendamento"
-                  className="press rounded-full border border-border bg-card px-6 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+                  className={`press rounded-full px-6 py-3.5 text-sm font-medium backdrop-blur-md transition-colors ${
+                    sky.isDark
+                      ? "border border-white/25 bg-white/10 text-white hover:bg-white/20"
+                      : "border border-border bg-white/70 text-foreground hover:border-primary hover:text-primary"
+                  }`}
                 >
                   Agendar consulta
                 </Link>
               </div>
             </Reveal>
-            <Reveal variant="fade" delay={480}>
-              <div className="mt-8 inline-flex items-center gap-3 rounded-full glass px-4 py-2 text-sm text-foreground">
+            {/* selo de clima ao vivo — prova do diferencial */}
+            <Reveal variant="fade" delay={500}>
+              <div
+                className={`mt-8 inline-flex items-center gap-2.5 rounded-full px-4 py-2 text-sm backdrop-blur-md ${
+                  sky.isDark
+                    ? "border border-white/20 bg-white/10 text-white/90"
+                    : "border border-border/60 bg-white/70 text-foreground"
+                }`}
+              >
                 <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
-                <Clock className="h-4 w-4 text-primary" />
-                <span>Acesso imediato após o cadastro</span>
+                {sky.weather ? (
+                  <span>
+                    {sky.weather.emoji} {sky.weather.temp}°C · {sky.weather.condition} — este céu é
+                    o clima real de agora, como no app
+                  </span>
+                ) : (
+                  <span>☁️ Este céu muda com o clima real — como dentro do app</span>
+                )}
               </div>
             </Reveal>
           </div>
-          <Reveal variant="scale" delay={200} className="relative">
-            <div className="absolute -inset-4 rounded-[2rem] bg-[var(--gradient-warm)] blur-xl opacity-60 gradient-animated" />
-            <div className="absolute -inset-1 rounded-[2rem] bg-gradient-to-tr from-primary/40 via-transparent to-accent/40 opacity-70 blur-md" />
-            <TiltCard className="relative rounded-[2rem]" max={5}>
-              <img
-                src={heroImg}
-                alt="Mulher grávida com as mãos no ventre"
-                width={1600}
-                height={1200}
-                className="relative aspect-[4/5] w-full rounded-[2rem] object-cover shadow-[var(--shadow-soft)]"
-              />
-              <div className="absolute -left-3 top-6 glass rounded-2xl px-3 py-2 text-xs shadow-[var(--shadow-card)] animate-[floatY_6s_ease-in-out_infinite]">
-                <div className="flex items-center gap-2">
-                  <HeartPulse className="h-4 w-4 text-primary" />
-                  <span className="font-medium">140 bpm</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground">batimentos do bebê</p>
-              </div>
-              <div className="absolute -right-3 bottom-8 glass rounded-2xl px-3 py-2 text-xs shadow-[var(--shadow-card)] animate-[floatY_7.5s_ease-in-out_infinite_reverse]">
-                <div className="flex items-center gap-2">
-                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
-                  <span className="font-medium">24 semanas</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground">sua gestação hoje</p>
-              </div>
-            </TiltCard>
+
+          {/* Telefone flutuante com a home do app */}
+          <Reveal variant="scale" delay={250} className="relative flex justify-center">
+            <div className="animate-[phoneFloat_7s_ease-in-out_infinite]">
+              <PhoneFrame>
+                <AppHomeMockupScreen />
+              </PhoneFrame>
+            </div>
           </Reveal>
         </div>
       </section>
 
-      {/* Funcionalidades do app */}
+      {/* ── Por dentro do app: 3 telas em destaque ─────────────────── */}
+      <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
+        <Reveal variant="up">
+          <div className="mx-auto mb-16 max-w-2xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              Por dentro do app
+            </p>
+            <h2 className="mt-3 font-serif text-3xl md:text-5xl">
+              Tecnologia que sente o seu momento.
+            </h2>
+            <p className="mt-4 text-muted-foreground">
+              Cada tela foi desenhada com o Dr. Clóvis para a rotina real de uma gestante — do
+              positivo ao pós-parto.
+            </p>
+          </div>
+        </Reveal>
+
+        <div className="space-y-20 md:space-y-28">
+          {SHOWCASE.map((item, i) => (
+            <div
+              key={item.badge}
+              className={`grid items-center gap-10 md:grid-cols-2 ${
+                i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
+              }`}
+            >
+              <Reveal variant={i % 2 === 1 ? "left" : "up"} className="flex justify-center">
+                <PhoneFrame tilt={i % 2 === 1 ? "right" : "left"}>
+                  {item.screen === "home" && <AppHomeMockupScreen />}
+                  {item.screen === "chat" && <AppChatMockupScreen />}
+                  {item.screen === "saude" && <AppSaudeMockupScreen />}
+                </PhoneFrame>
+              </Reveal>
+              <Reveal variant="up" delay={120}>
+                <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                  {item.badge}
+                </span>
+                <h3 className="mt-4 font-serif text-2xl md:text-4xl">{item.title}</h3>
+                <p className="mt-4 text-base leading-relaxed text-muted-foreground">{item.text}</p>
+                <ul className="mt-6 space-y-2.5">
+                  {item.bullets.map((b) => (
+                    <li key={b} className="flex items-center gap-2.5 text-sm text-foreground">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                        ✓
+                      </span>
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+              </Reveal>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Funcionalidades em grade ───────────────────────────────── */}
       <section className="border-y border-border/60 bg-secondary/40">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <Reveal variant="up">
             <div className="mb-10 max-w-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-                O que o app oferece
+                Tudo que o app faz
               </p>
               <h2 className="mt-3 font-serif text-3xl md:text-4xl">
-                Tudo que você precisa em um só lugar.
+                Um pré-natal completo, na palma da mão.
               </h2>
-              <p className="mt-3 text-muted-foreground">
-                Do pré-natal ao pós-parto, passando pelo ciclo menstrual e cuidados preventivos — o
-                Obstétrica é seu parceiro de saúde.
-              </p>
             </div>
           </Reveal>
           <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3">
@@ -229,7 +324,7 @@ function Index() {
         </div>
       </section>
 
-      {/* Números */}
+      {/* ── Números ─────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <Reveal variant="up">
           <div className="max-w-2xl">
@@ -262,21 +357,20 @@ function Index() {
       {/* Evolução do bebê — feature demo */}
       <BabyEvolution />
 
-      {/* O médico por trás do app */}
+      {/* ── O médico por trás do app ───────────────────────────────── */}
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 md:grid-cols-[1fr_1.1fr]">
         <Reveal variant="left">
-          <Parallax speed={0.05}>
-            <TiltCard className="relative rounded-[2rem]" max={4}>
-              <img
-                src={portrait}
-                alt="Dr. Clóvis Bacha"
-                loading="lazy"
-                width={1024}
-                height={1024}
-                className="aspect-square w-full rounded-[2rem] object-cover shadow-[var(--shadow-card)]"
-              />
-            </TiltCard>
-          </Parallax>
+          <div className="relative">
+            <div className="absolute -inset-3 rounded-[2.3rem] bg-gradient-to-tr from-primary/20 via-transparent to-accent/30 blur-lg" />
+            <img
+              src={portrait}
+              alt="Dr. Clóvis Bacha"
+              loading="lazy"
+              width={1024}
+              height={1024}
+              className="relative aspect-square w-full rounded-[2rem] object-cover shadow-[var(--shadow-card)]"
+            />
+          </div>
         </Reveal>
         <div>
           <Reveal variant="up">
@@ -324,7 +418,7 @@ function Index() {
       {/* Depoimentos */}
       <TestimonialsSection />
 
-      {/* CTA final */}
+      {/* ── CTA final ──────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-[var(--gradient-primary)] text-primary-foreground">
         <div
           aria-hidden
