@@ -10270,32 +10270,52 @@ function ProductSheet({
 
               {/* Produtos relacionados */}
               {related.length > 0 && (
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
-                    Também recomendados
-                  </p>
-                  <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="pt-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex-1 h-px bg-gray-100" />
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">
+                      Também recomendados
+                    </p>
+                    <div className="flex-1 h-px bg-gray-100" />
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
                     {related.map((r) => {
                       const rv = CAT_VISUAL[r.category];
                       return (
                         <button
                           key={r.id}
                           onClick={() => onSelectRelated(r)}
-                          className="flex shrink-0 flex-col items-center rounded-xl border border-gray-200 bg-white overflow-hidden w-[88px] active:bg-gray-50 transition-colors"
+                          className="flex shrink-0 flex-col rounded-2xl overflow-hidden bg-white shadow-[0_2px_12px_rgba(0,0,0,0.1)] active:scale-[0.96] transition-transform text-left"
+                          style={{ width: 120 }}
                         >
                           <div
-                            className={`w-full bg-gradient-to-br ${rv.bg} flex items-center justify-center`}
-                            style={{ height: 64 }}
+                            className={`w-full bg-gradient-to-br ${rv.dark} flex items-center justify-center relative`}
+                            style={{ height: 90 }}
                           >
-                            <span className="text-2xl">{rv.emoji}</span>
+                            <span
+                              className="text-[36px] leading-none"
+                              style={{ filter: "drop-shadow(0 0 10px rgba(255,255,255,0.2))" }}
+                            >
+                              {rv.emoji}
+                            </span>
+                            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/50 to-transparent px-2 pt-4 pb-1.5">
+                              <span className="text-white text-[10px] font-bold">
+                                −{r.discount}%
+                              </span>
+                            </div>
                           </div>
-                          <div className="p-1.5 w-full">
-                            <p className="text-[10px] text-center line-clamp-2 text-gray-700 leading-tight">
+                          <div className="px-2 pt-2 pb-2.5">
+                            <p className="text-[10px] font-medium line-clamp-2 text-gray-800 leading-snug">
                               {r.name}
                             </p>
-                            <p className="text-[11px] font-semibold text-gray-900 text-center mt-1">
-                              {r.price}
-                            </p>
+                            <div className="flex items-baseline gap-1 mt-1.5">
+                              <span className="text-[9px] text-gray-400 line-through">
+                                {r.originalPrice}
+                              </span>
+                              <span className="text-[13px] font-bold text-gray-900 leading-none">
+                                {r.price}
+                              </span>
+                            </div>
                           </div>
                         </button>
                       );
