@@ -31,7 +31,7 @@ import {
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
-import { SkyLayers } from "@/components/weather-sky";
+import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
 import { babyForWeek } from "@/lib/gestacao";
 
 /* ================================================================
@@ -405,28 +405,6 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
   },
 ];
 
-/**
- * Gradiente base do hero card — responde à hora do dia.
- * Madrugada (0–5h): paleta escura quente para modo noturno (#9).
- */
-function timeGradient(): string {
-  const h = new Date().getHours();
-  if (h < 5)
-    // madrugada — malva escuro profundo
-    return "linear-gradient(148deg, oklch(0.24 0.04 32), oklch(0.2 0.032 24), oklch(0.18 0.026 18))";
-  if (h < 10)
-    // amanhecer — âmbar rosado
-    return "linear-gradient(148deg, oklch(0.99 0.012 68), oklch(0.975 0.04 42), oklch(0.968 0.025 35))";
-  if (h < 15)
-    // dia — creme pêssego
-    return "linear-gradient(148deg, oklch(0.992 0.008 52), oklch(0.975 0.032 32), oklch(0.965 0.022 40))";
-  if (h < 19)
-    // tarde — blush âmbar
-    return "linear-gradient(148deg, oklch(0.988 0.015 45), oklch(0.972 0.038 28), oklch(0.96 0.028 38))";
-  // noite — malva suave
-  return "linear-gradient(148deg, oklch(0.985 0.012 38), oklch(0.965 0.025 25), oklch(0.955 0.02 40))";
-}
-
 export function AppHomeScreen({
   firstName,
   babyName,
@@ -446,31 +424,30 @@ export function AppHomeScreen({
 
   const h = new Date().getHours();
   const isMadrugada = h < 5;
+  const period = periodFor(h);
+  // Céu escuro (noite/madrugada) ou de transição (entardecer) pede texto claro
+  const darkSky = period === "madrugada" || period === "noite" || period === "entardecer";
 
-  // Cores de texto adaptadas ao modo madrugada (fundo escuro)
-  const heroText = isMadrugada ? "text-white/90" : "text-foreground";
-  const heroMuted = isMadrugada ? "text-white/55" : "text-muted-foreground";
-  const heroBadge = isMadrugada ? "bg-white/15 text-white/85" : "bg-card/80 text-foreground";
-  const heroLabel = isMadrugada ? "text-white/45" : "text-primary";
+  // Cores de texto adaptadas ao céu do momento
+  const heroText = darkSky ? "text-white/95" : "text-foreground";
+  const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
+  const heroBadge = darkSky ? "bg-white/15 text-white/90" : "bg-card/80 text-foreground";
+  const heroLabel = darkSky ? "text-white/60" : "text-primary";
 
   return (
     <div className="space-y-4 pb-2">
-      {/* ── Hero card: semana + bebê + clima ───────────────────────── */}
+      {/* ── Hero card: céu real do momento + bebê + clima ──────────── */}
       <div
-        className="rounded-3xl relative overflow-hidden p-5"
-        style={{ background: timeGradient() }}
+        className="rounded-3xl relative overflow-hidden p-5 transition-[background] duration-1000"
+        style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
-        {/* Overlay de clima — muda a "vibe" visual conforme a meteorologia */}
-        {!isMadrugada && weather && (
-          <div
-            className="absolute inset-0 rounded-3xl pointer-events-none transition-opacity duration-1000"
-            style={{ background: weather.overlay }}
-            aria-hidden
-          />
-        )}
-
-        {/* Camadas vivas de clima: estrelas à noite, nuvens, chuva */}
-        <SkyLayers code={weather?.code ?? 1} isDark={isMadrugada || h >= 19} mini />
+        {/* Céu vivo: sol/lua, estrelas à noite, nuvens à deriva, chuva */}
+        <SkyLayers
+          code={weather?.code ?? 1}
+          isDark={period === "madrugada" || period === "noite"}
+          mini
+          period={period}
+        />
 
         <div className="relative">
           <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${heroLabel}`}>
@@ -536,10 +513,10 @@ export function AppHomeScreen({
                   <span>Parto</span>
                 </div>
                 <div
-                  className={`h-2 w-full rounded-full ${isMadrugada ? "bg-white/15" : "bg-border/60"}`}
+                  className={`h-2 w-full rounded-full ${darkSky ? "bg-white/20" : "bg-border/60"}`}
                 >
                   <div
-                    className={`h-2 rounded-full transition-all duration-700 ${isMadrugada ? "bg-white/60" : "bg-primary"}`}
+                    className={`h-2 rounded-full transition-all duration-700 ${darkSky ? "bg-white/70" : "bg-primary"}`}
                     style={{ width: `${progress ?? 0}%` }}
                   />
                 </div>
@@ -547,13 +524,21 @@ export function AppHomeScreen({
 
               {/* Strip de clima — só aparece quando dados chegam */}
               {!isMadrugada && weather && (
-                <div className="mt-3 rounded-2xl bg-white/30 backdrop-blur-sm px-3 py-2 flex items-start gap-2.5">
+                <div
+                  className={`mt-3 rounded-2xl backdrop-blur-sm px-3 py-2 flex items-start gap-2.5 ${
+                    darkSky ? "bg-white/15" : "bg-white/40"
+                  }`}
+                >
                   <span className="text-lg leading-none mt-0.5">{weather.emoji}</span>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-foreground/80">
+                    <p
+                      className={`text-[11px] font-semibold ${darkSky ? "text-white/90" : "text-foreground/80"}`}
+                    >
                       {weather.temp}°C · {weather.condition}
                     </p>
-                    <p className="text-[11px] text-foreground/65 mt-0.5 leading-snug">
+                    <p
+                      className={`text-[11px] mt-0.5 leading-snug ${darkSky ? "text-white/70" : "text-foreground/65"}`}
+                    >
                       {weather.tipEmoji} {weather.tip}
                     </p>
                   </div>

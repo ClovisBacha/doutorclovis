@@ -39,7 +39,7 @@ function conditionFor(code: number): { condition: string; emoji: string } {
   return { condition: "Tempo estável", emoji: "🌤️" };
 }
 
-function periodFor(h: number): SkyTheme["period"] {
+export function periodFor(h: number): SkyTheme["period"] {
   if (h < 5) return "madrugada";
   if (h < 10) return "manha";
   if (h < 17) return "dia";
@@ -47,7 +47,7 @@ function periodFor(h: number): SkyTheme["period"] {
   return "noite";
 }
 
-function gradientFor(period: SkyTheme["period"], code: number): string {
+export function gradientFor(period: SkyTheme["period"], code: number): string {
   const cloudy = code === 3 || code === 45 || code === 48;
   const rainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 99);
   switch (period) {
@@ -155,26 +155,36 @@ function Stars() {
   );
 }
 
-function Moon() {
+function Moon({ small }: { small?: boolean }) {
   return (
     <div
-      className="absolute right-[14%] top-[12%] h-16 w-16 rounded-full md:h-20 md:w-20"
+      className={`absolute right-[10%] top-[8%] rounded-full ${
+        small ? "h-8 w-8" : "right-[14%] top-[12%] h-16 w-16 md:h-20 md:w-20"
+      }`}
       style={{
         background: "radial-gradient(circle at 38% 35%, #fdfbf3, #e8e4d8 70%)",
-        boxShadow: "0 0 40px 12px rgba(253, 251, 243, 0.25)",
+        boxShadow: small
+          ? "0 0 20px 6px rgba(253, 251, 243, 0.25)"
+          : "0 0 40px 12px rgba(253, 251, 243, 0.25)",
       }}
       aria-hidden
     />
   );
 }
 
-function Sun({ low }: { low?: boolean }) {
+function Sun({ low, small }: { low?: boolean; small?: boolean }) {
   return (
     <div
-      className={`absolute right-[12%] ${low ? "top-[38%]" : "top-[10%]"} h-20 w-20 rounded-full md:h-28 md:w-28 animate-[sunPulse_5s_ease-in-out_infinite]`}
+      className={`absolute rounded-full animate-[sunPulse_5s_ease-in-out_infinite] ${
+        small
+          ? `right-[8%] ${low ? "top-[30%]" : "top-[6%]"} h-10 w-10`
+          : `right-[12%] ${low ? "top-[38%]" : "top-[10%]"} h-20 w-20 md:h-28 md:w-28`
+      }`}
       style={{
         background: "radial-gradient(circle at 40% 38%, #fff8e1, #ffd54f 65%, #ffb300)",
-        boxShadow: "0 0 60px 20px rgba(255, 213, 79, 0.35)",
+        boxShadow: small
+          ? "0 0 28px 10px rgba(255, 213, 79, 0.35)"
+          : "0 0 60px 20px rgba(255, 213, 79, 0.35)",
       }}
       aria-hidden
     />
@@ -252,20 +262,28 @@ export function SkyLayers({
   code,
   isDark,
   mini = false,
+  period,
 }: {
   code: number;
   isDark: boolean;
   mini?: boolean;
+  /** quando informado, renderiza também sol (dia) ou lua (noite) */
+  period?: SkyTheme["period"];
 }) {
   const rainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 99);
   const heavyClouds = code === 3 || code === 45 || code === 48 || rainy;
   const someClouds = code >= 1 && code <= 2;
+  const clear = code === 0;
   return (
     <div
-      className={`pointer-events-none absolute inset-0 overflow-hidden ${mini ? "opacity-60" : ""}`}
+      className={`pointer-events-none absolute inset-0 overflow-hidden ${mini ? "opacity-70" : ""}`}
       aria-hidden
     >
       {isDark && <Stars />}
+      {period && isDark && !heavyClouds && <Moon small={mini} />}
+      {period && !isDark && (clear || someClouds) && (
+        <Sun low={period === "entardecer"} small={mini} />
+      )}
       {(someClouds || heavyClouds) && <Clouds density={heavyClouds ? "heavy" : "light"} />}
       {rainy && <Rain />}
     </div>

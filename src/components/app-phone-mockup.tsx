@@ -20,6 +20,7 @@ import {
   Video,
 } from "lucide-react";
 import { BabyIllustration } from "@/components/baby-illustration";
+import { SkyLayers, gradientFor, type SkyTheme } from "@/components/weather-sky";
 
 /** Moldura de iPhone com Dynamic Island. Conteúdo via children. */
 export function PhoneFrame({
@@ -64,63 +65,89 @@ export function PhoneFrame({
   );
 }
 
-/** Tela Home do app — semana, bebê, clima, progresso, próxima consulta. */
-export function AppHomeMockupScreen() {
+/** Tela Home do app — céu do período, bebê central, clima, próxima consulta. */
+export function AppHomeMockupScreen({
+  period = "entardecer",
+}: {
+  /** céu exibido no card — pode ser sincronizado com o seletor do site */
+  period?: SkyTheme["period"];
+}) {
+  const darkSky = period === "madrugada" || period === "noite" || period === "entardecer";
+  const txt = darkSky ? "text-white/95" : "text-foreground";
+  const muted = darkSky ? "text-white/65" : "text-muted-foreground";
+  const badge = darkSky ? "bg-white/15 text-white/90" : "bg-card/80 text-foreground";
   return (
     <div className="space-y-2.5 px-3 pt-2">
-      {/* hero card com gradiente de fim de tarde + clima */}
+      {/* hero card — o mesmo céu do app real */}
       <div
-        className="relative overflow-hidden rounded-3xl p-4"
-        style={{
-          background:
-            "linear-gradient(160deg, oklch(0.93 0.05 75), oklch(0.9 0.07 45) 55%, oklch(0.87 0.06 25))",
-        }}
+        className="relative overflow-hidden rounded-3xl p-4 transition-[background] duration-700"
+        style={{ background: gradientFor(period, 2) }}
       >
-        <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-primary">
-          Olá, Mariana 💛
-        </p>
-        {/* Bebê protagonista — centralizado, sem o círculo do saco */}
-        <div className="flex justify-center">
-          <BabyIllustration week={24} showSac={false} showInfo={false} className="h-24 w-24" />
-        </div>
-        <div className="flex items-baseline justify-center gap-1">
-          <p className="font-serif text-[2.2rem] leading-none tracking-tight text-foreground">24</p>
-          <div>
-            <p className="text-[9px] font-semibold leading-tight text-muted-foreground">semanas</p>
-            <p className="text-[9px] text-muted-foreground">3 dias</p>
+        <SkyLayers
+          code={2}
+          isDark={period === "madrugada" || period === "noite"}
+          mini
+          period={period}
+        />
+        <div className="relative">
+          <p
+            className={`text-[9px] font-semibold uppercase tracking-[0.2em] ${darkSky ? "text-white/60" : "text-primary"}`}
+          >
+            Olá, Mariana 💛
+          </p>
+          {/* Bebê protagonista — centralizado, sem o círculo do saco */}
+          <div className="flex justify-center">
+            <BabyIllustration week={24} showSac={false} showInfo={false} className="h-24 w-24" />
           </div>
-        </div>
-        <div className="mt-1.5 flex flex-wrap justify-center gap-1">
-          {["30 cm", "600 g", "🌽 espiga de milho"].map((b) => (
-            <span
-              key={b}
-              className="rounded-full bg-card/80 px-1.5 py-0.5 text-[8px] font-medium text-foreground shadow-sm"
+          <div className="flex items-baseline justify-center gap-1">
+            <p className={`font-serif text-[2.2rem] leading-none tracking-tight ${txt}`}>24</p>
+            <div>
+              <p className={`text-[9px] font-semibold leading-tight ${muted}`}>semanas</p>
+              <p className={`text-[9px] ${muted}`}>3 dias</p>
+            </div>
+          </div>
+          <div className="mt-1.5 flex flex-wrap justify-center gap-1">
+            {["30 cm", "600 g", "🌽 espiga de milho"].map((b) => (
+              <span
+                key={b}
+                className={`rounded-full px-1.5 py-0.5 text-[8px] font-medium shadow-sm ${badge}`}
+              >
+                {b}
+              </span>
+            ))}
+          </div>
+          {/* progresso */}
+          <div className="mt-2">
+            <div className={`mb-0.5 flex justify-between text-[7px] ${muted}`}>
+              <span>Início</span>
+              <span>60% concluído</span>
+              <span>Parto</span>
+            </div>
+            <div
+              className={`h-1.5 w-full rounded-full ${darkSky ? "bg-white/20" : "bg-border/60"}`}
             >
-              {b}
-            </span>
-          ))}
-        </div>
-        {/* progresso */}
-        <div className="mt-2">
-          <div className="mb-0.5 flex justify-between text-[7px] text-muted-foreground">
-            <span>Início</span>
-            <span>60% concluído</span>
-            <span>Parto</span>
+              <div
+                className={`h-1.5 w-[60%] rounded-full ${darkSky ? "bg-white/70" : "bg-primary"}`}
+              />
+            </div>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-border/60">
-            <div className="h-1.5 w-[60%] rounded-full bg-primary" />
-          </div>
-        </div>
-        {/* strip de clima */}
-        <div className="mt-2 flex items-start gap-1.5 rounded-2xl bg-white/40 px-2 py-1.5 backdrop-blur-sm">
-          <span className="text-sm leading-none">⛅</span>
-          <div>
-            <p className="text-[8px] font-semibold text-foreground/80">
-              24°C · Parcialmente nublado
-            </p>
-            <p className="text-[8px] leading-snug text-foreground/65">
-              ⛅ Clima agradável para uma caminhada curta
-            </p>
+          {/* strip de clima */}
+          <div
+            className={`mt-2 flex items-start gap-1.5 rounded-2xl px-2 py-1.5 backdrop-blur-sm ${darkSky ? "bg-white/15" : "bg-white/40"}`}
+          >
+            <span className="text-sm leading-none">⛅</span>
+            <div>
+              <p
+                className={`text-[8px] font-semibold ${darkSky ? "text-white/90" : "text-foreground/80"}`}
+              >
+                24°C · Parcialmente nublado
+              </p>
+              <p
+                className={`text-[8px] leading-snug ${darkSky ? "text-white/70" : "text-foreground/65"}`}
+              >
+                ⛅ Clima agradável para uma caminhada curta
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -253,11 +253,11 @@ function Index() {
             </Reveal>
           </div>
 
-          {/* Telefone flutuante com a home do app */}
+          {/* Telefone flutuante — o app dentro dele acompanha o céu do site */}
           <Reveal variant="scale" delay={250} className="relative flex justify-center">
             <div className="animate-[phoneFloat_7s_ease-in-out_infinite]">
               <PhoneFrame>
-                <AppHomeMockupScreen />
+                <AppHomeMockupScreen period={sky.period} />
               </PhoneFrame>
             </div>
           </Reveal>
