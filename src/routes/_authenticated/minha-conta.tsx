@@ -10111,9 +10111,182 @@ const CAT_VISUAL: Record<ShopProduct["category"], { bg: string; emoji: string }>
   livros: { bg: "from-amber-50 to-orange-100", emoji: "📖" },
 };
 
+function ProductSheet({
+  product,
+  onClose,
+  onSelectRelated,
+}: {
+  product: ShopProduct | null;
+  onClose: () => void;
+  onSelectRelated: (p: ShopProduct) => void;
+}) {
+  const vis = product ? CAT_VISUAL[product.category] : null;
+  const related = product
+    ? CURATED_PRODUCTS.filter((p) => p.category === product.category && p.id !== product.id).slice(
+        0,
+        4,
+      )
+    : [];
+
+  useEffect(() => {
+    document.body.style.overflow = product ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [product]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${
+          product ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
+
+      {/* Sheet */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl bg-white overflow-hidden transition-transform duration-300 ease-out ${
+          product ? "translate-y-0" : "translate-y-full"
+        }`}
+        style={{ maxHeight: "88dvh" }}
+      >
+        {product && vis && (
+          <div className="overflow-y-auto overscroll-contain">
+            {/* Handle + fechar */}
+            <div className="sticky top-0 z-10 flex items-center justify-center px-4 pt-3 pb-2 bg-white border-b border-gray-100">
+              <div className="w-10 h-1 rounded-full bg-gray-300" />
+              <button
+                onClick={onClose}
+                className="absolute right-4 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Imagem */}
+            <div
+              className={`relative w-full bg-gradient-to-br ${vis.bg} flex items-center justify-center`}
+              style={{ height: 210 }}
+            >
+              <span className="text-8xl select-none drop-shadow-md">{vis.emoji}</span>
+              {product.badge && (
+                <span className="absolute top-3 left-3 bg-[#ff7733] text-white text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wide leading-none">
+                  {product.badge}
+                </span>
+              )}
+              <span className="absolute bottom-3 left-3 bg-[#00a650] text-white text-[12px] font-bold px-2 py-1 rounded-sm leading-none">
+                {product.discount}% OFF
+              </span>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-4 space-y-4 pb-8">
+              {/* Nome + preços */}
+              <div>
+                <h2 className="text-[18px] font-semibold text-gray-900 leading-snug">
+                  {product.name}
+                </h2>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-[13px] text-gray-400 line-through">
+                    {product.originalPrice}
+                  </span>
+                  <span className="text-[26px] font-bold text-gray-900 leading-none">
+                    {product.price}
+                  </span>
+                  <span className="text-[12px] font-bold text-[#00a650]">
+                    {product.discount}% OFF
+                  </span>
+                </div>
+                <p className="text-[11px] font-medium text-[#00a650] mt-1">Envio grátis</p>
+              </div>
+
+              {/* Recomendação médica */}
+              <div className="rounded-xl bg-primary/[0.06] border border-primary/15 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-primary mb-1.5">
+                  👨‍⚕️ Por que Dr. Clóvis recomenda
+                </p>
+                <p className="text-[13px] text-gray-700 leading-relaxed">{product.description}</p>
+              </div>
+
+              {/* Semana recomendada */}
+              {(product.weeks_min != null || product.weeks_max != null) && (
+                <div className="flex items-center gap-2 text-[12px]">
+                  <span className="text-gray-500">📅 Semana recomendada:</span>
+                  <span className="font-semibold text-gray-800">
+                    {product.weeks_min != null && product.weeks_max != null
+                      ? `Sem. ${product.weeks_min}–${product.weeks_max}`
+                      : product.weeks_min != null
+                        ? `A partir da sem. ${product.weeks_min}`
+                        : `Até a sem. ${product.weeks_max}`}
+                  </span>
+                </div>
+              )}
+
+              {/* Selo de confiança */}
+              <p className="text-[10px] text-gray-400">
+                ✓ Curado e recomendado por Dr. Clóvis Bacha — Ginecologista e Obstetra especialista
+                em gestação de alto risco
+              </p>
+
+              {/* CTA Amazon */}
+              <a
+                href={product.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff9900] py-4 text-[15px] font-bold text-white shadow-sm active:scale-[0.98] transition-transform"
+              >
+                Comprar na Amazon →
+              </a>
+
+              {/* Produtos relacionados */}
+              {related.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                    Também recomendados
+                  </p>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {related.map((r) => {
+                      const rv = CAT_VISUAL[r.category];
+                      return (
+                        <button
+                          key={r.id}
+                          onClick={() => onSelectRelated(r)}
+                          className="flex shrink-0 flex-col items-center rounded-xl border border-gray-200 bg-white overflow-hidden w-[88px] active:bg-gray-50 transition-colors"
+                        >
+                          <div
+                            className={`w-full bg-gradient-to-br ${rv.bg} flex items-center justify-center`}
+                            style={{ height: 64 }}
+                          >
+                            <span className="text-2xl">{rv.emoji}</span>
+                          </div>
+                          <div className="p-1.5 w-full">
+                            <p className="text-[10px] text-center line-clamp-2 text-gray-700 leading-tight">
+                              {r.name}
+                            </p>
+                            <p className="text-[11px] font-semibold text-gray-900 text-center mt-1">
+                              {r.price}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function LojaTab({ gest }: { gest: Gest }) {
   const [category, setCategory] = useState("all");
   const [weekFilter, setWeekFilter] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null);
   const currentWeek = gest?.weeks ?? null;
 
   const filtered = CURATED_PRODUCTS.filter((p) => {
@@ -10237,12 +10410,10 @@ function LojaTab({ gest }: { gest: Gest }) {
           {filtered.map((product) => {
             const vis = CAT_VISUAL[product.category];
             return (
-              <a
+              <button
                 key={product.id}
-                href={product.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col bg-white active:bg-gray-50 transition-colors"
+                onClick={() => setSelectedProduct(product)}
+                className="flex flex-col bg-white active:bg-gray-50 transition-colors text-left"
               >
                 {/* Imagem — proporção quadrada */}
                 <div
@@ -10280,7 +10451,7 @@ function LojaTab({ gest }: { gest: Gest }) {
                   </p>
                   <p className="text-[10px] text-gray-400 mt-1 leading-none">✓ Dr. Clóvis</p>
                 </div>
-              </a>
+              </button>
             );
           })}
         </div>
@@ -10289,6 +10460,12 @@ function LojaTab({ gest }: { gest: Gest }) {
       <p className="text-center text-[10px] text-muted-foreground">
         Links de afiliado · Comprar pelo link apoia o portal sem custo extra
       </p>
+
+      <ProductSheet
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onSelectRelated={(p) => setSelectedProduct(p)}
+      />
     </div>
   );
 }
