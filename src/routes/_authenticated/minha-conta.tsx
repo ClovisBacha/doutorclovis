@@ -10287,7 +10287,23 @@ function LojaTab({ gest }: { gest: Gest }) {
   const [category, setCategory] = useState("all");
   const [weekFilter, setWeekFilter] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null);
+  const [filtersHidden, setFiltersHidden] = useState(false);
+  const lastScrollY = useRef(0);
   const currentWeek = gest?.weeks ?? null;
+
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y > 140 && y > lastScrollY.current + 8) {
+        setFiltersHidden(true);
+      } else if (y < lastScrollY.current - 6) {
+        setFiltersHidden(false);
+      }
+      lastScrollY.current = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const filtered = CURATED_PRODUCTS.filter((p) => {
     if (category !== "all" && p.category !== category) return false;
@@ -10376,21 +10392,27 @@ function LojaTab({ gest }: { gest: Gest }) {
         </div>
       )}
 
-      {/* ── Filtros de categoria ─────────────────── */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        {SHOP_CATEGORIES.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => setCategory(c.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
-              category === c.key
-                ? "bg-foreground text-background"
-                : "bg-secondary text-muted-foreground"
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
+      {/* ── Filtros de categoria — sticky com hide/show no scroll ── */}
+      <div
+        className={`sticky top-0 z-20 -mx-4 px-4 py-2 bg-background/95 backdrop-blur-sm border-b border-border/40 transition-transform duration-200 ease-in-out ${
+          filtersHidden ? "-translate-y-[130%]" : "translate-y-0"
+        }`}
+      >
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+          {SHOP_CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setCategory(c.key)}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
+                category === c.key
+                  ? "bg-foreground text-background"
+                  : "bg-secondary text-muted-foreground"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Grid de produtos ─────────────────────── */}
@@ -10406,50 +10428,52 @@ function LojaTab({ gest }: { gest: Gest }) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-[1px] border border-gray-200 rounded-xl overflow-hidden bg-gray-200">
+        <div className="grid grid-cols-2 gap-3">
           {filtered.map((product) => {
             const vis = CAT_VISUAL[product.category];
             return (
               <button
                 key={product.id}
                 onClick={() => setSelectedProduct(product)}
-                className="flex flex-col bg-white active:bg-gray-50 transition-colors text-left"
+                className="flex flex-col bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm active:scale-[0.96] transition-transform text-left"
               >
                 {/* Imagem — proporção quadrada */}
                 <div
                   className={`relative w-full bg-gradient-to-br ${vis.bg} flex items-center justify-center`}
                   style={{ aspectRatio: "1 / 1" }}
                 >
-                  <span className="text-5xl drop-shadow-sm select-none">{vis.emoji}</span>
+                  <span className="text-[60px] drop-shadow select-none leading-none">
+                    {vis.emoji}
+                  </span>
 
-                  {/* Oferta principal badge */}
+                  {/* Badge de destaque */}
                   {product.badge && (
-                    <span className="absolute top-1.5 left-1.5 bg-[#ff7733] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
+                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
                       {product.badge}
                     </span>
                   )}
 
-                  {/* % OFF badge — sempre visível */}
-                  <span className="absolute bottom-1.5 left-1.5 bg-[#00a650] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none">
+                  {/* % OFF sempre visível */}
+                  <span className="absolute bottom-2 left-2 bg-[#00a650] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none">
                     {product.discount}% OFF
                   </span>
                 </div>
 
-                {/* Info — layout ML */}
-                <div className="flex flex-col px-2 pt-1.5 pb-2 gap-0">
+                {/* Info */}
+                <div className="flex flex-col px-2.5 pt-2 pb-2.5 gap-0">
                   <p className="text-[12px] leading-snug line-clamp-2 text-gray-800">
                     {product.name}
                   </p>
-                  <p className="text-[11px] text-gray-400 line-through mt-1 leading-none">
+                  <p className="text-[11px] text-gray-400 line-through mt-1.5 leading-none">
                     {product.originalPrice}
                   </p>
-                  <p className="text-[15px] font-semibold text-gray-900 leading-tight mt-0.5">
+                  <p className="text-[16px] font-semibold text-gray-900 leading-tight mt-0.5">
                     {product.price}
                   </p>
-                  <p className="text-[10px] font-medium text-[#00a650] mt-0.5 leading-none">
+                  <p className="text-[10px] font-medium text-[#00a650] mt-1 leading-none">
                     Envio grátis
                   </p>
-                  <p className="text-[10px] text-gray-400 mt-1 leading-none">✓ Dr. Clóvis</p>
+                  <p className="text-[10px] text-gray-400 mt-1.5 leading-none">✓ Dr. Clóvis</p>
                 </div>
               </button>
             );
