@@ -8,7 +8,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -99,7 +99,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, viewport-fit=cover",
+      },
       { title: "Obstétrica by Dr. Clóvis — App de Gestação e Saúde da Mulher" },
       {
         name: "description",
@@ -108,9 +111,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { name: "author", content: "Dr. Clóvis Bacha" },
       { name: "theme-color", content: "#8b5147" },
+      { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "Obstétrica" },
+      { name: "msapplication-TileColor", content: "#8b5147" },
       { property: "og:title", content: "Obstétrica by Dr. Clóvis" },
       {
         property: "og:description",
@@ -137,7 +142,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.svg" },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -203,6 +210,27 @@ function useSWRegistration() {
   }, []);
 }
 
+// Captura o evento beforeinstallprompt para mostrar banner customizado depois
+let deferredInstallPrompt: Event | null = null;
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    window.dispatchEvent(new CustomEvent("pwa-installable"));
+  });
+}
+
+export function triggerPWAInstall() {
+  if (!deferredInstallPrompt) return false;
+  (deferredInstallPrompt as BeforeInstallPromptEvent).prompt();
+  deferredInstallPrompt = null;
+  return true;
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+}
+
 function useScrollToTop() {
   const { location } = useRouterState();
   useEffect(() => {
@@ -242,6 +270,87 @@ function SiteShell() {
         <PublicBottomNav />
       </div>
       <Toaster position="bottom-right" richColors />
+      <PWAInstallBanner />
+    </div>
+  );
+}
+
+function PWAInstallBanner() {
+  const [visible, setVisible] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    // Só mostra uma vez
+    if (localStorage.getItem("pwa-banner-dismissed")) return;
+
+    const ios =
+      /iphone|ipad|ipod/i.test(navigator.userAgent) &&
+      !(navigator as unknown as { standalone?: boolean }).standalone;
+    const isAndroid = window.matchMedia("(max-width: 768px)").matches && !ios;
+
+    if (ios) {
+      // iOS: mostra instruções de "Adicionar à Tela Inicial"
+      setIsIOS(true);
+      const t = setTimeout(() => setVisible(true), 4000);
+      return () => clearTimeout(t);
+    }
+
+    if (isAndroid) {
+      // Android: espera o beforeinstallprompt
+      const handler = () => {
+        const t = setTimeout(() => setVisible(true), 3000);
+        return () => clearTimeout(t);
+      };
+      window.addEventListener("pwa-installable", handler, { once: true });
+      return () => window.removeEventListener("pwa-installable", handler);
+    }
+  }, []);
+
+  const dismiss = () => {
+    setVisible(false);
+    localStorage.setItem("pwa-banner-dismissed", "1");
+  };
+
+  const install = () => {
+    if (!isIOS) triggerPWAInstall();
+    dismiss();
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed bottom-20 left-4 right-4 z-50 mx-auto max-w-sm animate-[slideUp_0.4s_ease-out] rounded-2xl bg-primary p-4 shadow-[0_8px_32px_rgba(0,0,0,0.25)] md:bottom-6">
+      <div className="flex items-start gap-3">
+        <img src="/icon-192.png" alt="" className="h-12 w-12 shrink-0 rounded-xl" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-primary-foreground">Instalar o app</p>
+          {isIOS ? (
+            <p className="mt-0.5 text-xs text-primary-foreground/80">
+              Toque em <strong>compartilhar</strong> ↑ e depois em{" "}
+              <strong>"Adicionar à Tela Início"</strong>
+            </p>
+          ) : (
+            <p className="mt-0.5 text-xs text-primary-foreground/80">
+              Acesse o Obstétrica diretamente da tela inicial, como um app nativo.
+            </p>
+          )}
+          {!isIOS && (
+            <button
+              onClick={install}
+              className="mt-2 rounded-full bg-primary-foreground px-4 py-1.5 text-xs font-semibold text-primary transition-opacity hover:opacity-90"
+            >
+              Instalar agora
+            </button>
+          )}
+        </div>
+        <button
+          onClick={dismiss}
+          aria-label="Fechar"
+          className="shrink-0 text-primary-foreground/60 hover:text-primary-foreground"
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }

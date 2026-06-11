@@ -1,34 +1,73 @@
 {
+  "id": "/",
   "name": "Obstétrica by Dr. Clóvis",
   "short_name": "Obstétrica",
   "description": "Acompanhe sua gestação semana a semana com o app desenvolvido pelo Dr. Clóvis Bacha, especialista em gestação de alto risco.",
-  "start_url": "/",
+  "start_url": "/minha-conta",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#faf7f5",
   "theme_color": "#8b5147",
   "orientation": "portrait-primary",
   "lang": "pt-BR",
+  "dir": "ltr",
   "categories": ["health", "medical"],
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "any",
-      "type": "image/x-icon",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
       "purpose": "any"
     }
   ],
   "shortcuts": [
     {
-      "name": "Agendamento",
-      "short_name": "Agendar",
-      "description": "Solicitar consulta com Dr. Clóvis Bacha",
-      "url": "/agendamento"
+      "name": "Meu app de gestação",
+      "short_name": "App",
+      "description": "Acessar semana, bebê, consultas e saúde",
+      "url": "/minha-conta",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Minha conta",
-      "short_name": "App",
-      "description": "Acessar o app de gestação",
-      "url": "/minha-conta"
+      "name": "Agendar consulta",
+      "short_name": "Agendar",
+      "description": "Solicitar consulta com Dr. Clóvis Bacha",
+      "url": "/agendamento",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og.svg",
+      "sizes": "1200x630",
+      "type": "image/svg+xml",
+      "form_factor": "wide",
+      "label": "Tela inicial do app de gestação"
     }
   ]
 }

@@ -423,6 +423,16 @@
     box-shadow: 0 0 80px 32px rgba(255, 213, 79, 0.5);
   }
 }
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @keyframes phoneFloat {
   0%,
   100% {

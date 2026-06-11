@@ -1,7 +1,15 @@
-const CACHE = "obstetricia-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/og.svg", "/robots.txt", "/apple-touch-icon.svg"];
-// Patterns for static assets that can be cached indefinitely
-const STATIC_RE = /\.(js|css|woff2?|svg|png|ico|webmanifest)(\?|$)/;
+const CACHE = "obstetricia-v2";
+const SHELL = [
+  "/",
+  "/manifest.webmanifest",
+  "/favicon.ico",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
+  "/og.svg",
+  "/robots.txt",
+];
+const STATIC_RE = /\.(js|css|woff2?|svg|png|ico|webmanifest|jpg|jpeg|webp)(\?|$)/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -25,7 +33,6 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only intercept same-origin GET requests; skip API and auth routes
   if (
     request.method !== "GET" ||
     url.origin !== self.location.origin ||
@@ -35,7 +42,7 @@ self.addEventListener("fetch", (event) => {
     return;
 
   if (STATIC_RE.test(url.pathname)) {
-    // Cache-first for static assets — serve instantly, refresh in background
+    // Cache-first para assets estáticos
     event.respondWith(
       caches.match(request).then((cached) => {
         const revalidate = fetch(request).then((res) => {
@@ -46,21 +53,22 @@ self.addEventListener("fetch", (event) => {
       }),
     );
   } else if (request.mode === "navigate") {
-    // Network-first for page navigations; fall back to shell on offline
+    // Network-first para navegação; fallback offline para shell
     event.respondWith(
       fetch(request).catch(() => caches.match("/").then((r) => r ?? Response.error())),
     );
   }
 });
 
-// Push notification handling (existing)
+// Notificações push
 self.addEventListener("push", (event) => {
   if (!event.data) return;
   const { title, body, icon, url } = event.data.json();
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: icon || "/apple-touch-icon.svg",
+      icon: icon || "/icon-192.png",
+      badge: "/icon-192.png",
       data: { url },
     }),
   );
