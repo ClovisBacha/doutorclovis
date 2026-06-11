@@ -3032,6 +3032,121 @@ function buildPatientContext(profile: Profile | null, gest: Gest): string {
   return parts.join(" ");
 }
 
+// ─── WhatsApp-style chat ─────────────────────────────────────────────────────
+
+type WAMsg = {
+  role: "user" | "assistant";
+  content: string;
+  ts: Date;
+  image?: string;
+  audioUrl?: string;
+  audioDuration?: string;
+  fileName?: string;
+  fileSize?: string;
+};
+
+function waFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function WABubble({ msg }: { msg: WAMsg }) {
+  const isUser = msg.role === "user";
+  const timeStr = msg.ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  return (
+    <div className={`flex items-end gap-1.5 mb-0.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+      {!isUser && (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white self-end mb-0.5">
+          IA
+        </div>
+      )}
+
+      <div
+        className={`max-w-[75%] shadow-sm overflow-hidden ${
+          isUser
+            ? "bg-[#d9fdd3] rounded-2xl rounded-tr-none"
+            : "bg-white rounded-2xl rounded-tl-none"
+        }`}
+      >
+        {/* Imagem */}
+        {msg.image && <img src={msg.image} alt="" className="block w-full max-h-52 object-cover" />}
+
+        {/* Áudio */}
+        {msg.audioUrl && (
+          <div className="flex items-center gap-2 px-3 py-2.5" style={{ minWidth: 180 }}>
+            <button
+              onClick={() => {
+                if (!audioRef.current) return;
+                if (playing) {
+                  audioRef.current.pause();
+                  setPlaying(false);
+                } else {
+                  audioRef.current.play().then(() => setPlaying(true));
+                }
+              }}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white text-[13px]"
+            >
+              {playing ? "⏸" : "▶"}
+            </button>
+            <div className="flex flex-1 items-center gap-[2px]">
+              {[3, 6, 4, 9, 5, 7, 4, 8, 6, 5, 9, 4, 7, 5, 8].map((h, i) => (
+                <div
+                  key={i}
+                  className="w-[2px] rounded-full bg-primary/35 shrink-0"
+                  style={{ height: h }}
+                />
+              ))}
+            </div>
+            <span className="text-[11px] text-gray-500 shrink-0">
+              {msg.audioDuration ?? "0:00"}
+            </span>
+            <audio
+              ref={audioRef}
+              src={msg.audioUrl}
+              onEnded={() => setPlaying(false)}
+              className="hidden"
+            />
+          </div>
+        )}
+
+        {/* Arquivo */}
+        {msg.fileName && (
+          <div className="flex items-center gap-3 px-3 py-2.5" style={{ minWidth: 180 }}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl">
+              📄
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] font-semibold text-gray-900 line-clamp-1">{msg.fileName}</p>
+              {msg.fileSize && <p className="text-[10px] text-gray-400 mt-0.5">{msg.fileSize}</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Texto */}
+        {msg.content && (
+          <p className="px-3 pt-2 text-[14px] leading-snug text-gray-800 whitespace-pre-wrap">
+            {msg.content}
+          </p>
+        )}
+
+        {/* Timestamp */}
+        <div className="flex items-center justify-end gap-1 px-2.5 pb-1.5 pt-0.5">
+          <span className="text-[10px] leading-none text-gray-400">{timeStr}</span>
+          {isUser && (
+            <span className="text-[10px] leading-none" style={{ color: "#53bdeb" }}>
+              ✓✓
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const ctx = buildPatientContext(profile, gest);
   const firstName = profile?.display_name?.split(" ")[0];
@@ -3044,27 +3159,51 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
     .filter(Boolean)
     .join(" ");
 
-  const [messages, setMessages] = useState<ChatMsg[]>([{ role: "assistant", content: greeting }]);
+  const [messages, setMessages] = useState<WAMsg[]>([
+    { role: "assistant", content: greeting, ts: new Date() },
+  ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showAttach, setShowAttach] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recSec, setRecSec] = useState(0);
 
-  async function send() {
-    const text = input.trim();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileImageRef = useRef<HTMLInputElement>(null);
+  const fileDocRef = useRef<HTMLInputElement>(null);
+  const mediaRecRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, loading]);
+
+  async function sendText(textOverride?: string) {
+    const text = (textOverride ?? input).trim();
     if (!text || loading) return;
 
-    // Prepend patient context to first user message so the AI knows who she is
-    const enrichedText = ctx && messages.length === 1 ? `[Contexto: ${ctx}]\n\n${text}` : text;
-    const displayMsg: ChatMsg = { role: "user", content: text };
-    const apiMsg: ChatMsg = { role: "user", content: enrichedText };
+    const enrichedText =
+      ctx && messages.filter((m) => m.role === "user").length === 0
+        ? `[Contexto: ${ctx}]\n\n${text}`
+        : text;
 
+    const displayMsg: WAMsg = { role: "user", content: text, ts: new Date() };
     const displayNext = [...messages, displayMsg];
-    const apiNext = [...messages, apiMsg];
+
+    const apiHistory: ChatMsg[] = [
+      ...messages.filter((m) => m.content).map((m) => ({ role: m.role, content: m.content })),
+      { role: "user", content: enrichedText },
+    ];
 
     setMessages(displayNext);
     setInput("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
     setLoading(true);
+
     try {
-      const uiMessages = apiNext.map((m, i) => ({
+      const uiMessages = apiHistory.map((m, i) => ({
         id: String(i),
         role: m.role,
         parts: [{ type: "text", text: m.content }],
@@ -3078,7 +3217,8 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let acc = "";
-      setMessages([...displayNext, { role: "assistant", content: "" }]);
+      const asstMsg: WAMsg = { role: "assistant", content: "", ts: new Date() };
+      setMessages([...displayNext, asstMsg]);
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -3090,55 +3230,291 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             if (json.type === "text-delta" && json.delta) acc += json.delta;
           } catch {}
         });
-        setMessages([...displayNext, { role: "assistant", content: acc }]);
+        setMessages([...displayNext, { ...asstMsg, content: acc }]);
       }
     } catch {
       setMessages([
         ...displayNext,
-        { role: "assistant", content: "Desculpe, ocorreu um erro. Tente novamente." },
+        {
+          role: "assistant",
+          content: "Desculpe, ocorreu um erro. Tente novamente.",
+          ts: new Date(),
+        },
       ]);
     } finally {
       setLoading(false);
     }
   }
 
+  function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () =>
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: "", image: reader.result as string, ts: new Date() },
+      ]);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+    setShowAttach(false);
+  }
+
+  function handleDoc(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: "",
+        fileName: file.name,
+        fileSize: waFileSize(file.size),
+        ts: new Date(),
+      },
+    ]);
+    e.target.value = "";
+    setShowAttach(false);
+  }
+
+  async function toggleRecording() {
+    if (recording) {
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      mediaRecRef.current?.stop();
+      mediaRecRef.current?.stream.getTracks().forEach((t) => t.stop());
+      setRecording(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => audioChunksRef.current.push(e.data);
+      mr.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const url = URL.createObjectURL(blob);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "user",
+            content: "",
+            audioUrl: url,
+            audioDuration: `${Math.floor(recSec / 60)}:${String(recSec % 60).padStart(2, "0")}`,
+            ts: new Date(),
+          },
+        ]);
+        setRecSec(0);
+      };
+      mr.start();
+      mediaRecRef.current = mr;
+      setRecording(true);
+      setRecSec(0);
+      recTimerRef.current = setInterval(() => setRecSec((s) => s + 1), 1000);
+    } catch {
+      alert("Não foi possível acessar o microfone.");
+    }
+  }
+
+  function cancelRecording() {
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+    if (mediaRecRef.current) {
+      mediaRecRef.current.onstop = null;
+      mediaRecRef.current.stop();
+      mediaRecRef.current.stream.getTracks().forEach((t) => t.stop());
+    }
+    setRecording(false);
+    setRecSec(0);
+  }
+
+  const recDisplay = `${Math.floor(recSec / 60)}:${String(recSec % 60).padStart(2, "0")}`;
+
   return (
-    <div className="flex h-[60vh] flex-col rounded-3xl border border-border bg-card">
-      <div className="border-b border-border p-4">
-        <p className="font-serif text-lg">Assistente IA</p>
-        <p className="text-xs text-muted-foreground">
-          Dúvidas gerais sobre gestação — não substitui consulta médica.
-        </p>
+    <div className="-mx-4 flex flex-col overflow-hidden rounded-t-none" style={{ height: "72vh" }}>
+      {/* Header estilo WhatsApp */}
+      <div className="flex items-center gap-3 bg-primary px-4 py-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-[11px] font-bold text-white">
+          IA
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold leading-tight text-white">
+            Assistente Dr. Clóvis
+          </p>
+          <p className="text-[11px] text-white/70">Dúvidas gerais sobre gestação</p>
+        </div>
       </div>
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+
+      {/* Área de mensagens */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto space-y-0.5 px-3 py-3"
+        style={{ background: "#e9ddd4" }}
+      >
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
-                m.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary"
-              }`}
-            >
-              {m.content || "..."}
+          <WABubble key={i} msg={m} />
+        ))}
+
+        {/* Indicador digitando */}
+        {loading && (
+          <div className="flex items-end gap-1.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
+              IA
+            </div>
+            <div className="rounded-2xl rounded-tl-none bg-white px-4 py-3 shadow-sm">
+              <div className="flex items-center gap-1">
+                {[0, 1, 2].map((j) => (
+                  <div
+                    key={j}
+                    className="h-2 w-2 animate-bounce rounded-full bg-gray-400"
+                    style={{ animationDelay: `${j * 0.15}s` }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-        ))}
+        )}
       </div>
-      <div className="flex gap-2 border-t border-border p-3">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="Digite sua pergunta..."
-          className="flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm"
-        />
+
+      {/* Menu de anexos */}
+      {showAttach && (
+        <div className="grid grid-cols-3 gap-3 border-t border-gray-100 bg-white px-4 py-4">
+          <button
+            onClick={() => fileImageRef.current?.click()}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-500 text-2xl text-white shadow-sm">
+              🖼️
+            </div>
+            <span className="text-[11px] font-medium text-gray-600">Galeria</span>
+          </button>
+          <button
+            onClick={() => fileDocRef.current?.click()}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500 text-2xl text-white shadow-sm">
+              📄
+            </div>
+            <span className="text-[11px] font-medium text-gray-600">Documento</span>
+          </button>
+          <button
+            onClick={() => setShowAttach(false)}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-500 shadow-sm">
+              ✕
+            </div>
+            <span className="text-[11px] font-medium text-gray-600">Fechar</span>
+          </button>
+        </div>
+      )}
+
+      {/* Barra de gravação */}
+      {recording && (
+        <div className="flex items-center gap-3 border-t border-red-100 bg-red-50 px-4 py-2">
+          <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+          <span className="text-[13px] font-semibold text-red-600">{recDisplay}</span>
+          <span className="flex-1 text-[12px] text-red-400">Gravando...</span>
+          <button onClick={cancelRecording} className="text-[12px] font-medium text-red-400">
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {/* Barra de input estilo WhatsApp */}
+      <div className="flex items-end gap-2 border-t border-gray-200 bg-[#f0f2f5] px-2 py-2">
+        {/* Botão + (anexar) */}
         <button
-          onClick={send}
-          disabled={loading}
-          className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-60"
+          onClick={() => setShowAttach((v) => !v)}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-200"
         >
-          {loading ? "..." : "Enviar"}
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            className="h-5 w-5"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
         </button>
+
+        {/* Campo de texto */}
+        <div className="flex min-h-[40px] flex-1 items-end rounded-3xl bg-white px-4 py-2">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = Math.min(e.target.scrollHeight, 100) + "px";
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendText();
+              }
+            }}
+            placeholder="Mensagem"
+            rows={1}
+            className="flex-1 resize-none bg-transparent text-[15px] leading-[1.45] text-gray-800 placeholder-gray-400 outline-none"
+            style={{ maxHeight: 100 }}
+          />
+          {!input.trim() && !recording && (
+            <button
+              onClick={() => fileImageRef.current?.click()}
+              className="ml-1 shrink-0 self-end text-xl text-gray-400"
+            >
+              📷
+            </button>
+          )}
+        </div>
+
+        {/* Enviar ou Microfone */}
+        {input.trim() ? (
+          <button
+            onClick={() => sendText()}
+            disabled={loading}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-md transition-transform active:scale-95 disabled:opacity-60"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 translate-x-0.5">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            onClick={toggleRecording}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md transition-all active:scale-95 ${
+              recording ? "bg-red-500" : "bg-primary"
+            } text-white`}
+          >
+            {recording ? (
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 3.49-3.44 6.19-6.91 6.19S5.58 15.49 5.09 12H3.07c.53 4.21 3.98 7.5 8.16 7.94V23h2.54v-3.06C17.95 19.5 21.4 16.21 21.93 12h-2.02z" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
+
+      {/* Inputs de arquivo ocultos */}
+      <input
+        ref={fileImageRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImage}
+        className="hidden"
+      />
+      <input
+        ref={fileDocRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.pptx,.xlsx,.txt,.csv"
+        onChange={handleDoc}
+        className="hidden"
+      />
     </div>
   );
 }
