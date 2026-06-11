@@ -673,8 +673,8 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
       </div>
       {/* Segunda gestação: historical alerts */}
       {(profile.pregnancy_number ?? 1) >= 2 && (
-        <div className="col-span-full rounded-3xl border border-amber-300 bg-amber-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 mb-3">
+        <div className="col-span-full rounded-3xl border border-primary/25 bg-primary/8 p-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">
             🔁 2ª Gestação — Histórico da anterior
           </p>
           <div className="space-y-2 text-sm">
@@ -692,7 +692,7 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             )}
             {profile.prior_gestational_diabetes && (
               <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
-                <span className="text-orange-500 text-base">🍬</span>
+                <span className="text-primary text-base">🍬</span>
                 <p>
                   Você teve <strong>diabetes gestacional</strong> anteriormente. O risco de
                   recorrência é maior — converse com Dr. Clóvis sobre o teste de glicemia antecipado
@@ -702,7 +702,7 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             )}
             {profile.prior_preterm && (
               <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
-                <span className="text-purple-500 text-base">👶</span>
+                <span className="text-primary text-base">👶</span>
                 <p>
                   Histórico de <strong>parto prematuro</strong>. Dr. Clóvis acompanhará o
                   comprimento cervical com mais frequência nesta gestação.
@@ -711,7 +711,7 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             )}
             {profile.prior_cesarean && (
               <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
-                <span className="text-blue-500 text-base">🏥</span>
+                <span className="text-primary text-base">🏥</span>
                 <p>
                   Cesariana anterior registrada. A via de parto desta gestação será planejada em
                   conjunto com Dr. Clóvis.
@@ -722,7 +722,7 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               !profile.prior_gestational_diabetes &&
               !profile.prior_preterm &&
               !profile.prior_cesarean && (
-                <p className="text-amber-700">
+                <p className="text-primary">
                   Nenhuma complicação registrada na gestação anterior. Continue preenchendo seu
                   histórico em <strong>Perfil → 2ª Gestação</strong>.
                 </p>
@@ -967,7 +967,7 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
     <div className="space-y-6">
       {/* Context banner */}
       {weeks != null && !isMonitoringPhase && (
-        <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-sm text-blue-900">
+        <div className="rounded-2xl border border-border bg-secondary/70 p-4 text-sm text-foreground">
           {weeks < 20
             ? `Você está na semana ${weeks}. Os movimentos começam a ser sentidos entre as semanas 18 e 25. Continue o pré-natal normalmente.`
             : `Você está na semana ${weeks}. Já pode começar a perceber os movimentos de ${label}! A contagem formal de chutes começa na semana 28.`}
@@ -1202,8 +1202,8 @@ function ChecklistTab({ gest }: { gest: Gest }) {
             urgencyBanner.color === "rose"
               ? "border-rose-300 bg-rose-50 text-rose-900"
               : urgencyBanner.color === "amber"
-                ? "border-amber-300 bg-amber-50 text-amber-900"
-                : "border-blue-300 bg-blue-50 text-blue-900"
+                ? "border-primary/25 bg-primary/8 text-foreground"
+                : "border-primary/25 bg-secondary/60 text-foreground"
           }`}
         >
           {urgencyBanner.text}
@@ -1992,7 +1992,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
           </p>
         </div>
         <div
-          className={`rounded-3xl border p-5 ${bpStatus?.color === "rose" ? "border-rose-300 bg-rose-50" : bpStatus?.color === "amber" ? "border-amber-300 bg-amber-50" : "border-border bg-card"}`}
+          className={`rounded-3xl border p-5 ${bpStatus?.color === "rose" ? "border-rose-300 bg-rose-50" : bpStatus?.color === "amber" ? "border-primary/25 bg-primary/8" : "border-border bg-card"}`}
         >
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Última PA</p>
           <p className="mt-2 font-serif text-3xl">
@@ -2000,7 +2000,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
           </p>
           {bpStatus && (
             <p
-              className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-700" : bpStatus.color === "amber" ? "text-amber-700" : "text-emerald-700"}`}
+              className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-700" : bpStatus.color === "amber" ? "text-primary" : "text-emerald-700"}`}
             >
               {bpStatus.label}
             </p>
@@ -2014,13 +2014,13 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
             gv == null ? null : gv > 140 ? "Atenção: elevada" : gv > 95 ? "Limite" : "Normal";
           return (
             <div
-              className={`rounded-3xl border p-5 ${gColor === "rose" ? "border-rose-300 bg-rose-50" : gColor === "amber" ? "border-amber-300 bg-amber-50" : "border-border bg-card"}`}
+              className={`rounded-3xl border p-5 ${gColor === "rose" ? "border-rose-300 bg-rose-50" : gColor === "amber" ? "border-primary/25 bg-primary/8" : "border-border bg-card"}`}
             >
               <p className="text-xs uppercase tracking-[0.22em] text-primary">Glicemia</p>
               <p className="mt-2 font-serif text-3xl">{gv != null ? `${gv} mg/dL` : "—"}</p>
               {gLabel && (
                 <p
-                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-amber-700" : "text-emerald-700"}`}
+                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-primary" : "text-emerald-700"}`}
                 >
                   {gLabel}
                 </p>
@@ -2778,8 +2778,8 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
       titulo: "Procure atendimento agora",
     },
     amarelo: {
-      box: "border-amber-300 bg-amber-50",
-      dot: "bg-amber-500",
+      box: "border-primary/25 bg-primary/8",
+      dot: "bg-primary",
       titulo: "Atenção — fale com o consultório",
     },
     verde: {
@@ -2791,7 +2791,7 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
 
   return (
     <div className="max-w-2xl">
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
+      <div className="rounded-2xl border border-primary/20 bg-primary/6/60 p-4 text-sm text-foreground">
         Esta triagem é uma orientação e <strong>não substitui avaliação médica</strong>. Em
         emergência, ligue <strong>192 (SAMU)</strong> ou vá ao pronto-socorro.
       </div>
@@ -3797,9 +3797,9 @@ const PRENATAL_MILESTONES: Milestone[] = [
 ];
 
 const TYPE_COLOR: Record<Milestone["type"], string> = {
-  exam: "bg-blue-100 text-blue-700 border-blue-200",
-  consult: "bg-violet-100 text-violet-700 border-violet-200",
-  vaccine: "bg-amber-100 text-amber-700 border-amber-200",
+  exam: "bg-secondary text-primary border-border",
+  consult: "bg-primary/10 text-primary border-primary/20",
+  vaccine: "bg-amber-100 text-primary border-primary/20",
   milestone: "bg-primary/10 text-primary border-primary/20",
 };
 const TYPE_LABEL: Record<Milestone["type"], string> = {
@@ -3997,8 +3997,8 @@ type Contraction = {
 const INTENSITY_LABEL = ["", "Leve", "Moderada", "Forte"];
 const INTENSITY_COLOR = [
   "",
-  "bg-blue-100 text-blue-700",
-  "bg-amber-100 text-amber-700",
+  "bg-secondary text-primary",
+  "bg-amber-100 text-primary",
   "bg-rose-100 text-rose-700",
 ];
 
@@ -4141,14 +4141,14 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
 
   const statusStyle: Record<string, string> = {
     normal: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    atencao: "border-amber-200 bg-amber-50 text-amber-800",
+    atencao: "border-primary/20 bg-primary/6 text-foreground",
     alerta: "border-rose-200 bg-rose-50 text-rose-800",
     urgente: "border-rose-400 bg-rose-100 text-rose-900",
   };
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
+      <div className="rounded-2xl border border-primary/20 bg-primary/6/60 p-4 text-sm text-foreground">
         Use este diário se sentir contrações regulares.{" "}
         <strong>Em dúvida, ligue para o consultório.</strong> Em emergência, ligue{" "}
         <strong>192 (SAMU)</strong>.
@@ -4536,7 +4536,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
                       {new Date(h.submitted_at).toLocaleDateString("pt-BR")}
                     </p>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${h.seen_by_doctor ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+                      className={`rounded-full px-2 py-0.5 text-xs ${h.seen_by_doctor ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-primary"}`}
                     >
                       {h.seen_by_doctor ? "Visualizado ✓" : "Aguardando"}
                     </span>
@@ -5151,9 +5151,9 @@ type TimelineEvent = {
 
 const EV_STYLE: Record<TimelineEvent["type"], { dot: string; badge: string }> = {
   saude: { dot: "bg-sky-400", badge: "bg-sky-100 text-sky-700" },
-  diario: { dot: "bg-violet-400", badge: "bg-violet-100 text-violet-700" },
+  diario: { dot: "bg-primary/60", badge: "bg-primary/10 text-primary" },
   consulta: { dot: "bg-emerald-400", badge: "bg-emerald-100 text-emerald-700" },
-  chutes: { dot: "bg-amber-400", badge: "bg-amber-100 text-amber-700" },
+  chutes: { dot: "bg-primary", badge: "bg-amber-100 text-primary" },
   preconsulta: { dot: "bg-rose-400", badge: "bg-rose-100 text-rose-700" },
   marco: { dot: "bg-primary", badge: "bg-primary/10 text-primary" },
 };
@@ -5524,8 +5524,8 @@ function HumorTab() {
             </div>
           )}
           {hardDay >= 0 && hardDay !== bestDay && (
-            <div className="rounded-2xl bg-amber-50 p-3 text-center">
-              <p className="text-lg font-bold text-amber-600">{DAY_NAMES[hardDay]}</p>
+            <div className="rounded-2xl bg-primary/6 p-3 text-center">
+              <p className="text-lg font-bold text-primary">{DAY_NAMES[hardDay]}</p>
               <p className="mt-1 text-xs text-muted-foreground">Dia mais difícil</p>
             </div>
           )}
@@ -5841,7 +5841,7 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
             ` No ${currentTrimester}º trimestre, recomendamos as meditações destacadas.`}
         </p>
         {!("speechSynthesis" in window) && (
-          <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <p className="mt-2 rounded-xl bg-primary/6 px-3 py-2 text-xs text-primary">
             Use Chrome, Edge ou Safari para narração em voz. Outros navegadores podem não suportar.
           </p>
         )}
@@ -6003,7 +6003,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
     encerrada: "Encerrada",
   };
   const STATUS_STYLE_TC: Record<string, string> = {
-    agendada: "bg-amber-100 text-amber-700",
+    agendada: "bg-amber-100 text-primary",
     sala_aberta: "bg-emerald-100 text-emerald-700",
     encerrada: "bg-secondary text-muted-foreground",
   };
@@ -6527,7 +6527,7 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
           durante a gestação são reconhecidos pelo recém-nascido.
         </p>
         {currentWeek > 0 && currentWeek < 16 && (
-          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          <p className="mt-3 rounded-xl bg-primary/6 px-3 py-2 text-xs text-primary">
             Na semana {currentWeek}, o bebê ainda não ouve sons externos. A partir da semana 16 o
             sistema auditivo começa a se desenvolver.
           </p>
@@ -6918,7 +6918,7 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium">{ex.title}</p>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${ex.safetyLevel === "verde" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}
+                      className={`rounded-full px-2 py-0.5 text-xs ${ex.safetyLevel === "verde" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-primary"}`}
                     >
                       {ex.safetyLevel === "verde" ? "✓ Liberado" : "⚠ Consulte médico"}
                     </span>
@@ -6934,7 +6934,7 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
                 <div className="border-t border-border px-5 pb-5">
                   <p className="mt-4 text-sm text-muted-foreground">{ex.description}</p>
                   {ex.caution && (
-                    <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <p className="mt-2 rounded-xl bg-primary/6 px-3 py-2 text-xs text-primary">
                       {ex.caution}
                     </p>
                   )}
@@ -7228,7 +7228,7 @@ const QUARTO_ITEMS: QuartinhoItem[] = [
 
 const PRIORITY_STYLE: Record<QuartinhoItem["priority"], { badge: string; label: string }> = {
   essencial: { badge: "bg-rose-100 text-rose-700", label: "Essencial" },
-  recomendado: { badge: "bg-amber-100 text-amber-700", label: "Recomendado" },
+  recomendado: { badge: "bg-amber-100 text-primary", label: "Recomendado" },
   opcional: { badge: "bg-sky-100 text-sky-700", label: "Opcional" },
 };
 
@@ -7305,14 +7305,11 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
 
       {/* Upcoming this week */}
       {upcoming.length > 0 && (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-sm font-semibold text-amber-800">⏰ Comprar nas próximas semanas</p>
+        <div className="rounded-3xl border border-primary/20 bg-primary/6 p-5">
+          <p className="text-sm font-semibold text-foreground">⏰ Comprar nas próximas semanas</p>
           <div className="mt-3 space-y-2">
             {upcoming.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between text-xs text-amber-700"
-              >
+              <div key={item.id} className="flex items-center justify-between text-xs text-primary">
                 <span>{item.label}</span>
                 <span>Sem. {item.weekSuggested}</span>
               </div>
@@ -7390,7 +7387,7 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
                         </span>
                         {currentWeek > 0 && (
                           <span
-                            className={`rounded-full px-2 py-0.5 text-xs ${isTimely ? "bg-amber-100 text-amber-700" : "bg-secondary text-muted-foreground"}`}
+                            className={`rounded-full px-2 py-0.5 text-xs ${isTimely ? "bg-amber-100 text-primary" : "bg-secondary text-muted-foreground"}`}
                           >
                             Sem. {item.weekSuggested}
                           </span>
@@ -7863,7 +7860,9 @@ function NomeTab({ profile }: { profile: Profile | null }) {
           <button
             onClick={() => handleToggle(session.is_active, !session.reveal_winner)}
             className={`rounded-full px-4 py-2 text-sm font-medium ${
-              session.reveal_winner ? "bg-amber-500 text-white" : "bg-secondary text-foreground"
+              session.reveal_winner
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-foreground"
             }`}
           >
             {session.reveal_winner ? "Revelar vencedor ✓" : "Revelar vencedor"}
@@ -7935,7 +7934,9 @@ function NomeTab({ profile }: { profile: Profile | null }) {
                 <div
                   key={entry.id}
                   className={`flex items-center gap-4 rounded-2xl border p-4 ${
-                    i === 0 && votes > 0 ? "border-amber-300 bg-amber-50" : "border-border bg-card"
+                    i === 0 && votes > 0
+                      ? "border-primary/25 bg-primary/8"
+                      : "border-border bg-card"
                   }`}
                 >
                   <span className="w-6 text-center text-sm font-bold text-muted-foreground">
@@ -8533,9 +8534,9 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
             </p>
           </div>
           {hasCertificate && (
-            <div className="rounded-2xl bg-amber-50 border border-amber-300 px-4 py-2 text-center">
+            <div className="rounded-2xl bg-primary/6 border border-primary/30 px-4 py-2 text-center">
               <p className="text-lg">🎓</p>
-              <p className="text-xs font-semibold text-amber-700">Certificado</p>
+              <p className="text-xs font-semibold text-primary">Certificado</p>
             </div>
           )}
         </div>
@@ -8552,8 +8553,10 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
       {hasCertificate && (
         <div className="rounded-3xl border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-yellow-50 p-8 text-center">
           <p className="text-4xl mb-2">🎓</p>
-          <h3 className="font-serif text-2xl font-bold text-amber-800">Certificado de Pré-natal</h3>
-          <p className="mt-2 text-amber-700">
+          <h3 className="font-serif text-2xl font-bold text-foreground">
+            Certificado de Pré-natal
+          </h3>
+          <p className="mt-2 text-primary">
             Parabéns! Você concluiu o curso de pré-natal da Escola do Bebê.
           </p>
           <p className="mt-1 text-sm text-amber-600">
@@ -8981,7 +8984,7 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
         )}
 
         {status === "error" && (
-          <div className="mt-3 rounded-xl bg-white p-3 text-sm text-amber-700">
+          <div className="mt-3 rounded-xl bg-white p-3 text-sm text-primary">
             <p className="font-medium">Não foi possível obter localização.</p>
             <p className="text-xs mt-1">
               Permita o acesso à localização no navegador e tente novamente. Mesmo assim, os números
@@ -9008,9 +9011,9 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
               label: "Bombeiros / Resgate",
               subtitle: "Resgate de emergência",
               number: "193",
-              color: "bg-orange-500",
+              color: "bg-primary/60",
             },
-            { label: "CVV", subtitle: "Apoio emocional 24h", number: "188", color: "bg-blue-600" },
+            { label: "CVV", subtitle: "Apoio emocional 24h", number: "188", color: "bg-primary" },
           ].map(({ label, subtitle, number, color }) => (
             <a
               key={number}
@@ -9111,7 +9114,7 @@ function aqiLabel(aqi: number): { label: string; color: string } {
   if (aqi <= 20) return { label: "Ótima", color: "text-green-600" };
   if (aqi <= 40) return { label: "Boa", color: "text-lime-600" };
   if (aqi <= 60) return { label: "Moderada", color: "text-amber-600" };
-  if (aqi <= 80) return { label: "Ruim", color: "text-orange-600" };
+  if (aqi <= 80) return { label: "Ruim", color: "text-primary" };
   return { label: "Muito ruim", color: "text-red-600" };
 }
 
@@ -9202,7 +9205,7 @@ function ClimaTab({ gest }: { gest: Gest }) {
         )}
 
         {error && (
-          <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-700">
+          <div className="rounded-xl bg-primary/6 border border-primary/20 p-4 text-sm text-primary">
             {error}
           </div>
         )}
@@ -9213,7 +9216,7 @@ function ClimaTab({ gest }: { gest: Gest }) {
               <div className="rounded-2xl bg-secondary/40 p-4">
                 <p className="text-4xl text-center">{weatherEmoji(weather.weatherCode)}</p>
                 <p
-                  className={`mt-2 text-center text-3xl font-bold ${isVeryHot ? "text-red-600" : isHot ? "text-orange-500" : ""}`}
+                  className={`mt-2 text-center text-3xl font-bold ${isVeryHot ? "text-red-600" : isHot ? "text-primary" : ""}`}
                 >
                   {weather.temp}°C
                 </p>
@@ -9273,11 +9276,11 @@ function ClimaTab({ gest }: { gest: Gest }) {
             </div>
           )}
           {isHot && !isVeryHot && (
-            <div className="rounded-2xl border border-orange-300 bg-orange-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 mb-2">
+            <div className="rounded-2xl border border-primary/20 bg-primary/6 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
                 🌡️ Temperatura elevada ({weather.temp}°C)
               </p>
-              <ul className="space-y-1.5 text-sm text-orange-800">
+              <ul className="space-y-1.5 text-sm text-foreground">
                 <li>💧 Aumente a ingestão de água — mínimo 2,5L por dia</li>
                 <li>👗 Use roupas leves e frescas (algodão, linho)</li>
                 <li>🕙 Evite sol entre 10h e 16h</li>
@@ -9300,11 +9303,11 @@ function ClimaTab({ gest }: { gest: Gest }) {
             </div>
           )}
           {aqiBad && !aqiVeryBad && (
-            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">
+            <div className="rounded-2xl border border-primary/25 bg-primary/8 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
                 😷 Qualidade do ar moderada (IQA: {weather.aqi})
               </p>
-              <ul className="space-y-1.5 text-sm text-amber-800">
+              <ul className="space-y-1.5 text-sm text-foreground">
                 <li>🌬️ Limite exercícios físicos intensos ao ar livre</li>
                 <li>🕙 Prefira horários com menor tráfego (manhã cedo ou noite)</li>
                 <li>💧 Mantenha boa hidratação para ajudar as vias aéreas</li>
@@ -9920,7 +9923,7 @@ function BreastfeedingSection() {
                     <span className="text-sm font-semibold text-primary">{dur}min</span>
                   )}
                   {!log.ended_at && (
-                    <span className="text-xs text-amber-600 font-medium">em andamento</span>
+                    <span className="text-xs text-primary font-medium">em andamento</span>
                   )}
                 </div>
               );
@@ -9991,15 +9994,15 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
   return (
     <div className="max-w-xl space-y-6">
       {doneMilestones.length > 0 && (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-3">
+        <div className="rounded-3xl border border-primary/20 bg-primary/6 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-3">
             🎉 {doneMilestones.length} marcos conquistados!
           </p>
           <div className="flex flex-wrap gap-2">
             {doneMilestones.map((m) => (
               <span
                 key={m.key}
-                className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800"
+                className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-medium text-foreground"
               >
                 {m.emoji} {m.label}
               </span>
@@ -10050,7 +10053,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
                 onClick={() => toggleMilestone(m.key)}
                 className={`rounded-2xl border p-4 text-left transition-all ${
                   done
-                    ? "border-amber-300 bg-amber-50"
+                    ? "border-primary/25 bg-primary/8"
                     : "border-border bg-card hover:border-primary/40"
                 }`}
               >
@@ -10059,7 +10062,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
                   <div className="flex-1">
                     <p className="text-sm font-medium">{m.label}</p>
                     {done && rec && (
-                      <p className="text-xs text-amber-700">
+                      <p className="text-xs text-primary">
                         ✅ {new Date(rec.achieved_at + "T00:00:00").toLocaleDateString("pt-BR")}
                       </p>
                     )}
@@ -10400,9 +10403,9 @@ function ConquistasTab() {
       </div>
 
       {newBadges.length > 0 && (
-        <div className="rounded-3xl border border-amber-300 bg-amber-50 p-5 text-center">
+        <div className="rounded-3xl border border-primary/25 bg-primary/8 p-5 text-center">
           <p className="text-2xl mb-1">🎉</p>
-          <p className="font-semibold text-amber-800">
+          <p className="font-semibold text-foreground">
             {newBadges.length === 1
               ? "Nova conquista desbloqueada!"
               : `${newBadges.length} novas conquistas!`}
@@ -10427,7 +10430,7 @@ function ConquistasTab() {
                     key={def.key}
                     className={`rounded-2xl border p-4 text-center transition-all ${
                       isNew
-                        ? "border-amber-300 bg-amber-50 shadow-md"
+                        ? "border-primary/25 bg-primary/8 shadow-md"
                         : isUnlocked
                           ? "border-primary/30 bg-primary/5"
                           : "border-border bg-secondary/20 opacity-50"
@@ -10665,8 +10668,8 @@ const CAT_VISUAL: Record<
     label: "Suplementos",
   },
   conforto: {
-    bg: "from-violet-50 to-purple-100",
-    dark: "from-[#1e0b3d] to-[#3b1a6b]",
+    bg: "from-rose-50 to-rose-100",
+    dark: "from-[#2d0a14] to-[#5c1a28]",
     emoji: "🛏️",
     label: "Conforto",
   },
@@ -10677,8 +10680,8 @@ const CAT_VISUAL: Record<
     label: "Amamentação",
   },
   enxoval: {
-    bg: "from-sky-50 to-blue-100",
-    dark: "from-[#0b1e3d] to-[#1a3a6b]",
+    bg: "from-stone-50 to-stone-100",
+    dark: "from-[#1a1410] to-[#2d2218]",
     emoji: "🍼",
     label: "Enxoval",
   },
@@ -11172,12 +11175,12 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   const statusConfig: Record<string, { label: string; color: string; emoji: string }> = {
     pendente_pagamento: {
       label: "Aguardando pagamento",
-      color: "border-amber-200 bg-amber-50",
+      color: "border-primary/20 bg-primary/6",
       emoji: "⏳",
     },
     pagamento_enviado: {
       label: "Pagamento enviado — aguardando confirmação",
-      color: "border-blue-200 bg-blue-50",
+      color: "border-border bg-secondary/60",
       emoji: "💸",
     },
     confirmado: {
@@ -11973,7 +11976,7 @@ function PreventivosTab() {
           {
             label: "Em breve",
             value: soonCount,
-            color: "text-amber-700 bg-amber-50 border-amber-200",
+            color: "text-primary bg-primary/6 border-primary/20",
           },
           {
             label: "Não registrado",
@@ -11996,7 +11999,7 @@ function PreventivosTab() {
             status === "overdue"
               ? "border-red-200 bg-red-50"
               : status === "soon"
-                ? "border-amber-200 bg-amber-50"
+                ? "border-primary/20 bg-primary/6"
                 : status === "ok"
                   ? "border-green-200 bg-green-50"
                   : "border-border bg-card";
@@ -12028,7 +12031,7 @@ function PreventivosTab() {
                               daysUntil < 0
                                 ? "text-red-600 font-medium"
                                 : daysUntil <= 60
-                                  ? "text-amber-700 font-medium"
+                                  ? "text-primary font-medium"
                                   : "text-green-600"
                             }
                           >
@@ -12877,9 +12880,9 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
       </div>
 
       {/* Quando buscar ajuda */}
-      <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-6">
-        <p className="font-serif text-lg text-amber-900">Quando buscar ajuda profissional</p>
-        <ul className="mt-3 space-y-2 text-sm text-amber-800">
+      <div className="rounded-3xl border border-primary/20 bg-primary/6/60 p-6">
+        <p className="font-serif text-lg text-foreground">Quando buscar ajuda profissional</p>
+        <ul className="mt-3 space-y-2 text-sm text-foreground">
           {[
             "Tristeza profunda por mais de 2 semanas que não passa",
             "Dificuldade de cuidar de si mesma ou de outras responsabilidades",
@@ -12892,7 +12895,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-amber-700">
+        <p className="mt-3 text-xs text-primary">
           Converse com o Dr. Clóvis na sua próxima consulta. Ele pode indicar acompanhamento
           psicológico especializado em gestação.
         </p>

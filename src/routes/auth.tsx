@@ -176,7 +176,13 @@ function AuthPage() {
           : "Nova senha";
 
   return (
-    <section className="mx-auto flex max-w-md flex-col px-5 py-16">
+    <section
+      className="mx-auto flex max-w-md flex-col px-5 py-16"
+      style={{
+        background:
+          "radial-gradient(ellipse 80% 60% at 50% 0%, oklch(0.92 0.03 52 / 0.6) 0%, transparent 70%)",
+      }}
+    >
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Minha conta</p>
       <h1 className="mt-3 font-serif text-3xl">{title}</h1>
       <p className="mt-3 text-sm text-muted-foreground">
