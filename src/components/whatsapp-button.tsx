@@ -1,3 +1,4 @@
+import { useRouterState } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
 
 const WHATSAPP_NUMBER = "5531986342903";
@@ -9,6 +10,12 @@ export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_ME
 export const WHATSAPP_DISPLAY = "(31) 98634-2903";
 
 export function WhatsAppFloating() {
+  const { location } = useRouterState();
+
+  // No app logado o botão cobriria a navegação inferior; lá o contato fica na aba Médico.
+  if (location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel"))
+    return null;
+
   return (
     <a
       href={WHATSAPP_URL}

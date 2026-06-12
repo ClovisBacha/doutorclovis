@@ -1,0 +1,964 @@
+-- ============================================================================
+-- MIGRATIONS PENDENTES — aplicar no Supabase (SQL Editor)
+-- ============================================================================
+-- Gerado em 2026-06-12. Consolida todas as migrations de 2026-06-08 em diante,
+-- que ainda não foram aplicadas no banco (28 tabelas faltando, verificadas via
+-- REST: contraction_logs, preconsulta_forms, exam_files, consultation_notes,
+-- baby_letters, family_album_posts, menstrual_cycles, ppd_screenings, etc).
+--
+-- COMO APLICAR:
+--   1. Acesse o painel do Supabase → SQL Editor
+--   2. Cole este arquivo inteiro e clique em RUN
+--   3. Pode rodar mais de uma vez sem erro (idempotente)
+-- ============================================================================
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608120000_security_hardening.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Endurecimento de segurança do modo acompanhante.
+--
+-- Antes, qualquer usuário ANÔNIMO podia ler TODOS os convites (token + user_id)
+-- por causa da política "public read by token" com USING (true). A leitura do
+-- convite agora acontece só no servidor (service role), via a server function
+-- getCompanionView, que valida o token e a expiração. Então removemos o acesso
+-- anônimo direto à tabela.
+
+DROP POLICY IF EXISTS "public read by token" ON public.companion_invites;
+REVOKE SELECT ON public.companion_invites FROM anon;
+
+-- Faz os convites expirarem por padrão (90 dias) e preenche os que estão sem data.
+ALTER TABLE public.companion_invites
+  ALTER COLUMN expires_at SET DEFAULT (now() + interval '90 days');
+
+UPDATE public.companion_invites
+  SET expires_at = created_at + interval '90 days'
+  WHERE expires_at IS NULL;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608140000_contractions_preconsulta.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Feature 10: Diário de Contrações
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.contraction_logs (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid        REFERENCES auth.users NOT NULL,
+  started_at  timestamptz NOT NULL DEFAULT now(),
+  ended_at    timestamptz,
+  intensity   smallint    DEFAULT 2 CHECK (intensity BETWEEN 1 AND 3),
+  notes       text,
+  created_at  timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.contraction_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users manage own contraction_logs" ON public.contraction_logs;
+CREATE POLICY "Users manage own contraction_logs"
+  ON public.contraction_logs FOR ALL
+  USING  (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+GRANT ALL ON public.contraction_logs TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Feature 11: Pré-consulta Inteligente
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.preconsulta_forms (
+  id                  uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             uuid        REFERENCES auth.users NOT NULL,
+  submitted_at        timestamptz DEFAULT now(),
+  weeks_at_submission int,
+  current_weight      numeric(5,1),
+  systolic            int,
+  diastolic           int,
+  symptoms            text[]      DEFAULT '{}',
+  medications         text,
+  questions           text,
+  emotional_state     text,
+  other_notes         text,
+  seen_by_doctor      boolean     DEFAULT false
+);
+
+ALTER TABLE public.preconsulta_forms ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users manage own preconsulta_forms" ON public.preconsulta_forms;
+CREATE POLICY "Users manage own preconsulta_forms"
+  ON public.preconsulta_forms FOR ALL
+  USING  (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+GRANT ALL ON public.preconsulta_forms TO authenticated;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608150000_extended_health_profiles.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Feature 6: Métricas de wearables em health_logs
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.health_logs
+  ADD COLUMN IF NOT EXISTS spo2          smallint,        -- SpO2 em %
+  ADD COLUMN IF NOT EXISTS heart_rate_bpm smallint,       -- FC em bpm
+  ADD COLUMN IF NOT EXISTS steps          int,            -- passos do dia
+  ADD COLUMN IF NOT EXISTS sleep_hours    numeric(4,1);   -- horas de sono
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Feature 9: Dados corporais em patient_profiles (curva IOM)
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS height_cm                int,
+  ADD COLUMN IF NOT EXISTS pre_pregnancy_weight_kg  numeric(5,1);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Feature 2: Notas de consulta (transcrição por IA)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.consultation_notes (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          uuid        REFERENCES auth.users NOT NULL,
+  recorded_at      timestamptz DEFAULT now(),
+  title            text,
+  raw_transcript   text,
+  orientacoes      text,
+  medicamentos     text,
+  proximos_exames  text,
+  proxima_consulta text,
+  created_at       timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.consultation_notes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users manage own consultation_notes" ON public.consultation_notes;
+CREATE POLICY "Users manage own consultation_notes"
+  ON public.consultation_notes FOR ALL
+  USING  (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+GRANT ALL ON public.consultation_notes TO authenticated;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608170000_teleconsulta.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Feature 13: Teleconsulta
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.teleconsulta_sessions (
+  id                 uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_user_id    uuid        REFERENCES auth.users NOT NULL,
+  scheduled_for      timestamptz,
+  room_name          text        NOT NULL DEFAULT gen_random_uuid()::text,
+  status             text        NOT NULL DEFAULT 'agendada'
+                                 CHECK (status IN ('agendada','sala_aberta','encerrada')),
+  doctor_notes       text,
+  patient_notes      text,
+  created_at         timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.teleconsulta_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Patients can read their own sessions
+DROP POLICY IF EXISTS "Patients read own teleconsultas" ON public.teleconsulta_sessions;
+CREATE POLICY "Patients read own teleconsultas"
+  ON public.teleconsulta_sessions FOR SELECT
+  USING (auth.uid() = patient_user_id);
+
+-- Patients can update only patient_notes on their own sessions
+DROP POLICY IF EXISTS "Patients update own notes" ON public.teleconsulta_sessions;
+CREATE POLICY "Patients update own notes"
+  ON public.teleconsulta_sessions FOR UPDATE
+  USING (auth.uid() = patient_user_id)
+  WITH CHECK (auth.uid() = patient_user_id);
+
+-- Service role manages all (for admin server functions)
+GRANT ALL ON public.teleconsulta_sessions TO service_role;
+GRANT SELECT, UPDATE ON public.teleconsulta_sessions TO authenticated;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608180000_baby_letters.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Feature 21: Carta Semanal do Bebê
+CREATE TABLE IF NOT EXISTS public.baby_letters (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid        REFERENCES auth.users NOT NULL,
+  week         smallint    NOT NULL,
+  content      text        NOT NULL,
+  generated_at timestamptz DEFAULT now(),
+  UNIQUE (user_id, week)
+);
+
+ALTER TABLE public.baby_letters ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users manage own baby_letters" ON public.baby_letters;
+CREATE POLICY "Users manage own baby_letters"
+  ON public.baby_letters FOR ALL
+  USING  (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+GRANT ALL ON public.baby_letters TO authenticated;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608190000_family_features.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Feature 33: Álbum Familiar
+CREATE TABLE IF NOT EXISTS public.family_album_posts (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_user_id  uuid        REFERENCES auth.users NOT NULL,
+  author_name      text        NOT NULL DEFAULT 'Família',
+  caption          text,
+  image_data       text,        -- base64 JPEG, optional
+  emoji            text,
+  created_at       timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.family_album_posts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Patient manages own album" ON public.family_album_posts;
+CREATE POLICY "Patient manages own album"
+  ON public.family_album_posts FOR ALL
+  USING  (auth.uid() = patient_user_id)
+  WITH CHECK (auth.uid() = patient_user_id);
+
+GRANT ALL ON public.family_album_posts TO authenticated;
+GRANT ALL ON public.family_album_posts TO service_role;
+
+-- Feature 34: Votação de Nome do Bebê
+CREATE TABLE IF NOT EXISTS public.baby_name_sessions (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_user_id  uuid        REFERENCES auth.users NOT NULL UNIQUE,
+  share_token      text        NOT NULL DEFAULT gen_random_uuid()::text UNIQUE,
+  is_active        boolean     DEFAULT true,
+  reveal_winner    boolean     DEFAULT false,
+  created_at       timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.baby_name_entries (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id       uuid        REFERENCES public.baby_name_sessions(id) ON DELETE CASCADE NOT NULL,
+  name             text        NOT NULL,
+  suggested_by     text        NOT NULL DEFAULT 'Anônimo',
+  created_at       timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.baby_name_votes (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  entry_id         uuid        REFERENCES public.baby_name_entries(id) ON DELETE CASCADE NOT NULL,
+  voter_name       text        NOT NULL DEFAULT 'Anônimo',
+  voter_token      text        NOT NULL,
+  created_at       timestamptz DEFAULT now(),
+  UNIQUE (entry_id, voter_token)
+);
+
+ALTER TABLE public.baby_name_sessions  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.baby_name_entries   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.baby_name_votes     ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Patient manages own name session" ON public.baby_name_sessions;
+CREATE POLICY "Patient manages own name session"
+  ON public.baby_name_sessions FOR ALL
+  USING (auth.uid() = patient_user_id)
+  WITH CHECK (auth.uid() = patient_user_id);
+
+GRANT ALL ON public.baby_name_sessions TO authenticated;
+GRANT ALL ON public.baby_name_sessions TO service_role;
+GRANT ALL ON public.baby_name_entries  TO service_role;
+GRANT ALL ON public.baby_name_votes    TO service_role;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608200000_escola_panico.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Feature 36: Escola do Bebê — progresso por módulo
+CREATE TABLE IF NOT EXISTS public.course_progress (
+  id            uuid      PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid      REFERENCES auth.users NOT NULL,
+  module_week   smallint  NOT NULL,
+  quiz_score    smallint  DEFAULT 0,
+  completed_at  timestamptz DEFAULT now(),
+  UNIQUE (user_id, module_week)
+);
+
+ALTER TABLE public.course_progress ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Patient manages own progress" ON public.course_progress;
+CREATE POLICY "Patient manages own progress"
+  ON public.course_progress FOR ALL
+  USING  (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+GRANT ALL ON public.course_progress TO authenticated;
+GRANT ALL ON public.course_progress TO service_role;
+
+-- Feature 41: Botão do Pânico — eventos de emergência
+CREATE TABLE IF NOT EXISTS public.panic_events (
+  id         uuid       PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid       REFERENCES auth.users NOT NULL,
+  latitude   double precision,
+  longitude  double precision,
+  address    text,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.panic_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Patient manages own panic events" ON public.panic_events;
+CREATE POLICY "Patient manages own panic events"
+  ON public.panic_events FOR ALL
+  USING  (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- Companion reads panic events via service_role only
+GRANT ALL ON public.panic_events TO authenticated;
+GRANT ALL ON public.panic_events TO service_role;
+
+-- Feature 43: Medicamentos em uso na carteirinha
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS medications text;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608210000_postpartum.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Feature 50: Portal Pós-parto
+
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS birth_date date;
+
+CREATE TABLE IF NOT EXISTS public.ppd_screenings (
+  id          uuid      PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid      REFERENCES auth.users NOT NULL,
+  score       smallint  NOT NULL,
+  answers     jsonb     NOT NULL DEFAULT '[]',
+  screened_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.breastfeeding_logs (
+  id          uuid      PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid      REFERENCES auth.users NOT NULL,
+  started_at  timestamptz NOT NULL DEFAULT now(),
+  ended_at    timestamptz,
+  side        text      NOT NULL DEFAULT 'ambos',
+  notes       text,
+  created_at  timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.baby_milestones (
+  id            uuid      PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       uuid      REFERENCES auth.users NOT NULL,
+  milestone_key text      NOT NULL,
+  custom_label  text,
+  achieved_at   date      NOT NULL,
+  notes         text,
+  created_at    timestamptz DEFAULT now(),
+  UNIQUE (user_id, milestone_key)
+);
+
+CREATE TABLE IF NOT EXISTS public.baby_weights (
+  id          uuid      PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid      REFERENCES auth.users NOT NULL,
+  measured_at date      NOT NULL,
+  weight_g    int       NOT NULL,
+  created_at  timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.baby_vaccines (
+  id              uuid      PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid      REFERENCES auth.users NOT NULL,
+  vaccine_key     text      NOT NULL,
+  administered_at date      NOT NULL,
+  batch           text,
+  created_at      timestamptz DEFAULT now(),
+  UNIQUE (user_id, vaccine_key)
+);
+
+ALTER TABLE public.ppd_screenings     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.breastfeeding_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.baby_milestones    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.baby_weights       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.baby_vaccines      ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Patient manages own ppd" ON public.ppd_screenings;
+CREATE POLICY "Patient manages own ppd"       ON public.ppd_screenings     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Patient manages own bf logs" ON public.breastfeeding_logs;
+CREATE POLICY "Patient manages own bf logs"   ON public.breastfeeding_logs FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Patient manages own milestones" ON public.baby_milestones;
+CREATE POLICY "Patient manages own milestones" ON public.baby_milestones   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Patient manages own weights" ON public.baby_weights;
+CREATE POLICY "Patient manages own weights"   ON public.baby_weights       FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Patient manages own vaccines" ON public.baby_vaccines;
+CREATE POLICY "Patient manages own vaccines"  ON public.baby_vaccines      FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+GRANT ALL ON public.ppd_screenings     TO authenticated, service_role;
+GRANT ALL ON public.breastfeeding_logs TO authenticated, service_role;
+GRANT ALL ON public.baby_milestones    TO authenticated, service_role;
+GRANT ALL ON public.baby_weights       TO authenticated, service_role;
+GRANT ALL ON public.baby_vaccines      TO authenticated, service_role;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260608220000_fix_rls_name_tables.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Fix: RLS policies missing for baby_name_entries and baby_name_votes
+-- These tables had RLS enabled but no policies, blocking all access
+
+-- Allow service_role to manage entries and votes (for server functions)
+-- Public can insert entries/votes if they know a valid session (controlled at app layer)
+DROP POLICY IF EXISTS "Service manages name entries" ON public.baby_name_entries;
+CREATE POLICY "Service manages name entries"
+  ON public.baby_name_entries FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Service manages name votes" ON public.baby_name_votes;
+CREATE POLICY "Service manages name votes"
+  ON public.baby_name_votes FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Grant authenticated read on entries and votes for potential future direct queries
+GRANT SELECT ON public.baby_name_entries TO authenticated;
+GRANT SELECT ON public.baby_name_votes    TO authenticated;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260609000000_features_shop_achievements_push_segunda.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Feature 11: Consulta Particular (paid private consultations)
+CREATE TABLE IF NOT EXISTS public.private_consultations (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  patient_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  consult_type text NOT NULL,
+  preferred_dates text[] DEFAULT '{}',
+  message text,
+  status text NOT NULL DEFAULT 'pendente_pagamento',
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.private_consultations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own private consultations" ON public.private_consultations;
+CREATE POLICY "Patient manages own private consultations"
+  ON public.private_consultations FOR ALL
+  TO authenticated
+  USING (patient_user_id = auth.uid())
+  WITH CHECK (patient_user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages private consultations" ON public.private_consultations;
+CREATE POLICY "Service manages private consultations"
+  ON public.private_consultations FOR ALL
+  TO service_role
+  USING (true) WITH CHECK (true);
+GRANT ALL ON public.private_consultations TO authenticated;
+GRANT ALL ON public.private_consultations TO service_role;
+
+-- Feature 16: Achievements (Conquistas)
+CREATE TABLE IF NOT EXISTS public.patient_achievements (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  achievement_key text NOT NULL,
+  unlocked_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, achievement_key)
+);
+ALTER TABLE public.patient_achievements ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own achievements" ON public.patient_achievements;
+CREATE POLICY "Patient manages own achievements"
+  ON public.patient_achievements FOR ALL
+  TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages achievements" ON public.patient_achievements;
+CREATE POLICY "Service manages achievements"
+  ON public.patient_achievements FOR ALL
+  TO service_role
+  USING (true) WITH CHECK (true);
+GRANT ALL ON public.patient_achievements TO authenticated;
+GRANT ALL ON public.patient_achievements TO service_role;
+
+-- Feature 17: Push notification subscriptions
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  endpoint text NOT NULL,
+  p256dh text NOT NULL,
+  auth_key text NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, endpoint)
+);
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own subscriptions" ON public.push_subscriptions;
+CREATE POLICY "Patient manages own subscriptions"
+  ON public.push_subscriptions FOR ALL
+  TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages subscriptions" ON public.push_subscriptions;
+CREATE POLICY "Service manages subscriptions"
+  ON public.push_subscriptions FOR ALL
+  TO service_role
+  USING (true) WITH CHECK (true);
+GRANT ALL ON public.push_subscriptions TO authenticated;
+GRANT ALL ON public.push_subscriptions TO service_role;
+
+-- Feature 19: Second pregnancy tracking
+ALTER TABLE public.patient_profiles ADD COLUMN IF NOT EXISTS pregnancy_number integer DEFAULT 1;
+ALTER TABLE public.patient_profiles ADD COLUMN IF NOT EXISTS prior_bp_elevated boolean DEFAULT false;
+ALTER TABLE public.patient_profiles ADD COLUMN IF NOT EXISTS prior_bp_week integer;
+ALTER TABLE public.patient_profiles ADD COLUMN IF NOT EXISTS prior_gestational_diabetes boolean DEFAULT false;
+ALTER TABLE public.patient_profiles ADD COLUMN IF NOT EXISTS prior_preterm boolean DEFAULT false;
+ALTER TABLE public.patient_profiles ADD COLUMN IF NOT EXISTS prior_cesarean boolean DEFAULT false;
+ALTER TABLE public.patient_profiles ADD COLUMN IF NOT EXISTS prior_notes text;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260609010000_saude_feminina_corporativo.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Feature 40: Ciclo Menstrual (Saúde da Mulher)
+CREATE TABLE IF NOT EXISTS public.menstrual_cycles (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  start_date date NOT NULL,
+  end_date date,
+  flow_intensity text,
+  symptoms text[] DEFAULT '{}',
+  notes text,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, start_date)
+);
+ALTER TABLE public.menstrual_cycles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own cycles" ON public.menstrual_cycles;
+CREATE POLICY "Patient manages own cycles"
+  ON public.menstrual_cycles FOR ALL TO authenticated
+  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages cycles" ON public.menstrual_cycles;
+CREATE POLICY "Service manages cycles"
+  ON public.menstrual_cycles FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+GRANT ALL ON public.menstrual_cycles TO authenticated, service_role;
+
+-- Feature 40: Preventive Reminders
+CREATE TABLE IF NOT EXISTS public.preventive_reminders (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  exam_key text NOT NULL,
+  last_done_date date,
+  notes text,
+  UNIQUE(user_id, exam_key)
+);
+ALTER TABLE public.preventive_reminders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own reminders" ON public.preventive_reminders;
+CREATE POLICY "Patient manages own reminders"
+  ON public.preventive_reminders FOR ALL TO authenticated
+  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages reminders" ON public.preventive_reminders;
+CREATE POLICY "Service manages reminders"
+  ON public.preventive_reminders FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+GRANT ALL ON public.preventive_reminders TO authenticated, service_role;
+
+-- Feature 50: Corporate leads (anon access for contact form)
+CREATE TABLE IF NOT EXISTS public.corporate_leads (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_name text NOT NULL,
+  contact_name text NOT NULL,
+  contact_email text NOT NULL,
+  contact_phone text,
+  employee_count text,
+  message text,
+  status text NOT NULL DEFAULT 'novo',
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.corporate_leads ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can submit corporate lead" ON public.corporate_leads;
+CREATE POLICY "Anyone can submit corporate lead"
+  ON public.corporate_leads FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+DROP POLICY IF EXISTS "Service manages corporate leads" ON public.corporate_leads;
+CREATE POLICY "Service manages corporate leads"
+  ON public.corporate_leads FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+GRANT INSERT ON public.corporate_leads TO anon, authenticated;
+GRANT ALL ON public.corporate_leads TO service_role;
+
+-- Feature 50: Corporate accounts
+CREATE TABLE IF NOT EXISTS public.corporate_accounts (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  company_name text NOT NULL,
+  contact_email text NOT NULL,
+  plan_type text NOT NULL DEFAULT 'basico',
+  max_seats integer NOT NULL DEFAULT 10,
+  access_code text NOT NULL UNIQUE DEFAULT upper(encode(gen_random_bytes(6), 'hex')),
+  status text NOT NULL DEFAULT 'ativo',
+  notes text,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.corporate_accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Authenticated can read active accounts for validation" ON public.corporate_accounts;
+CREATE POLICY "Authenticated can read active accounts for validation"
+  ON public.corporate_accounts FOR SELECT TO authenticated
+  USING (status = 'ativo');
+DROP POLICY IF EXISTS "Service manages corporate accounts" ON public.corporate_accounts;
+CREATE POLICY "Service manages corporate accounts"
+  ON public.corporate_accounts FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+GRANT SELECT ON public.corporate_accounts TO authenticated;
+GRANT ALL ON public.corporate_accounts TO service_role;
+
+-- Link patients to corporate accounts
+ALTER TABLE public.patient_profiles ADD COLUMN IF NOT EXISTS corporate_account_id uuid REFERENCES public.corporate_accounts(id);
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260609020000_performance_indexes.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Performance indexes for all tables added in recent feature migrations
+
+-- private_consultations
+CREATE INDEX IF NOT EXISTS idx_private_consultations_patient ON public.private_consultations(patient_user_id);
+CREATE INDEX IF NOT EXISTS idx_private_consultations_status ON public.private_consultations(status);
+CREATE INDEX IF NOT EXISTS idx_private_consultations_created_at ON public.private_consultations(created_at DESC);
+
+-- patient_achievements
+CREATE INDEX IF NOT EXISTS idx_patient_achievements_user ON public.patient_achievements(user_id);
+CREATE INDEX IF NOT EXISTS idx_patient_achievements_key ON public.patient_achievements(achievement_key);
+
+-- push_subscriptions
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON public.push_subscriptions(user_id);
+
+-- menstrual_cycles
+CREATE INDEX IF NOT EXISTS idx_menstrual_cycles_user ON public.menstrual_cycles(user_id);
+CREATE INDEX IF NOT EXISTS idx_menstrual_cycles_start_date ON public.menstrual_cycles(user_id, start_date DESC);
+
+-- preventive_reminders
+CREATE INDEX IF NOT EXISTS idx_preventive_reminders_user ON public.preventive_reminders(user_id);
+
+-- corporate_leads
+CREATE INDEX IF NOT EXISTS idx_corporate_leads_status ON public.corporate_leads(status);
+CREATE INDEX IF NOT EXISTS idx_corporate_leads_created_at ON public.corporate_leads(created_at DESC);
+
+-- corporate_accounts
+CREATE INDEX IF NOT EXISTS idx_corporate_accounts_status ON public.corporate_accounts(status);
+CREATE INDEX IF NOT EXISTS idx_corporate_accounts_access_code ON public.corporate_accounts(access_code);
+
+-- Original tables that benefit from common query patterns
+CREATE INDEX IF NOT EXISTS idx_appointment_requests_status ON public.appointment_requests(status);
+CREATE INDEX IF NOT EXISTS idx_appointment_requests_created_at ON public.appointment_requests(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_journal_entries_user ON public.journal_entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON public.journal_entries(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_kick_sessions_user ON public.kick_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_kick_sessions_created_at ON public.kick_sessions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_health_logs_user ON public.health_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_health_logs_date ON public.health_logs(user_id, logged_at DESC);
+CREATE INDEX IF NOT EXISTS idx_doctor_questions_user ON public.doctor_questions(user_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_questions_status ON public.doctor_questions(status);
+CREATE INDEX IF NOT EXISTS idx_checklist_items_user ON public.checklist_items(user_id);
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260610000000_glucose_exams_birthplan.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- 1. Glicemia em health_logs
+ALTER TABLE public.health_logs ADD COLUMN IF NOT EXISTS glucose_mg_dl INTEGER;
+
+-- 2. Laudos e exames (fotos de documentos)
+CREATE TABLE IF NOT EXISTS public.exam_files (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name        TEXT        NOT NULL,
+  category    TEXT        NOT NULL DEFAULT 'outros',
+  week        INTEGER,
+  notes       TEXT,
+  image_data  TEXT,                          -- base64 JPEG
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.exam_files ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own exam_files" ON public.exam_files;
+CREATE POLICY "own exam_files" ON public.exam_files
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+GRANT SELECT, INSERT, DELETE ON public.exam_files TO authenticated;
+CREATE INDEX IF NOT EXISTS idx_exam_files_user ON public.exam_files(user_id, created_at DESC);
+
+-- 3. Plano de parto
+CREATE TABLE IF NOT EXISTS public.birth_plans (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  birth_type      TEXT,
+  pain_relief     TEXT[],
+  who_present     TEXT,
+  cord_cutting    TEXT,
+  skin_to_skin    BOOLEAN     DEFAULT true,
+  breastfeeding   TEXT,
+  lighting        TEXT,
+  music           TEXT,
+  notes           TEXT,
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.birth_plans ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own birth_plans" ON public.birth_plans;
+CREATE POLICY "own birth_plans" ON public.birth_plans
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.birth_plans TO authenticated;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_birth_plans_user ON public.birth_plans(user_id);
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260610010000_doctor_scheduling.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- 1. Disponibilidade semanal do médico
+CREATE TABLE IF NOT EXISTS public.doctor_availability (
+  id           UUID      PRIMARY KEY DEFAULT gen_random_uuid(),
+  day_of_week  SMALLINT  NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Dom ... 6=Sáb
+  start_time   TEXT      NOT NULL DEFAULT '08:00',
+  end_time     TEXT      NOT NULL DEFAULT '18:00',
+  slot_minutes INTEGER   NOT NULL DEFAULT 30,
+  enabled      BOOLEAN   NOT NULL DEFAULT true,
+  UNIQUE(day_of_week)
+);
+-- Padrão: segunda a sexta 08:00–12:00 e 14:00–18:00 (dois registros por dia não suportados aqui;
+-- usamos um único horário contínuo por dia para simplicidade)
+INSERT INTO public.doctor_availability (day_of_week, start_time, end_time, slot_minutes, enabled) VALUES
+  (0, '08:00', '12:00', 30, false),
+  (1, '08:00', '18:00', 30, true),
+  (2, '08:00', '18:00', 30, true),
+  (3, '08:00', '18:00', 30, true),
+  (4, '08:00', '18:00', 30, true),
+  (5, '08:00', '18:00', 30, true),
+  (6, '08:00', '12:00', 30, false)
+ON CONFLICT (day_of_week) DO NOTHING;
+
+ALTER TABLE public.doctor_availability ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.doctor_availability TO anon, authenticated;
+GRANT ALL ON public.doctor_availability TO service_role;
+DROP POLICY IF EXISTS "public_read_availability" ON public.doctor_availability;
+CREATE POLICY "public_read_availability"  ON public.doctor_availability FOR SELECT USING (true);
+DROP POLICY IF EXISTS "auth_write_availability" ON public.doctor_availability;
+CREATE POLICY "auth_write_availability"   ON public.doctor_availability FOR ALL
+  USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- 2. Datas bloqueadas (férias, afastamento)
+CREATE TABLE IF NOT EXISTS public.blocked_dates (
+  id         UUID      PRIMARY KEY DEFAULT gen_random_uuid(),
+  date       DATE      NOT NULL UNIQUE,
+  reason     TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.blocked_dates ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.blocked_dates TO anon, authenticated;
+GRANT ALL ON public.blocked_dates TO service_role;
+DROP POLICY IF EXISTS "public_read_blocked" ON public.blocked_dates;
+CREATE POLICY "public_read_blocked"   ON public.blocked_dates FOR SELECT USING (true);
+DROP POLICY IF EXISTS "auth_write_blocked" ON public.blocked_dates;
+CREATE POLICY "auth_write_blocked"    ON public.blocked_dates FOR ALL
+  USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- 3. Campos adicionais em appointment_requests
+ALTER TABLE public.appointment_requests
+  ADD COLUMN IF NOT EXISTS confirmed_date    DATE,
+  ADD COLUMN IF NOT EXISTS confirmed_time    TEXT,
+  ADD COLUMN IF NOT EXISTS payment_status    TEXT NOT NULL DEFAULT 'sem_cobranca',
+  ADD COLUMN IF NOT EXISTS price_brl         INTEGER,         -- centavos
+  ADD COLUMN IF NOT EXISTS internal_notes    TEXT;
+
+-- Índice para calendar view
+CREATE INDEX IF NOT EXISTS idx_appt_confirmed_date
+  ON public.appointment_requests(confirmed_date)
+  WHERE confirmed_date IS NOT NULL;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260611000000_whatsapp_agent.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Conversas do agente WhatsApp (máquina de estados por telefone)
+CREATE TABLE IF NOT EXISTS public.whatsapp_conversations (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone         TEXT        NOT NULL UNIQUE,
+  patient_name  TEXT,
+  state         TEXT        NOT NULL DEFAULT 'start',
+  context       JSONB       NOT NULL DEFAULT '{}',
+  last_message_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_wa_conv_phone ON public.whatsapp_conversations(phone);
+
+ALTER TABLE public.whatsapp_conversations ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.whatsapp_conversations TO service_role;
+-- Apenas service_role lê/escreve (acesso exclusivo via backend)
+
+-- Tabela de médicos parceiros (plataforma B2B futura)
+-- Cada médico que contratar o produto tem um registro aqui.
+CREATE TABLE IF NOT EXISTS public.doctor_accounts (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  name          TEXT        NOT NULL,
+  specialty     TEXT        NOT NULL DEFAULT 'Ginecologista e Obstetra',
+  crm           TEXT,
+  rqe           TEXT,
+  email         TEXT        NOT NULL UNIQUE,
+  whatsapp_phone TEXT,                    -- número vinculado ao WhatsApp Business
+  wa_phone_id   TEXT,                    -- WHATSAPP_PHONE_NUMBER_ID desse médico
+  wa_token      TEXT,                    -- token de acesso (criptografar em prod)
+  pix_key       TEXT,
+  plan          TEXT        NOT NULL DEFAULT 'trial',  -- trial | starter | pro | enterprise
+  plan_expires_at TIMESTAMPTZ,
+  active        BOOLEAN     NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.doctor_accounts ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.doctor_accounts TO service_role;
+GRANT SELECT ON public.doctor_accounts TO authenticated;
+DROP POLICY IF EXISTS "own_doctor_account" ON public.doctor_accounts;
+CREATE POLICY "own_doctor_account" ON public.doctor_accounts
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Leads de médicos interessados no produto B2B
+CREATE TABLE IF NOT EXISTS public.doctor_leads (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT        NOT NULL,
+  email       TEXT        NOT NULL,
+  phone       TEXT,
+  specialty   TEXT,
+  city        TEXT,
+  message     TEXT,
+  utm_source  TEXT,
+  status      TEXT        NOT NULL DEFAULT 'novo',   -- novo | contatado | demo | cliente | perdido
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.doctor_leads ENABLE ROW LEVEL SECURITY;
+GRANT INSERT ON public.doctor_leads TO anon, authenticated;
+GRANT ALL ON public.doctor_leads TO service_role;
+DROP POLICY IF EXISTS "insert_lead" ON public.doctor_leads;
+CREATE POLICY "insert_lead" ON public.doctor_leads FOR INSERT WITH CHECK (true);
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260611020000_clinical_tools.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Clinical tools: EPDS screenings, glucose diary, biometry logs
+
+-- EPDS screening results (linked to patient via user_id)
+CREATE TABLE IF NOT EXISTS epds_screenings (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  period      TEXT NOT NULL CHECK (period IN ('prenatal', 'postpartum')),
+  answers     INTEGER[] NOT NULL, -- 10 scores, one per question
+  total_score INTEGER NOT NULL,
+  q10_score   INTEGER NOT NULL DEFAULT 0,
+  level       TEXT NOT NULL CHECK (level IN ('baixo', 'moderado', 'alto', 'urgente')),
+  notes       TEXT,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE epds_screenings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users own epds" ON epds_screenings;
+CREATE POLICY "users own epds" ON epds_screenings
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+-- Doctors (admin) can read all
+DROP POLICY IF EXISTS "admin read epds" ON epds_screenings;
+CREATE POLICY "admin read epds" ON epds_screenings
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM auth.users u
+      WHERE u.id = auth.uid()
+      AND (u.raw_app_meta_data->>'is_admin')::boolean = true
+    )
+  );
+
+-- Glucose diary for gestational diabetes monitoring
+CREATE TABLE IF NOT EXISTS glucose_diary (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  measured_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  moment        TEXT NOT NULL CHECK (moment IN ('fasting', 'post_breakfast_1h', 'post_breakfast_2h', 'post_lunch_1h', 'post_lunch_2h', 'post_dinner_1h', 'post_dinner_2h', 'bedtime')),
+  value_mgdl    INTEGER NOT NULL,
+  notes         TEXT,
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE glucose_diary ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users own glucose_diary" ON glucose_diary;
+CREATE POLICY "users own glucose_diary" ON glucose_diary
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Fetal biometry logs (for reference, linked to appointment or session)
+CREATE TABLE IF NOT EXISTS biometry_logs (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  gestational_week INTEGER,
+  bpd_cm          NUMERIC(5,2),
+  hc_cm           NUMERIC(5,2),
+  ac_cm           NUMERIC(5,2),
+  fl_cm           NUMERIC(5,2),
+  efw_grams       INTEGER,
+  efw_percentile  TEXT,
+  formula         TEXT DEFAULT 'hadlock',
+  notes           TEXT,
+  exam_date       DATE DEFAULT CURRENT_DATE,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE biometry_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users own biometry_logs" ON biometry_logs;
+CREATE POLICY "users own biometry_logs" ON biometry_logs
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Index for quick retrieval per user
+CREATE INDEX IF NOT EXISTS idx_epds_user ON epds_screenings(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_glucose_user ON glucose_diary(user_id, measured_at DESC);
+CREATE INDEX IF NOT EXISTS idx_biometry_user ON biometry_logs(user_id, exam_date DESC);
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260611030000_teleconsulta_notes.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Add clinical_note column to teleconsulta_sessions
+ALTER TABLE teleconsulta_sessions
+  ADD COLUMN IF NOT EXISTS clinical_note TEXT;
+
+-- Index for quick admin retrieval of sessions with notes
+CREATE INDEX IF NOT EXISTS idx_teleconsulta_status
+  ON teleconsulta_sessions(status, scheduled_for DESC);
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260611040000_teleconsulta_meet_url.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Store the Google Meet (or Jitsi fallback) URL for each teleconsulta session
+ALTER TABLE teleconsulta_sessions
+  ADD COLUMN IF NOT EXISTS meet_url TEXT;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260611050000_pix_payments.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Add Mercado Pago PIX fields to private_consultations
+ALTER TABLE private_consultations
+  ADD COLUMN IF NOT EXISTS mp_payment_id TEXT,
+  ADD COLUMN IF NOT EXISTS pix_qr_code TEXT,
+  ADD COLUMN IF NOT EXISTS pix_qr_code_base64 TEXT,
+  ADD COLUMN IF NOT EXISTS amount_cents INTEGER;
+
+-- Index for webhook lookup
+CREATE INDEX IF NOT EXISTS idx_private_consultations_mp_payment_id
+  ON private_consultations(mp_payment_id)
+  WHERE mp_payment_id IS NOT NULL;

@@ -49,9 +49,13 @@ cp .env.example .env
 
 O `.env` está no `.gitignore` — nunca commite chaves reais.
 
-> **Atenção:** a migration `supabase/migrations/20260608120000_security_hardening.sql`
-> precisa ser aplicada no Supabase (SQL Editor) para fechar o acesso anônimo
-> aos convites de acompanhante e ativar a expiração.
+> **Atenção:** o banco de produção só tem as 8 tabelas originais — todas as
+> migrations a partir de `20260608120000` estão pendentes (28 tabelas faltando,
+> verificado em 2026-06-12). Aplique `supabase/APLICAR_PENDENTES.sql` no
+> SQL Editor do Supabase (arquivo consolidado e idempotente; pode rodar mais
+> de uma vez). Sem isso, Contrações, Pré-consulta, Exames, Linha do Tempo,
+> Ciclo Menstrual, Plano de Parto, Teleconsulta, Álbum, Pós-parto, Escola,
+> Conquistas e outras abas não persistem dados.
 
 ## Deploy (Vercel)
 

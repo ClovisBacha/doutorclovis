@@ -1,4 +1,5 @@
 import { useChat } from "@ai-sdk/react";
+import { useRouterState } from "@tanstack/react-router";
 import { DefaultChatTransport } from "ai";
 import { MessageCircle, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -7,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
 export function ChatbotWidget() {
+  const { location } = useRouterState();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const { messages, sendMessage, status } = useChat({ transport });
@@ -17,6 +19,10 @@ export function ChatbotWidget() {
   }, [messages, status]);
 
   const loading = status === "submitted" || status === "streaming";
+
+  // No app logado o chat tem aba própria (Chat IA); o botão flutuante cobriria a navegação inferior.
+  if (location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel"))
+    return null;
 
   return (
     <>
