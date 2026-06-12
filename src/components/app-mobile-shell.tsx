@@ -336,54 +336,54 @@ type GestInfo = { weeks: number; days: number; totalDays: number } | null;
 export type NextAppointment = { dateLabel: string; typeLabel: string };
 
 const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = [
-  { Icon: Baby, label: "Bebê", tab: "Bebê", color: "bg-pink-50 text-pink-600 ring-pink-200" },
+  { Icon: Baby, label: "Bebê", tab: "Bebê", color: "bg-rose-50 text-rose-500 ring-rose-100" },
   {
     Icon: Footprints,
     label: "Chutes",
     tab: "Chutes",
-    color: "bg-violet-50 text-violet-600 ring-violet-200",
+    color: "bg-primary/10 text-primary ring-primary/15",
   },
   {
     Icon: CalendarDays,
     label: "Calendário",
     tab: "Calendário",
-    color: "bg-blue-50 text-blue-600 ring-blue-200",
+    color: "bg-amber-50 text-amber-600 ring-amber-100",
   },
   {
     Icon: CreditCard,
     label: "Carteirinha",
     tab: "Carteirinha",
-    color: "bg-amber-50 text-amber-600 ring-amber-200",
+    color: "bg-yellow-50 text-yellow-600 ring-yellow-100",
   },
   {
     Icon: Activity,
     label: "Saúde",
     tab: "Saúde",
-    color: "bg-emerald-50 text-emerald-600 ring-emerald-200",
+    color: "bg-emerald-50 text-emerald-600 ring-emerald-100",
   },
   {
     Icon: AlertTriangle,
     label: "Alertas",
     tab: "Alertas",
-    color: "bg-rose-50 text-rose-600 ring-rose-200",
+    color: "bg-rose-50 text-rose-500 ring-rose-100",
   },
   {
     Icon: FileText,
     label: "Pré-consulta",
     tab: "Pré-consulta",
-    color: "bg-sky-50 text-sky-600 ring-sky-200",
+    color: "bg-orange-50 text-orange-500 ring-orange-100",
   },
   {
     Icon: NotebookPen,
     label: "Diário",
     tab: "Diário",
-    color: "bg-orange-50 text-orange-600 ring-orange-200",
+    color: "bg-amber-50 text-amber-700 ring-amber-100",
   },
   {
     Icon: GraduationCap,
     label: "Escola",
     tab: "Escola",
-    color: "bg-teal-50 text-teal-600 ring-teal-200",
+    color: "bg-teal-50 text-teal-600 ring-teal-100",
   },
   {
     Icon: Stethoscope,
@@ -395,7 +395,7 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     Icon: MessageCircle,
     label: "Chat IA",
     tab: "Chat IA",
-    color: "bg-indigo-50 text-indigo-600 ring-indigo-200",
+    color: "bg-primary/8 text-primary ring-primary/15",
   },
   {
     Icon: UserCircle,
@@ -450,7 +450,10 @@ export function AppHomeScreen({
         />
 
         <div className="relative">
-          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${heroLabel}`}>
+          <p
+            className={`text-xs font-semibold uppercase tracking-[0.2em] ${heroLabel}`}
+            style={{ fontFamily: "var(--font-round)" }}
+          >
             Olá, {firstName} 💛
           </p>
 
@@ -604,27 +607,33 @@ export function AppHomeScreen({
 
       {/* ── Grade de ícones ─────────────────────────────────────────── */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+        <p
+          className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary"
+          style={{ fontFamily: "var(--font-round)" }}
+        >
           Acesso rápido
         </p>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-2.5">
           {GRID.map(({ Icon, label, tab, color }) => {
             const isHeartIcon = Icon === Heart;
             return (
               <button
                 key={tab}
                 onClick={() => onNavigate(tab)}
-                className="spotlight-card group flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-card p-2.5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-95 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-card)]"
+                className="spotlight-card group flex flex-col items-center gap-2 rounded-3xl border border-border/40 bg-card px-1.5 py-3 shadow-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-95 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md"
               >
                 <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-110 group-hover:-rotate-3 group-active:scale-90 ${color}`}
+                  className={`flex h-13 w-13 items-center justify-center rounded-3xl ring-1 shadow-sm transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-110 group-hover:-rotate-3 group-active:scale-90 ${color}`}
                 >
                   <Icon
                     className={`h-5 w-5 ${isHeartIcon ? "heartbeat-icon" : ""}`}
-                    strokeWidth={1.8}
+                    strokeWidth={1.7}
                   />
                 </div>
-                <span className="text-[10px] font-medium leading-tight text-center text-foreground/80">
+                <span
+                  className="text-[10px] font-semibold leading-tight text-center text-foreground/75"
+                  style={{ fontFamily: "var(--font-round)" }}
+                >
                   {label}
                 </span>
               </button>
@@ -666,7 +675,12 @@ export function AppHomeScreen({
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <p className="font-serif text-lg text-primary-foreground">Chat com IA</p>
+            <p
+              className="text-lg font-semibold text-primary-foreground"
+              style={{ fontFamily: "var(--font-round)" }}
+            >
+              Chat com IA
+            </p>
             <p className="text-xs text-primary-foreground/80">Tire dúvidas a qualquer hora</p>
           </div>
           <ChevronRight className="ml-auto h-4 w-4 text-primary-foreground/70 transition-transform duration-300 group-hover:translate-x-1" />
