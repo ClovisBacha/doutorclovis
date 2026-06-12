@@ -138,7 +138,11 @@ function AlbumPage() {
             />
             {imageData && (
               <div className="relative inline-block">
-                <img src={imageData} alt="preview" className="h-32 rounded-xl object-cover" />
+                <img
+                  src={imageData}
+                  alt="pré-visualização da imagem"
+                  className="h-32 rounded-xl object-cover"
+                />
                 <button
                   onClick={() => {
                     setImageData(null);
