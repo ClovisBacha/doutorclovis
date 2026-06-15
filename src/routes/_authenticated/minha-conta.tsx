@@ -296,6 +296,51 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
 ];
 
+const CAT_STYLE: Record<string, { pill: string; glass: string; accent: string; emoji: string }> = {
+  Gestação: {
+    pill: "bg-pink-100/90 text-pink-700 shadow-[0_0_0_1px_rgba(244,114,182,0.25)]",
+    glass: "glass-card glass-pink",
+    accent: "text-pink-600",
+    emoji: "🌸",
+  },
+  Saúde: {
+    pill: "bg-emerald-100/90 text-emerald-700 shadow-[0_0_0_1px_rgba(16,185,129,0.25)]",
+    glass: "glass-card glass-emerald",
+    accent: "text-emerald-600",
+    emoji: "🌿",
+  },
+  Família: {
+    pill: "bg-violet-100/90 text-violet-700 shadow-[0_0_0_1px_rgba(139,92,246,0.25)]",
+    glass: "glass-card glass-violet",
+    accent: "text-violet-600",
+    emoji: "💜",
+  },
+  Consultas: {
+    pill: "bg-blue-100/90 text-blue-700 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]",
+    glass: "glass-card glass-blue",
+    accent: "text-blue-600",
+    emoji: "📋",
+  },
+  Aprender: {
+    pill: "bg-teal-100/90 text-teal-700 shadow-[0_0_0_1px_rgba(20,184,166,0.25)]",
+    glass: "glass-card glass-teal",
+    accent: "text-teal-600",
+    emoji: "✨",
+  },
+  Médico: {
+    pill: "bg-primary/10 text-primary shadow-[0_0_0_1px_rgba(var(--primary),0.2)]",
+    glass: "glass-card glass-rose",
+    accent: "text-primary",
+    emoji: "🩺",
+  },
+  Conta: {
+    pill: "bg-indigo-100/90 text-indigo-700 shadow-[0_0_0_1px_rgba(99,102,241,0.25)]",
+    glass: "glass-card glass-indigo",
+    accent: "text-indigo-600",
+    emoji: "💫",
+  },
+};
+
 function categoryOfTab(t: Tab): string {
   return CATEGORIES.find((c) => (c.tabs as readonly string[]).includes(t))?.label ?? "Gestação";
 }
@@ -482,6 +527,7 @@ function MinhaContaPage() {
           <div className="print:hidden mt-2 md:mt-6 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {CATEGORIES.map((cat) => {
               const active = categoryOfTab(tab) === cat.label;
+              const cs = CAT_STYLE[cat.label] ?? CAT_STYLE["Gestação"];
               return (
                 <button
                   key={cat.label}
@@ -489,12 +535,13 @@ function MinhaContaPage() {
                     if (!active) setTab(cat.tabs[0]);
                     setMobileHome(false);
                   }}
-                  className={`flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+                  className={`press flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
                     active
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground/45 hover:text-foreground/70"
+                      ? `${cs.pill} font-semibold`
+                      : "text-foreground/40 hover:text-foreground/65"
                   }`}
                 >
+                  {active ? `${cs.emoji} ` : ""}
                   {cat.label}
                 </button>
               );
@@ -504,22 +551,25 @@ function MinhaContaPage() {
           {/* Tab row */}
           <div className="print:hidden mt-3 flex gap-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <div className="flex min-w-full gap-1">
-              {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => {
-                    setTab(t);
-                    setMobileHome(false);
-                  }}
-                  className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
-                    tab === t
-                      ? "bg-primary/10 font-semibold text-primary"
-                      : "text-foreground/45 hover:text-foreground/70"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
+              {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => {
+                const cs = CAT_STYLE[categoryOfTab(tab)] ?? CAT_STYLE["Gestação"];
+                return (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setTab(t);
+                      setMobileHome(false);
+                    }}
+                    className={`press flex-shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+                      tab === t
+                        ? `${cs.pill} font-semibold`
+                        : "text-foreground/40 hover:text-foreground/65"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -582,8 +632,10 @@ function MinhaContaPage() {
 function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   if (!profile || !gest) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center">
-        <p className="text-muted-foreground">
+      <div className="glass-card glass-pink rounded-3xl p-10 text-center">
+        <p className="text-5xl mb-4">🌸</p>
+        <p className="font-serif text-xl text-pink-700">Configure seu perfil</p>
+        <p className="mt-2 text-sm text-muted-foreground">
           Configure a data da sua última menstruação ou os dados do ultrassom em{" "}
           <strong>Perfil</strong> para começar o acompanhamento.
         </p>
@@ -980,15 +1032,17 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
     <div className="space-y-6">
       {/* Context banner */}
       {weeks != null && !isMonitoringPhase && (
-        <div className="rounded-2xl border border-border bg-secondary/70 p-4 text-sm text-foreground">
+        <div className="glass-card glass-violet rounded-2xl p-4 text-sm text-violet-800">
+          <span className="mr-1.5">{weeks < 20 ? "🌱" : "🤗"}</span>
           {weeks < 20
-            ? `Você está na semana ${weeks}. Os movimentos começam a ser sentidos entre as semanas 18 e 25. Continue o pré-natal normalmente.`
-            : `Você está na semana ${weeks}. Já pode começar a perceber os movimentos de ${label}! A contagem formal de chutes começa na semana 28.`}
+            ? `Semana ${weeks} — os movimentos começam a ser sentidos entre as semanas 18 e 25. Continue o pré-natal normalmente.`
+            : `Semana ${weeks} — você já pode perceber os movimentos de ${label}! A contagem formal de chutes começa na semana 28.`}
         </div>
       )}
 
-      <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">Contador de chutes</p>
+      <div className="glass-card glass-violet rounded-3xl p-8 text-center">
+        <p className="text-4xl mb-3">👶🦵</p>
+        <p className="font-serif text-xl text-violet-700">Contador de chutes</p>
         <p className="mt-2 text-sm text-muted-foreground">
           {isMonitoringPhase
             ? `A partir da semana 28, conte 10 movimentos de ${label}. O ideal é sentir 10 em até 2 horas.`
@@ -1416,17 +1470,19 @@ function ProfileTab({
   return (
     <div className="space-y-6">
       {/* Completion card */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="glass-card glass-indigo rounded-3xl p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Perfil completo</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-indigo-600">
+              💫 Perfil completo
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {completionPct < 100
                 ? "Complete seu perfil para aproveitar todas as funcionalidades."
-                : "Seu perfil está completo!"}
+                : "Seu perfil está completo! 🎉"}
             </p>
           </div>
-          <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-primary/20 text-sm font-bold text-primary">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-indigo-200 text-sm font-bold text-indigo-600">
             {completionPct}%
           </div>
         </div>
@@ -2000,28 +2056,32 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
     <div className="space-y-6">
       {/* Stats row */}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Último peso</p>
+        <div className="press glass-card glass-emerald rounded-3xl p-5">
+          <p className="text-xs uppercase tracking-[0.22em] text-emerald-600">⚖️ Último peso</p>
           <p className="mt-2 font-serif text-3xl">
             {last?.weight_kg ? `${last.weight_kg} kg` : "—"}
           </p>
         </div>
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Ganho total</p>
+        <div className="press glass-card glass-teal rounded-3xl p-5">
+          <p className="text-xs uppercase tracking-[0.22em] text-teal-600">📈 Ganho total</p>
           <p className="mt-2 font-serif text-3xl">
             {totalGain != null ? `${Number(totalGain) > 0 ? "+" : ""}${totalGain} kg` : "—"}
           </p>
         </div>
         <div
-          className={`rounded-3xl border p-5 ${bpStatus?.color === "rose" ? "border-rose-300 bg-rose-50" : bpStatus?.color === "amber" ? "border-primary/25 bg-primary/8" : "border-border bg-card"}`}
+          className={`press rounded-3xl p-5 ${bpStatus?.color === "rose" ? "glass-card glass-rose" : bpStatus?.color === "amber" ? "glass-card glass-amber" : "glass-card glass-blue"}`}
         >
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Última PA</p>
+          <p
+            className={`text-xs uppercase tracking-[0.22em] ${bpStatus?.color === "rose" ? "text-rose-600" : bpStatus?.color === "amber" ? "text-amber-600" : "text-blue-600"}`}
+          >
+            🩺 Última PA
+          </p>
           <p className="mt-2 font-serif text-3xl">
             {lastBp?.systolic && lastBp?.diastolic ? `${lastBp.systolic}/${lastBp.diastolic}` : "—"}
           </p>
           {bpStatus && (
             <p
-              className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-700" : bpStatus.color === "amber" ? "text-primary" : "text-emerald-700"}`}
+              className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-700" : bpStatus.color === "amber" ? "text-amber-700" : "text-emerald-700"}`}
             >
               {bpStatus.label}
             </p>
@@ -2035,13 +2095,17 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
             gv == null ? null : gv > 140 ? "Atenção: elevada" : gv > 95 ? "Limite" : "Normal";
           return (
             <div
-              className={`rounded-3xl border p-5 ${gColor === "rose" ? "border-rose-300 bg-rose-50" : gColor === "amber" ? "border-primary/25 bg-primary/8" : "border-border bg-card"}`}
+              className={`press rounded-3xl p-5 ${gColor === "rose" ? "glass-card glass-rose" : gColor === "amber" ? "glass-card glass-amber" : "glass-card glass-sky"}`}
             >
-              <p className="text-xs uppercase tracking-[0.22em] text-primary">Glicemia</p>
+              <p
+                className={`text-xs uppercase tracking-[0.22em] ${gColor === "rose" ? "text-rose-600" : gColor === "amber" ? "text-amber-600" : "text-sky-600"}`}
+              >
+                🍬 Glicemia
+              </p>
               <p className="mt-2 font-serif text-3xl">{gv != null ? `${gv} mg/dL` : "—"}</p>
               {gLabel && (
                 <p
-                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-primary" : "text-emerald-700"}`}
+                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-amber-700" : "text-emerald-700"}`}
                 >
                   {gLabel}
                 </p>
@@ -2049,8 +2113,8 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
             </div>
           );
         })()}
-        <div className="rounded-3xl border border-border bg-card p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">SpO₂ / FC</p>
+        <div className="press glass-card glass-pink rounded-3xl p-5">
+          <p className="text-xs uppercase tracking-[0.22em] text-pink-600">🫀 SpO₂ / FC</p>
           <p className="mt-2 font-serif text-2xl">
             {last?.spo2 ? `${last.spo2}%` : "—"}
             {last?.heart_rate_bpm ? (

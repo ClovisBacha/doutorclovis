@@ -523,6 +523,86 @@
   animation-delay: 1.3s;
 }
 
+/* ── Liquid Glass cards — superfícies translúcidas com tint cromático ── */
+.glass-card {
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-pink {
+  background: rgba(244, 114, 182, 0.11);
+  box-shadow:
+    0 4px 24px rgba(244, 114, 182, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-emerald {
+  background: rgba(16, 185, 129, 0.1);
+  box-shadow:
+    0 4px 24px rgba(16, 185, 129, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-violet {
+  background: rgba(139, 92, 246, 0.1);
+  box-shadow:
+    0 4px 24px rgba(139, 92, 246, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-blue {
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow:
+    0 4px 24px rgba(59, 130, 246, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-teal {
+  background: rgba(20, 184, 166, 0.1);
+  box-shadow:
+    0 4px 24px rgba(20, 184, 166, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-indigo {
+  background: rgba(99, 102, 241, 0.1);
+  box-shadow:
+    0 4px 24px rgba(99, 102, 241, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-amber {
+  background: rgba(245, 158, 11, 0.1);
+  box-shadow:
+    0 4px 24px rgba(245, 158, 11, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-rose {
+  background: rgba(244, 63, 94, 0.1);
+  box-shadow:
+    0 4px 24px rgba(244, 63, 94, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-sky {
+  background: rgba(14, 165, 233, 0.1);
+  box-shadow:
+    0 4px 24px rgba(14, 165, 233, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.glass-orange {
+  background: rgba(249, 115, 22, 0.1);
+  box-shadow:
+    0 4px 24px rgba(249, 115, 22, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
 /* ── Staggered fade-in — entrada em cascata para listas e grids ── */
 @keyframes fadeSlideUp {
   from {
