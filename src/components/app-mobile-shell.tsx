@@ -466,31 +466,35 @@ export function AppHomeScreen({
                 />
               </div>
 
-              {/* Número de semana — centralizado, com efeito liquid glass */}
+              {/* Número de semana — lente de vidro líquido translúcida */}
               <div className="mt-1 flex flex-col items-center">
                 <p
                   className="leading-none"
                   style={{
                     fontFamily: "'Nunito', system-ui, sans-serif",
-                    fontSize: "3.6rem",
+                    fontSize: "3.7rem",
                     fontWeight: 700,
                     letterSpacing: "-0.02em",
                     fontVariantNumeric: "tabular-nums lining-nums",
-                    backgroundImage: darkSky
-                      ? "linear-gradient(170deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.72) 55%, rgba(255,255,255,0.85) 100%)"
-                      : "linear-gradient(170deg, rgba(255,255,255,0.95) 0%, rgba(70,48,38,0.55) 55%, rgba(70,48,38,0.78) 100%)",
+                    backgroundImage:
+                      "linear-gradient(180deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.15) 100%)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
                     color: "transparent",
-                    filter: darkSky
-                      ? "drop-shadow(0 1px 0 rgba(255,255,255,0.45)) drop-shadow(0 6px 14px rgba(0,0,0,0.18))"
-                      : "drop-shadow(0 1px 0 rgba(255,255,255,0.6)) drop-shadow(0 6px 14px rgba(0,0,0,0.10))",
+                    textShadow: [
+                      "0 -1px 1px rgba(255,255,255,0.55)", // reflexo de luz no topo
+                      "0 1px 1px rgba(255,255,255,0.25)", // segundo realce de refração
+                      "0 4px 10px rgba(0,0,0,0.06)", // profundidade esfumada
+                      "0 1px 3px rgba(0,0,0,0.05)", // volume sutil junto ao corpo
+                    ].join(", "),
                   }}
                 >
                   {gest.weeks}
                 </p>
                 <p
-                  className={`mt-1 text-[11px] font-medium tracking-widest uppercase ${heroMuted}`}
+                  className={`mt-1.5 text-[11px] font-semibold uppercase opacity-70 ${heroMuted}`}
+                  style={{ fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: "0.18em" }}
                 >
                   semanas{gest.days > 0 ? ` · ${gest.days} dias` : ""}
                 </p>
