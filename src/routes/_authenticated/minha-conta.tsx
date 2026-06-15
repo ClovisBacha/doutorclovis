@@ -853,7 +853,11 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
         />
         <button
           onClick={add}
-          className="mt-3 rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground"
+          className="mt-3 rounded-full px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-all duration-300 active:scale-95 hover:opacity-90"
+          style={{
+            background:
+              "radial-gradient(circle at 30% 30%, color-mix(in oklch, var(--primary) 80%, white), var(--primary) 70%)",
+          }}
         >
           Salvar no diário
         </button>
@@ -986,7 +990,11 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
         {!active ? (
           <button
             onClick={start}
-            className="mt-6 rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground"
+            className="mt-6 rounded-full px-8 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-all duration-300 active:scale-95 hover:opacity-90"
+            style={{
+              background:
+                "radial-gradient(circle at 30% 30%, color-mix(in oklch, var(--primary) 80%, white), var(--primary) 70%)",
+            }}
           >
             Iniciar sessão
           </button>
@@ -994,7 +1002,11 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
           <div className="mt-6">
             <button
               onClick={tap}
-              className="mx-auto flex h-44 w-44 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl transition-transform active:scale-95"
+              className="liquid-pulse mx-auto flex h-44 w-44 items-center justify-center rounded-full text-primary-foreground shadow-xl transition-transform duration-300 active:scale-95 hover:scale-[1.03]"
+              style={{
+                background:
+                  "radial-gradient(circle at 30% 25%, color-mix(in oklch, var(--primary) 78%, white), var(--primary) 70%)",
+              }}
             >
               <div>
                 <div className="font-serif text-5xl">{count}</div>
@@ -5313,10 +5325,10 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
       {loading ? (
         <p className="text-center text-sm text-muted-foreground">Carregando...</p>
       ) : filtered.length === 0 ? (
-        <div className="rounded-3xl p-10 text-center">
-          <p className="text-muted-foreground">
-            Nenhum registro ainda. Comece usando as outras abas!
-          </p>
+        <div className="py-14 text-center">
+          <p className="text-4xl mb-3">📋</p>
+          <p className="font-serif text-xl text-foreground/70">Nenhum registro ainda</p>
+          <p className="mt-2 text-sm text-muted-foreground">Comece usando as outras abas!</p>
         </div>
       ) : (
         <div className="relative ml-4">
@@ -5428,11 +5440,11 @@ function HumorTab() {
 
   if (entries.length === 0)
     return (
-      <div className="rounded-3xl p-10 text-center">
-        <p className="font-serif text-xl">Nenhum registro ainda</p>
+      <div className="py-14 text-center">
+        <p className="text-4xl mb-3">💛</p>
+        <p className="font-serif text-xl text-foreground/70">Nenhum registro ainda</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Use a aba <strong>Diário</strong> para registrar seu humor diariamente e ver as análises
-          aqui.
+          Use a aba <strong>Diário</strong> para registrar seu humor diariamente.
         </p>
       </div>
     );
@@ -6035,8 +6047,12 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
       {loading ? (
         <p className="text-center text-sm text-muted-foreground">Carregando...</p>
       ) : sessions.length === 0 ? (
-        <div className="rounded-3xl p-10 text-center">
-          <p className="text-muted-foreground">Nenhuma teleconsulta agendada no momento.</p>
+        <div className="py-14 text-center">
+          <p className="text-4xl mb-3">📱</p>
+          <p className="font-serif text-xl text-foreground/70">Nenhuma teleconsulta</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Nenhuma consulta agendada no momento.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -6233,8 +6249,9 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
           )}
         </div>
       ) : (
-        <div className="rounded-3xl p-10 text-center">
-          <p className="font-serif text-xl text-muted-foreground">Sua carta ainda não foi gerada</p>
+        <div className="py-14 text-center">
+          <p className="text-4xl mb-3">💌</p>
+          <p className="font-serif text-xl text-foreground/70">Sua carta ainda não chegou</p>
           <p className="mt-2 text-sm text-muted-foreground">
             Clique abaixo para receber uma mensagem especial do seu bebê nesta semana.
           </p>
@@ -7737,9 +7754,10 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
           Álbum ({posts.length} {posts.length === 1 ? "memória" : "memórias"})
         </h3>
         {posts.length === 0 ? (
-          <div className="rounded-3xl p-12 text-center text-muted-foreground">
-            <p className="text-3xl mb-2">📷</p>
-            <p>Nenhuma memória ainda. Comece adicionando a primeira!</p>
+          <div className="py-14 text-center">
+            <p className="text-4xl mb-3">📷</p>
+            <p className="font-serif text-xl text-foreground/70">Nenhuma memória ainda</p>
+            <p className="mt-2 text-sm text-muted-foreground">Comece adicionando a primeira!</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -7932,10 +7950,11 @@ function NomeTab({ profile }: { profile: Profile | null }) {
           )}
         </h3>
         {entries.length === 0 ? (
-          <div className="rounded-3xl p-12 text-center text-muted-foreground">
-            <p className="text-3xl mb-2">👶</p>
-            <p>
-              Nenhum nome ainda. Adicione o primeiro ou compartilhe o link para a família sugerir!
+          <div className="py-14 text-center">
+            <p className="text-4xl mb-3">👶</p>
+            <p className="font-serif text-xl text-foreground/70">Nenhum nome ainda</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Adicione o primeiro ou compartilhe o link para a família sugerir!
             </p>
           </div>
         ) : (
@@ -8809,8 +8828,9 @@ function FAQTab({ gest }: { gest: Gest }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl p-8 text-center text-muted-foreground">
-          Nenhuma pergunta encontrada.
+        <div className="py-12 text-center">
+          <p className="text-3xl mb-3">🔍</p>
+          <p className="font-serif text-lg text-foreground/70">Nenhuma pergunta encontrada</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -11013,8 +11033,8 @@ function LojaTab({ gest }: { gest: Gest }) {
               onClick={() => setCategory(c.key)}
               className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-all ${
                 category === c.key
-                  ? "bg-primary text-white shadow-sm"
-                  : "border border-primary/25 text-primary/80"
+                  ? "bg-primary/10 text-primary font-semibold"
+                  : "text-foreground/45 hover:text-foreground/70"
               }`}
             >
               {c.label}
@@ -11025,9 +11045,9 @@ function LojaTab({ gest }: { gest: Gest }) {
 
       {/* ── Grid de produtos ─────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="rounded-2xl py-12 text-center text-muted-foreground">
-          <p className="text-3xl mb-2">🔍</p>
-          <p className="text-sm">Nenhum produto neste filtro.</p>
+        <div className="py-12 text-center">
+          <p className="text-3xl mb-3">🔍</p>
+          <p className="font-serif text-lg text-foreground/70">Nenhum produto neste filtro</p>
           <button
             onClick={() => setWeekFilter(false)}
             className="mt-2 text-xs text-primary underline"
@@ -11351,9 +11371,12 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
       )}
 
       {consultations.length === 0 ? (
-        <div className="rounded-3xl p-12 text-center text-muted-foreground">
-          <p className="text-3xl mb-2">📋</p>
-          <p>Nenhuma consulta solicitada ainda.</p>
+        <div className="py-14 text-center">
+          <p className="text-4xl mb-3">📋</p>
+          <p className="font-serif text-xl text-foreground/70">Nenhuma consulta ainda</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Solicite sua primeira consulta particular acima.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -11696,9 +11719,10 @@ function CicloMenstrualTab() {
 
       {/* Cycle history */}
       {cycles.length === 0 ? (
-        <div className="rounded-3xl p-12 text-center text-muted-foreground">
-          <p className="text-3xl mb-2">📅</p>
-          <p>Nenhum ciclo registrado ainda.</p>
+        <div className="py-14 text-center">
+          <p className="text-4xl mb-3">📅</p>
+          <p className="font-serif text-xl text-foreground/70">Nenhum ciclo registrado</p>
+          <p className="mt-2 text-sm text-muted-foreground">Registre seu primeiro ciclo acima.</p>
         </div>
       ) : (
         <div className="space-y-3">
