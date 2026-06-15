@@ -471,10 +471,11 @@ export function AppHomeScreen({
                 <p
                   className={`leading-none ${heroText}`}
                   style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                    fontSize: "3.4rem",
-                    fontWeight: 700,
-                    letterSpacing: "-0.01em",
+                    fontFamily: "'Nunito', system-ui, sans-serif",
+                    fontSize: "3.6rem",
+                    fontWeight: 800,
+                    letterSpacing: "-0.02em",
+                    fontVariantNumeric: "tabular-nums lining-nums",
                   }}
                 >
                   {gest.weeks}
