@@ -172,7 +172,14 @@
   }
 
   body {
-    background-color: var(--color-background);
+    background-color: oklch(0.982 0.008 50);
+    /* Mesh gradient: 3 blobs coloridos que criam profundidade tech */
+    background-image:
+      radial-gradient(ellipse 75% 60% at -8% 0%, oklch(0.87 0.09 15 / 0.28) 0%, transparent 65%),
+      radial-gradient(ellipse 65% 55% at 108% 25%, oklch(0.8 0.1 300 / 0.16) 0%, transparent 65%),
+      radial-gradient(ellipse 90% 65% at 50% 115%, oklch(0.82 0.08 255 / 0.12) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 45% at 85% 90%, oklch(0.88 0.07 330 / 0.1) 0%, transparent 60%);
+    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: "DM Sans", system-ui, sans-serif;
     font-feature-settings: "ss01", "cv11";
@@ -530,75 +537,76 @@
     0 4px 24px rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
+/* Gradientes internos diagonais — profundidade e personalidade em cada card */
 .glass-pink {
-  background: rgba(244, 114, 182, 0.11);
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.2) 0%, rgba(167, 139, 250, 0.08) 100%);
   box-shadow:
-    0 4px 24px rgba(244, 114, 182, 0.1),
+    0 6px 32px rgba(244, 114, 182, 0.16),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-emerald {
-  background: rgba(16, 185, 129, 0.1);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(20, 184, 166, 0.06) 100%);
   box-shadow:
-    0 4px 24px rgba(16, 185, 129, 0.09),
+    0 6px 32px rgba(16, 185, 129, 0.14),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-violet {
-  background: rgba(139, 92, 246, 0.1);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, rgba(59, 130, 246, 0.07) 100%);
   box-shadow:
-    0 4px 24px rgba(139, 92, 246, 0.09),
+    0 6px 32px rgba(139, 92, 246, 0.15),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-blue {
-  background: rgba(59, 130, 246, 0.1);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(99, 102, 241, 0.07) 100%);
   box-shadow:
-    0 4px 24px rgba(59, 130, 246, 0.09),
+    0 6px 32px rgba(59, 130, 246, 0.14),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-teal {
-  background: rgba(20, 184, 166, 0.1);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.18) 0%, rgba(16, 185, 129, 0.06) 100%);
   box-shadow:
-    0 4px 24px rgba(20, 184, 166, 0.09),
+    0 6px 32px rgba(20, 184, 166, 0.14),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-indigo {
-  background: rgba(99, 102, 241, 0.1);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.19) 0%, rgba(139, 92, 246, 0.07) 100%);
   box-shadow:
-    0 4px 24px rgba(99, 102, 241, 0.09),
+    0 6px 32px rgba(99, 102, 241, 0.15),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-amber {
-  background: rgba(245, 158, 11, 0.1);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(249, 115, 22, 0.07) 100%);
   box-shadow:
-    0 4px 24px rgba(245, 158, 11, 0.09),
+    0 6px 32px rgba(245, 158, 11, 0.14),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-rose {
-  background: rgba(244, 63, 94, 0.1);
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.18) 0%, rgba(244, 114, 182, 0.07) 100%);
   box-shadow:
-    0 4px 24px rgba(244, 63, 94, 0.09),
+    0 6px 32px rgba(244, 63, 94, 0.14),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-sky {
-  background: rgba(14, 165, 233, 0.1);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.18) 0%, rgba(59, 130, 246, 0.07) 100%);
   box-shadow:
-    0 4px 24px rgba(14, 165, 233, 0.09),
+    0 6px 32px rgba(14, 165, 233, 0.14),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 .glass-orange {
-  background: rgba(249, 115, 22, 0.1);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.18) 0%, rgba(245, 158, 11, 0.07) 100%);
   box-shadow:
-    0 4px 24px rgba(249, 115, 22, 0.09),
+    0 6px 32px rgba(249, 115, 22, 0.14),
     0 1px 3px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 /* ── Staggered fade-in — entrada em cascata para listas e grids ── */
