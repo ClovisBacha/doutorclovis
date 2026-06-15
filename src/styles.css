@@ -172,13 +172,27 @@
   }
 
   body {
-    background-color: oklch(0.982 0.008 50);
-    /* Mesh gradient: 3 blobs coloridos que criam profundidade tech */
+    background-color: oklch(0.985 0.012 30); /* base creme rosado quente */
+    /* Pôr do sol rosa — lavanda no topo, rosa quente no centro, pêssego dourado na base */
     background-image:
-      radial-gradient(ellipse 75% 60% at -8% 0%, oklch(0.87 0.09 15 / 0.28) 0%, transparent 65%),
-      radial-gradient(ellipse 65% 55% at 108% 25%, oklch(0.8 0.1 300 / 0.16) 0%, transparent 65%),
-      radial-gradient(ellipse 90% 65% at 50% 115%, oklch(0.82 0.08 255 / 0.12) 0%, transparent 65%),
-      radial-gradient(ellipse 50% 45% at 85% 90%, oklch(0.88 0.07 330 / 0.1) 0%, transparent 60%);
+      linear-gradient(
+        172deg,
+        oklch(0.89 0.07 295 / 0.4) 0%,
+        oklch(0.87 0.11 340 / 0.45) 25%,
+        oklch(0.88 0.12 10 / 0.4) 50%,
+        oklch(0.91 0.1 35 / 0.28) 72%,
+        oklch(0.95 0.08 58 / 0.18) 100%
+      ),
+      /* Brilho do sol — blob dourado-coral no canto inferior-direito */
+        radial-gradient(ellipse 75% 55% at 78% 92%, oklch(0.93 0.14 55 / 0.32) 0%, transparent 62%),
+      /* Reflexo do céu — lavanda no topo-esquerda */
+        radial-gradient(ellipse 65% 48% at 10% 4%, oklch(0.85 0.09 285 / 0.24) 0%, transparent 58%),
+      /* Acento magenta suave — canto direito médio */
+        radial-gradient(
+          ellipse 55% 45% at 100% 45%,
+          oklch(0.83 0.13 330 / 0.18) 0%,
+          transparent 55%
+        );
     background-attachment: fixed;
     color: var(--color-foreground);
     font-family: "DM Sans", system-ui, sans-serif;
