@@ -450,19 +450,13 @@ export function AppHomeScreen({
         />
 
         <div className="relative">
-          <p className={`font-serif text-base font-semibold leading-snug ${heroLabel}`}>
-            Olá, {firstName} 💛
-          </p>
-
           {isMadrugada && (
-            <p className="mt-1 text-[11px] text-white/40">
-              🌙 Madrugada — tente descansar um pouco
-            </p>
+            <p className="text-[11px] text-white/40">🌙 Madrugada — tente descansar um pouco</p>
           )}
 
           {gest && baby ? (
             <>
-              {/* Bebê protagonista — centralizado, sem o círculo do saco */}
+              {/* Bebê protagonista */}
               <div className="mt-1 flex justify-center">
                 <BabyIllustration
                   week={gest.weeks}
@@ -472,33 +466,35 @@ export function AppHomeScreen({
                 />
               </div>
 
-              {/* Número de semana estilo Apple Fitness — centralizado sob o bebê */}
-              <div className="mt-1 flex items-baseline justify-center gap-1.5">
-                <p className={`font-serif text-[3.4rem] leading-none tracking-tight ${heroText}`}>
+              {/* Número de semana — centralizado, sub-textos empilhados abaixo */}
+              <div className="mt-1 flex flex-col items-center">
+                <p className={`font-serif text-[3.6rem] leading-none tracking-tight ${heroText}`}>
                   {gest.weeks}
                 </p>
-                <div className="mb-1">
-                  <p className={`text-xs font-semibold leading-tight ${heroMuted}`}>semanas</p>
-                  <p className={`text-xs ${heroMuted}`}>{gest.days} dias</p>
-                </div>
+                <p
+                  className={`mt-0.5 text-[11px] font-medium tracking-widest uppercase ${heroMuted}`}
+                >
+                  semanas{gest.days > 0 ? ` · ${gest.days} dias` : ""}
+                </p>
               </div>
 
               {babyName && (
-                <p className={`mt-0.5 text-center text-xs ${heroMuted}`}>Acompanhando {babyName}</p>
+                <p className={`mt-1 text-center text-xs ${heroMuted}`}>Acompanhando {babyName}</p>
               )}
 
-              <div className="mt-2.5 flex flex-wrap justify-center gap-2">
+              {/* Badges liquid glass */}
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
                 {[baby.size, baby.weight, `🍓 ${baby.fruit}`].map((label) => (
                   <span
                     key={label}
                     className="rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide"
                     style={{
-                      background: "rgba(255,255,255,0.20)",
-                      backdropFilter: "blur(12px)",
-                      WebkitBackdropFilter: "blur(12px)",
-                      border: "1px solid rgba(255,255,255,0.40)",
+                      background: "rgba(255,255,255,0.18)",
+                      backdropFilter: "blur(20px)",
+                      WebkitBackdropFilter: "blur(20px)",
+                      border: "1px solid rgba(255,255,255,0.35)",
                       boxShadow:
-                        "0 2px 12px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.22)",
+                        "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.20)",
                       color: darkSky ? "rgba(255,255,255,0.93)" : "rgba(30,20,14,0.82)",
                     }}
                   >
@@ -509,7 +505,7 @@ export function AppHomeScreen({
 
               {/* Barra de progresso */}
               <div className="mt-4">
-                <div className={`mb-1 flex justify-between text-[10px] ${heroMuted}`}>
+                <div className={`mb-1.5 flex justify-between text-[10px] ${heroMuted}`}>
                   <span>Início</span>
                   <span>{Math.round(progress ?? 0)}% concluído</span>
                   <span>Parto</span>
