@@ -628,13 +628,14 @@ export function AppHomeScreen({
           Acesso rápido
         </p>
         <div className="grid grid-cols-4 gap-2">
-          {GRID.map(({ Icon, label, tab, color }) => {
+          {GRID.map(({ Icon, label, tab, color }, i) => {
             const isHeartIcon = Icon === Heart;
             return (
               <button
                 key={tab}
                 onClick={() => onNavigate(tab)}
-                className="spotlight-card group flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-card p-2.5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-95 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-card)]"
+                style={{ animationDelay: `${i * 45}ms` }}
+                className="press fade-slide-up spotlight-card group flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-card p-2.5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-card)]"
               >
                 <div
                   className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-110 group-hover:-rotate-3 group-active:scale-90 ${color}`}

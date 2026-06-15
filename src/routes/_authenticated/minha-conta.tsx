@@ -336,8 +336,15 @@ function MinhaContaPage() {
 
   if (loading)
     return (
-      <div className="mx-auto max-w-5xl px-5 py-20 text-center text-muted-foreground">
-        Carregando...
+      <div className="mx-auto max-w-5xl px-5 py-8 space-y-4">
+        <div className="skeleton h-52 rounded-3xl" />
+        <div className="grid grid-cols-4 gap-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="skeleton h-[72px] rounded-2xl" />
+          ))}
+        </div>
+        <div className="skeleton h-16 rounded-3xl" />
+        <div className="skeleton h-24 rounded-3xl" />
       </div>
     );
 
@@ -516,7 +523,7 @@ function MinhaContaPage() {
             </div>
           </div>
 
-          <div className="mt-6">
+          <div key={tab} className="mt-6 tab-enter">
             <TabErrorBoundary tabName={tab}>
               {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
               {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
@@ -5098,7 +5105,10 @@ function ConsultasTab() {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Histórico de consultas</p>
         {loadingNotes ? (
-          <p className="mt-3 text-sm text-muted-foreground">Carregando...</p>
+          <div className="mt-4 space-y-2">
+            <div className="skeleton h-12 rounded-xl" />
+            <div className="skeleton h-12 rounded-xl" />
+          </div>
         ) : notes.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">Nenhuma consulta salva ainda.</p>
         ) : (
@@ -5323,7 +5333,11 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
       </div>
 
       {loading ? (
-        <p className="text-center text-sm text-muted-foreground">Carregando...</p>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="skeleton h-16 rounded-2xl" />
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
         <div className="py-14 text-center">
           <p className="text-4xl mb-3">📋</p>
@@ -6045,7 +6059,10 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {loading ? (
-        <p className="text-center text-sm text-muted-foreground">Carregando...</p>
+        <div className="space-y-3">
+          <div className="skeleton h-20 rounded-2xl" />
+          <div className="skeleton h-20 rounded-2xl" />
+        </div>
       ) : sessions.length === 0 ? (
         <div className="py-14 text-center">
           <p className="text-4xl mb-3">📱</p>

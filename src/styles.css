@@ -254,7 +254,7 @@
   /* curvas de easing usadas em todo o site — suaves, com desaceleração longa */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Transição entre páginas (View Transitions API) — cross-fade com leve subida */
@@ -276,15 +276,16 @@
   animation: vt-enter 360ms var(--ease-out-expo) both;
 }
 
-/* Feedback tátil de toque/clique — botões "afundam" levemente como no iOS */
+/* Feedback tátil de toque/clique — comprime rápido, solta com spring */
 .press {
   transition:
-    transform 240ms var(--ease-spring),
-    box-shadow 240ms var(--ease-out-quart),
+    transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 300ms var(--ease-out-quart),
     opacity 240ms var(--ease-out-quart);
 }
 .press:active {
-  transform: scale(0.965);
+  transform: scale(0.96);
+  transition-duration: 100ms, 100ms, 100ms;
 }
 
 /* Sublinhado animado para links de navegação */
@@ -522,6 +523,51 @@
   animation-delay: 1.3s;
 }
 
+/* ── Staggered fade-in — entrada em cascata para listas e grids ── */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-slide-up {
+  opacity: 0;
+  animation: fadeSlideUp 400ms var(--ease-out-expo) both;
+}
+
+/* ── Skeleton shimmer — estado de carregamento (usa shimmerMove já existente) ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    color-mix(in oklab, var(--muted) 55%, white) 50%,
+    var(--muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmerMove 1.6s ease-in-out infinite;
+}
+
+/* ── Tab transition — conteúdo desliza suavemente ao trocar aba ── */
+@keyframes tabEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tab-enter {
+  animation: tabEnter 280ms var(--ease-out-expo) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -535,6 +581,14 @@
   }
   .liquid-pulse::before,
   .liquid-pulse::after {
+    animation: none;
+  }
+  .fade-slide-up,
+  .tab-enter {
+    animation: none;
+    opacity: 1;
+  }
+  .skeleton {
     animation: none;
   }
 }
