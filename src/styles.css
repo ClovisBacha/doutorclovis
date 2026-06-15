@@ -47,7 +47,7 @@
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
   --color-primary-soft: var(--primary-soft);
-  --font-serif: var(--font-serif);
+  --font-display: var(--font-serif);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -111,7 +111,7 @@
   --shadow-float:
     0 20px 60px -20px oklch(0.3 0.02 35 / 0.14), 0 8px 24px -8px oklch(0.3 0.02 35 / 0.08);
 
-  --font-serif: "New York", ui-serif, "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  --font-serif: "DM Sans", system-ui, sans-serif;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -174,24 +174,22 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: "DM Sans", system-ui, sans-serif;
     font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    /* ── Tipografia com respiro ───────────────────────────────────
-       line-height generoso transmite calma e facilita a leitura em
-       momentos de estresse. Em vez de 1.5 (padrão browser), usamos
-       1.65 no corpo e 1.8 em parágrafos longos.                  */
-    line-height: 1.65;
-    font-size: 1rem; /* 16px — nunca menos que isso em mobile */
+    line-height: 1.6;
+    font-size: 1rem;
   }
 
   h1,
   h2,
   h3,
   .font-serif {
-    font-family: var(--font-serif);
-    letter-spacing: -0.025em;
-    line-height: 1.12; /* títulos compactos, corpo arejado */
+    font-family: "DM Sans", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
   }
 
   h1,
