@@ -607,7 +607,7 @@ export function AppHomeScreen({
       ) : (
         <button
           onClick={() => onNavigate("Consultas")}
-          className="group w-full rounded-3xl border border-dashed border-primary/25 bg-primary/4 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/40 hover:bg-primary/8"
+          className="group w-full rounded-3xl border border-primary/12 bg-primary/5 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/25 hover:bg-primary/8"
         >
           <div className="flex items-center gap-3 px-4 py-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15 text-primary transition-transform duration-300 group-hover:scale-105">

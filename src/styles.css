@@ -489,6 +489,39 @@
   transform-origin: center;
 }
 
+/* ── Liquid pulse — ondas translúcidas expandindo de um botão circular ── */
+@keyframes liquidPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.liquid-pulse {
+  position: relative;
+  isolation: isolate;
+}
+.liquid-pulse::before,
+.liquid-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.35), transparent 70%);
+  z-index: -1;
+  animation: liquidPulse 2.6s ease-out infinite;
+}
+.liquid-pulse::after {
+  animation-delay: 1.3s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -498,6 +531,10 @@
     transition-duration: 0.001ms !important;
   }
   .heartbeat-icon {
+    animation: none;
+  }
+  .liquid-pulse::before,
+  .liquid-pulse::after {
     animation: none;
   }
 }
