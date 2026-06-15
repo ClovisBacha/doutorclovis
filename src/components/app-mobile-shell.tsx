@@ -468,11 +468,19 @@ export function AppHomeScreen({
 
               {/* Número de semana — centralizado, sub-textos empilhados abaixo */}
               <div className="mt-1 flex flex-col items-center">
-                <p className={`font-serif text-[3.6rem] leading-none tracking-tight ${heroText}`}>
+                <p
+                  className={`leading-none ${heroText}`}
+                  style={{
+                    fontFamily: "'Playfair Display', Georgia, serif",
+                    fontSize: "3.4rem",
+                    fontWeight: 700,
+                    letterSpacing: "-0.01em",
+                  }}
+                >
                   {gest.weeks}
                 </p>
                 <p
-                  className={`mt-0.5 text-[11px] font-medium tracking-widest uppercase ${heroMuted}`}
+                  className={`mt-1 text-[11px] font-medium tracking-widest uppercase ${heroMuted}`}
                 >
                   semanas{gest.days > 0 ? ` · ${gest.days} dias` : ""}
                 </p>
