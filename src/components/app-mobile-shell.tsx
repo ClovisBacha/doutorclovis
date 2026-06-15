@@ -450,7 +450,7 @@ export function AppHomeScreen({
         />
 
         <div className="relative">
-          <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${heroLabel}`}>
+          <p className={`font-serif text-base font-semibold leading-snug ${heroLabel}`}>
             Olá, {firstName} 💛
           </p>
 
@@ -487,22 +487,24 @@ export function AppHomeScreen({
                 <p className={`mt-0.5 text-center text-xs ${heroMuted}`}>Acompanhando {babyName}</p>
               )}
 
-              <div className="mt-2.5 flex flex-wrap justify-center gap-1.5">
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
-                >
-                  {baby.size}
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
-                >
-                  {baby.weight}
-                </span>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm ${heroBadge}`}
-                >
-                  🍓 {baby.fruit}
-                </span>
+              <div className="mt-2.5 flex flex-wrap justify-center gap-2">
+                {[baby.size, baby.weight, `🍓 ${baby.fruit}`].map((label) => (
+                  <span
+                    key={label}
+                    className="rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide"
+                    style={{
+                      background: "rgba(255,255,255,0.20)",
+                      backdropFilter: "blur(12px)",
+                      WebkitBackdropFilter: "blur(12px)",
+                      border: "1px solid rgba(255,255,255,0.40)",
+                      boxShadow:
+                        "0 2px 12px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.22)",
+                      color: darkSky ? "rgba(255,255,255,0.93)" : "rgba(30,20,14,0.82)",
+                    }}
+                  >
+                    {label}
+                  </span>
+                ))}
               </div>
 
               {/* Barra de progresso */}
