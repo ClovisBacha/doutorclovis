@@ -466,16 +466,25 @@ export function AppHomeScreen({
                 />
               </div>
 
-              {/* Número de semana — centralizado, sub-textos empilhados abaixo */}
+              {/* Número de semana — centralizado, com efeito liquid glass */}
               <div className="mt-1 flex flex-col items-center">
                 <p
-                  className={`leading-none ${heroText}`}
+                  className="leading-none"
                   style={{
                     fontFamily: "'Nunito', system-ui, sans-serif",
                     fontSize: "3.6rem",
-                    fontWeight: 800,
+                    fontWeight: 700,
                     letterSpacing: "-0.02em",
                     fontVariantNumeric: "tabular-nums lining-nums",
+                    backgroundImage: darkSky
+                      ? "linear-gradient(170deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.72) 55%, rgba(255,255,255,0.85) 100%)"
+                      : "linear-gradient(170deg, rgba(255,255,255,0.95) 0%, rgba(70,48,38,0.55) 55%, rgba(70,48,38,0.78) 100%)",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                    color: "transparent",
+                    filter: darkSky
+                      ? "drop-shadow(0 1px 0 rgba(255,255,255,0.45)) drop-shadow(0 6px 14px rgba(0,0,0,0.18))"
+                      : "drop-shadow(0 1px 0 rgba(255,255,255,0.6)) drop-shadow(0 6px 14px rgba(0,0,0,0.10))",
                   }}
                 >
                   {gest.weeks}
