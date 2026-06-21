@@ -58,6 +58,7 @@ import {
   ACHIEVEMENT_DEFS,
   type AchievementDef,
 } from "@/lib/achievements.functions";
+import { GestacaoPath } from "@/components/gestacao-path";
 import {
   requestPrivateConsultation,
   getMyPrivateConsultations,
@@ -185,6 +186,7 @@ type Gest = ReturnType<typeof computeGestation>;
 
 const TABS = [
   "Bebê",
+  "Caminho",
   "Carta do Bebê",
   "Calendário",
   "Linha do Tempo",
@@ -233,6 +235,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
     label: "Gestação",
     tabs: [
       "Bebê",
+      "Caminho",
       "Carta do Bebê",
       "Calendário",
       "Linha do Tempo",
@@ -576,6 +579,7 @@ function MinhaContaPage() {
           <div key={tab} className="mt-6 tab-enter">
             <TabErrorBoundary tabName={tab}>
               {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
+              {tab === "Caminho" && <GestacaoPath profile={profile} gest={gest} />}
               {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
               {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
               {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
