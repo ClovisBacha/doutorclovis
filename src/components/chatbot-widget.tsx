@@ -14,6 +14,22 @@ export function ChatbotWidget() {
   const { messages, sendMessage, status } = useChat({ transport });
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // O botão só aparece quando a visitante rola PARA CIMA (sinal de que procura
+  // algo) — rolando para baixo ele some e não atrapalha a leitura do conteúdo.
+  const [showButton, setShowButton] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const delta = y - lastY;
+      if (delta < -12) setShowButton(true);
+      else if (delta > 12) setShowButton(false);
+      lastY = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, status]);
@@ -28,7 +44,11 @@ export function ChatbotWidget() {
     <>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)] transition-transform hover:scale-105"
+        className={`fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:scale-105 ${
+          open || showButton
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-24 opacity-0"
+        }`}
         aria-label="Abrir chat"
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}

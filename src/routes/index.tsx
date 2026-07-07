@@ -25,6 +25,7 @@ import { SkyCanvas, useWeatherSky } from "@/components/weather-sky";
 import {
   AppChatMockupScreen,
   AppHomeMockupScreen,
+  AppJogoMockupScreen,
   AppSaudeMockupScreen,
   PhoneFrame,
 } from "@/components/app-phone-mockup";
@@ -120,6 +121,17 @@ const SHOWCASE = [
       "Histórico vai para o médico",
     ],
     screen: "chat" as const,
+  },
+  {
+    badge: "Jornada diária",
+    title: "Cuidar virou um jogo que ela quer jogar todo dia",
+    text: "As 40 semanas viram um caminho de fases com desafios diários: abrir o baú do dia, colecionar a figurinha da fruta, manter a chama acesa. Cada desafio é uma orientação médica real — beber água, contar os chutes, agendar o exame da semana.",
+    bullets: [
+      "Desafios diários com orientação médica",
+      "Álbum de figurinhas semana a semana",
+      "Sequência de dias estilo Duolingo",
+    ],
+    screen: "jogo" as const,
   },
   {
     badge: "Saúde",
@@ -293,6 +305,7 @@ function Index() {
                 <PhoneFrame tilt={i % 2 === 1 ? "right" : "left"}>
                   {item.screen === "home" && <AppHomeMockupScreen />}
                   {item.screen === "chat" && <AppChatMockupScreen />}
+                  {item.screen === "jogo" && <AppJogoMockupScreen />}
                   {item.screen === "saude" && <AppSaudeMockupScreen />}
                 </PhoneFrame>
               </Reveal>

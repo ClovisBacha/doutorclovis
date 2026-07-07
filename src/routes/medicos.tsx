@@ -363,6 +363,118 @@ function MedicosPage() {
         </div>
       </section>
 
+      {/* ── Segundo Cérebro — IA treinada na voz do médico ─────── */}
+      <section className="px-6 py-20">
+        <div className="mx-auto max-w-5xl">
+          <Reveal>
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+                Segundo Cérebro
+              </p>
+              <h2 className="mt-3 font-serif text-3xl md:text-4xl">
+                Uma IA que responde como <em>você</em> responderia
+              </h2>
+              <p className="mt-4 text-muted-foreground">
+                Quantas vezes você já respondeu &ldquo;posso tomar dipirona?&rdquo; ou
+                &ldquo;enjoo até quando é normal?&rdquo;. Centenas. O Segundo Cérebro aprende com
+                as <strong>suas</strong> respostas, o <strong>seu</strong> jeito de acolher e as{" "}
+                <strong>suas</strong> condutas — e passa a responder as próximas mil por você, do
+                jeito que você responderia. A paciente sente que foi o médico dela que cuidou. E
+                foi: com a sua voz, multiplicada.
+              </p>
+            </div>
+          </Reveal>
+
+          {/* Comparação: IA genérica × Segundo Cérebro */}
+          <div className="mt-12 grid gap-6 md:grid-cols-2">
+            <Reveal>
+              <div className="h-full rounded-3xl border border-border bg-card p-6 opacity-75">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  🤖 IA genérica
+                </p>
+                <div className="mt-4 rounded-2xl rounded-tl-sm bg-secondary p-3.5 text-sm leading-relaxed text-muted-foreground">
+                  &ldquo;Consulte um profissional de saúde. Analgésicos podem ter contraindicações
+                  na gravidez. Não posso fornecer aconselhamento médico.&rdquo;
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Fria, evasiva, sem vínculo. A paciente sai e pergunta no Google.
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delay={0.1}>
+              <div className="h-full rounded-3xl border-2 border-primary/30 bg-card p-6 shadow-[var(--shadow-card)]">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                    🧠 Seu Segundo Cérebro
+                  </p>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary">
+                    ✓ no seu estilo
+                  </span>
+                </div>
+                <div className="mt-4 rounded-2xl rounded-tl-sm bg-primary/8 p-3.5 text-sm leading-relaxed text-foreground">
+                  &ldquo;Pode ficar tranquila, Ana 🌸 Dipirona é liberada na gestação, como sempre
+                  oriento: até 1g de 6/6h se precisar. Se a dor de cabeça vier forte ou com visão
+                  embaçada, aí quero te ver — me chama que encaixamos você.&rdquo;
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  A sua conduta, o seu tom, o seu emoji. A paciente foi acolhida — por você.
+                </p>
+              </div>
+            </Reveal>
+          </div>
+
+          {/* Como ele aprende — o loop em 3 passos */}
+          <Reveal delay={0.15}>
+            <div className="mt-10 grid gap-4 md:grid-cols-3">
+              {[
+                {
+                  n: "1",
+                  title: "Você responde uma vez",
+                  text: "Suas orientações, áudios de consulta transcritos e respostas às perguntas das pacientes viram a base de conhecimento — com o seu vocabulário e as suas condutas.",
+                },
+                {
+                  n: "2",
+                  title: "O cérebro aprende o seu jeito",
+                  text: "A IA é treinada para reproduzir o seu tom: como você acalma, como você explica, quando você chama para o consultório. Você revisa e aprova — cada aprovação o deixa mais parecido com você.",
+                },
+                {
+                  n: "3",
+                  title: "Ele responde as próximas mil",
+                  text: "Disponível 24h no app e no WhatsApp. O que você validou, ele responde na hora; o que é caso novo ou sinal de alerta, ele encaminha para você — nunca inventa conduta.",
+                },
+              ].map((s) => (
+                <div
+                  key={s.n}
+                  className="rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)]"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    {s.n}
+                  </span>
+                  <p className="mt-3 font-medium">{s.title}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{s.text}</p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+
+          {/* Fecho de convencimento */}
+          <Reveal delay={0.2}>
+            <div className="mt-10 rounded-3xl bg-[var(--gradient-primary)] p-8 text-center text-primary-foreground">
+              <p className="font-serif text-xl md:text-2xl">
+                Seu conhecimento atende uma paciente por vez.
+                <br className="hidden md:block" /> Seu Segundo Cérebro atende todas — ao mesmo
+                tempo.
+              </p>
+              <p className="mx-auto mt-3 max-w-2xl text-sm opacity-90">
+                Enquanto concorrentes usam chatbots genéricos, suas pacientes conversam com a sua
+                experiência clínica. É o tipo de diferencial que não dá para copiar: só existe um
+                médico com as suas respostas.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       {/* ── Clinical Tools ────────────────────────────────────── */}
       <section className="px-6 py-20">
         <div className="mx-auto max-w-5xl">

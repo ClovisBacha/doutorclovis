@@ -316,3 +316,95 @@ export function AppSaudeMockupScreen() {
     </div>
   );
 }
+
+/** Tela da Jornada — o caminho gamificado com desafios diários. */
+export function AppJogoMockupScreen() {
+  const node3d = (bg: string, lip: string) =>
+    ({ background: bg, boxShadow: `0 3px 0 ${lip}` }) as React.CSSProperties;
+  return (
+    <div className="space-y-2.5 px-3 pt-2">
+      <p className="font-serif text-base text-foreground">Minha jornada</p>
+
+      {/* Stats: chama · dia · figurinhas */}
+      <div className="flex items-center justify-around rounded-2xl border border-border bg-card px-2 py-1.5">
+        <span className="flex items-center gap-1 text-[9px] font-bold text-amber-500">
+          🔥 12 <span className="font-medium text-muted-foreground">dias</span>
+        </span>
+        <span className="h-4 w-px bg-border" />
+        <span className="flex items-center gap-1 text-[9px] font-bold text-sky-500">
+          📅 47º <span className="font-medium text-muted-foreground">dia</span>
+        </span>
+        <span className="h-4 w-px bg-border" />
+        <span className="flex items-center gap-1 text-[9px] font-bold text-violet-500">🏆 9</span>
+      </div>
+
+      {/* Banner da fase */}
+      <div className="flex items-center justify-between rounded-2xl bg-amber-500 px-3 py-2 text-white">
+        <div>
+          <p className="text-[7px] font-bold uppercase tracking-wider text-white/80">
+            Fase 4 · Semanas 22–28
+          </p>
+          <p className="text-[11px] font-extrabold">Crescendo forte</p>
+        </div>
+        <span className="text-lg">🌈</span>
+      </div>
+
+      {/* Caminho: figurinhas conquistadas → baú de hoje → dias travados */}
+      <div className="relative rounded-3xl border border-border bg-card px-3 pb-2 pt-1.5">
+        <p className="text-center text-[7px] font-bold uppercase tracking-wider text-muted-foreground">
+          Semana 24 🌽
+        </p>
+        <div className="mt-1 flex flex-col items-center gap-1.5">
+          <div className="ml-[-40%]">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[11px]"
+              style={node3d("#f59e0b", "#b45309")}
+            >
+              🍓
+            </div>
+          </div>
+          <div className="ml-[20%]">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black text-white"
+              style={node3d("#f59e0b", "#b45309")}
+            >
+              ✓
+            </div>
+          </div>
+          {/* Baú de hoje com balão */}
+          <div className="relative ml-[-15%]">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-white px-1.5 py-0.5 text-[6px] font-extrabold uppercase tracking-wide text-pink-500 shadow-sm">
+              Desafio de hoje 🎁
+            </div>
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-full text-sm ring-2 ring-white/70"
+              style={node3d("#f59e0b", "#b45309")}
+            >
+              🎁
+            </div>
+          </div>
+          <div className="ml-[30%]">
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[9px] font-black text-slate-400"
+              style={node3d("#e2e8f0", "#cbd5e1")}
+            >
+              5
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desafio do dia */}
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2.5">
+        <p className="text-[7px] font-bold uppercase tracking-wider text-emerald-700">
+          ✅ Complete as 3 para ganhar o dia
+        </p>
+        <div className="mt-1 space-y-0.5 text-[9px] text-emerald-900">
+          <p className="text-emerald-600 line-through">🙂 Check-in: como você está?</p>
+          <p className="text-emerald-600 line-through">📖 Ler sobre o bebê hoje</p>
+          <p>🚶‍♀️ Caminhar 20 minutos</p>
+        </div>
+      </div>
+    </div>
+  );
+}
