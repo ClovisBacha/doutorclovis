@@ -500,6 +500,82 @@ function TaskRing({ done, color }: { done: number; color: string }) {
   );
 }
 
+/* ── Pezinhos de bebê no trecho já percorrido ──
+   Entre duas moedas consecutivas COMPLETADAS, uma trilha de pegadas
+   minúsculas alternando pé esquerdo/direito, rotacionadas na direção
+   da caminhada — como se o bebê tivesse passado ali. */
+
+type Footstep = {
+  x: number; // left em %
+  y: number; // top em px
+  angle: number; // direção da caminhada em graus
+  left: boolean; // pé esquerdo (espelhado)
+  delay: number; // ms — os passos "acontecem" em sequência
+  color: string;
+};
+
+function BabyFootprint({ color }: { color: string }) {
+  // Pezinho como a referência: planta em gota + dedão interno + 4 dedinhos
+  return (
+    <svg viewBox="0 0 20 28" className="h-[13px] w-auto" aria-hidden>
+      <ellipse cx="10.5" cy="18" rx="6.5" ry="8.6" fill={color} />
+      <ellipse cx="9" cy="15" rx="4" ry="5" fill="rgba(255,255,255,0.28)" />
+      <circle cx="16" cy="7.6" r="3" fill={color} />
+      <circle cx="10.6" cy="5.4" r="2.2" fill={color} />
+      <circle cx="6.2" cy="6" r="1.9" fill={color} />
+      <circle cx="2.6" cy="7.8" r="1.6" fill={color} />
+    </svg>
+  );
+}
+
+/** Gera as pegadas entre pares consecutivos de nós já percorridos. */
+function buildFootsteps(nodes: JourneyNode[], doneDays: number[], pathWidthPx: number): Footstep[] {
+  const walkable = nodes.filter(
+    (n): n is Extract<JourneyNode, { kind: "day" | "album-week" }> =>
+      n.kind === "day" || n.kind === "album-week",
+  );
+  const walked = (n: (typeof walkable)[number]) =>
+    n.kind === "album-week" || doneDays.includes(n.D);
+
+  const steps: Footstep[] = [];
+  for (let i = 0; i < walkable.length - 1; i++) {
+    const a = walkable[i];
+    const b = walkable[i + 1];
+    // Só linhas adjacentes (sem cruzar pill de semana ou banner de fase)
+    if (b.y - a.y > 118) continue;
+    if (!walked(a) || !walked(b)) continue;
+
+    const dxPx = ((b.x - a.x) / 100) * pathWidthPx;
+    const dyPx = b.y - a.y;
+    const len = Math.hypot(dxPx, dyPx);
+    if (len < 60) continue;
+    const angle = (Math.atan2(dyPx, dxPx) * 180) / Math.PI + 90;
+    // perpendicular unitária (para afastar pé esquerdo/direito da linha)
+    const px = -dyPx / len;
+    const py = dxPx / len;
+    const week = a.kind === "day" ? a.week : a.kind === "album-week" ? a.week : 20;
+    const color = `color-mix(in oklab, ${trimMeta(week).main} 52%, white)`;
+
+    // 4 passos entre as bordas das moedas (raio ~34px de folga)
+    const t0 = Math.min(0.42, 40 / len);
+    const t1 = 1 - t0;
+    const count = 4;
+    for (let s = 0; s < count; s++) {
+      const t = t0 + ((t1 - t0) * s) / (count - 1);
+      const side = s % 2 === 0 ? 1 : -1;
+      steps.push({
+        x: a.x + (b.x - a.x) * t + ((px * side * 7) / pathWidthPx) * 100,
+        y: a.y + dyPx * t + py * side * 7,
+        angle,
+        left: side === 1,
+        delay: s * 140,
+        color,
+      });
+    }
+  }
+  return steps;
+}
+
 /* ══════════════════════════════ Componente ══════════════════════════════ */
 
 export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
@@ -581,6 +657,19 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     () => buildFullJourney(phases, journeyStartD),
     [phases, journeyStartD],
   );
+
+  // Largura real do caminho (px) — necessária para ângulo/afastamento das pegadas,
+  // já que os nós posicionam left em % e top em px
+  const pathRef = useRef<HTMLDivElement>(null);
+  const [pathW, setPathW] = useState(390);
+  useEffect(() => {
+    const measure = () => setPathW(pathRef.current?.clientWidth || 390);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  const footsteps = useMemo(() => buildFootsteps(nodes, doneDays, pathW), [nodes, doneDays, pathW]);
 
   // Centraliza o nó de HOJE na tela ao abrir (scroll da própria página)
   useEffect(() => {
@@ -720,6 +809,11 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       .dc-chest { animation: dcChestPulse 1.1s ease-in-out infinite; }
       @keyframes dcHaloPulse { 0%,100%{opacity:0.35;} 50%{opacity:1;} }
       .dc-halo { animation: dcHaloPulse 1.8s ease-in-out infinite; }
+      @keyframes dcStep {
+        from { opacity: 0; transform: scale(0.4); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .dc-step { animation: dcStep 420ms var(--ease-spring) backwards; }
       @keyframes dcStickerPop {
         0% { transform: scale(0) rotate(-12deg); }
         70% { transform: scale(1.25) rotate(4deg); }
@@ -727,7 +821,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       }
       .dc-sticker-pop { animation: dcStickerPop 700ms cubic-bezier(0.34,1.56,0.64,1) both; }
       @media (prefers-reduced-motion: reduce) {
-        .dc-confetti, .dc-chest, .dc-sticker-pop, .dc-halo { animation: none; }
+        .dc-confetti, .dc-chest, .dc-sticker-pop, .dc-halo, .dc-step { animation: none; }
       }
     `}</style>
   );
@@ -985,7 +1079,26 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
 
       {/* ── Caminho contínuo em tela cheia (Duolingo-style) ──
           Sem caixa nem scroll interno: a página inteira É o caminho. */}
-      <div className="relative -mx-5 md:mx-0" style={{ height: `${height}px` }}>
+      <div ref={pathRef} className="relative -mx-5 md:mx-0" style={{ height: `${height}px` }}>
+        {/* Pegadas do bebê no trecho já percorrido (atrás das moedas) */}
+        {footsteps.map((f, i) => (
+          <div
+            key={`f${i}`}
+            className="pointer-events-none absolute select-none"
+            style={{
+              left: `${f.x}%`,
+              top: `${f.y}px`,
+              transform: `translate(-50%,-50%) rotate(${f.angle}deg)${f.left ? " scaleX(-1)" : ""}`,
+              filter: "drop-shadow(0 1.5px 1.5px rgba(0,0,0,0.20))",
+            }}
+            aria-hidden
+          >
+            <span className="dc-step inline-block" style={{ animationDelay: `${f.delay}ms` }}>
+              <BabyFootprint color={f.color} />
+            </span>
+          </div>
+        ))}
+
         {nodes.map((node) => {
           if (node.kind === "phase-banner") {
             const p = node.phase;
