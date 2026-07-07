@@ -270,6 +270,80 @@ function lsSet(key: string, value: unknown) {
   } catch {
     /* quota/privado */
   }
+  // A jornada pertence ao PERFIL da paciente, não ao aparelho: cada escrita
+  // agenda uma sincronização do estado completo para journey_state no Supabase
+  // (o localStorage vira cache offline). Debounce para agrupar toques rápidos.
+  scheduleJourneySync();
+}
+
+/* ── Sincronização da jornada com o perfil (journey_state) ─────────────────── */
+
+const JOURNEY_PREFIX = "dc-path-";
+const SYNC_MARKER = "dc-journey-synced-at"; // fora do prefixo: não entra no blob
+
+function collectJourneyBlob(): Record<string, unknown> {
+  const blob: Record<string, unknown> = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(JOURNEY_PREFIX)) continue;
+    try {
+      blob[k] = JSON.parse(localStorage.getItem(k) ?? "null");
+    } catch {
+      /* valor corrompido: fica de fora */
+    }
+  }
+  return blob;
+}
+
+let journeySyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleJourneySync() {
+  if (typeof window === "undefined") return;
+  if (journeySyncTimer) clearTimeout(journeySyncTimer);
+  journeySyncTimer = setTimeout(async () => {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const now = new Date().toISOString();
+      const { error } = await (supabase as any)
+        .from("journey_state")
+        .upsert({ user_id: u.user.id, data: collectJourneyBlob(), updated_at: now });
+      if (!error) localStorage.setItem(SYNC_MARKER, JSON.stringify(now));
+    } catch {
+      /* offline / tabela ainda não aplicada: o localStorage segue como fonte */
+    }
+  }, 1500);
+}
+
+/**
+ * Baixa a jornada do perfil e hidrata o localStorage quando a nuvem estiver
+ * mais recente que a última sincronização deste aparelho (last-write-wins).
+ * Retorna true quando hidratou algo (o chamador re-lê os estados).
+ */
+async function pullJourneyFromProfile(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return false;
+    const { data: row, error } = await (supabase as any)
+      .from("journey_state")
+      .select("data,updated_at")
+      .eq("user_id", u.user.id)
+      .maybeSingle();
+    if (error || !row?.data) return false;
+    const localMark = lsGet<string>(SYNC_MARKER, "");
+    if (localMark && localMark >= row.updated_at) return false; // aparelho já em dia
+    for (const [k, v] of Object.entries(row.data as Record<string, unknown>)) {
+      if (!k.startsWith(JOURNEY_PREFIX)) continue; // só chaves da jornada
+      localStorage.setItem(k, JSON.stringify(v));
+    }
+    localStorage.setItem(SYNC_MARKER, JSON.stringify(row.updated_at));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function localDateStr(d = new Date()): string {
@@ -624,27 +698,48 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     [isPostDate],
   );
 
-  /* ── Carregamento + começo inteligente ── */
+  /* ── Carregamento + começo inteligente (jornada pertence ao PERFIL) ── */
   useEffect(() => {
     if (!hasGest) return;
-    setStickers(lsGet<number[]>(LS.stickers, []));
-    setDoneDays(lsGet<number[]>(LS.doneDays, []));
-    setCheckin(lsGet<Checkin>(LS.checkin, { last: "", streak: 0 }));
-    setBirth(lsGet<Birth | null>(LS.birth, null));
-    setCelebrated(lsGet<boolean>(LS.celebrated, false));
+    let cancelled = false;
 
-    let js = lsGet<JourneyStart | null>(LS.journeyStart, null);
-    if (!js) {
-      js = { date: localDateStr(), gestDay: todayD };
-      lsSet(LS.journeyStart, js);
-      if (todayD > 14 && !lsGet(LS.welcomed, false)) {
-        setShowWelcome(true);
-        lsSet(LS.welcomed, true);
+    // Leitura pura do cache local (sem criar nada ainda)
+    const hydrateFromLocal = () => {
+      setStickers(lsGet<number[]>(LS.stickers, []));
+      setDoneDays(lsGet<number[]>(LS.doneDays, []));
+      setCheckin(lsGet<Checkin>(LS.checkin, { last: "", streak: 0 }));
+      setBirth(lsGet<Birth | null>(LS.birth, null));
+      setCelebrated(lsGet<boolean>(LS.celebrated, false));
+      setJourneyStart(lsGet<JourneyStart | null>(LS.journeyStart, null));
+      setTodayTasks(lsGet<Record<string, boolean>>(LS.dayTasks(todayD), {}));
+    };
+
+    // Render imediato com o que o aparelho tem
+    hydrateFromLocal();
+
+    (async () => {
+      // Nuvem PRIMEIRO: num aparelho novo, a jornada real vem do perfil —
+      // sem isso criaríamos uma jornada zerada por cima da verdadeira.
+      const changed = await pullJourneyFromProfile();
+      if (cancelled) return;
+      if (changed) hydrateFromLocal();
+
+      // Só agora, se o perfil também não tem jornada, ela começa HOJE
+      let js = lsGet<JourneyStart | null>(LS.journeyStart, null);
+      if (!js) {
+        js = { date: localDateStr(), gestDay: todayD };
+        lsSet(LS.journeyStart, js);
+        if (todayD > 14 && !lsGet(LS.welcomed, false)) {
+          setShowWelcome(true);
+          lsSet(LS.welcomed, true);
+        }
       }
-    }
-    setJourneyStart(js);
-    // Hidrata o anel de hoje do localStorage (senão só preenche ao abrir o sheet)
-    setTodayTasks(lsGet<Record<string, boolean>>(LS.dayTasks(todayD), {}));
+      if (!cancelled) setJourneyStart(js);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [hasGest, todayD]);
 
   const journeyStartD = journeyStart?.gestDay ?? todayD;

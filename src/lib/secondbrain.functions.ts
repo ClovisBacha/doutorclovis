@@ -95,7 +95,7 @@ const SettingsSchema = z.object({
   }),
 });
 
-/** Salva as configurações do segundo cérebro (upsert da linha id=1). */
+/** Salva as configurações do cérebro DO médico (upsert por doctor_id). */
 export const saveBrainSettings = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => SettingsSchema.parse(i))
   .handler(async ({ data }) => {
