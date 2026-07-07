@@ -167,6 +167,8 @@ function PainelPage() {
     if (tab === "Teleconsultas") {
       loadTeleconsultas();
       loadPreForms();
+      // O select de pacientes da nova teleconsulta vem do engagement
+      if (!engagement) loadEngagement();
     }
     if (tab === "Consultas Pagas") loadPrivateConsults();
     if (tab === "Empresas") loadCorporate();
@@ -274,7 +276,14 @@ function PainelPage() {
         {tab === "Perguntas" && (
           <QuestionsSection questions={questions} onToggle={toggleAnswered} />
         )}
-        {tab === "Cérebro 🧠" && <CerebroSection tokenFn={token} />}
+        {tab === "Cérebro 🧠" && (
+          <CerebroSection
+            tokenFn={token}
+            onTrained={(id) =>
+              setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered: true } : x)))
+            }
+          />
+        )}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
         )}
@@ -1340,8 +1349,8 @@ function TeleconsultasSection({
               >
                 <option value="">Selecione a paciente...</option>
                 {patients.map((p) => (
-                  <option key={p.userId} value={p.userId}>
-                    {p.displayName ?? p.email ?? p.userId}
+                  <option key={p.id} value={p.id}>
+                    {p.display_name ?? p.id}
                   </option>
                 ))}
               </select>
@@ -2721,7 +2730,13 @@ function BrainToggle({
   );
 }
 
-function CerebroSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function CerebroSection({
+  tokenFn,
+  onTrained,
+}: {
+  tokenFn: () => Promise<string>;
+  onTrained: (questionId: string) => void;
+}) {
   return (
     <div className="space-y-6">
       <div>
@@ -2733,7 +2748,7 @@ function CerebroSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         </p>
       </div>
       <BrainSettingsCard tokenFn={tokenFn} />
-      <BrainTrainCard tokenFn={tokenFn} />
+      <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />
       <BrainKnowledgeCard tokenFn={tokenFn} />
       <BrainPlaygroundCard tokenFn={tokenFn} />
     </div>
@@ -2760,13 +2775,18 @@ function BrainSettingsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   async function save() {
     if (!settings) return;
     setSaving(true);
-    const res = await saveBrainSettings({ data: { accessToken: await tokenFn(), settings } });
-    setSaving(false);
-    if (!res.ok) {
+    try {
+      const res = await saveBrainSettings({ data: { accessToken: await tokenFn(), settings } });
+      if (!res.ok) {
+        toast.error("Não foi possível salvar o estilo. Tente novamente.");
+        return;
+      }
+      toast.success("Estilo do médico salvo.");
+    } catch {
       toast.error("Não foi possível salvar o estilo. Tente novamente.");
-      return;
+    } finally {
+      setSaving(false);
     }
-    toast.success("Estilo do médico salvo.");
   }
 
   return (
@@ -2847,7 +2867,13 @@ function BrainSettingsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 }
 
 /** Card "Treinar respondendo": perguntas reais das pacientes viram conhecimento. */
-function BrainTrainCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function BrainTrainCard({
+  tokenFn,
+  onTrained,
+}: {
+  tokenFn: () => Promise<string>;
+  onTrained: (questionId: string) => void;
+}) {
   const [questions, setQuestions] = useState<
     { id: string; question: string; created_at: string }[] | null
   >(null);
@@ -2866,16 +2892,23 @@ function BrainTrainCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     const answer = (answers[q.id] ?? "").trim();
     if (!answer || sendingId) return;
     setSendingId(q.id);
-    const res = await answerAndTrain({
-      data: { accessToken: await tokenFn(), questionId: q.id, answer },
-    });
-    setSendingId(null);
-    if (!res.ok) {
+    try {
+      const res = await answerAndTrain({
+        data: { accessToken: await tokenFn(), questionId: q.id, answer },
+      });
+      if (!res.ok) {
+        toast.error("Não foi possível treinar com essa resposta. Tente novamente.");
+        return;
+      }
+      setQuestions((prev) => (prev ?? []).filter((x) => x.id !== q.id));
+      // Reflete o "respondida" também na aba Perguntas e no contador do topo.
+      onTrained(q.id);
+      toast.success("🧠 O cérebro aprendeu mais uma");
+    } catch {
       toast.error("Não foi possível treinar com essa resposta. Tente novamente.");
-      return;
+    } finally {
+      setSendingId(null);
     }
-    setQuestions((prev) => (prev ?? []).filter((x) => x.id !== q.id));
-    toast.success("🧠 O cérebro aprendeu mais uma");
   }
 
   return (
@@ -2941,17 +2974,23 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
   // Busca com debounce; a primeira carga (search vazio) é imediata.
   useEffect(() => {
+    // Guard contra respostas fora de ordem: descarta resultados de buscas antigas.
+    let alive = true;
     const t = setTimeout(
       async () => {
         const res = await listBrainEntries({
           data: { accessToken: await tokenFn(), search: search.trim() || undefined },
         });
+        if (!alive) return;
         if (res.ok) setEntries(res.entries);
         else toast.error("Não foi possível carregar a base de conhecimento.");
       },
       search ? 350 : 0,
     );
-    return () => clearTimeout(t);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
   }, [search, tokenFn]);
 
   async function toggleApproved(entry: BrainEntry) {
@@ -2989,25 +3028,33 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   async function add() {
     if (!newQuestion.trim() || !newAnswer.trim() || adding) return;
     setAdding(true);
-    const res = await addBrainEntry({
-      data: {
-        accessToken: await tokenFn(),
-        question: newQuestion.trim(),
-        answer: newAnswer.trim(),
-        category: newCategory.trim() || null,
-      },
-    });
-    setAdding(false);
-    if (!res.ok || !res.entry) {
+    try {
+      const res = await addBrainEntry({
+        data: {
+          accessToken: await tokenFn(),
+          question: newQuestion.trim(),
+          answer: newAnswer.trim(),
+          category: newCategory.trim() || null,
+        },
+      });
+      if (!res.ok || !res.entry) {
+        toast.error("Não foi possível adicionar a entrada. Tente novamente.");
+        return;
+      }
+      const entry = res.entry;
+      // Com busca ativa, limpa o filtro (o effect recarrega a lista completa,
+      // já com a nova entrada); sem busca, insere direto no topo.
+      if (search) setSearch("");
+      else setEntries((prev) => [entry, ...(prev ?? [])]);
+      setNewQuestion("");
+      setNewAnswer("");
+      setNewCategory("");
+      toast.success("🧠 O cérebro aprendeu mais uma");
+    } catch {
       toast.error("Não foi possível adicionar a entrada. Tente novamente.");
-      return;
+    } finally {
+      setAdding(false);
     }
-    const entry = res.entry;
-    setEntries((prev) => [entry, ...(prev ?? [])]);
-    setNewQuestion("");
-    setNewAnswer("");
-    setNewCategory("");
-    toast.success("🧠 O cérebro aprendeu mais uma");
   }
 
   return (
@@ -3128,17 +3175,22 @@ function BrainPlaygroundCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     const q = question.trim();
     if (!q || asking) return;
     setAsking(true);
-    const res = await testBrain({ data: { accessToken: await tokenFn(), question: q } });
-    setAsking(false);
-    if (!res.ok) {
-      toast.error(
-        "answer" in res && res.answer
-          ? res.answer
-          : "Não foi possível testar o cérebro. Tente novamente.",
-      );
-      return;
+    try {
+      const res = await testBrain({ data: { accessToken: await tokenFn(), question: q } });
+      if (!res.ok) {
+        toast.error(
+          "answer" in res && res.answer
+            ? res.answer
+            : "Não foi possível testar o cérebro. Tente novamente.",
+        );
+        return;
+      }
+      setResult({ question: q, answer: res.answer });
+    } catch {
+      toast.error("Não foi possível testar o cérebro. Tente novamente.");
+    } finally {
+      setAsking(false);
     }
-    setResult({ question: q, answer: res.answer });
   }
 
   return (

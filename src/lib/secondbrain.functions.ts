@@ -61,11 +61,12 @@ export const getBrainSettings = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: row } = await (supabaseAdmin as any)
+    const { data: row, error } = await (supabaseAdmin as any)
       .from("brain_settings")
       .select("persona,sample_phrases,rules,enabled_app,enabled_whatsapp")
       .eq("id", 1)
       .maybeSingle();
+    if (error) return { ok: false as const };
 
     // Linha id=1 ainda não existe → devolve os defaults sem criar.
     const settings: BrainSettings = row ?? DEFAULT_SETTINGS;
@@ -122,7 +123,8 @@ export const listBrainEntries = createServerFn({ method: "POST" })
       query = query.or(`question.ilike.%${search}%,answer.ilike.%${search}%`);
     }
 
-    const { data: rows } = await query;
+    const { data: rows, error } = await query;
+    if (error) return { ok: false as const };
     return { ok: true as const, entries: (rows ?? []) as BrainEntry[] };
   });
 
@@ -196,10 +198,7 @@ export const deleteBrainEntry = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { error } = await (supabaseAdmin as any)
-      .from("brain_entries")
-      .delete()
-      .eq("id", data.id);
+    const { error } = await (supabaseAdmin as any).from("brain_entries").delete().eq("id", data.id);
     return { ok: !error };
   });
 
@@ -242,26 +241,38 @@ export const answerAndTrain = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Só perguntas ainda não respondidas: evita entrada duplicada em
+    // duplo clique/duas abas respondendo a mesma pergunta.
     const { data: question } = await (supabaseAdmin as any)
       .from("doctor_questions")
       .select("id,question")
       .eq("id", data.questionId)
+      .eq("answered", false)
       .maybeSingle();
     if (!question) return { ok: false as const };
 
-    const { error: insertError } = await (supabaseAdmin as any).from("brain_entries").insert({
-      question: question.question,
-      answer: data.answer,
-      source: "pergunta",
-      approved: true,
-    });
-    if (insertError) return { ok: false as const };
+    const { data: entry, error: insertError } = await (supabaseAdmin as any)
+      .from("brain_entries")
+      .insert({
+        question: question.question,
+        answer: data.answer,
+        source: "pergunta",
+        approved: true,
+      })
+      .select("id")
+      .single();
+    if (insertError || !entry) return { ok: false as const };
 
     const { error: updateError } = await (supabaseAdmin as any)
       .from("doctor_questions")
       .update({ answered: true })
       .eq("id", data.questionId);
-    return { ok: !updateError };
+    if (updateError) {
+      // Compensação: desfaz a entry recém-criada para o retry não duplicar.
+      await (supabaseAdmin as any).from("brain_entries").delete().eq("id", entry.id);
+      return { ok: false as const };
+    }
+    return { ok: true as const };
   });
 
 const TestSchema = z.object({
@@ -277,7 +288,8 @@ export const testBrain = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
 
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (!key) return { ok: false as const, answer: "GOOGLE_GENERATIVE_AI_API_KEY não configurada." };
+    if (!key)
+      return { ok: false as const, answer: "GOOGLE_GENERATIVE_AI_API_KEY não configurada." };
 
     const [{ getBrainContext }, { generateText }, { createChatProvider, DEFAULT_CHAT_MODEL }] =
       await Promise.all([
