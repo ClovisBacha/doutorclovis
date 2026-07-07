@@ -56,6 +56,22 @@ CREATE POLICY "own journey" ON public.journey_state
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.journey_state TO authenticated;
 GRANT ALL ON public.journey_state TO service_role;
 
+-- updated_at SEMPRE do relógio do SERVIDOR: o last-write-wins entre aparelhos
+-- não pode depender do relógio (possivelmente errado) de cada celular
+CREATE OR REPLACE FUNCTION public.touch_journey_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_journey_touch ON public.journey_state;
+CREATE TRIGGER trg_journey_touch
+  BEFORE INSERT OR UPDATE ON public.journey_state
+  FOR EACH ROW EXECUTE FUNCTION public.touch_journey_updated_at();
+
 -- 4. Resolução robusta de uid por e-mail (para achar o médico dono sem varrer
 --    listUsers, que inclui todas as pacientes). SECURITY DEFINER, exposta só
 --    ao service_role — as server functions chamam via supabaseAdmin.rpc.

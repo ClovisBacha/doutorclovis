@@ -297,19 +297,33 @@ function collectJourneyBlob(): Record<string, unknown> {
 
 let journeySyncTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Barreira anti-corrida: NENHUM push acontece antes de o pull inicial do
+// perfil terminar — senão um toque rápido num aparelho novo empurraria o
+// blob zerado por cima da jornada real na nuvem (e o marcador bloquearia a
+// hidratação em seguida). Atribuída no mount; resolvida = passa direto.
+let initialPullGate: Promise<unknown> = Promise.resolve();
+
 function scheduleJourneySync() {
   if (typeof window === "undefined") return;
   if (journeySyncTimer) clearTimeout(journeySyncTimer);
   journeySyncTimer = setTimeout(async () => {
     try {
+      await initialPullGate; // espera o pull do mount (instantâneo se já resolvido)
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
-      const now = new Date().toISOString();
-      const { error } = await (supabase as any)
+      // LWW de blob INTEIRO: dois aparelhos online no mesmo dia → o push mais
+      // tardio vence por completo (perda granular aceita pelo produto).
+      // updated_at é do SERVIDOR (trigger touch_journey_updated_at) para o
+      // relógio do aparelho não distorcer o last-write-wins.
+      const { data: row, error } = await (supabase as any)
         .from("journey_state")
-        .upsert({ user_id: u.user.id, data: collectJourneyBlob(), updated_at: now });
-      if (!error) localStorage.setItem(SYNC_MARKER, JSON.stringify(now));
+        .upsert({ user_id: u.user.id, data: collectJourneyBlob() })
+        .select("updated_at")
+        .maybeSingle();
+      if (!error && row?.updated_at) {
+        localStorage.setItem(SYNC_MARKER, JSON.stringify(row.updated_at));
+      }
     } catch {
       /* offline / tabela ainda não aplicada: o localStorage segue como fonte */
     }
@@ -684,6 +698,9 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   // estado de outros dias abertos no sheet (dayTasks muda a cada openDay)
   const [todayTasks, setTodayTasks] = useState<Record<string, boolean>>({});
   const [showWelcome, setShowWelcome] = useState(false);
+  // Incrementa quando o pull da nuvem hidrata o localStorage — filhos que leem
+  // no mount (PosPartoJourney) usam como key para remontar com dados frescos
+  const [hydratedAt, setHydratedAt] = useState(0);
 
   // Lazy init: evita flash da tela errada no primeiro render (rota é ssr:false)
   const [birth, setBirth] = useState<Birth | null>(() => lsGet<Birth | null>(LS.birth, null));
@@ -720,9 +737,17 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     (async () => {
       // Nuvem PRIMEIRO: num aparelho novo, a jornada real vem do perfil —
       // sem isso criaríamos uma jornada zerada por cima da verdadeira.
-      const changed = await pullJourneyFromProfile();
+      // A mesma promise vira a barreira que segura qualquer push (P1).
+      const pullPromise = pullJourneyFromProfile();
+      initialPullGate = pullPromise.catch(() => {});
+      const changed = await pullPromise;
       if (cancelled) return;
-      if (changed) hydrateFromLocal();
+      if (changed) {
+        hydrateFromLocal();
+        // Filhos que leem o localStorage no próprio mount (PosPartoJourney)
+        // remontam via key para reler o estado recém-baixado (P2)
+        setHydratedAt((n) => n + 1);
+      }
 
       // Só agora, se o perfil também não tem jornada, ela começa HOJE
       let js = lsGet<JourneyStart | null>(LS.journeyStart, null);
@@ -977,6 +1002,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   if (birth && celebrated) {
     return (
       <PosPartoJourney
+        key={`pos-${hydratedAt}`}
         babyLabel={babyLabel}
         birth={birth}
         checkedToday={checkedToday}
