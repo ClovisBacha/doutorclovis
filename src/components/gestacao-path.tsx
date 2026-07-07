@@ -316,8 +316,9 @@ function posMeta(week: number) {
   };
 }
 
-const LOCKED = { main: "#e2e8f0", lip: "#cbd5e1" };
-const MISSED = { main: "#fce7f3", lip: "#f3cfe2" };
+// Lábios bem mais escuros que o corpo: a moeda 3D precisa ler como moeda mesmo cinza
+const LOCKED = { main: "#dde5ee", lip: "#9fb0c4" };
+const MISSED = { main: "#fbd3e8", lip: "#ef9fca" };
 
 const CONFETTI_COLORS = ["#ec4899", "#f59e0b", "#8b5cf6", "#38bdf8", "#34d399", "#fbbf24"];
 
@@ -396,6 +397,109 @@ function buildPhaseNodes(
   return { nodes, height: y + 40 };
 }
 
+/* ── Caminho contínuo estilo Duolingo: todas as fases numa página só ── */
+
+const IDAY_ROW = 104;
+const IALBUM_ROW = 112;
+const IWEEK_HEADER = 72; // folga para o balão "Desafio de hoje" não cobrir o pill da semana
+const IBANNER_ROW = 120;
+
+type JourneyNode =
+  | PathNode
+  | { kind: "phase-banner"; phase: Phase; y: number }
+  | { kind: "mascot"; emoji: string; y: number; x: number };
+
+const MASCOTS = ["🧸", "🦢", "🌷", "🍼", "🐘", "🌈", "🐥", "🧦"];
+
+/** Uma página só: banners de seção entre as fases, dias grandes, mascotes ao lado. */
+function buildFullJourney(
+  phases: Phase[],
+  journeyStartD: number,
+): { nodes: JourneyNode[]; height: number } {
+  const nodes: JourneyNode[] = [];
+  let y = 8;
+  let row = 0;
+  let mascotIdx = 0;
+  const xOf = (r: number) => 50 + 26 * Math.sin((r * Math.PI) / 4);
+
+  // Mascote grande ao lado do caminho (Duolingo), do lado oposto ao nó da linha
+  const maybeMascot = (x: number, rowY: number, rowH: number) => {
+    if (row % 5 !== 2) return;
+    nodes.push({
+      kind: "mascot",
+      emoji: MASCOTS[mascotIdx++ % MASCOTS.length],
+      y: rowY + rowH / 2,
+      x: x < 50 ? Math.min(x + 44, 82) : Math.max(x - 44, 18),
+    });
+  };
+
+  for (const p of phases) {
+    nodes.push({ kind: "phase-banner", phase: p, y });
+    y += IBANNER_ROW;
+    for (let w = p.from; w <= p.to; w++) {
+      const weekStartD = w * 7;
+      const weekEndD = w * 7 + 6;
+      if (weekEndD < journeyStartD) {
+        const x = xOf(row);
+        nodes.push({ kind: "album-week", week: w, y: y + IALBUM_ROW / 2, x, row });
+        maybeMascot(x, y, IALBUM_ROW);
+        y += IALBUM_ROW;
+        row++;
+      } else {
+        nodes.push({ kind: "week-header", week: w, y });
+        y += IWEEK_HEADER;
+        for (let D = Math.max(weekStartD, journeyStartD); D <= weekEndD; D++) {
+          const x = xOf(row);
+          nodes.push({ kind: "day", D, week: w, y: y + IDAY_ROW / 2, x, row });
+          maybeMascot(x, y, IDAY_ROW);
+          y += IDAY_ROW;
+          row++;
+        }
+      }
+    }
+  }
+  return { nodes, height: y + 40 };
+}
+
+/* ── Anel de progresso segmentado (Duolingo): 3 segmentos = 3 tarefas do dia ── */
+
+function polar(cx: number, cy: number, r: number, deg: number) {
+  const rad = ((deg - 90) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+function arcPath(cx: number, cy: number, r: number, start: number, end: number) {
+  const s = polar(cx, cy, r, start);
+  const e = polar(cx, cy, r, end);
+  const large = end - start > 180 ? 1 : 0;
+  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
+}
+
+function TaskRing({ done, color }: { done: number; color: string }) {
+  // 3 segmentos de 104° com folgas de 16°, começando no topo
+  const segs = [0, 1, 2].map((i) => {
+    const start = i * 120 + 8;
+    return arcPath(50, 50, 46, start, start + 104);
+  });
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      className="pointer-events-none absolute -inset-[9px] h-[calc(100%+18px)] w-[calc(100%+18px)]"
+      aria-hidden
+    >
+      {segs.map((d, i) => (
+        <path
+          key={i}
+          d={d}
+          fill="none"
+          stroke={i < done ? color : "oklch(0.91 0.01 40)"}
+          strokeWidth="7"
+          strokeLinecap="round"
+        />
+      ))}
+    </svg>
+  );
+}
+
 /* ══════════════════════════════ Componente ══════════════════════════════ */
 
 export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
@@ -407,7 +511,6 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   const isPostDate = hasGest && rawD > 286; // passou da semana 40
   const isBeyond42 = hasGest && rawD > 300; // passou da semana 42
 
-  const containerRef = useRef<HTMLDivElement>(null);
   const [sheet, setSheet] = useState<
     { kind: "day"; D: number } | { kind: "album"; week: number } | null
   >(null);
@@ -419,7 +522,6 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   const [checkin, setCheckin] = useState<Checkin>({ last: "", streak: 0 });
   const [dayTasks, setDayTasks] = useState<Record<string, boolean>>({});
   const [showWelcome, setShowWelcome] = useState(false);
-  const [selectedPhase, setSelectedPhase] = useState<number>(0);
 
   // Lazy init: evita flash da tela errada no primeiro render (rota é ssr:false)
   const [birth, setBirth] = useState<Birth | null>(() => lsGet<Birth | null>(LS.birth, null));
@@ -453,9 +555,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       }
     }
     setJourneyStart(js);
-    const idx = phases.findIndex((p) => p === phaseOfWeek(phases, currentWeek));
-    setSelectedPhase(idx >= 0 ? idx : 0);
-  }, [hasGest, todayD, currentWeek, phases]);
+  }, [hasGest, todayD]);
 
   const journeyStartD = journeyStart?.gestDay ?? todayD;
 
@@ -471,33 +571,22 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     return s;
   }, [doneDays, todayD, hasGest]);
 
-  const phase = phases[selectedPhase] ?? phases[0];
-  const currentPhase = phaseOfWeek(phases, currentWeek);
-
+  // Caminho contínuo: todas as fases numa página só, como o Duolingo
   const { nodes, height } = useMemo(
-    () => buildPhaseNodes(phase, journeyStartD),
-    [phase, journeyStartD],
+    () => buildFullJourney(phases, journeyStartD),
+    [phases, journeyStartD],
   );
 
-  const phaseProgress = useMemo(() => {
-    const from = Math.max(phase.from * 7, journeyStartD);
-    const to = Math.min(phase.to * 7 + 6, todayD);
-    if (to < from) return { done: 0, total: 0 };
-    const total = to - from + 1;
-    const done = doneDays.filter((d) => d >= from && d <= to).length;
-    return { done, total };
-  }, [phase, journeyStartD, todayD, doneDays]);
-
+  // Centraliza o nó de HOJE na tela ao abrir (scroll da própria página)
   useEffect(() => {
-    if (!containerRef.current || !hasGest || birth) return;
-    const el = containerRef.current;
-    const target = nodes.find((n) => n.kind === "day" && n.D === todayD);
-    const y = target?.y ?? 0;
+    if (!hasGest || birth) return;
     const t = setTimeout(() => {
-      el.scrollTo({ top: Math.max(0, y - el.clientHeight / 2), behavior: "smooth" });
-    }, 400);
+      document
+        .getElementById("dc-today-node")
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 450);
     return () => clearTimeout(t);
-  }, [nodes, todayD, hasGest, birth]);
+  }, [hasGest, birth, todayD]);
 
   const checkedToday = checkin.last === localDateStr();
 
@@ -623,6 +712,8 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       .dc-confetti { animation: dcConfettiFall 1.6s ease-in both; }
       @keyframes dcChestPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.12);} }
       .dc-chest { animation: dcChestPulse 1.1s ease-in-out infinite; }
+      @keyframes dcHaloPulse { 0%,100%{opacity:0.35;} 50%{opacity:1;} }
+      .dc-halo { animation: dcHaloPulse 1.8s ease-in-out infinite; }
       @keyframes dcStickerPop {
         0% { transform: scale(0) rotate(-12deg); }
         70% { transform: scale(1.25) rotate(4deg); }
@@ -630,7 +721,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       }
       .dc-sticker-pop { animation: dcStickerPop 700ms cubic-bezier(0.34,1.56,0.64,1) both; }
       @media (prefers-reduced-motion: reduce) {
-        .dc-confetti, .dc-chest, .dc-sticker-pop { animation: none; }
+        .dc-confetti, .dc-chest, .dc-sticker-pop, .dc-halo { animation: none; }
       }
     `}</style>
   );
@@ -845,8 +936,8 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="flex items-center justify-around rounded-2xl bg-white/70 px-3 py-2.5 backdrop-blur-sm shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+      {/* Stats — faixa sólida fixa no topo (Duolingo): conteúdo passa por baixo limpo */}
+      <div className="sticky top-0 z-30 -mx-5 flex items-center justify-around border-b border-border/60 bg-background/95 px-6 py-3 backdrop-blur-md md:mx-0 md:rounded-2xl md:border">
         <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
           <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
           <span className="text-lg font-extrabold text-amber-500">{streak}</span>
@@ -886,167 +977,188 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         </div>
       )}
 
-      {/* Seletor de fases (bônus ⏳ só aparece no pós-data) */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {phases.map((p, i) => {
-          const isCurrent = p === currentPhase;
-          const locked = p.from * 7 > todayD;
-          const isSelected = i === selectedPhase;
-          return (
-            <button
-              key={p.n}
-              onClick={() => setSelectedPhase(i)}
-              disabled={locked}
-              className={`press flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-all disabled:cursor-not-allowed ${
-                isSelected
-                  ? `${trimMeta(p.from).banner} text-white shadow-sm`
-                  : locked
-                    ? "bg-slate-100 text-slate-300"
-                    : "bg-white/80 text-slate-500"
-              }`}
-            >
-              {locked ? "🔒" : p.emoji} Fase {p.n}
-              {isCurrent && !isSelected && <span className="ml-1">•</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        className={`flex items-center justify-between rounded-2xl ${trimMeta(phase.from).banner} px-5 py-4 text-white shadow-md`}
-      >
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-white/80">
-            Fase {phase.n} · Semanas {phase.from}–{phase.to}
-          </p>
-          <p className="mt-0.5 text-xl font-extrabold">{phase.name}</p>
-          {phaseProgress.total > 0 && (
-            <p className="mt-0.5 text-xs font-semibold text-white/75">
-              {phaseProgress.done} de {phaseProgress.total} desafios completos
-            </p>
-          )}
-        </div>
-        <div className="text-4xl">{phase.emoji}</div>
-      </div>
-
-      {/* Caminho */}
-      <div
-        ref={containerRef}
-        className="relative overflow-y-auto rounded-3xl bg-gradient-to-b from-white/60 to-white/30 backdrop-blur-sm"
-        style={{ height: "60vh" }}
-      >
-        <div className="relative" style={{ height: `${height}px` }}>
-          {nodes.map((node) => {
-            if (node.kind === "week-header") {
-              const tm = trimMeta(node.week);
-              return (
-                <div
-                  key={`h${node.week}`}
-                  className="absolute left-1/2 -translate-x-1/2"
-                  style={{ top: `${node.y + 8}px` }}
-                >
-                  <span
-                    className={`rounded-full bg-white/90 px-3 py-1 text-[11px] font-extrabold shadow-sm ${tm.softText}`}
-                  >
-                    Semana {node.week} {FRUIT_EMOJI[node.week] ?? ""}
-                    {MILESTONES[node.week] ? ` · ${MILESTONES[node.week].emoji}` : ""}
-                  </span>
-                </div>
-              );
-            }
-
-            if (node.kind === "album-week") {
-              const collected = stickers.includes(node.week);
-              return (
-                <button
-                  key={`a${node.week}`}
-                  onClick={() => openAlbum(node.week)}
-                  className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none"
-                  style={{ left: `${node.x}%`, top: `${node.y}px` }}
-                  aria-label={`Álbum semana ${node.week}`}
-                >
-                  <div
-                    className="duo3d flex h-16 w-16 items-center justify-center rounded-full"
-                    style={
-                      {
-                        background: collected ? "#fdf2f8" : "#f1f5f9",
-                        "--lip": collected ? "#fbcfe8" : "#e2e8f0",
-                      } as React.CSSProperties
-                    }
-                  >
-                    <span className={`text-2xl ${collected ? "" : "opacity-40 grayscale"}`}>
-                      {FRUIT_EMOJI[node.week] ?? "🍼"}
-                    </span>
-                  </div>
-                  <span className="mt-1 text-[10px] font-bold text-slate-400">
-                    S{node.week} · memória {collected ? "💜" : "📖"}
-                  </span>
-                </button>
-              );
-            }
-
-            const { D, week } = node;
-            const isToday = D === todayD;
-            const done = doneDays.includes(D);
-            const isPast = D < todayD;
-            const isFuture = D > todayD;
-            const tm = trimMeta(week);
-            const palette = done || isToday ? tm : isPast ? MISSED : LOCKED;
-            const dia = isToday ? 72 : 52;
-            const dayOfWeek = (D % 7) + 1;
-
+      {/* ── Caminho contínuo em tela cheia (Duolingo-style) ──
+          Sem caixa nem scroll interno: a página inteira É o caminho. */}
+      <div className="relative -mx-5 md:mx-0" style={{ height: `${height}px` }}>
+        {nodes.map((node) => {
+          if (node.kind === "phase-banner") {
+            const p = node.phase;
+            const tm = trimMeta(p.from);
+            const locked = p.from * 7 > todayD;
             return (
-              <div key={`d${D}`}>
-                <button
-                  onClick={() => openDay(D)}
-                  disabled={isFuture}
-                  className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none disabled:cursor-not-allowed"
-                  style={{ left: `${node.x}%`, top: `${node.y}px` }}
-                  aria-label={`Dia ${dayOfWeek} da semana ${week}`}
+              <div
+                key={`b${p.n}`}
+                className="absolute inset-x-4 md:inset-x-0"
+                style={{ top: `${node.y}px` }}
+              >
+                <div
+                  className={`flex items-center justify-between rounded-2xl ${locked ? "bg-slate-300" : tm.banner} px-5 py-4 text-white`}
+                  style={{
+                    boxShadow: `0 4px 0 ${locked ? "#94a3b8" : tm.lip}, 0 10px 24px -10px rgba(0,0,0,0.18)`,
+                  }}
                 >
-                  {isToday && (
-                    <div className="duo-bubble absolute -top-10 z-20 whitespace-nowrap">
-                      <div className="relative rounded-xl bg-white px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-pink-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
-                        {done ? "Desafio completo ✓" : "Desafio de hoje 🎁"}
-                        <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-white" />
-                      </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-white/80">
+                      Fase {p.n} · Semanas {p.from}–{p.to}
+                    </p>
+                    <p className="mt-0.5 text-xl font-extrabold">{p.name}</p>
+                  </div>
+                  <div className={`text-4xl ${locked ? "opacity-50 grayscale" : ""}`}>
+                    {locked ? "🔒" : p.emoji}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (node.kind === "mascot") {
+            return (
+              <div
+                key={`m${node.y}`}
+                className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 select-none"
+                style={{ left: `${node.x}%`, top: `${node.y}px` }}
+                aria-hidden
+              >
+                <div className="float-slow text-7xl drop-shadow-[0_8px_10px_rgba(0,0,0,0.12)]">
+                  {node.emoji}
+                </div>
+                <div className="mx-auto mt-1.5 h-2.5 w-14 rounded-full bg-slate-900/10 blur-[3px]" />
+              </div>
+            );
+          }
+
+          if (node.kind === "week-header") {
+            const tm = trimMeta(node.week);
+            return (
+              <div
+                key={`h${node.week}`}
+                className="absolute left-1/2 -translate-x-1/2"
+                style={{ top: `${node.y + 8}px` }}
+              >
+                <span
+                  className={`rounded-full bg-white/90 px-3.5 py-1 text-[11px] font-extrabold shadow-sm backdrop-blur-sm ${tm.softText}`}
+                >
+                  Semana {node.week} {FRUIT_EMOJI[node.week] ?? ""}
+                  {MILESTONES[node.week] ? ` · ${MILESTONES[node.week].emoji}` : ""}
+                </span>
+              </div>
+            );
+          }
+
+          if (node.kind === "album-week") {
+            const collected = stickers.includes(node.week);
+            const tm = trimMeta(node.week);
+            // Desbloqueado é COLORIDO (Duolingo): cinza fica só para o futuro.
+            // Não colecionada = moeda mais clara da mesma cor, convidando o toque.
+            return (
+              <button
+                key={`a${node.week}`}
+                onClick={() => openAlbum(node.week)}
+                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none"
+                style={{ left: `${node.x}%`, top: `${node.y}px` }}
+                aria-label={`Memória da semana ${node.week}`}
+              >
+                <div
+                  className="duo3d flex h-16 w-16 items-center justify-center rounded-full"
+                  style={
+                    {
+                      background: collected
+                        ? `linear-gradient(180deg, color-mix(in oklab, ${tm.main} 82%, white) 0%, ${tm.main} 55%)`
+                        : `color-mix(in oklab, ${tm.main} 38%, white)`,
+                      "--lip": collected ? tm.lip : `color-mix(in oklab, ${tm.lip} 55%, white)`,
+                      boxShadow: `0 6px 0 var(--lip)`,
+                    } as React.CSSProperties
+                  }
+                >
+                  <span className="text-2xl">{FRUIT_EMOJI[node.week] ?? "🍼"}</span>
+                </div>
+              </button>
+            );
+          }
+
+          const { D, week } = node;
+          const isToday = D === todayD;
+          const done = doneDays.includes(D);
+          const isPast = D < todayD;
+          const isFuture = D > todayD;
+          const tm = trimMeta(week);
+          const palette = done || isToday ? tm : isPast ? MISSED : LOCKED;
+          const dia = isToday ? 84 : 64;
+          const dayOfWeek = (D % 7) + 1;
+          const tasksDone = isToday
+            ? [checkedToday || dayTasks.humor, dayTasks.desafio, dayTasks.leitura].filter(Boolean)
+                .length
+            : 0;
+
+          return (
+            <div key={`d${D}`}>
+              <button
+                id={isToday ? "dc-today-node" : undefined}
+                onClick={() => openDay(D)}
+                disabled={isFuture}
+                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none disabled:cursor-not-allowed"
+                style={{ left: `${node.x}%`, top: `${node.y}px` }}
+                aria-label={`Dia ${dayOfWeek} da semana ${week}`}
+              >
+                {isToday && (
+                  <div className="duo-bubble absolute -top-11 z-20 whitespace-nowrap">
+                    <div className="relative rounded-xl bg-white px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-pink-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
+                      {done ? "Desafio completo ✓" : "Desafio de hoje 🎁"}
+                      <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-white" />
                     </div>
+                  </div>
+                )}
+                <div className="relative">
+                  {/* Halo pulsante convida o toque (opacity-only, zero repaint) */}
+                  {isToday && !done && (
+                    <span
+                      className="dc-halo pointer-events-none absolute inset-0 rounded-full"
+                      style={{ boxShadow: `0 0 30px 6px ${tm.main}55` }}
+                    />
                   )}
+                  {/* Anel segmentado: 3 segmentos = as 3 tarefas de hoje */}
+                  {isToday && <TaskRing done={done ? 3 : tasksDone} color={tm.main} />}
                   <div
-                    className={`duo3d flex items-center justify-center rounded-full ${
-                      isToday ? "ring-4 ring-white/70" : ""
-                    } ${isToday && !done ? "dc-chest" : ""}`}
+                    className={`duo3d relative flex items-center justify-center overflow-hidden rounded-full ${
+                      isToday && !done ? "dc-chest" : ""
+                    }`}
                     style={
                       {
                         width: `${dia}px`,
                         height: `${dia}px`,
-                        background: palette.main,
+                        background: `linear-gradient(180deg, color-mix(in oklab, ${palette.main} 82%, white) 0%, ${palette.main} 55%)`,
                         "--lip": palette.lip,
+                        boxShadow: `0 ${isToday ? 8 : 6}px 0 ${palette.lip}`,
                       } as React.CSSProperties
                     }
                   >
                     {isToday && !done ? (
-                      <span className="text-2xl">🎁</span>
+                      <span className="text-3xl">🎁</span>
                     ) : done ? (
-                      <span className={`font-black text-white ${isToday ? "text-2xl" : "text-lg"}`}>
+                      <span
+                        className={`font-black text-white ${isToday ? "text-3xl" : "text-2xl"}`}
+                      >
                         ✓
                       </span>
                     ) : (
                       <span
-                        className={`font-black tabular-nums ${
+                        className={`text-base font-black tabular-nums ${
                           isFuture ? "text-slate-400" : "text-pink-300"
-                        } text-sm`}
+                        }`}
                       >
                         {dayOfWeek}
                       </span>
                     )}
                   </div>
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              </button>
+            </div>
+          );
+        })}
       </div>
+
+      {/* Folga para a barra de navegação inferior do app */}
+      <div className="h-16" />
 
       {/* Sheet de DIA */}
       {sheet?.kind === "day" &&
