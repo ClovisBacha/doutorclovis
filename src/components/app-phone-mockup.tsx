@@ -46,8 +46,8 @@ export function PhoneFrame({
       <div className="relative rounded-[2.8rem] border-[10px] border-[oklch(0.2_0.01_270)] bg-[oklch(0.2_0.01_270)] shadow-[0_24px_80px_-24px_rgba(0,0,0,0.45)]">
         {/* dynamic island */}
         <div className="absolute left-1/2 top-2.5 z-20 h-6 w-24 -translate-x-1/2 rounded-full bg-[oklch(0.2_0.01_270)]" />
-        {/* tela */}
-        <div className="relative h-[560px] overflow-hidden rounded-[2.1rem] bg-background">
+        {/* tela — shine varre o vidro no hover */}
+        <div className="shine relative h-[560px] overflow-hidden rounded-[2.1rem] bg-background">
           {/* status bar */}
           <div className="relative z-10 flex items-center justify-between px-6 pt-3 text-[10px] font-semibold text-foreground">
             <span>9:41</span>

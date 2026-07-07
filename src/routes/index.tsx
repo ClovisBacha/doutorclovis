@@ -377,7 +377,7 @@ function Index() {
             { v: 98, s: "%", l: "de satisfação" },
           ].map((n, i) => (
             <Reveal key={n.l} variant="scale" delay={i * 110}>
-              <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)] hover-lift">
+              <div className="shine relative overflow-hidden rounded-2xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)] hover-lift">
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/10" />
                 <p className="relative font-serif text-5xl text-primary">
                   <AnimatedCounter value={n.v} suffix={n.s} />
@@ -472,7 +472,7 @@ function Index() {
               <Magnetic>
                 <Link
                   to="/auth"
-                  className="press flex items-center gap-2 rounded-full bg-background px-6 py-3 text-sm font-medium text-primary shadow-lg shadow-black/10"
+                  className="press glow-cta flex items-center gap-2 rounded-full bg-background px-6 py-3 text-sm font-medium text-primary shadow-lg shadow-black/10"
                 >
                   <Smartphone className="h-4 w-4" /> Entrar no App
                 </Link>

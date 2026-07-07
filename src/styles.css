@@ -306,6 +306,14 @@
   transform: scale(0.96);
   transition-duration: 100ms, 100ms, 100ms;
 }
+/* Hover levanta 1px — sem box-shadow aqui de propósito: sombras pertencem a cada
+   superfície (.glass-*, shadow-*) e uma sombra genérica atropelaria todas elas. */
+.press:hover {
+  transform: translateY(-1px);
+}
+.press:hover:active {
+  transform: scale(0.96);
+}
 
 /* Sublinhado animado para links de navegação */
 .nav-link {
@@ -623,6 +631,107 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
+/* ── Cartão 3D tátil — generaliza o "lábio" do .duo3d para superfícies ──
+   Declarado DEPOIS das .glass-* de propósito: quando combinadas no mesmo
+   elemento, a pilha de box-shadow com lábio vence na cascata. */
+.card-3d {
+  --lip: oklch(0.86 0.02 40);
+  box-shadow:
+    0 4px 0 var(--lip),
+    0 8px 24px -8px oklch(0.3 0.02 35 / 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition:
+    transform 240ms var(--ease-spring),
+    box-shadow 240ms var(--ease-out-quart);
+}
+.card-3d:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 var(--lip),
+    0 14px 32px -10px oklch(0.3 0.02 35 / 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.card-3d:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 2px 0 var(--lip),
+    0 4px 12px -6px oklch(0.3 0.02 35 / 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  transition-duration: 120ms, 120ms;
+}
+
+/* ── Shine — reflexo de luz que varre a superfície no hover ──
+   Usa ::after (deixa o ::before livre para .spotlight-card e .duo3d).
+   Incompatível apenas com .liquid-pulse, que já ocupa o ::after do host. */
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 60%
+  );
+  transform: translateX(-150%);
+  pointer-events: none;
+}
+.shine:hover::after {
+  transform: translateX(150%);
+  transition: transform 700ms var(--ease-out-quart);
+}
+
+/* ── Vida: flutuação lenta (reusa phoneFloat) e glow de CTA ──
+   O halo do .glow-cta vive num ::before com sombra ESTÁTICA — só a opacity
+   anima (zero repaint). Não combinar com .duo3d/.spotlight-card (::before). */
+.float-slow {
+  animation: phoneFloat 4s ease-in-out infinite;
+}
+@keyframes glowFade {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.glow-cta {
+  position: relative;
+}
+.glow-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 28px 4px color-mix(in oklab, var(--primary) 45%, transparent);
+  animation: glowFade 2.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ── Pop-in — entrada com mola para badges, toasts e emojis ── */
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.pop-in {
+  /* backwards (não both): mesmo motivo do .tab-enter — não reter transform
+     e virar containing block de overlays position:fixed. */
+  animation: popIn 320ms var(--ease-spring) backwards;
+}
+
 /* ── Nós 3D estilo Duolingo — botão chunky com "lábio" de sombra ── */
 .duo3d {
   position: relative;
@@ -676,6 +785,32 @@ button:active > .duo3d {
   animation: fadeSlideUp 400ms var(--ease-out-expo) both;
 }
 
+/* Cascata: use com .fade-slide-up — ex.: class="fade-slide-up stagger-3" */
+.stagger-1 {
+  animation-delay: 45ms;
+}
+.stagger-2 {
+  animation-delay: 90ms;
+}
+.stagger-3 {
+  animation-delay: 135ms;
+}
+.stagger-4 {
+  animation-delay: 180ms;
+}
+.stagger-5 {
+  animation-delay: 225ms;
+}
+.stagger-6 {
+  animation-delay: 270ms;
+}
+.stagger-7 {
+  animation-delay: 315ms;
+}
+.stagger-8 {
+  animation-delay: 360ms;
+}
+
 /* ── Skeleton shimmer — estado de carregamento (usa shimmerMove já existente) ── */
 .skeleton {
   background: linear-gradient(
@@ -692,11 +827,11 @@ button:active > .duo3d {
 @keyframes tabEnter {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(8px) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -723,12 +858,40 @@ button:active > .duo3d {
     animation: none;
   }
   .fade-slide-up,
-  .tab-enter {
+  .tab-enter,
+  .pop-in {
     animation: none;
     opacity: 1;
   }
   .skeleton {
     animation: none;
+  }
+  .float-slow {
+    animation: none;
+  }
+  .glow-cta::before {
+    animation: none;
+    opacity: 0.45;
+  }
+  /* Sweep instantâneo viraria um flash — melhor remover o reflexo */
+  .shine::after {
+    content: none;
+  }
+  /* O seletor universal acima não zera animation-delay */
+  .stagger-1,
+  .stagger-2,
+  .stagger-3,
+  .stagger-4,
+  .stagger-5,
+  .stagger-6,
+  .stagger-7,
+  .stagger-8 {
+    animation-delay: 0ms !important;
+  }
+  .card-3d:hover,
+  .card-3d:active,
+  .press:hover {
+    transform: none;
   }
   /* View Transitions: os pseudo-elementos ::view-transition-* não são
      alcançados pelo seletor universal acima */

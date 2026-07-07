@@ -299,10 +299,11 @@ export function AppBottomNav({
             aria-current={active ? "page" : undefined}
             className="flex flex-1 flex-col items-center gap-0.5 py-2 transition-colors duration-200"
           >
-            {/* Pill de fundo — expande quando ativo, desaparece quando inativo */}
+            {/* Pill de fundo — expande com mola quando ativa (key retrigger do pop-in) */}
             <div
+              key={active ? "on" : "off"}
               className={`flex h-8 w-14 items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-                active ? "bg-primary/12 scale-105" : "scale-100"
+                active ? "pop-in bg-primary/12 scale-105" : "scale-100"
               }`}
             >
               <Icon
@@ -437,7 +438,7 @@ export function AppHomeScreen({
     <div className="space-y-4 pb-2">
       {/* ── Hero card: céu real do momento + bebê + clima ──────────── */}
       <div
-        className="rounded-3xl relative overflow-hidden p-5 transition-[background] duration-1000"
+        className="shine rounded-3xl relative overflow-hidden p-5 transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Céu vivo: sol/lua, estrelas à noite, nuvens à deriva, chuva */}
@@ -455,8 +456,8 @@ export function AppHomeScreen({
 
           {gest && baby ? (
             <>
-              {/* Bebê protagonista */}
-              <div className="mt-1 flex justify-center">
+              {/* Bebê protagonista — flutua devagar, como se boiasse */}
+              <div className="float-slow mt-1 flex justify-center">
                 <BabyIllustration
                   week={gest.weeks}
                   showSac={false}
@@ -585,7 +586,7 @@ export function AppHomeScreen({
       {nextAppointment ? (
         <button
           onClick={() => onNavigate("Consultas")}
-          className="group w-full rounded-3xl border border-primary/20 bg-primary/6 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/35 hover:bg-primary/10 shadow-[var(--shadow-card)]"
+          className="shine group w-full rounded-3xl border border-primary/20 bg-primary/6 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/35 hover:bg-primary/10 shadow-[var(--shadow-card)]"
         >
           <div className="flex items-center gap-3 px-4 py-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-105 group-hover:-rotate-3">
@@ -606,7 +607,7 @@ export function AppHomeScreen({
       ) : (
         <button
           onClick={() => onNavigate("Consultas")}
-          className="group w-full rounded-3xl border border-primary/12 bg-primary/5 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/25 hover:bg-primary/8"
+          className="shine group w-full rounded-3xl border border-primary/12 bg-primary/5 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/25 hover:bg-primary/8"
         >
           <div className="flex items-center gap-3 px-4 py-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15 text-primary transition-transform duration-300 group-hover:scale-105">
@@ -634,7 +635,7 @@ export function AppHomeScreen({
                 key={tab}
                 onClick={() => onNavigate(tab)}
                 style={{ animationDelay: `${i * 45}ms` }}
-                className="press fade-slide-up spotlight-card group flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-card p-2.5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-card)]"
+                className="card-3d fade-slide-up spotlight-card group flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-card p-2.5 hover:border-primary/30"
               >
                 <div
                   className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-110 group-hover:-rotate-3 group-active:scale-90 ${color}`}
@@ -656,7 +657,7 @@ export function AppHomeScreen({
       {/* ── Card do médico ──────────────────────────────────────────── */}
       <button
         onClick={() => onNavigate("Médico")}
-        className="group w-full rounded-3xl border border-border bg-card overflow-hidden text-left shadow-[var(--shadow-card)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98]"
+        className="shine group w-full rounded-3xl border border-border bg-card overflow-hidden text-left shadow-[var(--shadow-card)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98]"
       >
         <div className="flex items-center gap-4 p-4">
           <img
