@@ -1259,20 +1259,44 @@ function ChecklistTab({ gest }: { gest: Gest }) {
   async function load() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("checklist_items")
       .select("*")
       .order("created_at", { ascending: true });
-    if (!data || data.length === 0) {
+    if (error) {
+      toast.error("Não foi possível carregar o checklist.");
+      return;
+    }
+    // Semeia os itens padrão só uma vez por usuário — quem apagou tudo fica com a lista vazia
+    const seededKey = `dc-checklist-seeded-${u.user.id}`;
+    const alreadySeeded = typeof window !== "undefined" && localStorage.getItem(seededKey);
+    if ((!data || data.length === 0) && !alreadySeeded) {
       const seed = DEFAULT_ITEMS.map((d) => ({ ...d, user_id: u.user!.id, done: false }));
-      await (supabase as any).from("checklist_items").insert(seed);
+      const { error: seedError } = await (supabase as any).from("checklist_items").insert(seed);
+      if (seedError) {
+        toast.error("Não foi possível criar a lista inicial.");
+        setItems([]);
+        return;
+      }
+      try {
+        localStorage.setItem(seededKey, "1");
+      } catch {
+        /* modo privado — segue sem persistir a flag */
+      }
       const { data: again } = await (supabase as any)
         .from("checklist_items")
         .select("*")
         .order("created_at", { ascending: true });
       setItems(again ?? []);
     } else {
-      setItems(data);
+      if (data && data.length > 0) {
+        try {
+          localStorage.setItem(seededKey, "1");
+        } catch {
+          /* ignora */
+        }
+      }
+      setItems(data ?? []);
     }
   }
   useEffect(() => {
@@ -3066,29 +3090,48 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
 /* ---------- Carteirinha digital (feat 43 — evoluída) ---------- */
 function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const [copied, setCopied] = useState(false);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+
+  const due = profile
+    ? (profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null))
+    : null;
+  const updatedAt = new Date().toLocaleString("pt-BR");
+
+  const cardText = profile
+    ? [
+        `🚨 CARTEIRINHA DE EMERGÊNCIA — GESTANTE`,
+        `Paciente: ${profile.display_name ?? "—"}`,
+        `Bebê: ${profile.baby_name ?? "—"}`,
+        `IG: ${gest ? `${gest.weeks}s ${gest.days}d` : "—"}`,
+        `DPP: ${due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}`,
+        `Tipo sanguíneo: ${profile.blood_type ?? "—"}`,
+        `Alergias: ${profile.allergies ?? "Nenhuma"}`,
+        `Medicamentos: ${profile.medications ?? "Nenhum"}`,
+        `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
+        `Médico: Dr. Clóvis Bacha | CRM-MG`,
+        `Atualizado: ${updatedAt}`,
+      ].join("\n")
+    : "";
+
+  // QR gerado localmente: dados de saúde não saem do aparelho e funciona offline
+  useEffect(() => {
+    if (!cardText) return;
+    let cancelled = false;
+    import("qrcode")
+      .then((QRCode) => QRCode.toDataURL(cardText, { width: 480, margin: 1 }))
+      .then((url) => {
+        if (!cancelled) setQrUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQrUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cardText]);
 
   if (!profile)
     return <p className="text-sm text-muted-foreground">Preencha seu perfil primeiro.</p>;
-
-  const due = profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
-  const updatedAt = new Date().toLocaleString("pt-BR");
-
-  const cardText = [
-    `🚨 CARTEIRINHA DE EMERGÊNCIA — GESTANTE`,
-    `Paciente: ${profile.display_name ?? "—"}`,
-    `Bebê: ${profile.baby_name ?? "—"}`,
-    `IG: ${gest ? `${gest.weeks}s ${gest.days}d` : "—"}`,
-    `DPP: ${due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}`,
-    `Tipo sanguíneo: ${profile.blood_type ?? "—"}`,
-    `Alergias: ${profile.allergies ?? "Nenhuma"}`,
-    `Medicamentos: ${profile.medications ?? "Nenhum"}`,
-    `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
-    `Médico: Dr. Clóvis Bacha | CRM-MG`,
-    `Atualizado: ${updatedAt}`,
-  ].join("\n");
-
-  const qrData = encodeURIComponent(cardText);
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${qrData}`;
 
   function copyCard() {
     navigator.clipboard.writeText(cardText);
@@ -3136,11 +3179,15 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         </div>
 
         <div className="mt-6 flex flex-col items-center border-t border-primary/20 pt-5">
-          <img
-            src={qrUrl}
-            alt="QR Code de emergência"
-            className="h-48 w-48 rounded-lg bg-white p-2"
-          />
+          {qrUrl ? (
+            <img
+              src={qrUrl}
+              alt="QR Code de emergência"
+              className="h-48 w-48 rounded-lg bg-white p-2"
+            />
+          ) : (
+            <div className="skeleton h-48 w-48 rounded-lg" />
+          )}
           <p className="mt-2 text-xs text-muted-foreground text-center">
             Escaneie para ver todos os dados em caso de emergência
           </p>
@@ -5325,35 +5372,45 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
 
   async function load() {
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        toast.error("Sua sessão expirou — entre novamente.");
+        return;
+      }
+      await loadEvents(u.user.id);
+    } finally {
+      setLoading(false);
+    }
+  }
 
+  async function loadEvents(userId: string) {
     const [logsRes, journalRes, consultRes, kicksRes, preRes] = await Promise.all([
       (supabase as any)
         .from("health_logs")
         .select("id, log_date, weight_kg, systolic, diastolic")
-        .eq("user_id", u.user.id)
+        .eq("user_id", userId)
         .order("log_date", { ascending: false }),
       (supabase as any)
         .from("journal_entries")
         .select("id, entry_date, mood, content")
-        .eq("user_id", u.user.id)
+        .eq("user_id", userId)
         .order("entry_date", { ascending: false }),
       (supabase as any)
         .from("consultation_notes")
         .select("id, recorded_at, title, orientacoes")
-        .eq("user_id", u.user.id)
+        .eq("user_id", userId)
         .order("recorded_at", { ascending: false }),
       (supabase as any)
         .from("kick_sessions")
         .select("id, started_at, kick_count")
-        .eq("user_id", u.user.id)
+        .eq("user_id", userId)
         .not("ended_at", "is", null)
         .order("started_at", { ascending: false }),
       (supabase as any)
         .from("preconsulta_forms")
         .select("id, submitted_at, weeks_at_submission, emotional_state")
-        .eq("user_id", u.user.id)
+        .eq("user_id", userId)
         .order("submitted_at", { ascending: false }),
     ]);
 
@@ -5407,17 +5464,31 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
       });
     }
 
-    // Gestational milestones already passed
-    if (gest) {
-      const { PRENATAL_MILESTONES } = await import("./minha-conta").catch(() => ({
-        PRENATAL_MILESTONES: [] as any[],
-      }));
-      // Use hardcoded milestones since we can't import from same file
+    // Marcos gestacionais já alcançados entram como eventos na linha do tempo
+    if (gest && profile) {
+      for (const m of PRENATAL_MILESTONES) {
+        if (m.week > gest.weeks) continue;
+        const d = weekToDate(m.week, profile);
+        if (!d) continue;
+        all.push({
+          id: `milestone-${m.week}-${m.label}`,
+          date: d.toISOString().slice(0, 10),
+          type: "consulta",
+          title: `📌 ${m.label} (semana ${m.week})`,
+          detail: m.detail,
+        });
+      }
+    }
+
+    const failed = [logsRes, journalRes, consultRes, kicksRes, preRes].filter(
+      (r) => r.error,
+    ).length;
+    if (failed > 0) {
+      toast.error(`Alguns registros não puderam ser carregados (${failed} de 5 fontes).`);
     }
 
     all.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
     setEvents(all);
-    setLoading(false);
   }
 
   const filtered = filter === "todos" ? events : events.filter((e) => e.type === filter);
@@ -5895,28 +5966,21 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
   const [topicFilter, setTopicFilter] = useState<string>("todos");
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [breathPhase, setBreathPhase] = useState<"inhale" | "hold" | "exhale" | null>(null);
-  const breathRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const breathRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function startBreathing() {
-    let phase: "inhale" | "hold" | "exhale" = "inhale";
+    // 4-4-6: cada fase reagenda a próxima com a duração correta (setInterval fixaria 4s para tudo)
     const durations = { inhale: 4000, hold: 4000, exhale: 6000 };
-    setBreathPhase("inhale");
-    breathRef.current = setInterval(() => {
-      if (phase === "inhale") {
-        phase = "hold";
-        setBreathPhase("hold");
-      } else if (phase === "hold") {
-        phase = "exhale";
-        setBreathPhase("exhale");
-      } else {
-        phase = "inhale";
-        setBreathPhase("inhale");
-      }
-    }, durations[phase]);
+    const nextOf = { inhale: "hold", hold: "exhale", exhale: "inhale" } as const;
+    function tick(phase: "inhale" | "hold" | "exhale") {
+      setBreathPhase(phase);
+      breathRef.current = setTimeout(() => tick(nextOf[phase]), durations[phase]);
+    }
+    tick("inhale");
   }
 
   function stopBreathing() {
-    if (breathRef.current) clearInterval(breathRef.current);
+    if (breathRef.current) clearTimeout(breathRef.current);
     setBreathPhase(null);
   }
 
@@ -5969,7 +6033,7 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
   useEffect(() => {
     return () => {
       window.speechSynthesis?.cancel();
-      if (breathRef.current) clearInterval(breathRef.current);
+      if (breathRef.current) clearTimeout(breathRef.current);
     };
   }, []);
 
@@ -6594,7 +6658,8 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
   }
 
   function scheduleHeartbeats(ctx: AudioContext, master: GainNode) {
-    const interval = 60 / 140;
+    // ~72 bpm: frequência cardíaca materna em repouso (o rótulo do som é "coração da mamãe")
+    const interval = 60 / 72;
     nextBeatRef.current = ctx.currentTime + 0.1;
     schedulerRef.current = setInterval(() => {
       const t = nextBeatRef.current;
@@ -12576,13 +12641,13 @@ function MédicoTab() {
         </div>
         <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 mb-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">
-            Próxima live
+            Lives no Instagram
           </p>
           <p className="text-sm font-medium text-foreground">
-            Sangramento no início da gestação: quando se preocupar
+            O Dr. Clóvis faz lives regulares sobre gestação e saúde da mulher
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            20 de Junho de 2026 · Instagram @drclovisbacha
+            Siga @drclovisbacha e ative as notificações para não perder
           </p>
           <a
             href="https://www.instagram.com/drclovisbacha/"
@@ -12590,7 +12655,7 @@ function MédicoTab() {
             rel="noopener noreferrer"
             className="mt-3 inline-block text-xs font-medium text-primary underline underline-offset-4"
           >
-            Ativar lembrete no Instagram →
+            Seguir no Instagram →
           </a>
         </div>
         <div className="space-y-2">
