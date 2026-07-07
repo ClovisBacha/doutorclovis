@@ -25,6 +25,16 @@ async function requireAdmin(accessToken: string) {
   return data.user;
 }
 
+/**
+ * Cada perfil de médico tem o SEU cérebro (tabelas chaveadas por doctor_id).
+ * Nesta instalação, o dono é o 1º e-mail de ADMIN_EMAILS — toda a equipe
+ * treina o cérebro DO médico. Fallback: o próprio admin autenticado.
+ */
+async function ownerDoctorId(fallbackUid: string): Promise<string> {
+  const { resolveOwnerDoctorId } = await import("./secondbrain.server");
+  return (await resolveOwnerDoctorId()) ?? fallbackUid;
+}
+
 export type BrainEntry = {
   id: string;
   question: string;
@@ -61,14 +71,15 @@ export const getBrainSettings = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    const doctorId = await ownerDoctorId(user.id);
     const { data: row, error } = await (supabaseAdmin as any)
       .from("brain_settings")
       .select("persona,sample_phrases,rules,enabled_app,enabled_whatsapp")
-      .eq("id", 1)
+      .eq("doctor_id", doctorId)
       .maybeSingle();
     if (error) return { ok: false as const };
 
-    // Linha id=1 ainda não existe → devolve os defaults sem criar.
+    // Cérebro deste médico ainda não configurado → defaults sem criar.
     const settings: BrainSettings = row ?? DEFAULT_SETTINGS;
     return { ok: true as const, settings };
   });
@@ -92,9 +103,10 @@ export const saveBrainSettings = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    const doctorId = await ownerDoctorId(user.id);
     const { error } = await (supabaseAdmin as any)
       .from("brain_settings")
-      .upsert({ id: 1, ...data.settings, updated_at: new Date().toISOString() });
+      .upsert({ doctor_id: doctorId, ...data.settings, updated_at: new Date().toISOString() });
     return { ok: !error };
   });
 
@@ -111,9 +123,11 @@ export const listBrainEntries = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    const doctorId = await ownerDoctorId(user.id);
     let query = (supabaseAdmin as any)
       .from("brain_entries")
       .select("*")
+      .eq("doctor_id", doctorId)
       .order("created_at", { ascending: false })
       .limit(200);
 
@@ -144,9 +158,11 @@ export const addBrainEntry = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    const doctorId = await ownerDoctorId(user.id);
     const { data: row, error } = await (supabaseAdmin as any)
       .from("brain_entries")
       .insert({
+        doctor_id: doctorId,
         question: data.question,
         answer: data.answer,
         category: data.category ?? null,
@@ -184,7 +200,8 @@ export const updateBrainEntry = createServerFn({ method: "POST" })
         category: data.category ?? null,
         approved: data.approved,
       })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("doctor_id", await ownerDoctorId(user.id));
     return { ok: !error };
   });
 
@@ -198,7 +215,11 @@ export const deleteBrainEntry = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { error } = await (supabaseAdmin as any).from("brain_entries").delete().eq("id", data.id);
+    const { error } = await (supabaseAdmin as any)
+      .from("brain_entries")
+      .delete()
+      .eq("id", data.id)
+      .eq("doctor_id", await ownerDoctorId(user.id));
     return { ok: !error };
   });
 
@@ -254,6 +275,7 @@ export const answerAndTrain = createServerFn({ method: "POST" })
     const { data: entry, error: insertError } = await (supabaseAdmin as any)
       .from("brain_entries")
       .insert({
+        doctor_id: await ownerDoctorId(user.id),
         question: question.question,
         answer: data.answer,
         source: "pergunta",
@@ -298,7 +320,7 @@ export const testBrain = createServerFn({ method: "POST" })
         import("./ai-gateway.server"),
       ]);
 
-    const brain = await getBrainContext(data.question);
+    const brain = await getBrainContext(data.question, await ownerDoctorId(user.id));
     const system = [
       "Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra especialista em gestação de alto risco.",
       "Responda em português brasileiro, com tom acolhedor, claro e profissional. Seja conciso (3 a 6 frases).",

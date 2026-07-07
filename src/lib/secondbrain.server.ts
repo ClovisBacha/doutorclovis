@@ -21,6 +21,42 @@ export type BrainContext = {
   enabledWhatsapp: boolean;
 };
 
+/* ── Multi-perfil: cada médico tem o SEU cérebro ─────────────────────────────
+   As tabelas são chaveadas por doctor_id (uid do médico no auth). Nesta
+   instalação single-doctor, o "dono" é o primeiro e-mail de ADMIN_EMAILS —
+   toda a equipe (ex.: secretária) treina o cérebro DO médico, e o chat/
+   WhatsApp respondem com ele. Numa futura plataforma multi-médico, basta
+   passar o doctorId da conversa para getBrainContext.                       */
+
+let cachedOwnerId: string | null | undefined;
+
+/** Resolve o uid do médico dono da instalação (1º e-mail de ADMIN_EMAILS). */
+export async function resolveOwnerDoctorId(): Promise<string | null> {
+  if (cachedOwnerId !== undefined) return cachedOwnerId;
+  try {
+    const ownerEmail = (process.env.ADMIN_EMAILS || "").split(",")[0]?.trim().toLowerCase();
+    if (!ownerEmail) {
+      cachedOwnerId = null;
+      return null;
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    for (let page = 1; page <= 5; page++) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (error || !data?.users?.length) break;
+      const hit = data.users.find((u) => u.email?.toLowerCase() === ownerEmail);
+      if (hit) {
+        cachedOwnerId = hit.id;
+        return hit.id;
+      }
+      if (data.users.length < 200) break;
+    }
+  } catch {
+    /* segue sem dono resolvido */
+  }
+  cachedOwnerId = null;
+  return null;
+}
+
 type BrainSettingsRow = {
   persona: string | null;
   sample_phrases: string | null;
@@ -55,22 +91,41 @@ const MAX_ENTRIES_SCORED = 6;
 const MAX_ENTRIES_FALLBACK = 3;
 
 /**
- * Carrega settings + entries e monta o bloco do Segundo Cérebro para o prompt.
+ * Carrega settings + entries DO MÉDICO e monta o bloco para o prompt.
  * `userMessage` serve SÓ para ranquear as entries — nunca entra no block.
+ * `doctorId` opcional: sem ele, usa o médico dono da instalação.
  */
-export async function getBrainContext(userMessage: string): Promise<BrainContext> {
+export async function getBrainContext(
+  userMessage: string,
+  doctorId?: string,
+): Promise<BrainContext> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let target = doctorId ?? (await resolveOwnerDoctorId());
+    if (!target) {
+      // Fallback: o cérebro configurado mais recentemente (instalações onde
+      // ADMIN_EMAILS não resolve para um usuário do auth)
+      const { data: latest } = await (supabaseAdmin as any)
+        .from("brain_settings")
+        .select("doctor_id")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      target = latest?.doctor_id ?? null;
+    }
+    if (!target) return { block: "", enabledApp: true, enabledWhatsapp: true };
 
     const [settingsRes, entriesRes] = await Promise.all([
       (supabaseAdmin as any)
         .from("brain_settings")
         .select("persona,sample_phrases,rules,enabled_app,enabled_whatsapp")
-        .eq("id", 1)
+        .eq("doctor_id", target)
         .maybeSingle(),
       (supabaseAdmin as any)
         .from("brain_entries")
         .select("question,answer")
+        .eq("doctor_id", target)
         .eq("approved", true)
         .order("created_at", { ascending: false })
         .limit(MAX_ENTRIES_LOADED),
