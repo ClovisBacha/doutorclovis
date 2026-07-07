@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getAdminData,
@@ -319,7 +320,8 @@ function AppointmentsSection({
   async function saveConfirmation(a: AdminAppointment) {
     if (!confirmForm.date || !confirmForm.time) return;
     setSaving(true);
-    await (supabase as any)
+    // .select() para detectar update que não afetou nenhuma linha (ex.: RLS)
+    const { data, error } = await (supabase as any)
       .from("appointment_requests")
       .update({
         status: "confirmed",
@@ -328,18 +330,34 @@ function AppointmentsSection({
         price_brl: confirmForm.price ? Math.round(Number(confirmForm.price) * 100) : null,
         internal_notes: confirmForm.notes || null,
       })
-      .eq("id", a.id);
+      .eq("id", a.id)
+      .select("id");
+    setSaving(false);
+    if (error || !data?.length) {
+      toast.error(
+        "Não foi possível confirmar a consulta. Verifique sua permissão de administrador e tente novamente." +
+          (error ? ` (${error.message})` : ""),
+      );
+      return;
+    }
     onChangeStatus(a.id, "confirmed");
     setExpandedId(null);
-    setSaving(false);
     onRefresh();
   }
 
   async function markPaid(id: string) {
-    await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("appointment_requests")
       .update({ payment_status: "pago" })
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
+    if (error || !data?.length) {
+      toast.error(
+        "Não foi possível marcar como pago. Tente novamente." +
+          (error ? ` (${error.message})` : ""),
+      );
+      return;
+    }
     onRefresh();
   }
 
@@ -2415,7 +2433,8 @@ function AgendaSection() {
 
   async function saveAvailability(row: DoctorAvailability) {
     setSaving(true);
-    await (supabase as any)
+    // .select() para detectar update que não afetou nenhuma linha (ex.: RLS)
+    const { data, error } = await (supabase as any)
       .from("doctor_availability")
       .update({
         start_time: row.start_time,
@@ -2423,8 +2442,17 @@ function AgendaSection() {
         slot_minutes: row.slot_minutes,
         enabled: row.enabled,
       })
-      .eq("id", row.id);
+      .eq("id", row.id)
+      .select("id");
     setSaving(false);
+    if (error || !data?.length) {
+      toast.error(
+        "Não foi possível salvar o horário. Verifique sua permissão de administrador e tente novamente." +
+          (error ? ` (${error.message})` : ""),
+      );
+      return;
+    }
+    toast.success("Horário salvo.");
   }
 
   function updateRow(idx: number, patch: Partial<DoctorAvailability>) {
@@ -2437,20 +2465,37 @@ function AgendaSection() {
   async function addBlockedDate() {
     if (!newBlockDate) return;
     setAddingBlock(true);
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("blocked_dates")
       .insert({ date: newBlockDate, reason: newBlockReason || null })
       .select()
       .single();
-    if (data)
-      setBlockedDates((prev) => [...prev, data].sort((a, b) => a.date.localeCompare(b.date)));
+    setAddingBlock(false);
+    if (error || !data) {
+      toast.error(
+        "Não foi possível bloquear a data. Tente novamente." + (error ? ` (${error.message})` : ""),
+      );
+      return;
+    }
+    setBlockedDates((prev) => [...prev, data].sort((a, b) => a.date.localeCompare(b.date)));
     setNewBlockDate("");
     setNewBlockReason("");
-    setAddingBlock(false);
   }
 
   async function removeBlockedDate(id: string) {
-    await (supabase as any).from("blocked_dates").delete().eq("id", id);
+    // .select() para detectar delete que não afetou nenhuma linha (ex.: RLS)
+    const { data, error } = await (supabase as any)
+      .from("blocked_dates")
+      .delete()
+      .eq("id", id)
+      .select("id");
+    if (error || !data?.length) {
+      toast.error(
+        "Não foi possível remover a data bloqueada. Tente novamente." +
+          (error ? ` (${error.message})` : ""),
+      );
+      return;
+    }
     setBlockedDates((prev) => prev.filter((b) => b.id !== id));
   }
 

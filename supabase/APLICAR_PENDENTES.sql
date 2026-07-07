@@ -606,15 +606,16 @@ CREATE TABLE IF NOT EXISTS public.corporate_accounts (
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.corporate_accounts ENABLE ROW LEVEL SECURITY;
+-- A validação do código de acesso acontece server-side (service_role) em
+-- joinCorporate (src/lib/corporativo.functions.ts); o cliente não deve ler esta
+-- tabela — a policy antiga expunha o access_code de todas as empresas a
+-- qualquer usuária logada.
 DROP POLICY IF EXISTS "Authenticated can read active accounts for validation" ON public.corporate_accounts;
-CREATE POLICY "Authenticated can read active accounts for validation"
-  ON public.corporate_accounts FOR SELECT TO authenticated
-  USING (status = 'ativo');
 DROP POLICY IF EXISTS "Service manages corporate accounts" ON public.corporate_accounts;
 CREATE POLICY "Service manages corporate accounts"
   ON public.corporate_accounts FOR ALL TO service_role
   USING (true) WITH CHECK (true);
-GRANT SELECT ON public.corporate_accounts TO authenticated;
+REVOKE SELECT ON public.corporate_accounts FROM authenticated;
 GRANT ALL ON public.corporate_accounts TO service_role;
 
 -- Link patients to corporate accounts
@@ -660,11 +661,11 @@ CREATE INDEX IF NOT EXISTS idx_appointment_requests_created_at ON public.appoint
 CREATE INDEX IF NOT EXISTS idx_journal_entries_user ON public.journal_entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON public.journal_entries(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kick_sessions_user ON public.kick_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_kick_sessions_created_at ON public.kick_sessions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_kick_sessions_started_at ON public.kick_sessions(user_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_health_logs_user ON public.health_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_health_logs_date ON public.health_logs(user_id, logged_at DESC);
+CREATE INDEX IF NOT EXISTS idx_health_logs_date ON public.health_logs(user_id, log_date DESC);
 CREATE INDEX IF NOT EXISTS idx_doctor_questions_user ON public.doctor_questions(user_id);
-CREATE INDEX IF NOT EXISTS idx_doctor_questions_status ON public.doctor_questions(status);
+CREATE INDEX IF NOT EXISTS idx_doctor_questions_answered ON public.doctor_questions(answered);
 CREATE INDEX IF NOT EXISTS idx_checklist_items_user ON public.checklist_items(user_id);
 
 
@@ -747,9 +748,15 @@ GRANT SELECT ON public.doctor_availability TO anon, authenticated;
 GRANT ALL ON public.doctor_availability TO service_role;
 DROP POLICY IF EXISTS "public_read_availability" ON public.doctor_availability;
 CREATE POLICY "public_read_availability"  ON public.doctor_availability FOR SELECT USING (true);
+-- Escrita restrita ao médico (admin = app_metadata.is_admin = true).
+-- A policy antiga "auth_write_availability" deixava QUALQUER usuária logada
+-- editar a agenda do médico.
 DROP POLICY IF EXISTS "auth_write_availability" ON public.doctor_availability;
-CREATE POLICY "auth_write_availability"   ON public.doctor_availability FOR ALL
-  USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+GRANT INSERT, UPDATE, DELETE ON public.doctor_availability TO authenticated;
+DROP POLICY IF EXISTS "admin_write_availability" ON public.doctor_availability;
+CREATE POLICY "admin_write_availability" ON public.doctor_availability FOR ALL TO authenticated
+  USING (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false))
+  WITH CHECK (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false));
 
 -- 2. Datas bloqueadas (férias, afastamento)
 CREATE TABLE IF NOT EXISTS public.blocked_dates (
@@ -763,9 +770,13 @@ GRANT SELECT ON public.blocked_dates TO anon, authenticated;
 GRANT ALL ON public.blocked_dates TO service_role;
 DROP POLICY IF EXISTS "public_read_blocked" ON public.blocked_dates;
 CREATE POLICY "public_read_blocked"   ON public.blocked_dates FOR SELECT USING (true);
+-- Escrita restrita ao médico (admin) — mesma regra da disponibilidade acima.
 DROP POLICY IF EXISTS "auth_write_blocked" ON public.blocked_dates;
-CREATE POLICY "auth_write_blocked"    ON public.blocked_dates FOR ALL
-  USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+GRANT INSERT, UPDATE, DELETE ON public.blocked_dates TO authenticated;
+DROP POLICY IF EXISTS "admin_write_blocked" ON public.blocked_dates;
+CREATE POLICY "admin_write_blocked" ON public.blocked_dates FOR ALL TO authenticated
+  USING (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false))
+  WITH CHECK (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false));
 
 -- 3. Campos adicionais em appointment_requests
 ALTER TABLE public.appointment_requests
@@ -779,6 +790,26 @@ ALTER TABLE public.appointment_requests
 CREATE INDEX IF NOT EXISTS idx_appt_confirmed_date
   ON public.appointment_requests(confirmed_date)
   WHERE confirmed_date IS NOT NULL;
+
+-- 4. Painel do médico: permitir que o admin confirme consulta e marque
+--    pagamento direto do navegador. Admin = usuário com app_metadata.is_admin
+--    = true (mesma convenção da policy "admin read epds" mais abaixo).
+--    Marque aqui o(s) e-mail(s) do médico (idempotente; é preciso sair e
+--    entrar de novo no site para o token JWT incluir a claim):
+UPDATE auth.users
+  SET raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"is_admin": true}'::jsonb
+  WHERE email = 'bachaclovis@gmail.com';
+
+GRANT SELECT, UPDATE ON public.appointment_requests TO authenticated;
+DROP POLICY IF EXISTS "admin read appointments" ON public.appointment_requests;
+CREATE POLICY "admin read appointments" ON public.appointment_requests
+  FOR SELECT TO authenticated
+  USING (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false));
+DROP POLICY IF EXISTS "admin update appointments" ON public.appointment_requests;
+CREATE POLICY "admin update appointments" ON public.appointment_requests
+  FOR UPDATE TO authenticated
+  USING (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false))
+  WITH CHECK (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false));
 
 
 -- ───────────────────────────────────────────────────────────────────────────

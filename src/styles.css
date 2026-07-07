@@ -701,7 +701,10 @@ button:active > .duo3d {
 }
 
 .tab-enter {
-  animation: tabEnter 280ms var(--ease-out-expo) both;
+  /* `backwards` (não `both`): o keyframe final é idêntico ao estado natural,
+     e manter o transform após a animação transformaria o wrapper em containing
+     block, quebrando os overlays position:fixed dentro das abas. */
+  animation: tabEnter 280ms var(--ease-out-expo) backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -725,6 +728,12 @@ button:active > .duo3d {
     opacity: 1;
   }
   .skeleton {
+    animation: none;
+  }
+  /* View Transitions: os pseudo-elementos ::view-transition-* não são
+     alcançados pelo seletor universal acima */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
     animation: none;
   }
 }

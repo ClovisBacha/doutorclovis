@@ -137,13 +137,16 @@ export const setMilestone = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (!u.user) return { ok: false as const };
-    const { error } = await supabaseAdmin.from("baby_milestones").upsert({
-      user_id: u.user.id,
-      milestone_key: data.milestoneKey,
-      achieved_at: data.achievedAt,
-      notes: data.notes,
-      custom_label: data.customLabel,
-    });
+    const { error } = await supabaseAdmin.from("baby_milestones").upsert(
+      {
+        user_id: u.user.id,
+        milestone_key: data.milestoneKey,
+        achieved_at: data.achievedAt,
+        notes: data.notes,
+        custom_label: data.customLabel,
+      },
+      { onConflict: "user_id,milestone_key" },
+    );
     return { ok: !error };
   });
 

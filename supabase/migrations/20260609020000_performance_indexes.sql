@@ -33,9 +33,9 @@ CREATE INDEX IF NOT EXISTS idx_appointment_requests_created_at ON public.appoint
 CREATE INDEX IF NOT EXISTS idx_journal_entries_user ON public.journal_entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON public.journal_entries(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kick_sessions_user ON public.kick_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_kick_sessions_created_at ON public.kick_sessions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_kick_sessions_started_at ON public.kick_sessions(user_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_health_logs_user ON public.health_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_health_logs_date ON public.health_logs(user_id, logged_at DESC);
+CREATE INDEX IF NOT EXISTS idx_health_logs_date ON public.health_logs(user_id, log_date DESC);
 CREATE INDEX IF NOT EXISTS idx_doctor_questions_user ON public.doctor_questions(user_id);
-CREATE INDEX IF NOT EXISTS idx_doctor_questions_status ON public.doctor_questions(status);
+CREATE INDEX IF NOT EXISTS idx_doctor_questions_answered ON public.doctor_questions(answered);
 CREATE INDEX IF NOT EXISTS idx_checklist_items_user ON public.checklist_items(user_id);

@@ -34,12 +34,15 @@ export const markModuleComplete = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const };
-    const { error } = await supabaseAdmin.from("course_progress").upsert({
-      user_id: u.user.id,
-      module_week: data.moduleWeek,
-      quiz_score: data.quizScore,
-      completed_at: new Date().toISOString(),
-    });
+    const { error } = await supabaseAdmin.from("course_progress").upsert(
+      {
+        user_id: u.user.id,
+        module_week: data.moduleWeek,
+        quiz_score: data.quizScore,
+        completed_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,module_week" },
+    );
     return { ok: !error };
   });
 

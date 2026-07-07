@@ -9,7 +9,6 @@
  */
 import { useState, useEffect } from "react";
 import {
-  Activity,
   AlertTriangle,
   Baby,
   CalendarDays,
@@ -356,7 +355,7 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     color: "bg-amber-50 text-amber-600 ring-amber-200",
   },
   {
-    Icon: Activity,
+    Icon: Heart,
     label: "Saúde",
     tab: "Saúde",
     color: "bg-emerald-50 text-emerald-600 ring-emerald-200",
@@ -614,8 +613,8 @@ export function AppHomeScreen({
               <CalendarDays className="h-5 w-5" strokeWidth={1.8} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">Agendar consulta</p>
-              <p className="text-xs text-muted-foreground">Nenhuma consulta agendada</p>
+              <p className="text-sm font-medium text-foreground">Minhas consultas</p>
+              <p className="text-xs text-muted-foreground">Agende ou acompanhe suas consultas</p>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-primary/40 transition-transform duration-300 group-hover:translate-x-1" />
           </div>

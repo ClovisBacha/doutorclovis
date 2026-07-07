@@ -331,7 +331,7 @@ const CAT_STYLE: Record<string, { pill: string; glass: string; accent: string; e
     emoji: "✨",
   },
   Médico: {
-    pill: "bg-primary/10 text-primary shadow-[0_0_0_1px_rgba(var(--primary),0.2)]",
+    pill: "bg-primary/10 text-primary shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_20%,transparent)]",
     glass: "glass-card glass-rose",
     accent: "text-primary",
     emoji: "🩺",
@@ -346,6 +346,28 @@ const CAT_STYLE: Record<string, { pill: string; glass: string; accent: string; e
 
 function categoryOfTab(t: Tab): string {
   return CATEGORIES.find((c) => (c.tabs as readonly string[]).includes(t))?.label ?? "Gestação";
+}
+
+/**
+ * Dispara a checagem de conquistas após uma ação premiável (fire-and-forget).
+ * Exibe um toast para cada conquista recém-desbloqueada; falhas são silenciosas.
+ */
+function triggerAchievementsCheck() {
+  supabase.auth
+    .getSession()
+    .then(({ data: s }) =>
+      s.session?.access_token
+        ? checkAndAwardAchievements({ data: { accessToken: s.session.access_token } })
+        : null,
+    )
+    .then((res) => {
+      if (!res || !res.ok) return;
+      for (const key of res.newlyAwarded ?? []) {
+        const def = ACHIEVEMENT_DEFS.find((d) => d.key === key);
+        if (def) toast(`${def.emoji} Nova conquista desbloqueada: ${def.title}!`);
+      }
+    })
+    .catch(() => {});
 }
 
 function MinhaContaPage() {
@@ -541,7 +563,7 @@ function MinhaContaPage() {
                   className={`press flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
                     active
                       ? `${cs.pill} font-semibold`
-                      : "text-foreground/40 hover:text-foreground/65"
+                      : "text-foreground/60 hover:text-foreground/80"
                   }`}
                 >
                   {active ? `${cs.emoji} ` : ""}
@@ -566,7 +588,7 @@ function MinhaContaPage() {
                     className={`press flex-shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
                       tab === t
                         ? `${cs.pill} font-semibold`
-                        : "text-foreground/40 hover:text-foreground/65"
+                        : "text-foreground/60 hover:text-foreground/80"
                     }`}
                   >
                     {t}
@@ -607,7 +629,7 @@ function MinhaContaPage() {
               {tab === "Álbum" && <AlbumTab profile={profile} />}
               {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
               {tab === "Escola" && <EscolaBebêTab gest={gest} />}
-              {tab === "FAQ" && <FAQTab gest={gest} />}
+              {tab === "FAQ" && <FAQTab gest={gest} onNavigate={(t) => setTab(t as Tab)} />}
               {tab === "Pânico" && <PânicoTab profile={profile} />}
               {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
               {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
@@ -677,7 +699,7 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           {progress.toFixed(0)}% da jornada {daysToDue != null && `· faltam ${daysToDue} dias`}
         </p>
 
-        <div className="mt-6 rounded-2xl bg-[var(--gradient-warm)] p-6">
+        <div className="mt-6 rounded-2xl bg-[image:var(--gradient-warm)] p-6">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">
             {babyLabel} esta semana
           </p>
@@ -852,17 +874,27 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
     if (!content.trim()) return;
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    await (supabase as any).from("journal_entries").insert({
+    const { error } = await (supabase as any).from("journal_entries").insert({
       user_id: u.user.id,
       content: content.trim(),
       mood,
+      entry_date: new Date().toLocaleDateString("en-CA"),
     });
+    if (error) {
+      toast.error("Não foi possível salvar o registro. Tente novamente.");
+      return;
+    }
     setContent("");
     load();
+    triggerAchievementsCheck();
   }
 
   async function remove(id: string) {
-    await (supabase as any).from("journal_entries").delete().eq("id", id);
+    const { error } = await (supabase as any).from("journal_entries").delete().eq("id", id);
+    if (error) {
+      toast.error("Não foi possível excluir o registro. Tente novamente.");
+      return;
+    }
     load();
   }
 
@@ -984,11 +1016,15 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
   async function start() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("kick_sessions")
       .insert({ user_id: u.user.id, kick_count: 0 })
       .select()
       .single();
+    if (error) {
+      toast.error("Não foi possível iniciar a sessão. Tente novamente.");
+      return;
+    }
     setActive(data);
     setCount(0);
     startRef.current = Date.now();
@@ -1006,13 +1042,18 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
 
   async function stop(finalCount = count) {
     if (!active) return;
-    await (supabase as any)
+    const { error } = await (supabase as any)
       .from("kick_sessions")
       .update({ ended_at: new Date().toISOString(), kick_count: finalCount })
       .eq("id", active.id);
+    if (error) {
+      toast.error("Não foi possível salvar a sessão. Tente novamente.");
+      return;
+    }
     setActive(null);
     setCount(0);
     load();
+    triggerAchievementsCheck();
   }
 
   const mins = Math.floor(elapsed / 60000);
@@ -1426,48 +1467,54 @@ function ProfileTab({
   async function save() {
     setSaving(true);
     setMsg(null);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const payload: any = {
-      id: u.user.id,
-      display_name: form.display_name || null,
-      baby_name: form.baby_name || null,
-      lmp_date: form.lmp_date || null,
-      due_date: form.lmp_date ? dueDateFromLmp(form.lmp_date) : null,
-      reference_date: form.reference_date || null,
-      reference_weeks: form.reference_weeks ? Number(form.reference_weeks) : null,
-      reference_days: form.reference_days ? Number(form.reference_days) : null,
-      blood_type: form.blood_type || null,
-      allergies: form.allergies || null,
-      emergency_contact: form.emergency_contact || null,
-      emergency_phone: form.emergency_phone || null,
-      height_cm: form.height_cm ? Number(form.height_cm) : null,
-      pre_pregnancy_weight_kg: form.pre_pregnancy_weight_kg
-        ? Number(form.pre_pregnancy_weight_kg)
-        : null,
-      medications: form.medications || null,
-      birth_date: form.birth_date || null,
-      pregnancy_number: form.pregnancy_number ? Number(form.pregnancy_number) : 1,
-      prior_bp_elevated: form.prior_bp_elevated,
-      prior_bp_week: form.prior_bp_week ? Number(form.prior_bp_week) : null,
-      prior_gestational_diabetes: form.prior_gestational_diabetes,
-      prior_preterm: form.prior_preterm,
-      prior_cesarean: form.prior_cesarean,
-      prior_notes: form.prior_notes || null,
-      updated_at: new Date().toISOString(),
-    };
-    const { data, error } = await (supabase as any)
-      .from("patient_profiles")
-      .upsert(payload)
-      .select()
-      .single();
-    setSaving(false);
-    if (error) {
-      setMsg(error.message);
-    } else {
-      onSaved(data);
-      setMsg("Salvo com sucesso ✓");
-      toast.success("Perfil salvo com sucesso!");
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        toast.error("Sua sessão expirou — entre novamente.");
+        return;
+      }
+      const payload: any = {
+        id: u.user.id,
+        display_name: form.display_name || null,
+        baby_name: form.baby_name || null,
+        lmp_date: form.lmp_date || null,
+        due_date: form.lmp_date ? dueDateFromLmp(form.lmp_date) : null,
+        reference_date: form.reference_date || null,
+        reference_weeks: form.reference_weeks ? Number(form.reference_weeks) : null,
+        reference_days: form.reference_days ? Number(form.reference_days) : null,
+        blood_type: form.blood_type || null,
+        allergies: form.allergies || null,
+        emergency_contact: form.emergency_contact || null,
+        emergency_phone: form.emergency_phone || null,
+        height_cm: form.height_cm ? Number(form.height_cm) : null,
+        pre_pregnancy_weight_kg: form.pre_pregnancy_weight_kg
+          ? Number(form.pre_pregnancy_weight_kg)
+          : null,
+        medications: form.medications || null,
+        birth_date: form.birth_date || null,
+        pregnancy_number: form.pregnancy_number ? Number(form.pregnancy_number) : 1,
+        prior_bp_elevated: form.prior_bp_elevated,
+        prior_bp_week: form.prior_bp_week ? Number(form.prior_bp_week) : null,
+        prior_gestational_diabetes: form.prior_gestational_diabetes,
+        prior_preterm: form.prior_preterm,
+        prior_cesarean: form.prior_cesarean,
+        prior_notes: form.prior_notes || null,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await (supabase as any)
+        .from("patient_profiles")
+        .upsert(payload)
+        .select()
+        .single();
+      if (error) {
+        setMsg(error.message);
+      } else {
+        onSaved(data);
+        setMsg("Salvo com sucesso ✓");
+        toast.success("Perfil salvo com sucesso!");
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -1920,23 +1967,38 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
     if (
       !form.weight_kg &&
       !form.systolic &&
+      !form.diastolic &&
       !form.glucose_mg_dl &&
       !form.spo2 &&
-      !form.heart_rate_bpm
-    )
+      !form.heart_rate_bpm &&
+      !form.steps &&
+      !form.sleep_hours &&
+      !form.notes
+    ) {
+      toast.error("Preencha ao menos um campo para registrar.");
       return;
-    await (supabase as any).from("health_logs").insert({
+    }
+    // Envia apenas os campos preenchidos (colunas extras podem não existir
+    // no banco ainda sem as migrations pendentes) e a data local do navegador.
+    const payload: Record<string, unknown> = {
       user_id: u.user.id,
-      weight_kg: form.weight_kg ? Number(form.weight_kg) : null,
-      systolic: form.systolic ? Number(form.systolic) : null,
-      diastolic: form.diastolic ? Number(form.diastolic) : null,
-      glucose_mg_dl: form.glucose_mg_dl ? Number(form.glucose_mg_dl) : null,
-      spo2: form.spo2 ? Number(form.spo2) : null,
-      heart_rate_bpm: form.heart_rate_bpm ? Number(form.heart_rate_bpm) : null,
-      steps: form.steps ? Number(form.steps) : null,
-      sleep_hours: form.sleep_hours ? Number(form.sleep_hours) : null,
-      notes: form.notes || null,
-    });
+      log_date: new Date().toLocaleDateString("en-CA"),
+    };
+    if (form.weight_kg) payload.weight_kg = Number(form.weight_kg);
+    if (form.systolic) payload.systolic = Number(form.systolic);
+    if (form.diastolic) payload.diastolic = Number(form.diastolic);
+    if (form.glucose_mg_dl) payload.glucose_mg_dl = Number(form.glucose_mg_dl);
+    if (form.spo2) payload.spo2 = Number(form.spo2);
+    if (form.heart_rate_bpm) payload.heart_rate_bpm = Number(form.heart_rate_bpm);
+    if (form.steps) payload.steps = Number(form.steps);
+    if (form.sleep_hours) payload.sleep_hours = Number(form.sleep_hours);
+    if (form.notes) payload.notes = form.notes;
+    const { error } = await (supabase as any).from("health_logs").insert(payload);
+    if (error) {
+      toast.error("Erro ao salvar o registro. Tente novamente.");
+      return;
+    }
+    triggerAchievementsCheck();
     setForm({
       weight_kg: "",
       systolic: "",
@@ -1951,7 +2013,11 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
     load();
   }
   async function remove(id: string) {
-    await (supabase as any).from("health_logs").delete().eq("id", id);
+    const { error } = await (supabase as any).from("health_logs").delete().eq("id", id);
+    if (error) {
+      toast.error("Não foi possível excluir o registro. Tente novamente.");
+      return;
+    }
     load();
   }
 
@@ -2143,12 +2209,12 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
           </div>
           <svg viewBox={`0 0 ${iomChartW} ${iomChartH}`} className="mt-3 h-44 w-full">
             {/* Corridor band */}
-            <polygon points={bandPolygon} fill="hsl(var(--primary))" fillOpacity="0.12" />
+            <polygon points={bandPolygon} fill="var(--primary)" fillOpacity="0.12" />
             {/* Min line */}
             <polyline
               points={bandMinPts}
               fill="none"
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               strokeWidth="1"
               strokeDasharray="4 3"
               opacity="0.4"
@@ -2157,7 +2223,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
             <polyline
               points={bandMaxPts}
               fill="none"
-              stroke="hsl(var(--primary))"
+              stroke="var(--primary)"
               strokeWidth="1"
               strokeDasharray="4 3"
               opacity="0.4"
@@ -2167,7 +2233,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
               <polyline
                 points={actualPts}
                 fill="none"
-                stroke="hsl(var(--primary))"
+                stroke="var(--primary)"
                 strokeWidth="2.5"
                 strokeLinejoin="round"
               />
@@ -2179,7 +2245,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
                 cx={toSvgX(p.week)}
                 cy={toSvgY(p.weight)}
                 r="4"
-                fill="hsl(var(--primary))"
+                fill="var(--primary)"
               />
             ))}
             {/* X-axis labels */}
@@ -2189,7 +2255,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
                 x={toSvgX(w)}
                 y={iomChartH - 1}
                 fontSize="8"
-                fill="hsl(var(--muted-foreground))"
+                fill="var(--muted-foreground)"
                 textAnchor="middle"
               >
                 {w}s
@@ -2351,7 +2417,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
               <polyline
                 points={pts}
                 fill="none"
-                stroke="hsl(var(--primary))"
+                stroke="var(--primary)"
                 strokeWidth="2.2"
                 strokeLinejoin="round"
               />
@@ -2366,7 +2432,7 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
                       ? "#f87171"
                       : l.glucose_mg_dl! > 95
                         ? "#fb923c"
-                        : "hsl(var(--primary))"
+                        : "var(--primary)"
                   }
                 />
               ))}
@@ -2592,20 +2658,38 @@ function QuestionsTab({ gest }: { gest: Gest }) {
     const q = (question ?? text).trim();
     if (!q) return;
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    await (supabase as any).from("doctor_questions").insert({ user_id: u.user.id, question: q });
+    if (!u.user) {
+      toast.error("Sua sessão expirou. Faça login novamente.");
+      return;
+    }
+    const { error } = await (supabase as any)
+      .from("doctor_questions")
+      .insert({ user_id: u.user.id, question: q });
+    if (error) {
+      toast.error("Não foi possível salvar a pergunta. Tente novamente.");
+      return;
+    }
     setText("");
     load();
+    triggerAchievementsCheck();
   }
   async function toggle(q: DoctorQ) {
-    await (supabase as any)
+    const { error } = await (supabase as any)
       .from("doctor_questions")
       .update({ answered: !q.answered })
       .eq("id", q.id);
+    if (error) {
+      toast.error("Não foi possível atualizar a pergunta. Tente novamente.");
+      return;
+    }
     setItems((arr) => arr.map((x) => (x.id === q.id ? { ...x, answered: !x.answered } : x)));
   }
   async function remove(id: string) {
-    await (supabase as any).from("doctor_questions").delete().eq("id", id);
+    const { error } = await (supabase as any).from("doctor_questions").delete().eq("id", id);
+    if (error) {
+      toast.error("Não foi possível remover a pergunta. Tente novamente.");
+      return;
+    }
     setItems((arr) => arr.filter((x) => x.id !== id));
   }
 
@@ -2847,17 +2931,24 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
   async function avaliar() {
     setLoading(true);
     setResult(null);
-    const res = await assessSymptoms({
-      data: {
-        symptoms: [...selected],
-        systolic: sys ? Number(sys) : null,
-        diastolic: dia ? Number(dia) : null,
-        note: note || undefined,
-        weeks,
-      },
-    });
-    setResult(res);
-    setLoading(false);
+    try {
+      const res = await assessSymptoms({
+        data: {
+          symptoms: [...selected],
+          systolic: sys ? Number(sys) : null,
+          diastolic: dia ? Number(dia) : null,
+          note: note || undefined,
+          weeks,
+        },
+      });
+      setResult(res);
+    } catch {
+      toast.error(
+        "Não foi possível avaliar os sintomas. Tente novamente ou ligue para o consultório.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   const styles: Record<RiskLevel, { box: string; dot: string; titulo: string }> = {
@@ -2880,7 +2971,7 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
 
   return (
     <div className="max-w-2xl">
-      <div className="rounded-2xl border border-primary/20 bg-primary/6/60 p-4 text-sm text-foreground">
+      <div className="rounded-2xl border border-primary/20 bg-primary/6 p-4 text-sm text-foreground">
         Esta triagem é uma orientação e <strong>não substitui avaliação médica</strong>. Em
         emergência, ligue <strong>192 (SAMU)</strong> ou vá ao pronto-socorro.
       </div>
@@ -3008,7 +3099,7 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   return (
     <div className="mx-auto max-w-lg space-y-4">
       {/* Main card */}
-      <div className="rounded-3xl bg-[var(--gradient-warm)] p-8 shadow-[var(--shadow-card)]">
+      <div className="rounded-3xl bg-[image:var(--gradient-warm)] p-8 shadow-[var(--shadow-card)]">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-primary">
@@ -3144,12 +3235,6 @@ type WAMsg = {
   fileName?: string;
   fileSize?: string;
 };
-
-function waFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 function WABubble({ msg }: { msg: WAMsg }) {
   const isUser = msg.role === "user";
@@ -3309,37 +3394,30 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [recSec, setRecSec] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileImageRef = useRef<HTMLInputElement>(null);
-  const fileDocRef = useRef<HTMLInputElement>(null);
-  const mediaRecRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading]);
 
-  async function sendText(textOverride?: string) {
+  function dataUrlMediaType(dataUrl: string): string {
+    return /^data:([^;,]+)/.exec(dataUrl)?.[1] ?? "image/jpeg";
+  }
+
+  async function sendText(textOverride?: string, image?: string) {
     const text = (textOverride ?? input).trim();
-    if (!text || loading) return;
+    if ((!text && !image) || loading) return;
 
     const enrichedText =
       ctx && messages.filter((m) => m.role === "user").length === 0
-        ? `[Contexto: ${ctx}]\n\n${text}`
+        ? `[Contexto: ${ctx}]\n\n${text}`.trim()
         : text;
 
-    const displayMsg: WAMsg = { role: "user", content: text, ts: new Date() };
+    const displayMsg: WAMsg = { role: "user", content: text, image, ts: new Date() };
     const displayNext = [...messages, displayMsg];
-
-    const apiHistory: ChatMsg[] = [
-      ...messages.filter((m) => m.content).map((m) => ({ role: m.role, content: m.content })),
-      { role: "user", content: enrichedText },
-    ];
 
     setMessages(displayNext);
     setInput("");
@@ -3347,35 +3425,52 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
     setLoading(true);
 
     try {
-      const uiMessages = apiHistory.map((m, i) => ({
-        id: String(i),
-        role: m.role,
-        parts: [{ type: "text", text: m.content }],
-      }));
+      const uiMessages = [...messages.filter((m) => m.content || m.image), displayMsg].map(
+        (m, i) => {
+          const msgText = m === displayMsg ? enrichedText : m.content;
+          return {
+            id: String(i),
+            role: m.role,
+            parts: [
+              ...(m.image
+                ? [{ type: "file", mediaType: dataUrlMediaType(m.image), url: m.image }]
+                : []),
+              ...(msgText ? [{ type: "text", text: msgText }] : []),
+            ],
+          };
+        },
+      );
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: uiMessages }),
       });
+      if (!res.ok) throw new Error(await res.text());
       if (!res.body) throw new Error("no stream");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let acc = "";
+      let buffer = "";
       const asstMsg: WAMsg = { role: "assistant", content: "", ts: new Date() };
       setMessages([...displayNext, asstMsg]);
+      const processLine = (line: string) => {
+        if (!line.startsWith("data: ")) return;
+        try {
+          const json = JSON.parse(line.slice(6));
+          if (json.type === "text-delta" && json.delta) acc += json.delta;
+        } catch {}
+      };
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value);
-        chunk.split("\n").forEach((line) => {
-          if (!line.startsWith("data: ")) return;
-          try {
-            const json = JSON.parse(line.slice(6));
-            if (json.type === "text-delta" && json.delta) acc += json.delta;
-          } catch {}
-        });
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        lines.forEach(processLine);
         setMessages([...displayNext, { ...asstMsg, content: acc }]);
       }
+      (buffer + decoder.decode()).split("\n").forEach(processLine);
+      setMessages([...displayNext, { ...asstMsg, content: acc }]);
     } catch {
       setMessages([
         ...displayNext,
@@ -3392,85 +3487,30 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
 
   function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () =>
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: "", image: reader.result as string, ts: new Date() },
-      ]);
-    reader.readAsDataURL(file);
     e.target.value = "";
     setShowAttach(false);
-  }
-
-  function handleDoc(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
     if (!file) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: "",
-        fileName: file.name,
-        fileSize: waFileSize(file.size),
-        ts: new Date(),
-      },
-    ]);
-    e.target.value = "";
-    setShowAttach(false);
-  }
-
-  async function toggleRecording() {
-    if (recording) {
-      if (recTimerRef.current) clearInterval(recTimerRef.current);
-      mediaRecRef.current?.stop();
-      mediaRecRef.current?.stream.getTracks().forEach((t) => t.stop());
-      setRecording(false);
+    if (!file.type.startsWith("image/")) {
+      toast.error("Envie um arquivo de imagem válido.");
       return;
     }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-      mr.ondataavailable = (e) => audioChunksRef.current.push(e.data);
-      mr.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        const url = URL.createObjectURL(blob);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "user",
-            content: "",
-            audioUrl: url,
-            audioDuration: `${Math.floor(recSec / 60)}:${String(recSec % 60).padStart(2, "0")}`,
-            ts: new Date(),
-          },
-        ]);
-        setRecSec(0);
-      };
-      mr.start();
-      mediaRecRef.current = mr;
-      setRecording(true);
-      setRecSec(0);
-      recTimerRef.current = setInterval(() => setRecSec((s) => s + 1), 1000);
-    } catch {
-      alert("Não foi possível acessar o microfone.");
+    if (file.size > 4 * 1024 * 1024) {
+      toast.error("Imagem muito grande — o limite é 4 MB.");
+      return;
     }
+    const reader = new FileReader();
+    reader.onload = () => void sendText(input, reader.result as string);
+    reader.readAsDataURL(file);
   }
 
-  function cancelRecording() {
-    if (recTimerRef.current) clearInterval(recTimerRef.current);
-    if (mediaRecRef.current) {
-      mediaRecRef.current.onstop = null;
-      mediaRecRef.current.stop();
-      mediaRecRef.current.stream.getTracks().forEach((t) => t.stop());
-    }
-    setRecording(false);
-    setRecSec(0);
+  function handleDocSoon() {
+    setShowAttach(false);
+    toast("Envio de documentos em breve — por enquanto, envie fotos ou texto.");
   }
 
-  const recDisplay = `${Math.floor(recSec / 60)}:${String(recSec % 60).padStart(2, "0")}`;
+  function handleAudioSoon() {
+    toast("Mensagens de áudio em breve — por enquanto, envie texto ou fotos.");
+  }
 
   const chatBg = "linear-gradient(160deg, #150608 0%, #280d10 35%, #3d1218 65%, #521a20 100%)";
 
@@ -3585,10 +3625,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               Galeria
             </span>
           </button>
-          <button
-            onClick={() => fileDocRef.current?.click()}
-            className="flex flex-col items-center gap-1.5"
-          >
+          <button onClick={handleDocSoon} className="flex flex-col items-center gap-1.5">
             <div
               className="flex h-12 w-12 items-center justify-center rounded-full text-2xl"
               style={{
@@ -3623,27 +3660,6 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
               Fechar
             </span>
-          </button>
-        </div>
-      )}
-
-      {/* Barra de gravação — glass */}
-      {recording && (
-        <div
-          className="flex items-center gap-3 px-4 py-2"
-          style={{
-            background: "rgba(255,60,60,0.15)",
-            backdropFilter: "blur(16px)",
-            borderTop: "1px solid rgba(255,80,80,0.25)",
-          }}
-        >
-          <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-400" />
-          <span className="text-[13px] font-semibold text-red-300">{recDisplay}</span>
-          <span className="flex-1 text-[12px]" style={{ color: "rgba(255,150,150,0.8)" }}>
-            Gravando...
-          </span>
-          <button onClick={cancelRecording} className="text-[12px] font-medium text-red-300">
-            Cancelar
           </button>
         </div>
       )}
@@ -3707,7 +3723,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               color: "rgba(255,255,255,0.92)",
             }}
           />
-          {!input.trim() && !recording && (
+          {!input.trim() && (
             <button
               onClick={() => fileImageRef.current?.click()}
               className="ml-1 shrink-0 self-end text-xl"
@@ -3735,31 +3751,16 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           </button>
         ) : (
           <button
-            onClick={toggleRecording}
+            onClick={handleAudioSoon}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-all active:scale-95"
-            style={
-              recording
-                ? {
-                    background: "linear-gradient(135deg, #ef4444, #dc2626)",
-                    boxShadow:
-                      "0 4px 18px rgba(239,68,68,0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
-                  }
-                : {
-                    background: "linear-gradient(135deg, #a855f7, #8b5147)",
-                    boxShadow:
-                      "0 4px 18px rgba(168,85,247,0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
-                  }
-            }
+            style={{
+              background: "linear-gradient(135deg, #a855f7, #8b5147)",
+              boxShadow: "0 4px 18px rgba(168,85,247,0.5), inset 0 1px 1px rgba(255,255,255,0.3)",
+            }}
           >
-            {recording ? (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                <rect x="6" y="6" width="12" height="12" rx="1" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 3.49-3.44 6.19-6.91 6.19S5.58 15.49 5.09 12H3.07c.53 4.21 3.98 7.5 8.16 7.94V23h2.54v-3.06C17.95 19.5 21.4 16.21 21.93 12h-2.02z" />
-              </svg>
-            )}
+            <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+              <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 3.49-3.44 6.19-6.91 6.19S5.58 15.49 5.09 12H3.07c.53 4.21 3.98 7.5 8.16 7.94V23h2.54v-3.06C17.95 19.5 21.4 16.21 21.93 12h-2.02z" />
+            </svg>
           </button>
         )}
       </div>
@@ -3770,13 +3771,6 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         type="file"
         accept="image/*"
         onChange={handleImage}
-        className="hidden"
-      />
-      <input
-        ref={fileDocRef}
-        type="file"
-        accept=".pdf,.doc,.docx,.pptx,.xlsx,.txt,.csv"
-        onChange={handleDoc}
         className="hidden"
       />
     </div>
@@ -3944,17 +3938,16 @@ function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest:
       const d = weekToDate(m.week, profile!);
       if (!d) return;
       const ymd = d.toISOString().slice(0, 10).replace(/-/g, "");
-      events
-        .push(
-          "BEGIN:VEVENT",
-          `UID:prenatal-${m.week}-${m.label.slice(0, 10).replace(/\s/g, "")}@doutorclovis`,
-          `DTSTART;VALUE=DATE:${ymd}`,
-          `DTEND;VALUE=DATE:${ymd}`,
-          `SUMMARY:Pré-natal S${m.week}: ${m.label}`,
-          m.detail ? `DESCRIPTION:${m.detail}` : "",
-          "END:VEVENT",
-        )
-        .filter(Boolean);
+      const lines = [
+        "BEGIN:VEVENT",
+        `UID:prenatal-${m.week}-${m.label.slice(0, 10).replace(/\s/g, "")}@doutorclovis`,
+        `DTSTART;VALUE=DATE:${ymd}`,
+        `DTEND;VALUE=DATE:${ymd}`,
+        `SUMMARY:Pré-natal S${m.week}: ${m.label}`,
+        m.detail ? `DESCRIPTION:${m.detail}` : "",
+        "END:VEVENT",
+      ].filter(Boolean);
+      events.push(...lines);
     });
     const ics = [
       "BEGIN:VCALENDAR",
@@ -4187,11 +4180,15 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
   async function startContraction() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("contraction_logs")
       .insert({ user_id: u.user.id, intensity })
       .select()
       .single();
+    if (error) {
+      toast.error("Não foi possível registrar a contração. Tente novamente.");
+      return;
+    }
     setActive(data);
     startRef.current = Date.now();
     setElapsed(0);
@@ -4200,10 +4197,14 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
 
   async function stopContraction() {
     if (!active) return;
-    await (supabase as any)
+    const { error } = await (supabase as any)
       .from("contraction_logs")
       .update({ ended_at: new Date().toISOString() })
       .eq("id", active.id);
+    if (error) {
+      toast.error("Não foi possível salvar a contração. Tente novamente.");
+      return;
+    }
     setActive(null);
     setElapsed(0);
     load();
@@ -4212,13 +4213,15 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
   async function clearSession() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    // Only remove last 6 hours of contractions
-    const sixHoursAgo = new Date(Date.now() - 6 * 3600000).toISOString();
-    await (supabase as any)
+    if (!window.confirm("Apagar todo o histórico de contrações?")) return;
+    const { error } = await (supabase as any)
       .from("contraction_logs")
       .delete()
-      .eq("user_id", u.user.id)
-      .gte("started_at", sixHoursAgo);
+      .eq("user_id", u.user.id);
+    if (error) {
+      toast.error("Não foi possível limpar o histórico. Tente novamente.");
+      return;
+    }
     setActive(null);
     load();
   }
@@ -4226,7 +4229,13 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
   const elapsedSecs = Math.floor(elapsed / 1000);
   const elapsedMins = Math.floor(elapsedSecs / 60);
   const recentContractions = contractions.slice(0, 10);
-  const analysis = analyzeContractions(recentContractions);
+  // Análise/banner consideram apenas contrações das últimas 2 horas,
+  // para não manter alertas urgentes presos com dados antigos.
+  const ANALYSIS_WINDOW_MS = 2 * 3600000;
+  const analysisWindow = contractions
+    .filter((c) => Date.now() - new Date(c.started_at).getTime() < ANALYSIS_WINDOW_MS)
+    .slice(0, 10);
+  const analysis = analyzeContractions(analysisWindow);
 
   const statusStyle: Record<string, string> = {
     normal: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -4237,14 +4246,14 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-primary/20 bg-primary/6/60 p-4 text-sm text-foreground">
+      <div className="rounded-2xl border border-primary/20 bg-primary/6 p-4 text-sm text-foreground">
         Use este diário se sentir contrações regulares.{" "}
         <strong>Em dúvida, ligue para o consultório.</strong> Em emergência, ligue{" "}
         <strong>192 (SAMU)</strong>.
       </div>
 
       {/* Analysis banner */}
-      {recentContractions.length >= 2 && (
+      {analysisWindow.length >= 2 && (
         <div className={`rounded-2xl border p-4 ${statusStyle[analysis.status]}`}>
           <p className="font-semibold">{analysis.label}</p>
           <p className="mt-0.5 text-sm">{analysis.detail}</p>
@@ -4442,19 +4451,29 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session) return;
-    const res = await submitPreConsulta({
-      data: {
-        accessToken: s.session.access_token,
-        weeks: gest?.weeks ?? null,
-        ...form,
-      },
-    });
-    setLoading(false);
-    if (res.ok) {
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) {
+        toast.error("Sua sessão expirou. Faça login novamente.");
+        return;
+      }
+      const res = await submitPreConsulta({
+        data: {
+          accessToken: s.session.access_token,
+          weeks: gest?.weeks ?? null,
+          ...form,
+        },
+      });
+      if (!res.ok) {
+        toast.error("Não foi possível enviar. Tente novamente.");
+        return;
+      }
       setDone(true);
       loadHistory();
+    } catch {
+      toast.error("Não foi possível enviar. Verifique sua conexão e tente novamente.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -4924,6 +4943,7 @@ function ConsultasTab() {
   >("transcript");
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
+  const mimeRef = useRef<string>("audio/webm");
 
   useEffect(() => {
     loadNotes();
@@ -4931,30 +4951,41 @@ function ConsultasTab() {
 
   async function loadNotes() {
     setLoadingNotes(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data } = await (supabase as any)
-      .from("consultation_notes")
-      .select("*")
-      .eq("user_id", u.user.id)
-      .order("recorded_at", { ascending: false });
-    setNotes(data ?? []);
-    setLoadingNotes(false);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const { data } = await (supabase as any)
+        .from("consultation_notes")
+        .select("*")
+        .eq("user_id", u.user.id)
+        .order("recorded_at", { ascending: false });
+      setNotes(data ?? []);
+    } finally {
+      setLoadingNotes(false);
+    }
   }
 
   async function startRecording() {
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferred = ["audio/mp4", "audio/webm"].find(
+        (t) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported?.(t),
+      );
+      const mr = preferred
+        ? new MediaRecorder(stream, { mimeType: preferred })
+        : new MediaRecorder(stream);
+      mimeRef.current = (mr.mimeType || preferred || "audio/webm").split(";")[0];
       chunksRef.current = [];
       mr.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
+      const mediaStream = stream;
       mr.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(chunksRef.current, { type: mimeRef.current });
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
-        stream.getTracks().forEach((t) => t.stop());
+        mediaStream.getTracks().forEach((t) => t.stop());
       };
       mr.start();
       mediaRef.current = mr;
@@ -4963,8 +4994,14 @@ function ConsultasTab() {
       setAudioBlob(null);
       setAudioUrl(null);
       setSavedMsg(null);
-    } catch {
-      alert("Não foi possível acessar o microfone. Verifique as permissões do navegador.");
+    } catch (err) {
+      stream?.getTracks().forEach((t) => t.stop());
+      alert(
+        err instanceof DOMException &&
+          (err.name === "NotAllowedError" || err.name === "SecurityError")
+          ? "Não foi possível acessar o microfone. Verifique as permissões do navegador."
+          : "Seu navegador não suporta gravação de áudio. Tente atualizar o navegador.",
+      );
     }
   }
 
@@ -4979,7 +5016,12 @@ function ConsultasTab() {
     setResult(null);
     try {
       const fd = new FormData();
-      fd.append("audio", audioBlob, "consulta.webm");
+      const ext = audioBlob.type.includes("mp4")
+        ? "m4a"
+        : audioBlob.type.includes("ogg")
+          ? "ogg"
+          : "webm";
+      fd.append("audio", audioBlob, `consulta.${ext}`);
       const res = await fetch("/api/transcribe", { method: "POST", body: fd });
       const json: TranscribeResult = await res.json();
       setResult(json);
@@ -4993,26 +5035,32 @@ function ConsultasTab() {
   async function saveNote() {
     if (!result?.ok) return;
     setSaving(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { error } = await (supabase as any).from("consultation_notes").insert({
-      user_id: u.user.id,
-      title: result.titulo ?? "Consulta",
-      raw_transcript: result.transcript ?? null,
-      orientacoes: result.orientacoes?.join("\n") ?? null,
-      medicamentos: result.medicamentos?.join("\n") ?? null,
-      proximos_exames: result.proximos_exames?.join("\n") ?? null,
-      proxima_consulta: result.proxima_consulta ?? null,
-    });
-    setSaving(false);
-    if (error) {
-      setSavedMsg("Erro ao salvar: " + error.message);
-    } else {
-      setSavedMsg("Nota salva com sucesso ✓");
-      setResult(null);
-      setAudioBlob(null);
-      setAudioUrl(null);
-      loadNotes();
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        setSavedMsg("Sua sessão expirou. Faça login novamente.");
+        return;
+      }
+      const { error } = await (supabase as any).from("consultation_notes").insert({
+        user_id: u.user.id,
+        title: result.titulo ?? "Consulta",
+        raw_transcript: result.transcript ?? null,
+        orientacoes: result.orientacoes?.join("\n") ?? null,
+        medicamentos: result.medicamentos?.join("\n") ?? null,
+        proximos_exames: result.proximos_exames?.join("\n") ?? null,
+        proxima_consulta: result.proxima_consulta ?? null,
+      });
+      if (error) {
+        setSavedMsg("Erro ao salvar: " + error.message);
+      } else {
+        setSavedMsg("Nota salva com sucesso ✓");
+        setResult(null);
+        setAudioBlob(null);
+        setAudioUrl(null);
+        loadNotes();
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -5664,7 +5712,7 @@ function HumorTab() {
               <polyline
                 points={polyline}
                 fill="none"
-                stroke="hsl(var(--primary))"
+                stroke="var(--primary)"
                 strokeWidth={2}
                 strokeLinejoin="round"
               />
@@ -5674,7 +5722,7 @@ function HumorTab() {
               (p, i) =>
                 p.y !== null && (
                   <g key={i}>
-                    <circle cx={p.x} cy={p.y!} r={4} fill="hsl(var(--primary))" />
+                    <circle cx={p.x} cy={p.y!} r={4} fill="var(--primary)" />
                     <text
                       x={p.x}
                       y={H + 18}
@@ -6093,11 +6141,21 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
 
   async function saveNotes(id: string) {
     setSavingNotes(true);
-    const { data } = await supabase.auth.getSession();
-    const tk = data.session?.access_token ?? "";
-    await savePatientNotes({ data: { accessToken: tk, id, notes } });
-    setSavingNotes(false);
-    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, patient_notes: notes } : s)));
+    try {
+      const { data } = await supabase.auth.getSession();
+      const tk = data.session?.access_token ?? "";
+      const res = await savePatientNotes({ data: { accessToken: tk, id, notes } });
+      if (!res.ok) {
+        toast.error("Não foi possível salvar as anotações. Tente novamente.");
+        return;
+      }
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, patient_notes: notes } : s)));
+      toast.success("Anotações salvas");
+    } catch {
+      toast.error("Não foi possível salvar as anotações. Tente novamente.");
+    } finally {
+      setSavingNotes(false);
+    }
   }
 
   const STATUS_LABEL_TC: Record<string, string> = {
@@ -6263,9 +6321,15 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
       // Save to DB
       const { data: u } = await supabase.auth.getUser();
       if (u.user) {
-        await (supabase as any)
+        const { error } = await (supabase as any)
           .from("baby_letters")
-          .upsert({ user_id: u.user.id, week, content: json.letter });
+          .upsert(
+            { user_id: u.user.id, week, content: json.letter },
+            { onConflict: "user_id,week" },
+          );
+        if (error) {
+          toast.error("Não foi possível salvar a carta. Ela não ficará guardada para depois.");
+        }
       }
     } catch (e: any) {
       setLetter("Erro ao gerar a carta: " + (e?.message ?? "tente novamente."));
@@ -7563,6 +7627,8 @@ function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }
 
   const dueMs = new Date(due + "T00:00:00").getTime();
   const diffMs = Math.max(0, dueMs - now);
+  const isDueToday = now >= dueMs && now < dueMs + 86400000;
+  const overdueDays = Math.floor((now - dueMs) / 86400000);
   const totalSec = Math.floor(diffMs / 1000);
   const days = Math.floor(totalSec / 86400);
   const hours = Math.floor((totalSec % 86400) / 3600);
@@ -7606,11 +7672,17 @@ function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }
             {progress.toFixed(1)}% da gestação completa
           </p>
         </div>
-        {diffMs === 0 && (
-          <p className="mt-4 text-lg font-semibold text-primary">
-            🎊 Hoje é a data provável do parto! Parabéns, mamãe!
-          </p>
-        )}
+        {diffMs === 0 &&
+          (isDueToday ? (
+            <p className="mt-4 text-lg font-semibold text-primary">
+              🎊 Hoje é a data provável do parto! Parabéns, mamãe!
+            </p>
+          ) : (
+            <p className="mt-4 text-lg font-semibold text-primary">
+              A DPP passou há {overdueDays} {overdueDays === 1 ? "dia" : "dias"} — mantenha contato
+              próximo com o consultório.
+            </p>
+          ))}
       </div>
 
       <div>
@@ -7742,7 +7814,11 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
   async function handleDelete(id: string) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    await deleteAlbumPost({ data: { accessToken: s.session.access_token, id } });
+    const res = await deleteAlbumPost({ data: { accessToken: s.session.access_token, id } });
+    if (!res.ok) {
+      toast.error("Não foi possível excluir a foto. Tente novamente.");
+      return;
+    }
     setPosts((p) => p.filter((x) => x.id !== id));
   }
 
@@ -7868,7 +7944,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
                     </p>
                     <button
                       onClick={() => handleDelete(post.id)}
-                      className="text-xs text-destructive opacity-0 transition-opacity group-hover:opacity-100"
+                      className="text-xs text-destructive transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100"
                     >
                       Excluir
                     </button>
@@ -7914,13 +7990,18 @@ function NomeTab({ profile }: { profile: Profile | null }) {
       setSaving(false);
       return;
     }
-    await addNameByPatient({
+    const addRes = await addNameByPatient({
       data: {
         accessToken: s.session.access_token,
         name: newName.trim(),
         suggestedBy: "Mamãe",
       },
     });
+    if (!addRes.ok) {
+      toast.error("Não foi possível adicionar o nome. Tente novamente.");
+      setSaving(false);
+      return;
+    }
     const res = await getOrCreateNameSession({ data: { accessToken: s.session.access_token } });
     if (res.ok) {
       setSession(res.session);
@@ -7933,9 +8014,13 @@ function NomeTab({ profile }: { profile: Profile | null }) {
   async function handleToggle(isActive: boolean, revealWinner: boolean) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    await toggleNameSession({
+    const res = await toggleNameSession({
       data: { accessToken: s.session.access_token, isActive, revealWinner },
     });
+    if (!res.ok) {
+      toast.error("Não foi possível atualizar a votação. Tente novamente.");
+      return;
+    }
     setSession((prev) =>
       prev ? { ...prev, is_active: isActive, reveal_winner: revealWinner } : prev,
     );
@@ -7944,7 +8029,11 @@ function NomeTab({ profile }: { profile: Profile | null }) {
   async function handleRemove(entryId: string) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    await removeNameEntry({ data: { accessToken: s.session.access_token, entryId } });
+    const res = await removeNameEntry({ data: { accessToken: s.session.access_token, entryId } });
+    if (!res.ok) {
+      toast.error("Não foi possível remover o nome. Tente novamente.");
+      return;
+    }
     setEntries((e) => e.filter((x) => x.id !== entryId));
   }
 
@@ -8487,6 +8576,7 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
       }
       const res = await getCourseProgress({ data: { accessToken: s.session.access_token } });
       if (res.ok) setProgress(res.progress);
+      else toast.error("Não foi possível carregar seu progresso do curso. Tente novamente.");
       setLoading(false);
     })();
   }, []);
@@ -8500,21 +8590,28 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
   }
 
   const completedCount = COURSE_MODULES.filter((m) => isDone(m.week)).length;
-  const unlockedCount = COURSE_MODULES.filter((m) => isUnlocked(m.week)).length;
-  const hasCertificate = unlockedCount > 0 && completedCount >= Math.ceil(unlockedCount * 0.8);
+  const hasCertificate = COURSE_MODULES.length > 0 && completedCount >= COURSE_MODULES.length;
 
   async function finishQuiz(score: number) {
     if (!activeModule) return;
     setSaving(true);
-    const { data: s } = await supabase.auth.getSession();
-    if (s.session) {
-      await markModuleComplete({
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) {
+        toast.error("Não foi possível salvar seu progresso — faça login novamente.");
+        return;
+      }
+      const res = await markModuleComplete({
         data: {
           accessToken: s.session.access_token,
           moduleWeek: activeModule.week,
           quizScore: score,
         },
       });
+      if (!res.ok) {
+        toast.error("Não foi possível salvar seu progresso. Tente novamente.");
+        return;
+      }
       setProgress((p) => [
         ...p.filter((x) => x.module_week !== activeModule.week),
         {
@@ -8523,8 +8620,10 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
           completed_at: new Date().toISOString(),
         },
       ]);
+      triggerAchievementsCheck();
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   function openModule(m: CourseModule) {
@@ -8866,7 +8965,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
 ];
 
-function FAQTab({ gest }: { gest: Gest }) {
+function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) => void }) {
   const currentWeek = gest?.weeks ?? 0;
   const [open, setOpen] = useState<number | null>(null);
   const [search, setSearch] = useState("");
@@ -8956,12 +9055,7 @@ function FAQTab({ gest }: { gest: Gest }) {
       <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-sm text-center text-muted-foreground">
         Não encontrou sua dúvida?{" "}
         <button
-          onClick={() => {
-            const tabBtns = document.querySelectorAll<HTMLButtonElement>("button");
-            tabBtns.forEach((btn) => {
-              if (btn.textContent === "Chat IA") btn.click();
-            });
-          }}
+          onClick={() => onNavigate("Chat IA")}
           className="text-primary font-medium hover:underline"
         >
           Pergunte ao assistente de IA
@@ -8976,7 +9070,9 @@ function FAQTab({ gest }: { gest: Gest }) {
 ───────────────────────────────────────────────────────────────────────────── */
 
 function PânicoTab({ profile }: { profile: Profile | null }) {
-  const [status, setStatus] = useState<"idle" | "locating" | "sent" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "locating" | "sent" | "error" | "save_error">(
+    "idle",
+  );
   const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(
     null,
   );
@@ -9020,15 +9116,21 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
       setLocation({ lat, lng, address: address ?? undefined });
 
       const { data: s } = await supabase.auth.getSession();
-      if (s.session) {
-        await savePanicEvent({
-          data: {
-            accessToken: s.session.access_token,
-            latitude: lat,
-            longitude: lng,
-            address,
-          },
-        });
+      const res = s.session
+        ? await savePanicEvent({
+            data: {
+              accessToken: s.session.access_token,
+              latitude: lat,
+              longitude: lng,
+              address,
+            },
+          })
+        : { ok: false as const };
+
+      if (!res.ok) {
+        setStatus("save_error");
+        toast.error("Não foi possível registrar o alerta — ligue 192 imediatamente");
+        return;
       }
 
       setStatus("sent");
@@ -9108,6 +9210,22 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
             </p>
           </div>
         )}
+
+        {status === "save_error" && (
+          <div className="mt-3 rounded-xl bg-white p-3 text-sm text-red-700">
+            <p className="font-medium">O alerta não pôde ser registrado.</p>
+            <p className="text-xs mt-1">
+              Sua localização foi obtida, mas o alerta não pôde ser registrado. Ligue{" "}
+              <strong>192</strong> e avise seu contato de emergência diretamente.
+            </p>
+            {location && (
+              <p className="text-xs text-muted-foreground mt-1">
+                📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+                {location.address ? ` — ${location.address}` : ""}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Emergency numbers — large tap targets */}
@@ -9184,8 +9302,9 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       <p className="text-center text-xs text-muted-foreground px-4">
-        O botão registra sua localização GPS e alerta seu acompanhante designado. Configure o
-        contato de emergência em <strong>Perfil</strong>.
+        O botão registra sua localização GPS; seu acompanhante designado poderá vê-la na página de
+        acompanhamento (últimos 30 minutos). Configure o contato de emergência em{" "}
+        <strong>Perfil</strong>.
       </p>
     </div>
   );
@@ -9472,7 +9591,7 @@ const EPDS_QUESTIONS = [
   {
     q: "Tenho sido capaz de rir e ver o lado divertido das coisas",
     opts: ["Tanto quanto antes", "Não tanto agora", "Definitivamente menos", "Não consigo mais"],
-    reverse: true,
+    reverse: false,
   },
   {
     q: "Tenho aguardado com satisfação as coisas boas que estavam por acontecer",
@@ -9482,7 +9601,7 @@ const EPDS_QUESTIONS = [
       "Definitivamente menos",
       "Quase nada",
     ],
-    reverse: true,
+    reverse: false,
   },
   {
     q: "Me culpei sem necessidade quando as coisas correram mal",
@@ -9881,10 +10000,17 @@ function BreastfeedingSection() {
   }, []);
 
   useEffect(() => {
-    if (!activeLog) return;
-    const t = setInterval(() => setElapsed((e) => e + 1), 1000);
-    return () => clearInterval(t);
-  }, [activeLog]);
+    if (!activeLog || !activeStart) return;
+    const update = () =>
+      setElapsed(Math.max(0, Math.floor((Date.now() - activeStart.getTime()) / 1000)));
+    update();
+    const t = setInterval(update, 1000);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, [activeLog, activeStart]);
 
   async function loadLogs() {
     const { data: s } = await supabase.auth.getSession();
@@ -9893,7 +10019,16 @@ function BreastfeedingSection() {
       return;
     }
     const res = await getBreastfeedingLogs({ data: { accessToken: s.session.access_token } });
-    if (res.ok) setLogs(res.logs);
+    if (res.ok) {
+      setLogs(res.logs);
+      // Retomar mamada em andamento (ex.: após recarregar a página)
+      const open = res.logs.find((l) => !l.ended_at);
+      if (open) {
+        setActiveLog(open.id);
+        setActiveStart(new Date(open.started_at));
+        setActiveSide(open.side);
+      }
+    }
     setLoading(false);
   }
 
@@ -9924,8 +10059,8 @@ function BreastfeedingSection() {
     await loadLogs();
   }
 
-  const todayLogs = logs.filter((l) =>
-    l.started_at.startsWith(new Date().toISOString().slice(0, 10)),
+  const todayLogs = logs.filter(
+    (l) => new Date(l.started_at).toDateString() === new Date().toDateString(),
   );
   const todayCount = todayLogs.length;
   const todayMinutes = todayLogs.reduce((sum, l) => {
@@ -10010,7 +10145,7 @@ function BreastfeedingSection() {
       {/* Recent logs */}
       {!loading && logs.length > 0 && (
         <div>
-          <h3 className="font-semibold mb-3">Últimas 7 dias</h3>
+          <h3 className="font-semibold mb-3">Últimos 7 dias</h3>
           <div className="space-y-2">
             {logs.slice(0, 20).map((log) => {
               const dur = log.ended_at
@@ -11253,37 +11388,53 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
 
   async function handleRequest() {
     setSubmitting(true);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setSubmitting(false);
-      return;
-    }
-    const res = await requestPrivateConsultation({
-      data: {
-        accessToken: s.session.access_token,
-        consultType: selectedType,
-        preferredDates: preferredDates.filter(Boolean),
-        message: message || null,
-      },
-    });
-    if (res.ok) {
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) {
+        toast.error("Sua sessão expirou. Faça login novamente.");
+        return;
+      }
+      const res = await requestPrivateConsultation({
+        data: {
+          accessToken: s.session.access_token,
+          consultType: selectedType,
+          preferredDates: preferredDates.filter(Boolean),
+          message: message || null,
+        },
+      });
+      if (!res.ok) {
+        toast.error("Não foi possível enviar a solicitação. Tente novamente.");
+        return;
+      }
       setNewId(res.consultation.id);
       setStep("list");
       await load();
+    } catch {
+      toast.error("Não foi possível enviar a solicitação. Tente novamente.");
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   }
 
   async function handleMarkPayment(id: string) {
     setMarkingId(id);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) {
+        toast.error("Sua sessão expirou. Faça login novamente.");
+        return;
+      }
+      const res = await markPaymentSent({ data: { accessToken: s.session.access_token, id } });
+      if (!res.ok) {
+        toast.error("Não foi possível registrar o pagamento. Tente novamente.");
+        return;
+      }
+      await load();
+    } catch {
+      toast.error("Não foi possível registrar o pagamento. Tente novamente.");
+    } finally {
       setMarkingId(null);
-      return;
     }
-    await markPaymentSent({ data: { accessToken: s.session.access_token, id } });
-    await load();
-    setMarkingId(null);
   }
 
   const selectedConsultType = CONSULT_TYPES.find((c) => c.key === selectedType) ?? CONSULT_TYPES[0];
@@ -11450,7 +11601,9 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         <div className="rounded-3xl border border-green-200 bg-green-50 p-5">
           <p className="font-semibold text-green-700">✅ Solicitação enviada!</p>
           <p className="text-sm text-green-600 mt-1">
-            Escaneie o QR Code PIX abaixo ou copie o código para pagar. A confirmação é automática.
+            {consultations.find((c) => c.id === newId)?.pix_qr_code_base64
+              ? "Escaneie o QR Code PIX abaixo ou copie o código para pagar. A confirmação é automática."
+              : "Use a chave PIX abaixo para pagar e depois toque em “Marquei o pagamento” — o Dr. Clóvis confirmará manualmente."}
           </p>
         </div>
       )}
@@ -11641,6 +11794,8 @@ function CicloMenstrualTab() {
       setNewSymptoms([]);
       setNewNotes("");
       await load();
+    } else {
+      toast.error("Não foi possível salvar o ciclo. Tente novamente.");
     }
     setSubmitting(false);
   }
@@ -11648,7 +11803,13 @@ function CicloMenstrualTab() {
   async function handleMarkEnd(cycleId: string) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session?.access_token) return;
-    await updateCycleEnd({ data: { accessToken: s.session.access_token, cycleId, endDate } });
+    const res = await updateCycleEnd({
+      data: { accessToken: s.session.access_token, cycleId, endDate },
+    });
+    if (!res.ok) {
+      toast.error("Não foi possível salvar o fim do ciclo. Tente novamente.");
+      return;
+    }
     setEndingId(null);
     await load();
   }
@@ -11656,7 +11817,11 @@ function CicloMenstrualTab() {
   async function handleDelete(cycleId: string) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session?.access_token) return;
-    await deleteCycle({ data: { accessToken: s.session.access_token, cycleId } });
+    const res = await deleteCycle({ data: { accessToken: s.session.access_token, cycleId } });
+    if (!res.ok) {
+      toast.error("Não foi possível excluir o ciclo. Tente novamente.");
+      return;
+    }
     await load();
   }
 
@@ -11817,8 +11982,8 @@ function CicloMenstrualTab() {
             const gapToNext =
               i > 0
                 ? Math.round(
-                    (new Date(cycle.start_date + "T00:00:00").getTime() -
-                      new Date(cycles[i - 1].start_date + "T00:00:00").getTime()) /
+                    (new Date(cycles[i - 1].start_date + "T00:00:00").getTime() -
+                      new Date(cycle.start_date + "T00:00:00").getTime()) /
                       86400000,
                   )
                 : null;
@@ -12560,7 +12725,7 @@ function ExamesTab({ gest }: { gest: Gest }) {
       setSubmitting(false);
       return;
     }
-    await (supabase as any).from("exam_files").insert({
+    const { error } = await (supabase as any).from("exam_files").insert({
       user_id: u.user.id,
       name: form.name,
       category: form.category,
@@ -12568,15 +12733,24 @@ function ExamesTab({ gest }: { gest: Gest }) {
       notes: form.notes || null,
       image_data: imageData,
     });
+    setSubmitting(false);
+    if (error) {
+      toast.error("Não foi possível salvar o exame. Tente novamente.");
+      return;
+    }
     setForm({ name: "", category: "ultrassom", week: "", notes: "" });
     setImageData(null);
     if (fileRef.current) fileRef.current.value = "";
-    setSubmitting(false);
     load();
   }
 
   async function remove(id: string) {
-    await (supabase as any).from("exam_files").delete().eq("id", id);
+    if (!window.confirm("Excluir este exame?")) return;
+    const { error } = await (supabase as any).from("exam_files").delete().eq("id", id);
+    if (error) {
+      toast.error("Não foi possível excluir o exame. Tente novamente.");
+      return;
+    }
     load();
   }
 
@@ -12781,13 +12955,20 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
 
   async function savePlan() {
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    await (supabase as any)
+    if (!u.user) {
+      toast.error("Sua sessão expirou. Faça login novamente.");
+      return;
+    }
+    const { error } = await (supabase as any)
       .from("birth_plans")
       .upsert(
         { ...plan, user_id: u.user.id, updated_at: new Date().toISOString() },
         { onConflict: "user_id" },
       );
+    if (error) {
+      toast.error("Não foi possível salvar o plano. Tente novamente.");
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
@@ -12968,7 +13149,7 @@ function PlanoField({
 function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-primary/20 bg-[var(--gradient-warm)] p-8">
+      <div className="rounded-3xl border border-primary/20 bg-[image:var(--gradient-warm)] p-8">
         <p className="font-serif text-2xl text-foreground">Você não está sozinha.</p>
         <p className="mt-3 text-muted-foreground leading-relaxed">
           Perdas gestacionais, diagnósticos difíceis e momentos de medo fazem parte da jornada de
@@ -13000,7 +13181,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
       </div>
 
       {/* Quando buscar ajuda */}
-      <div className="rounded-3xl border border-primary/20 bg-primary/6/60 p-6">
+      <div className="rounded-3xl border border-primary/20 bg-primary/6 p-6">
         <p className="font-serif text-lg text-foreground">Quando buscar ajuda profissional</p>
         <ul className="mt-3 space-y-2 text-sm text-foreground">
           {[

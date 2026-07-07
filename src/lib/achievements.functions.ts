@@ -138,6 +138,7 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
       return {
         ok: false as const,
         unlocked: [] as { achievement_key: string; unlocked_at: string }[],
+        newlyAwarded: [] as string[],
       };
     const uid = u.user.id;
     const toAward: string[] = [];
@@ -209,6 +210,17 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     if (checkItems && checkItems.length > 0 && checkItems.every((c: any) => c.done))
       toAward.push("prenatal_done");
 
+    // Chaves já desbloqueadas antes desta checagem, para detectar as novas
+    // (permite que os pontos de ação exibam um toast de "nova conquista").
+    const { data: existingRows } = await db
+      .from("patient_achievements")
+      .select("achievement_key")
+      .eq("user_id", uid);
+    const existing = new Set(
+      ((existingRows ?? []) as { achievement_key: string }[]).map((r) => r.achievement_key),
+    );
+    const newlyAwarded = toAward.filter((key) => !existing.has(key));
+
     if (toAward.length > 0) {
       await db.from("patient_achievements").upsert(
         toAward.map((key) => ({ user_id: uid, achievement_key: key })),
@@ -223,5 +235,6 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     return {
       ok: true as const,
       unlocked: (rows ?? []) as { achievement_key: string; unlocked_at: string }[],
+      newlyAwarded,
     };
   });

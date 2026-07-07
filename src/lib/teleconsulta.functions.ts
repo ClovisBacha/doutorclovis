@@ -67,14 +67,26 @@ export const getTeleconsultasAdmin = createServerFn({ method: "POST" })
     const admin = await requireAdmin(data.accessToken);
     if (!admin) return { ok: false as const, error: "Não autorizado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Sem FK entre teleconsulta_sessions e patient_profiles, o embed do
+    // PostgREST falha (PGRST200) — buscamos os nomes em uma segunda query.
     const { data: rows, error } = await supabaseAdmin
       .from("teleconsulta_sessions")
-      .select("*, patient_profiles(display_name)")
+      .select("*")
       .order("created_at", { ascending: false });
     if (error) return { ok: false as const, error: error.message };
+    const userIds = [...new Set((rows ?? []).map((r: any) => r.patient_user_id))];
+    const nameById = new Map<string, string | null>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabaseAdmin
+        .from("patient_profiles")
+        .select("id, display_name")
+        .in("id", userIds);
+      for (const p of (profiles ?? []) as { id: string; display_name: string | null }[])
+        nameById.set(p.id, p.display_name);
+    }
     const sessions: TeleconsultaSession[] = (rows ?? []).map((r: any) => ({
       ...r,
-      patient_name: r.patient_profiles?.display_name ?? null,
+      patient_name: nameById.get(r.patient_user_id) ?? null,
     }));
     return { ok: true as const, sessions };
   });
@@ -299,8 +311,8 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
       const { data: profile } = await supabaseAdmin
         .from("patient_profiles")
         .select("display_name")
-        .eq("user_id", data.patientUserId)
-        .single();
+        .eq("id", data.patientUserId)
+        .maybeSingle();
       await sendPatientMeetEmail(
         authUser.user.email,
         (profile as any)?.display_name ?? "Paciente",

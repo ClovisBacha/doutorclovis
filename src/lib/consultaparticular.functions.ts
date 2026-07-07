@@ -161,11 +161,28 @@ export const getPrivateConsultationsAdmin = createServerFn({ method: "POST" })
     const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (!u.user?.email || !adminEmails.includes(u.user.email.toLowerCase()))
       return { ok: false as const, error: "Não autorizado" };
-    const { data: rows } = await db
+    // Sem FK entre private_consultations e patient_profiles, o embed do
+    // PostgREST falha (PGRST200) — buscamos os nomes em uma segunda query.
+    const { data: rows, error } = await db
       .from("private_consultations")
-      .select("*, patient_profiles(display_name)")
+      .select("*")
       .order("created_at", { ascending: false });
-    return { ok: true as const, consultations: (rows ?? []) as any[] };
+    if (error) return { ok: false as const, error: error.message };
+    const userIds = [...new Set((rows ?? []).map((r: any) => r.patient_user_id))];
+    const nameById = new Map<string, string | null>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await db
+        .from("patient_profiles")
+        .select("id, display_name")
+        .in("id", userIds);
+      for (const p of (profiles ?? []) as { id: string; display_name: string | null }[])
+        nameById.set(p.id, p.display_name);
+    }
+    const consultations = (rows ?? []).map((r: any) => ({
+      ...r,
+      patient_profiles: { display_name: nameById.get(r.patient_user_id) ?? null },
+    }));
+    return { ok: true as const, consultations: consultations as any[] };
   });
 
 export const confirmPaymentAdmin = createServerFn({ method: "POST" })
