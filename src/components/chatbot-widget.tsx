@@ -42,19 +42,21 @@ export function ChatbotWidget() {
 
   return (
     <>
+      {/* bottom-24 no mobile: fica acima da barra de navegação inferior (botão "App");
+          no desktop (sem a barra) volta para bottom-6. Entrada em fade suave de 600ms. */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:scale-105 ${
+        className={`fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-soft)] transition-all duration-[600ms] ease-out hover:scale-105 ${
           open || showButton
-            ? "translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-24 opacity-0"
+            ? "translate-y-0 scale-100 opacity-100"
+            : "pointer-events-none translate-y-3 scale-95 opacity-0"
         }`}
         aria-label="Abrir chat"
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </button>
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 flex h-[32rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-soft)]">
+        <div className="fixed bottom-[10.5rem] right-4 md:bottom-24 md:right-6 z-50 flex h-[30rem] max-h-[calc(100dvh-14rem)] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-soft)]">
           <div className="border-b border-border bg-primary px-4 py-3 text-primary-foreground">
             <p className="font-serif text-lg">Assistente do consultório</p>
             <p className="text-xs opacity-80">Tire dúvidas sobre consultas e atendimento</p>
