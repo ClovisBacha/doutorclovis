@@ -521,6 +521,9 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   const [doneDays, setDoneDays] = useState<number[]>([]);
   const [checkin, setCheckin] = useState<Checkin>({ last: "", streak: 0 });
   const [dayTasks, setDayTasks] = useState<Record<string, boolean>>({});
+  // Estado dedicado do dia de HOJE: alimenta o anel segmentado sem vazar o
+  // estado de outros dias abertos no sheet (dayTasks muda a cada openDay)
+  const [todayTasks, setTodayTasks] = useState<Record<string, boolean>>({});
   const [showWelcome, setShowWelcome] = useState(false);
 
   // Lazy init: evita flash da tela errada no primeiro render (rota é ssr:false)
@@ -555,6 +558,8 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       }
     }
     setJourneyStart(js);
+    // Hidrata o anel de hoje do localStorage (senão só preenche ao abrir o sheet)
+    setTodayTasks(lsGet<Record<string, boolean>>(LS.dayTasks(todayD), {}));
   }, [hasGest, todayD]);
 
   const journeyStartD = journeyStart?.gestDay ?? todayD;
@@ -609,6 +614,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     const state = { ...dayTaskState(D), [id]: value };
     lsSet(LS.dayTasks(D), state);
     if (sheet?.kind === "day" && sheet.D === D) setDayTasks(state);
+    if (D === todayD) setTodayTasks(state);
     const allDone = state.humor && state.desafio && state.leitura;
     if (allDone && !doneDays.includes(D)) {
       const next = [...doneDays, D];
@@ -1086,8 +1092,9 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           const dia = isToday ? 84 : 64;
           const dayOfWeek = (D % 7) + 1;
           const tasksDone = isToday
-            ? [checkedToday || dayTasks.humor, dayTasks.desafio, dayTasks.leitura].filter(Boolean)
-                .length
+            ? [checkedToday || todayTasks.humor, todayTasks.desafio, todayTasks.leitura].filter(
+                Boolean,
+              ).length
             : 0;
 
           return (

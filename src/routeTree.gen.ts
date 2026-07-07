@@ -14,7 +14,6 @@ import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
-import { Route as PreviewCaminhoRouteImport } from './routes/preview-caminho'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
 import { Route as MitosRouteImport } from './routes/mitos'
@@ -70,11 +69,6 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const PrimeiraConsultaRoute = PrimeiraConsultaRouteImport.update({
   id: '/primeira-consulta',
   path: '/primeira-consulta',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PreviewCaminhoRoute = PreviewCaminhoRouteImport.update({
-  id: '/preview-caminho',
-  path: '/preview-caminho',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MuralRoute = MuralRouteImport.update({
@@ -253,7 +247,6 @@ export interface FileRoutesByFullPath {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
-  '/preview-caminho': typeof PreviewCaminhoRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -291,7 +284,6 @@ export interface FileRoutesByTo {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
-  '/preview-caminho': typeof PreviewCaminhoRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -331,7 +323,6 @@ export interface FileRoutesById {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
-  '/preview-caminho': typeof PreviewCaminhoRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -371,7 +362,6 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
-    | '/preview-caminho'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -409,7 +399,6 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
-    | '/preview-caminho'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -448,7 +437,6 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
-    | '/preview-caminho'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -488,7 +476,6 @@ export interface RootRouteChildren {
   MitosRoute: typeof MitosRoute
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
-  PreviewCaminhoRoute: typeof PreviewCaminhoRoute
   PrimeiraConsultaRoute: typeof PrimeiraConsultaRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -539,13 +526,6 @@ declare module '@tanstack/react-router' {
       path: '/primeira-consulta'
       fullPath: '/primeira-consulta'
       preLoaderRoute: typeof PrimeiraConsultaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/preview-caminho': {
-      id: '/preview-caminho'
-      path: '/preview-caminho'
-      fullPath: '/preview-caminho'
-      preLoaderRoute: typeof PreviewCaminhoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mural': {
@@ -803,7 +783,6 @@ const rootRouteChildren: RootRouteChildren = {
   MitosRoute: MitosRoute,
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
-  PreviewCaminhoRoute: PreviewCaminhoRoute,
   PrimeiraConsultaRoute: PrimeiraConsultaRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
