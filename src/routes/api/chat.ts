@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
+import { getBrainContext } from "@/lib/secondbrain.server";
 
 // Rate limit simples por IP (janela fixa, em memória). Em ambiente serverless
 // a memória não é compartilhada entre instâncias nem persiste entre cold starts,
@@ -43,6 +44,19 @@ Regras de resposta:
 - Se a pessoa quiser marcar consulta, direcione para a página /agendamento.
 - Não invente dados (telefone, endereço, valores). Se não souber, peça para a paciente entrar em contato pelo site.`;
 
+/** Extrai o texto da última mensagem de usuário (formato UIMessage com parts). */
+function lastUserText(messages: UIMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg?.role !== "user") continue;
+    return (msg.parts ?? [])
+      .map((p) => (p.type === "text" ? p.text : ""))
+      .join(" ")
+      .trim();
+  }
+  return "";
+}
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
@@ -64,15 +78,23 @@ export const Route = createFileRoute("/api/chat")({
         const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         if (!key) return new Response("Missing GOOGLE_GENERATIVE_AI_API_KEY", { status: 500 });
 
+        // Segundo Cérebro: contexto de estilo/conduta do médico injetado no
+        // system prompt. getBrainContext é safe (falha vira block vazio),
+        // então nunca derruba o chat.
+        const messages = body.messages as UIMessage[];
+        const brain = await getBrainContext(lastUserText(messages));
+        const system =
+          brain.enabledApp && brain.block ? `${SYSTEM_PROMPT}\n\n${brain.block}` : SYSTEM_PROMPT;
+
         const google = createChatProvider(key);
         const result = streamText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
-          system: SYSTEM_PROMPT,
-          messages: await convertToModelMessages(body.messages as UIMessage[]),
+          system,
+          messages: await convertToModelMessages(messages),
         });
 
         return result.toUIMessageStreamResponse({
-          originalMessages: body.messages as UIMessage[],
+          originalMessages: messages,
         });
       },
     },

@@ -38,6 +38,19 @@ import {
   CONSULT_TYPES as PRIVATE_CONSULT_TYPES,
   type PrivateConsultation,
 } from "@/lib/consultaparticular.functions";
+import {
+  getBrainSettings,
+  saveBrainSettings,
+  listBrainEntries,
+  addBrainEntry,
+  updateBrainEntry,
+  deleteBrainEntry,
+  listUnansweredQuestions,
+  answerAndTrain,
+  testBrain,
+  type BrainEntry,
+  type BrainSettings,
+} from "@/lib/secondbrain.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({ meta: [{ title: "Painel do médico — Obstétrica by Dr. Clóvis" }] }),
@@ -63,6 +76,7 @@ const PANEL_TABS = [
   "Agenda",
   "Ferramentas",
   "Perguntas",
+  "Cérebro 🧠",
   "Pré-consultas",
   "Teleconsultas",
   "Consultas Pagas",
@@ -260,6 +274,7 @@ function PainelPage() {
         {tab === "Perguntas" && (
           <QuestionsSection questions={questions} onToggle={toggleAnswered} />
         )}
+        {tab === "Cérebro 🧠" && <CerebroSection tokenFn={token} />}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
         )}
@@ -2669,6 +2684,519 @@ function AgendaSection() {
 function timeToMins(t: string): number {
   const [h, m] = t.split(":").map(Number);
   return (h || 0) * 60 + (m || 0);
+}
+
+/* ---------- Cérebro 🧠 (Segundo Cérebro do médico) ---------- */
+
+const BRAIN_SOURCE_STYLE: Record<string, string> = {
+  manual: "bg-secondary text-muted-foreground",
+  pergunta: "bg-violet-100 text-violet-700",
+  whatsapp: "bg-emerald-100 text-emerald-800",
+};
+
+function BrainToggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${checked ? "bg-primary" : "bg-muted"}`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${checked ? "translate-x-4" : "translate-x-0"}`}
+        />
+      </button>
+      <span className="text-sm">{label}</span>
+    </div>
+  );
+}
+
+function CerebroSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="font-serif text-xl">Segundo Cérebro do Dr. Clóvis</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ensine a IA a responder como você responderia: defina seu estilo, responda perguntas reais
+          das pacientes e alimente a base de conhecimento. O cérebro é usado pelo chat do app e pelo
+          atendimento no WhatsApp.
+        </p>
+      </div>
+      <BrainSettingsCard tokenFn={tokenFn} />
+      <BrainTrainCard tokenFn={tokenFn} />
+      <BrainKnowledgeCard tokenFn={tokenFn} />
+      <BrainPlaygroundCard tokenFn={tokenFn} />
+    </div>
+  );
+}
+
+/** Card "Estilo do médico": persona, frases típicas, regras e onde usar o cérebro. */
+function BrainSettingsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [settings, setSettings] = useState<BrainSettings | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const res = await getBrainSettings({ data: { accessToken: await tokenFn() } });
+      if (res.ok) setSettings(res.settings);
+      else toast.error("Não foi possível carregar o estilo do médico.");
+    })();
+  }, [tokenFn]);
+
+  function patch(p: Partial<BrainSettings>) {
+    setSettings((s) => (s ? { ...s, ...p } : s));
+  }
+
+  async function save() {
+    if (!settings) return;
+    setSaving(true);
+    const res = await saveBrainSettings({ data: { accessToken: await tokenFn(), settings } });
+    setSaving(false);
+    if (!res.ok) {
+      toast.error("Não foi possível salvar o estilo. Tente novamente.");
+      return;
+    }
+    toast.success("Estilo do médico salvo.");
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <p className="font-medium">Estilo do médico</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        Como a IA deve soar quando responde em seu nome.
+      </p>
+
+      {!settings ? (
+        <div className="mt-4 space-y-3">
+          <div className="h-20 animate-pulse rounded-xl bg-secondary" />
+          <div className="h-20 animate-pulse rounded-xl bg-secondary" />
+        </div>
+      ) : (
+        <div className="mt-4 space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Persona (quem é você e como fala)
+            </label>
+            <textarea
+              value={settings.persona}
+              onChange={(e) => patch({ persona: e.target.value })}
+              rows={3}
+              placeholder="Ex: Sou acolhedor e direto, explico com linguagem simples e sempre tranquilizo a paciente antes de orientar."
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Frases típicas (uma por linha)
+            </label>
+            <textarea
+              value={settings.sample_phrases}
+              onChange={(e) => patch({ sample_phrases: e.target.value })}
+              rows={3}
+              placeholder={
+                "Ex:\nFica tranquila, isso é comum na gestação.\nQualquer dúvida, estou por aqui."
+              }
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Regras (o que a IA nunca deve fazer / sempre deve fazer)
+            </label>
+            <textarea
+              value={settings.rules}
+              onChange={(e) => patch({ rules: e.target.value })}
+              rows={3}
+              placeholder="Ex: Nunca indicar medicação. Em sangramento ou dor forte, orientar procurar o pronto-socorro imediatamente."
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-6">
+            <BrainToggle
+              checked={settings.enabled_app}
+              onChange={(v) => patch({ enabled_app: v })}
+              label="Usar no chat do app"
+            />
+            <BrainToggle
+              checked={settings.enabled_whatsapp}
+              onChange={(v) => patch({ enabled_whatsapp: v })}
+              label="Usar no WhatsApp"
+            />
+          </div>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+          >
+            {saving ? "Salvando..." : "Salvar estilo"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Card "Treinar respondendo": perguntas reais das pacientes viram conhecimento. */
+function BrainTrainCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [questions, setQuestions] = useState<
+    { id: string; question: string; created_at: string }[] | null
+  >(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const res = await listUnansweredQuestions({ data: { accessToken: await tokenFn() } });
+      if (res.ok) setQuestions(res.questions);
+      else toast.error("Não foi possível carregar as perguntas das pacientes.");
+    })();
+  }, [tokenFn]);
+
+  async function train(q: { id: string; question: string }) {
+    const answer = (answers[q.id] ?? "").trim();
+    if (!answer || sendingId) return;
+    setSendingId(q.id);
+    const res = await answerAndTrain({
+      data: { accessToken: await tokenFn(), questionId: q.id, answer },
+    });
+    setSendingId(null);
+    if (!res.ok) {
+      toast.error("Não foi possível treinar com essa resposta. Tente novamente.");
+      return;
+    }
+    setQuestions((prev) => (prev ?? []).filter((x) => x.id !== q.id));
+    toast.success("🧠 O cérebro aprendeu mais uma");
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <p className="font-medium">Treinar respondendo</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        Cada resposta sua vira conhecimento: a paciente recebe a resposta e o cérebro aprende a
+        conduta para as próximas.
+      </p>
+
+      {questions === null ? (
+        <div className="mt-4 space-y-3">
+          <div className="h-24 animate-pulse rounded-xl bg-secondary" />
+          <div className="h-24 animate-pulse rounded-xl bg-secondary" />
+        </div>
+      ) : questions.length === 0 ? (
+        <p className="mt-4 rounded-xl bg-secondary/60 p-4 text-sm text-muted-foreground">
+          Tudo respondido por aqui! 🎉 Quando uma paciente enviar uma nova pergunta, ela aparece
+          nesta lista para você ensinar o cérebro.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-4">
+          {questions.map((q) => (
+            <div key={q.id} className="rounded-xl border border-border p-4">
+              <p className="text-xs text-muted-foreground">
+                {new Date(q.created_at).toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+              <p className="mt-1 font-medium">{q.question}</p>
+              <textarea
+                value={answers[q.id] ?? ""}
+                onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                rows={3}
+                placeholder="Escreva como você responderia a essa paciente..."
+                className="mt-3 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+              />
+              <button
+                onClick={() => train(q)}
+                disabled={sendingId === q.id || !(answers[q.id] ?? "").trim()}
+                className="mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
+              >
+                {sendingId === q.id ? "Treinando..." : "Responder e treinar"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Card "Base de conhecimento": busca, edição e novas entradas manuais. */
+function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [entries, setEntries] = useState<BrainEntry[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [newQuestion, setNewQuestion] = useState("");
+  const [newAnswer, setNewAnswer] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  // Busca com debounce; a primeira carga (search vazio) é imediata.
+  useEffect(() => {
+    const t = setTimeout(
+      async () => {
+        const res = await listBrainEntries({
+          data: { accessToken: await tokenFn(), search: search.trim() || undefined },
+        });
+        if (res.ok) setEntries(res.entries);
+        else toast.error("Não foi possível carregar a base de conhecimento.");
+      },
+      search ? 350 : 0,
+    );
+    return () => clearTimeout(t);
+  }, [search, tokenFn]);
+
+  async function toggleApproved(entry: BrainEntry) {
+    const approved = !entry.approved;
+    setEntries((prev) => (prev ?? []).map((x) => (x.id === entry.id ? { ...x, approved } : x)));
+    const res = await updateBrainEntry({
+      data: {
+        accessToken: await tokenFn(),
+        id: entry.id,
+        question: entry.question,
+        answer: entry.answer,
+        category: entry.category,
+        approved,
+      },
+    });
+    if (!res.ok) {
+      setEntries((prev) =>
+        (prev ?? []).map((x) => (x.id === entry.id ? { ...x, approved: entry.approved } : x)),
+      );
+      toast.error("Não foi possível atualizar a entrada. Tente novamente.");
+    }
+  }
+
+  async function remove(id: string) {
+    if (!window.confirm("Excluir esta entrada da base de conhecimento?")) return;
+    const res = await deleteBrainEntry({ data: { accessToken: await tokenFn(), id } });
+    if (!res.ok) {
+      toast.error("Não foi possível excluir a entrada. Tente novamente.");
+      return;
+    }
+    setEntries((prev) => (prev ?? []).filter((x) => x.id !== id));
+    toast.success("Entrada excluída.");
+  }
+
+  async function add() {
+    if (!newQuestion.trim() || !newAnswer.trim() || adding) return;
+    setAdding(true);
+    const res = await addBrainEntry({
+      data: {
+        accessToken: await tokenFn(),
+        question: newQuestion.trim(),
+        answer: newAnswer.trim(),
+        category: newCategory.trim() || null,
+      },
+    });
+    setAdding(false);
+    if (!res.ok || !res.entry) {
+      toast.error("Não foi possível adicionar a entrada. Tente novamente.");
+      return;
+    }
+    const entry = res.entry;
+    setEntries((prev) => [entry, ...(prev ?? [])]);
+    setNewQuestion("");
+    setNewAnswer("");
+    setNewCategory("");
+    toast.success("🧠 O cérebro aprendeu mais uma");
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <p className="font-medium">Base de conhecimento</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        Tudo o que o cérebro já sabe. Desative uma entrada para tirá-la das respostas sem excluir.
+      </p>
+
+      {/* Nova entrada */}
+      <div className="mt-4 rounded-xl border border-dashed border-border p-4">
+        <p className="text-sm font-medium">Nova entrada</p>
+        <div className="mt-2 space-y-2">
+          <input
+            value={newQuestion}
+            onChange={(e) => setNewQuestion(e.target.value)}
+            placeholder="Pergunta (ex: Posso tomar dipirona na gestação?)"
+            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+          <textarea
+            value={newAnswer}
+            onChange={(e) => setNewAnswer(e.target.value)}
+            rows={3}
+            placeholder="Resposta, do jeito que você responderia"
+            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              placeholder="Categoria (opcional)"
+              className="w-44 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+            />
+            <button
+              onClick={add}
+              disabled={adding || !newQuestion.trim() || !newAnswer.trim()}
+              className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
+            >
+              {adding ? "Adicionando..." : "+ Adicionar ao cérebro"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Busca */}
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Buscar na base (pergunta ou resposta)..."
+        className="mt-4 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+      />
+
+      {/* Lista */}
+      {entries === null ? (
+        <div className="mt-4 space-y-2">
+          <div className="h-16 animate-pulse rounded-xl bg-secondary" />
+          <div className="h-16 animate-pulse rounded-xl bg-secondary" />
+        </div>
+      ) : entries.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          {search
+            ? "Nada encontrado para essa busca."
+            : "O cérebro ainda está vazio. Adicione a primeira entrada acima ou responda uma pergunta de paciente."}
+        </p>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {entries.map((entry) => (
+            <div
+              key={entry.id}
+              className={`rounded-xl border p-4 ${entry.approved ? "border-border" : "border-dashed border-border bg-secondary/30"}`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{entry.question}</p>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${BRAIN_SOURCE_STYLE[entry.source] ?? "bg-secondary text-muted-foreground"}`}
+                    >
+                      {entry.source}
+                    </span>
+                    {entry.category && (
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                        {entry.category}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{entry.answer}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <BrainToggle
+                    checked={entry.approved}
+                    onChange={() => toggleApproved(entry)}
+                    label={entry.approved ? "Ativa" : "Inativa"}
+                  />
+                  <button
+                    onClick={() => remove(entry.id)}
+                    className="rounded-full border border-rose-300 px-2.5 py-0.5 text-xs text-rose-600 hover:bg-rose-100"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Card "Playground": teste o cérebro como se fosse uma paciente. */
+function BrainPlaygroundCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [result, setResult] = useState<{ question: string; answer: string } | null>(null);
+
+  async function ask() {
+    const q = question.trim();
+    if (!q || asking) return;
+    setAsking(true);
+    const res = await testBrain({ data: { accessToken: await tokenFn(), question: q } });
+    setAsking(false);
+    if (!res.ok) {
+      toast.error(
+        "answer" in res && res.answer
+          ? res.answer
+          : "Não foi possível testar o cérebro. Tente novamente.",
+      );
+      return;
+    }
+    setResult({ question: q, answer: res.answer });
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <p className="font-medium">Playground</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        Pergunte como se fosse uma paciente e veja o que o cérebro responde hoje.
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") ask();
+          }}
+          placeholder="Ex: Estou com azia forte, o que posso fazer?"
+          className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+        />
+        <button
+          onClick={ask}
+          disabled={asking || !question.trim()}
+          className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+        >
+          {asking ? "Pensando..." : "Perguntar"}
+        </button>
+      </div>
+
+      {(result || asking) && (
+        <div className="mt-4 space-y-3">
+          {result && !asking && (
+            <>
+              <div className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+                  {result.question}
+                </div>
+              </div>
+              <div className="flex justify-start">
+                <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-sm bg-secondary px-4 py-2.5 text-sm">
+                  {result.answer}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                💬 É assim que suas pacientes vão ler a resposta.
+              </p>
+            </>
+          )}
+          {asking && (
+            <div className="flex justify-start">
+              <div className="animate-pulse rounded-2xl rounded-bl-sm bg-secondary px-4 py-2.5 text-sm text-muted-foreground">
+                Pensando...
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ---------- Receipt Modal ---------- */

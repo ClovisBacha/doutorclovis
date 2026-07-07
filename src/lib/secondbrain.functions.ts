@@ -1,0 +1,310 @@
+/**
+ * Segundo Cérebro do Dr. Clóvis — server functions do painel do médico.
+ *
+ * CRUD de brain_settings/brain_entries, treino a partir das perguntas das
+ * pacientes (doctor_questions) e teste do cérebro com o mesmo modelo do chat.
+ * Todas as funções exigem admin (ADMIN_EMAILS), como em admin.functions.ts.
+ */
+
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+
+// Quem é "o médico": e-mails autorizados, separados por vírgula em ADMIN_EMAILS.
+function adminEmails() {
+  return (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function requireAdmin(accessToken: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
+  if (error || !data.user?.email) return null;
+  if (!adminEmails().includes(data.user.email.toLowerCase())) return null;
+  return data.user;
+}
+
+export type BrainEntry = {
+  id: string;
+  question: string;
+  answer: string;
+  category: string | null;
+  source: string;
+  approved: boolean;
+  created_at: string;
+};
+
+export type BrainSettings = {
+  persona: string;
+  sample_phrases: string;
+  rules: string;
+  enabled_app: boolean;
+  enabled_whatsapp: boolean;
+};
+
+const DEFAULT_SETTINGS: BrainSettings = {
+  persona: "",
+  sample_phrases: "",
+  rules: "",
+  enabled_app: true,
+  enabled_whatsapp: true,
+};
+
+const TokenSchema = z.object({ accessToken: z.string().min(10) });
+
+/** Carrega as configurações do segundo cérebro (defaults se ainda não salvas). */
+export const getBrainSettings = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row } = await (supabaseAdmin as any)
+      .from("brain_settings")
+      .select("persona,sample_phrases,rules,enabled_app,enabled_whatsapp")
+      .eq("id", 1)
+      .maybeSingle();
+
+    // Linha id=1 ainda não existe → devolve os defaults sem criar.
+    const settings: BrainSettings = row ?? DEFAULT_SETTINGS;
+    return { ok: true as const, settings };
+  });
+
+const SettingsSchema = z.object({
+  accessToken: z.string().min(10),
+  settings: z.object({
+    persona: z.string(),
+    sample_phrases: z.string(),
+    rules: z.string(),
+    enabled_app: z.boolean(),
+    enabled_whatsapp: z.boolean(),
+  }),
+});
+
+/** Salva as configurações do segundo cérebro (upsert da linha id=1). */
+export const saveBrainSettings = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => SettingsSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin as any)
+      .from("brain_settings")
+      .upsert({ id: 1, ...data.settings, updated_at: new Date().toISOString() });
+    return { ok: !error };
+  });
+
+const ListSchema = z.object({
+  accessToken: z.string().min(10),
+  search: z.string().optional(),
+});
+
+/** Lista as entradas do cérebro (busca opcional em pergunta/resposta). */
+export const listBrainEntries = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => ListSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let query = (supabaseAdmin as any)
+      .from("brain_entries")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    // Remove caracteres que quebram a sintaxe do .or()/ilike do PostgREST.
+    const search = (data.search ?? "").replace(/[%,()]/g, " ").trim();
+    if (search) {
+      query = query.or(`question.ilike.%${search}%,answer.ilike.%${search}%`);
+    }
+
+    const { data: rows } = await query;
+    return { ok: true as const, entries: (rows ?? []) as BrainEntry[] };
+  });
+
+const AddSchema = z.object({
+  accessToken: z.string().min(10),
+  question: z.string().min(1),
+  answer: z.string().min(1),
+  category: z.string().nullable().optional(),
+  source: z.string().optional(),
+});
+
+/** Adiciona uma entrada de conhecimento (pergunta + resposta do médico). */
+export const addBrainEntry = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => AddSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row, error } = await (supabaseAdmin as any)
+      .from("brain_entries")
+      .insert({
+        question: data.question,
+        answer: data.answer,
+        category: data.category ?? null,
+        source: data.source ?? "manual",
+        approved: true,
+      })
+      .select()
+      .single();
+    if (error) return { ok: false as const };
+    return { ok: true as const, entry: row as BrainEntry };
+  });
+
+const UpdateSchema = z.object({
+  accessToken: z.string().min(10),
+  id: z.string().uuid(),
+  question: z.string().min(1),
+  answer: z.string().min(1),
+  category: z.string().nullable().optional(),
+  approved: z.boolean(),
+});
+
+/** Atualiza uma entrada de conhecimento. */
+export const updateBrainEntry = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => UpdateSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin as any)
+      .from("brain_entries")
+      .update({
+        question: data.question,
+        answer: data.answer,
+        category: data.category ?? null,
+        approved: data.approved,
+      })
+      .eq("id", data.id);
+    return { ok: !error };
+  });
+
+const DeleteSchema = z.object({ accessToken: z.string().min(10), id: z.string().uuid() });
+
+/** Remove uma entrada de conhecimento. */
+export const deleteBrainEntry = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => DeleteSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin as any)
+      .from("brain_entries")
+      .delete()
+      .eq("id", data.id);
+    return { ok: !error };
+  });
+
+/** Lista as perguntas das pacientes ainda sem resposta (para treinar o cérebro). */
+export const listUnansweredQuestions = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: rows } = await (supabaseAdmin as any)
+      .from("doctor_questions")
+      .select("id,question,created_at")
+      .eq("answered", false)
+      .order("created_at", { ascending: true })
+      .limit(50);
+
+    return {
+      ok: true as const,
+      questions: (rows ?? []) as { id: string; question: string; created_at: string }[],
+    };
+  });
+
+const AnswerTrainSchema = z.object({
+  accessToken: z.string().min(10),
+  questionId: z.string().uuid(),
+  answer: z.string().min(1),
+});
+
+/**
+ * Responde uma pergunta de paciente e treina o cérebro com ela: cria uma
+ * brain_entry (source='pergunta') com a pergunta original + resposta e marca
+ * a doctor_question como respondida (transação lógica: só marca se treinou).
+ */
+export const answerAndTrain = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => AnswerTrainSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: question } = await (supabaseAdmin as any)
+      .from("doctor_questions")
+      .select("id,question")
+      .eq("id", data.questionId)
+      .maybeSingle();
+    if (!question) return { ok: false as const };
+
+    const { error: insertError } = await (supabaseAdmin as any).from("brain_entries").insert({
+      question: question.question,
+      answer: data.answer,
+      source: "pergunta",
+      approved: true,
+    });
+    if (insertError) return { ok: false as const };
+
+    const { error: updateError } = await (supabaseAdmin as any)
+      .from("doctor_questions")
+      .update({ answered: true })
+      .eq("id", data.questionId);
+    return { ok: !updateError };
+  });
+
+const TestSchema = z.object({
+  accessToken: z.string().min(10),
+  question: z.string().min(1),
+});
+
+/** Testa o segundo cérebro: responde uma pergunta com o mesmo modelo do chat. */
+export const testBrain = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TestSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+
+    const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!key) return { ok: false as const, answer: "GOOGLE_GENERATIVE_AI_API_KEY não configurada." };
+
+    const [{ getBrainContext }, { generateText }, { createChatProvider, DEFAULT_CHAT_MODEL }] =
+      await Promise.all([
+        import("./secondbrain.server"),
+        import("ai"),
+        import("./ai-gateway.server"),
+      ]);
+
+    const brain = await getBrainContext(data.question);
+    const system = [
+      "Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra especialista em gestação de alto risco.",
+      "Responda em português brasileiro, com tom acolhedor, claro e profissional. Seja conciso (3 a 6 frases).",
+      "NUNCA dê diagnóstico ou prescrição. Em urgência, oriente ligar 192 (SAMU) ou ir ao pronto-socorro.",
+      brain.block,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    try {
+      const google = createChatProvider(key);
+      const result = await generateText({
+        model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
+        system,
+        prompt: data.question,
+      });
+      return { ok: true as const, answer: result.text };
+    } catch {
+      return { ok: false as const, answer: "Falha ao consultar o modelo. Tente novamente." };
+    }
+  });

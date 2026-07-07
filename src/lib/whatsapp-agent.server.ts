@@ -16,6 +16,7 @@ import { createChatProvider, DEFAULT_CHAT_MODEL } from "./ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DOCTOR } from "./doctor.config";
 import { waSendText, waSendButtons } from "./whatsapp.server";
+import { getBrainContext } from "./secondbrain.server";
 
 /* ------------------------------------------------------------------ */
 /* Tipos                                                                */
@@ -90,6 +91,16 @@ async function callAgent(conv: WaConversation, userMessage: string): Promise<Age
   const google = createChatProvider(key);
   const history = conv.context.history ?? [];
 
+  // Segundo Cérebro: contexto adicional de estilo/conduta do médico.
+  // getBrainContext é safe (falha vira block vazio) — nunca derruba o agente.
+  // O block só influencia o TOM do campo "reply"; o formato JSON da resposta
+  // e o fluxo de estados continuam regidos pelo prompt abaixo.
+  const brain = await getBrainContext(userMessage);
+  const system =
+    brain.enabledWhatsapp && brain.block
+      ? `${SYSTEM}\n\n${brain.block}\nO bloco acima orienta apenas o estilo e a conduta do texto enviado ao paciente. Continue seguindo o fluxo de estados e o formato de resposta em JSON exigidos na mensagem do usuário.`
+      : SYSTEM;
+
   const stateInstructions: Record<ConvState, string> = {
     start: `O paciente acabou de mandar a primeira mensagem. Cumprimenta-o pelo nome se disponível, apresente-se brevemente e pergunte como pode ajudar. Se a intenção for agendamento, mova para collecting_name.`,
     collecting_name: `Você precisa do nome completo do paciente. Se já foi fornecido no histórico, use-o. Extraia o nome e mova para collecting_reason.`,
@@ -134,9 +145,9 @@ Responda OBRIGATORIAMENTE em JSON válido com este formato exato:
 
   const result = await generateText({
     model: google(process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL),
-    system: SYSTEM,
+    system,
     prompt,
-    maxTokens: 512,
+    maxOutputTokens: 512, // AI SDK v5+ renomeou maxTokens → maxOutputTokens
   });
 
   try {
