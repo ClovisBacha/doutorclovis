@@ -325,7 +325,7 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
       >
         {PLANS.map((p) => (
           <option key={p} value={p}>
-            {p}
+            {p === "clinica" ? "clinica (Pro Equipe)" : p}
           </option>
         ))}
       </select>

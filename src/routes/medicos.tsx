@@ -47,8 +47,8 @@ const PLANS = [
     highlight: false,
     desc: "Para o médico solo que quer modernizar o consultório",
     features: [
-      "Tudo do Free, sem limite de pacientes*",
-      "🧠 Segundo Cérebro no chat do app",
+      "Pacientes sempre ilimitadas",
+      "🧠 Segundo Cérebro — Nível 1, atende no app",
       "Confirmações automáticas por WhatsApp",
       "Cobrança PIX integrada",
       "📊 Biometria fetal + percentil Intergrowth-21",
@@ -56,7 +56,6 @@ const PLANS = [
       "🩸 Protocolo DMG + calculadora de insulina",
       "🫀 Rastreio de risco pré-eclâmpsia (ACOG/SBH)",
       "Exportação .ics (Google / Apple Calendar)",
-      "*até 50 pacientes ativas/mês",
     ],
     cta: "Começar grátis por 14 dias",
   },
@@ -66,34 +65,32 @@ const PLANS = [
     price: "R$ 347",
     period: "/mês",
     highlight: true,
-    desc: "Agente IA no WhatsApp + gestão completa",
+    desc: "O Segundo Cérebro também atende no WhatsApp",
     features: [
-      "Tudo do Starter",
-      "🤖 Agente IA 24h no WhatsApp (não só no app)",
-      "Segundo Cérebro sem limite de treino",
-      "Triagem automática de pacientes",
+      "Tudo do Starter, pacientes ilimitadas",
+      "🧠 Segundo Cérebro — Nível 2, atende no WhatsApp",
+      "Agenda consulta e detecta urgência sozinho",
       "Lembretes automáticos de consulta (reduz falta em até 38%)",
       "Dashboard com FAQ inteligente e risco de abandono",
       "Cobrança e recibo digital",
       "Bloqueio de agenda e férias",
-      "Pacientes ilimitadas",
       "Suporte prioritário",
     ],
     cta: "Assinar Pro",
   },
   {
     key: "enterprise",
-    name: "Clínica",
-    price: "R$ 597",
-    period: "/mês",
+    name: "Pro Equipe",
+    price: "a partir de R$ 297",
+    period: "/médico/mês",
     highlight: false,
-    desc: "Para clínicas com múltiplos profissionais",
+    desc: "O Pro para clínicas — 2+ médicos, mais barato por assento",
     features: [
-      "Tudo do Pro, vários médicos numa conta só",
+      "Tudo do Pro, para cada médico da equipe",
       "Cada médico com o seu próprio Segundo Cérebro",
       "Painel consolidado: pacientes e uso de IA por médico",
+      "Preço cai por assento: 2–4 médicos R$297, 5+ R$247",
       "Integração com sistemas legados (TISS/TUSS)",
-      "SLA de uptime garantido",
       "Gerente de conta dedicado",
     ],
     cta: "Falar com a equipe",
@@ -148,8 +145,8 @@ const FAQS = [
     a: "Sim. Você precisará de um número dedicado e um App no Meta for Developers. Nossa equipe te auxilia na configuração em até 48h — o processo leva cerca de 20 minutos.",
   },
   {
-    q: "O agente IA dá diagnóstico ou conduta médica?",
-    a: "Não. O agente é treinado para agendar, responder dúvidas administrativas e orientar emergências ao SAMU/UPA. Toda conduta clínica permanece exclusivamente sua.",
+    q: "O Segundo Cérebro dá diagnóstico ou conduta médica?",
+    a: "Não. Ele só responde o que você já validou (suas respostas de sempre) e, no Nível 2 (Pro), também agenda e orienta emergências ao SAMU/UPA. Qualquer coisa nova ou fora do que você ensinou, ele encaminha para você — nunca inventa conduta.",
   },
   {
     q: "Meus dados e os das pacientes ficam seguros?",
@@ -161,11 +158,11 @@ const FAQS = [
   },
   {
     q: "Funciona com meu sistema atual (iClinic, Feegow)?",
-    a: "Na versão Clínica oferecemos integrações via API. Para Starter e Pro, a plataforma funciona de forma independente — a migração de dados pode ser feita com ajuda da nossa equipe.",
+    a: "No Pro Equipe oferecemos integrações via API. Para Free, Starter e Pro, a plataforma funciona de forma independente — a migração de dados pode ser feita com ajuda da nossa equipe.",
   },
   {
     q: "Quantas pacientes posso ter?",
-    a: "Starter: até 50 pacientes ativas/mês. Pro e Clínica: ilimitadas.",
+    a: "No Free, até 5 (para testar). A partir do Starter, pacientes sempre ilimitadas — o preço não muda pelo tamanho da sua carteira, só pelo alcance do Segundo Cérebro (app ou app + WhatsApp).",
   },
 ];
 
@@ -281,115 +278,7 @@ function MedicosPage() {
         </div>
       </section>
 
-      {/* ── WhatsApp Agent Feature ─────────────────────────────── */}
-      <section className="bg-[var(--gradient-warm)] px-6 py-20">
-        <div className="mx-auto max-w-5xl">
-          <div className="grid gap-12 md:grid-cols-2 md:items-center">
-            <Reveal>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-                  Destaque do Pro
-                </p>
-                <h2 className="mt-3 font-serif text-3xl md:text-4xl">
-                  Agente de IA no WhatsApp que trabalha enquanto você dorme
-                </h2>
-                <p className="mt-4 text-muted-foreground">
-                  Pacientes enviam mensagem a qualquer hora. O agente responde em segundos, coleta
-                  nome e motivo, verifica disponibilidade e registra o pedido de agendamento — tudo
-                  sem intervenção humana.
-                </p>
-                <div className="mt-5 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
-                  <p className="font-medium text-foreground">
-                    🧠 → 🤖 Qual a diferença do Segundo Cérebro?
-                  </p>
-                  <p className="mt-1 text-muted-foreground">
-                    O Segundo Cérebro é o <strong>manual</strong> — o que ele sabe responder, do seu
-                    jeito. O Agente de WhatsApp é <strong>quem atende</strong> com esse manual na
-                    mão, 24h, no canal onde a paciente já está — sem ela precisar abrir o app.
-                  </p>
-                </div>
-                <ul className="mt-6 space-y-3 text-sm">
-                  {[
-                    "Responde dúvidas frequentes (exames, preparo, convênio)",
-                    "Coleta dados e cria pedido de agendamento no painel",
-                    "Envia confirmação e lembrete 24h antes",
-                    "Detecta urgências e orienta SAMU / UPA",
-                    "LGPD compliant — opt-in explícito, dados criptografados",
-                  ].map((f) => (
-                    <li key={f} className="flex items-start gap-2">
-                      <span className="mt-0.5 text-primary">✓</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Reveal>
-
-            {/* Mock conversation */}
-            <Reveal delay={0.1}>
-              <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Exemplo de conversa
-                </p>
-                <div className="space-y-3">
-                  {[
-                    {
-                      from: "patient",
-                      text: "Oi, gostaria de marcar consulta com o Dr. Clóvis",
-                      time: "23:14",
-                    },
-                    {
-                      from: "agent",
-                      text: "Olá! Sou a assistente virtual do Dr. Clóvis Bacha 👋 Com quem estou falando?",
-                      time: "23:14",
-                    },
-                    { from: "patient", text: "Ana Lima", time: "23:15" },
-                    {
-                      from: "agent",
-                      text: "Prazer, Ana! Qual o motivo da consulta? (ex: pré-natal, 2ª opinião, rotina)",
-                      time: "23:15",
-                    },
-                    { from: "patient", text: "Pré-natal, estou com 8 semanas", time: "23:16" },
-                    {
-                      from: "agent",
-                      text: "Que notícia linda! 🌸 Qual período prefere — manhã ou tarde? E tem alguma data preferida?",
-                      time: "23:16",
-                    },
-                    { from: "patient", text: "Manhã, semana que vem", time: "23:17" },
-                    {
-                      from: "agent",
-                      text: "Perfeito, Ana! Registrei: Pré-natal às 8 semanas, manhã, semana de 16/06. Nossa equipe confirma o horário em até 2h. ✅",
-                      time: "23:17",
-                    },
-                  ].map((msg, i) => (
-                    <div
-                      key={i}
-                      className={`flex ${msg.from === "agent" ? "justify-start" : "justify-end"}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                          msg.from === "agent"
-                            ? "rounded-tl-sm bg-secondary text-foreground"
-                            : "rounded-tr-sm bg-primary text-primary-foreground"
-                        }`}
-                      >
-                        <p>{msg.text}</p>
-                        <p
-                          className={`mt-0.5 text-right text-[10px] ${msg.from === "agent" ? "text-muted-foreground" : "text-primary-foreground/70"}`}
-                        >
-                          {msg.time}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Segundo Cérebro — IA treinada na voz do médico ─────── */}
+      {/* ── Segundo Cérebro — UM produto, dois alcances ─────────── */}
       <section className="px-6 py-20">
         <div className="mx-auto max-w-5xl">
           <Reveal>
@@ -408,17 +297,6 @@ function MedicosPage() {
                 jeito que você responderia. A paciente sente que foi o médico dela que cuidou. E
                 foi: com a sua voz, multiplicada.
               </p>
-              <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left text-sm">
-                <p className="font-medium text-foreground">📖 Pense nele como o seu manual</p>
-                <p className="mt-1 text-muted-foreground">
-                  Você escreve <strong>uma vez</strong>: seu jeito de falar, suas respostas de
-                  sempre. Dois &ldquo;atendentes&rdquo; consultam esse manual para responder por
-                  você: o <strong>Chat do app</strong> (tira dúvida) e o{" "}
-                  <strong>Agente de WhatsApp</strong> (tira dúvida <em>e também</em> agenda, avisa
-                  urgência — exclusivo do plano Pro). O manual é o mesmo; o que muda é quem atende e
-                  onde.
-                </p>
-              </div>
             </div>
           </Reveal>
 
@@ -459,6 +337,124 @@ function MedicosPage() {
               </div>
             </Reveal>
           </div>
+
+          {/* Onde ele atende — o MESMO cérebro, dois alcances (não dois produtos) */}
+          <Reveal delay={0.12}>
+            <div className="mt-14">
+              <p className="text-center text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+                Um cérebro só, dois alcances
+              </p>
+              <p className="mx-auto mt-2 max-w-xl text-center text-sm text-muted-foreground">
+                Você treina <strong>uma vez</strong>. Onde ele atende depende só do seu plano — é o
+                mesmo cérebro ficando mais presente, não um segundo recurso para aprender.
+              </p>
+              <div className="mt-8 grid gap-5 md:grid-cols-2">
+                <div className="rounded-3xl border border-border bg-card p-6">
+                  <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
+                    Nível 1 · plano Starter
+                  </span>
+                  <p className="mt-4 text-3xl">📱</p>
+                  <p className="mt-2 font-serif text-xl">Atende dentro do app</p>
+                  <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 text-primary">✓</span>Responde dúvidas 24h, com o seu
+                      jeito
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 text-primary">✓</span>Encaminha para você o que não
+                      sabe
+                    </li>
+                  </ul>
+                </div>
+                <div className="relative rounded-3xl border-2 border-primary/30 bg-primary/5 p-6 shadow-[var(--shadow-card)]">
+                  <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                    Nível 2 · plano Pro
+                  </span>
+                  <p className="mt-4 text-3xl">📱 + 💬</p>
+                  <p className="mt-2 font-serif text-xl">Atende também no WhatsApp</p>
+                  <ul className="mt-4 space-y-2 text-sm text-foreground">
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 text-primary">✓</span>Tudo do Nível 1, onde a paciente
+                      já está
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 text-primary">✓</span>Agenda consulta sozinho, sem
+                      você abrir o painel
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 text-primary">✓</span>Detecta urgência e orienta
+                      SAMU/UPA
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 text-primary">✓</span>LGPD compliant — opt-in
+                      explícito
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* Mock conversation — o Nível 2 em ação */}
+          <Reveal delay={0.16}>
+            <div className="mx-auto mt-8 max-w-md rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+              <p className="mb-4 text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                O Nível 2 em ação, no WhatsApp
+              </p>
+              <div className="space-y-3">
+                {[
+                  {
+                    from: "patient",
+                    text: "Oi, gostaria de marcar consulta com o Dr. Clóvis",
+                    time: "23:14",
+                  },
+                  {
+                    from: "agent",
+                    text: "Olá! Sou a assistente virtual do Dr. Clóvis Bacha 👋 Com quem estou falando?",
+                    time: "23:14",
+                  },
+                  { from: "patient", text: "Ana Lima", time: "23:15" },
+                  {
+                    from: "agent",
+                    text: "Prazer, Ana! Qual o motivo da consulta? (ex: pré-natal, 2ª opinião, rotina)",
+                    time: "23:15",
+                  },
+                  { from: "patient", text: "Pré-natal, estou com 8 semanas", time: "23:16" },
+                  {
+                    from: "agent",
+                    text: "Que notícia linda! 🌸 Qual período prefere — manhã ou tarde? E tem alguma data preferida?",
+                    time: "23:16",
+                  },
+                  { from: "patient", text: "Manhã, semana que vem", time: "23:17" },
+                  {
+                    from: "agent",
+                    text: "Perfeito, Ana! Registrei: Pré-natal às 8 semanas, manhã, semana de 16/06. Nossa equipe confirma o horário em até 2h. ✅",
+                    time: "23:17",
+                  },
+                ].map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${msg.from === "agent" ? "justify-start" : "justify-end"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                        msg.from === "agent"
+                          ? "rounded-tl-sm bg-secondary text-foreground"
+                          : "rounded-tr-sm bg-primary text-primary-foreground"
+                      }`}
+                    >
+                      <p>{msg.text}</p>
+                      <p
+                        className={`mt-0.5 text-right text-[10px] ${msg.from === "agent" ? "text-muted-foreground" : "text-primary-foreground/70"}`}
+                      >
+                        {msg.time}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
 
           {/* Como ele aprende — o loop em 3 passos */}
           <Reveal delay={0.15}>

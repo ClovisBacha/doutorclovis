@@ -31,13 +31,16 @@ async function requireSuperAdmin(accessToken: string) {
 // Usado só para a ESTIMATIVA de receita mensal (MRR) no console.
 // "trial" = avaliação de 14 dias (label do cadastro, sem expiração automática
 // ainda — roadmap de billing). "free" = plano permanente, sem custo variável:
-// sem Segundo Cérebro, sem agente de WhatsApp, poucas pacientes.
+// sem Segundo Cérebro, até 5 pacientes. "clinica" = "Pro Equipe" na página de
+// vendas: preço POR MÉDICO (a partir de R$297) — como cada médico da equipe é
+// uma linha própria em `doctors`, a soma abaixo já reflete o preço por
+// assento automaticamente (não usa o desconto de 5+ médicos; é uma estimativa).
 const PLAN_PRICE: Record<string, number> = {
   trial: 0,
   free: 0,
   starter: 197,
   pro: 347,
-  clinica: 597,
+  clinica: 297,
 };
 
 export type PlatformDoctor = {
