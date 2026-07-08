@@ -47,6 +47,261 @@ export type Database = {
         };
         Relationships: [];
       };
+      baby_letters: {
+        Row: {
+          content: string;
+          generated_at: string;
+          id: string;
+          user_id: string;
+          week: number;
+        };
+        Insert: {
+          content: string;
+          generated_at?: string;
+          id?: string;
+          user_id: string;
+          week: number;
+        };
+        Update: {
+          content?: string;
+          generated_at?: string;
+          id?: string;
+          user_id?: string;
+          week?: number;
+        };
+        Relationships: [];
+      };
+      baby_milestones: {
+        Row: {
+          achieved_at: string;
+          created_at: string;
+          custom_label: string | null;
+          id: string;
+          milestone_key: string;
+          notes: string | null;
+          user_id: string;
+        };
+        Insert: {
+          achieved_at: string;
+          created_at?: string;
+          custom_label?: string | null;
+          id?: string;
+          milestone_key: string;
+          notes?: string | null;
+          user_id: string;
+        };
+        Update: {
+          achieved_at?: string;
+          created_at?: string;
+          custom_label?: string | null;
+          id?: string;
+          milestone_key?: string;
+          notes?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      baby_name_entries: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+          session_id: string;
+          suggested_by: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          name: string;
+          session_id: string;
+          suggested_by?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+          session_id?: string;
+          suggested_by?: string;
+        };
+        Relationships: [];
+      };
+      baby_name_sessions: {
+        Row: {
+          created_at: string;
+          id: string;
+          is_active: boolean | null;
+          patient_user_id: string;
+          reveal_winner: boolean | null;
+          share_token: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          is_active?: boolean | null;
+          patient_user_id: string;
+          reveal_winner?: boolean | null;
+          share_token?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          is_active?: boolean | null;
+          patient_user_id?: string;
+          reveal_winner?: boolean | null;
+          share_token?: string;
+        };
+        Relationships: [];
+      };
+      baby_name_votes: {
+        Row: {
+          created_at: string;
+          entry_id: string;
+          id: string;
+          voter_name: string;
+          voter_token: string;
+        };
+        Insert: {
+          created_at?: string;
+          entry_id: string;
+          id?: string;
+          voter_name?: string;
+          voter_token: string;
+        };
+        Update: {
+          created_at?: string;
+          entry_id?: string;
+          id?: string;
+          voter_name?: string;
+          voter_token?: string;
+        };
+        Relationships: [];
+      };
+      baby_vaccines: {
+        Row: {
+          administered_at: string;
+          batch: string | null;
+          created_at: string;
+          id: string;
+          user_id: string;
+          vaccine_key: string;
+        };
+        Insert: {
+          administered_at: string;
+          batch?: string | null;
+          created_at?: string;
+          id?: string;
+          user_id: string;
+          vaccine_key: string;
+        };
+        Update: {
+          administered_at?: string;
+          batch?: string | null;
+          created_at?: string;
+          id?: string;
+          user_id?: string;
+          vaccine_key?: string;
+        };
+        Relationships: [];
+      };
+      baby_weights: {
+        Row: {
+          created_at: string;
+          id: string;
+          measured_at: string;
+          user_id: string;
+          weight_g: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          measured_at: string;
+          user_id: string;
+          weight_g: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          measured_at?: string;
+          user_id?: string;
+          weight_g?: number;
+        };
+        Relationships: [];
+      };
+      birth_plans: {
+        Row: {
+          birth_type: string | null;
+          breastfeeding: string | null;
+          cord_cutting: string | null;
+          id: string;
+          lighting: string | null;
+          music: string | null;
+          notes: string | null;
+          pain_relief: string[] | null;
+          skin_to_skin: boolean | null;
+          updated_at: string;
+          user_id: string;
+          who_present: string | null;
+        };
+        Insert: {
+          birth_type?: string | null;
+          breastfeeding?: string | null;
+          cord_cutting?: string | null;
+          id?: string;
+          lighting?: string | null;
+          music?: string | null;
+          notes?: string | null;
+          pain_relief?: string[] | null;
+          skin_to_skin?: boolean | null;
+          updated_at?: string;
+          user_id: string;
+          who_present?: string | null;
+        };
+        Update: {
+          birth_type?: string | null;
+          breastfeeding?: string | null;
+          cord_cutting?: string | null;
+          id?: string;
+          lighting?: string | null;
+          music?: string | null;
+          notes?: string | null;
+          pain_relief?: string[] | null;
+          skin_to_skin?: boolean | null;
+          updated_at?: string;
+          user_id?: string;
+          who_present?: string | null;
+        };
+        Relationships: [];
+      };
+      breastfeeding_logs: {
+        Row: {
+          created_at: string;
+          ended_at: string | null;
+          id: string;
+          notes: string | null;
+          side: string;
+          started_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          ended_at?: string | null;
+          id?: string;
+          notes?: string | null;
+          side?: string;
+          started_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          ended_at?: string | null;
+          id?: string;
+          notes?: string | null;
+          side?: string;
+          started_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       checklist_items: {
         Row: {
           category: string;
@@ -101,6 +356,99 @@ export type Database = {
         };
         Relationships: [];
       };
+      consultation_notes: {
+        Row: {
+          created_at: string;
+          id: string;
+          medicamentos: string | null;
+          orientacoes: string | null;
+          proxima_consulta: string | null;
+          proximos_exames: string | null;
+          raw_transcript: string | null;
+          recorded_at: string;
+          title: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          medicamentos?: string | null;
+          orientacoes?: string | null;
+          proxima_consulta?: string | null;
+          proximos_exames?: string | null;
+          raw_transcript?: string | null;
+          recorded_at?: string;
+          title?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          medicamentos?: string | null;
+          orientacoes?: string | null;
+          proxima_consulta?: string | null;
+          proximos_exames?: string | null;
+          raw_transcript?: string | null;
+          recorded_at?: string;
+          title?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      contraction_logs: {
+        Row: {
+          created_at: string;
+          ended_at: string | null;
+          id: string;
+          intensity: number | null;
+          notes: string | null;
+          started_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          ended_at?: string | null;
+          id?: string;
+          intensity?: number | null;
+          notes?: string | null;
+          started_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          ended_at?: string | null;
+          id?: string;
+          intensity?: number | null;
+          notes?: string | null;
+          started_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      course_progress: {
+        Row: {
+          completed_at: string;
+          id: string;
+          module_week: number;
+          quiz_score: number | null;
+          user_id: string;
+        };
+        Insert: {
+          completed_at?: string;
+          id?: string;
+          module_week: number;
+          quiz_score?: number | null;
+          user_id: string;
+        };
+        Update: {
+          completed_at?: string;
+          id?: string;
+          module_week?: number;
+          quiz_score?: number | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       doctor_questions: {
         Row: {
           answered: boolean;
@@ -122,6 +470,69 @@ export type Database = {
           id?: string;
           question?: string;
           user_id?: string;
+        };
+        Relationships: [];
+      };
+      exam_files: {
+        Row: {
+          category: string;
+          created_at: string;
+          id: string;
+          image_data: string | null;
+          name: string;
+          notes: string | null;
+          user_id: string;
+          week: number | null;
+        };
+        Insert: {
+          category?: string;
+          created_at?: string;
+          id?: string;
+          image_data?: string | null;
+          name: string;
+          notes?: string | null;
+          user_id: string;
+          week?: number | null;
+        };
+        Update: {
+          category?: string;
+          created_at?: string;
+          id?: string;
+          image_data?: string | null;
+          name?: string;
+          notes?: string | null;
+          user_id?: string;
+          week?: number | null;
+        };
+        Relationships: [];
+      };
+      family_album_posts: {
+        Row: {
+          author_name: string;
+          caption: string | null;
+          created_at: string;
+          emoji: string | null;
+          id: string;
+          image_data: string | null;
+          patient_user_id: string;
+        };
+        Insert: {
+          author_name?: string;
+          caption?: string | null;
+          created_at?: string;
+          emoji?: string | null;
+          id?: string;
+          image_data?: string | null;
+          patient_user_id: string;
+        };
+        Update: {
+          author_name?: string;
+          caption?: string | null;
+          created_at?: string;
+          emoji?: string | null;
+          id?: string;
+          image_data?: string | null;
+          patient_user_id?: string;
         };
         Relationships: [];
       };
@@ -212,6 +623,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      panic_events: {
+        Row: {
+          address: string | null;
+          created_at: string;
+          id: string;
+          latitude: number | null;
+          longitude: number | null;
+          user_id: string;
+        };
+        Insert: {
+          address?: string | null;
+          created_at?: string;
+          id?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          user_id: string;
+        };
+        Update: {
+          address?: string | null;
+          created_at?: string;
+          id?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       patient_profiles: {
         Row: {
           allergies: string | null;
@@ -263,6 +701,159 @@ export type Database = {
           reference_days?: number | null;
           reference_weeks?: number | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      ppd_screenings: {
+        Row: {
+          answers: Json;
+          id: string;
+          score: number;
+          screened_at: string;
+          user_id: string;
+        };
+        Insert: {
+          answers?: Json;
+          id?: string;
+          score: number;
+          screened_at?: string;
+          user_id: string;
+        };
+        Update: {
+          answers?: Json;
+          id?: string;
+          score?: number;
+          screened_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      preconsulta_forms: {
+        Row: {
+          current_weight: number | null;
+          diastolic: number | null;
+          emotional_state: string | null;
+          id: string;
+          medications: string | null;
+          other_notes: string | null;
+          questions: string | null;
+          seen_by_doctor: boolean | null;
+          submitted_at: string;
+          symptoms: string[] | null;
+          systolic: number | null;
+          user_id: string;
+          weeks_at_submission: number | null;
+        };
+        Insert: {
+          current_weight?: number | null;
+          diastolic?: number | null;
+          emotional_state?: string | null;
+          id?: string;
+          medications?: string | null;
+          other_notes?: string | null;
+          questions?: string | null;
+          seen_by_doctor?: boolean | null;
+          submitted_at?: string;
+          symptoms?: string[] | null;
+          systolic?: number | null;
+          user_id: string;
+          weeks_at_submission?: number | null;
+        };
+        Update: {
+          current_weight?: number | null;
+          diastolic?: number | null;
+          emotional_state?: string | null;
+          id?: string;
+          medications?: string | null;
+          other_notes?: string | null;
+          questions?: string | null;
+          seen_by_doctor?: boolean | null;
+          submitted_at?: string;
+          symptoms?: string[] | null;
+          systolic?: number | null;
+          user_id?: string;
+          weeks_at_submission?: number | null;
+        };
+        Relationships: [];
+      };
+      private_consultations: {
+        Row: {
+          amount_cents: number | null;
+          consult_type: string;
+          created_at: string;
+          id: string;
+          message: string | null;
+          mp_payment_id: string | null;
+          patient_user_id: string;
+          pix_qr_code: string | null;
+          pix_qr_code_base64: string | null;
+          preferred_dates: string[] | null;
+          status: string;
+        };
+        Insert: {
+          amount_cents?: number | null;
+          consult_type: string;
+          created_at?: string;
+          id?: string;
+          message?: string | null;
+          mp_payment_id?: string | null;
+          patient_user_id: string;
+          pix_qr_code?: string | null;
+          pix_qr_code_base64?: string | null;
+          preferred_dates?: string[] | null;
+          status?: string;
+        };
+        Update: {
+          amount_cents?: number | null;
+          consult_type?: string;
+          created_at?: string;
+          id?: string;
+          message?: string | null;
+          mp_payment_id?: string | null;
+          patient_user_id?: string;
+          pix_qr_code?: string | null;
+          pix_qr_code_base64?: string | null;
+          preferred_dates?: string[] | null;
+          status?: string;
+        };
+        Relationships: [];
+      };
+      teleconsulta_sessions: {
+        Row: {
+          clinical_note: string | null;
+          created_at: string;
+          doctor_notes: string | null;
+          id: string;
+          meet_url: string | null;
+          patient_notes: string | null;
+          patient_user_id: string;
+          room_name: string;
+          scheduled_for: string | null;
+          status: string;
+        };
+        Insert: {
+          clinical_note?: string | null;
+          created_at?: string;
+          doctor_notes?: string | null;
+          id?: string;
+          meet_url?: string | null;
+          patient_notes?: string | null;
+          patient_user_id: string;
+          room_name?: string;
+          scheduled_for?: string | null;
+          status?: string;
+        };
+        Update: {
+          clinical_note?: string | null;
+          created_at?: string;
+          doctor_notes?: string | null;
+          id?: string;
+          meet_url?: string | null;
+          patient_notes?: string | null;
+          patient_user_id?: string;
+          room_name?: string;
+          scheduled_for?: string | null;
+          status?: string;
         };
         Relationships: [];
       };

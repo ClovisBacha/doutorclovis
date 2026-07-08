@@ -204,7 +204,7 @@ Gere a nota SOAP. Use formatação clara com cabeçalhos em negrito. Seja espec�
     const result = await generateText({
       model: google(process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL),
       prompt,
-      maxTokens: 600,
+      maxOutputTokens: 600,
     });
 
     return { ok: true as const, note: result.text };

@@ -40,6 +40,7 @@ import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
+import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
 import { Route as AlbumTokenRouteImport } from './routes/album.$token'
@@ -202,6 +203,11 @@ const ApiNutritionRoute = ApiNutritionRouteImport.update({
   path: '/api/nutrition',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMpWebhookRoute = ApiMpWebhookRouteImport.update({
+  id: '/api/mp-webhook',
+  path: '/api/mp-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -271,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
@@ -310,6 +317,7 @@ export interface FileRoutesByTo {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
@@ -392,6 +401,7 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/transcribe'
     | '/api/whatsapp'
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/transcribe'
     | '/api/whatsapp'
@@ -471,6 +482,7 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/transcribe'
     | '/api/whatsapp'
@@ -509,6 +521,7 @@ export interface RootRouteChildren {
   AlbumTokenRoute: typeof AlbumTokenRoute
   ApiCartaSemanalRoute: typeof ApiCartaSemanalRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
@@ -735,6 +748,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiNutritionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mp-webhook': {
+      id: '/api/mp-webhook'
+      path: '/api/mp-webhook'
+      fullPath: '/api/mp-webhook'
+      preLoaderRoute: typeof ApiMpWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -833,6 +853,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlbumTokenRoute: AlbumTokenRoute,
   ApiCartaSemanalRoute: ApiCartaSemanalRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,

@@ -1898,7 +1898,10 @@ function ProfileTab({
                     setCorporateMsg(
                       `✅ Vinculado a ${res.companyName}! Salve o perfil para confirmar.`,
                     );
-                    onSaved({ ...profile!, corporate_account_id: "pending" } as typeof profile);
+                    onSaved({
+                      ...profile!,
+                      corporate_account_id: "pending",
+                    } as NonNullable<typeof profile>);
                   } else {
                     setCorporateMsg(res.error ?? "Código inválido.");
                   }
@@ -5735,11 +5738,11 @@ function HumorTab() {
     : 3;
   const suggestions = MOOD_SUGGESTIONS[Math.min(5, Math.max(1, overallAvg))] ?? MOOD_SUGGESTIONS[3];
 
-  const bestDay = dayAvg.reduce(
+  const bestDay = dayAvg.reduce<number>(
     (best, v, i) => (v !== null && (best === -1 || v > (dayAvg[best] ?? 0)) ? i : best),
     -1,
   );
-  const hardDay = dayAvg.reduce(
+  const hardDay = dayAvg.reduce<number>(
     (hard, v, i) => (v !== null && (hard === -1 || v < (dayAvg[hard] ?? 6)) ? i : hard),
     -1,
   );
