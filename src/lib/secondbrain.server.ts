@@ -21,6 +21,28 @@ export type BrainContext = {
   enabledWhatsapp: boolean;
 };
 
+/** Canal em que o cérebro foi usado (telemetria do dashboard do médico). */
+export type BrainChannel = "app" | "whatsapp" | "teste";
+
+/**
+ * Registra (fire-and-forget) um "acerto" do cérebro em brain_hits, para o
+ * dashboard do médico medir quantas vezes o cérebro respondeu no mês.
+ * O teste do painel (channel 'teste') NÃO conta como uso real. A falha do
+ * insert NUNCA pode quebrar o chat: tudo dentro de try/catch, sem await que
+ * propague (void em IIFE — a promise não é aguardada por quem chama).
+ */
+function logBrainHit(doctorId: string, channel: BrainChannel): void {
+  if (channel === "teste") return;
+  void (async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await (supabaseAdmin as any).from("brain_hits").insert({ doctor_id: doctorId, channel });
+    } catch {
+      /* telemetria é best-effort — nunca afeta a resposta ao paciente */
+    }
+  })();
+}
+
 /* ── Multi-perfil: cada médico tem o SEU cérebro ─────────────────────────────
    As tabelas são chaveadas por doctor_id (uid do médico no auth). Nesta
    instalação single-doctor, o "dono" é o primeiro e-mail de ADMIN_EMAILS —
@@ -114,6 +136,7 @@ const MAX_ENTRIES_FALLBACK = 3;
 export async function getBrainContext(
   userMessage: string,
   doctorId?: string,
+  channel: BrainChannel = "app",
 ): Promise<BrainContext> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -184,6 +207,10 @@ export async function getBrainContext(
         ...selected.map((e) => `P: ${e.question}\nR: ${e.answer}`),
       );
     }
+
+    // Bloco não-vazio realmente montado → o cérebro vai ser usado: registra o
+    // hit (fire-and-forget; 'teste' é ignorado dentro de logBrainHit).
+    logBrainHit(target, channel);
 
     return { block: parts.join("\n") + "\n", enabledApp, enabledWhatsapp };
   } catch {

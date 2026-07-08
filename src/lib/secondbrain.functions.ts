@@ -357,7 +357,7 @@ export const testBrain = createServerFn({ method: "POST" })
         import("./ai-gateway.server"),
       ]);
 
-    const brain = await getBrainContext(data.question, await ownerDoctorId(user));
+    const brain = await getBrainContext(data.question, await ownerDoctorId(user), "teste");
     const system = [
       "Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra especialista em gestação de alto risco.",
       "Responda em português brasileiro, com tom acolhedor, claro e profissional. Seja conciso (3 a 6 frases).",

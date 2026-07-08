@@ -1182,6 +1182,50 @@ ALTER TABLE public.brain_entries ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.brain_entries TO service_role;
 REVOKE ALL ON public.brain_entries FROM anon, authenticated;
 
+-- brain_hits — telemetria do cérebro (quantas vezes foi usado) para o dashboard.
+-- Acesso EXCLUSIVO via service_role (logging server-side).
+CREATE TABLE IF NOT EXISTS public.brain_hits (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  doctor_id  uuid,
+  channel    text        NOT NULL,  -- app | whatsapp | teste
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_brain_hits_doctor_created
+  ON public.brain_hits(doctor_id, created_at DESC);
+ALTER TABLE public.brain_hits ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.brain_hits TO service_role;
+REVOKE ALL ON public.brain_hits FROM anon, authenticated;
+
+-- triage_logs — cada triagem de sintomas (Alertas) vira registro na conta.
+-- Alto risco: alerta vermelho/amarelo PRECISA ficar gravado (paciente + médico).
+CREATE TABLE IF NOT EXISTS public.triage_logs (
+  id         uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  level      text        NOT NULL,               -- vermelho | amarelo | verde
+  symptoms   text[]      NOT NULL DEFAULT '{}',
+  systolic   integer,
+  diastolic  integer,
+  note       text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_triage_logs_user_created
+  ON public.triage_logs(user_id, created_at DESC);
+ALTER TABLE public.triage_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own triage logs" ON public.triage_logs;
+CREATE POLICY "Patient manages own triage logs"
+  ON public.triage_logs FOR ALL TO authenticated
+  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages triage logs" ON public.triage_logs;
+CREATE POLICY "Service manages triage logs"
+  ON public.triage_logs FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+GRANT ALL ON public.triage_logs TO authenticated, service_role;
+
+-- Flag de seed do checklist na conta (em vez de localStorage) — não re-semeia
+-- itens num aparelho novo de quem apagou tudo de propósito.
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS checklist_seeded boolean NOT NULL DEFAULT false;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- NÚCLEO MULTI-TENANT — o app é uma plataforma para QUALQUER médico assinante
 -- (não mais exclusivo do Dr. Clóvis). Três peças:

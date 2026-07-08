@@ -59,4 +59,38 @@ Regras absolutas:
     return { level, reasons, message };
   });
 
+/**
+ * Grava a triagem na CONTA da paciente (triage_logs). Numa plataforma de alto
+ * risco, um alerta vermelho/amarelo não pode viver só em useState: fica no
+ * histórico da paciente e alimenta o dashboard do médico (triagens do mês).
+ * Degrada com elegância: se a tabela ainda não foi aplicada, apenas ignora.
+ */
+export const saveTriageLog = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        level: z.enum(["vermelho", "amarelo", "verde"]),
+        symptoms: z.array(z.string()).max(40),
+        systolic: z.number().int().nullable().optional(),
+        diastolic: z.number().int().nullable().optional(),
+        note: z.string().max(500).nullable().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (authErr || !u.user) return { ok: false as const };
+    const { error } = await (supabaseAdmin as any).from("triage_logs").insert({
+      user_id: u.user.id,
+      level: data.level,
+      symptoms: data.symptoms,
+      systolic: data.systolic ?? null,
+      diastolic: data.diastolic ?? null,
+      note: data.note ?? null,
+    });
+    return { ok: !error };
+  });
+
 export { ALL_SYMPTOMS };

@@ -57,6 +57,7 @@ import {
   updateMyDoctor,
   type DoctorProfile,
 } from "@/lib/doctors.functions";
+import { getDoctorDashboard, type DoctorDashboard } from "@/lib/dashboard.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({ meta: [{ title: "Painel do médico — Obstétrica by Dr. Clóvis" }] }),
@@ -77,6 +78,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 const PANEL_TABS = [
+  "Painel 📊",
   "Calendário",
   "Agendamentos",
   "Agenda",
@@ -95,7 +97,7 @@ type PanelTab = (typeof PANEL_TABS)[number];
 // Médicos assinantes (fora da equipe da instalação) só veem as abas já
 // escopadas por perfil — as demais mostram dados da instalação inteira e
 // abrem por médico conforme o roadmap (docs/MULTI_TENANT.md, etapa 2).
-const DOCTOR_TABS: readonly PanelTab[] = ["Cérebro 🧠", "Meu Perfil"];
+const DOCTOR_TABS: readonly PanelTab[] = ["Painel 📊", "Cérebro 🧠", "Meu Perfil"];
 
 async function token() {
   const { data } = await supabase.auth.getSession();
@@ -107,7 +109,7 @@ function PainelPage() {
   const [allowed, setAllowed] = useState(false);
   // Equipe da instalação (ADMIN_EMAILS) vê tudo; médico assinante vê DOCTOR_TABS
   const [isPlatformTeam, setIsPlatformTeam] = useState(false);
-  const [tab, setTab] = useState<PanelTab>("Calendário");
+  const [tab, setTab] = useState<PanelTab>("Painel 📊");
   const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [preForms, setPreForms] = useState<AdminPreConsulta[]>([]);
@@ -139,7 +141,6 @@ function PainelPage() {
       if (me.ok && me.doctor?.active) {
         setAllowed(true);
         setIsPlatformTeam(false);
-        setTab("Cérebro 🧠");
         return;
       }
       setAllowed(false);
@@ -292,6 +293,7 @@ function PainelPage() {
       </div>
 
       <div className="mt-8">
+        {tab === "Painel 📊" && <DashboardSection tokenFn={token} onNavigate={setTab} />}
         {tab === "Calendário" && (
           <CalendárioSection appointments={appointments} onNavigate={setTab} />
         )}
@@ -349,6 +351,575 @@ function PainelPage() {
         )}
       </div>
     </section>
+  );
+}
+
+/* ---------- Painel (dashboard do médico) ---------- */
+// Saudação conforme o horário — abre o painel com um tom pessoal.
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+// "há X dias/horas" a partir de um ISO — usado nas perguntas recentes.
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "agora mesmo";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  return `há ${d} ${d === 1 ? "dia" : "dias"}`;
+}
+
+// Tempo economizado pelo cérebro: cada resposta ≈ 3 min do médico.
+function savedTimeLabel(hits: number): string {
+  const totalMin = hits * 3;
+  if (totalMin < 60) return `${totalMin} min`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m === 0 ? `${h}h` : `${h}h${m}`;
+}
+
+const STAGE_META: {
+  key: keyof DoctorDashboard["patients"]["stages"];
+  label: string;
+  bar: string;
+  dot: string;
+}[] = [
+  { key: "t1", label: "1º trimestre", bar: "bg-emerald-400", dot: "bg-emerald-400" },
+  { key: "t2", label: "2º trimestre", bar: "bg-sky-400", dot: "bg-sky-400" },
+  { key: "t3", label: "3º trimestre", bar: "bg-violet-400", dot: "bg-violet-400" },
+  { key: "postparto", label: "Pós-parto", bar: "bg-rose-400", dot: "bg-rose-400" },
+  {
+    key: "semData",
+    label: "Sem data",
+    bar: "bg-muted-foreground/40",
+    dot: "bg-muted-foreground/40",
+  },
+];
+
+function DashboardSection({
+  tokenFn,
+  onNavigate,
+}: {
+  tokenFn: () => Promise<string>;
+  onNavigate: (tab: PanelTab) => void;
+}) {
+  const [data, setData] = useState<DoctorDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await getDoctorDashboard({ data: { accessToken: await tokenFn() } });
+      if (res.ok && res.dashboard) setData(res.dashboard);
+      else setError(true);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) return <DashboardSkeleton />;
+
+  if (error || !data)
+    return (
+      <div className="rounded-3xl border border-border bg-card p-10 text-center shadow-[var(--shadow-card)]">
+        <p className="text-4xl">📊</p>
+        <p className="mt-3 font-medium">Não foi possível carregar o painel</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Verifique sua conexão e tente novamente.
+        </p>
+        <button
+          onClick={load}
+          className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground"
+        >
+          ↺ Tentar de novo
+        </button>
+      </div>
+    );
+
+  return <DashboardView data={data} onNavigate={onNavigate} onRefresh={load} />;
+}
+
+/** Parte visual do dashboard — recebe os dados prontos (permite preview isolado). */
+export function DashboardView({
+  data,
+  onNavigate,
+  onRefresh,
+}: {
+  data: DoctorDashboard;
+  onNavigate: (tab: PanelTab) => void;
+  onRefresh?: () => void;
+}) {
+  const { patients, questions, brain, appointments, engagement } = data;
+  const stageTotal = STAGE_META.reduce((s, m) => s + patients.stages[m.key], 0);
+
+  return (
+    <div className="space-y-8">
+      {/* 1. Cabeçalho */}
+      <div className="fade-slide-up flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Painel do médico
+          </p>
+          <h2 className="mt-1 font-serif text-2xl md:text-3xl">
+            {greeting()} 👋 Aqui está o seu consultório hoje
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Atualizado{" "}
+            {new Date(data.generatedAt).toLocaleString("pt-BR", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+        <button
+          onClick={onRefresh}
+          className="shrink-0 rounded-full border border-border px-4 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+        >
+          ↺ Atualizar
+        </button>
+      </div>
+
+      {/* 2. Cards de destaque */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <HeroCard
+          icon="👩‍🍼"
+          value={patients.total}
+          label="Pacientes conectadas"
+          hint={
+            patients.newThisMonth > 0
+              ? `+${patients.newThisMonth} novas neste mês`
+              : "Acompanhando você no app"
+          }
+          tone="primary"
+          delay="stagger-1"
+        />
+        <HeroCard
+          icon="⚡"
+          value={patients.active7d}
+          label="Ativas esta semana"
+          hint={`${patients.inactive7d} sem abrir há 7 dias`}
+          tone="emerald"
+          delay="stagger-2"
+        />
+        <HeroCard
+          icon="💬"
+          value={questions.pending}
+          label="Perguntas a responder"
+          hint={
+            questions.pending > 0 ? "Responda e treine o cérebro" : "Tudo respondido, parabéns!"
+          }
+          tone={questions.pending > 0 ? "amber" : "muted"}
+          delay="stagger-3"
+        />
+        <HeroCard
+          icon="📅"
+          value={appointments.confirmedUpcoming}
+          label="Consultas confirmadas"
+          hint={
+            appointments.pending > 0
+              ? `${appointments.pending} pedido(s) a confirmar`
+              : "Nenhum pedido pendente"
+          }
+          tone="sky"
+          delay="stagger-4"
+        />
+      </div>
+
+      {/* 3. Valor do plano — Segundo Cérebro */}
+      <BrainValueCard brain={brain} onNavigate={onNavigate} />
+
+      {/* 4. Gestações por fase */}
+      <div className="fade-slide-up rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="font-serif text-lg">Sua carteira por fase da gestação</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Onde estão as {patients.total} pacientes conectadas agora.
+            </p>
+          </div>
+        </div>
+        {stageTotal === 0 ? (
+          <p className="mt-5 rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground">
+            Ainda não há pacientes com dados de gestação. Assim que elas preencherem o perfil, a
+            distribuição por trimestre aparece aqui.
+          </p>
+        ) : (
+          <>
+            {/* Barra empilhada proporcional */}
+            <div className="mt-5 flex h-4 w-full overflow-hidden rounded-full bg-secondary/60">
+              {STAGE_META.map((m) => {
+                const n = patients.stages[m.key];
+                if (n === 0) return null;
+                return (
+                  <div
+                    key={m.key}
+                    className={`${m.bar} h-full transition-all`}
+                    style={{ width: `${(n / stageTotal) * 100}%` }}
+                    title={`${m.label}: ${n}`}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-5">
+              {STAGE_META.map((m) => {
+                const n = patients.stages[m.key];
+                const pct = stageTotal ? Math.round((n / stageTotal) * 100) : 0;
+                return (
+                  <div key={m.key} className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${m.dot}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold leading-none">
+                        {n}
+                        <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                          {pct}%
+                        </span>
+                      </p>
+                      <p className="truncate text-[11px] text-muted-foreground">{m.label}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 5. FAQ inteligente + 6. Perguntas recentes */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <FaqIntelligenceCard themes={questions.topThemes} onNavigate={onNavigate} />
+        <RecentQuestionsCard
+          items={questions.recentPending}
+          pending={questions.pending}
+          onNavigate={onNavigate}
+        />
+      </div>
+
+      {/* 7. Risco de abandono + 8. Próxima consulta */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChurnRiskCard patients={engagement.churnRisk} />
+        <NextAppointmentCard appointments={appointments} onNavigate={onNavigate} />
+      </div>
+    </div>
+  );
+}
+
+const HERO_TONE: Record<string, { wrap: string; icon: string; value: string }> = {
+  primary: { wrap: "border-primary/25 bg-primary/5", icon: "bg-primary/10", value: "text-primary" },
+  emerald: {
+    wrap: "border-emerald-300/40 bg-emerald-50/60",
+    icon: "bg-emerald-100",
+    value: "text-emerald-600",
+  },
+  amber: {
+    wrap: "border-amber-300/50 bg-amber-50/60",
+    icon: "bg-amber-100",
+    value: "text-amber-600",
+  },
+  sky: { wrap: "border-sky-300/40 bg-sky-50/60", icon: "bg-sky-100", value: "text-sky-600" },
+  muted: { wrap: "border-border bg-card", icon: "bg-secondary", value: "text-foreground" },
+};
+
+function HeroCard({
+  icon,
+  value,
+  label,
+  hint,
+  tone,
+  delay,
+}: {
+  icon: string;
+  value: number;
+  label: string;
+  hint: string;
+  tone: keyof typeof HERO_TONE | string;
+  delay: string;
+}) {
+  const t = HERO_TONE[tone] ?? HERO_TONE.muted;
+  return (
+    <div className={`fade-slide-up ${delay} card-3d rounded-3xl border p-5 ${t.wrap}`}>
+      <div className={`flex h-10 w-10 items-center justify-center rounded-2xl text-xl ${t.icon}`}>
+        {icon}
+      </div>
+      <p className={`mt-3 font-serif text-4xl leading-none ${t.value}`}>{value}</p>
+      <p className="mt-2 text-sm font-medium">{label}</p>
+      <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
+function BrainValueCard({
+  brain,
+  onNavigate,
+}: {
+  brain: DoctorDashboard["brain"];
+  onNavigate: (tab: PanelTab) => void;
+}) {
+  const active = brain.hitsThisMonth > 0;
+  return (
+    <div className="fade-slide-up shine relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/70 p-6 text-primary-foreground shadow-[var(--shadow-card)] md:p-8">
+      <div className="relative z-[1] flex flex-wrap items-start justify-between gap-6">
+        <div className="max-w-xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] opacity-80">
+            🧠 O valor do seu plano
+          </p>
+          {active ? (
+            <>
+              <p className="mt-3 font-serif text-3xl leading-tight md:text-4xl">
+                Seu Segundo Cérebro respondeu{" "}
+                <span className="underline decoration-white/40 underline-offset-4">
+                  {brain.hitsThisMonth}
+                </span>{" "}
+                {brain.hitsThisMonth === 1 ? "vez" : "vezes"} este mês
+              </p>
+              <p className="mt-3 text-sm opacity-90">
+                Isso são cerca de <strong>{savedTimeLabel(brain.hitsThisMonth)}</strong> que você
+                não precisou gastar digitando respostas — o cérebro atendeu por você, no seu tom, a
+                qualquer hora.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mt-3 font-serif text-3xl leading-tight md:text-4xl">
+                Seu Segundo Cérebro está pronto para trabalhar por você
+              </p>
+              <p className="mt-3 text-sm opacity-90">
+                Ainda não houve atendimentos automáticos neste mês. Quanto mais respostas você
+                treinar, mais o cérebro responde no seu lugar — economizando seu tempo dia após dia.
+              </p>
+            </>
+          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              onClick={() => onNavigate("Cérebro 🧠")}
+              className="rounded-full bg-white/95 px-5 py-2 text-sm font-semibold text-primary transition-transform hover:scale-[1.03]"
+            >
+              {active ? "Treinar mais respostas →" : "Treinar meu cérebro →"}
+            </button>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-2 text-xs font-medium">
+              {brain.enabledApp ? "✅ App" : "⭕ App"} ·{" "}
+              {brain.enabledWhatsapp ? "✅ WhatsApp" : "⭕ WhatsApp"}
+            </span>
+          </div>
+        </div>
+        <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-1">
+          <div className="rounded-2xl bg-white/15 px-5 py-3 text-center backdrop-blur-sm">
+            <p className="font-serif text-3xl leading-none">{brain.approved}</p>
+            <p className="mt-1 text-[11px] opacity-90">respostas que já sabe</p>
+          </div>
+          <div className="rounded-2xl bg-white/15 px-5 py-3 text-center backdrop-blur-sm">
+            <p className="font-serif text-3xl leading-none">{brain.entries}</p>
+            <p className="mt-1 text-[11px] opacity-90">itens na base</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FaqIntelligenceCard({
+  themes,
+  onNavigate,
+}: {
+  themes: DoctorDashboard["questions"]["topThemes"];
+  onNavigate: (tab: PanelTab) => void;
+}) {
+  const max = themes.length ? Math.max(...themes.map((t) => t.count)) : 1;
+  return (
+    <div className="fade-slide-up flex flex-col rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-lg">FAQ inteligente 🔎</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        Os temas que suas pacientes mais perguntam — treine o cérebro neles e responda uma vez só.
+      </p>
+      {themes.length === 0 ? (
+        <p className="mt-5 flex-1 rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground">
+          Ainda não há perguntas suficientes para identificar temas. Eles aparecem aqui conforme as
+          pacientes usam o chat e enviam dúvidas.
+        </p>
+      ) : (
+        <div className="mt-4 flex flex-1 flex-wrap content-start gap-2">
+          {themes.map((t) => {
+            // Fonte cresce com a frequência — nuvem de temas simples.
+            const scale = 0.85 + (t.count / max) * 0.5;
+            return (
+              <span
+                key={t.theme}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 font-medium text-primary"
+                style={{ fontSize: `${scale}rem` }}
+              >
+                {t.theme}
+                <span className="rounded-full bg-primary/15 px-1.5 text-[11px]">{t.count}</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <button
+        onClick={() => onNavigate("Cérebro 🧠")}
+        className="mt-5 self-start rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground"
+      >
+        Treinar o cérebro nesses temas →
+      </button>
+    </div>
+  );
+}
+
+function RecentQuestionsCard({
+  items,
+  pending,
+  onNavigate,
+}: {
+  items: DoctorDashboard["questions"]["recentPending"];
+  pending: number;
+  onNavigate: (tab: PanelTab) => void;
+}) {
+  return (
+    <div className="fade-slide-up flex flex-col rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-serif text-lg">Perguntas aguardando você</p>
+        {pending > 0 && (
+          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+            {pending}
+          </span>
+        )}
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-4 flex-1 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700">
+          🎉 Nenhuma pergunta pendente. Suas pacientes estão em dia!
+        </p>
+      ) : (
+        <ul className="mt-4 flex-1 space-y-2.5">
+          {items.map((q) => (
+            <li key={q.id} className="rounded-2xl border border-border/70 bg-secondary/30 p-3">
+              <p className="line-clamp-2 text-sm text-foreground">{q.question}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{timeAgo(q.created_at)}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        onClick={() => onNavigate("Cérebro 🧠")}
+        className="mt-5 self-start rounded-full border border-border px-5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+      >
+        Responder e treinar →
+      </button>
+    </div>
+  );
+}
+
+function ChurnRiskCard({ patients }: { patients: DoctorDashboard["engagement"]["churnRisk"] }) {
+  return (
+    <div className="fade-slide-up rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-lg">Oportunidade de reengajar 💛</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        Pacientes que já usaram o app mas sumiram há mais de 10 dias — uma mensagem sua faz
+        diferença.
+      </p>
+      {patients.length === 0 ? (
+        <p className="mt-5 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700">
+          ✨ Ninguém em risco de abandono. Suas pacientes estão engajadas!
+        </p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {patients.map((p, i) => (
+            <li
+              key={`${p.name}-${i}`}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/50 px-4 py-3"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-700">
+                  {p.name.trim().charAt(0).toUpperCase() || "?"}
+                </span>
+                <p className="truncate text-sm font-medium">{p.name}</p>
+              </div>
+              <span className="shrink-0 text-xs font-medium text-amber-700">
+                há {p.lastActiveDays} dias sem abrir
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function NextAppointmentCard({
+  appointments,
+  onNavigate,
+}: {
+  appointments: DoctorDashboard["appointments"];
+  onNavigate: (tab: PanelTab) => void;
+}) {
+  return (
+    <div className="fade-slide-up flex flex-col rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-lg">Agenda 📅</p>
+      {appointments.next ? (
+        <div className="mt-4 rounded-2xl border border-sky-200/70 bg-sky-50/50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-600">
+            Próxima consulta confirmada
+          </p>
+          <p className="mt-1.5 font-serif text-xl">{appointments.next.patientName}</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">{appointments.next.dateLabel}</p>
+        </div>
+      ) : (
+        <p className="mt-4 rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground">
+          Nenhuma consulta confirmada nos próximos dias.
+        </p>
+      )}
+      <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-secondary/30 px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">
+            {appointments.pending} pedido{appointments.pending === 1 ? "" : "s"} a confirmar
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {appointments.confirmedUpcoming} confirmada(s) no total
+          </p>
+        </div>
+        {appointments.pending > 0 && (
+          <button
+            onClick={() => onNavigate("Agendamentos")}
+            className="shrink-0 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground"
+          >
+            Ver pedidos →
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="h-16 w-2/3 animate-pulse rounded-2xl bg-secondary" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-32 animate-pulse rounded-3xl bg-secondary" />
+        ))}
+      </div>
+      <div className="h-44 animate-pulse rounded-3xl bg-secondary" />
+      <div className="h-40 animate-pulse rounded-3xl bg-secondary" />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="h-52 animate-pulse rounded-3xl bg-secondary" />
+        <div className="h-52 animate-pulse rounded-3xl bg-secondary" />
+      </div>
+    </div>
   );
 }
 

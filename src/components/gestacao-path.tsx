@@ -254,7 +254,7 @@ const LS = {
   celebrated: "dc-path-birth-celebrated",
 };
 
-function lsGet<T>(key: string, fallback: T): T {
+export function lsGet<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = localStorage.getItem(key);
@@ -263,7 +263,7 @@ function lsGet<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
-function lsSet(key: string, value: unknown) {
+export function lsSet(key: string, value: unknown) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
@@ -300,11 +300,30 @@ let journeySyncTimer: ReturnType<typeof setTimeout> | null = null;
 // Barreira anti-corrida: NENHUM push acontece antes de o pull inicial do
 // perfil terminar — senão um toque rápido num aparelho novo empurraria o
 // blob zerado por cima da jornada real na nuvem (e o marcador bloquearia a
-// hidratação em seguida). Atribuída no mount; resolvida = passa direto.
+// hidratação em seguida). Armada por ensureInitialJourneyPull; até lá, um push
+// espera de graça em Promise.resolve().
 let initialPullGate: Promise<unknown> = Promise.resolve();
+let gatePrimed = false;
+
+// Dispara o pull inicial da nuvem UMA vez por sessão e arma a barreira acima.
+// Precisa rodar antes do PRIMEIRO push — venha ele da aba Caminho (que monta
+// GestacaoPath) ou de abas irmãs (Sons/Quartinho) que também gravam chaves
+// dc-path- via lsSet sem passar pela Caminho. Num aparelho onde a jornada só
+// existe na nuvem, sem esse pull o push empurraria um blob incompleto por cima
+// da jornada real e o marcador ainda bloquearia a re-hidratação (P1).
+export function ensureInitialJourneyPull(): Promise<boolean> {
+  if (gatePrimed) return initialPullGate as Promise<boolean>;
+  gatePrimed = true;
+  const pullPromise = pullJourneyFromProfile();
+  initialPullGate = pullPromise.catch(() => false);
+  return pullPromise;
+}
 
 function scheduleJourneySync() {
   if (typeof window === "undefined") return;
+  // Arma o pull inicial/barreira já na primeira escrita, qualquer que seja a
+  // aba — impede que Sons/Quartinho empurrem antes do pull inicial (P1).
+  ensureInitialJourneyPull();
   if (journeySyncTimer) clearTimeout(journeySyncTimer);
   journeySyncTimer = setTimeout(async () => {
     try {
@@ -737,10 +756,11 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     (async () => {
       // Nuvem PRIMEIRO: num aparelho novo, a jornada real vem do perfil —
       // sem isso criaríamos uma jornada zerada por cima da verdadeira.
-      // A mesma promise vira a barreira que segura qualquer push (P1).
-      const pullPromise = pullJourneyFromProfile();
-      initialPullGate = pullPromise.catch(() => {});
-      const changed = await pullPromise;
+      // A primeira montagem arma a barreira compartilhada (P1); remontagens
+      // seguintes (reabrir a aba) re-baixam para frescor cross-device.
+      const changed = gatePrimed
+        ? await pullJourneyFromProfile()
+        : await ensureInitialJourneyPull();
       if (cancelled) return;
       if (changed) {
         hydrateFromLocal();

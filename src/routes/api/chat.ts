@@ -82,7 +82,7 @@ export const Route = createFileRoute("/api/chat")({
         // system prompt. getBrainContext é safe (falha vira block vazio),
         // então nunca derruba o chat.
         const messages = body.messages as UIMessage[];
-        const brain = await getBrainContext(lastUserText(messages));
+        const brain = await getBrainContext(lastUserText(messages), undefined, "app");
         const system =
           brain.enabledApp && brain.block ? `${SYSTEM_PROMPT}\n\n${brain.block}` : SYSTEM_PROMPT;
 

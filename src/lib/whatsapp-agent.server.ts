@@ -95,7 +95,7 @@ async function callAgent(conv: WaConversation, userMessage: string): Promise<Age
   // getBrainContext é safe (falha vira block vazio) — nunca derruba o agente.
   // O block só influencia o TOM do campo "reply"; o formato JSON da resposta
   // e o fluxo de estados continuam regidos pelo prompt abaixo.
-  const brain = await getBrainContext(userMessage);
+  const brain = await getBrainContext(userMessage, undefined, "whatsapp");
   const system =
     brain.enabledWhatsapp && brain.block
       ? `${SYSTEM}\n\n${brain.block}\nO bloco acima orienta apenas o estilo e a conduta do texto enviado ao paciente. Continue seguindo o fluxo de estados e o formato de resposta em JSON exigidos na mensagem do usuário.`

@@ -23,7 +23,7 @@ import {
   trimesterForWeek,
 } from "@/lib/gestacao";
 import { BabyIllustration } from "@/components/baby-illustration";
-import { assessSymptoms } from "@/lib/triage.functions";
+import { assessSymptoms, saveTriageLog } from "@/lib/triage.functions";
 import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
 import {
   submitPreConsulta,
@@ -58,7 +58,7 @@ import {
   ACHIEVEMENT_DEFS,
   type AchievementDef,
 } from "@/lib/achievements.functions";
-import { GestacaoPath } from "@/components/gestacao-path";
+import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
   requestPrivateConsultation,
   getMyPrivateConsultations,
@@ -378,6 +378,14 @@ function MinhaContaPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   // Mobile-only: true = dashboard home screen
   const [mobileHome, setMobileHome] = useState(true);
+
+  // Baixa a jornada da nuvem e arma a barreira anti-push logo no mount da
+  // página, independente da aba ativa: abas como Sons/Quartinho gravam chaves
+  // dc-path- sem montar a aba Caminho, então o pull inicial precisa acontecer
+  // antes de qualquer push para não sobrescrever a jornada real na conta (P1).
+  useEffect(() => {
+    ensureInitialJourneyPull();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -1267,9 +1275,32 @@ function ChecklistTab({ gest }: { gest: Gest }) {
       toast.error("Não foi possível carregar o checklist.");
       return;
     }
-    // Semeia os itens padrão só uma vez por usuário — quem apagou tudo fica com a lista vazia
-    const seededKey = `dc-checklist-seeded-${u.user.id}`;
-    const alreadySeeded = typeof window !== "undefined" && localStorage.getItem(seededKey);
+    // Semeia os itens padrão só uma vez por usuário — quem apagou tudo fica com
+    // a lista vazia. A flag "já semeei" vive na CONTA (patient_profiles.
+    // checklist_seeded), não no localStorage: assim um aparelho novo não
+    // re-semeia itens que a paciente apagou de propósito. Degrada com elegância
+    // se a coluna ainda não foi aplicada (trata como não-semeado).
+    let alreadySeeded = false;
+    try {
+      const { data: prof } = await (supabase as any)
+        .from("patient_profiles")
+        .select("checklist_seeded")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      alreadySeeded = !!prof?.checklist_seeded;
+    } catch {
+      /* coluna ausente — segue como não-semeado */
+    }
+    async function markSeeded() {
+      try {
+        await (supabase as any)
+          .from("patient_profiles")
+          .update({ checklist_seeded: true })
+          .eq("id", u.user!.id);
+      } catch {
+        /* coluna ausente — ignora */
+      }
+    }
     if ((!data || data.length === 0) && !alreadySeeded) {
       const seed = DEFAULT_ITEMS.map((d) => ({ ...d, user_id: u.user!.id, done: false }));
       const { error: seedError } = await (supabase as any).from("checklist_items").insert(seed);
@@ -1278,23 +1309,15 @@ function ChecklistTab({ gest }: { gest: Gest }) {
         setItems([]);
         return;
       }
-      try {
-        localStorage.setItem(seededKey, "1");
-      } catch {
-        /* modo privado — segue sem persistir a flag */
-      }
+      await markSeeded();
       const { data: again } = await (supabase as any)
         .from("checklist_items")
         .select("*")
         .order("created_at", { ascending: true });
       setItems(again ?? []);
     } else {
-      if (data && data.length > 0) {
-        try {
-          localStorage.setItem(seededKey, "1");
-        } catch {
-          /* ignora */
-        }
+      if (data && data.length > 0 && !alreadySeeded) {
+        await markSeeded();
       }
       setItems(data ?? []);
     }
@@ -2966,6 +2989,25 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
         },
       });
       setResult(res);
+      // Grava a triagem na CONTA da paciente (histórico + dashboard do médico).
+      // Fire-and-forget: falha de rede/tabela ausente NÃO atrapalha a orientação.
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (s.session?.access_token) {
+          void saveTriageLog({
+            data: {
+              accessToken: s.session.access_token,
+              level: res.level,
+              symptoms: [...selected],
+              systolic: sys ? Number(sys) : null,
+              diastolic: dia ? Number(dia) : null,
+              note: note || null,
+            },
+          }).catch(() => {});
+        }
+      } catch {
+        /* sessão indisponível — a triagem já foi mostrada, seguimos */
+      }
     } catch {
       toast.error(
         "Não foi possível avaliar os sintomas. Tente novamente ou ligue para o consultório.",
@@ -6548,14 +6590,11 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
   const currentWeek = gest?.weeks ?? 0;
   const [playing, setPlaying] = useState<SoundType | null>(null);
   const [volume, setVolume] = useState(0.5);
-  const [playCount, setPlayCount] = useState<Partial<Record<SoundType, number>>>(() => {
-    if (typeof window === "undefined") return {};
-    try {
-      return JSON.parse(localStorage.getItem("sons_play_count") ?? "{}");
-    } catch {
-      return {};
-    }
-  });
+  // Chave com prefixo dc-path- para entrar no sync do journey_state (a
+  // preferência de sons mais tocados segue a paciente entre aparelhos).
+  const [playCount, setPlayCount] = useState<Partial<Record<SoundType, number>>>(() =>
+    lsGet<Partial<Record<SoundType, number>>>("dc-path-sons-play-count", {}),
+  );
   const ctxRef = useRef<AudioContext | null>(null);
   const nodesRef = useRef<AudioNode[]>([]);
   const masterRef = useRef<GainNode | null>(null);
@@ -6744,7 +6783,7 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
     setPlaying(type);
     const newCount = { ...playCount, [type]: (playCount[type] ?? 0) + 1 };
     setPlayCount(newCount);
-    localStorage.setItem("sons_play_count", JSON.stringify(newCount));
+    lsSet("dc-path-sons-play-count", newCount);
   }
 
   useEffect(() => {
@@ -7475,14 +7514,11 @@ const PRIORITY_STYLE: Record<QuartinhoItem["priority"], { badge: string; label: 
 const QUARTO_CATEGORIES = [...new Set(QUARTO_ITEMS.map((i) => i.category))];
 
 function QuartinhoTab({ gest }: { gest: Gest }) {
-  const [checked, setChecked] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set<string>();
-    try {
-      return new Set(JSON.parse(localStorage.getItem("quartinho_checked") ?? "[]"));
-    } catch {
-      return new Set<string>();
-    }
-  });
+  // Chave com prefixo dc-path- para pegar carona no sync do journey_state:
+  // o checklist do quartinho passa a viver na CONTA, não só no aparelho.
+  const [checked, setChecked] = useState<Set<string>>(
+    () => new Set(lsGet<string[]>("dc-path-quartinho-checked", [])),
+  );
   const [catFilter, setCatFilter] = useState<string>("todos");
   const [priorityFilter, setPriorityFilter] = useState<string>("todos");
   const currentWeek = gest?.weeks ?? 0;
@@ -7492,7 +7528,7 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setChecked(next);
-    localStorage.setItem("quartinho_checked", JSON.stringify([...next]));
+    lsSet("dc-path-quartinho-checked", [...next]);
   }
 
   const filtered = QUARTO_ITEMS.filter((item) => {
