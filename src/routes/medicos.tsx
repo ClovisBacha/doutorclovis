@@ -20,6 +20,10 @@ export const Route = createFileRoute("/medicos")({
   component: MedicosPage,
 });
 
+// Promoção de lançamento: enquanto ativa, o anual dá 25% off (em vez dos
+// 2 meses grátis ≈ 17%). Basta trocar active para false quando encerrar.
+const LAUNCH_PROMO = { active: true, off: 0.25, label: "🚀 Lançamento" };
+
 // monthly = preço no plano mensal (0 = grátis). No plano ANUAL o médico paga
 // 10 meses e usa 12 (2 meses grátis ≈ 17% off) → mensal equivalente arredondado.
 const PLANS = [
@@ -671,7 +675,9 @@ function MedicosPage() {
                 ))}
               </div>
               <p className="text-xs font-medium text-primary">
-                💚 No anual, 2 meses grátis — economize ~17%
+                {LAUNCH_PROMO.active
+                  ? "🚀 Promoção de lançamento — 25% OFF no plano anual, por tempo limitado"
+                  : "💚 No anual, 2 meses grátis — economize ~17%"}
               </p>
             </div>
           </Reveal>
@@ -679,14 +685,17 @@ function MedicosPage() {
           <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {PLANS.map((plan, i) => {
               const annual = billing === "anual";
-              // No anual paga 10 e usa 12 → mensal equivalente arredondado.
+              const promo = LAUNCH_PROMO.active;
+              // Anual: com promoção de lançamento = 25% off; sem = 2 meses grátis (≈17%).
+              const annualFactor = promo ? 1 - LAUNCH_PROMO.off : 10 / 12;
               const shown =
                 plan.monthly === 0
                   ? 0
                   : annual
-                    ? Math.round((plan.monthly * 10) / 12)
+                    ? Math.round(plan.monthly * annualFactor)
                     : plan.monthly;
-              const savings = plan.monthly === 0 ? 0 : plan.monthly * 2; // 2 meses grátis/ano
+              // Economia no ano inteiro (12 meses do cheio − 12 meses do promocional).
+              const savings = plan.monthly === 0 ? 0 : (plan.monthly - shown) * 12;
               return (
                 <Reveal key={plan.key} delay={i * 0.07}>
                   <div
@@ -699,15 +708,27 @@ function MedicosPage() {
                         Mais popular
                       </span>
                     )}
-                    <p className="text-sm font-semibold uppercase tracking-widest text-primary">
-                      {plan.name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold uppercase tracking-widest text-primary">
+                        {plan.name}
+                      </p>
+                      {annual && promo && plan.monthly > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                          {LAUNCH_PROMO.label} · 25% OFF
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-1 font-serif text-lg text-foreground">{plan.tagline}</p>
                     <div className="mt-3">
                       {plan.isFrom && (
                         <span className="text-xs text-muted-foreground">a partir de </span>
                       )}
-                      <div className="flex items-end gap-1">
+                      <div className="flex items-end gap-1.5">
+                        {annual && promo && plan.monthly > 0 && (
+                          <span className="mb-1 text-lg text-muted-foreground line-through">
+                            R$ {plan.monthly}
+                          </span>
+                        )}
                         <span className="font-serif text-4xl font-bold">R$ {shown}</span>
                         <span className="mb-1 text-sm text-muted-foreground">
                           {plan.monthly === 0 ? "/sempre" : `/mês${plan.perSuffix}`}
