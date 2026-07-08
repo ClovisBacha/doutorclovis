@@ -24,56 +24,51 @@ const PLANS = [
   {
     key: "free",
     name: "Free",
+    tagline: "Organize o consultório",
     price: "R$ 0",
     period: "/sempre",
     highlight: false,
-    desc: "Para testar sem compromisso — sem cartão, sem prazo",
+    desc: "Tudo o que você precisa para sair do caderno — de graça, para sempre.",
     features: [
       "Agenda online + confirmações",
-      "App de pré-natal para a paciente",
-      "Prontuário gestacional simplificado",
-      "Calculadoras clínicas (DPP, biometria)",
+      "App de pré-natal para as suas pacientes",
+      "Prontuário gestacional + calculadoras clínicas",
       "Até 5 pacientes ativas",
-      "Sem Segundo Cérebro de IA",
-      "Sem agente de WhatsApp",
+      "Sem fidelidade, sem cartão",
     ],
     cta: "Criar conta grátis",
   },
   {
     key: "starter",
     name: "Starter",
+    tagline: "A IA responde por você",
     price: "R$ 197",
     period: "/mês",
     highlight: false,
-    desc: "Para o médico solo que quer modernizar o consultório",
+    desc: "Suas pacientes tiram dúvidas com a sua IA no app — você para de repetir as mesmas respostas.",
     features: [
-      "Pacientes sempre ilimitadas",
-      "🧠 Segundo Cérebro — Nível 1, atende no app",
+      "Tudo do Free, pacientes ilimitadas",
+      "🧠 A sua IA responde as pacientes 24h (no app)",
+      "Ferramentas clínicas: biometria, EPDS, DMG, pré-eclâmpsia",
       "Confirmações automáticas por WhatsApp",
       "Cobrança PIX integrada",
-      "📊 Biometria fetal + percentil Intergrowth-21",
-      "🩺 EPDS digital (rastreio depressão perinatal)",
-      "🩸 Protocolo DMG + calculadora de insulina",
-      "🫀 Rastreio de risco pré-eclâmpsia (ACOG/SBH)",
-      "Exportação .ics (Google / Apple Calendar)",
     ],
     cta: "Começar grátis por 14 dias",
   },
   {
     key: "pro",
     name: "Pro",
+    tagline: "A IA vira sua secretária",
     price: "R$ 347",
     period: "/mês",
     highlight: true,
-    desc: "O Segundo Cérebro também atende no WhatsApp",
+    desc: "A mesma IA agora atende e agenda no WhatsApp — menos faltas, menos trabalho de recepção.",
     features: [
-      "Tudo do Starter, pacientes ilimitadas",
-      "🧠 Segundo Cérebro — Nível 2, atende no WhatsApp",
-      "Agenda consulta e detecta urgência sozinho",
-      "Lembretes automáticos de consulta (reduz falta em até 38%)",
-      "Dashboard com FAQ inteligente e risco de abandono",
-      "Cobrança e recibo digital",
-      "Bloqueio de agenda e férias",
+      "Tudo do Starter",
+      "💬 A sua IA atende e agenda no WhatsApp (não só no app)",
+      "Detecta urgência e orienta SAMU/UPA sozinha",
+      "Lembretes automáticos → até 38% menos faltas",
+      "Dashboard: FAQ inteligente e risco de abandono",
       "Suporte prioritário",
     ],
     cta: "Assinar Pro",
@@ -81,52 +76,55 @@ const PLANS = [
   {
     key: "enterprise",
     name: "Pro Equipe",
-    price: "a partir de R$ 297",
-    period: "/médico/mês",
+    tagline: "O Pro para a clínica",
+    price: "R$ 297",
+    period: "/médico · a partir de",
     highlight: false,
-    desc: "O Pro para clínicas — 2+ médicos, mais barato por assento",
+    desc: "O Pro para vários médicos numa conta só — mais barato quanto maior a equipe.",
     features: [
       "Tudo do Pro, para cada médico da equipe",
-      "Cada médico com o seu próprio Segundo Cérebro",
-      "Painel consolidado: pacientes e uso de IA por médico",
-      "Preço cai por assento: 2–4 médicos R$297, 5+ R$247",
-      "Integração com sistemas legados (TISS/TUSS)",
+      "Cada médico com a sua própria IA",
+      "Painel consolidado por médico",
+      "Preço por assento: 2–4 médicos R$297, 5+ R$247",
       "Gerente de conta dedicado",
     ],
     cta: "Falar com a equipe",
   },
 ];
 
+// As dores levantadas das reclamações reais dos concorrentes (Reclame Aqui:
+// Doctoralia, iClinic, Feegow, Amplimed) — cada uma vira uma promessa nossa.
 const PAIN_POINTS = [
   {
-    icon: "😤",
-    problem: "Contrato anual preso",
-    solution: "Sem fidelidade obrigatória. Cancele quando quiser, sem multa.",
+    icon: "🔒",
+    problem: '"Fui preso num contrato de 12 meses e não consigo cancelar"',
+    solution: "Aqui não há fidelidade. Cancela num clique, sem multa, sem ligar para ninguém.",
   },
   {
-    icon: "📵",
-    problem: "WhatsApp virou recepção",
-    solution: "O agente IA responde, agenda e confirma 24h/dia. Você fica com o que importa.",
+    icon: "🐌",
+    problem: '"Abri chamado no suporte e a resposta demorou semanas"',
+    solution: "Suporte com gente de verdade, resposta no mesmo dia. Você nunca fica na mão.",
+  },
+  {
+    icon: "🎣",
+    problem: '"Prometeram pacientes que nunca vieram — propaganda enganosa"',
+    solution:
+      "Nada de promessa vazia: comece grátis e veja o valor com as suas pacientes antes de pagar.",
   },
   {
     icon: "💸",
-    problem: "Perda de R$ 4k/mês com faltas",
-    solution: "Lembretes automáticos reduzem no-show em até 38%. ROI no primeiro mês.",
+    problem: "Perda de milhares por mês com faltas",
+    solution: "Lembretes e confirmação automática no WhatsApp reduzem o no-show em até 38%.",
   },
   {
-    icon: "🗂️",
-    problem: "Prontuário genérico",
-    solution: "Formulários específicos para pré-natal, DUM, ultrassom e alto risco.",
+    icon: "📵",
+    problem: "WhatsApp virou recepção 24h",
+    solution: "A IA responde, agenda e tria por você — no canal onde a paciente já está.",
   },
   {
     icon: "💳",
-    problem: "Taxa de cartão de 3–4%",
-    solution: "PIX nativo sem taxas. Recibo digital automático após confirmação.",
-  },
-  {
-    icon: "📊",
-    problem: "Sem visão do consultório",
-    solution: "Dashboard com taxa de ocupação, inadimplência e engajamento das pacientes.",
+    problem: "Taxa de cartão comendo o faturamento",
+    solution: "PIX nativo sem taxa. Recibo digital automático após a confirmação.",
   },
 ];
 
@@ -212,40 +210,53 @@ function MedicosPage() {
           </Reveal>
           <Reveal delay={0.14}>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-              Agente de IA 24h no WhatsApp que agenda, confirma e cobra. Portal pré-natal para suas
-              pacientes. Sem contrato anual. Feito por obstetra, para obstetras.
+              Uma IA treinada com as <strong>suas</strong> respostas atende suas pacientes 24h,
+              agenda e reduz as faltas. Comece de graça — você só paga quando ver valor. Feito por
+              obstetra, para obstetras.
             </p>
           </Reveal>
           <Reveal delay={0.2}>
             <div className="mt-10 flex flex-wrap justify-center gap-4">
               <a
-                href="#planos"
+                href="/medicos/cadastro"
                 className="rounded-full bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg transition hover:opacity-90"
               >
-                Ver planos
+                Começar grátis
               </a>
               <a
-                href="#contato"
+                href="#planos"
                 className="rounded-full border border-primary/40 bg-background/70 px-8 py-3.5 text-sm font-semibold text-primary transition hover:bg-primary/5"
               >
-                Falar com a equipe
+                Ver planos
               </a>
             </div>
           </Reveal>
         </div>
 
-        {/* Stats */}
-        <div className="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
+        {/* Garantias — cada uma responde à maior dor dos concorrentes */}
+        <div className="mx-auto mt-16 grid max-w-3xl gap-4 sm:grid-cols-3">
           {[
-            { value: "38%", label: "Menos faltas" },
-            { value: "24h", label: "Agendamento automático" },
-            { value: "R$ 0", label: "Taxa no PIX" },
-            { value: "14 dias", label: "Grátis para testar" },
-          ].map((s) => (
-            <Reveal key={s.label}>
-              <div className="rounded-2xl border border-primary/10 bg-card/80 p-4 text-center shadow-sm backdrop-blur">
-                <p className="font-serif text-2xl font-bold text-primary">{s.value}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{s.label}</p>
+            {
+              icon: "🔓",
+              title: "Sem fidelidade",
+              text: "Cancele quando quiser, num clique. Nunca vamos te prender por 12 meses.",
+            },
+            {
+              icon: "🎁",
+              title: "Grátis para começar",
+              text: "Teste com pacientes de verdade. Só cobra quando o valor for seu.",
+            },
+            {
+              icon: "⚡",
+              title: "Suporte no mesmo dia",
+              text: "Gente de verdade responde rápido. Sem ticket que some por semanas.",
+            },
+          ].map((g) => (
+            <Reveal key={g.title}>
+              <div className="h-full rounded-2xl border border-primary/15 bg-card/80 p-5 text-left shadow-sm backdrop-blur">
+                <p className="text-2xl">{g.icon}</p>
+                <p className="mt-2 font-semibold">{g.title}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{g.text}</p>
               </div>
             </Reveal>
           ))}
@@ -619,10 +630,11 @@ function MedicosPage() {
         <div className="mx-auto max-w-5xl">
           <Reveal>
             <h2 className="text-center font-serif text-3xl md:text-4xl">
-              Preços transparentes, sem surpresas
+              Escolha pelo que quer tirar do seu prato
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-center text-muted-foreground">
-              Sem contrato anual. Sem taxa de implantação. Cancele quando quiser.
+              Sem contrato, sem taxa de implantação, sem fidelidade. Suba ou desça de plano quando
+              quiser — cancele num clique.
             </p>
           </Reveal>
 
@@ -642,6 +654,7 @@ function MedicosPage() {
                   <p className="text-sm font-semibold uppercase tracking-widest text-primary">
                     {plan.name}
                   </p>
+                  <p className="mt-1 font-serif text-lg text-foreground">{plan.tagline}</p>
                   <div className="mt-3 flex items-end gap-1">
                     <span className="font-serif text-4xl font-bold">{plan.price}</span>
                     <span className="mb-1 text-sm text-muted-foreground">{plan.period}</span>
