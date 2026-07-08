@@ -89,10 +89,10 @@ const PLANS = [
     highlight: false,
     desc: "Para clínicas com múltiplos profissionais",
     features: [
-      "Tudo do Pro, multi-médico",
-      "Agente IA personalizado (nome e voz da clínica)",
+      "Tudo do Pro, vários médicos numa conta só",
+      "Cada médico com o seu próprio Segundo Cérebro",
+      "Painel consolidado: pacientes e uso de IA por médico",
       "Integração com sistemas legados (TISS/TUSS)",
-      "White-label — seu logo, seu domínio",
       "SLA de uptime garantido",
       "Gerente de conta dedicado",
     ],
@@ -298,6 +298,16 @@ function MedicosPage() {
                   nome e motivo, verifica disponibilidade e registra o pedido de agendamento — tudo
                   sem intervenção humana.
                 </p>
+                <div className="mt-5 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
+                  <p className="font-medium text-foreground">
+                    🧠 → 🤖 Qual a diferença do Segundo Cérebro?
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    O Segundo Cérebro é o <strong>manual</strong> — o que ele sabe responder, do seu
+                    jeito. O Agente de WhatsApp é <strong>quem atende</strong> com esse manual na
+                    mão, 24h, no canal onde a paciente já está — sem ela precisar abrir o app.
+                  </p>
+                </div>
                 <ul className="mt-6 space-y-3 text-sm">
                   {[
                     "Responde dúvidas frequentes (exames, preparo, convênio)",
@@ -398,6 +408,17 @@ function MedicosPage() {
                 jeito que você responderia. A paciente sente que foi o médico dela que cuidou. E
                 foi: com a sua voz, multiplicada.
               </p>
+              <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-primary/20 bg-primary/5 p-4 text-left text-sm">
+                <p className="font-medium text-foreground">📖 Pense nele como o seu manual</p>
+                <p className="mt-1 text-muted-foreground">
+                  Você escreve <strong>uma vez</strong>: seu jeito de falar, suas respostas de
+                  sempre. Dois &ldquo;atendentes&rdquo; consultam esse manual para responder por
+                  você: o <strong>Chat do app</strong> (tira dúvida) e o{" "}
+                  <strong>Agente de WhatsApp</strong> (tira dúvida <em>e também</em> agenda, avisa
+                  urgência — exclusivo do plano Pro). O manual é o mesmo; o que muda é quem atende e
+                  onde.
+                </p>
+              </div>
             </div>
           </Reveal>
 
