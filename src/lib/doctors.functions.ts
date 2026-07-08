@@ -74,7 +74,18 @@ export const getMyDoctor = createServerFn({ method: "POST" })
       .maybeSingle();
 
     const isPlatformAdmin = !!user.email && adminEmails().includes(user.email.toLowerCase());
-    return { ok: true as const, doctor: (row ?? null) as DoctorProfile | null, isPlatformAdmin };
+
+    // Entitlements resolvidos do plano — a UI usa para liberar/bloquear
+    // recursos (IA no app, IA no WhatsApp, limite de pacientes, equipe).
+    const { getEntitlements } = await import("./entitlements.server");
+    const entitlements = await getEntitlements(user);
+
+    return {
+      ok: true as const,
+      doctor: (row ?? null) as DoctorProfile | null,
+      isPlatformAdmin,
+      entitlements,
+    };
   });
 
 /** Cria (ou completa) o perfil de médico do usuário logado — plano trial. */

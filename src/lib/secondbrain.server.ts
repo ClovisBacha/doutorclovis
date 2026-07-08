@@ -145,10 +145,15 @@ export async function getBrainContext(
     // usuário pode criar brain_settings via cadastro de médico, esse fallback
     // permitiria sequestrar a persona do chat público. Dono não resolvido →
     // chat segue sem cérebro.
-    const target = doctorId ?? (await resolveOwnerDoctorId());
+    const ownerId = await resolveOwnerDoctorId();
+    const target = doctorId ?? ownerId;
     if (!target) return { block: "", enabledApp: true, enabledWhatsapp: true };
+    // A conta dona da instalação (ADMIN_EMAILS) tem acesso total; um assinante
+    // usa as capacidades do próprio plano.
+    const isOwner = !!ownerId && target === ownerId;
 
-    const [settingsRes, entriesRes] = await Promise.all([
+    const { getEntitlementsByDoctorId } = await import("./entitlements.server");
+    const [settingsRes, entriesRes, ent] = await Promise.all([
       (supabaseAdmin as any)
         .from("brain_settings")
         .select("persona,sample_phrases,rules,enabled_app,enabled_whatsapp")
@@ -161,6 +166,7 @@ export async function getBrainContext(
         .eq("approved", true)
         .order("created_at", { ascending: false })
         .limit(MAX_ENTRIES_LOADED),
+      getEntitlementsByDoctorId(target, isOwner),
     ]);
 
     const settings = (settingsRes.data ?? null) as BrainSettingsRow | null;
@@ -169,8 +175,18 @@ export async function getBrainContext(
     const persona = (settings?.persona ?? "").trim();
     const samplePhrases = (settings?.sample_phrases ?? "").trim();
     const rules = (settings?.rules ?? "").trim();
-    const enabledApp = settings?.enabled_app ?? true;
-    const enabledWhatsapp = settings?.enabled_whatsapp ?? true;
+    // Entitlement do plano MANDA sobre o toggle salvo: mesmo com enabled_*=true,
+    // se o plano não cobre o canal, o cérebro nunca é injetado nele. É isto que
+    // faz "quem pagou o plano X ter exatamente o acesso do plano X".
+    const enabledApp = (settings?.enabled_app ?? true) && ent.aiApp;
+    const enabledWhatsapp = (settings?.enabled_whatsapp ?? true) && ent.aiWhatsapp;
+
+    // Canal não coberto pelo plano → bloco vazio (nada do cérebro vaza).
+    if (channel === "app" && !enabledApp) return { block: "", enabledApp, enabledWhatsapp };
+    if (channel === "whatsapp" && !enabledWhatsapp) {
+      return { block: "", enabledApp, enabledWhatsapp };
+    }
+    if (channel === "teste" && !ent.aiApp) return { block: "", enabledApp, enabledWhatsapp };
 
     // Pontua cada entry pelas palavras da mensagem presentes em pergunta+resposta.
     const words = significantWords(userMessage);

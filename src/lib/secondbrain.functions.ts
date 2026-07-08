@@ -63,6 +63,16 @@ function isPlatformTeam(user: { email?: string | null }): boolean {
   return !!user.email && adminEmails().includes(user.email.toLowerCase());
 }
 
+/**
+ * O Segundo Cérebro (IA) é do plano Starter+ (Free organiza o consultório mas
+ * NÃO tem IA). Gate por entitlement: treinar/usar o cérebro exige `aiApp`.
+ * Retorna true se o médico pode operar o cérebro no plano atual.
+ */
+async function canUseBrain(user: { id: string; email?: string | null }): Promise<boolean> {
+  const { getEntitlements } = await import("./entitlements.server");
+  return (await getEntitlements(user)).aiApp;
+}
+
 export type BrainEntry = {
   id: string;
   question: string;
@@ -129,6 +139,8 @@ export const saveBrainSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    // Free não tem IA: não pode configurar o cérebro.
+    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const doctorId = await ownerDoctorId(user);
@@ -184,6 +196,8 @@ export const addBrainEntry = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    // Free não tem IA: não pode treinar o cérebro.
+    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const doctorId = await ownerDoctorId(user);
@@ -345,6 +359,12 @@ export const testBrain = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    // Free não tem IA: não pode testar o cérebro.
+    if (!(await canUseBrain(user)))
+      return {
+        ok: false as const,
+        answer: "O Segundo Cérebro está disponível a partir do plano Starter.",
+      };
 
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key)
