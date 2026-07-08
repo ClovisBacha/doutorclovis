@@ -374,10 +374,16 @@ function MinhaContaPage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("Bebê");
+  // Deep-link opcional ?tab=<Aba> (usado pela varredura do super-admin)
+  const initialTab = ((): Tab => {
+    if (typeof window === "undefined") return "Bebê";
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t && (TABS as readonly string[]).includes(t) ? (t as Tab) : "Bebê";
+  })();
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [isAdmin, setIsAdmin] = useState(false);
-  // Mobile-only: true = dashboard home screen
-  const [mobileHome, setMobileHome] = useState(true);
+  // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
+  const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
 
   // Baixa a jornada da nuvem e arma a barreira anti-push logo no mount da
   // página, independente da aba ativa: abas como Sons/Quartinho gravam chaves
