@@ -20,13 +20,16 @@ export const Route = createFileRoute("/medicos")({
   component: MedicosPage,
 });
 
+// monthly = preço no plano mensal (0 = grátis). No plano ANUAL o médico paga
+// 10 meses e usa 12 (2 meses grátis ≈ 17% off) → mensal equivalente arredondado.
 const PLANS = [
   {
     key: "free",
     name: "Free",
     tagline: "Organize o consultório",
-    price: "R$ 0",
-    period: "/sempre",
+    monthly: 0,
+    isFrom: false,
+    perSuffix: "",
     highlight: false,
     desc: "Tudo o que você precisa para sair do caderno — de graça, para sempre.",
     features: [
@@ -42,8 +45,9 @@ const PLANS = [
     key: "starter",
     name: "Starter",
     tagline: "A IA responde por você",
-    price: "R$ 197",
-    period: "/mês",
+    monthly: 197,
+    isFrom: false,
+    perSuffix: "",
     highlight: false,
     desc: "Suas pacientes tiram dúvidas com a sua IA no app — você para de repetir as mesmas respostas.",
     features: [
@@ -59,8 +63,9 @@ const PLANS = [
     key: "pro",
     name: "Pro",
     tagline: "A IA vira sua secretária",
-    price: "R$ 347",
-    period: "/mês",
+    monthly: 347,
+    isFrom: false,
+    perSuffix: "",
     highlight: true,
     desc: "A mesma IA agora atende e agenda no WhatsApp — menos faltas, menos trabalho de recepção.",
     features: [
@@ -77,8 +82,9 @@ const PLANS = [
     key: "enterprise",
     name: "Pro Equipe",
     tagline: "O Pro para a clínica",
-    price: "R$ 297",
-    period: "/médico · a partir de",
+    monthly: 297,
+    isFrom: true,
+    perSuffix: "/médico",
     highlight: false,
     desc: "O Pro para vários médicos numa conta só — mais barato quanto maior a equipe.",
     features: [
@@ -165,6 +171,9 @@ const FAQS = [
 ];
 
 function MedicosPage() {
+  // Anual é o padrão: é o melhor negócio para os dois lados (2 meses grátis
+  // ≈ 17% off) e sempre rotulado "cobrado anualmente" — sem pegadinha.
+  const [billing, setBilling] = useState<"mensal" | "anual">("anual");
   const [leadForm, setLeadForm] = useState({
     name: "",
     email: "",
@@ -230,6 +239,11 @@ function MedicosPage() {
                 Ver planos
               </a>
             </div>
+          </Reveal>
+          <Reveal delay={0.26}>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Grátis para sempre no plano inicial · sem cartão de crédito · cancele quando quiser
+            </p>
           </Reveal>
         </div>
 
@@ -638,56 +652,108 @@ function MedicosPage() {
             </p>
           </Reveal>
 
-          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            {PLANS.map((plan, i) => (
-              <Reveal key={plan.key} delay={i * 0.07}>
-                <div
-                  className={`relative flex h-full flex-col rounded-3xl border p-6 shadow-[var(--shadow-card)] ${
-                    plan.highlight ? "border-primary bg-primary/5" : "border-border bg-card"
-                  }`}
-                >
-                  {plan.highlight && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-0.5 text-xs font-bold text-primary-foreground">
-                      Mais popular
-                    </span>
-                  )}
-                  <p className="text-sm font-semibold uppercase tracking-widest text-primary">
-                    {plan.name}
-                  </p>
-                  <p className="mt-1 font-serif text-lg text-foreground">{plan.tagline}</p>
-                  <div className="mt-3 flex items-end gap-1">
-                    <span className="font-serif text-4xl font-bold">{plan.price}</span>
-                    <span className="mb-1 text-sm text-muted-foreground">{plan.period}</span>
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{plan.desc}</p>
-                  <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2">
-                        <span className="mt-0.5 shrink-0 text-primary">✓</span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href={plan.key === "enterprise" ? "#contato" : "/medicos/cadastro"}
-                    className={`mt-8 block rounded-full py-3 text-center text-sm font-semibold transition ${
-                      plan.highlight
-                        ? "bg-primary text-primary-foreground hover:opacity-90"
-                        : "border border-primary/40 text-primary hover:bg-primary/5"
+          {/* Seletor Mensal / Anual */}
+          <Reveal>
+            <div className="mt-8 flex flex-col items-center gap-2">
+              <div className="inline-flex rounded-full border border-border bg-card p-1">
+                {(["mensal", "anual"] as const).map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setBilling(b)}
+                    className={`rounded-full px-5 py-1.5 text-sm font-semibold transition ${
+                      billing === b
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-primary"
                     }`}
                   >
-                    {plan.cta}
-                  </a>
-                </div>
-              </Reveal>
-            ))}
+                    {b === "mensal" ? "Mensal" : "Anual"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs font-medium text-primary">
+                💚 No anual, 2 meses grátis — economize ~17%
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {PLANS.map((plan, i) => {
+              const annual = billing === "anual";
+              // No anual paga 10 e usa 12 → mensal equivalente arredondado.
+              const shown =
+                plan.monthly === 0
+                  ? 0
+                  : annual
+                    ? Math.round((plan.monthly * 10) / 12)
+                    : plan.monthly;
+              const savings = plan.monthly === 0 ? 0 : plan.monthly * 2; // 2 meses grátis/ano
+              return (
+                <Reveal key={plan.key} delay={i * 0.07}>
+                  <div
+                    className={`relative flex h-full flex-col rounded-3xl border p-6 shadow-[var(--shadow-card)] ${
+                      plan.highlight ? "border-primary bg-primary/5" : "border-border bg-card"
+                    }`}
+                  >
+                    {plan.highlight && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-0.5 text-xs font-bold text-primary-foreground">
+                        Mais popular
+                      </span>
+                    )}
+                    <p className="text-sm font-semibold uppercase tracking-widest text-primary">
+                      {plan.name}
+                    </p>
+                    <p className="mt-1 font-serif text-lg text-foreground">{plan.tagline}</p>
+                    <div className="mt-3">
+                      {plan.isFrom && (
+                        <span className="text-xs text-muted-foreground">a partir de </span>
+                      )}
+                      <div className="flex items-end gap-1">
+                        <span className="font-serif text-4xl font-bold">R$ {shown}</span>
+                        <span className="mb-1 text-sm text-muted-foreground">
+                          {plan.monthly === 0 ? "/sempre" : `/mês${plan.perSuffix}`}
+                        </span>
+                      </div>
+                      {annual && plan.monthly > 0 ? (
+                        <p className="mt-1 text-xs text-primary">
+                          cobrado anualmente · você economiza R$ {savings.toLocaleString("pt-BR")}
+                          /ano
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {plan.monthly === 0 ? "grátis, para sempre" : "sem fidelidade"}
+                        </p>
+                      )}
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">{plan.desc}</p>
+                    <ul className="mt-6 flex-1 space-y-2.5 text-sm">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-start gap-2">
+                          <span className="mt-0.5 shrink-0 text-primary">✓</span>
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <a
+                      href={plan.key === "enterprise" ? "#contato" : "/medicos/cadastro"}
+                      className={`mt-8 block rounded-full py-3 text-center text-sm font-semibold transition ${
+                        plan.highlight
+                          ? "bg-primary text-primary-foreground hover:opacity-90"
+                          : "border border-primary/40 text-primary hover:bg-primary/5"
+                      }`}
+                    >
+                      {plan.cta}
+                    </a>
+                  </div>
+                </Reveal>
+              );
+            })}
           </div>
 
           <Reveal>
             <p className="mt-8 text-center text-xs text-muted-foreground">
-              Todos os planos incluem 14 dias grátis sem cartão de crédito. · Planos em BRL,
-              cobrados mensalmente. · WhatsApp Business API requer conta Meta Business (grátis até
-              1.000 conversas/mês).
+              Todo plano pago começa com 14 dias grátis, sem cartão de crédito. · Valores em BRL. ·
+              O WhatsApp usa a conta Meta Business do próprio médico (grátis até 1.000
+              conversas/mês).
             </p>
           </Reveal>
         </div>
