@@ -22,6 +22,24 @@ export const Route = createFileRoute("/medicos")({
 
 const PLANS = [
   {
+    key: "free",
+    name: "Free",
+    price: "R$ 0",
+    period: "/sempre",
+    highlight: false,
+    desc: "Para testar sem compromisso — sem cartão, sem prazo",
+    features: [
+      "Agenda online + confirmações",
+      "App de pré-natal para a paciente",
+      "Prontuário gestacional simplificado",
+      "Calculadoras clínicas (DPP, biometria)",
+      "Até 5 pacientes ativas",
+      "Sem Segundo Cérebro de IA",
+      "Sem agente de WhatsApp",
+    ],
+    cta: "Criar conta grátis",
+  },
+  {
     key: "starter",
     name: "Starter",
     price: "R$ 197",
@@ -29,18 +47,16 @@ const PLANS = [
     highlight: false,
     desc: "Para o médico solo que quer modernizar o consultório",
     features: [
-      "Agendamento online 24h",
+      "Tudo do Free, sem limite de pacientes*",
+      "🧠 Segundo Cérebro no chat do app",
       "Confirmações automáticas por WhatsApp",
       "Cobrança PIX integrada",
-      "Prontuário gestacional simplificado",
-      "App para a paciente (portal pré-natal)",
-      "Painel de agendamentos",
       "📊 Biometria fetal + percentil Intergrowth-21",
-      "🧠 EPDS digital (rastreio depressão perinatal)",
+      "🩺 EPDS digital (rastreio depressão perinatal)",
       "🩸 Protocolo DMG + calculadora de insulina",
       "🫀 Rastreio de risco pré-eclâmpsia (ACOG/SBH)",
       "Exportação .ics (Google / Apple Calendar)",
-      "Até 50 pacientes ativas/mês",
+      "*até 50 pacientes ativas/mês",
     ],
     cta: "Começar grátis por 14 dias",
   },
@@ -53,12 +69,13 @@ const PLANS = [
     desc: "Agente IA no WhatsApp + gestão completa",
     features: [
       "Tudo do Starter",
-      "🤖 Agente IA 24h no WhatsApp",
+      "🤖 Agente IA 24h no WhatsApp (não só no app)",
+      "Segundo Cérebro sem limite de treino",
       "Triagem automática de pacientes",
       "Lembretes automáticos de consulta (reduz falta em até 38%)",
+      "Dashboard com FAQ inteligente e risco de abandono",
       "Cobrança e recibo digital",
       "Bloqueio de agenda e férias",
-      "Relatório mensal de pacientes",
       "Pacientes ilimitadas",
       "Suporte prioritário",
     ],
@@ -67,13 +84,12 @@ const PLANS = [
   {
     key: "enterprise",
     name: "Clínica",
-    price: "Sob consulta",
-    period: "",
+    price: "R$ 597",
+    period: "/mês",
     highlight: false,
     desc: "Para clínicas com múltiplos profissionais",
     features: [
-      "Tudo do Pro",
-      "Múltiplos médicos na mesma plataforma",
+      "Tudo do Pro, multi-médico",
       "Agente IA personalizado (nome e voz da clínica)",
       "Integração com sistemas legados (TISS/TUSS)",
       "White-label — seu logo, seu domínio",
@@ -593,11 +609,11 @@ function MedicosPage() {
             </p>
           </Reveal>
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
+          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {PLANS.map((plan, i) => (
               <Reveal key={plan.key} delay={i * 0.07}>
                 <div
-                  className={`relative flex flex-col rounded-3xl border p-7 shadow-[var(--shadow-card)] ${
+                  className={`relative flex h-full flex-col rounded-3xl border p-6 shadow-[var(--shadow-card)] ${
                     plan.highlight ? "border-primary bg-primary/5" : "border-border bg-card"
                   }`}
                 >

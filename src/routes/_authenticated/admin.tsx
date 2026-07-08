@@ -110,7 +110,7 @@ function LinkCard({ path, label }: { path: string; label: string }) {
   );
 }
 
-const PLANS = ["trial", "starter", "pro", "clinica"] as const;
+const PLANS = ["trial", "free", "starter", "pro", "clinica"] as const;
 
 function AdminConsole() {
   const [allowed, setAllowed] = useState<boolean | null>(null);

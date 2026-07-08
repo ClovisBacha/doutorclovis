@@ -29,8 +29,12 @@ async function requireSuperAdmin(accessToken: string) {
 
 // Preços de referência por plano (o que decidimos juntos — fácil de ajustar).
 // Usado só para a ESTIMATIVA de receita mensal (MRR) no console.
+// "trial" = avaliação de 14 dias (label do cadastro, sem expiração automática
+// ainda — roadmap de billing). "free" = plano permanente, sem custo variável:
+// sem Segundo Cérebro, sem agente de WhatsApp, poucas pacientes.
 const PLAN_PRICE: Record<string, number> = {
   trial: 0,
+  free: 0,
   starter: 197,
   pro: 347,
   clinica: 597,
@@ -191,7 +195,7 @@ const SetStatusSchema = z.object({
   accessToken: z.string().min(10),
   doctorId: z.string().uuid(),
   active: z.boolean().optional(),
-  plan: z.enum(["trial", "starter", "pro", "clinica"]).optional(),
+  plan: z.enum(["trial", "free", "starter", "pro", "clinica"]).optional(),
 });
 
 /** Ativa/desativa ou muda o plano de um médico (super-admin). */
