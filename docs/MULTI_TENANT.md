@@ -7,20 +7,23 @@ paciente pertence a um médico.
 
 ## ✅ Já implementado
 
-| Peça | Onde | Status |
-|---|---|---|
-| Segundo Cérebro por médico | `brain_settings`/`brain_entries` chaveadas por `doctor_id`; 9 operações escopadas; `getBrainContext(msg, doctorId?)` | ✅ validado |
-| Perfil do médico | Tabela `doctors` (nome, CRM, especialidade, WhatsApp, PIX, slug, plano) com RLS própria | ✅ schema |
-| Vínculo paciente→médico | `patient_profiles.doctor_id` (+ índice); `null` = médico dono da instalação (compat) | ✅ schema |
-| Jornada/gamificação por perfil | `journey_state` (blob jsonb por user) com RLS own-row; `gestacao-path.tsx` sincroniza: nuvem primeiro no mount, push com debounce a cada mudança, localStorage vira cache offline | ✅ |
-| Resolução do médico dono | RPC `get_user_id_by_email` (SECURITY DEFINER, só service_role) + cache apenas de sucesso | ✅ |
-| Dados clínicos da paciente | Todas as tabelas de paciente já são por `user_id` com RLS own-row | ✅ desde o início |
+| Peça                           | Onde                                                                                                                                                                              | Status            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| Segundo Cérebro por médico     | `brain_settings`/`brain_entries` chaveadas por `doctor_id`; 9 operações escopadas; `getBrainContext(msg, doctorId?)`                                                              | ✅ validado       |
+| Perfil do médico               | Tabela `doctors` (nome, CRM, especialidade, WhatsApp, PIX, slug, plano) com RLS própria                                                                                           | ✅ schema         |
+| Vínculo paciente→médico        | `patient_profiles.doctor_id` (+ índice); `null` = médico dono da instalação (compat)                                                                                              | ✅ schema         |
+| Jornada/gamificação por perfil | `journey_state` (blob jsonb por user) com RLS own-row; `gestacao-path.tsx` sincroniza: nuvem primeiro no mount, push com debounce a cada mudança, localStorage vira cache offline | ✅                |
+| Resolução do médico dono       | RPC `get_user_id_by_email` (SECURITY DEFINER, só service_role) + cache apenas de sucesso                                                                                          | ✅                |
+| Dados clínicos da paciente     | Todas as tabelas de paciente já são por `user_id` com RLS own-row                                                                                                                 | ✅ desde o início |
 
 ## 🔜 Próximas etapas (em ordem)
 
-1. **Onboarding do médico** — fluxo de cadastro que cria a linha em `doctors`
-   e substitui `ADMIN_EMAILS` por checagem na tabela (`requireDoctor(uid)`);
-   `ADMIN_EMAILS` vira só o superadmin da plataforma.
+1. ~~**Onboarding do médico**~~ ✅ — `/medicos/cadastro` (conta + perfil
+   profissional → linha em `doctors`, plano trial); painel aceita médicos
+   assinantes (abas já escopadas: Cérebro 🧠 e Meu Perfil); o Cérebro é gateado
+   por `doctors` OU `ADMIN_EMAILS`, e cada médico assinante treina o SEU
+   cérebro (equipe da instalação treina o do dono); CTAs dos planos apontam
+   para o cadastro.
 2. **Escopar o painel por médico** — `admin.functions.ts` e afins filtram
    `appointment_requests`, `doctor_questions`, `teleconsultas` etc. pelo
    `doctor_id` do chamador; adicionar `doctor_id` a essas tabelas

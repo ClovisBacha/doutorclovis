@@ -375,9 +375,9 @@ function MedicosPage() {
                 Uma IA que responde como <em>você</em> responderia
               </h2>
               <p className="mt-4 text-muted-foreground">
-                Quantas vezes você já respondeu &ldquo;posso tomar dipirona?&rdquo; ou
-                &ldquo;enjoo até quando é normal?&rdquo;. Centenas. O Segundo Cérebro aprende com
-                as <strong>suas</strong> respostas, o <strong>seu</strong> jeito de acolher e as{" "}
+                Quantas vezes você já respondeu &ldquo;posso tomar dipirona?&rdquo; ou &ldquo;enjoo
+                até quando é normal?&rdquo;. Centenas. O Segundo Cérebro aprende com as{" "}
+                <strong>suas</strong> respostas, o <strong>seu</strong> jeito de acolher e as{" "}
                 <strong>suas</strong> condutas — e passa a responder as próximas mil por você, do
                 jeito que você responderia. A paciente sente que foi o médico dela que cuidou. E
                 foi: com a sua voz, multiplicada.
@@ -623,7 +623,7 @@ function MedicosPage() {
                     ))}
                   </ul>
                   <a
-                    href="#contato"
+                    href={plan.key === "enterprise" ? "#contato" : "/medicos/cadastro"}
                     className={`mt-8 block rounded-full py-3 text-center text-sm font-semibold transition ${
                       plan.highlight
                         ? "bg-primary text-primary-foreground hover:opacity-90"

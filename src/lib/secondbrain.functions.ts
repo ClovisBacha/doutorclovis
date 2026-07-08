@@ -21,16 +21,32 @@ async function requireAdmin(accessToken: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
   if (error || !data.user?.email) return null;
-  if (!adminEmails().includes(data.user.email.toLowerCase())) return null;
-  return data.user;
+  // Equipe da instalação (ADMIN_EMAILS) OU médico assinante ativo (doctors)
+  if (adminEmails().includes(data.user.email.toLowerCase())) return data.user;
+  const { data: doc } = await (supabaseAdmin as any)
+    .from("doctors")
+    .select("id,active")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  if (doc?.active) return data.user;
+  return null;
 }
 
 /**
  * Cada perfil de médico tem o SEU cérebro (tabelas chaveadas por doctor_id).
- * Nesta instalação, o dono é o 1º e-mail de ADMIN_EMAILS — toda a equipe
- * treina o cérebro DO médico. Fallback: o próprio admin autenticado.
+ * Regra de identidade:
+ *   - Médico assinante (linha em doctors) → treina/usa o PRÓPRIO cérebro.
+ *   - Equipe da instalação (ADMIN_EMAILS, ex.: secretária) sem linha em
+ *     doctors → treina o cérebro do médico DONO (1º e-mail de ADMIN_EMAILS).
  */
 async function ownerDoctorId(fallbackUid: string): Promise<string> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: doc } = await (supabaseAdmin as any)
+    .from("doctors")
+    .select("id")
+    .eq("id", fallbackUid)
+    .maybeSingle();
+  if (doc?.id) return doc.id as string;
   const { resolveOwnerDoctorId } = await import("./secondbrain.server");
   return (await resolveOwnerDoctorId()) ?? fallbackUid;
 }

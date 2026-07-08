@@ -51,6 +51,12 @@ import {
   type BrainEntry,
   type BrainSettings,
 } from "@/lib/secondbrain.functions";
+import {
+  getMyDoctor,
+  registerDoctor,
+  updateMyDoctor,
+  type DoctorProfile,
+} from "@/lib/doctors.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({ meta: [{ title: "Painel do médico — Obstétrica by Dr. Clóvis" }] }),
@@ -82,8 +88,14 @@ const PANEL_TABS = [
   "Consultas Pagas",
   "Empresas",
   "Engajamento",
+  "Meu Perfil",
 ] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
+
+// Médicos assinantes (fora da equipe da instalação) só veem as abas já
+// escopadas por perfil — as demais mostram dados da instalação inteira e
+// abrem por médico conforme o roadmap (docs/MULTI_TENANT.md, etapa 2).
+const DOCTOR_TABS: readonly PanelTab[] = ["Cérebro 🧠", "Meu Perfil"];
 
 async function token() {
   const { data } = await supabase.auth.getSession();
@@ -93,6 +105,8 @@ async function token() {
 function PainelPage() {
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  // Equipe da instalação (ADMIN_EMAILS) vê tudo; médico assinante vê DOCTOR_TABS
+  const [isPlatformTeam, setIsPlatformTeam] = useState(false);
   const [tab, setTab] = useState<PanelTab>("Calendário");
   const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
@@ -110,17 +124,28 @@ function PainelPage() {
   } | null>(null);
 
   async function load() {
-    const tk = await token();
-    const res = await getAdminData({ data: { accessToken: tk } });
-    if (!res.ok) {
+    try {
+      const tk = await token();
+      const res = await getAdminData({ data: { accessToken: tk } });
+      if (res.ok) {
+        setAllowed(true);
+        setIsPlatformTeam(true);
+        setAppointments(res.appointments);
+        setQuestions(res.questions);
+        return;
+      }
+      // Não é da equipe da instalação: é um médico assinante?
+      const me = await getMyDoctor({ data: { accessToken: tk } });
+      if (me.ok && me.doctor?.active) {
+        setAllowed(true);
+        setIsPlatformTeam(false);
+        setTab("Cérebro 🧠");
+        return;
+      }
       setAllowed(false);
+    } finally {
       setLoading(false);
-      return;
     }
-    setAllowed(true);
-    setAppointments(res.appointments);
-    setQuestions(res.questions);
-    setLoading(false);
   }
 
   async function loadEngagement() {
@@ -203,8 +228,11 @@ function PainelPage() {
       <section className="mx-auto max-w-2xl px-5 py-20 text-center">
         <h1 className="font-serif text-3xl">Área restrita</h1>
         <p className="mt-3 text-muted-foreground">
-          Este painel é exclusivo da equipe médica. Se você é o responsável, peça para adicionar seu
-          e-mail à variável <code className="rounded bg-secondary px-1">ADMIN_EMAILS</code>.
+          Este painel é exclusivo para médicos. Se você é médico(a),{" "}
+          <a href="/medicos/cadastro" className="font-semibold text-primary hover:underline">
+            crie sua conta aqui
+          </a>{" "}
+          — leva 2 minutos e os primeiros 14 dias são grátis.
         </p>
       </section>
     );
@@ -220,8 +248,10 @@ function PainelPage() {
       </p>
       <h1 className="mt-2 font-serif text-3xl md:text-4xl">Gestão do consultório</h1>
 
-      {/* Summary stats */}
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Summary stats (dados da instalação — só para a equipe) */}
+      <div
+        className={`mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 ${isPlatformTeam ? "" : "hidden"}`}
+      >
         <Stat label="Pedidos pendentes" value={pendingAppts} highlight={pendingAppts > 0} />
         <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
         <Stat label="Pré-consultas novas" value={unseenForms} highlight={unseenForms > 0} />
@@ -230,7 +260,7 @@ function PainelPage() {
 
       {/* Tabs */}
       <div className="mt-8 flex flex-wrap gap-2 border-b border-border">
-        {PANEL_TABS.map((t) => (
+        {(isPlatformTeam ? PANEL_TABS : DOCTOR_TABS).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -284,6 +314,7 @@ function PainelPage() {
             }
           />
         )}
+        {tab === "Meu Perfil" && <MeuPerfilSection tokenFn={token} />}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
         )}
@@ -3400,6 +3431,174 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
             Este documento não tem validade fiscal. Para nota fiscal, consulte a recepção.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Meu Perfil (perfil do médico assinante) ---------- */
+
+function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [exists, setExists] = useState(false);
+  const [plan, setPlan] = useState("trial");
+  const [slug, setSlug] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    display_name: "",
+    title: "",
+    specialty: "",
+    crm: "",
+    whatsapp: "",
+    pix_key: "",
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const tk = await tokenFn();
+        const res = await getMyDoctor({ data: { accessToken: tk } });
+        if (res.ok && res.doctor) {
+          const d = res.doctor as DoctorProfile;
+          setExists(true);
+          setPlan(d.plan);
+          setSlug(d.slug);
+          setForm({
+            display_name: d.display_name,
+            title: d.title,
+            specialty: d.specialty,
+            crm: d.crm,
+            whatsapp: d.whatsapp,
+            pix_key: d.pix_key,
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function save() {
+    if (form.display_name.trim().length < 2) {
+      toast.error("Informe seu nome.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const tk = await tokenFn();
+      // Equipe da instalação pode ainda não ter linha em doctors: cria na hora
+      if (exists) {
+        const res = await updateMyDoctor({ data: { accessToken: tk, profile: form } });
+        if (!res.ok) {
+          toast.error("Não foi possível salvar o perfil.");
+          return;
+        }
+      } else {
+        const res = await registerDoctor({ data: { accessToken: tk, profile: form } });
+        if (!res.ok || !res.doctor) {
+          toast.error("Não foi possível salvar o perfil.");
+          return;
+        }
+        setExists(true);
+        setSlug(res.doctor.slug);
+        setPlan(res.doctor.plan);
+      }
+      toast.success("Perfil salvo ✓");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="skeleton h-64 rounded-3xl" />;
+
+  const input =
+    "mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary";
+  const label = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-serif text-lg">Perfil do médico</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              É com esses dados que suas pacientes veem você no app.
+            </p>
+          </div>
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            plano {plan}
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <label className={label}>Nome completo *</label>
+            <input
+              value={form.display_name}
+              onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
+              className={input}
+            />
+          </div>
+          <div>
+            <label className={label}>CRM</label>
+            <input
+              value={form.crm}
+              onChange={(e) => setForm((f) => ({ ...f, crm: e.target.value }))}
+              className={input}
+            />
+          </div>
+          <div>
+            <label className={label}>WhatsApp</label>
+            <input
+              value={form.whatsapp}
+              onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.value }))}
+              className={input}
+            />
+          </div>
+          <div>
+            <label className={label}>Título</label>
+            <input
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Ginecologista e Obstetra"
+              className={input}
+            />
+          </div>
+          <div>
+            <label className={label}>Especialidade / foco</label>
+            <input
+              value={form.specialty}
+              onChange={(e) => setForm((f) => ({ ...f, specialty: e.target.value }))}
+              placeholder="Gestação de alto risco"
+              className={input}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className={label}>Chave PIX (cobranças)</label>
+            <input
+              value={form.pix_key}
+              onChange={(e) => setForm((f) => ({ ...f, pix_key: e.target.value }))}
+              className={input}
+            />
+          </div>
+        </div>
+
+        {slug && (
+          <p className="mt-4 text-xs text-muted-foreground">
+            Seu endereço na plataforma:{" "}
+            <code className="rounded bg-secondary px-1.5 py-0.5">/dr/{slug}</code> (páginas por
+            médico chegam na próxima etapa)
+          </p>
+        )}
+
+        <button
+          onClick={save}
+          disabled={saving}
+          className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {saving ? "Salvando..." : "Salvar perfil"}
+        </button>
       </div>
     </div>
   );

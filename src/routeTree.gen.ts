@@ -36,6 +36,7 @@ import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
+import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
@@ -180,6 +181,11 @@ const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
   path: '/votar-nome/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MedicosCadastroRoute = MedicosCadastroRouteImport.update({
+  id: '/medicos_/cadastro',
+  path: '/medicos/cadastro',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
   id: '/api/whatsapp',
   path: '/api/whatsapp',
@@ -261,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
+  '/medicos/cadastro': typeof MedicosCadastroRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesByTo {
@@ -298,6 +305,7 @@ export interface FileRoutesByTo {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
+  '/medicos/cadastro': typeof MedicosCadastroRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesById {
@@ -337,6 +345,7 @@ export interface FileRoutesById {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
+  '/medicos_/cadastro': typeof MedicosCadastroRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRouteTypes {
@@ -376,6 +385,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/transcribe'
     | '/api/whatsapp'
+    | '/medicos/cadastro'
     | '/votar-nome/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -413,6 +423,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/transcribe'
     | '/api/whatsapp'
+    | '/medicos/cadastro'
     | '/votar-nome/$token'
   id:
     | '__root__'
@@ -451,6 +462,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/transcribe'
     | '/api/whatsapp'
+    | '/medicos_/cadastro'
     | '/votar-nome/$token'
   fileRoutesById: FileRoutesById
 }
@@ -488,6 +500,7 @@ export interface RootRouteChildren {
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
+  MedicosCadastroRoute: typeof MedicosCadastroRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
 }
 
@@ -682,6 +695,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VotarNomeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/medicos_/cadastro': {
+      id: '/medicos_/cadastro'
+      path: '/medicos/cadastro'
+      fullPath: '/medicos/cadastro'
+      preLoaderRoute: typeof MedicosCadastroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/whatsapp': {
       id: '/api/whatsapp'
       path: '/api/whatsapp'
@@ -795,6 +815,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNutritionRoute: ApiNutritionRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,
+  MedicosCadastroRoute: MedicosCadastroRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
 }
 export const routeTree = rootRouteImport
