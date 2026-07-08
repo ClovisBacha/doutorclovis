@@ -79,3 +79,35 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.search_doctors(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.search_doctors(text) TO authenticated, service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- BLINDAGEM DO VÍNCULO: só o service_role (as server functions, após o médico
+-- ACEITAR) pode gravar patient_profiles.doctor_id. A paciente edita o próprio
+-- perfil pelo navegador (role `authenticated`, RLS "own profile update"), então
+-- sem esta trava ela poderia se autovincular a QUALQUER médico via update direto
+-- no Supabase — furando o fluxo de aprovação e puxando o cérebro pago dele.
+--
+-- IMPORTANTE: SECURITY INVOKER (padrão) — o gatilho precisa enxergar o papel
+-- REAL de quem escreve (current_user). SECURITY DEFINER quebraria a checagem.
+CREATE OR REPLACE FUNCTION public.protect_patient_doctor_id()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF current_user <> 'service_role' THEN
+    IF TG_OP = 'INSERT' THEN
+      -- A paciente nunca se vincula sozinha ao criar o perfil.
+      NEW.doctor_id := NULL;
+    ELSIF NEW.doctor_id IS DISTINCT FROM OLD.doctor_id THEN
+      -- Nem troca/define o médico depois: mantém o valor definido pelo servidor.
+      NEW.doctor_id := OLD.doctor_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_doctor_id ON public.patient_profiles;
+CREATE TRIGGER trg_protect_doctor_id
+  BEFORE INSERT OR UPDATE ON public.patient_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.protect_patient_doctor_id();
