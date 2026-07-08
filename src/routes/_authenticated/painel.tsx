@@ -58,6 +58,13 @@ import {
   type DoctorProfile,
 } from "@/lib/doctors.functions";
 import { getDoctorDashboard, type DoctorDashboard } from "@/lib/dashboard.functions";
+import {
+  listPatientRequests,
+  respondPatientRequest,
+  listMyPatients,
+  type PatientRequest,
+  type LinkedPatient,
+} from "@/lib/patientlink.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({ meta: [{ title: "Painel do médico — Obstétrica by Dr. Clóvis" }] }),
@@ -90,6 +97,7 @@ const PANEL_TABS = [
   "Consultas Pagas",
   "Empresas",
   "Engajamento",
+  "Pacientes 👩‍🍼",
   "Meu Perfil",
 ] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
@@ -97,7 +105,7 @@ type PanelTab = (typeof PANEL_TABS)[number];
 // Médicos assinantes (fora da equipe da instalação) só veem as abas já
 // escopadas por perfil — as demais mostram dados da instalação inteira e
 // abrem por médico conforme o roadmap (docs/MULTI_TENANT.md, etapa 2).
-const DOCTOR_TABS: readonly PanelTab[] = ["Painel 📊", "Cérebro 🧠", "Meu Perfil"];
+const DOCTOR_TABS: readonly PanelTab[] = ["Painel 📊", "Cérebro 🧠", "Pacientes 👩‍🍼", "Meu Perfil"];
 
 async function token() {
   const { data } = await supabase.auth.getSession();
@@ -317,6 +325,7 @@ function PainelPage() {
             }
           />
         )}
+        {tab === "Pacientes 👩‍🍼" && <PacientesSection tokenFn={token} />}
         {tab === "Meu Perfil" && <MeuPerfilSection tokenFn={token} />}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
@@ -4175,6 +4184,187 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         >
           {saving ? "Salvando..." : "Salvar perfil"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Pacientes (vínculo paciente ↔ médico) ---------- */
+function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [loading, setLoading] = useState(true);
+  const [requests, setRequests] = useState<PatientRequest[]>([]);
+  const [patients, setPatients] = useState<LinkedPatient[]>([]);
+  // id da solicitação sendo respondida (desabilita os botões enquanto em voo)
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+
+  async function loadPatients() {
+    const tk = await tokenFn();
+    const res = await listMyPatients({ data: { accessToken: tk } });
+    if (res.ok) setPatients(res.patients);
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const tk = await tokenFn();
+        const [reqRes, patRes] = await Promise.all([
+          listPatientRequests({ data: { accessToken: tk } }),
+          listMyPatients({ data: { accessToken: tk } }),
+        ]);
+        if (reqRes.ok) setRequests(reqRes.requests);
+        if (patRes.ok) setPatients(patRes.patients);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function respond(req: PatientRequest, accept: boolean) {
+    setRespondingId(req.id);
+    try {
+      const tk = await tokenFn();
+      const res = await respondPatientRequest({
+        data: { accessToken: tk, requestId: req.id, accept },
+      });
+      if (!res.ok) {
+        toast.error("Não foi possível responder à solicitação. Tente novamente.");
+        return;
+      }
+      // Remove o card otimisticamente e, ao aceitar, atualiza as pacientes.
+      setRequests((rs) => rs.filter((r) => r.id !== req.id));
+      if (accept) {
+        toast.success("Paciente vinculada ✓");
+        await loadPatients();
+      } else {
+        toast.success("Solicitação recusada.");
+      }
+    } finally {
+      setRespondingId(null);
+    }
+  }
+
+  if (loading) return <div className="skeleton h-64 rounded-3xl" />;
+
+  const fmtDate = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+
+  return (
+    <div className="space-y-8">
+      {/* Solicitações pendentes */}
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="font-serif text-xl">Solicitações pendentes</h2>
+          {requests.length > 0 && (
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+              {requests.length}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pacientes que pediram para acompanhar você no app. Aceite para vinculá-las.
+        </p>
+
+        {requests.length === 0 ? (
+          <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-3xl">📭</p>
+            <p className="mt-2 text-sm text-muted-foreground">Nenhuma solicitação pendente</p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {requests.map((r) => {
+              const busy = respondingId === r.id;
+              return (
+                <div
+                  key={r.id}
+                  className="rounded-2xl border border-primary/40 bg-card p-5 shadow-[var(--shadow-card)]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{r.patient_name ?? "Paciente"}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Solicitado em{" "}
+                        {new Date(r.created_at).toLocaleDateString("pt-BR", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                      {r.message && (
+                        <p className="mt-2 rounded-xl bg-secondary/40 p-3 text-sm text-foreground">
+                          “{r.message}”
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={() => respond(r, true)}
+                        disabled={busy}
+                        className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                      >
+                        {busy ? "…" : "Aceitar"}
+                      </button>
+                      <button
+                        onClick={() => respond(r, false)}
+                        disabled={busy}
+                        className="rounded-full border border-border px-4 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary disabled:opacity-50"
+                      >
+                        Recusar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Minhas pacientes */}
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="font-serif text-xl">Minhas pacientes</h2>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+            {patients.length}
+          </span>
+        </div>
+
+        {patients.length === 0 ? (
+          <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-3xl">👩‍🍼</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Você ainda não tem pacientes vinculadas. Compartilhe seu perfil para que elas
+              encontrem você e enviem uma solicitação.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+            <ul className="divide-y divide-border">
+              {patients.map((p) => {
+                const due = fmtDate(p.due_date);
+                return (
+                  <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                        {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
+                      </span>
+                      <p className="truncate text-sm font-medium">{p.display_name ?? "Sem nome"}</p>
+                    </div>
+                    {due && (
+                      <span className="shrink-0 text-xs text-muted-foreground">DPP {due}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

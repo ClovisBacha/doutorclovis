@@ -1,5 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppBottomNav,
@@ -59,6 +58,14 @@ import {
   type AchievementDef,
 } from "@/lib/achievements.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
+import {
+  searchDoctors,
+  requestDoctor,
+  getMyDoctorLink,
+  cancelDoctorRequest,
+  type DoctorPublic,
+  type MyDoctorLink,
+} from "@/lib/patientlink.functions";
 import {
   requestPrivateConsultation,
   getMyPrivateConsultations,
@@ -3481,7 +3488,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const greeting = [
     firstName ? `Olá, ${firstName}!` : "Olá!",
     gest ? `Você está na semana ${gest.weeks} — vou responder levando em conta sua gestação.` : "",
-    "Sou o assistente virtual do consultório do Dr. Clóvis Bacha. Como posso ajudar?",
+    "Sou o assistente virtual do consultório do seu obstetra. Como posso ajudar?",
   ]
     .filter(Boolean)
     .join(" ");
@@ -3538,9 +3545,16 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           };
         },
       );
+      // Envia o token da paciente para o /api/chat resolver o médico dela e
+      // usar a IA do consultório correto (cada conta é individual).
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ messages: uiMessages }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -12503,278 +12517,200 @@ function PreventivosTab() {
 // MÉDICO TAB — perfil completo do Dr. Clóvis Bacha
 // ─────────────────────────────────────────────────────────────────────────────
 function MédicoTab() {
-  const SPECIALTIES = [
-    "Gestação de alto risco",
-    "Hipertensão na gravidez (pré-eclâmpsia)",
-    "Diabetes gestacional",
-    "Gestação gemelar e múltipla",
-    "Malformações fetais",
-    "Prematuridade",
-    "Medicina fetal",
-    "Ultrassonografia obstétrica",
-    "Dopplervelocimetria",
-    "Cardiotocografia computadorizada",
-  ];
+  const [token, setToken] = useState<string | null>(null);
+  const [link, setLink] = useState<MyDoctorLink | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<DoctorPublic[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
 
-  const TIMELINE = [
-    { ano: "1998", t: "Graduação em Medicina", d: "Universidade Federal" },
-    { ano: "2001", t: "Residência em GO", d: "Hospital Universitário" },
-    { ano: "2003", t: "Especialização em Medicina Fetal", d: "" },
-    { ano: "2006", t: "Fellowship — Ultrassonografia Obstétrica", d: "" },
-    { ano: "2008", t: "Título de Especialista", d: "FEBRASGO" },
-    { ano: "2015", t: "Pós-graduação em Alto Risco", d: "" },
-    { ano: "2019", t: "Dopplervelocimetria avançada", d: "ISUOG" },
-    { ano: "2022", t: "Cardiotocografia computadorizada", d: "" },
-  ];
+  async function getToken(): Promise<string | null> {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  }
 
-  const HOSPITALS = [
-    {
-      name: "Hospital Vila da Serra",
-      address: "Nova Lima — MG",
-      specialty: "UTI neonatal de alta complexidade",
-      detail: "Referência regional em gestações de alto risco com suporte intensivo.",
-    },
-    {
-      name: "Hospital Mater Dei Santo Agostinho",
-      address: "Belo Horizonte — MG",
-      specialty: "Referência em obstetrícia",
-      detail: "Centro de excelência em medicina materno-fetal e neonatologia.",
-    },
-    {
-      name: "Hospital Sofia Feldman",
-      address: "Belo Horizonte — MG",
-      specialty: "Parto humanizado",
-      detail: "Reconhecido pela OMS por suas práticas humanizadas de atenção ao parto.",
-    },
-    {
-      name: "Maternidade Octaviano Neves",
-      address: "Belo Horizonte — MG",
-      specialty: "Tradição em GO",
-      detail: "Décadas de excelência no atendimento obstétrico em Minas Gerais.",
-    },
-  ];
+  async function loadLink() {
+    const tk = await getToken();
+    setToken(tk);
+    if (!tk) {
+      setLoading(false);
+      return;
+    }
+    const res = await getMyDoctorLink({ data: { accessToken: tk } });
+    if (res.ok) setLink(res.link);
+    setLoading(false);
+  }
 
-  const LIVES_PAST = [
-    { titulo: "Diabetes gestacional: controle e cuidados", data: "Abril 2026" },
-    { titulo: "Pré-eclâmpsia: reconheça os sinais", data: "Março 2026" },
-    { titulo: "Vacinas na gestação: quais são obrigatórias?", data: "Fevereiro 2026" },
-  ];
+  useEffect(() => {
+    void loadLink();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const SOCIETIES = [
-    "FEBRASGO — Federação Brasileira de Ginecologia e Obstetrícia",
-    "ISUOG — International Society of Ultrasound in Obstetrics and Gynecology",
-    "SOGIMIG — Sociedade de Ginecologia e Obstetrícia de Minas Gerais",
-    "CFM — Conselho Federal de Medicina",
-  ];
+  async function doSearch(e?: React.FormEvent) {
+    e?.preventDefault();
+    const tk = token ?? (await getToken());
+    if (!tk) return;
+    setSearching(true);
+    const res = await searchDoctors({ data: { accessToken: tk, query: query.trim() } });
+    setResults(res.ok ? res.doctors : []);
+    setSearched(true);
+    setSearching(false);
+  }
+
+  async function sendRequest(d: DoctorPublic) {
+    const tk = token ?? (await getToken());
+    if (!tk) return;
+    setBusyId(d.id);
+    const res = await requestDoctor({ data: { accessToken: tk, doctorId: d.id } });
+    setBusyId(null);
+    if (res.ok) {
+      toast.success(
+        res.status === "accepted"
+          ? "Você já está vinculada a esse médico."
+          : "Solicitação enviada! Aguarde o médico aceitar.",
+      );
+      setShowSearch(false);
+      await loadLink();
+    } else {
+      toast.error("Não foi possível enviar a solicitação.");
+    }
+  }
+
+  async function cancelPending() {
+    const tk = token ?? (await getToken());
+    if (!tk || !link?.pending) return;
+    setBusyId("cancel");
+    await cancelDoctorRequest({ data: { accessToken: tk, requestId: link.pending.id } });
+    setBusyId(null);
+    await loadLink();
+  }
+
+  if (loading)
+    return <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>;
+
+  const doctor = link?.doctor ?? null;
+  const pending = link?.pending ?? null;
 
   return (
-    <div className="space-y-8 pb-8">
-      {/* Cabeçalho do médico */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="grid md:grid-cols-[200px_1fr]">
-          <img
-            src={portrait}
-            alt="Dr. Clóvis Bacha"
-            className="w-full aspect-square object-cover md:h-full"
-          />
-          <div className="p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              Médico responsável
-            </p>
-            <h2 className="mt-1 font-serif text-2xl text-foreground">Dr. Clóvis Bacha</h2>
+    <div className="space-y-6 pb-8">
+      {doctor ? (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            Meu obstetra
+          </p>
+          <h2 className="mt-1 font-serif text-2xl text-foreground">
+            {doctor.display_name || "Obstetra"}
+          </h2>
+          {(doctor.title || doctor.specialty) && (
             <p className="text-sm text-muted-foreground">
-              Ginecologista e Obstetra · Especialista em Gestação de Alto Risco
+              {[doctor.title, doctor.specialty].filter(Boolean).join(" · ")}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["CRM-MG", "FEBRASGO", "ISUOG", "SOGIMIG"].map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Mais de duas décadas dedicadas ao acompanhamento de gestações complexas — unindo
-              medicina baseada em evidências ao cuidado profundamente humano. Especializado em
-              Medicina Fetal, Ultrassonografia Obstétrica e Dopplervelocimetria.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link
-                to="/sobre"
-                className="text-xs font-medium text-primary underline underline-offset-4"
-              >
-                Currículo completo →
-              </Link>
-              <Link
-                to="/agendamento"
-                className="text-xs font-medium text-primary underline underline-offset-4"
-              >
-                Agendar consulta →
-              </Link>
-            </div>
+          )}
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Você está vinculada a este obstetra. No <strong>Chat IA</strong>, o assistente responde
+            com o estilo e as condutas que o seu médico validou.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              to="/agendamento"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Agendar consulta
+            </Link>
+            <button
+              onClick={() => setShowSearch((s) => !s)}
+              className="rounded-full border border-primary/40 px-4 py-2 text-sm font-medium text-primary"
+            >
+              Trocar de médico
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Áreas de atuação */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h3 className="font-serif text-lg text-foreground mb-4">Áreas de atuação</h3>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {SPECIALTIES.map((s) => (
-            <div key={s} className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-              {s}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Formação */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h3 className="font-serif text-lg text-foreground mb-4">Formação e trajetória</h3>
-        <ol className="relative border-l-2 border-primary/30 pl-5 space-y-5">
-          {TIMELINE.map((e) => (
-            <li key={e.ano} className="relative">
-              <span className="absolute -left-[25px] flex h-4 w-4 items-center justify-center rounded-full bg-primary ring-4 ring-card" />
-              <p className="font-serif text-xl text-primary">{e.ano}</p>
-              <p className="text-sm font-medium text-foreground">{e.t}</p>
-              {e.d && <p className="text-xs text-muted-foreground">{e.d}</p>}
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      {/* Hospitais */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-serif text-lg text-foreground">Onde o Dr. Clóvis atende</h3>
-          <Link
-            to="/hospitais"
-            className="text-xs font-medium text-primary underline underline-offset-4"
+      ) : pending ? (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+            Solicitação enviada
+          </p>
+          <h2 className="mt-1 font-serif text-xl text-foreground">
+            Aguardando {pending.doctor.display_name || "o médico"} aceitar
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Assim que o médico aceitar, você poderá conversar com a IA do consultório dele aqui no
+            app.
+          </p>
+          <button
+            onClick={cancelPending}
+            disabled={busyId === "cancel"}
+            className="mt-4 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground disabled:opacity-40"
           >
-            Ver rotas →
-          </Link>
+            Cancelar solicitação
+          </button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {HOSPITALS.map((h) => (
-            <div key={h.name} className="rounded-xl border border-border bg-secondary/30 p-4">
-              <p className="font-medium text-sm text-foreground">{h.name}</p>
-              <p className="text-xs text-primary mt-0.5">{h.address}</p>
-              <p className="text-xs text-muted-foreground mt-1">{h.specialty}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{h.detail}</p>
-            </div>
-          ))}
+      ) : (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            Meu obstetra
+          </p>
+          <h2 className="mt-1 font-serif text-xl text-foreground">Encontre o seu obstetra</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Busque pelo nome do seu médico e envie uma solicitação. Quando ele aceitar, seu
+            acompanhamento fica conectado — e o Chat IA passa a responder como o consultório dele.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          A escolha do hospital depende do plano de saúde e da complexidade da gestação. Confirme
-          com a equipe.
-        </p>
-      </div>
+      )}
 
-      {/* Lives */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-serif text-lg text-foreground">Lives e conteúdo</h3>
-          <Link
-            to="/lives"
-            className="text-xs font-medium text-primary underline underline-offset-4"
-          >
-            Ver todas →
-          </Link>
-        </div>
-        <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 mb-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">
-            Lives no Instagram
-          </p>
-          <p className="text-sm font-medium text-foreground">
-            O Dr. Clóvis faz lives regulares sobre gestação e saúde da mulher
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Siga @drclovisbacha e ative as notificações para não perder
-          </p>
-          <a
-            href="https://www.instagram.com/drclovisbacha/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-block text-xs font-medium text-primary underline underline-offset-4"
-          >
-            Seguir no Instagram →
-          </a>
-        </div>
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-            Lives anteriores
-          </p>
-          {LIVES_PAST.map((l) => (
-            <div
-              key={l.titulo}
-              className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 px-3 py-2"
+      {(!doctor || showSearch) && !pending && (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <form onSubmit={doSearch} className="flex gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Nome do médico ou especialidade…"
+              className="flex-1 rounded-full border border-input bg-card px-4 py-2 text-sm outline-none focus:border-primary"
+            />
+            <button
+              type="submit"
+              disabled={searching}
+              className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
             >
-              <p className="text-sm text-foreground">{l.titulo}</p>
-              <p className="text-xs text-muted-foreground ml-4 flex-shrink-0">{l.data}</p>
-            </div>
-          ))}
+              {searching ? "Buscando…" : "Buscar"}
+            </button>
+          </form>
+          <div className="mt-4 space-y-2">
+            {searched && results.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhum médico encontrado. Confira o nome ou peça o convite ao seu obstetra.
+              </p>
+            )}
+            {results.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {d.display_name || "Obstetra"}
+                  </p>
+                  {(d.title || d.specialty) && (
+                    <p className="text-xs text-muted-foreground">
+                      {[d.title, d.specialty].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => sendRequest(d)}
+                  disabled={busyId === d.id}
+                  className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
+                >
+                  {busyId === d.id ? "Enviando…" : "Solicitar"}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* Bastidores / Alto Risco */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-serif text-lg text-foreground">Gestação de alto risco</h3>
-          <Link
-            to="/bastidores"
-            className="text-xs font-medium text-primary underline underline-offset-4"
-          >
-            Saiba mais →
-          </Link>
-        </div>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-          Considera-se gestação de alto risco quando existem condições que aumentam as chances de
-          complicações para a mãe e/ou o bebê. O acompanhamento especializado faz toda a diferença
-          no desfecho.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[
-            {
-              titulo: "Hipertensão",
-              texto:
-                "Pré-eclâmpsia, eclâmpsia e hipertensão crônica requerem monitoramento intensivo.",
-            },
-            {
-              titulo: "Diabetes gestacional",
-              texto: "Controle glicêmico rigoroso e ajuste de dieta durante toda a gestação.",
-            },
-            {
-              titulo: "Malformações fetais",
-              texto: "Diagnóstico precoce com ecocardiografia e ultrassonografia morfológica.",
-            },
-            {
-              titulo: "Gestação múltipla",
-              texto: "Gemelar e múltipla exigem protocolos específicos de vigilância fetal.",
-            },
-          ].map((c) => (
-            <div key={c.titulo} className="rounded-xl border border-border bg-secondary/30 p-3">
-              <p className="text-sm font-medium text-foreground">{c.titulo}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{c.texto}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Sociedades */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h3 className="font-serif text-lg text-foreground mb-4">Sociedades e filiações</h3>
-        <div className="space-y-2">
-          {SOCIETIES.map((s) => (
-            <div key={s} className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-              {s}
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
