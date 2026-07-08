@@ -54,7 +54,15 @@ function CadastroMedicoPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+        const { data: su, error } = await supabase.auth.signUp({ email: email.trim(), password });
+        // Anti-enumeração do Supabase: e-mail já cadastrado retorna "sucesso"
+        // sem sessão e com identities vazio — orienta a entrar em vez de
+        // prometer um e-mail de confirmação que nunca chega.
+        if (!error && su.user && su.user.identities?.length === 0) {
+          toast.error("Este e-mail já tem conta — use o modo Entrar.");
+          setMode("login");
+          return;
+        }
         if (error) {
           // Conta já existe → tenta entrar
           const { error: loginErr } = await supabase.auth.signInWithPassword({
@@ -86,6 +94,8 @@ function CadastroMedicoPage() {
         return;
       }
       setStep("perfil");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
     } finally {
       setBusy(false);
     }
@@ -114,6 +124,8 @@ function CadastroMedicoPage() {
       }
       toast.success("Bem-vindo(a)! Seu consultório digital está pronto. 🎉");
       navigate({ to: "/painel" });
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
     } finally {
       setBusy(false);
     }

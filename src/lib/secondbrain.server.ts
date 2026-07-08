@@ -118,18 +118,11 @@ export async function getBrainContext(
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let target = doctorId ?? (await resolveOwnerDoctorId());
-    if (!target) {
-      // Fallback: o cérebro configurado mais recentemente (instalações onde
-      // ADMIN_EMAILS não resolve para um usuário do auth)
-      const { data: latest } = await (supabaseAdmin as any)
-        .from("brain_settings")
-        .select("doctor_id")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      target = latest?.doctor_id ?? null;
-    }
+    // P3: SEM fallback para "settings mais recente" — agora que qualquer
+    // usuário pode criar brain_settings via cadastro de médico, esse fallback
+    // permitiria sequestrar a persona do chat público. Dono não resolvido →
+    // chat segue sem cérebro.
+    const target = doctorId ?? (await resolveOwnerDoctorId());
     if (!target) return { block: "", enabledApp: true, enabledWhatsapp: true };
 
     const [settingsRes, entriesRes] = await Promise.all([

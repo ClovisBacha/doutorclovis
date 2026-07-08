@@ -309,6 +309,7 @@ function PainelPage() {
         {tab === "Cérebro 🧠" && (
           <CerebroSection
             tokenFn={token}
+            showTrainCard={isPlatformTeam}
             onTrained={(id) =>
               setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered: true } : x)))
             }
@@ -2764,14 +2765,18 @@ function BrainToggle({
 function CerebroSection({
   tokenFn,
   onTrained,
+  showTrainCard,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
+  // Treinar respondendo lista perguntas das pacientes da INSTALAÇÃO —
+  // exclusivo da equipe até o escopo por médico (etapa 2 do roadmap)
+  showTrainCard: boolean;
 }) {
   return (
     <div className="space-y-6">
       <div>
-        <p className="font-serif text-xl">Segundo Cérebro do Dr. Clóvis</p>
+        <p className="font-serif text-xl">Seu Segundo Cérebro</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Ensine a IA a responder como você responderia: defina seu estilo, responda perguntas reais
           das pacientes e alimente a base de conhecimento. O cérebro é usado pelo chat do app e pelo
@@ -2779,7 +2784,7 @@ function CerebroSection({
         </p>
       </div>
       <BrainSettingsCard tokenFn={tokenFn} />
-      <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />
+      {showTrainCard && <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />}
       <BrainKnowledgeCard tokenFn={tokenFn} />
       <BrainPlaygroundCard tokenFn={tokenFn} />
     </div>
