@@ -102,24 +102,13 @@ const APP_FEATURES = [
 
 const SHOWCASE = [
   {
-    badge: "Tela inicial",
-    title: "Um app que vive o seu momento",
-    text: "A home muda com a hora do dia e o clima da sua cidade: amanhecer dourado, tarde azul, noite estrelada. O bebê cresce na tela junto com a sua gestação — semana a semana, com tamanho, peso e progresso até o parto.",
-    bullets: [
-      "Clima e dicas em tempo real",
-      "Bebê ilustrado por semana",
-      "Progresso estilo fitness",
-    ],
-    screen: "home" as const,
-  },
-  {
     badge: "Chat IA",
-    title: "Respostas na hora, a qualquer hora",
-    text: "A IA treinada em obstetrícia responde dúvidas com base em protocolos médicos e sabe quando acionar o alerta: se o sintoma for sério, ela orienta você a procurar atendimento — e avisa o médico.",
+    title: "Fale a qualquer hora com a IA do seu médico",
+    text: "Dúvida às 3h da manhã? Converse a qualquer momento com uma inteligência artificial treinada nas respostas que o seu próprio obstetra já validou — como se ele respondesse por você, na hora, sem esperar a próxima consulta.",
     bullets: [
-      "Disponível 24h, inclusive feriados",
-      "Triagem inteligente de sintomas",
-      "Histórico vai para o médico",
+      "Disponível 24h, todos os dias",
+      "Respostas no estilo e nas condutas do seu médico",
+      "Triagem de sintomas e alerta quando é sério",
     ],
     screen: "chat" as const,
   },
@@ -305,7 +294,6 @@ function Index() {
               >
                 <Reveal variant={i % 2 === 1 ? "left" : "up"} className="flex justify-center">
                   <PhoneFrame tilt={i % 2 === 1 ? "right" : "left"}>
-                    {item.screen === "home" && <AppHomeMockupScreen />}
                     {item.screen === "chat" && <AppChatMockupScreen />}
                     {item.screen === "jogo" && <AppJogoMockupScreen />}
                     {item.screen === "saude" && <AppSaudeMockupScreen />}
