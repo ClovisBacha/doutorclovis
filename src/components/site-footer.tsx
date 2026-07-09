@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Phone, Mail, MapPin, Instagram } from "lucide-react";
 import { DOCTOR } from "@/lib/doctor.config";
+import logo from "@/assets/logo-obstetrica.png";
 
 export function SiteFooter() {
   return (
@@ -8,13 +9,18 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-4">
         {/* Brand */}
         <div className="md:col-span-1">
-          <p className="font-serif text-xl text-primary">Obstétrica</p>
-          <p className="text-xs text-muted-foreground mt-0.5">by {DOCTOR.name}</p>
+          <img
+            src={logo}
+            alt="Obstétrica — Excelência no atendimento à gestante"
+            className="h-9 w-auto"
+          />
+          <p className="mt-2 text-xs text-muted-foreground">by {DOCTOR.name}</p>
           <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
             {DOCTOR.title} · {DOCTOR.specialty}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            {DOCTOR.crm} · {DOCTOR.rqe}
+            {DOCTOR.crm}
+            {DOCTOR.rqe && !DOCTOR.rqe.includes("●") ? ` · ${DOCTOR.rqe}` : ""}
           </p>
           <a
             href={DOCTOR.instagram}

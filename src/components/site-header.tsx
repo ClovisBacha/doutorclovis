@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Menu, X, Smartphone, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import logo from "@/assets/logo-obstetrica.png";
 
 const navPublic = [
   { to: "/gestacao", label: "Gestação" },
@@ -35,6 +36,10 @@ export function SiteHeader() {
   }, []);
 
   const nav = signedIn ? navAuth : navPublic;
+  // Navegação dividida à esquerda/direita da logo centralizada
+  const half = Math.ceil(nav.length / 2);
+  const leftNav = nav.slice(0, half);
+  const rightNav = nav.slice(half);
 
   return (
     <header
@@ -44,28 +49,74 @@ export function SiteHeader() {
           : "border-b border-transparent bg-transparent"
       }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-        <Link to="/" className="group flex items-baseline gap-2">
-          <span className="font-serif text-xl font-semibold tracking-tight text-primary transition-opacity duration-300 group-hover:opacity-80">
-            Obstétrica
-          </span>
-          <span className="hidden text-xs text-muted-foreground sm:inline">by Dr. Clóvis</span>
+      <div className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+        {/* Esquerda: hambúrguer (mobile) + 1ª metade da navegação (desktop) */}
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => setOpen((o) => !o)}
+            className="press relative rounded-md p-2 text-foreground md:hidden"
+            aria-label={open ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={open}
+          >
+            <span className="relative block h-5 w-5">
+              <Menu
+                className={`absolute inset-0 h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+                  open ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100"
+                }`}
+              />
+              <X
+                className={`absolute inset-0 h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+                  open ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0"
+                }`}
+              />
+            </span>
+          </button>
+          <nav className="hidden items-center gap-6 md:flex">
+            {leftNav.map((n) => (
+              <Link
+                key={n.to}
+                to={n.to}
+                activeOptions={{ exact: false }}
+                activeProps={{ className: "text-primary" }}
+                className="nav-link text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary"
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        {/* Logo centralizada (desktop e celular) */}
+        <Link
+          to="/"
+          aria-label="Obstétrica — página inicial"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-300 hover:opacity-80"
+        >
+          <img
+            src={logo}
+            alt="Obstétrica — Excelência no atendimento à gestante"
+            className="h-8 w-auto md:h-9 [filter:drop-shadow(0_1px_2px_rgb(0_0_0/0.08))]"
+          />
         </Link>
-        <nav className="hidden items-center gap-6 md:flex">
-          {nav.map((n) => (
-            <Link
-              key={n.to}
-              to={n.to}
-              activeOptions={{ exact: false }}
-              activeProps={{ className: "text-primary" }}
-              className="nav-link text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary"
-            >
-              {n.label}
-            </Link>
-          ))}
+
+        {/* Direita: 2ª metade da navegação + CTA (desktop) / espaçador (mobile) */}
+        <div className="flex items-center gap-6">
+          <nav className="hidden items-center gap-6 md:flex">
+            {rightNav.map((n) => (
+              <Link
+                key={n.to}
+                to={n.to}
+                activeOptions={{ exact: false }}
+                activeProps={{ className: "text-primary" }}
+                className="nav-link text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-primary"
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
           <Link
             to={signedIn ? "/minha-conta" : "/auth"}
-            className="press flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:shadow-[var(--shadow-soft)]"
+            className="press hidden items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:shadow-[var(--shadow-soft)] md:flex"
           >
             {signedIn ? (
               <>
@@ -77,26 +128,9 @@ export function SiteHeader() {
               </>
             )}
           </Link>
-        </nav>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="press relative rounded-md p-2 text-foreground md:hidden"
-          aria-label={open ? "Fechar menu" : "Abrir menu"}
-          aria-expanded={open}
-        >
-          <span className="relative block h-5 w-5">
-            <Menu
-              className={`absolute inset-0 h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
-                open ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100"
-              }`}
-            />
-            <X
-              className={`absolute inset-0 h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
-                open ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0"
-              }`}
-            />
-          </span>
-        </button>
+          {/* espaçador direito no mobile — equilibra o hambúrguer da esquerda */}
+          <div className="w-9 md:hidden" aria-hidden />
+        </div>
       </div>
 
       {/* Menu mobile — altura animada via grid-template-rows */}
