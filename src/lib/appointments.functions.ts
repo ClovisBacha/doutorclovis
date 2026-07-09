@@ -68,7 +68,7 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
             `<p style="margin:0 0 6px"><strong>Paciente:</strong> ${data.patient_name}</p>
              <p style="margin:0 0 6px"><strong>Contato:</strong> ${data.patient_phone} · ${data.patient_email}</p>
              ${resumo}
-             <p style="margin:14px 0 0"><a href="https://doutorclovis.vercel.app/painel" style="color:#a85a44">Abrir o painel do médico →</a></p>`,
+             <p style="margin:14px 0 0"><a href="https://obstetrica.com.br/painel" style="color:#a85a44">Abrir o painel do médico →</a></p>`,
           ),
         });
       }

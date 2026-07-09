@@ -14,7 +14,7 @@ export const DOCTOR = {
   /** Endereço do consultório — deixar vazio para não exibir no rodapé */
   address: "",
   /** URL pública do site (sem barra final) — usada no sitemap e OG */
-  siteUrl: "https://obstetricia.drclovisbacha.com.br",
+  siteUrl: "https://obstetrica.com.br",
   instagram: "https://www.instagram.com/drclovisbacha/",
   /** Chave PIX para recebimento de consultas particulares */
   pixKey: "bachaclovis@gmail.com",

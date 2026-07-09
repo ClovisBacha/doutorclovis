@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const BASE_URL = process.env.VITE_PUBLIC_URL ?? "https://doutorclovis.vercel.app";
+const BASE_URL = process.env.VITE_PUBLIC_URL ?? "https://obstetrica.com.br";
 
 const entries = [
   { path: "/", priority: "1.0", changefreq: "weekly" },
