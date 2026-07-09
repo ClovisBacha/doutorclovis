@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   Activity,
   Baby,
@@ -30,6 +30,7 @@ import {
   PhoneFrame,
 } from "@/components/app-phone-mockup";
 import { FootprintTrail } from "@/components/footprint-trail";
+import { setHeroDark } from "@/components/hero-theme";
 
 export const Route = createFileRoute("/")({
   head: () => {
@@ -150,6 +151,12 @@ function Index() {
   const sky = useWeatherSky(periodOverride);
   const heroText = sky.isDark ? "text-white" : "text-foreground";
   const heroMuted = sky.isDark ? "text-white/70" : "text-muted-foreground";
+
+  // Publica se o hero está escuro → header troca a logo (branca no escuro).
+  useEffect(() => {
+    setHeroDark(sky.isDark);
+    return () => setHeroDark(false);
+  }, [sky.isDark]);
 
   return (
     <>

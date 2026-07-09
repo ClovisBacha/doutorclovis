@@ -3,6 +3,8 @@ import { Menu, X, Smartphone, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo-obstetrica.png";
+import logoWhite from "@/assets/logo-obstetrica-white.png";
+import { useHeroDark } from "@/components/hero-theme";
 
 const navPublic = [
   { to: "/gestacao", label: "Gestação" },
@@ -34,6 +36,11 @@ export function SiteHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  const heroDark = useHeroDark();
+  // Logo branca só quando o header está TRANSPARENTE sobre um hero escuro;
+  // ao rolar (fundo claro) ou fora do hero escuro → logo rosa.
+  const overDark = heroDark && !scrolled;
 
   const nav = signedIn ? navAuth : navPublic;
   // Navegação dividida à esquerda/direita da logo centralizada
@@ -86,17 +93,30 @@ export function SiteHeader() {
           </nav>
         </div>
 
-        {/* Logo centralizada (desktop e celular) */}
+        {/* Logo centralizada (desktop e celular) — troca inteligente:
+            branca sobre o hero escuro (topo/noite), rosa nos demais casos. */}
         <Link
           to="/"
           aria-label="Obstétrica — página inicial"
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-300 hover:opacity-80"
         >
-          <img
-            src={logo}
-            alt="Obstétrica — Excelência no atendimento à gestante"
-            className="h-8 w-auto md:h-9 [filter:drop-shadow(0_1px_3px_rgb(0_0_0/0.16))]"
-          />
+          <span className="relative block h-8 md:h-9">
+            <img
+              src={logo}
+              alt="Obstétrica — Excelência no atendimento à gestante"
+              className={`h-8 w-auto md:h-9 [filter:drop-shadow(0_1px_3px_rgb(0_0_0/0.16))] transition-opacity duration-500 ${
+                overDark ? "opacity-0" : "opacity-100"
+              }`}
+            />
+            <img
+              src={logoWhite}
+              alt=""
+              aria-hidden
+              className={`absolute inset-0 h-8 w-auto md:h-9 [filter:drop-shadow(0_1px_3px_rgb(0_0_0/0.28))] transition-opacity duration-500 ${
+                overDark ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          </span>
         </Link>
 
         {/* Direita: 2ª metade da navegação + CTA (desktop) / espaçador (mobile) */}
