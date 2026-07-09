@@ -95,7 +95,7 @@ export function SiteHeader() {
           <img
             src={logo}
             alt="Obstétrica — Excelência no atendimento à gestante"
-            className="h-8 w-auto md:h-9 [filter:drop-shadow(0_1px_2px_rgb(0_0_0/0.08))]"
+            className="h-8 w-auto md:h-9 [filter:drop-shadow(0_1px_3px_rgb(0_0_0/0.16))]"
           />
         </Link>
 

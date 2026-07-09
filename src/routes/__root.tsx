@@ -110,12 +110,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Acompanhe sua gestação semana a semana, converse com IA especializada, agende consultas e muito mais. Desenvolvido com Dr. Clóvis Bacha, especialista em gestação de alto risco.",
       },
       { name: "author", content: "Dr. Clóvis Bacha" },
-      { name: "theme-color", content: "#8b5147" },
+      { name: "theme-color", content: "#a8574a" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "Obstétrica" },
-      { name: "msapplication-TileColor", content: "#8b5147" },
+      { name: "msapplication-TileColor", content: "#a8574a" },
       { property: "og:title", content: "Obstétrica by Dr. Clóvis" },
       {
         property: "og:description",
@@ -124,7 +124,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { property: "og:locale", content: "pt_BR" },
       { property: "og:url", content: DOCTOR.siteUrl },
-      { property: "og:image", content: `${DOCTOR.siteUrl}/og.svg` },
+      { property: "og:image", content: `${DOCTOR.siteUrl}/og.png` },
+      { property: "og:image:type", content: "image/png" },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -134,7 +135,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Acompanhe sua gestação semana a semana com o app desenvolvido pelo Dr. Clóvis Bacha.",
       },
-      { name: "twitter:image", content: `${DOCTOR.siteUrl}/og.svg` },
+      { name: "twitter:image", content: `${DOCTOR.siteUrl}/og.png` },
       {
         name: "robots",
         content: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1",

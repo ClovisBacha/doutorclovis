@@ -8,7 +8,7 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#faf7f5",
-  "theme_color": "#8b5147",
+  "theme_color": "#a8574a",
   "orientation": "portrait-primary",
   "lang": "pt-BR",
   "dir": "ltr",
@@ -63,9 +63,9 @@
   ],
   "screenshots": [
     {
-      "src": "/og.svg",
+      "src": "/og.png",
       "sizes": "1200x630",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "form_factor": "wide",
       "label": "Tela inicial do app de gestação"
     }
