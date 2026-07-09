@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   Activity,
   Baby,
@@ -29,6 +29,7 @@ import {
   AppSaudeMockupScreen,
   PhoneFrame,
 } from "@/components/app-phone-mockup";
+import { FootprintTrail } from "@/components/footprint-trail";
 
 export const Route = createFileRoute("/")({
   head: () => {
@@ -293,40 +294,44 @@ function Index() {
           </div>
         </Reveal>
 
-        <div className="space-y-20 md:space-y-28">
+        <div className="space-y-8 md:space-y-12">
           {SHOWCASE.map((item, i) => (
-            <div
-              key={item.badge}
-              className={`grid items-center gap-10 md:grid-cols-2 ${
-                i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
-              }`}
-            >
-              <Reveal variant={i % 2 === 1 ? "left" : "up"} className="flex justify-center">
-                <PhoneFrame tilt={i % 2 === 1 ? "right" : "left"}>
-                  {item.screen === "home" && <AppHomeMockupScreen />}
-                  {item.screen === "chat" && <AppChatMockupScreen />}
-                  {item.screen === "jogo" && <AppJogoMockupScreen />}
-                  {item.screen === "saude" && <AppSaudeMockupScreen />}
-                </PhoneFrame>
-              </Reveal>
-              <Reveal variant="up" delay={120}>
-                <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
-                  {item.badge}
-                </span>
-                <h3 className="mt-4 font-serif text-2xl md:text-4xl">{item.title}</h3>
-                <p className="mt-4 text-base leading-relaxed text-muted-foreground">{item.text}</p>
-                <ul className="mt-6 space-y-2.5">
-                  {item.bullets.map((b) => (
-                    <li key={b} className="flex items-center gap-2.5 text-sm text-foreground">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                        ✓
-                      </span>
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </Reveal>
-            </div>
+            <Fragment key={item.badge}>
+              {i > 0 && <FootprintTrail dir={i % 2 === 1 ? "ltr" : "rtl"} />}
+              <div
+                className={`grid items-center gap-10 md:grid-cols-2 ${
+                  i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
+                }`}
+              >
+                <Reveal variant={i % 2 === 1 ? "left" : "up"} className="flex justify-center">
+                  <PhoneFrame tilt={i % 2 === 1 ? "right" : "left"}>
+                    {item.screen === "home" && <AppHomeMockupScreen />}
+                    {item.screen === "chat" && <AppChatMockupScreen />}
+                    {item.screen === "jogo" && <AppJogoMockupScreen />}
+                    {item.screen === "saude" && <AppSaudeMockupScreen />}
+                  </PhoneFrame>
+                </Reveal>
+                <Reveal variant="up" delay={120}>
+                  <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                    {item.badge}
+                  </span>
+                  <h3 className="mt-4 font-serif text-2xl md:text-4xl">{item.title}</h3>
+                  <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+                    {item.text}
+                  </p>
+                  <ul className="mt-6 space-y-2.5">
+                    {item.bullets.map((b) => (
+                      <li key={b} className="flex items-center gap-2.5 text-sm text-foreground">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                          ✓
+                        </span>
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </Reveal>
+              </div>
+            </Fragment>
           ))}
         </div>
       </section>

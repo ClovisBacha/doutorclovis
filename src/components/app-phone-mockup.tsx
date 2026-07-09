@@ -20,6 +20,7 @@ import {
   Video,
 } from "lucide-react";
 import { BabyIllustration } from "@/components/baby-illustration";
+import { BabyFootprint } from "@/components/footprint-trail";
 import { SkyLayers, gradientFor, type SkyTheme } from "@/components/weather-sky";
 
 /** Moldura de iPhone com Dynamic Island. Conteúdo via children. */
@@ -354,7 +355,7 @@ export function AppJogoMockupScreen() {
         <p className="text-center text-[7px] font-bold uppercase tracking-wider text-muted-foreground">
           Semana 24 🌽
         </p>
-        <div className="mt-1 flex flex-col items-center gap-1.5">
+        <div className="mt-1 flex flex-col items-center gap-1">
           <div className="ml-[-40%]">
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full text-[11px]"
@@ -363,6 +364,11 @@ export function AppJogoMockupScreen() {
               🍓
             </div>
           </div>
+          {/* pezinhos no trecho já percorrido — como no jogo atual */}
+          <div className="ml-[-8%] flex items-center gap-1">
+            <BabyFootprint color="#fbbf24" className="h-3 w-auto rotate-180" />
+            <BabyFootprint color="#fbbf24" className="mt-1 h-3 w-auto -scale-x-100 rotate-180" />
+          </div>
           <div className="ml-[20%]">
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black text-white"
@@ -370,6 +376,10 @@ export function AppJogoMockupScreen() {
             >
               ✓
             </div>
+          </div>
+          <div className="ml-[2%] flex items-center gap-1">
+            <BabyFootprint color="#fbbf24" className="h-3 w-auto rotate-180" />
+            <BabyFootprint color="#fbbf24" className="mt-1 h-3 w-auto -scale-x-100 rotate-180" />
           </div>
           {/* Baú de hoje com balão */}
           <div className="relative ml-[-15%]">
