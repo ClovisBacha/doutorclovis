@@ -1705,6 +1705,9 @@ function ProfileTab({
             value={form.birth_date}
             onChange={(v) => setForm({ ...form, birth_date: v })}
           />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Deixe em branco enquanto a gestação está em curso — preencha só quando o bebê nascer.
+          </p>
         </div>
       </div>
 
