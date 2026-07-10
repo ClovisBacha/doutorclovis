@@ -141,7 +141,7 @@
     }
   },
   "14": {
-    "teach": "Semana 2: chegou a hora da ovulação! Em um ciclo de 28 dias, por volta do dia 14 um óvulo maduro é liberado pelo ovário e captado pela trompa. Se ele encontrar um espermatozoide por ali, a mágica da fecundação pode acontecer.",
+    "teach": "Chegou a hora da ovulação! Em um ciclo de 28 dias, por volta do dia 14 um óvulo maduro é liberado pelo ovário e captado pela trompa. Se ele encontrar um espermatozoide por ali, a mágica da fecundação pode acontecer.",
     "q1": {
       "q": "Em um ciclo de 28 dias, quando costuma ocorrer a ovulação?",
       "o": ["No primeiro dia da menstruação", "No último dia do ciclo", "Por volta do dia 14"],
@@ -290,7 +290,7 @@
     }
   },
   "21": {
-    "teach": "Semana 3: se o encontro aconteceu, a fecundação ocorre na trompa. Óvulo e espermatozoide formam uma única célula com todo o material genético do seu bebê. Enquanto viaja alguns dias em direção ao útero, essa célula se divide sem parar: 2, 4, 8, 16...",
+    "teach": "Se o encontro aconteceu, a fecundação ocorre na trompa. Óvulo e espermatozoide formam uma única célula com todo o material genético do seu bebê. Enquanto viaja alguns dias em direção ao útero, essa célula se divide sem parar: 2, 4, 8, 16...",
     "q1": {
       "q": "Onde acontece a fecundação?",
       "o": ["Dentro do útero", "Na trompa", "No ovário"],
@@ -431,7 +431,7 @@
     }
   },
   "28": {
-    "teach": "Semana 4: que momento! O embrião chega ao útero e se implanta no endométrio, aquele 'ninho' que o corpo preparou. A partir da implantação, começa a produção do hCG, o hormônio da gravidez, que em breve fará o teste dar positivo.",
+    "teach": "Que momento! O embrião chega ao útero e se implanta no endométrio, aquele 'ninho' que o corpo preparou. A partir da implantação, começa a produção do hCG, o hormônio da gravidez, que em breve fará o teste dar positivo.",
     "q1": {
       "q": "O que é a implantação?",
       "o": [
@@ -572,7 +572,7 @@
     }
   },
   "35": {
-    "teach": "Semana 5: seu bebê é um embriãozinho de cerca de 2 mm, do tamanho de uma semente de gergelim. E já está formando o tubo neural, a estrutura que dará origem ao cérebro e à medula espinhal. Pequenino, mas num ritmo de obra impressionante!",
+    "teach": "Seu bebê é um embriãozinho de cerca de 2 mm, do tamanho de uma semente de gergelim. E já está formando o tubo neural, a estrutura que dará origem ao cérebro e à medula espinhal. Pequenino, mas num ritmo de obra impressionante!",
     "q1": {
       "q": "Qual é o tamanho aproximado do embrião na semana 5?",
       "o": ["Cerca de 10 cm", "Cerca de 2 cm", "Cerca de 2 mm"],
@@ -705,7 +705,7 @@
     }
   },
   "42": {
-    "teach": "Semana 6, e que notícia: o coração do seu bebê começa a bater! Ele acelera entre 100 e 160 batimentos por minuto, bem mais rápido que o seu. O embrião mede cerca de 5 mm, do tamanho de uma lentilha, e cresce a cada dia.",
+    "teach": "E que notícia: o coração do seu bebê começa a bater! Ele acelera entre 100 e 160 batimentos por minuto, bem mais rápido que o seu. O embrião mede cerca de 5 mm, do tamanho de uma lentilha, e cresce a cada dia.",
     "q1": {
       "q": "Qual é a frequência cardíaca do embrião quando o coração começa a bater?",
       "o": ["Entre 60 e 80 bpm", "Entre 100 e 160 bpm", "Entre 300 e 400 bpm"],
@@ -838,7 +838,7 @@
     }
   },
   "49": {
-    "teach": "Semana 7: novidade no corpinho do bebê: surgem os brotos que virarão braços e pernas! Ele já mede cerca de 1 cm, com a cabecinha proporcionalmente grande, porque o cérebro está em plena construção.",
+    "teach": "Novidade no corpinho do bebê: surgem os brotos que virarão braços e pernas! Ele já mede cerca de 1 cm, com a cabecinha proporcionalmente grande, porque o cérebro está em plena construção.",
     "q1": {
       "q": "Qual é a novidade do bebê na semana 7?",
       "o": ["Brotos de braços e pernas", "Unhas completamente formadas", "Cabelo crescendo"],
@@ -1649,7 +1649,7 @@
     }
   },
   "90": {
-    "teach": "Semana 12 no bolso! Bebê de ~5,5 cm e 14 g chupando o dedo e treinando a respiração; risco de abortamento caindo bastante; intestino agradecendo fibras, água e movimento; e a lição de ouro dos exames: rastreio estima risco, não dá diagnóstico. Você está fechando o 1º trimestre com chave de ouro.",
+    "teach": "No bolso! Bebê de ~5,5 cm e 14 g chupando o dedo e treinando a respiração; risco de abortamento caindo bastante; intestino agradecendo fibras, água e movimento; e a lição de ouro dos exames: rastreio estima risco, não dá diagnóstico. Você está fechando o 1º trimestre com chave de ouro.",
     "q1": {
       "q": "Qual o tamanho e peso aproximados do bebê na semana 12?",
       "o": ["10 cm e 100 g", "5,5 cm e 14 g", "2 cm e 2 g"],
@@ -1905,7 +1905,7 @@
     }
   },
   "102": {
-    "teach": "Semana 14 é a última chamada para o morfológico do 1º trimestre com translucência nucal — se o seu ainda não foi feito, fale com seu médico. Quem preferiu o NIPT segue com essa opção em aberto. E as consultas de pré-natal continuam no ritmo combinado: elas acompanham pressão, peso e o crescimento do bebê.",
+    "teach": "É a última chamada para o morfológico do 1º trimestre com translucência nucal — se o seu ainda não foi feito, fale com seu médico. Quem preferiu o NIPT segue com essa opção em aberto. E as consultas de pré-natal continuam no ritmo combinado: elas acompanham pressão, peso e o crescimento do bebê.",
     "q1": {
       "q": "Até quando vai a janela da translucência nucal?",
       "o": ["Até o fim da gestação", "Até a semana 14", "Até a semana 20"],
@@ -1966,7 +1966,7 @@
     }
   },
   "105": {
-    "teach": "Semana 15: seu bebê tem cerca de 10 cm e está cada vez mais ativo. Os ossinhos endurecem, ele mexe braços e pernas com energia e faz caretas — franze a testa e 'treina' expressões. Você ainda não sente, mas ele se movimenta bastante lá dentro.",
+    "teach": "Seu bebê tem cerca de 10 cm e está cada vez mais ativo. Os ossinhos endurecem, ele mexe braços e pernas com energia e faz caretas — franze a testa e 'treina' expressões. Você ainda não sente, mas ele se movimenta bastante lá dentro.",
     "q1": {
       "q": "O que o bebê faz na semana 15?",
       "o": [
@@ -2107,7 +2107,7 @@
     }
   },
   "112": {
-    "teach": "Semana 16, marco lindo: o sistema auditivo do bebê se desenvolve e ele começa a ouvir sons internos — o batimento do seu coração e a sua voz, que chega pelo corpo. Ele mede cerca de 11-12 cm e pesa uns 100 g. A partir de agora, falar com ele ganha um novo sentido.",
+    "teach": "Marco lindo: o sistema auditivo do bebê se desenvolve e ele começa a ouvir sons internos — o batimento do seu coração e a sua voz, que chega pelo corpo. Ele mede cerca de 11-12 cm e pesa uns 100 g. A partir de agora, falar com ele ganha um novo sentido.",
     "q1": {
       "q": "Qual novidade importante acontece por volta da semana 16?",
       "o": [
@@ -2236,7 +2236,7 @@
     }
   },
   "119": {
-    "teach": "Semana 17: seu bebê ganha uma camadinha de gordura e a pele fica menos transparente. As articulações se movem melhor e ele pratica reflexos, como sugar. O cordão umbilical fica mais forte e grosso, garantindo o transporte de nutrientes e oxigênio.",
+    "teach": "Seu bebê ganha uma camadinha de gordura e a pele fica menos transparente. As articulações se movem melhor e ele pratica reflexos, como sugar. O cordão umbilical fica mais forte e grosso, garantindo o transporte de nutrientes e oxigênio.",
     "q1": {
       "q": "O que a gordura que se forma agora faz pelo bebê?",
       "o": [
@@ -2373,7 +2373,7 @@
     }
   },
   "126": {
-    "teach": "Semana 18: o sistema nervoso avança e os nervos começam a receber mielina, uma capa que acelera os 'recados' entre eles. O bebê alterna sono e vigília e se mexe cada vez mais. Ele mede uns 14 cm e pesa por volta de 200 g.",
+    "teach": "O sistema nervoso avança e os nervos começam a receber mielina, uma capa que acelera os 'recados' entre eles. O bebê alterna sono e vigília e se mexe cada vez mais. Ele mede uns 14 cm e pesa por volta de 200 g.",
     "q1": {
       "q": "O que a mielina faz pelos nervos do bebê?",
       "o": ["Forma o cabelo", "Acelera a transmissão dos sinais nervosos", "Endurece os ossos"],
@@ -2483,7 +2483,7 @@
     }
   },
   "132": {
-    "teach": "Semana 19: o corpo do bebê se cobre de lanugo, uma penugem fininha, e de vernix caseosa, uma camada branca que protege a pele no líquido amniótico. O cérebro delimita áreas para os sentidos: tato, paladar, audição, visão e olfato. Ele está se preparando para sentir o mundo.",
+    "teach": "O corpo do bebê se cobre de lanugo, uma penugem fininha, e de vernix caseosa, uma camada branca que protege a pele no líquido amniótico. O cérebro delimita áreas para os sentidos: tato, paladar, audição, visão e olfato. Ele está se preparando para sentir o mundo.",
     "q1": {
       "q": "O que é a vernix caseosa?",
       "o": [
@@ -2604,7 +2604,7 @@
     }
   },
   "139": {
-    "teach": "Semana 20: METADE da jornada! Seu bebê mede cerca de 25 cm (da cabeça ao calcanhar) e pesa uns 300 g. Ele está coberto de vernix, deglute líquido amniótico e tem períodos ativos que você já sente. Uma conquista e tanto — para vocês dois.",
+    "teach": "METADE da jornada! Seu bebê mede cerca de 25 cm (da cabeça ao calcanhar) e pesa uns 300 g. Ele está coberto de vernix, deglute líquido amniótico e tem períodos ativos que você já sente. Uma conquista e tanto — para vocês dois.",
     "q1": {
       "q": "O que marca a semana 20?",
       "o": [
@@ -2702,7 +2702,7 @@
     }
   },
   "145": {
-    "teach": "Semana 21: o bebê deglute mais líquido amniótico e as papilas gustativas já funcionam — os sabores da sua alimentação passam para o líquido e ele 'experimenta'! O sistema digestivo treina para o futuro. Ele mede cerca de 27 cm e está cada vez mais ativo.",
+    "teach": "O bebê deglute mais líquido amniótico e as papilas gustativas já funcionam — os sabores da sua alimentação passam para o líquido e ele 'experimenta'! O sistema digestivo treina para o futuro. Ele mede cerca de 27 cm e está cada vez mais ativo.",
     "q1": {
       "q": "O que o bebê consegue fazer na semana 21 com o líquido amniótico?",
       "o": [
@@ -2869,7 +2869,7 @@
     }
   },
   "154": {
-    "teach": "Semana 22: seu bebê tem cerca de 28 cm e já parece um recém-nascido em miniatura. Surgem sobrancelhas e cílios, e as impressões digitais estão formadas — únicas, só dele! A pele ainda é enrugada, pois a gordura vem depois. Ele mede e pesa cada vez mais.",
+    "teach": "Seu bebê tem cerca de 28 cm e já parece um recém-nascido em miniatura. Surgem sobrancelhas e cílios, e as impressões digitais estão formadas — únicas, só dele! A pele ainda é enrugada, pois a gordura vem depois. Ele mede e pesa cada vez mais.",
     "q1": {
       "q": "O que já está formado no bebê na semana 22?",
       "o": ["Impressões digitais únicas", "Dentes prontos", "Pulmões maduros"],
@@ -2994,7 +2994,7 @@
     }
   },
   "161": {
-    "teach": "Semana 23: o bebê pesa cerca de 500 g e a pele, ainda avermelhada e enrugada, começa a receber gordura. Ele ouve bem: reconhece a voz da mãe e se assusta com ruídos altos. Os vasos sanguíneos dos pulmões se desenvolvem, um preparo importante para respirar no futuro.",
+    "teach": "O bebê pesa cerca de 500 g e a pele, ainda avermelhada e enrugada, começa a receber gordura. Ele ouve bem: reconhece a voz da mãe e se assusta com ruídos altos. Os vasos sanguíneos dos pulmões se desenvolvem, um preparo importante para respirar no futuro.",
     "q1": {
       "q": "O que se desenvolve nos pulmões do bebê na semana 23?",
       "o": [
@@ -3100,7 +3100,7 @@
     }
   },
   "167": {
-    "teach": "Semana 24, marco importante: o bebê atinge a VIABILIDADE FETAL — com UTI neonatal, já há chance de sobreviver fora do útero. Os pulmões começam a produzir surfactante, uma substância que os mantém abertos. Ele pesa cerca de 600 g e mede uns 30 cm.",
+    "teach": "Marco importante: o bebê atinge a VIABILIDADE FETAL — com UTI neonatal, já há chance de sobreviver fora do útero. Os pulmões começam a produzir surfactante, uma substância que os mantém abertos. Ele pesa cerca de 600 g e mede uns 30 cm.",
     "q1": {
       "q": "O que significa a 'viabilidade fetal' alcançada na semana 24?",
       "o": [
@@ -3161,16 +3161,16 @@
     }
   },
   "170": {
-    "teach": "O bebê já responde à luz forte na barriga e abre e fecha os olhos. Uma lanterninha suave sobre a barriga pode fazê-lo se mexer. São mais formas de interagir: junto com a voz e a música, você constrói um repertório de estímulos que já criam vínculo.",
+    "teach": "O bebê já responde à luz forte na barriga: mesmo com as pálpebras ainda fechadas, ele percebe a claridade. Uma lanterninha suave sobre a barriga pode fazê-lo se mexer. Junto com a voz e a música, você constrói um repertório de estímulos que já criam vínculo.",
     "q1": {
       "q": "Como o bebê reage à luz forte na barriga nesta fase?",
       "o": [
         "Não percebe nada",
         "Enxerga imagens nítidas",
-        "Pode se mexer; ele já abre e fecha os olhos"
+        "Pode se mexer; ele percebe a luz mesmo com as pálpebras fechadas"
       ],
       "a": 2,
-      "why": "Ele percebe a luz e pode reagir com movimento; a visão nítida vem só após o nascimento."
+      "why": "Ele percebe a luz, mas os olhos só começam a abrir por volta da semana 26; a visão nítida vem após o nascimento."
     },
     "q2": {
       "q": "Se o TOTG indicar diabetes gestacional, a conduta é...",
@@ -3199,7 +3199,7 @@
     }
   },
   "172": {
-    "teach": "Semana 25: o bebê pesa cerca de 700 g e a pele fica menos enrugada com a gordura que se acumula. Ele reconhece bem a voz da mãe e pode responder com movimentos a sons familiares. As narinas se abrem e ele 'pratica' respirar líquido amniótico.",
+    "teach": "O bebê pesa cerca de 700 g e a pele fica menos enrugada com a gordura que se acumula. Ele reconhece bem a voz da mãe e pode responder com movimentos a sons familiares. As narinas se abrem e ele 'pratica' respirar líquido amniótico.",
     "q1": {
       "q": "O que muda na pele do bebê na semana 25?",
       "o": [
@@ -3305,7 +3305,7 @@
     }
   },
   "178": {
-    "teach": "Semana 26: os olhos do bebê começam a abrir! Ele já tem cílios e pisca. O sistema nervoso está mais ativo e a audição é fina — ele reconhece a sua voz e a do parceiro. Pesa cerca de 900 g. Cada semana traz novas conquistas sensoriais.",
+    "teach": "Os olhos do bebê começam a abrir! Ele já tem cílios e pisca. O sistema nervoso está mais ativo e a audição é fina — ele reconhece a sua voz e a do parceiro. Pesa cerca de 900 g. Cada semana traz novas conquistas sensoriais.",
     "q1": {
       "q": "O que acontece com os olhos do bebê na semana 26?",
       "o": ["Começam a abrir e ele pisca", "Ficam fechados até o parto", "Enxergam cores nítidas"],
@@ -3369,7 +3369,7 @@
     }
   },
   "182": {
-    "teach": "Semana 27: você pode sentir soluços do bebê — movimentos rítmicos e repetidos na barriga, totalmente normais e fofos! Ele tem ciclos de sono mais organizados e responde a estímulos. Pesa cerca de 1 kg. É a última semana do 2º trimestre.",
+    "teach": "Você pode sentir soluços do bebê — movimentos rítmicos e repetidos na barriga, totalmente normais e fofos! Ele tem ciclos de sono mais organizados e responde a estímulos. Pesa cerca de 1 kg. É a última semana do 2º trimestre.",
     "q1": {
       "q": "Movimentos rítmicos e repetidos na barriga costumam ser...",
       "o": ["Contrações de parto", "Sinal de problema", "Soluços do bebê, normais"],
@@ -3475,7 +3475,7 @@
     }
   },
   "188": {
-    "teach": "Semana 28: bem-vinda ao 3º TRIMESTRE! Seu bebê pesa cerca de 1 kg e mede uns 37 cm. O cérebro cresce rápido e forma sulcos e dobras. As consultas ficam mais frequentes daqui para frente. A reta final começa — e você chega nela cheia de conhecimento.",
+    "teach": "O 3º trimestre está chegando! Seu bebê já pesa cerca de 1 kg e mede uns 37 cm. O cérebro cresce rápido e forma sulcos e dobras. As consultas ficam mais frequentes daqui para frente. A reta final começa — e você chega nela cheia de conhecimento.",
     "q1": {
       "q": "O que marca a semana 28?",
       "o": ["O fim da gestação", "A formação dos órgãos", "O início do 3º trimestre"],
@@ -3728,7 +3728,7 @@
     }
   },
   "203": {
-    "teach": "Semana 29: seu bebê pesa cerca de 1,2 kg e a gordura subcutânea se acumula, deixando a pele menos enrugada. Os ossos endurecem e precisam de cálcio — por isso capriche em leite, iogurte, queijo ou equivalentes. Ele está cada vez mais forte e ativo.",
+    "teach": "Seu bebê pesa cerca de 1,2 kg e a gordura subcutânea se acumula, deixando a pele menos enrugada. Os ossos endurecem e precisam de cálcio — por isso capriche em leite, iogurte, queijo ou equivalentes. Ele está cada vez mais forte e ativo.",
     "q1": {
       "q": "O que a gordura que se acumula agora faz pelo bebê?",
       "o": [
@@ -3849,7 +3849,7 @@
     }
   },
   "210": {
-    "teach": "Semana 30: seu bebê pesa cerca de 1,4 kg e mede uns 40 cm. O cérebro cresce rápido e a medula óssea assume a produção de glóbulos vermelhos. Ele tem menos espaço e os movimentos mudam de padrão — de chutes a rolamentos e pressões. Continua ativo, do jeitinho dele.",
+    "teach": "Seu bebê pesa cerca de 1,4 kg e mede uns 40 cm. O cérebro cresce rápido e a medula óssea assume a produção de glóbulos vermelhos. Ele tem menos espaço e os movimentos mudam de padrão — de chutes a rolamentos e pressões. Continua ativo, do jeitinho dele.",
     "q1": {
       "q": "Por que os movimentos mudam de padrão na semana 30?",
       "o": [
@@ -3970,7 +3970,7 @@
     }
   },
   "217": {
-    "teach": "Semana 31: seu bebê pesa cerca de 1,7 kg. Ele dorme boa parte do tempo, com fases de sono REM (talvez até sonhe!). Os pulmões continuam amadurecendo. A maioria dos bebês já está de cabeça para baixo ou logo se posiciona assim — a posição ideal para o parto vaginal.",
+    "teach": "Seu bebê pesa cerca de 1,7 kg. Ele dorme boa parte do tempo, com fases de sono REM (talvez até sonhe!). Os pulmões continuam amadurecendo. A maioria dos bebês já está de cabeça para baixo ou logo se posiciona assim — a posição ideal para o parto vaginal.",
     "q1": {
       "q": "Qual é a posição ideal do bebê para o parto vaginal?",
       "o": ["Cefálica (cabeça para baixo)", "Sentado (pélvico)", "Atravessado"],
@@ -4080,7 +4080,7 @@
     }
   },
   "223": {
-    "teach": "Semana 32: seu bebê pesa cerca de 1,8 kg e tem boas chances de já estar de cabeça para baixo. Ele treina respirar (movimentos do tórax com líquido), suga e engole. As unhas chegam à ponta dos dedos. A gordura o deixa mais 'fofinho' a cada dia.",
+    "teach": "Seu bebê pesa cerca de 1,8 kg e tem boas chances de já estar de cabeça para baixo. Ele treina respirar (movimentos do tórax com líquido), suga e engole. As unhas chegam à ponta dos dedos. A gordura o deixa mais 'fofinho' a cada dia.",
     "q1": {
       "q": "O que o bebê treina na semana 32?",
       "o": ["Respirar (movimentos do tórax), sugar e engolir", "Enxergar cores", "Falar"],
@@ -4178,7 +4178,7 @@
     }
   },
   "229": {
-    "teach": "Semana 33: seu bebê pesa cerca de 2 kg. Os pulmões amadurecem rápido e o sistema imune recebe anticorpos seus pela placenta — uma proteção que continua após o nascimento pela amamentação. Os ossos endurecem, mas o crânio segue flexível para facilitar a passagem no parto.",
+    "teach": "Seu bebê pesa cerca de 2 kg. Os pulmões amadurecem rápido e o sistema imune recebe anticorpos seus pela placenta — uma proteção que continua após o nascimento pela amamentação. Os ossos endurecem, mas o crânio segue flexível para facilitar a passagem no parto.",
     "q1": {
       "q": "Por que o crânio do bebê continua flexível?",
       "o": [
@@ -4284,7 +4284,7 @@
     }
   },
   "235": {
-    "teach": "Semana 34: seu bebê pesa cerca de 2,2 kg. A vernix (camada branca protetora) engrossa e o lanugo começa a diminuir. O sistema nervoso central e os pulmões amadurecem rápido. A maioria dos bebês nascidos a partir daqui se sai bem, mas cada semana a mais é valiosa.",
+    "teach": "Seu bebê pesa cerca de 2,2 kg. A vernix (camada branca protetora) engrossa e o lanugo começa a diminuir. O sistema nervoso central e os pulmões amadurecem rápido. A maioria dos bebês nascidos a partir daqui se sai bem, mas cada semana a mais é valiosa.",
     "q1": {
       "q": "O que acontece com o lanugo do bebê na semana 34?",
       "o": ["Começa a diminuir", "Aumenta bastante", "Some completamente"],
@@ -4333,7 +4333,7 @@
     }
   },
   "238": {
-    "teach": "Semana 35: seu bebê pesa cerca de 2,4 kg e o espaço no útero fica apertado — por isso os movimentos são mais de rolar e pressionar do que chutar. Mesmo assim, ele deve continuar se mexendo todos os dias. Os rins estão maduros e o fígado processa alguns resíduos.",
+    "teach": "Seu bebê pesa cerca de 2,4 kg e o espaço no útero fica apertado — por isso os movimentos são mais de rolar e pressionar do que chutar. Mesmo assim, ele deve continuar se mexendo todos os dias. Os rins estão maduros e o fígado processa alguns resíduos.",
     "q1": {
       "q": "Por que os movimentos são mais de rolar e pressionar agora?",
       "o": ["O espaço no útero está apertado", "O bebê está fraco", "Ele parou de se mexer"],
