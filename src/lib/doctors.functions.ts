@@ -95,7 +95,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const user = await requireUser(data.accessToken);
-    if (!user) return { ok: false as const };
+    if (!user) return { ok: false as const, error: "Sessão inválida — entre novamente." };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Idempotente: se já existe, vira update do próprio perfil
@@ -125,17 +125,28 @@ export const registerDoctor = createServerFn({ method: "POST" })
       }
     }
 
-    const { data: row, error } = await (supabaseAdmin as any)
-      .from("doctors")
-      .upsert({
-        id: user.id,
-        ...data.profile,
-        slug,
-        updated_at: new Date().toISOString(),
-      })
-      .select("id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,active")
-      .single();
-    if (error) return { ok: false as const };
+    // Corrida de slug (dois homônimos simultâneos): na violação de UNIQUE,
+    // tenta uma vez com sufixo aleatório antes de desistir.
+    const doUpsert = (s: string | null) =>
+      (supabaseAdmin as any)
+        .from("doctors")
+        .upsert({
+          id: user.id,
+          ...data.profile,
+          slug: s,
+          updated_at: new Date().toISOString(),
+        })
+        .select("id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,active")
+        .single();
+
+    let { data: row, error } = await doUpsert(slug);
+    if (error && error.code === "23505" && slug) {
+      ({ data: row, error } = await doUpsert(`${slug}-${Math.random().toString(36).slice(2, 6)}`));
+    }
+    if (error) {
+      console.error("[registerDoctor]", error);
+      return { ok: false as const, error: error.message as string };
+    }
     return { ok: true as const, doctor: row as DoctorProfile };
   });
 

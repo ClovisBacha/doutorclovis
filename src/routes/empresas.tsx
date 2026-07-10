@@ -111,21 +111,6 @@ function EmpresasPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <div className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
-          <Link to="/" className="font-serif text-lg font-semibold text-primary">
-            Obstétrica
-          </Link>
-          <a
-            href="#contato"
-            className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
-          >
-            Solicitar proposta
-          </a>
-        </div>
-      </div>
-
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background py-24 px-5">
         <div className="mx-auto max-w-3xl text-center">
@@ -142,7 +127,7 @@ function EmpresasPage() {
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a
               href="#contato"
-              className="rounded-full bg-primary px-8 py-3 text-sm font-semibold text-white hover:opacity-90"
+              className="rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
               Solicitar demonstração grátis
             </a>
@@ -352,16 +337,6 @@ function EmpresasPage() {
           )}
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-8 px-5 text-center text-xs text-muted-foreground">
-        <p>
-          © {new Date().getFullYear()} {DOCTOR.name} · {DOCTOR.title} · {DOCTOR.crm}
-        </p>
-        <Link to="/" className="mt-2 block text-primary hover:underline">
-          Voltar ao site
-        </Link>
-      </footer>
     </div>
   );
 }

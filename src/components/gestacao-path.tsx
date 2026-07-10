@@ -1820,12 +1820,18 @@ function LessonSheet({
   onClose: () => void;
 }) {
   const alreadyDone = savedScore != null;
-  const [answers, setAnswers] = useState<(number | null)[]>(Array(m.quiz.length).fill(null));
-  const [checked, setChecked] = useState(false);
+  // Lição já concluída reabre em modo REVISÃO: respostas corretas destacadas
+  // e resultado com a nota salva — sem quiz em branco reeditável.
+  const [answers, setAnswers] = useState<(number | null)[]>(() =>
+    alreadyDone ? m.quiz.map((q) => q.correct) : Array(m.quiz.length).fill(null),
+  );
+  const [checked, setChecked] = useState(alreadyDone);
   const tm = trimMeta(m.week);
-  const score = checked
-    ? Math.round((m.quiz.filter((q, i) => answers[i] === q.correct).length / m.quiz.length) * 100)
-    : 0;
+  const score = alreadyDone
+    ? savedScore
+    : checked
+      ? Math.round((m.quiz.filter((q, i) => answers[i] === q.correct).length / m.quiz.length) * 100)
+      : 0;
 
   function verify() {
     const s = Math.round(

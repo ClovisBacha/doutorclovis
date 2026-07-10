@@ -209,7 +209,7 @@
   h2,
   h3,
   .font-serif {
-    font-family: "DM Sans", system-ui, sans-serif;
+    font-family: var(--font-serif);
     font-weight: 700;
     letter-spacing: -0.022em;
     line-height: 1.15;

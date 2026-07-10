@@ -5,7 +5,7 @@ import logo from "@/assets/logo-obstetrica.png";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-border/60 bg-secondary/40">
+    <footer className="border-t border-border/60 bg-secondary/40 pb-[72px] md:pb-0">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-4">
         {/* Brand */}
         <div className="md:col-span-1">

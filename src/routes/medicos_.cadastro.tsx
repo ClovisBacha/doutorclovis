@@ -19,7 +19,7 @@ export const Route = createFileRoute("/medicos_/cadastro")({
   component: CadastroMedicoPage,
 });
 
-type Step = "auth" | "perfil";
+type Step = "auth" | "perfil" | "confirm-email";
 
 function CadastroMedicoPage() {
   const navigate = useNavigate();
@@ -28,6 +28,9 @@ function CadastroMedicoPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  // Sessão pré-existente (ex.: conta de paciente): confirmar a intenção antes
+  // de criar um perfil de médico por cima da mesma conta.
+  const [existingSession, setExistingSession] = useState<string | null>(null);
 
   const [profile, setProfile] = useState({
     display_name: "",
@@ -38,12 +41,22 @@ function CadastroMedicoPage() {
     pix_key: "",
   });
 
-  // Já logado? Pula direto para o perfil profissional
+  // Já logado? Vai para o perfil profissional, mas avisa qual conta está em
+  // uso e oferece trocar — evita paciente virando "médico" sem perceber.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setStep("perfil");
+      if (data.session) {
+        setExistingSession(data.session.user.email ?? "sua conta atual");
+        setStep("perfil");
+      }
     });
   }, []);
+
+  async function switchAccount() {
+    await supabase.auth.signOut();
+    setExistingSession(null);
+    setStep("auth");
+  }
 
   async function submitAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -90,7 +103,8 @@ function CadastroMedicoPage() {
       }
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        toast.success("Confira seu e-mail para confirmar a conta e volte para continuar.");
+        // Confirmação de e-mail ativa: um toast some — a tela precisa ficar.
+        setStep("confirm-email");
         return;
       }
       setStep("perfil");
@@ -119,7 +133,11 @@ function CadastroMedicoPage() {
         data: { accessToken: s.session.access_token, profile },
       });
       if (!res.ok) {
-        toast.error("Não foi possível criar seu perfil. Tente novamente.");
+        toast.error(
+          "error" in res && res.error
+            ? `Não foi possível criar seu perfil: ${res.error}`
+            : "Não foi possível criar seu perfil. Tente novamente.",
+        );
         return;
       }
       toast.success("Bem-vindo(a)! Seu consultório digital está pronto. 🎉");
@@ -164,6 +182,49 @@ function CadastroMedicoPage() {
             2. Perfil médico
           </span>
         </div>
+
+        {step === "confirm-email" && (
+          <div className="mt-8 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-4xl">📬</p>
+            <h2 className="mt-3 font-serif text-xl">Confirme seu e-mail</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Enviamos um link de confirmação para <strong>{email}</strong>. Clique nele e volte a
+              esta página para continuar o cadastro do seu consultório.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="press mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground"
+            >
+              Já confirmei — continuar
+            </button>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Não chegou? Olhe o spam ou{" "}
+              <button
+                type="button"
+                onClick={() => setStep("auth")}
+                className="font-semibold text-primary hover:underline"
+              >
+                tente outro e-mail
+              </button>
+              .
+            </p>
+          </div>
+        )}
+
+        {step === "perfil" && existingSession && (
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-xs text-amber-800">
+            Você está conectado como <strong>{existingSession}</strong>. O perfil de médico será
+            criado nesta conta.{" "}
+            <button
+              type="button"
+              onClick={switchAccount}
+              className="font-semibold text-amber-900 underline"
+            >
+              Usar outra conta
+            </button>
+          </div>
+        )}
 
         {step === "auth" ? (
           <form
@@ -210,7 +271,7 @@ function CadastroMedicoPage() {
               </button>
             </p>
           </form>
-        ) : (
+        ) : step === "perfil" ? (
           <form
             onSubmit={submitPerfil}
             className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
@@ -282,7 +343,7 @@ function CadastroMedicoPage() {
               ficam protegidos por Row Level Security e LGPD.
             </p>
           </form>
-        )}
+        ) : null}
       </div>
     </main>
   );

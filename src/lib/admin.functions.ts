@@ -147,6 +147,76 @@ export const updateAppointmentStatus = createServerFn({ method: "POST" })
     return { ok: !error };
   });
 
+const ConfirmSchema = z.object({
+  accessToken: z.string().min(10),
+  id: z.string().uuid(),
+  confirmedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  confirmedTime: z.string().min(4).max(8),
+  priceBrl: z.number().int().nullable(),
+  internalNotes: z.string().max(2000).nullable(),
+});
+
+/**
+ * Confirma um pedido de consulta com data/hora (service role — o UPDATE pelo
+ * navegador dependia de claim is_admin no JWT e falhava silenciosamente).
+ * Recusa quando já existe outra consulta confirmada no mesmo horário.
+ */
+export const confirmAppointment = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => ConfirmSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, error: "Sem permissão." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Conflito de slot: outra consulta confirmada na mesma data/hora
+    const { data: clash } = await (supabaseAdmin as any)
+      .from("appointment_requests")
+      .select("id, patient_name")
+      .eq("status", "confirmed")
+      .eq("confirmed_date", data.confirmedDate)
+      .eq("confirmed_time", data.confirmedTime)
+      .neq("id", data.id)
+      .limit(1);
+    if (clash?.length) {
+      return {
+        ok: false as const,
+        error: `Já existe consulta confirmada nesse horário (${clash[0].patient_name ?? "outra paciente"}).`,
+      };
+    }
+
+    const { error } = await (supabaseAdmin as any)
+      .from("appointment_requests")
+      .update({
+        status: "confirmed",
+        confirmed_date: data.confirmedDate,
+        confirmed_time: data.confirmedTime,
+        price_brl: data.priceBrl,
+        internal_notes: data.internalNotes,
+      })
+      .eq("id", data.id);
+    return error
+      ? { ok: false as const, error: error.message }
+      : { ok: true as const, error: null };
+  });
+
+const PaidSchema = z.object({ accessToken: z.string().min(10), id: z.string().uuid() });
+
+/** Marca o pagamento de uma consulta como recebido (service role). */
+export const markAppointmentPaid = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => PaidSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, error: "Sem permissão." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("appointment_requests")
+      .update({ payment_status: "pago" })
+      .eq("id", data.id);
+    return error
+      ? { ok: false as const, error: error.message }
+      : { ok: true as const, error: null };
+  });
+
 const AnswerSchema = z.object({
   accessToken: z.string().min(10),
   id: z.string().uuid(),

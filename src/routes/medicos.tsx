@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Reveal } from "@/components/reveal";
@@ -195,7 +197,8 @@ function MedicosPage() {
     e.preventDefault();
     if (!leadForm.name || !leadForm.email) return;
     setSubmitting(true);
-    await (supabase as any).from("doctor_leads").insert({
+    // Nunca engolir o erro: um lead perdido em silêncio é um cliente perdido.
+    const { error } = await (supabase as any).from("doctor_leads").insert({
       name: leadForm.name,
       email: leadForm.email,
       phone: leadForm.phone || null,
@@ -203,8 +206,12 @@ function MedicosPage() {
       city: leadForm.city || null,
       message: leadForm.message || null,
     });
-    setSubmitted(true);
     setSubmitting(false);
+    if (error) {
+      toast.error("Não conseguimos enviar seu contato. Tente de novo ou chame no WhatsApp.");
+      return;
+    }
+    setSubmitted(true);
   }
 
   return (
@@ -757,11 +764,10 @@ function MedicosPage() {
                     className="flex w-full items-center justify-between px-6 py-4 text-left text-sm font-medium hover:bg-secondary/40"
                   >
                     <span>{faq.q}</span>
-                    <span
-                      className={`ml-4 shrink-0 transition-transform ${openFaq === i ? "rotate-180" : ""}`}
-                    >
-                      ▾
-                    </span>
+                    <ChevronDown
+                      aria-hidden
+                      className={`ml-4 h-4 w-4 shrink-0 transition-transform ${openFaq === i ? "rotate-180" : ""}`}
+                    />
                   </button>
                   {openFaq === i && (
                     <div className="border-t border-border px-6 pb-5 pt-3 text-sm text-muted-foreground">

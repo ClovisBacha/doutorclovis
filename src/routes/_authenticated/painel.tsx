@@ -10,12 +10,15 @@ import {
   markPreConsultaSeen,
   setQuestionAnswered,
   updateAppointmentStatus,
+  confirmAppointment,
+  markAppointmentPaid,
   type AdminAppointment,
   type AdminPreConsulta,
   type AdminQuestion,
   type PatientEngagement,
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
+import { ymdLocal } from "@/lib/utils";
 import {
   getTeleconsultasAdmin,
   createTeleconsulta,
@@ -956,24 +959,21 @@ function AppointmentsSection({
   async function saveConfirmation(a: AdminAppointment) {
     if (!confirmForm.date || !confirmForm.time) return;
     setSaving(true);
-    // .select() para detectar update que não afetou nenhuma linha (ex.: RLS)
-    const { data, error } = await (supabase as any)
-      .from("appointment_requests")
-      .update({
-        status: "confirmed",
-        confirmed_date: confirmForm.date,
-        confirmed_time: confirmForm.time,
-        price_brl: confirmForm.price ? Math.round(Number(confirmForm.price) * 100) : null,
-        internal_notes: confirmForm.notes || null,
-      })
-      .eq("id", a.id)
-      .select("id");
+    // Server function com service role: o UPDATE direto do navegador dependia
+    // de claim is_admin no JWT (RLS) e falhava silenciosamente sem ele.
+    const res = await confirmAppointment({
+      data: {
+        accessToken: await token(),
+        id: a.id,
+        confirmedDate: confirmForm.date,
+        confirmedTime: confirmForm.time,
+        priceBrl: confirmForm.price ? Math.round(Number(confirmForm.price) * 100) : null,
+        internalNotes: confirmForm.notes || null,
+      },
+    });
     setSaving(false);
-    if (error || !data?.length) {
-      toast.error(
-        "Não foi possível confirmar a consulta. Verifique sua permissão de administrador e tente novamente." +
-          (error ? ` (${error.message})` : ""),
-      );
+    if (!res.ok) {
+      toast.error(res.error || "Não foi possível confirmar a consulta. Tente novamente.");
       return;
     }
     onChangeStatus(a.id, "confirmed");
@@ -982,16 +982,9 @@ function AppointmentsSection({
   }
 
   async function markPaid(id: string) {
-    const { data, error } = await (supabase as any)
-      .from("appointment_requests")
-      .update({ payment_status: "pago" })
-      .eq("id", id)
-      .select("id");
-    if (error || !data?.length) {
-      toast.error(
-        "Não foi possível marcar como pago. Tente novamente." +
-          (error ? ` (${error.message})` : ""),
-      );
+    const res = await markAppointmentPaid({ data: { accessToken: await token(), id } });
+    if (!res.ok) {
+      toast.error(res.error || "Não foi possível marcar como pago. Tente novamente.");
       return;
     }
     onRefresh();
@@ -1019,17 +1012,33 @@ function AppointmentsSection({
       "PRODID:-//Obstetrica//Agenda//PT-BR",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
+      // VTIMEZONE é obrigatório quando DTSTART usa TZID (RFC 5545).
+      // Brasil não tem horário de verão desde 2019: offset fixo -03.
+      "BEGIN:VTIMEZONE",
+      "TZID:America/Sao_Paulo",
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      "TZOFFSETFROM:-0300",
+      "TZOFFSETTO:-0300",
+      "TZNAME:-03",
+      "END:STANDARD",
+      "END:VTIMEZONE",
     ];
+    const dtstamp = `${ymdLocal().replace(/-/g, "")}T000000Z`;
     for (const a of confirmed) {
       const d = (a as any).confirmed_date as string;
       const t = ((a as any).confirmed_time ?? "08:00") as string;
       const start = `${d.replace(/-/g, "")}T${t.replace(":", "")}00`;
+      // Fim = início + 1h via aritmética de Date: vira o dia corretamente
+      // (23:00 → 00:00 do dia seguinte, sem gerar hora 24 inválida).
       const [h, m] = t.split(":").map(Number);
-      const endH = String(h + 1).padStart(2, "0");
-      const end = `${d.replace(/-/g, "")}T${endH}${String(m).padStart(2, "0")}00`;
+      const endDate = new Date(`${d}T00:00:00`);
+      endDate.setHours(h + 1, m);
+      const end = `${ymdLocal(endDate).replace(/-/g, "")}T${String(endDate.getHours()).padStart(2, "0")}${String(endDate.getMinutes()).padStart(2, "0")}00`;
       lines.push(
         "BEGIN:VEVENT",
         `UID:${a.id}@doutorclovis`,
+        `DTSTAMP:${dtstamp}`,
         `DTSTART;TZID=America/Sao_Paulo:${start}`,
         `DTEND;TZID=America/Sao_Paulo:${end}`,
         `SUMMARY:Consulta — ${a.patient_name}`,
@@ -2883,7 +2892,7 @@ function CalendárioSection({
   );
 
   function getAppts(day: Date) {
-    const iso = day.toISOString().slice(0, 10);
+    const iso = ymdLocal(day);
     return confirmedAppts
       .filter((a) => (a as any).confirmed_date === iso)
       .sort((a, b) =>
@@ -2891,7 +2900,7 @@ function CalendárioSection({
       );
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymdLocal();
 
   const weekLabel = `${weekDays[0].toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} — ${weekDays[6].toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}`;
 
@@ -2931,7 +2940,7 @@ function CalendárioSection({
       {/* Week grid */}
       <div className="grid grid-cols-7 gap-1.5">
         {weekDays.map((day, i) => {
-          const iso = day.toISOString().slice(0, 10);
+          const iso = ymdLocal(day);
           const isToday = iso === today;
           const dayAppts = getAppts(day);
           return (

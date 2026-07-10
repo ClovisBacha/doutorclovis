@@ -147,12 +147,12 @@ function PricingCard({ tier }: { tier: PricingGlassTier }) {
           {tier.name}
         </motion.h3>
 
-        <motion.p variants={legoVariant} className="mt-1 text-sm font-medium text-white/45">
+        <motion.p variants={legoVariant} className="mt-1 text-sm font-medium text-white/65">
           {tier.tagline}
         </motion.p>
 
         {(tier.fromPrefix || tier.oldPrice) && (
-          <motion.span variants={legoVariant} className="mt-4 text-xs text-white/40">
+          <motion.span variants={legoVariant} className="mt-4 text-xs text-white/60">
             {tier.oldPrice ? (
               <>
                 de{" "}
@@ -171,7 +171,7 @@ function PricingCard({ tier }: { tier: PricingGlassTier }) {
           variants={legoVariant}
           className={`mb-2 flex items-baseline gap-1 ${tier.fromPrefix || tier.oldPrice ? "mt-1" : "mt-4"}`}
         >
-          <span className="text-2xl font-medium tracking-tight text-white/40">{currency}</span>
+          <span className="text-2xl font-medium tracking-tight text-white/60">{currency}</span>
           {/* overflow-y-hidden clipa só o eixo vertical (slide da animação);
               shrink-0 impede o flexbox de encolher e cortar o último dígito. */}
           <div className="flex h-[60px] shrink-0 items-center overflow-y-hidden">
@@ -188,7 +188,7 @@ function PricingCard({ tier }: { tier: PricingGlassTier }) {
               </motion.span>
             </AnimatePresence>
           </div>
-          <span className="ml-1 text-lg font-medium text-white/40">{period}</span>
+          <span className="ml-1 text-lg font-medium text-white/60">{period}</span>
         </motion.div>
 
         {tier.footnote && (

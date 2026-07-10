@@ -12,6 +12,7 @@ import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
+import { ymdLocal } from "@/lib/utils";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
@@ -46,12 +47,7 @@ import {
   type NameEntry,
   type NameSession,
 } from "@/lib/family.functions";
-import {
-  getCourseProgress,
-  markModuleComplete,
-  savePanicEvent,
-  type CourseProgress,
-} from "@/lib/escola.functions";
+import { getCourseProgress, savePanicEvent, type CourseProgress } from "@/lib/escola.functions";
 import { COURSE_MODULES } from "@/lib/course-modules";
 import {
   checkAndAwardAchievements,
@@ -4096,7 +4092,7 @@ function weekToDate(targetWeek: number, profile: Profile): Date | null {
 }
 
 function toGoogleCalUrl(label: string, date: Date) {
-  const ymd = date.toISOString().slice(0, 10).replace(/-/g, "");
+  const ymd = ymdLocal(date).replace(/-/g, "");
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: `Pré-natal: ${label}`,
@@ -4138,15 +4134,23 @@ function PrenatalCalendarTab({
 
   function downloadAllIcs() {
     const events: string[] = [];
+    // DTSTAMP é obrigatório no VEVENT (RFC 5545); DTEND de evento all-day é
+    // EXCLUSIVO — precisa ser o dia seguinte, senão o evento tem duração zero
+    // e alguns clientes o descartam.
+    const dtstamp = `${ymdLocal().replace(/-/g, "")}T000000Z`;
     PRENATAL_MILESTONES.forEach((m) => {
       const d = weekToDate(m.week, profile!);
       if (!d) return;
-      const ymd = d.toISOString().slice(0, 10).replace(/-/g, "");
+      const ymd = ymdLocal(d).replace(/-/g, "");
+      const next = new Date(d);
+      next.setDate(next.getDate() + 1);
+      const ymdEnd = ymdLocal(next).replace(/-/g, "");
       const lines = [
         "BEGIN:VEVENT",
         `UID:prenatal-${m.week}-${m.label.slice(0, 10).replace(/\s/g, "")}@doutorclovis`,
+        `DTSTAMP:${dtstamp}`,
         `DTSTART;VALUE=DATE:${ymd}`,
-        `DTEND;VALUE=DATE:${ymd}`,
+        `DTEND;VALUE=DATE:${ymdEnd}`,
         `SUMMARY:Pré-natal S${m.week}: ${m.label}`,
         m.detail ? `DESCRIPTION:${m.detail}` : "",
         "END:VEVENT",
@@ -5629,7 +5633,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         if (!d) continue;
         all.push({
           id: `milestone-${m.week}-${m.label}`,
-          date: d.toISOString().slice(0, 10),
+          date: ymdLocal(d),
           type: "consulta",
           title: `📌 ${m.label} (semana ${m.week})`,
           detail: m.detail,
@@ -9945,7 +9949,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
   const [milestones, setMilestones] = useState<BabyMilestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState<string | null>(null);
-  const [dateInput, setDateInput] = useState(new Date().toISOString().slice(0, 10));
+  const [dateInput, setDateInput] = useState(ymdLocal());
 
   useEffect(() => {
     (async () => {
@@ -10089,7 +10093,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
 function VaccinesSection({ birthDate }: { birthDate: Date }) {
   const [vaccines, setVaccines] = useState<BabyVaccine[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateInput, setDateInput] = useState(new Date().toISOString().slice(0, 10));
+  const [dateInput, setDateInput] = useState(ymdLocal());
 
   useEffect(() => {
     (async () => {
@@ -10208,7 +10212,7 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
 
 function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Profile }) {
   const [babyWeight, setBabyWeight] = useState("");
-  const [weightDate, setWeightDate] = useState(new Date().toISOString().slice(0, 10));
+  const [weightDate, setWeightDate] = useState(ymdLocal());
   const [weights, setWeights] = useState<BabyWeight[]>([]);
   const [saving, setSaving] = useState(false);
 

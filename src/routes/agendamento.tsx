@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ymdLocal } from "@/lib/utils";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { CalendarPlus, Check, Loader2 } from "lucide-react";
@@ -36,6 +37,7 @@ function downloadIcs(b: Booked) {
     "PRODID:-//Dr Clovis Bacha//Agendamento//PT-BR",
     "BEGIN:VEVENT",
     `UID:${start}-${Math.random().toString(36).slice(2)}@doutorclovis`,
+    `DTSTAMP:${toCalStamp(b.date, b.time)}`,
     `DTSTART:${start}`,
     `DTEND:${end}`,
     "SUMMARY:Consulta com Dr. Clóvis Bacha (a confirmar)",
@@ -75,7 +77,7 @@ function AgendamentoPage() {
   const [done, setDone] = useState(false);
   const [booked, setBooked] = useState<Booked | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymdLocal();
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
