@@ -8,6 +8,8 @@ export const DOCTOR = {
   rqe: "RQE ●●●●",
   /** E-mail profissional público */
   email: "contato@drclovisbacha.com.br",
+  /** E-mail de SUPORTE da plataforma Obstétrica (chat primeiro, e-mail depois) */
+  supportEmail: "obstetrica.app@gmail.com",
   /** WhatsApp com DDI (usado pelo componente whatsapp-button) */
   whatsappUrl: "https://wa.me/5531986342903",
   whatsappDisplay: "+55 (31) 98634-2903",

@@ -14,6 +14,7 @@ import { TabSkeleton } from "@/components/tab-skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
 import { ymdLocal } from "@/lib/utils";
+import { getMyDoctor } from "@/lib/doctors.functions";
 import { getMyAppointments, type MyAppointment } from "@/lib/appointments.functions";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
@@ -389,6 +390,7 @@ function MinhaContaPage() {
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isDoctor, setIsDoctor] = useState(false);
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
   // Navegação disparada de DENTRO de uma aba (ex.: "Configure em Perfil") —
@@ -452,6 +454,15 @@ function MinhaContaPage() {
       if (s.session?.access_token) {
         const r = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
         setIsAdmin(r.isAdmin);
+        // Médico cadastrado (ativo) também acessa o painel do consultório
+        if (!r.isAdmin) {
+          try {
+            const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
+            if (me.ok && me.doctor?.active) setIsDoctor(true);
+          } catch {
+            /* sem perfil de médico */
+          }
+        }
       }
     })();
   }, []);
@@ -543,7 +554,7 @@ function MinhaContaPage() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            {isAdmin && (
+            {(isAdmin || isDoctor) && (
               <Link
                 to="/painel"
                 className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
@@ -566,7 +577,7 @@ function MinhaContaPage() {
             {mobileHome ? `Olá, ${firstName} 💛` : SECTION_TITLES[activeSection]}
           </p>
           <div className="flex items-center gap-2">
-            {isAdmin && (
+            {(isAdmin || isDoctor) && (
               <Link
                 to="/painel"
                 className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
@@ -8940,7 +8951,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
             </span>
           </button>
           <a
-            href={`mailto:${DOCTOR.email}?subject=${encodeURIComponent("Preciso de ajuda — app Obstétrica")}&body=${encodeURIComponent("Olá! Já tentei pelo chat e ainda preciso de ajuda com: ")}`}
+            href={`mailto:${DOCTOR.supportEmail}?subject=${encodeURIComponent("Preciso de ajuda — app Obstétrica")}&body=${encodeURIComponent("Olá! Já tentei pelo chat e ainda preciso de ajuda com: ")}`}
             className="press flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-lg">
@@ -8951,7 +8962,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
                 Não resolveu? Mande um e-mail
               </span>
               <span className="block text-xs text-muted-foreground">
-                {DOCTOR.email} — resposta em até 1 dia útil
+                {DOCTOR.supportEmail} — resposta em até 1 dia útil
               </span>
             </span>
           </a>

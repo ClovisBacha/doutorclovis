@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getMyDoctor } from "@/lib/doctors.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -36,6 +37,8 @@ function translateAuthError(msg: string): string {
 function AuthPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
+  // Papel escolhido: define o destino pós-login e o fluxo de cadastro.
+  const [role, setRole] = useState<"paciente" | "medico">("paciente");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -46,8 +49,20 @@ function AuthPage() {
   const [resendLoading, setResendLoading] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/minha-conta" });
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return;
+      // Conta com perfil de médico ATIVO vai para o painel;
+      // as demais, para o app da paciente.
+      try {
+        const me = await getMyDoctor({ data: { accessToken: data.session.access_token } });
+        if (me.ok && me.doctor?.active) {
+          navigate({ to: "/painel" });
+          return;
+        }
+      } catch {
+        /* sem rede/perfil: segue como paciente */
+      }
+      navigate({ to: "/minha-conta" });
     });
   }, [navigate]);
 
@@ -87,6 +102,16 @@ function AuthPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (role === "medico") {
+          // Médico: painel se o perfil profissional existe e está ativo;
+          // senão, completar o cadastro (o fluxo reconhece a sessão).
+          const { data: s } = await supabase.auth.getSession();
+          const me = s.session
+            ? await getMyDoctor({ data: { accessToken: s.session.access_token } })
+            : null;
+          navigate({ to: me?.ok && me.doctor?.active ? "/painel" : "/medicos/cadastro" });
+          return;
+        }
         navigate({ to: "/minha-conta" });
       }
     } catch (err: unknown) {
@@ -190,8 +215,57 @@ function AuthPage() {
           ? "Digite seu e-mail e enviaremos um link para redefinir a senha."
           : mode === "reset"
             ? "Escolha uma nova senha para sua conta."
-            : "Acompanhe semana a semana o desenvolvimento do seu bebê, salve seu diário gestacional e muito mais."}
+            : role === "medico"
+              ? "Acesse o painel do seu consultório: pacientes, agenda e o seu Segundo Cérebro."
+              : "Acompanhe semana a semana o desenvolvimento do seu bebê, salve seu diário gestacional e muito mais."}
       </p>
+
+      {/* ── Papel: paciente ou médico (define destino e fluxo de cadastro) ── */}
+      {(mode === "login" || mode === "signup") && (
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          {(
+            [
+              { key: "paciente", emoji: "🤰", label: "Sou paciente" },
+              { key: "medico", emoji: "🩺", label: "Sou médico(a)" },
+            ] as const
+          ).map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => setRole(r.key)}
+              aria-pressed={role === r.key}
+              className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition-all ${
+                role === r.key
+                  ? "border-primary bg-primary/10 text-primary shadow-[var(--shadow-soft)]"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/40"
+              }`}
+            >
+              {r.emoji} {r.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Cadastro de médico tem fluxo próprio (CRM, perfil profissional) ── */}
+      {mode === "signup" && role === "medico" && (
+        <div className="mt-8 rounded-3xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)]">
+          <p className="text-4xl">🩺</p>
+          <h2 className="mt-3 font-serif text-xl">Criar conta de médico</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            O cadastro de médico tem uma etapa própria: conta profissional + perfil com CRM e
+            especialidade — é com ele que suas pacientes encontram você.
+          </p>
+          <Link
+            to="/medicos/cadastro"
+            className="press mt-5 inline-block rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
+          >
+            Continuar cadastro de médico →
+          </Link>
+          <p className="mt-3 text-xs text-muted-foreground">
+            14 dias grátis · sem cartão de crédito
+          </p>
+        </div>
+      )}
 
       {/* ── Forgot password form ── */}
       {mode === "forgot" && (
@@ -302,7 +376,7 @@ function AuthPage() {
       )}
 
       {/* ── Login / Signup form ── */}
-      {(mode === "login" || mode === "signup") && (
+      {(mode === "login" || (mode === "signup" && role !== "medico")) && (
         <form
           onSubmit={submit}
           className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
