@@ -47,15 +47,17 @@ export function SiteFooter() {
                 <span className="text-xs text-muted-foreground">(WhatsApp)</span>
               </a>
             </li>
-            <li className="flex items-center gap-2">
-              <Mail className="h-4 w-4 flex-shrink-0 text-primary" />
-              <a href={`mailto:${DOCTOR.email}`} className="hover:text-primary transition-colors">
-                {DOCTOR.email}
-              </a>
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80">
-                Suporte: comece pelo <strong>chat do app</strong> (na hora); se precisar, e-mail com
-                resposta em até 1 dia útil.
-              </p>
+            <li className="flex items-start gap-2">
+              <Mail className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+              <div className="min-w-0">
+                <a href={`mailto:${DOCTOR.email}`} className="hover:text-primary transition-colors">
+                  {DOCTOR.email}
+                </a>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">
+                  Suporte: comece pelo <strong>chat do app</strong> (na hora); se precisar, e-mail
+                  com resposta em até 1 dia útil.
+                </p>
+              </div>
             </li>
             {DOCTOR.address && (
               <li className="flex items-start gap-2">

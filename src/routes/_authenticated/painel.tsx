@@ -4230,6 +4230,8 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         ps.map((x) => (x.id === p.id ? { ...x, quiz_premium: !p.quiz_premium } : x)),
       );
       toast.success(!p.quiz_premium ? "Aulas premium ativadas ⭐" : "Premium desativado.");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
     } finally {
       setPremiumBusyId(null);
     }

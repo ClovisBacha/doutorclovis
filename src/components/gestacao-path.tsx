@@ -2159,7 +2159,7 @@ function QuizPaywall({ week }: { week: number }) {
         </div>
       )}
 
-      <p className="mt-2 text-center text-[10px] text-amber-700/80" style={{ color: tm.lip }}>
+      <p className="mt-2 text-center text-[10px] text-amber-700/80">
         A aula de hoje continua grátis, todos os dias 💛
       </p>
     </div>
