@@ -164,13 +164,13 @@ function Index() {
       <section className="relative -mt-[73px] overflow-hidden pt-[73px]">
         <SkyCanvas sky={sky} />
         <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pt-12 pb-24 md:grid-cols-[1.1fr_1fr] md:pt-20 md:pb-32">
-          <div>
+          {/* Painel Liquid Glass atrás do texto do hero: refrata o céu vivo e
+              garante contraste do texto em qualquer clima/hora do dia. */}
+          <div className="liquid-glass rounded-[2rem] p-6 md:p-9">
             <Reveal variant="blur">
               <p
-                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] backdrop-blur-md ${
-                  sky.isDark
-                    ? "border border-white/20 bg-white/10 text-white"
-                    : "border border-primary/20 bg-white/60 text-primary"
+                className={`glass-chip text-[11px] font-bold uppercase tracking-[0.22em] ${
+                  sky.isDark ? "text-white" : "text-primary"
                 }`}
               >
                 <Sparkles className="h-3 w-3 animate-[sparkle_2.4s_ease-in-out_infinite]" />O app da
@@ -178,7 +178,9 @@ function Index() {
               </p>
             </Reveal>
             <Reveal variant="up" delay={120}>
-              <h1 className={`mt-4 font-serif text-4xl leading-[1.05] md:text-6xl ${heroText}`}>
+              <h1
+                className={`mt-4 font-serif text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl ${heroText}`}
+              >
                 A gestação inteira <ShimmerText className="not-italic">no seu bolso</ShimmerText>.
               </h1>
             </Reveal>
@@ -277,7 +279,7 @@ function Index() {
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
         <Reveal variant="up">
           <div className="mx-auto mb-16 max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
               Por dentro do app
             </p>
             <h2 className="mt-3 font-serif text-3xl md:text-5xl">
@@ -307,7 +309,7 @@ function Index() {
                   </PhoneFrame>
                 </Reveal>
                 <Reveal variant="up" delay={120}>
-                  <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                  <span className="glass-chip text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
                     {item.badge}
                   </span>
                   <h3 className="mt-4 font-serif text-2xl md:text-4xl">{item.title}</h3>
@@ -336,7 +338,7 @@ function Index() {
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <Reveal variant="up">
             <div className="mb-10 max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 Tudo que o app faz
               </p>
               <h2 className="mt-3 font-serif text-3xl md:text-4xl">
@@ -376,7 +378,7 @@ function Index() {
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <Reveal variant="up">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
               Em números
             </p>
             <h2 className="mt-3 font-serif text-3xl md:text-4xl">A experiência por trás do app.</h2>
@@ -422,7 +424,7 @@ function Index() {
         </Reveal>
         <div>
           <Reveal variant="up">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
               O especialista
             </p>
             <h2 className="mt-3 font-serif text-3xl md:text-4xl">

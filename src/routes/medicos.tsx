@@ -13,7 +13,7 @@ export const Route = createFileRoute("/medicos")({
       {
         name: "description",
         content:
-          "Agendamento inteligente, agente de IA no WhatsApp e cobrança PIX integrada. A plataforma feita por obstetra para obstetras. Sem contrato anual.",
+          "Uma IA treinada nas suas respostas atende suas pacientes 24h, no app e no WhatsApp. Feita por obstetra para obstetras. Sem contrato anual.",
       },
     ],
   }),
@@ -26,6 +26,9 @@ const LAUNCH_PROMO = { active: true, off: 0.25, label: "🚀 Lançamento" };
 
 // monthly = preço no plano mensal (0 = grátis). No plano ANUAL o médico paga
 // 10 meses e usa 12 (2 meses grátis ≈ 17% off) → mensal equivalente arredondado.
+// Regra de ouro dos planos: cada bullet é algo que o produto FAZ hoje (ou é
+// entregue com implantação assistida, e diz isso). Nada de promessa vaga,
+// número inventado ou recurso de roadmap vendido como pronto.
 const PLANS = [
   {
     key: "free",
@@ -35,49 +38,46 @@ const PLANS = [
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "Tudo o que você precisa para sair do caderno — de graça, para sempre.",
+    desc: "Saia do caderno e do zap pessoal — de graça, para sempre.",
     features: [
-      "Agenda online + confirmações",
-      "App de pré-natal para as suas pacientes",
-      "Prontuário gestacional + calculadoras clínicas",
+      "App de pré-natal completo para as suas pacientes",
+      "Solicitações de consulta organizadas em um só lugar",
+      "Calculadoras e ferramentas clínicas básicas",
       "Até 5 pacientes ativas",
-      "Sem fidelidade, sem cartão",
     ],
     cta: "Criar conta grátis",
   },
   {
     key: "starter",
     name: "Starter",
-    tagline: "A IA responde por você",
+    tagline: "A sua IA no app",
     monthly: 197,
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "Suas pacientes tiram dúvidas com a sua IA no app — você para de repetir as mesmas respostas.",
+    desc: "Uma IA treinada nas SUAS respostas atende suas pacientes no app — você para de repetir as mesmas orientações.",
     features: [
-      "Tudo do Free, pacientes ilimitadas",
-      "🧠 A sua IA responde as pacientes 24h (no app)",
-      "Ferramentas clínicas: biometria, EPDS, DMG, pré-eclâmpsia",
-      "Confirmações automáticas por WhatsApp",
-      "Cobrança PIX integrada",
+      "Pacientes ilimitadas",
+      "🧠 IA com as suas respostas, 24h no app",
+      "Pré-consulta digital + monitoramento (peso, pressão, chutes)",
+      "Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia)",
     ],
     cta: "Começar grátis por 14 dias",
   },
   {
     key: "pro",
     name: "Pro",
-    tagline: "A IA vira sua secretária",
+    tagline: "A IA também no WhatsApp",
     monthly: 347,
     isFrom: false,
     perSuffix: "",
     highlight: true,
-    desc: "A mesma IA agora atende e agenda no WhatsApp — menos faltas, menos trabalho de recepção.",
+    desc: "A mesma IA atende e agenda no WhatsApp do consultório — implantada junto com a nossa equipe.",
     features: [
       "Tudo do Starter",
-      "💬 A sua IA atende e agenda no WhatsApp (não só no app)",
-      "Detecta urgência e orienta SAMU/UPA sozinha",
-      "Lembretes automáticos → até 38% menos faltas",
-      "Dashboard: FAQ inteligente e risco de abandono",
+      "💬 IA atende e agenda no WhatsApp (implantação assistida)",
+      "Triagem de urgência com orientação SAMU/UPA",
+      "Dashboard do consultório: dúvidas frequentes e engajamento",
       "Suporte prioritário",
     ],
     cta: "Assinar Pro",
@@ -90,13 +90,12 @@ const PLANS = [
     isFrom: true,
     perSuffix: "/médico",
     highlight: false,
-    desc: "O Pro para vários médicos numa conta só — mais barato quanto maior a equipe.",
+    desc: "O Pro para vários médicos, cada um com a sua própria IA.",
     features: [
       "Tudo do Pro, para cada médico da equipe",
-      "Cada médico com a sua própria IA",
-      "Painel consolidado por médico",
-      "Preço por assento: 2–4 médicos R$297, 5+ R$247",
-      "Gerente de conta dedicado",
+      "Cada médico com a sua própria IA e o seu painel",
+      "Preço por assento: 2–4 médicos R$297 · 5+ R$247",
+      "Onboarding e migração assistidos",
     ],
     cta: "Falar com a equipe",
   },
@@ -124,7 +123,8 @@ const PAIN_POINTS = [
   {
     icon: "💸",
     problem: "Perda de milhares por mês com faltas",
-    solution: "Lembretes e confirmação automática no WhatsApp reduzem o no-show em até 38%.",
+    solution:
+      "A IA confirma a consulta e lembra a paciente no canal onde ela já está — menos cadeira vazia.",
   },
   {
     icon: "📵",
@@ -134,7 +134,7 @@ const PAIN_POINTS = [
   {
     icon: "💳",
     problem: "Taxa de cartão comendo o faturamento",
-    solution: "PIX nativo sem taxa. Recibo digital automático após a confirmação.",
+    solution: "Consultas particulares pagas por PIX, direto na sua chave — sem taxa de cartão.",
   },
 ];
 
@@ -166,7 +166,7 @@ const FAQS = [
   },
   {
     q: "Funciona com meu sistema atual (iClinic, Feegow)?",
-    a: "No Pro Equipe oferecemos integrações via API. Para Free, Starter e Pro, a plataforma funciona de forma independente — a migração de dados pode ser feita com ajuda da nossa equipe.",
+    a: "A plataforma funciona de forma independente do seu sistema atual — você pode usar os dois em paralelo. A migração de dados é feita com a ajuda da nossa equipe; integrações diretas são avaliadas caso a caso no Pro Equipe.",
   },
   {
     q: "Quantas pacientes posso ter?",
