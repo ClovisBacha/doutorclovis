@@ -167,20 +167,22 @@ function CadastroMedicoPage() {
             : "É com esses dados que suas pacientes vão te encontrar."}
         </p>
 
-        {/* Etapas */}
-        <div className="mt-6 flex items-center justify-center gap-2 text-xs font-semibold">
-          <span
-            className={`rounded-full px-3 py-1 ${step === "auth" ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary"}`}
-          >
-            1. Conta
-          </span>
-          <span className="h-px w-6 bg-border" />
-          <span
-            className={`rounded-full px-3 py-1 ${step === "perfil" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
-          >
-            2. Perfil médico
-          </span>
-        </div>
+        {/* Etapas (só nos passos de formulário) */}
+        {(step === "auth" || step === "perfil") && (
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs font-semibold">
+            <span
+              className={`rounded-full px-3 py-1 ${step === "auth" ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary"}`}
+            >
+              1. Conta
+            </span>
+            <span className="h-px w-6 bg-border" />
+            <span
+              className={`rounded-full px-3 py-1 ${step === "perfil" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
+            >
+              2. Perfil médico
+            </span>
+          </div>
+        )}
 
         {step === "confirm-email" && (
           <div className="mt-8 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">

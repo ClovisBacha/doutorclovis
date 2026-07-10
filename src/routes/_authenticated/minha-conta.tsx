@@ -4200,7 +4200,7 @@ function PrenatalCalendarTab({
     const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = "prenatal-dr-clovis.ics";
+    a.download = "prenatal-obstetrica.ics";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -5181,11 +5181,14 @@ const APPT_STATUS_UI: Record<
 };
 
 function formatApptDate(ymd: string): string {
-  return new Date(ymd + "T00:00:00").toLocaleDateString("pt-BR", {
+  const s = new Date(ymd + "T00:00:00").toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
     month: "long",
   });
+  // Só a primeira letra maiúscula ("Sexta-feira, 17 de julho") — a classe
+  // capitalize deixaria cada palavra maiúscula ("17 De Julho").
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function ConsultasTab() {
@@ -5342,7 +5345,9 @@ function ConsultasTab() {
   const upcoming = appts
     .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
     .sort((a, b) =>
-      (a.confirmed_date! + a.confirmed_time!).localeCompare(b.confirmed_date! + b.confirmed_time!),
+      (a.confirmed_date! + (a.confirmed_time ?? "")).localeCompare(
+        b.confirmed_date! + (b.confirmed_time ?? ""),
+      ),
     );
   const pending = appts
     .filter((a) => a.status === "pending")
@@ -5412,7 +5417,7 @@ function ConsultasTab() {
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-sm font-semibold capitalize">
+                <p className="mt-2 text-sm font-semibold">
                   {formatApptDate(a.confirmed_date!)} · {a.confirmed_time}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{a.reason}</p>
@@ -5425,7 +5430,7 @@ function ConsultasTab() {
                 >
                   {APPT_STATUS_UI.pending.emoji} {APPT_STATUS_UI.pending.label}
                 </span>
-                <p className="mt-2 text-sm capitalize">
+                <p className="mt-2 text-sm">
                   Você pediu {formatApptDate(a.preferred_date)} · {a.preferred_time}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">

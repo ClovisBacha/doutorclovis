@@ -49,7 +49,7 @@ function downloadIcs(b: Booked) {
   const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = "consulta-dr-clovis.ics";
+  a.download = "consulta-obstetrica.ics";
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -84,10 +84,17 @@ function AgendamentoPage() {
       .getUser()
       .then(({ data }) => {
         if (data.user?.email) {
-          setMe({
+          const info = {
             name: (data.user.user_metadata?.display_name as string) ?? "",
             email: data.user.email,
-          });
+          };
+          setMe(info);
+          // Prefill SEM remontar o input: só escreve se a usuária ainda não
+          // digitou nada (evita apagar texto numa corrida com a sessão).
+          const nameEl = document.querySelector<HTMLInputElement>('input[name="name"]');
+          const emailEl = document.querySelector<HTMLInputElement>('input[name="email"]');
+          if (nameEl && !nameEl.value && info.name) nameEl.value = info.name;
+          if (emailEl && !emailEl.value) emailEl.value = info.email;
         }
       })
       .catch(() => {});
@@ -207,21 +214,13 @@ function AgendamentoPage() {
               onSubmit={onSubmit}
               className="mt-10 grid gap-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] sm:p-8"
             >
-              <Field
-                key={`n-${me?.name ?? ""}`}
-                label="Nome completo"
-                name="name"
-                required
-                defaultValue={me?.name ?? ""}
-              />
+              <Field label="Nome completo" name="name" required />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field
-                  key={`e-${me?.email ?? ""}`}
                   label="E-mail"
                   type="email"
                   name="email"
                   required
-                  defaultValue={me?.email ?? ""}
                   hint={me ? "Use este e-mail para a consulta aparecer no seu app." : undefined}
                 />
                 <Field

@@ -1051,7 +1051,7 @@ function AppointmentsSection({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "agenda-dr-clovis.ics";
+    link.download = "agenda-obstetrica.ics";
     link.click();
     URL.revokeObjectURL(url);
   }

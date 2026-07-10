@@ -17,7 +17,7 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("appointment_requests").insert({
       patient_name: data.patient_name,
-      patient_email: data.patient_email,
+      patient_email: data.patient_email.toLowerCase(),
       patient_phone: data.patient_phone,
       preferred_date: data.preferred_date,
       preferred_time: data.preferred_time,
@@ -109,7 +109,10 @@ export const getMyAppointments = createServerFn({ method: "POST" })
       .select(
         "id, preferred_date, preferred_time, confirmed_date, confirmed_time, status, reason, price_brl, payment_status, created_at",
       )
-      .ilike("patient_email", email)
+      // ilike mantém a insensibilidade a maiúsculas para linhas antigas, mas o
+      // e-mail precisa ter %/_ escapados: sem isso viram curingas LIKE e uma
+      // conta maria_jose@ leria as consultas de maria.jose@ (vazamento).
+      .ilike("patient_email", email.replace(/([\\%_])/g, "\\$1"))
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) {
