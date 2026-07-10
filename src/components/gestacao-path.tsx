@@ -270,12 +270,21 @@ export function lsGet<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
+let warnedStorageBlocked = false;
+
 export function lsSet(key: string, value: unknown) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* quota/privado */
+    // Modo privado/cota cheia: o progresso local não está sendo salvo.
+    // Avisa UMA vez em vez de falhar em silêncio.
+    if (!warnedStorageBlocked) {
+      warnedStorageBlocked = true;
+      toast.error(
+        "Seu navegador está bloqueando o salvamento local — o progresso do dia pode se perder. Evite o modo anônimo.",
+      );
+    }
   }
   // A jornada pertence ao PERFIL da paciente, não ao aparelho: cada escrita
   // agenda uma sincronização do estado completo para journey_state no Supabase
@@ -758,6 +767,14 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
   const [showBirthForm, setShowBirthForm] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
 
+  // Premium ativado: limpa o flag de "comprovante enviado" (o paywall some,
+  // mas o flag sincronizado não deve ficar para sempre no blob da jornada).
+  useEffect(() => {
+    if (quizPremium && lsGet<string>("dc-path-premium-pending", "")) {
+      lsSet("dc-path-premium-pending", "");
+    }
+  }, [quizPremium]);
+
   /* ── Fases visíveis: bônus pós-data só aparece para quem precisa ── */
   const phases = useMemo<Phase[]>(
     () => (isPostDate ? [...PHASES, BONUS_PHASE] : PHASES),
@@ -802,6 +819,13 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
 
       // Só agora, se o perfil também não tem jornada, ela começa HOJE
       let js = lsGet<JourneyStart | null>(LS.journeyStart, null);
+      // DUM corrigida no Perfil pode jogar o início da jornada para o "futuro"
+      // (gestDay > hoje) — recalcula em vez de exibir dia negativo/travado.
+      if (js && js.gestDay > todayD) {
+        js = { date: localDateStr(), gestDay: todayD };
+        lsSet(LS.journeyStart, js);
+        toast("📅 Suas datas mudaram — a jornada foi recalculada a partir de hoje.");
+      }
       if (!js) {
         js = { date: localDateStr(), gestDay: todayD };
         lsSet(LS.journeyStart, js);
@@ -948,7 +972,11 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
     const reduced =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (quizForDay(D) && !reduced) {
+    // A intro só roda quando uma aula de verdade vem a seguir: hoje (grátis)
+    // ou revisão premium. Dia passado sem premium vai direto ao paywall —
+    // sem prometer 1,3s de aula que não vem.
+    const willHaveLesson = D === todayD || quizPremium;
+    if (quizForDay(D) && !reduced && willHaveLesson) {
       setIntro(D);
       return;
     }
@@ -984,7 +1012,12 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
 
   // Piso de 300 dias: cobre qualquer parto real mesmo para quem só abre o app
   // meses depois do nascimento (a única saída da jornada não pode ficar travada).
-  const birthMinDate = localDateStr(new Date(Date.now() - 300 * 86400000));
+  // 420 dias (~14 meses) cobre até quem só volta ao app bem depois do parto.
+  const birthMinDate = localDateStr(new Date(Date.now() - 420 * 86400000));
+
+  // Declarar o nascimento muda o app inteiro para o modo pós-parto — por isso
+  // o fluxo tem DOIS passos: validar a data e depois confirmar de verdade.
+  const [birthConfirming, setBirthConfirming] = useState(false);
 
   function declareBirth() {
     const today = localDateStr();
@@ -1000,12 +1033,27 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
       toast.error("Data muito antiga — confira o dia do nascimento.");
       return;
     }
+    if (!birthConfirming) {
+      setBirthConfirming(true);
+      return;
+    }
     const b = { date: birthDateInput };
     setBirth(b);
     lsSet(LS.birth, b);
     setCelebrated(false);
     lsSet(LS.celebrated, false);
     setShowBirthForm(false);
+    setBirthConfirming(false);
+  }
+
+  /** Desfaz um nascimento declarado por engano (disponível na celebração). */
+  function undoBirth() {
+    setBirth(null);
+    lsSet(LS.birth, null);
+    setCelebrated(false);
+    lsSet(LS.celebrated, false);
+    setBirthConfirming(false);
+    toast.success("Tudo certo — sua gestação continua aqui 💛");
   }
 
   async function share(week: number) {
@@ -1135,6 +1183,12 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
         >
           Começar o 4º trimestre 🍼
         </button>
+        <button
+          onClick={undoBirth}
+          className="text-xs font-medium text-muted-foreground underline underline-offset-2"
+        >
+          Declarei sem querer — voltar para a gestação
+        </button>
       </div>
     );
   }
@@ -1197,23 +1251,50 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
         <div className="rounded-3xl bg-white/80 p-5 backdrop-blur-sm">
           <p className="text-sm font-bold">{babyLabel} já nasceu? 🎉</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Informe a data para celebrar e começar a jornada do 4º trimestre.
+            Informe a data para celebrar e começar a jornada do 4º trimestre. Seu caminho e as
+            figurinhas continuam guardados — eles voltam a aparecer no álbum. 💛
           </p>
-          <div className="mt-3 flex gap-2">
-            <input
-              type="date"
-              value={birthDateInput}
-              max={localDateStr()}
-              onChange={(e) => setBirthDateInput(e.target.value)}
-              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
-            />
-            <button
-              onClick={declareBirth}
-              className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
-            >
-              Nasceu! 🎉
-            </button>
-          </div>
+          {birthConfirming ? (
+            <div className="mt-3 rounded-xl bg-pink-50 p-3">
+              <p className="text-sm font-bold text-pink-800">
+                Confirmar o nascimento em{" "}
+                {new Date(birthDateInput + "T00:00:00").toLocaleDateString("pt-BR")}?
+              </p>
+              <p className="mt-0.5 text-xs text-pink-700">
+                O app muda para o modo pós-parto (dá para desfazer logo em seguida).
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={declareBirth}
+                  className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                >
+                  Sim, nasceu! 🎉
+                </button>
+                <button
+                  onClick={() => setBirthConfirming(false)}
+                  className="press rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500"
+                >
+                  Ainda não
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 flex gap-2">
+              <input
+                type="date"
+                value={birthDateInput}
+                max={localDateStr()}
+                onChange={(e) => setBirthDateInput(e.target.value)}
+                className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+              />
+              <button
+                onClick={declareBirth}
+                className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+              >
+                Nasceu! 🎉
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1281,27 +1362,56 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
           ) : (
             <div>
               <p className="text-sm font-bold">Que dia {babyLabel} chegou?</p>
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="date"
-                  value={birthDateInput}
-                  max={localDateStr()}
-                  onChange={(e) => setBirthDateInput(e.target.value)}
-                  className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm"
-                />
-                <button
-                  onClick={declareBirth}
-                  className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
-                >
-                  Confirmar 🎉
-                </button>
-                <button
-                  onClick={() => setShowBirthForm(false)}
-                  className="press rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-500"
-                >
-                  ✕
-                </button>
-              </div>
+              {birthConfirming ? (
+                <div className="mt-2 rounded-xl bg-pink-50 p-3">
+                  <p className="text-sm font-bold text-pink-800">
+                    Confirmar o nascimento em{" "}
+                    {new Date(birthDateInput + "T00:00:00").toLocaleDateString("pt-BR")}?
+                  </p>
+                  <p className="mt-0.5 text-xs text-pink-700">
+                    O app muda para o modo pós-parto (dá para desfazer logo em seguida).
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={declareBirth}
+                      className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                    >
+                      Sim, nasceu! 🎉
+                    </button>
+                    <button
+                      onClick={() => setBirthConfirming(false)}
+                      className="press rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500"
+                    >
+                      Ainda não
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="date"
+                    value={birthDateInput}
+                    max={localDateStr()}
+                    onChange={(e) => setBirthDateInput(e.target.value)}
+                    className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm"
+                  />
+                  <button
+                    onClick={declareBirth}
+                    className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                  >
+                    Confirmar 🎉
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBirthForm(false);
+                      setBirthConfirming(false);
+                    }}
+                    className="press rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-500"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1522,6 +1632,9 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
                   <span className="relative z-10 text-2xl">{FRUIT_EMOJI[node.week] ?? "🍼"}</span>
                   <span className="dc-coin-shine" aria-hidden />
                 </div>
+                <span className="mt-1 rounded-full bg-white/85 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400 shadow-sm">
+                  memória
+                </span>
               </button>
             );
           }
@@ -1545,9 +1658,18 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
             <div key={`d${D}`}>
               <button
                 id={isToday ? "dc-today-node" : undefined}
-                onClick={() => openDay(D)}
-                disabled={isFuture}
-                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none disabled:cursor-not-allowed"
+                onClick={() => {
+                  if (isFuture) {
+                    const em = D - todayD;
+                    toast(
+                      `🔒 Esse dia abre ${em === 1 ? "amanhã" : `em ${em} dias`} — um passo de cada vez 💛`,
+                    );
+                    return;
+                  }
+                  openDay(D);
+                }}
+                aria-disabled={isFuture}
+                className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none ${isFuture ? "cursor-not-allowed" : ""}`}
                 style={{ left: `${node.x}%`, top: `${node.y}px` }}
                 aria-label={`Dia ${dayOfWeek} da semana ${week}`}
               >
@@ -1632,6 +1754,14 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
           const state = isToday ? dayTasks : dayTaskState(D);
           const done = doneDays.includes(D);
           const tm = trimMeta(week);
+          // Progresso explícito das 3 tarefas — evita o "respondi o quiz e o
+          // dia não completou" (faltava o check-in de humor).
+          const humorOk = isToday ? checkedToday || !!state.humor : !!state.humor;
+          const tasksChecked = [humorOk, !!state.desafio, !!state.leitura].filter(Boolean).length;
+          const missingHumorHint =
+            isToday && !humorOk
+              ? "Quase lá! Falta o check-in de humor — feche esta aula e toque em como você está 💛"
+              : null;
           return (
             <div
               className="fixed inset-0 z-50 flex items-end"
@@ -1676,7 +1806,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
 
                 <div className="mb-4 rounded-2xl bg-emerald-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                    ✅ Complete as 3 para ganhar o dia
+                    ✅ Complete as 3 para ganhar o dia · {tasksChecked}/3
                   </p>
                   <div className="mt-2 flex flex-col gap-2">
                     {[
@@ -1765,6 +1895,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
                       week={week}
                       alreadyDone={!!state.desafio || done}
                       canEarn={isToday}
+                      missingHint={missingHumorHint}
                       onEarn={() => markDayTask(D, "desafio", true)}
                     />
                   ) : (
@@ -2066,6 +2197,11 @@ function QuizPaywall({ week }: { week: number }) {
   const tm = trimMeta(week);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Comprovante já enviado? Mostra o estado "aguardando ativação" (sincroniza
+  // entre aparelhos via journey_state, prefixo dc-path-).
+  const [pendingSince, setPendingSince] = useState<string>(() =>
+    lsGet<string>("dc-path-premium-pending", ""),
+  );
   const pixKey = DOCTOR.pixKey;
 
   async function copyPix() {
@@ -2094,70 +2230,106 @@ function QuizPaywall({ week }: { week: number }) {
         <div className="min-w-0">
           <p className="text-sm font-extrabold text-amber-900">Aula premium 🔒</p>
           <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
-            No plano grátis você faz <strong>a aula de cada dia</strong> no próprio dia. Com o
-            premium, você desbloqueia <strong>todas as aulas já liberadas</strong> para fazer e
-            revisar quando quiser.
+            Essa aula é de um dia que já passou. No plano grátis você faz{" "}
+            <strong>a aula de cada dia</strong> no próprio dia. Com o premium, você desbloqueia{" "}
+            <strong>todas as aulas já liberadas</strong> para fazer e revisar quando quiser.
           </p>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-xl border border-amber-200 bg-white/70 p-2.5 text-center">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Mensal</p>
-          <p className="text-lg font-extrabold text-amber-900">
-            R$ {QUIZ_PRICE_MONTHLY.toFixed(2).replace(".", ",")}
+      {pendingSince ? (
+        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+          <p className="text-sm font-extrabold text-emerald-800">⏳ Comprovante enviado!</p>
+          <p className="mt-1 text-xs leading-relaxed text-emerald-700">
+            Seu acesso é liberado pelo consultório em até 24h (enviado em{" "}
+            {new Date(pendingSince + "T00:00:00").toLocaleDateString("pt-BR")}). Assim que liberar,
+            as aulas abrem sozinhas por aqui.
           </p>
-          <p className="text-[10px] text-amber-700">por mês</p>
+          <div className="mt-2 flex justify-center gap-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="press rounded-full bg-emerald-500 px-4 py-2 text-xs font-extrabold text-white"
+            >
+              Já fui liberada — atualizar
+            </button>
+            <button
+              onClick={() => {
+                lsSet("dc-path-premium-pending", "");
+                setPendingSince("");
+                setOpen(true);
+              }}
+              className="press rounded-full border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700"
+            >
+              Reenviar
+            </button>
+          </div>
         </div>
-        <div className="relative rounded-xl border-2 border-amber-400 bg-white p-2.5 text-center">
-          <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black text-white">
-            ECONOMIZE 50%
-          </span>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Anual</p>
-          <p className="text-lg font-extrabold text-amber-900">
-            R$ {QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}
-          </p>
-          <p className="text-[10px] text-amber-700">por mês · cobrado anualmente</p>
-        </div>
-      </div>
-
-      {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
-          style={{ boxShadow: "0 4px 0 #b45309" }}
-        >
-          ✨ Desbloquear as aulas
-        </button>
       ) : (
-        <div className="mt-3 rounded-xl bg-white/80 p-3">
-          <p className="text-xs font-bold text-amber-900">Como ativar (2 passos):</p>
-          <ol className="mt-1.5 space-y-1.5 text-xs text-amber-800">
-            <li>
-              1. Pague via PIX — mensal R$ 19,90 ou anual R$ 118,80 — para a chave:
-              <button
-                onClick={copyPix}
-                className="press mt-1 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-2.5 py-2 font-mono text-[11px] text-amber-900"
-              >
-                <span className="truncate">{pixKey}</span>
-                <span className="shrink-0 font-sans font-bold text-amber-600">
-                  {copied ? "copiado ✓" : "copiar"}
-                </span>
-              </button>
-            </li>
-            <li>
-              2. Envie o comprovante no WhatsApp — seu acesso é liberado em até 24h.
-              <a
-                href={`${DOCTOR.whatsappUrl}?text=${encodeURIComponent("Olá! Paguei o desbloqueio das aulas premium do app (quiz diário). Segue o comprovante do PIX.")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="press mt-1 block rounded-full bg-emerald-500 py-2.5 text-center text-xs font-extrabold text-white"
-              >
-                Enviar comprovante no WhatsApp
-              </a>
-            </li>
-          </ol>
-        </div>
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-amber-200 bg-white/70 p-2.5 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Mensal</p>
+              <p className="text-lg font-extrabold text-amber-900">
+                R$ {QUIZ_PRICE_MONTHLY.toFixed(2).replace(".", ",")}
+              </p>
+              <p className="text-[10px] text-amber-700">por mês</p>
+            </div>
+            <div className="relative rounded-xl border-2 border-amber-400 bg-white p-2.5 text-center">
+              <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black text-white">
+                ECONOMIZE 50%
+              </span>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Anual</p>
+              <p className="text-lg font-extrabold text-amber-900">
+                R$ {QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}
+              </p>
+              <p className="text-[10px] text-amber-700">por mês · cobrado anualmente</p>
+            </div>
+          </div>
+
+          {!open ? (
+            <button
+              onClick={() => setOpen(true)}
+              className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+              style={{ boxShadow: "0 4px 0 #b45309" }}
+            >
+              ✨ Desbloquear as aulas
+            </button>
+          ) : (
+            <div className="mt-3 rounded-xl bg-white/80 p-3">
+              <p className="text-xs font-bold text-amber-900">Como ativar (2 passos):</p>
+              <ol className="mt-1.5 space-y-1.5 text-xs text-amber-800">
+                <li>
+                  1. Pague via PIX — mensal R$ 19,90 ou anual R$ 118,80 — para a chave:
+                  <button
+                    onClick={copyPix}
+                    className="press mt-1 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-2.5 py-2 font-mono text-[11px] text-amber-900"
+                  >
+                    <span className="truncate">{pixKey}</span>
+                    <span className="shrink-0 font-sans font-bold text-amber-600">
+                      {copied ? "copiado ✓" : "copiar"}
+                    </span>
+                  </button>
+                </li>
+                <li>
+                  2. Envie o comprovante no WhatsApp — seu acesso é liberado em até 24h.
+                  <a
+                    href={`${DOCTOR.whatsappUrl}?text=${encodeURIComponent("Olá! Paguei o desbloqueio das aulas premium do app (quiz diário). Segue o comprovante do PIX.")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      const today = localDateStr();
+                      lsSet("dc-path-premium-pending", today);
+                      setPendingSince(today);
+                    }}
+                    className="press mt-1 block rounded-full bg-emerald-500 py-2.5 text-center text-xs font-extrabold text-white"
+                  >
+                    Enviar comprovante no WhatsApp
+                  </a>
+                </li>
+              </ol>
+            </div>
+          )}
+        </>
       )}
 
       <p className="mt-2 text-center text-[10px] text-amber-700/80">
@@ -2272,6 +2444,7 @@ function DailyQuizBlock({
   week,
   alreadyDone,
   canEarn,
+  missingHint,
   onEarn,
 }: {
   quiz: DailyQuiz;
@@ -2279,6 +2452,8 @@ function DailyQuizBlock({
   week: number;
   alreadyDone: boolean;
   canEarn: boolean;
+  /** Dica do que ainda falta para fechar o dia (ex.: check-in de humor). */
+  missingHint?: string | null;
   onEarn: () => void;
 }) {
   const [answers, setAnswers] = useState<(number | null)[]>([null, null]);
@@ -2371,7 +2546,7 @@ function DailyQuizBlock({
           </p>
           <p className="text-xs text-muted-foreground">
             {canEarn && !alreadyDone
-              ? "Tarefa da aula completa — continue o dia! ✓"
+              ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
               : "Modo revisão — o desafio vale no próprio dia, mas aprender vale sempre 💜"}
           </p>
         </div>
@@ -2681,9 +2856,18 @@ function PosPartoJourney({
             return (
               <button
                 key={`d${D}`}
-                onClick={() => openDay(D)}
-                disabled={isFuture}
-                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none disabled:cursor-not-allowed"
+                onClick={() => {
+                  if (isFuture) {
+                    const em = D - todayD;
+                    toast(
+                      `🔒 Esse dia abre ${em === 1 ? "amanhã" : `em ${em} dias`} — um passo de cada vez 💛`,
+                    );
+                    return;
+                  }
+                  openDay(D);
+                }}
+                aria-disabled={isFuture}
+                className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none ${isFuture ? "cursor-not-allowed" : ""}`}
                 style={{ left: `${node.x}%`, top: `${node.y}px` }}
                 aria-label={`Dia ${(D % 7) + 1} da semana ${week} de vida`}
               >
