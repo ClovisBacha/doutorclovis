@@ -471,7 +471,7 @@ function Index() {
               to="/sobre"
               className="group mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary underline underline-offset-4"
             >
-              Ver currículo completo{" "}
+              Conhecer nossa história{" "}
               <span className="transition-transform duration-300 [transition-timing-function:var(--ease-out-expo)] group-hover:translate-x-1">
                 →
               </span>

@@ -14,13 +14,9 @@ export function SiteFooter() {
             alt="Obstétrica — Excelência no atendimento à gestante"
             className="h-9 w-auto"
           />
-          <p className="mt-2 text-xs text-muted-foreground">by {DOCTOR.name}</p>
+          <p className="mt-2 text-xs text-muted-foreground">o app da sua gestação</p>
           <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-            {DOCTOR.title} · {DOCTOR.specialty}
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {DOCTOR.crm}
-            {DOCTOR.rqe && !DOCTOR.rqe.includes("●") ? ` · ${DOCTOR.rqe}` : ""}
+            Acompanhamento semana a semana, com o cuidado do seu médico — do positivo ao pós-parto.
           </p>
           <a
             href={DOCTOR.instagram}
@@ -118,7 +114,7 @@ export function SiteFooter() {
         {/* Sobre */}
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Doutor
+            Institucional
           </p>
           <ul className="mt-3 space-y-2 text-sm">
             <li>
@@ -126,7 +122,7 @@ export function SiteFooter() {
                 to="/sobre"
                 className="text-muted-foreground hover:text-primary transition-colors"
               >
-                Currículo e formação
+                Sobre nós — nossa história
               </Link>
             </li>
             <li>
@@ -168,9 +164,7 @@ export function SiteFooter() {
       {/* LGPD + copyright */}
       <div className="border-t border-border/60 px-5 py-5">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 text-center text-xs text-muted-foreground sm:flex-row sm:justify-between sm:text-left">
-          <p>
-            © {new Date().getFullYear()} {DOCTOR.name} · {DOCTOR.crm} · Todos os direitos reservados
-          </p>
+          <p>© {new Date().getFullYear()} Obstétrica · Todos os direitos reservados</p>
           <p className="max-w-sm">
             Os dados inseridos no app são protegidos pela <strong>LGPD (Lei 13.709/2018)</strong> e
             utilizados exclusivamente para acompanhamento de saúde. Não compartilhamos informações

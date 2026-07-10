@@ -7,12 +7,14 @@ import {
   tabToSection,
   type AppTab,
   type BottomSection,
+  type NextAppointment,
 } from "@/components/app-mobile-shell";
 import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
 import { ymdLocal } from "@/lib/utils";
+import { getMyAppointments, type MyAppointment } from "@/lib/appointments.functions";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
@@ -395,6 +397,36 @@ function MinhaContaPage() {
     setMobileHome(false);
   };
 
+  // Próxima consulta confirmada → card na home mobile (fecha o ciclo
+  // médico→paciente também na primeira tela do app).
+  const [nextAppt, setNextAppt] = useState<NextAppointment | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return;
+        const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
+        if (!res.ok) return;
+        const today = ymdLocal();
+        const next = res.appointments
+          .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
+          .sort((a, b) =>
+            (a.confirmed_date! + (a.confirmed_time ?? "")).localeCompare(
+              b.confirmed_date! + (b.confirmed_time ?? ""),
+            ),
+          )[0];
+        if (next) {
+          setNextAppt({
+            dateLabel: `${formatApptDate(next.confirmed_date!)} · ${next.confirmed_time ?? ""}`,
+            typeLabel: next.reason,
+          });
+        }
+      } catch {
+        /* card é enhancement — sem consulta, sem card */
+      }
+    })();
+  }, []);
+
   // Baixa a jornada da nuvem e arma a barreira anti-push logo no mount da
   // página, independente da aba ativa: abas como Sons/Quartinho gravam chaves
   // dc-path- sem montar a aba Caminho, então o pull inicial precisa acontecer
@@ -558,6 +590,7 @@ function MinhaContaPage() {
               babyName={profile?.baby_name ?? null}
               gest={gest}
               onNavigate={mobileNavigate}
+              nextAppointment={nextAppt}
             />
           </div>
         )}
@@ -5136,7 +5169,28 @@ type TranscribeResult = {
   error?: string;
 };
 
+/* Rótulo/estilo por status da consulta — o mesmo vocabulário do painel. */
+const APPT_STATUS_UI: Record<
+  MyAppointment["status"],
+  { label: string; cls: string; emoji: string }
+> = {
+  confirmed: { label: "Confirmada", cls: "bg-emerald-100 text-emerald-700", emoji: "✅" },
+  pending: { label: "Aguardando confirmação", cls: "bg-amber-100 text-amber-700", emoji: "⏳" },
+  done: { label: "Realizada", cls: "bg-slate-100 text-slate-500", emoji: "✔️" },
+  cancelled: { label: "Não confirmada", cls: "bg-rose-100 text-rose-600", emoji: "✖️" },
+};
+
+function formatApptDate(ymd: string): string {
+  return new Date(ymd + "T00:00:00").toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+  });
+}
+
 function ConsultasTab() {
+  const [appts, setAppts] = useState<MyAppointment[]>([]);
+  const [loadingAppts, setLoadingAppts] = useState(true);
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -5155,6 +5209,16 @@ function ConsultasTab() {
 
   useEffect(() => {
     loadNotes();
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return;
+        const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
+        if (res.ok) setAppts(res.appointments);
+      } finally {
+        setLoadingAppts(false);
+      }
+    })();
   }, []);
 
   async function loadNotes() {
@@ -5272,8 +5336,137 @@ function ConsultasTab() {
     }
   }
 
+  // Ordenação: confirmadas futuras primeiro (mais próxima no topo), depois
+  // pendentes, depois histórico (realizadas/não confirmadas) mais recente antes.
+  const today = ymdLocal();
+  const upcoming = appts
+    .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
+    .sort((a, b) =>
+      (a.confirmed_date! + a.confirmed_time!).localeCompare(b.confirmed_date! + b.confirmed_time!),
+    );
+  const pending = appts
+    .filter((a) => a.status === "pending")
+    .sort((a, b) => a.preferred_date.localeCompare(b.preferred_date));
+  const history = appts
+    .filter(
+      (a) =>
+        a.status === "done" ||
+        a.status === "cancelled" ||
+        (a.status === "confirmed" && (a.confirmed_date ?? "") < today),
+    )
+    .slice(0, 6);
+
   return (
     <div className="space-y-6">
+      {/* ── Minhas consultas: o ciclo médico→paciente fecha AQUI ────── */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-serif text-lg">Minhas consultas</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Acompanhe o status dos seus agendamentos.
+            </p>
+          </div>
+          <a
+            href="/agendamento"
+            className="press rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+          >
+            Agendar nova consulta
+          </a>
+        </div>
+
+        {loadingAppts ? (
+          <div className="mt-4 space-y-2">
+            <div className="skeleton h-16 rounded-2xl" />
+            <div className="skeleton h-16 rounded-2xl" />
+          </div>
+        ) : appts.length === 0 ? (
+          <div className="mt-4 rounded-2xl bg-secondary/50 p-5 text-center">
+            <p className="text-2xl">🗓️</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Você ainda não tem consultas por aqui. Agende a primeira — leva 1 minuto.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Use o mesmo e-mail da sua conta para o agendamento aparecer aqui.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-2.5">
+            {upcoming.map((a, i) => (
+              <div
+                key={a.id}
+                className={`rounded-2xl border p-4 ${
+                  i === 0 ? "border-emerald-300 bg-emerald-50/60" : "border-border bg-background"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.confirmed.cls}`}
+                  >
+                    {APPT_STATUS_UI.confirmed.emoji} {i === 0 ? "Próxima consulta" : "Confirmada"}
+                  </span>
+                  {a.price_brl != null && (
+                    <span className="text-xs text-muted-foreground">
+                      R$ {(a.price_brl / 100).toFixed(2)}
+                      {a.payment_status === "pago" ? " · pago ✓" : ""}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-sm font-semibold capitalize">
+                  {formatApptDate(a.confirmed_date!)} · {a.confirmed_time}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{a.reason}</p>
+              </div>
+            ))}
+            {pending.map((a) => (
+              <div key={a.id} className="rounded-2xl border border-border bg-background p-4">
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.pending.cls}`}
+                >
+                  {APPT_STATUS_UI.pending.emoji} {APPT_STATUS_UI.pending.label}
+                </span>
+                <p className="mt-2 text-sm capitalize">
+                  Você pediu {formatApptDate(a.preferred_date)} · {a.preferred_time}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {a.reason} — o consultório confirma em até 1 dia útil.
+                </p>
+              </div>
+            ))}
+            {history.length > 0 && (
+              <details className="pt-1">
+                <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary">
+                  Histórico ({history.length})
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {history.map((a) => {
+                    const ui = APPT_STATUS_UI[a.status === "confirmed" ? "done" : a.status];
+                    return (
+                      <div
+                        key={a.id}
+                        className="rounded-2xl border border-border/60 bg-background/60 p-3 opacity-80"
+                      >
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ui.cls}`}
+                        >
+                          {ui.emoji} {ui.label}
+                        </span>
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          {new Date(
+                            (a.confirmed_date ?? a.preferred_date) + "T00:00:00",
+                          ).toLocaleDateString("pt-BR")}{" "}
+                          · {a.confirmed_time ?? a.preferred_time} — {a.reason}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Recording card */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Gravar consulta</p>

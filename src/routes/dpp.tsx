@@ -130,7 +130,7 @@ function DppPage() {
             ))}
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            * Estimativa estatística. Apenas a avaliação clínica do Dr. Clóvis confirma a melhor
+            * Estimativa estatística. Apenas a avaliação clínica do seu médico confirma a melhor
             janela para o parto.
           </p>
         </div>

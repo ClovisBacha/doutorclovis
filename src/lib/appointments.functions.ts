@@ -78,3 +78,43 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
 
     return { ok: true as const };
   });
+
+/* ── Consultas da própria paciente (fecha o ciclo médico→paciente) ─────────
+   A tabela não tem user_id (o agendamento é público, por e-mail); o vínculo
+   é o e-mail da conta logada. Server function com service role: a RLS de
+   SELECT é só do admin, então a paciente lê via servidor, nunca direto. */
+
+export type MyAppointment = {
+  id: string;
+  preferred_date: string;
+  preferred_time: string;
+  confirmed_date: string | null;
+  confirmed_time: string | null;
+  status: "pending" | "confirmed" | "done" | "cancelled";
+  reason: string;
+  price_brl: number | null;
+  payment_status: string | null;
+  created_at: string;
+};
+
+export const getMyAppointments = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u, error: uerr } = await supabaseAdmin.auth.getUser(data.accessToken);
+    const email = u?.user?.email;
+    if (uerr || !email) return { ok: false as const, appointments: [] as MyAppointment[] };
+    const { data: rows, error } = await (supabaseAdmin as any)
+      .from("appointment_requests")
+      .select(
+        "id, preferred_date, preferred_time, confirmed_date, confirmed_time, status, reason, price_brl, payment_status, created_at",
+      )
+      .ilike("patient_email", email)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) {
+      console.error("getMyAppointments failed", error);
+      return { ok: false as const, appointments: [] as MyAppointment[] };
+    }
+    return { ok: true as const, appointments: (rows ?? []) as MyAppointment[] };
+  });

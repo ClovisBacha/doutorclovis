@@ -14,7 +14,7 @@ export const Route = createFileRoute("/hospitais")({
       { property: "og:title", content: "Hospitais conveniados" },
       {
         property: "og:description",
-        content: "Encontre rotas até as maternidades atendidas pelo Dr. Clóvis Bacha.",
+        content: "Encontre rotas até as maternidades atendidas pelo seu médico.",
       },
     ],
   }),

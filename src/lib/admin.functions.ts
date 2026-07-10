@@ -144,6 +144,34 @@ export const updateAppointmentStatus = createServerFn({ method: "POST" })
       .from("appointment_requests")
       .update({ status: data.status })
       .eq("id", data.id);
+
+    // Cancelamento também fecha o ciclo: a paciente fica sabendo na hora.
+    if (!error && data.status === "cancelled") {
+      try {
+        const { data: row } = await (supabaseAdmin as any)
+          .from("appointment_requests")
+          .select("patient_name, patient_email, preferred_date, preferred_time")
+          .eq("id", data.id)
+          .maybeSingle();
+        if (row?.patient_email) {
+          const { sendEmail, emailLayout } = await import("@/lib/email.server");
+          const dataBr = new Date(row.preferred_date + "T00:00:00").toLocaleDateString("pt-BR");
+          await sendEmail({
+            to: row.patient_email,
+            replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+            subject: "Sobre sua solicitação de consulta",
+            html: emailLayout(
+              `Olá, ${(row.patient_name ?? "").split(" ")[0] || "tudo bem"}!`,
+              `<p style="margin:0 0 14px">Não foi possível confirmar sua consulta solicitada para ${dataBr} às ${row.preferred_time}.</p>
+               <p style="margin:0 0 6px">Responda este e-mail ou solicite um novo horário — teremos prazer em encontrar uma alternativa.</p>`,
+            ),
+          });
+        }
+      } catch (e) {
+        console.error("cancellation email failed", e);
+      }
+    }
+
     return { ok: !error };
   });
 
@@ -194,9 +222,47 @@ export const confirmAppointment = createServerFn({ method: "POST" })
         internal_notes: data.internalNotes,
       })
       .eq("id", data.id);
-    return error
-      ? { ok: false as const, error: error.message }
-      : { ok: true as const, error: null };
+    if (error) return { ok: false as const, error: error.message };
+
+    // Fecha o ciclo com a paciente: e-mail de confirmação com data/hora.
+    // Não bloqueia o fluxo se o e-mail falhar ou não estiver configurado.
+    try {
+      const { data: row } = await (supabaseAdmin as any)
+        .from("appointment_requests")
+        .select("patient_name, patient_email")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (row?.patient_email) {
+        const { sendEmail, emailLayout } = await import("@/lib/email.server");
+        const dataBr = new Date(data.confirmedDate + "T00:00:00").toLocaleDateString("pt-BR", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+        });
+        const preco =
+          data.priceBrl != null
+            ? `<p style="margin:0 0 6px"><strong>Valor:</strong> R$ ${(data.priceBrl / 100).toFixed(2)}</p>`
+            : "";
+        await sendEmail({
+          to: row.patient_email,
+          replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+          subject: "Sua consulta foi confirmada ✅",
+          html: emailLayout(
+            `Olá, ${(row.patient_name ?? "").split(" ")[0] || "tudo bem"}!`,
+            `<p style="margin:0 0 14px">Sua consulta foi <strong>confirmada</strong>:</p>
+             <p style="margin:0 0 6px"><strong>Data:</strong> ${dataBr}</p>
+             <p style="margin:0 0 6px"><strong>Horário:</strong> ${data.confirmedTime}</p>
+             ${preco}
+             <p style="margin:14px 0 0">Você também acompanha o status na aba <strong>Consultas</strong> do app.</p>
+             <p style="margin:10px 0 0;font-size:13px;color:#9b8178">Precisa remarcar? Responda este e-mail.</p>`,
+          ),
+        });
+      }
+    } catch (e) {
+      console.error("confirmation email failed", e);
+    }
+
+    return { ok: true as const, error: null };
   });
 
 const PaidSchema = z.object({ accessToken: z.string().min(10), id: z.string().uuid() });

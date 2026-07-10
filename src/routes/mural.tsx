@@ -56,7 +56,7 @@ function MuralPage() {
         </h2>
         <p className="mt-3 max-w-md text-muted-foreground">
           O mural ainda está vazio — cada foto aqui será uma história real de cuidado e confiança.
-          Se você já foi paciente do Dr. Clóvis, adoraríamos ter seu bebê aqui!
+          Se você já é paciente acompanhada pelo app, adoraríamos ter seu bebê aqui!
         </p>
 
         <div className="mt-8 rounded-3xl border border-primary/20 bg-primary/5 p-6 text-left max-w-sm w-full">

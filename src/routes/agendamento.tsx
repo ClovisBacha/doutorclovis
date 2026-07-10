@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ymdLocal } from "@/lib/utils";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { CalendarPlus, Check, Loader2 } from "lucide-react";
 import { submitAppointmentRequest } from "@/lib/appointments.functions";
 import { DOCTOR } from "@/lib/doctor.config";
@@ -22,7 +23,7 @@ function googleCalUrl(b: Booked) {
   const end = toCalStamp(b.date, addHour(b.time));
   const params = new URLSearchParams({
     action: "TEMPLATE",
-    text: "Consulta com Dr. Clóvis Bacha (a confirmar)",
+    text: "Consulta de pré-natal (a confirmar)",
     dates: `${start}/${end}`,
     details: `Motivo: ${b.reason}. Horário sujeito à confirmação do consultório.`,
   });
@@ -34,13 +35,13 @@ function downloadIcs(b: Booked) {
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Dr Clovis Bacha//Agendamento//PT-BR",
+    "PRODID:-//Obstetrica//Agendamento//PT-BR",
     "BEGIN:VEVENT",
     `UID:${start}-${Math.random().toString(36).slice(2)}@doutorclovis`,
     `DTSTAMP:${toCalStamp(b.date, b.time)}`,
     `DTSTART:${start}`,
     `DTEND:${end}`,
-    "SUMMARY:Consulta com Dr. Clóvis Bacha (a confirmar)",
+    "SUMMARY:Consulta de pré-natal (a confirmar)",
     `DESCRIPTION:Motivo: ${b.reason}. Horário sujeito à confirmação do consultório.`,
     "END:VEVENT",
     "END:VCALENDAR",
@@ -59,11 +60,10 @@ export const Route = createFileRoute("/agendamento")({
       { title: "Agendar consulta — Obstétrica" },
       {
         name: "description",
-        content:
-          "Solicite seu horário com o Dr. Clóvis Bacha. Nossa equipe confirma a consulta em até 1 dia útil.",
+        content: "Solicite seu horário. Nossa equipe confirma a consulta em até 1 dia útil.",
       },
       { property: "og:title", content: "Agendar consulta — Obstétrica" },
-      { property: "og:description", content: "Solicite seu horário com o Dr. Clóvis Bacha." },
+      { property: "og:description", content: "Solicite seu horário de consulta." },
     ],
   }),
   component: AgendamentoPage,
@@ -75,6 +75,23 @@ function AgendamentoPage() {
   const submit = useServerFn(submitAppointmentRequest);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  // Paciente logada: pré-preenche nome/e-mail da conta. O e-mail é a CHAVE que
+  // liga a consulta à conta dela (a aba Consultas do app busca por ele) — com
+  // outro e-mail o agendamento não aparece no app.
+  const [me, setMe] = useState<{ name: string; email: string } | null>(null);
+  useEffect(() => {
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (data.user?.email) {
+          setMe({
+            name: (data.user.user_metadata?.display_name as string) ?? "",
+            email: data.user.email,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [booked, setBooked] = useState<Booked | null>(null);
   const [error, setError] = useState<string | null>(null);
   const today = ymdLocal();
@@ -158,7 +175,7 @@ function AgendamentoPage() {
               <h2 className="mt-5 font-serif text-2xl">Solicitação enviada!</h2>
               <p className="mt-2 max-w-md text-muted-foreground">
                 Recebemos seu pedido e enviamos uma confirmação para o seu e-mail. A equipe entrará
-                em contato em até 1 dia útil para confirmar seu horário com o Dr. Clóvis.
+                em contato em até 1 dia útil para confirmar seu horário com o seu médico.
               </p>
               {booked && (
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -190,9 +207,23 @@ function AgendamentoPage() {
               onSubmit={onSubmit}
               className="mt-10 grid gap-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] sm:p-8"
             >
-              <Field label="Nome completo" name="name" required />
+              <Field
+                key={`n-${me?.name ?? ""}`}
+                label="Nome completo"
+                name="name"
+                required
+                defaultValue={me?.name ?? ""}
+              />
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="E-mail" type="email" name="email" required />
+                <Field
+                  key={`e-${me?.email ?? ""}`}
+                  label="E-mail"
+                  type="email"
+                  name="email"
+                  required
+                  defaultValue={me?.email ?? ""}
+                  hint={me ? "Use este e-mail para a consulta aparecer no seu app." : undefined}
+                />
                 <Field
                   label="Telefone / WhatsApp"
                   name="phone"
@@ -257,8 +288,9 @@ function AgendamentoPage() {
 
 function Field({
   label,
+  hint,
   ...props
-}: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+}: { label: string; hint?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-sm font-medium">{label}</label>
@@ -266,6 +298,7 @@ function Field({
         {...props}
         className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
       />
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }

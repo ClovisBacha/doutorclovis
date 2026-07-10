@@ -147,6 +147,37 @@ export const registerDoctor = createServerFn({ method: "POST" })
       console.error("[registerDoctor]", error);
       return { ok: false as const, error: error.message as string };
     }
+
+    // Cadastro NOVO avisa a equipe para fazer a ativação do painel (o gate do
+    // painel é operado manualmente enquanto o multi-tenant não chega às
+    // consultas). Não bloqueia o fluxo se o e-mail falhar.
+    if (!existing) {
+      try {
+        const { sendEmail, emailLayout } = await import("@/lib/email.server");
+        const notify = (process.env.ADMIN_EMAILS || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (notify.length) {
+          await sendEmail({
+            to: notify,
+            replyTo: user.email ?? undefined,
+            subject: `🩺 Novo médico cadastrado — ${data.profile.display_name}`,
+            html: emailLayout(
+              "Novo médico na plataforma",
+              `<p style="margin:0 0 6px"><strong>Nome:</strong> ${data.profile.display_name}</p>
+               <p style="margin:0 0 6px"><strong>CRM:</strong> ${data.profile.crm}</p>
+               <p style="margin:0 0 6px"><strong>WhatsApp:</strong> ${data.profile.whatsapp ?? "—"}</p>
+               <p style="margin:0 0 6px"><strong>E-mail:</strong> ${user.email ?? "—"}</p>
+               <p style="margin:14px 0 0">Entre em contato para ativar o painel e concluir o onboarding.</p>`,
+            ),
+          });
+        }
+      } catch (e) {
+        console.error("[registerDoctor] notify failed", e);
+      }
+    }
+
     return { ok: true as const, doctor: row as DoctorProfile };
   });
 

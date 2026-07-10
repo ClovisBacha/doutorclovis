@@ -7,7 +7,7 @@ import { TiltCard, SpotlightCard, Magnetic } from "@/components/motion-fx";
 export const Route = createFileRoute("/bastidores")({
   head: () => ({
     meta: [
-      { title: "Gestação de Alto Risco — O trabalho do Dr. Clóvis" },
+      { title: "Gestação de Alto Risco — Por dentro do cuidado" },
       {
         name: "description",
         content:
