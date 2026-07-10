@@ -3,6 +3,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Reveal } from "@/components/reveal";
 import { SpotlightCard } from "@/components/motion-fx";
+import { PricingGlass, type PricingGlassTier } from "@/components/ui/pricing-glass";
 
 export const Route = createFileRoute("/medicos")({
   head: () => ({
@@ -644,50 +645,30 @@ function MedicosPage() {
       </section>
 
       {/* ── Pricing ───────────────────────────────────────────── */}
-      <section id="planos" className="px-6 py-20">
-        <div className="mx-auto max-w-5xl">
+      <section
+        id="planos"
+        className="relative overflow-hidden px-6 py-24 text-white"
+        style={{
+          background: "radial-gradient(120% 90% at 50% 0%, #2a151a 0%, #1a0e12 45%, #120a0d 100%)",
+        }}
+      >
+        <div className="relative z-10 mx-auto max-w-6xl">
           <Reveal>
-            <h2 className="text-center font-serif text-3xl md:text-4xl">
+            <h2 className="text-center font-serif text-3xl text-white md:text-4xl">
               Escolha pelo que quer tirar do seu prato
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-center text-muted-foreground">
+            <p className="mx-auto mt-3 max-w-lg text-center text-white/60">
               Sem contrato, sem taxa de implantação, sem fidelidade. Suba ou desça de plano quando
               quiser — cancele num clique.
             </p>
           </Reveal>
 
-          {/* Seletor Mensal / Anual */}
-          <Reveal>
-            <div className="mt-8 flex flex-col items-center gap-2">
-              <div className="inline-flex rounded-full border border-border bg-card p-1">
-                {(["mensal", "anual"] as const).map((b) => (
-                  <button
-                    key={b}
-                    onClick={() => setBilling(b)}
-                    className={`rounded-full px-5 py-1.5 text-sm font-semibold transition ${
-                      billing === b
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-primary"
-                    }`}
-                  >
-                    {b === "mensal" ? "Mensal" : "Anual"}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs font-medium text-primary">
-                {LAUNCH_PROMO.active
-                  ? "🚀 Promoção de lançamento — 25% OFF no plano anual, por tempo limitado"
-                  : "💚 No anual, 2 meses grátis — economize ~17%"}
-              </p>
-            </div>
-          </Reveal>
-
-          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            {PLANS.map((plan, i) => {
-              const annual = billing === "anual";
-              const promo = LAUNCH_PROMO.active;
-              // Anual: com promoção de lançamento = 25% off; sem = 2 meses grátis (≈17%).
-              const annualFactor = promo ? 1 - LAUNCH_PROMO.off : 10 / 12;
+          {(() => {
+            const annual = billing === "anual";
+            const promo = LAUNCH_PROMO.active;
+            // Anual: com promoção de lançamento = 25% off; sem = 2 meses grátis (≈17%).
+            const annualFactor = promo ? 1 - LAUNCH_PROMO.off : 10 / 12;
+            const glassTiers: PricingGlassTier[] = PLANS.map((plan) => {
               const shown =
                 plan.monthly === 0
                   ? 0
@@ -696,82 +677,45 @@ function MedicosPage() {
                     : plan.monthly;
               // Economia no ano inteiro (12 meses do cheio − 12 meses do promocional).
               const savings = plan.monthly === 0 ? 0 : (plan.monthly - shown) * 12;
-              return (
-                <Reveal key={plan.key} delay={i * 0.07}>
-                  <div
-                    className={`relative flex h-full flex-col rounded-3xl border p-6 shadow-[var(--shadow-card)] ${
-                      plan.highlight ? "border-primary bg-primary/5" : "border-border bg-card"
-                    }`}
-                  >
-                    {plan.highlight && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-0.5 text-xs font-bold text-primary-foreground">
-                        Mais popular
-                      </span>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold uppercase tracking-widest text-primary">
-                        {plan.name}
-                      </p>
-                      {annual && promo && plan.monthly > 0 && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                          {LAUNCH_PROMO.label} · 25% OFF
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 font-serif text-lg text-foreground">{plan.tagline}</p>
-                    <div className="mt-3">
-                      {plan.isFrom && (
-                        <span className="text-xs text-muted-foreground">a partir de </span>
-                      )}
-                      <div className="flex items-end gap-1.5">
-                        {annual && promo && plan.monthly > 0 && (
-                          <span className="mb-1 text-lg text-muted-foreground line-through">
-                            R$ {plan.monthly}
-                          </span>
-                        )}
-                        <span className="font-serif text-4xl font-bold">R$ {shown}</span>
-                        <span className="mb-1 text-sm text-muted-foreground">
-                          {plan.monthly === 0 ? "/sempre" : `/mês${plan.perSuffix}`}
-                        </span>
-                      </div>
-                      {annual && plan.monthly > 0 ? (
-                        <p className="mt-1 text-xs text-primary">
-                          cobrado anualmente · você economiza R$ {savings.toLocaleString("pt-BR")}
-                          /ano
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {plan.monthly === 0 ? "grátis, para sempre" : "sem fidelidade"}
-                        </p>
-                      )}
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">{plan.desc}</p>
-                    <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-start gap-2">
-                          <span className="mt-0.5 shrink-0 text-primary">✓</span>
-                          <span>{f}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <a
-                      href={plan.key === "enterprise" ? "#contato" : "/medicos/cadastro"}
-                      className={`mt-8 block rounded-full py-3 text-center text-sm font-semibold transition ${
-                        plan.highlight
-                          ? "bg-primary text-primary-foreground hover:opacity-90"
-                          : "border border-primary/40 text-primary hover:bg-primary/5"
-                      }`}
-                    >
-                      {plan.cta}
-                    </a>
-                  </div>
-                </Reveal>
-              );
-            })}
-          </div>
+              return {
+                name: plan.name,
+                tagline: plan.tagline,
+                price: String(shown),
+                oldPrice: annual && promo && plan.monthly > 0 ? String(plan.monthly) : undefined,
+                // O sufixo por assento (ex.: "/médico") vai para a nota — inline,
+                // ao lado do número de 60px, estouraria o card estreito.
+                period: plan.monthly === 0 ? "/sempre" : "/mês",
+                fromPrefix: plan.isFrom,
+                footnote:
+                  (plan.monthly === 0
+                    ? "grátis, para sempre"
+                    : annual
+                      ? `cobrado anualmente · economize R$ ${savings.toLocaleString("pt-BR")}/ano`
+                      : "sem fidelidade") + (plan.perSuffix ? " · por médico" : ""),
+                isPopular: plan.highlight,
+                features: plan.features,
+                ctaLabel: plan.cta,
+                ctaHref: plan.key === "enterprise" ? "#contato" : "/medicos/cadastro",
+              };
+            });
+            return (
+              <PricingGlass
+                className="mt-8"
+                tiers={glassTiers}
+                annual={annual}
+                onAnnualChange={(a) => setBilling(a ? "anual" : "mensal")}
+                saveBadge={promo ? "25% OFF" : "2 MESES"}
+                toggleNote={
+                  promo
+                    ? "🚀 Promoção de lançamento — 25% OFF no plano anual, por tempo limitado"
+                    : "💚 No anual, 2 meses grátis — economize ~17%"
+                }
+              />
+            );
+          })()}
 
           <Reveal>
-            <p className="mt-8 text-center text-xs text-muted-foreground">
+            <p className="mt-10 text-center text-xs text-white/50">
               Todo plano pago começa com 14 dias grátis, sem cartão de crédito. · Valores em BRL. ·
               O WhatsApp usa a conta Meta Business do próprio médico (grátis até 1.000
               conversas/mês).
