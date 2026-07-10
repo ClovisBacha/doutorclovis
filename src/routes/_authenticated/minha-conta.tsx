@@ -391,6 +391,12 @@ function MinhaContaPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
+  // Navegação disparada de DENTRO de uma aba (ex.: "Configure em Perfil") —
+  // troca a aba e sai da home mobile, senão o destino fica escondido no celular.
+  const goToTab = (t: string) => {
+    setTab(t as Tab);
+    setMobileHome(false);
+  };
 
   // Baixa a jornada da nuvem e arma a barreira anti-push logo no mount da
   // página, independente da aba ativa: abas como Sons/Quartinho gravam chaves
@@ -621,10 +627,14 @@ function MinhaContaPage() {
 
           <div key={tab} className="mt-6 tab-enter">
             <TabErrorBoundary tabName={tab}>
-              {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
+              {tab === "Bebê" && <BabyTab profile={profile} gest={gest} onNavigate={goToTab} />}
               {tab === "Caminho" && <GestacaoPath profile={profile} gest={gest} />}
-              {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
-              {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
+              {tab === "Carta do Bebê" && (
+                <CartaBebêTab profile={profile} gest={gest} onNavigate={goToTab} />
+              )}
+              {tab === "Calendário" && (
+                <PrenatalCalendarTab profile={profile} gest={gest} onNavigate={goToTab} />
+              )}
               {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
               {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
               {tab === "Humor" && <HumorTab />}
@@ -632,7 +642,7 @@ function MinhaContaPage() {
                 <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
               )}
               {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
-              {tab === "Saúde" && <HealthTab gest={gest} profile={profile} />}
+              {tab === "Saúde" && <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />}
               {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
               {tab === "Meditações" && <MeditacoesTab gest={gest} />}
               {tab === "Sons" && <SonsBebêTab gest={gest} />}
@@ -646,14 +656,18 @@ function MinhaContaPage() {
               {tab === "Consultas" && <ConsultasTab />}
               {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
               {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
-              {tab === "Conta Regressiva" && <CountdownTab profile={profile} gest={gest} />}
+              {tab === "Conta Regressiva" && (
+                <CountdownTab profile={profile} gest={gest} onNavigate={goToTab} />
+              )}
               {tab === "Álbum" && <AlbumTab profile={profile} />}
               {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
               {tab === "Escola" && <EscolaBebêTab gest={gest} />}
-              {tab === "FAQ" && <FAQTab gest={gest} onNavigate={(t) => setTab(t as Tab)} />}
-              {tab === "Pânico" && <PânicoTab profile={profile} />}
-              {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
-              {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
+              {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
+              {tab === "Pânico" && <PânicoTab profile={profile} onNavigate={goToTab} />}
+              {tab === "Carteirinha" && (
+                <CardTab profile={profile} gest={gest} onNavigate={goToTab} />
+              )}
+              {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
               {tab === "Conquistas" && <ConquistasTab />}
               {tab === "Loja" && <LojaTab gest={gest} />}
               {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
@@ -662,9 +676,7 @@ function MinhaContaPage() {
               {tab === "Médico" && <MédicoTab />}
               {tab === "Exames" && <ExamesTab gest={gest} />}
               {tab === "Plano de Parto" && <PlanoPártoTab profile={profile} />}
-              {tab === "Apoio Emocional" && (
-                <ApoioEmocionalTab onNavigate={(t) => setTab(t as Tab)} />
-              )}
+              {tab === "Apoio Emocional" && <ApoioEmocionalTab onNavigate={goToTab} />}
               {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
               {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
             </TabErrorBoundary>
@@ -676,7 +688,15 @@ function MinhaContaPage() {
 }
 
 /* ---------- Bebê ---------- */
-function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function BabyTab({
+  profile,
+  gest,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+}) {
   if (!profile || !gest) {
     return (
       <div className="glass-card glass-pink rounded-3xl p-10 text-center">
@@ -684,7 +704,14 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         <p className="font-serif text-xl text-pink-700">Configure seu perfil</p>
         <p className="mt-2 text-sm text-muted-foreground">
           Configure a data da sua última menstruação ou os dados do ultrassom em{" "}
-          <strong>Perfil</strong> para começar o acompanhamento.
+          <button
+            type="button"
+            onClick={() => onNavigate("Perfil")}
+            className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+          >
+            Perfil
+          </button>{" "}
+          para começar o acompanhamento.
         </p>
       </div>
     );
@@ -830,7 +857,15 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               !profile.prior_cesarean && (
                 <p className="text-primary">
                   Nenhuma complicação registrada na gestação anterior. Continue preenchendo seu
-                  histórico em <strong>Perfil → 2ª Gestação</strong>.
+                  histórico em{" "}
+                  <button
+                    type="button"
+                    onClick={() => onNavigate("Perfil")}
+                    className="font-semibold underline underline-offset-2 hover:opacity-80"
+                  >
+                    Perfil → 2ª Gestação
+                  </button>
+                  .
                 </p>
               )}
             {profile.prior_notes && (
@@ -2000,7 +2035,15 @@ function iomGain(week: number, bmi: number): { min: number; max: number } {
   return { min: 0.5 + (week - 12) * rMin, max: 2.0 + (week - 12) * rMax };
 }
 
-function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
+function HealthTab({
+  gest,
+  profile,
+  onNavigate,
+}: {
+  gest: Gest;
+  profile: Profile | null;
+  onNavigate: (tab: string) => void;
+}) {
   const [logs, setLogs] = useState<HealthLog[]>([]);
   const [form, setForm] = useState({
     weight_kg: "",
@@ -2330,14 +2373,29 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
           </svg>
           <p className="mt-1 text-xs text-muted-foreground">
             Linha sólida = seu peso · Faixa = zona saudável para seu IMC. Configure altura e peso
-            pré-gestacional em <strong>Perfil</strong>.
+            pré-gestacional em{" "}
+            <button
+              type="button"
+              onClick={() => onNavigate("Perfil")}
+              className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+            >
+              Perfil
+            </button>
+            .
           </p>
         </div>
       ) : (
         prePregW == null && (
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
             Configure sua <strong>altura</strong> e <strong>peso pré-gestacional</strong> em{" "}
-            <strong>Perfil</strong> para ver a curva de ganho de peso recomendada pelo IOM.
+            <button
+              type="button"
+              onClick={() => onNavigate("Perfil")}
+              className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+            >
+              Perfil
+            </button>{" "}
+            para ver a curva de ganho de peso recomendada pelo IOM.
           </div>
         )
       )}
@@ -3149,7 +3207,15 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
 }
 
 /* ---------- Carteirinha digital (feat 43 — evoluída) ---------- */
-function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function CardTab({
+  profile,
+  gest,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+}) {
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
@@ -3301,8 +3367,15 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Mantenha seus dados atualizados em <strong>Perfil</strong> — o QR Code atualiza
-        automaticamente.
+        Mantenha seus dados atualizados em{" "}
+        <button
+          type="button"
+          onClick={() => onNavigate("Perfil")}
+          className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+        >
+          Perfil
+        </button>{" "}
+        — o QR Code atualiza automaticamente.
       </p>
     </div>
   );
@@ -4032,13 +4105,28 @@ function toGoogleCalUrl(label: string, date: Date) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function PrenatalCalendarTab({
+  profile,
+  gest,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+}) {
   if (!profile || (!profile.lmp_date && !profile.reference_date)) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Configure a DUM ou os dados do ultrassom em <strong>Perfil</strong> para gerar o
-          calendário personalizado.
+          Configure a DUM ou os dados do ultrassom em{" "}
+          <button
+            type="button"
+            onClick={() => onNavigate("Perfil")}
+            className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+          >
+            Perfil
+          </button>{" "}
+          para gerar o calendário personalizado.
         </p>
       </div>
     );
@@ -6406,7 +6494,15 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
 
 /* ---------- Carta Semanal do Bebê (Feature #21) ---------- */
 
-function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function CartaBebêTab({
+  profile,
+  gest,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+}) {
   const [letter, setLetter] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [cachedWeek, setCachedWeek] = useState<number | null>(null);
@@ -6474,8 +6570,15 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Configure sua gestação em <strong>Perfil</strong> para receber a carta semanal do seu
-          bebê.
+          Configure sua gestação em{" "}
+          <button
+            type="button"
+            onClick={() => onNavigate("Perfil")}
+            className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+          >
+            Perfil
+          </button>{" "}
+          para receber a carta semanal do seu bebê.
         </p>
       </div>
     );
@@ -7727,7 +7830,15 @@ const MILESTONES = [
   { week: 40, label: "Data provável do parto", emoji: "🍼" },
 ];
 
-function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function CountdownTab({
+  profile,
+  gest,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+}) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -7747,7 +7858,15 @@ function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }
   if (!due) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground">
-        Adicione a data provável do parto em <strong>Perfil</strong>.
+        Adicione a data provável do parto em{" "}
+        <button
+          type="button"
+          onClick={() => onNavigate("Perfil")}
+          className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+        >
+          Perfil
+        </button>
+        .
       </div>
     );
   }
@@ -9196,7 +9315,13 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
    Feature 41 — Botão do Pânico
 ───────────────────────────────────────────────────────────────────────────── */
 
-function PânicoTab({ profile }: { profile: Profile | null }) {
+function PânicoTab({
+  profile,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  onNavigate: (tab: string) => void;
+}) {
   const [status, setStatus] = useState<"idle" | "locating" | "sent" | "error" | "save_error">(
     "idle",
   );
@@ -9431,7 +9556,14 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
       <p className="text-center text-xs text-muted-foreground px-4">
         O botão registra sua localização GPS; seu acompanhante designado poderá vê-la na página de
         acompanhamento (últimos 30 minutos). Configure o contato de emergência em{" "}
-        <strong>Perfil</strong>.
+        <button
+          type="button"
+          onClick={() => onNavigate("Perfil")}
+          className="font-semibold underline underline-offset-2 hover:opacity-80"
+        >
+          Perfil
+        </button>
+        .
       </p>
     </div>
   );
@@ -9843,7 +9975,13 @@ const MILESTONES_DEF = [
   { key: "primeira_palavra", label: "Primeira palavra", emoji: "💬", weekApprox: 52 },
 ];
 
-function PosPartoTab({ profile }: { profile: Profile | null }) {
+function PosPartoTab({
+  profile,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  onNavigate: (tab: string) => void;
+}) {
   const [subTab, setSubTab] = useState<"saúde" | "amamentação" | "marcos" | "vacinas" | "retorno">(
     "saúde",
   );
@@ -9855,7 +9993,14 @@ function PosPartoTab({ profile }: { profile: Profile | null }) {
         <h2 className="font-serif text-xl">Portal Pós-parto</h2>
         <p className="text-sm text-muted-foreground">
           Ative o portal após o nascimento do bebê preenchendo a data de nascimento em{" "}
-          <strong>Perfil → Pós-parto</strong>.
+          <button
+            type="button"
+            onClick={() => onNavigate("Perfil")}
+            className="font-semibold underline underline-offset-2 hover:opacity-80"
+          >
+            Perfil → Pós-parto
+          </button>
+          .
         </p>
         <div className="rounded-xl bg-secondary/50 p-4 text-left text-sm space-y-1">
           <p className="font-medium">Recursos disponíveis:</p>
