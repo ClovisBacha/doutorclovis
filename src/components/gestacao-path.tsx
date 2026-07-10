@@ -2098,7 +2098,7 @@ function DailyQuizBlock({
             {score}/2
           </p>
           <p className="text-xs text-muted-foreground">
-            {canEarn
+            {canEarn && !alreadyDone
               ? "Tarefa da aula completa — continue o dia! ✓"
               : "Modo revisão — o desafio vale no próprio dia, mas aprender vale sempre 💜"}
           </p>
