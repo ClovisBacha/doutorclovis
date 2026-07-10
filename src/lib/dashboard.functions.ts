@@ -378,8 +378,7 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
               .limit(1),
           ]);
           const nextRow = (nextRes.data ?? [])[0] as
-            | { patient_name: string | null; preferred_date: string }
-            | undefined;
+            { patient_name: string | null; preferred_date: string } | undefined;
           let next: { dateLabel: string; patientName: string } | null = null;
           if (nextRow?.preferred_date) {
             const dateLabel = new Date(`${nextRow.preferred_date}T12:00:00`).toLocaleDateString(

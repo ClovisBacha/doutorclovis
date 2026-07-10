@@ -98,8 +98,7 @@ async function processWebhook(body: unknown): Promise<void> {
 
         // Tenta obter o nome do contato
         const contact = contacts.find((c) => (c as Record<string, unknown>).wa_id === fromPhone) as
-          | Record<string, unknown>
-          | undefined;
+          Record<string, unknown> | undefined;
         const _contactName = (contact?.profile as Record<string, unknown>)?.name ?? null;
 
         // Extrai texto da mensagem
