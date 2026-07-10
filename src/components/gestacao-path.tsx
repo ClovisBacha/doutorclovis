@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
+import { quizForDay, quizRoleForDay, type DailyQuiz } from "@/lib/daily-quizzes";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -1563,6 +1564,8 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           const week = Math.max(1, Math.min(42, Math.floor(D / 7)));
           const baby = babyForWeek(week);
           const ch = challengeForDay(D);
+          const quiz = quizForDay(D);
+          const role = quizRoleForDay(D);
           const isToday = D === todayD;
           const state = isToday ? dayTasks : dayTaskState(D);
           const done = doneDays.includes(D);
@@ -1616,11 +1619,18 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                   <div className="mt-2 flex flex-col gap-2">
                     {[
                       { id: "humor", label: "Check-in: como você está?", emoji: "🙂" },
-                      { id: "desafio", label: ch.label, emoji: ch.emoji },
+                      quiz
+                        ? {
+                            id: "desafio",
+                            label: `Quiz da professora: ${role.title} (abaixo)`,
+                            emoji: role.emoji,
+                          }
+                        : { id: "desafio", label: ch.label, emoji: ch.emoji },
                       { id: "leitura", label: `Ler sobre ${babyLabel} hoje (abaixo)`, emoji: "📖" },
                     ].map((t) => {
                       const checked = t.id === "humor" && isToday ? checkedToday : !!state[t.id];
-                      const canToggle = isToday && t.id === "desafio";
+                      // Com quiz, a tarefa "desafio" completa ao responder o quiz.
+                      const canToggle = isToday && t.id === "desafio" && !quiz;
                       return (
                         <div key={t.id} className="flex items-center gap-2">
                           <button
@@ -1684,13 +1694,28 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                   )}
                 </div>
 
+                {quiz && (
+                  <DailyQuizBlock
+                    key={`quiz-${D}`}
+                    quiz={quiz}
+                    roleTitle={`${role.emoji} ${role.title}`}
+                    week={week}
+                    alreadyDone={!!state.desafio || done}
+                    canEarn={isToday}
+                    onEarn={() => markDayTask(D, "desafio", true)}
+                  />
+                )}
+
                 {isToday && (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                  <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      🔒 Amanhã: novo desafio
+                      🔒 Amanhã: {quizForDay(D + 1) ? "nova aula da professora" : "novo desafio"}
                     </p>
                     <p className="mt-1 text-sm text-slate-500">
-                      {challengeForDay(D + 1).emoji} Volte amanhã para manter a chama 🔥
+                      {quizForDay(D + 1)
+                        ? `${quizRoleForDay(D + 1).emoji} ${quizRoleForDay(D + 1).title} · `
+                        : `${challengeForDay(D + 1).emoji} `}
+                      Volte amanhã para manter a chama 🔥
                       {streak > 0 ? ` (${streak} ${streak === 1 ? "dia" : "dias"})` : ""}
                     </p>
                   </div>
@@ -1960,6 +1985,125 @@ function LessonSheet({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ══════════════════ Quiz diário da professora (dentro do sheet do dia) ══════════════════
+   280 exercícios (semanas 1-40): mini-lição + 2 perguntas com explicação.
+   Responder no dia de HOJE completa a tarefa "desafio"; dias passados ficam
+   jogáveis em modo revisão (aprender vale sempre; a chama vale no dia). */
+
+function DailyQuizBlock({
+  quiz,
+  roleTitle,
+  week,
+  alreadyDone,
+  canEarn,
+  onEarn,
+}: {
+  quiz: DailyQuiz;
+  roleTitle: string;
+  week: number;
+  alreadyDone: boolean;
+  canEarn: boolean;
+  onEarn: () => void;
+}) {
+  const [answers, setAnswers] = useState<(number | null)[]>([null, null]);
+  const [checked, setChecked] = useState(false);
+  const tm = trimMeta(week);
+  const questions = [quiz.q1, quiz.q2];
+  const score = checked ? questions.filter((q, i) => answers[i] === q.a).length : 0;
+
+  function verify() {
+    setChecked(true);
+    if (canEarn && !alreadyDone) onEarn();
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
+          🎓 Aula de hoje · {roleTitle}
+        </p>
+        {alreadyDone && !checked && (
+          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-500">
+            revisão
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-violet-950">{quiz.teach}</p>
+
+      {questions.map((q, qi) => (
+        <div key={qi} className="mt-3">
+          <p className="text-sm font-bold text-violet-950">
+            {qi + 1}. {q.q}
+          </p>
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            {q.o.map((opt, oi) => {
+              let cls = "border-violet-200 bg-white text-violet-950";
+              if (checked) {
+                if (oi === q.a) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
+                else if (oi === answers[qi]) cls = "border-rose-300 bg-rose-50 text-rose-700";
+                else cls = "border-violet-100 bg-white text-slate-400";
+              } else if (answers[qi] === oi) {
+                cls = "border-violet-500 bg-violet-100 text-violet-900";
+              }
+              return (
+                <button
+                  key={oi}
+                  disabled={checked}
+                  onClick={() =>
+                    setAnswers((prev) => {
+                      const next = [...prev];
+                      next[qi] = oi;
+                      return next;
+                    })
+                  }
+                  className={`press rounded-xl border-2 px-3 py-2 text-left text-sm font-medium transition-colors ${cls}`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          {checked && (
+            <p
+              className={`mt-1.5 rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                answers[qi] === q.a
+                  ? "bg-emerald-100/70 text-emerald-800"
+                  : "bg-amber-100/70 text-amber-800"
+              }`}
+            >
+              {answers[qi] === q.a ? "✓ Isso! " : "💡 "}
+              {q.why}
+            </p>
+          )}
+        </div>
+      ))}
+
+      {!checked ? (
+        <button
+          onClick={verify}
+          disabled={answers.some((a) => a === null)}
+          className="press mt-4 w-full rounded-full py-3 text-sm font-extrabold text-white disabled:opacity-40"
+          style={{ background: tm.main, boxShadow: `0 4px 0 ${tm.lip}` }}
+        >
+          Responder
+        </button>
+      ) : (
+        <div className="mt-3 rounded-2xl bg-white p-3 text-center">
+          <p className="text-sm font-extrabold">
+            {score === 2 ? "🏆 Acertou tudo!" : score === 1 ? "🎉 Quase perfeito!" : "💪 Anotado!"}{" "}
+            {score}/2
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {canEarn
+              ? "Tarefa da aula completa — continue o dia! ✓"
+              : "Modo revisão — o desafio vale no próprio dia, mas aprender vale sempre 💜"}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
