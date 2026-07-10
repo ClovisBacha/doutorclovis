@@ -231,5 +231,12 @@ export function ScrollProgress() {
       "linear-gradient(90deg, var(--primary), color-mix(in oklab, var(--primary) 55%, white))",
   };
 
-  return <div ref={ref} aria-hidden className="fixed inset-x-0 top-0 z-50 h-[2px]" style={style} />;
+  return (
+    <div
+      ref={ref}
+      aria-hidden
+      className="fixed inset-x-0 z-50 h-[2px]"
+      style={{ ...style, top: "var(--safe-top)" }}
+    />
+  );
 }

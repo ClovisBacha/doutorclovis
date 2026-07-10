@@ -1609,6 +1609,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
       {intro !== null && (
         <QuizIntro
           D={intro}
+          isToday={intro === todayD}
           babyLabel={babyLabel}
           onDone={() => {
             const D = intro;
@@ -2170,18 +2171,38 @@ function QuizPaywall({ week }: { week: number }) {
    Tela cheia por ~1,3s: fundo no tom do trimestre, moeda saltando com anéis,
    "Semana N · Aula de hoje". Toque pula. Reduced-motion nem chega aqui. */
 
-function QuizIntro({ D, babyLabel, onDone }: { D: number; babyLabel: string; onDone: () => void }) {
+function QuizIntro({
+  D,
+  isToday,
+  babyLabel,
+  onDone,
+}: {
+  D: number;
+  isToday: boolean;
+  babyLabel: string;
+  onDone: () => void;
+}) {
   const [leaving, setLeaving] = useState(false);
   const week = Math.max(1, Math.min(42, Math.floor(D / 7)));
   const tm = trimMeta(week);
   const emoji = quizEmojiForDay(D);
+  const skipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doneRef = useRef(false);
+
+  // onDone dispara exatamente UMA vez (timer natural ou toque para pular)
+  const finish = () => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    onDone();
+  };
 
   useEffect(() => {
     const t1 = setTimeout(() => setLeaving(true), 1250);
-    const t2 = setTimeout(onDone, 1500);
+    const t2 = setTimeout(finish, 1500);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      if (skipTimer.current) clearTimeout(skipTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2196,8 +2217,9 @@ function QuizIntro({ D, babyLabel, onDone }: { D: number; babyLabel: string; onD
         paddingTop: "var(--safe-top)",
       }}
       onClick={() => {
+        if (doneRef.current || skipTimer.current) return;
         setLeaving(true);
-        setTimeout(onDone, 180);
+        skipTimer.current = setTimeout(finish, 180);
       }}
       role="status"
       aria-label="Abrindo a aula de hoje"
@@ -2227,10 +2249,10 @@ function QuizIntro({ D, babyLabel, onDone }: { D: number; babyLabel: string; onD
       </div>
 
       <p className="dc-intro-text mt-8 text-xs font-black uppercase tracking-[0.3em] text-white/85">
-        Semana {week} · Aula de hoje
+        Semana {week} · {isToday ? "Aula de hoje" : "Revisão"}
       </p>
       <p className="dc-intro-sub mt-2 max-w-[240px] text-center font-serif text-2xl font-extrabold leading-snug text-white drop-shadow-sm">
-        2 minutinhos por {babyLabel} 💛
+        {isToday ? `2 minutinhos por ${babyLabel} 💛` : `Relembre pelo ${babyLabel} 💛`}
       </p>
       <p className="dc-intro-sub mt-3 text-[11px] font-semibold text-white/75">
         toque para começar

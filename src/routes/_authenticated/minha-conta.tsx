@@ -10989,10 +10989,7 @@ function ProductSheet({
         {product && vis && (
           <div className="overflow-y-auto overscroll-contain">
             {/* Handle + fechar */}
-            <div
-              style={{ top: "var(--safe-top)" }}
-              className="sticky z-10 flex items-center justify-center px-4 pt-3 pb-2 bg-white border-b border-gray-100"
-            >
+            <div className="sticky top-0 z-10 flex items-center justify-center px-4 pt-3 pb-2 bg-white border-b border-gray-100">
               <div className="w-10 h-1 rounded-full bg-gray-300" />
               <button
                 onClick={onClose}
