@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
-import { quizForDay, quizRoleForDay, type DailyQuiz } from "@/lib/daily-quizzes";
+import { quizForDay, quizEmojiForDay, type DailyQuiz } from "@/lib/daily-quizzes";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -1565,7 +1565,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           const baby = babyForWeek(week);
           const ch = challengeForDay(D);
           const quiz = quizForDay(D);
-          const role = quizRoleForDay(D);
+          const quizEmoji = quizEmojiForDay(D);
           const isToday = D === todayD;
           const state = isToday ? dayTasks : dayTaskState(D);
           const done = doneDays.includes(D);
@@ -1622,8 +1622,8 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                       quiz
                         ? {
                             id: "desafio",
-                            label: `Quiz da professora: ${role.title} (abaixo)`,
-                            emoji: role.emoji,
+                            label: "Aula da professora de hoje (abaixo)",
+                            emoji: quizEmoji,
                           }
                         : { id: "desafio", label: ch.label, emoji: ch.emoji },
                       { id: "leitura", label: `Ler sobre ${babyLabel} hoje (abaixo)`, emoji: "📖" },
@@ -1698,7 +1698,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                   <DailyQuizBlock
                     key={`quiz-${D}`}
                     quiz={quiz}
-                    roleTitle={`${role.emoji} ${role.title}`}
+                    emoji={quizEmoji}
                     week={week}
                     alreadyDone={!!state.desafio || done}
                     canEarn={isToday}
@@ -1713,7 +1713,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                     </p>
                     <p className="mt-1 text-sm text-slate-500">
                       {quizForDay(D + 1)
-                        ? `${quizRoleForDay(D + 1).emoji} ${quizRoleForDay(D + 1).title} · `
+                        ? `${quizEmojiForDay(D + 1)} `
                         : `${challengeForDay(D + 1).emoji} `}
                       Volte amanhã para manter a chama 🔥
                       {streak > 0 ? ` (${streak} ${streak === 1 ? "dia" : "dias"})` : ""}
@@ -1996,14 +1996,14 @@ function LessonSheet({
 
 function DailyQuizBlock({
   quiz,
-  roleTitle,
+  emoji,
   week,
   alreadyDone,
   canEarn,
   onEarn,
 }: {
   quiz: DailyQuiz;
-  roleTitle: string;
+  emoji: string;
   week: number;
   alreadyDone: boolean;
   canEarn: boolean;
@@ -2024,7 +2024,7 @@ function DailyQuizBlock({
     <div className="mb-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
-          🎓 Aula de hoje · {roleTitle}
+          {emoji} Aula de hoje · Semana {week}
         </p>
         {alreadyDone && !checked && (
           <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-500">

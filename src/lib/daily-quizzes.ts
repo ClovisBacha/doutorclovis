@@ -29,16 +29,8 @@ export type DailyQuiz = {
   q2: QuizQuestion;
 };
 
-/** Papel pedagógico do dia (título do bloco no sheet). */
-export const QUIZ_ROLES = [
-  { emoji: "👶", title: "O bebê hoje" },
-  { emoji: "🤰", title: "Seu corpo" },
-  { emoji: "🥗", title: "Nutrição & hábitos" },
-  { emoji: "🛟", title: "Sinais & segurança" },
-  { emoji: "🩺", title: "Exames & consultas" },
-  { emoji: "💛", title: "Bem-estar & vínculo" },
-  { emoji: "⭐", title: "Revisão da semana" },
-] as const;
+/** Emoji rotativo do dia (variedade visual; o tema real vem do próprio teach). */
+const QUIZ_EMOJIS = ["👶", "🤰", "🥗", "🛟", "🩺", "💛", "⭐"] as const;
 
 const QUIZZES = raw as unknown as Record<string, DailyQuiz>;
 
@@ -47,6 +39,6 @@ export function quizForDay(D: number): DailyQuiz | null {
   return QUIZZES[String(D)] ?? null;
 }
 
-export function quizRoleForDay(D: number) {
-  return QUIZ_ROLES[D % 7];
+export function quizEmojiForDay(D: number) {
+  return QUIZ_EMOJIS[D % 7];
 }
