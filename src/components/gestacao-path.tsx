@@ -365,33 +365,122 @@ function scheduleJourneySync() {
   }, 1500);
 }
 
+/* ── Merge granular na hidratação (evita reverter progresso não sincronizado) ──
+ *
+ * O blob inteiro é last-write-wins, mas os dados de PROGRESSO só crescem: dias
+ * feitos, figurinhas, notas de lição e os checks de cada dia nunca "desfazem".
+ * Se o aparelho fez um desafio offline e a nuvem (de outro aparelho) ficou mais
+ * recente, um overwrite cego apagaria esse desafio. Por isso, no pull, esses
+ * campos são UNIDOS (local ∪ nuvem); só o estado de fato mutável (nascimento,
+ * início da jornada, check-in do dia) segue LWW com a nuvem vencendo. */
+
+const UNION_ARRAY_KEYS = new Set([
+  "dc-path-done-days",
+  "dc-path-pos-done-days",
+  "dc-path-stickers",
+  "dc-path-pos-stickers",
+]);
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Combina o valor local com o da nuvem para uma chave da jornada. */
+export function mergeJourneyValue(key: string, local: unknown, cloud: unknown): unknown {
+  // Arrays append-only (dias feitos, figurinhas) → união ordenada.
+  if (UNION_ARRAY_KEYS.has(key)) {
+    if (Array.isArray(local) && Array.isArray(cloud)) {
+      return Array.from(new Set([...local, ...cloud])).sort((a, b) => a - b);
+    }
+    return cloud;
+  }
+  // Notas das lições (semana → nota 0–100) → maior nota vence.
+  if (key === "dc-path-lessons") {
+    if (isPlainObject(local) && isPlainObject(cloud)) {
+      const out: Record<string, unknown> = { ...cloud };
+      for (const [w, v] of Object.entries(local)) {
+        const cur = out[w];
+        if (typeof v === "number" && (typeof cur !== "number" || v > cur)) out[w] = v;
+      }
+      return out;
+    }
+    return cloud;
+  }
+  // Tarefas de cada dia (humor/desafio/leitura) → OR: uma vez feito, feito.
+  if (/^dc-path-(pos-)?day-\d+$/.test(key)) {
+    if (isPlainObject(local) && isPlainObject(cloud)) {
+      const out: Record<string, unknown> = { ...cloud };
+      for (const [t, v] of Object.entries(local)) if (v) out[t] = true;
+      return out;
+    }
+    return cloud;
+  }
+  // Demais chaves (nascimento, início, check-in, welcomed, premium-pending):
+  // mutáveis → a nuvem (mais recente) vence, como antes.
+  return cloud;
+}
+
 /**
  * Baixa a jornada do perfil e hidrata o localStorage quando a nuvem estiver
- * mais recente que a última sincronização deste aparelho (last-write-wins).
- * Retorna true quando hidratou algo (o chamador re-lê os estados).
+ * mais recente que a última sincronização deste aparelho. Faz merge granular
+ * (união do progresso; LWW no estado mutável) e tenta de novo se a rede falhar
+ * — num aparelho novo, o game não pode ficar "zerado" por uma falha de rede.
+ * Retorna true quando hidratou/mesclou algo (o chamador re-lê os estados).
  */
-async function pullJourneyFromProfile(): Promise<boolean> {
+async function pullJourneyFromProfile(retries = 2): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  try {
-    const { supabase } = await import("@/integrations/supabase/client");
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return false;
-    const { data: row, error } = await (supabase as any)
-      .from("journey_state")
-      .select("data,updated_at")
-      .eq("user_id", u.user.id)
-      .maybeSingle();
-    if (error || !row?.data) return false;
-    const localMark = lsGet<string>(SYNC_MARKER, "");
-    if (localMark && localMark >= row.updated_at) return false; // aparelho já em dia
-    for (const [k, v] of Object.entries(row.data as Record<string, unknown>)) {
-      if (!k.startsWith(JOURNEY_PREFIX)) continue; // só chaves da jornada
-      localStorage.setItem(k, JSON.stringify(v));
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const { data: row, error } = await (supabase as any)
+        .from("journey_state")
+        .select("data,updated_at")
+        .eq("user_id", u.user.id)
+        .maybeSingle();
+      if (error) throw error; // rede/servidor: tenta de novo
+      if (!row?.data) return false; // sem jornada na nuvem (não é erro)
+      const localMark = lsGet<string>(SYNC_MARKER, "");
+      if (localMark && localMark >= row.updated_at) return false; // já em dia
+      const cloudData = row.data as Record<string, unknown>;
+      const keys = new Set<string>();
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(JOURNEY_PREFIX)) keys.add(k);
+      }
+      for (const k of Object.keys(cloudData)) if (k.startsWith(JOURNEY_PREFIX)) keys.add(k);
+      let localHadExtra = false; // o merge preservou algo que a nuvem não tinha?
+      for (const k of keys) {
+        const cloudHas = Object.prototype.hasOwnProperty.call(cloudData, k);
+        if (!cloudHas) {
+          localHadExtra = true; // chave só local: progresso não sincronizado
+          continue; // já está no localStorage — preserva
+        }
+        const localRaw = localStorage.getItem(k);
+        const localVal = localRaw != null ? safeParse(localRaw) : undefined;
+        const merged = mergeJourneyValue(k, localVal, cloudData[k]);
+        const mergedStr = JSON.stringify(merged);
+        if (mergedStr !== JSON.stringify(cloudData[k])) localHadExtra = true;
+        localStorage.setItem(k, mergedStr);
+      }
+      localStorage.setItem(SYNC_MARKER, JSON.stringify(row.updated_at));
+      // Se o merge manteve dados ausentes na nuvem, empurra de volta para ela
+      // convergir (senão o progresso ficaria só neste aparelho).
+      if (localHadExtra) scheduleJourneySync();
+      return true;
+    } catch {
+      if (attempt >= retries) return false;
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
     }
-    localStorage.setItem(SYNC_MARKER, JSON.stringify(row.updated_at));
-    return true;
+  }
+}
+
+function safeParse(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -759,6 +848,9 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
   // Incrementa quando o pull da nuvem hidrata o localStorage — filhos que leem
   // no mount (PosPartoJourney) usam como key para remontar com dados frescos
   const [hydratedAt, setHydratedAt] = useState(0);
+  // Aparelho novo (sem nada local) esperando a jornada vir da nuvem: mostra um
+  // aviso sutil em vez de piscar "zerado" (e o pull tem retry se a rede falhar).
+  const [syncing, setSyncing] = useState(false);
 
   // Lazy init: evita flash da tela errada no primeiro render (rota é ssr:false)
   const [birth, setBirth] = useState<Birth | null>(() => lsGet<Birth | null>(LS.birth, null));
@@ -801,6 +893,12 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
     // Render imediato com o que o aparelho tem
     hydrateFromLocal();
 
+    // Aparelho sem nenhum dado local + primeiro pull ainda em andamento: em vez
+    // de piscar a jornada "zerada", avisa que está sincronizando.
+    const localEmpty =
+      lsGet<number[]>(LS.doneDays, []).length === 0 && !lsGet<unknown>(LS.journeyStart, null);
+    setSyncing(localEmpty && !gatePrimed);
+
     (async () => {
       // Nuvem PRIMEIRO: num aparelho novo, a jornada real vem do perfil —
       // sem isso criaríamos uma jornada zerada por cima da verdadeira.
@@ -810,6 +908,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
         ? await pullJourneyFromProfile()
         : await ensureInitialJourneyPull();
       if (cancelled) return;
+      setSyncing(false);
       if (changed) {
         hydrateFromLocal();
         // Filhos que leem o localStorage no próprio mount (PosPartoJourney)
@@ -1313,6 +1412,13 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
   return (
     <div className="flex flex-col gap-4">
       {styleBlock}
+
+      {syncing && (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-700">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-violet-300 border-t-violet-600" />
+          Sincronizando sua jornada…
+        </div>
+      )}
 
       {showWelcome && (
         <div className="glass-card glass-pink rounded-3xl p-5">
