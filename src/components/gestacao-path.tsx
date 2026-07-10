@@ -1053,6 +1053,12 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
     setCelebrated(false);
     lsSet(LS.celebrated, false);
     setBirthConfirming(false);
+    // Se o check-in de humor de hoje aconteceu enquanto o app estava em modo
+    // pós-parto, ele não foi gravado na gestação (doCheckin pula com birth) —
+    // credita agora, senão o dia mostraria 3/3 sem nunca completar.
+    if (checkedToday && !dayTaskState(todayD).humor) {
+      markDayTask(todayD, "humor", true);
+    }
     toast.success("Tudo certo — sua gestação continua aqui 💛");
   }
 
@@ -2458,13 +2464,20 @@ function DailyQuizBlock({
 }) {
   const [answers, setAnswers] = useState<(number | null)[]>([null, null]);
   const [checked, setChecked] = useState(false);
+  // Congela "essa resposta valeu o desafio de hoje" no momento do Responder:
+  // onEarn marca a tarefa e flipa alreadyDone no MESMO render, então o rodapé
+  // não pode depender do prop ao vivo (viraria "modo revisão" na hora).
+  const [earnedNow, setEarnedNow] = useState(false);
   const tm = trimMeta(week);
   const questions = [quiz.q1, quiz.q2];
   const score = checked ? questions.filter((q, i) => answers[i] === q.a).length : 0;
 
   function verify() {
     setChecked(true);
-    if (canEarn && !alreadyDone) onEarn();
+    if (canEarn && !alreadyDone) {
+      setEarnedNow(true);
+      onEarn();
+    }
   }
 
   return (
@@ -2545,7 +2558,7 @@ function DailyQuizBlock({
             {score}/2
           </p>
           <p className="text-xs text-muted-foreground">
-            {canEarn && !alreadyDone
+            {earnedNow
               ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
               : "Modo revisão — o desafio vale no próprio dia, mas aprender vale sempre 💜"}
           </p>
