@@ -65,6 +65,7 @@ import {
   listPatientRequests,
   respondPatientRequest,
   listMyPatients,
+  setPatientQuizPremium,
   type PatientRequest,
   type LinkedPatient,
 } from "@/lib/patientlink.functions";
@@ -4212,6 +4213,28 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     if (res.ok) setPatients(res.patients);
   }
 
+  // Ativa/desativa o premium do quiz (após o PIX, o médico libera aqui)
+  const [premiumBusyId, setPremiumBusyId] = useState<string | null>(null);
+  async function togglePremium(p: LinkedPatient) {
+    setPremiumBusyId(p.id);
+    try {
+      const tk = await tokenFn();
+      const res = await setPatientQuizPremium({
+        data: { accessToken: tk, patientId: p.id, premium: !p.quiz_premium },
+      });
+      if (!res.ok) {
+        toast.error(res.error ?? "Não foi possível alterar o premium.");
+        return;
+      }
+      setPatients((ps) =>
+        ps.map((x) => (x.id === p.id ? { ...x, quiz_premium: !p.quiz_premium } : x)),
+      );
+      toast.success(!p.quiz_premium ? "Aulas premium ativadas ⭐" : "Premium desativado.");
+    } finally {
+      setPremiumBusyId(null);
+    }
+  }
+
   useEffect(() => {
     (async () => {
       try {
@@ -4363,11 +4386,30 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                         {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
                       </span>
-                      <p className="truncate text-sm font-medium">{p.display_name ?? "Sem nome"}</p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {p.display_name ?? "Sem nome"}
+                        </p>
+                        {due && <p className="text-xs text-muted-foreground">DPP {due}</p>}
+                      </div>
                     </div>
-                    {due && (
-                      <span className="shrink-0 text-xs text-muted-foreground">DPP {due}</span>
-                    )}
+                    {/* Premium do quiz: liberar após confirmar o PIX da paciente */}
+                    <button
+                      onClick={() => togglePremium(p)}
+                      disabled={premiumBusyId === p.id}
+                      title={
+                        p.quiz_premium
+                          ? "Aulas premium ativas — clique para desativar"
+                          : "Ativar aulas premium (após confirmar o PIX)"
+                      }
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
+                        p.quiz_premium
+                          ? "bg-amber-100 text-amber-700"
+                          : "border border-border text-muted-foreground hover:border-amber-400 hover:text-amber-600"
+                      }`}
+                    >
+                      {premiumBusyId === p.id ? "…" : p.quiz_premium ? "⭐ Premium" : "☆ Premium"}
+                    </button>
                   </li>
                 );
               })}

@@ -52,6 +52,10 @@ export function SiteFooter() {
               <a href={`mailto:${DOCTOR.email}`} className="hover:text-primary transition-colors">
                 {DOCTOR.email}
               </a>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80">
+                Suporte: comece pelo <strong>chat do app</strong> (na hora); se precisar, e-mail com
+                resposta em até 1 dia útil.
+              </p>
             </li>
             {DOCTOR.address && (
               <li className="flex items-start gap-2">

@@ -946,3 +946,10 @@ button:active > .duo3d {
     animation: none;
   }
 }
+
+/* ── Safe areas do iPhone (notch/Dynamic Island) ─────────────────────────────
+   Com viewport-fit=cover (PWA standalone), a página desenha SOB a barra de
+   status. Elementos fixos/sticky no topo compensam com --safe-top. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+}

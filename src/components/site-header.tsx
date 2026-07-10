@@ -50,6 +50,7 @@ export function SiteHeader() {
 
   return (
     <header
+      style={{ paddingTop: "var(--safe-top)" }}
       className={`sticky top-0 z-40 transition-all duration-500 [transition-timing-function:var(--ease-out-expo)] ${
         scrolled
           ? "border-b border-border/60 bg-background/70 shadow-[0_1px_24px_-12px_oklch(0.4_0.08_18/0.25)] backdrop-blur-xl backdrop-saturate-150"

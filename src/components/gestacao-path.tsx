@@ -4,12 +4,15 @@ import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
 import { quizForDay, quizEmojiForDay, type DailyQuiz } from "@/lib/daily-quizzes";
+import { DOCTOR } from "@/lib/doctor.config";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
 interface GestacaoPathProps {
   profile: { baby_name: string | null } | null;
   gest: Gest;
+  /** Premium do quiz: revisão de qualquer aula liberada (grátis = só a de hoje). */
+  quizPremium?: boolean;
 }
 
 /* ══════════════════════════ FASES (7 semanas cada) ══════════════════════════ */
@@ -717,7 +720,7 @@ function buildFootsteps(
 
 /* ══════════════════════════════ Componente ══════════════════════════════ */
 
-export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
+export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPathProps) {
   const hasGest = !!gest;
   // Dia gestacional de hoje (0-based desde a DUM), até a semana 42 (D=300)
   const rawD = hasGest ? gest.totalDays : 0;
@@ -930,12 +933,26 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     toast.success(`${FRUIT_EMOJI[week] ?? "🍼"} Figurinha coletada: ${baby.fruit}!`);
   }
 
-  function openDay(D: number) {
+  // Intro imersiva (Duolingo) antes do sheet da aula
+  const [intro, setIntro] = useState<number | null>(null);
+
+  function reallyOpenDay(D: number) {
     setDayTasks(dayTaskState(D));
     setSheet({ kind: "day", D });
     if (D === todayD) {
       setTimeout(() => markDayTask(D, "leitura", true), 600);
     }
+  }
+
+  function openDay(D: number) {
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (quizForDay(D) && !reduced) {
+      setIntro(D);
+      return;
+    }
+    reallyOpenDay(D);
   }
 
   /** Salva a lição concluída: otimista no aparelho, canônico no servidor. */
@@ -1043,6 +1060,36 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         100% { transform: scale(1) rotate(0); }
       }
       .dc-sticker-pop { animation: dcStickerPop 700ms cubic-bezier(0.34,1.56,0.64,1) both; }
+      /* Intro imersiva da aula (Duolingo): moeda salta, anéis pulsam, textos sobem */
+      @keyframes dcIntroCoin {
+        0% { transform: scale(0.2) rotate(-14deg); opacity: 0; }
+        60% { transform: scale(1.18) rotate(4deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      @keyframes dcIntroRing {
+        0% { transform: scale(0.5); opacity: 0.75; }
+        100% { transform: scale(2.1); opacity: 0; }
+      }
+      @keyframes dcIntroText {
+        0% { transform: translateY(18px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes dcIntroOut {
+        to { opacity: 0; }
+      }
+      .dc-intro-coin { animation: dcIntroCoin 620ms cubic-bezier(0.34,1.56,0.64,1) both; }
+      .dc-intro-ring { animation: dcIntroRing 900ms ease-out both; }
+      .dc-intro-text { animation: dcIntroText 480ms 260ms var(--ease-out-expo, ease-out) both; }
+      .dc-intro-sub { animation: dcIntroText 480ms 420ms var(--ease-out-expo, ease-out) both; }
+      .dc-intro-leave { animation: dcIntroOut 260ms ease-in both; }
+
+      /* Brilho 3D estilo logo: reflexo superior + luz interna suave */
+      .dc-coin-shine {
+        position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+        background:
+          radial-gradient(62% 48% at 30% 20%, rgba(255,255,255,0.62), rgba(255,255,255,0.10) 55%, transparent 72%),
+          radial-gradient(80% 45% at 50% 108%, rgba(255,255,255,0.20), transparent 60%);
+      }
       @media (prefers-reduced-motion: reduce) {
         .dc-confetti, .dc-chest, .dc-sticker-pop, .dc-halo, .dc-step { animation: none; }
       }
@@ -1261,7 +1308,10 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       )}
 
       {/* Stats — faixa sólida fixa no topo (Duolingo): conteúdo passa por baixo limpo */}
-      <div className="sticky top-0 z-30 -mx-5 flex items-center justify-around border-b border-border/60 bg-background/95 px-6 py-3 backdrop-blur-md md:mx-0 md:rounded-2xl md:border">
+      <div
+        style={{ top: "var(--safe-top)" }}
+        className="sticky z-30 -mx-5 flex items-center justify-around border-b border-border/60 bg-background/95 px-6 py-3 backdrop-blur-md md:mx-0 md:rounded-2xl md:border"
+      >
         <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
           <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
           <span className="text-lg font-extrabold text-amber-500">{streak}</span>
@@ -1423,7 +1473,10 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                       } as React.CSSProperties
                     }
                   >
-                    <span className="text-3xl">{!unlocked ? "🔒" : done ? "⭐" : "📚"}</span>
+                    <span className="relative z-10 text-3xl">
+                      {!unlocked ? "🔒" : done ? "⭐" : "📚"}
+                    </span>
+                    <span className="dc-coin-shine" aria-hidden />
                   </div>
                 </div>
                 <span
@@ -1466,7 +1519,8 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                     } as React.CSSProperties
                   }
                 >
-                  <span className="text-2xl">{FRUIT_EMOJI[node.week] ?? "🍼"}</span>
+                  <span className="relative z-10 text-2xl">{FRUIT_EMOJI[node.week] ?? "🍼"}</span>
+                  <span className="dc-coin-shine" aria-hidden />
                 </div>
               </button>
             );
@@ -1523,29 +1577,23 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                       {
                         width: `${dia}px`,
                         height: `${dia}px`,
-                        background: `linear-gradient(180deg, color-mix(in oklab, ${palette.main} 82%, white) 0%, ${palette.main} 55%)`,
+                        background: `radial-gradient(120% 120% at 32% 24%, color-mix(in oklab, ${palette.main} 55%, white) 0%, ${palette.main} 58%, color-mix(in oklab, ${palette.main} 82%, black) 100%)`,
                         "--lip": palette.lip,
-                        boxShadow: `0 ${isToday ? 8 : 6}px 0 ${palette.lip}`,
+                        boxShadow: `0 ${isToday ? 8 : 6}px 0 ${palette.lip}, 0 12px 24px -10px ${palette.main}99`,
                       } as React.CSSProperties
                     }
                   >
+                    {/* Sem números: as bolinhas falam pela cor e pelo brilho (estilo da logo) */}
                     {isToday && !done ? (
-                      <span className="text-3xl">🎁</span>
+                      <span className="relative z-10 text-3xl">🎁</span>
                     ) : done ? (
                       <span
-                        className={`font-black text-white ${isToday ? "text-3xl" : "text-2xl"}`}
+                        className={`relative z-10 font-black text-white ${isToday ? "text-3xl" : "text-2xl"}`}
                       >
                         ✓
                       </span>
-                    ) : (
-                      <span
-                        className={`text-base font-black tabular-nums ${
-                          isFuture ? "text-slate-400" : "text-pink-300"
-                        }`}
-                      >
-                        {dayOfWeek}
-                      </span>
-                    )}
+                    ) : null}
+                    <span className="dc-coin-shine" aria-hidden />
                   </div>
                 </div>
               </button>
@@ -1556,6 +1604,19 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
 
       {/* Folga para a barra de navegação inferior do app */}
       <div className="h-16" />
+
+      {/* Intro imersiva da aula (Duolingo): moeda salta, depois o sheet abre */}
+      {intro !== null && (
+        <QuizIntro
+          D={intro}
+          babyLabel={babyLabel}
+          onDone={() => {
+            const D = intro;
+            setIntro(null);
+            reallyOpenDay(D);
+          }}
+        />
+      )}
 
       {/* Sheet de DIA */}
       {sheet?.kind === "day" &&
@@ -1694,17 +1755,20 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                   )}
                 </div>
 
-                {quiz && (
-                  <DailyQuizBlock
-                    key={`quiz-${D}`}
-                    quiz={quiz}
-                    emoji={quizEmoji}
-                    week={week}
-                    alreadyDone={!!state.desafio || done}
-                    canEarn={isToday}
-                    onEarn={() => markDayTask(D, "desafio", true)}
-                  />
-                )}
+                {quiz &&
+                  (isToday || quizPremium ? (
+                    <DailyQuizBlock
+                      key={`quiz-${D}`}
+                      quiz={quiz}
+                      emoji={quizEmoji}
+                      week={week}
+                      alreadyDone={!!state.desafio || done}
+                      canEarn={isToday}
+                      onEarn={() => markDayTask(D, "desafio", true)}
+                    />
+                  ) : (
+                    <QuizPaywall week={week} />
+                  ))}
 
                 {isToday && (
                   <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
@@ -1985,6 +2049,192 @@ function LessonSheet({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ══════════════════ Paywall das aulas premium ══════════════════
+   Grátis: só a aula do dia de HOJE. Premium: revisitar/fazer qualquer aula
+   já liberada. Pagamento assistido: PIX + comprovante no WhatsApp e o
+   consultório ativa o acesso (toggle no painel do médico). */
+
+const QUIZ_PRICE_MONTHLY = 19.9;
+const QUIZ_PRICE_ANNUAL_MONTH = 9.9; // 12x — cobrado anualmente (R$ 118,80/ano)
+
+function QuizPaywall({ week }: { week: number }) {
+  const tm = trimMeta(week);
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const pixKey = DOCTOR.pixKey;
+
+  async function copyPix() {
+    try {
+      await navigator.clipboard.writeText(pixKey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar — anote a chave: " + pixKey);
+    }
+  }
+
+  return (
+    <div className="mb-4 overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-orange-50 p-4">
+      <div className="flex items-start gap-3">
+        <div
+          className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full"
+          style={{
+            background: `radial-gradient(120% 120% at 32% 24%, #fde68a 0%, #f59e0b 60%, #b45309 100%)`,
+            boxShadow: "0 5px 0 #b45309",
+          }}
+        >
+          <span className="relative z-10 text-2xl">👑</span>
+          <span className="dc-coin-shine" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-extrabold text-amber-900">Aula premium 🔒</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
+            No plano grátis você faz <strong>a aula de cada dia</strong> no próprio dia. Com o
+            premium, você desbloqueia <strong>todas as aulas já liberadas</strong> para fazer e
+            revisar quando quiser.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-amber-200 bg-white/70 p-2.5 text-center">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Mensal</p>
+          <p className="text-lg font-extrabold text-amber-900">
+            R$ {QUIZ_PRICE_MONTHLY.toFixed(2).replace(".", ",")}
+          </p>
+          <p className="text-[10px] text-amber-700">por mês</p>
+        </div>
+        <div className="relative rounded-xl border-2 border-amber-400 bg-white p-2.5 text-center">
+          <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black text-white">
+            ECONOMIZE 50%
+          </span>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Anual</p>
+          <p className="text-lg font-extrabold text-amber-900">
+            R$ {QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}
+          </p>
+          <p className="text-[10px] text-amber-700">por mês · cobrado anualmente</p>
+        </div>
+      </div>
+
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+          style={{ boxShadow: "0 4px 0 #b45309" }}
+        >
+          ✨ Desbloquear as aulas
+        </button>
+      ) : (
+        <div className="mt-3 rounded-xl bg-white/80 p-3">
+          <p className="text-xs font-bold text-amber-900">Como ativar (2 passos):</p>
+          <ol className="mt-1.5 space-y-1.5 text-xs text-amber-800">
+            <li>
+              1. Pague via PIX — mensal R$ 19,90 ou anual R$ 118,80 — para a chave:
+              <button
+                onClick={copyPix}
+                className="press mt-1 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-2.5 py-2 font-mono text-[11px] text-amber-900"
+              >
+                <span className="truncate">{pixKey}</span>
+                <span className="shrink-0 font-sans font-bold text-amber-600">
+                  {copied ? "copiado ✓" : "copiar"}
+                </span>
+              </button>
+            </li>
+            <li>
+              2. Envie o comprovante no WhatsApp — seu acesso é liberado em até 24h.
+              <a
+                href={`${DOCTOR.whatsappUrl}?text=${encodeURIComponent("Olá! Paguei o desbloqueio das aulas premium do app (quiz diário). Segue o comprovante do PIX.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="press mt-1 block rounded-full bg-emerald-500 py-2.5 text-center text-xs font-extrabold text-white"
+              >
+                Enviar comprovante no WhatsApp
+              </a>
+            </li>
+          </ol>
+        </div>
+      )}
+
+      <p className="mt-2 text-center text-[10px] text-amber-700/80" style={{ color: tm.lip }}>
+        A aula de hoje continua grátis, todos os dias 💛
+      </p>
+    </div>
+  );
+}
+
+/* ══════════════════ Intro imersiva da aula (estilo Duolingo) ══════════════════
+   Tela cheia por ~1,3s: fundo no tom do trimestre, moeda saltando com anéis,
+   "Semana N · Aula de hoje". Toque pula. Reduced-motion nem chega aqui. */
+
+function QuizIntro({ D, babyLabel, onDone }: { D: number; babyLabel: string; onDone: () => void }) {
+  const [leaving, setLeaving] = useState(false);
+  const week = Math.max(1, Math.min(42, Math.floor(D / 7)));
+  const tm = trimMeta(week);
+  const emoji = quizEmojiForDay(D);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setLeaving(true), 1250);
+    const t2 = setTimeout(onDone, 1500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div
+      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden ${
+        leaving ? "dc-intro-leave" : ""
+      }`}
+      style={{
+        background: `radial-gradient(120% 100% at 50% 20%, color-mix(in oklab, ${tm.main} 30%, white) 0%, color-mix(in oklab, ${tm.main} 72%, white) 45%, ${tm.main} 100%)`,
+        paddingTop: "var(--safe-top)",
+      }}
+      onClick={() => {
+        setLeaving(true);
+        setTimeout(onDone, 180);
+      }}
+      role="status"
+      aria-label="Abrindo a aula de hoje"
+    >
+      <div className="relative flex items-center justify-center">
+        {/* Anéis pulsando para fora */}
+        <span
+          className="dc-intro-ring absolute h-32 w-32 rounded-full border-4 border-white/50"
+          aria-hidden
+        />
+        <span
+          className="dc-intro-ring absolute h-32 w-32 rounded-full border-4 border-white/30"
+          style={{ animationDelay: "220ms" }}
+          aria-hidden
+        />
+        {/* Moeda saltando, no mesmo estilo glossy da logo */}
+        <div
+          className="dc-intro-coin relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full"
+          style={{
+            background: `radial-gradient(120% 120% at 32% 24%, color-mix(in oklab, ${tm.main} 45%, white) 0%, ${tm.main} 60%, color-mix(in oklab, ${tm.main} 80%, black) 100%)`,
+            boxShadow: `0 10px 0 ${tm.lip}, 0 22px 40px -12px rgba(0,0,0,0.35)`,
+          }}
+        >
+          <span className="relative z-10 text-5xl">{emoji}</span>
+          <span className="dc-coin-shine" aria-hidden />
+        </div>
+      </div>
+
+      <p className="dc-intro-text mt-8 text-xs font-black uppercase tracking-[0.3em] text-white/85">
+        Semana {week} · Aula de hoje
+      </p>
+      <p className="dc-intro-sub mt-2 max-w-[240px] text-center font-serif text-2xl font-extrabold leading-snug text-white drop-shadow-sm">
+        2 minutinhos por {babyLabel} 💛
+      </p>
+      <p className="dc-intro-sub mt-3 text-[11px] font-semibold text-white/75">
+        toque para começar
+      </p>
     </div>
   );
 }
@@ -2428,7 +2678,7 @@ function PosPartoJourney({
                   </div>
                 )}
                 <div
-                  className={`duo3d flex items-center justify-center rounded-full ${
+                  className={`duo3d relative flex items-center justify-center overflow-hidden rounded-full ${
                     isToday ? "ring-4 ring-white/70" : ""
                   } ${isToday && !done ? "dc-chest" : ""}`}
                   style={
@@ -2441,20 +2691,15 @@ function PosPartoJourney({
                   }
                 >
                   {isToday && !done ? (
-                    <span className="text-2xl">🎁</span>
+                    <span className="relative z-10 text-2xl">🎁</span>
                   ) : done ? (
-                    <span className={`font-black text-white ${isToday ? "text-2xl" : "text-lg"}`}>
+                    <span
+                      className={`relative z-10 font-black text-white ${isToday ? "text-2xl" : "text-lg"}`}
+                    >
                       ✓
                     </span>
-                  ) : (
-                    <span
-                      className={`font-black tabular-nums ${
-                        isFuture ? "text-slate-400" : "text-sky-300"
-                      } text-sm`}
-                    >
-                      {(D % 7) + 1}
-                    </span>
-                  )}
+                  ) : null}
+                  <span className="dc-coin-shine" aria-hidden />
                 </div>
               </button>
             );

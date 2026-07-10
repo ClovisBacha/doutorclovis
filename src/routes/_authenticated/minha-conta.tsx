@@ -139,6 +139,7 @@ type Profile = {
   prior_cesarean?: boolean | null;
   prior_notes?: string | null;
   corporate_account_id?: string | null;
+  quiz_premium?: boolean | null;
 };
 
 type JournalEntry = {
@@ -658,7 +659,9 @@ function MinhaContaPage() {
           <div key={tab} className="mt-6 tab-enter">
             <TabErrorBoundary tabName={tab}>
               {tab === "Bebê" && <BabyTab profile={profile} gest={gest} onNavigate={goToTab} />}
-              {tab === "Caminho" && <GestacaoPath profile={profile} gest={gest} />}
+              {tab === "Caminho" && (
+                <GestacaoPath profile={profile} gest={gest} quizPremium={!!profile?.quiz_premium} />
+              )}
               {tab === "Carta do Bebê" && (
                 <CartaBebêTab profile={profile} gest={gest} onNavigate={goToTab} />
               )}
@@ -8915,6 +8918,49 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
 
   return (
     <div className="max-w-2xl space-y-5">
+      {/* ── Suporte em 2 passos: chat primeiro, e-mail se precisar ── */}
+      <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5">
+        <h2 className="font-serif text-xl">Precisa de ajuda? 💬</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Nosso suporte funciona em 2 passos — comece sempre pelo chat.
+        </p>
+        <div className="mt-4 space-y-2.5">
+          <button
+            onClick={() => onNavigate("Chat IA")}
+            className="press flex w-full items-center gap-3 rounded-2xl bg-primary p-4 text-left text-primary-foreground shadow-[var(--shadow-soft)]"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg">
+              1️⃣
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold">Fale com o chat</span>
+              <span className="block text-xs opacity-85">
+                Resposta na hora, 24h — resolve a maioria das dúvidas
+              </span>
+            </span>
+          </button>
+          <a
+            href={`mailto:${DOCTOR.email}?subject=${encodeURIComponent("Preciso de ajuda — app Obstétrica")}&body=${encodeURIComponent("Olá! Já tentei pelo chat e ainda preciso de ajuda com: ")}`}
+            className="press flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-lg">
+              2️⃣
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-foreground">
+                Não resolveu? Mande um e-mail
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {DOCTOR.email} — resposta em até 1 dia útil
+              </span>
+            </span>
+          </a>
+        </div>
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          🚨 Emergência médica não é suporte: ligue 192 (SAMU) ou vá à maternidade.
+        </p>
+      </div>
+
       <div className="rounded-3xl border border-border bg-card p-5">
         <h2 className="font-serif text-xl mb-1">Perguntas frequentes</h2>
         {currentWeek > 0 && (
@@ -10943,7 +10989,10 @@ function ProductSheet({
         {product && vis && (
           <div className="overflow-y-auto overscroll-contain">
             {/* Handle + fechar */}
-            <div className="sticky top-0 z-10 flex items-center justify-center px-4 pt-3 pb-2 bg-white border-b border-gray-100">
+            <div
+              style={{ top: "var(--safe-top)" }}
+              className="sticky z-10 flex items-center justify-center px-4 pt-3 pb-2 bg-white border-b border-gray-100"
+            >
               <div className="w-10 h-1 rounded-full bg-gray-300" />
               <button
                 onClick={onClose}
@@ -11197,7 +11246,8 @@ function LojaTab({ gest }: { gest: Gest }) {
 
       {/* ── Filtros — sticky, some on scroll down ── */}
       <div
-        className={`sticky top-0 z-20 -mx-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm border-b border-gray-100 transition-transform duration-200 ease-in-out ${
+        style={{ top: "var(--safe-top)" }}
+        className={`sticky z-20 -mx-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm border-b border-gray-100 transition-transform duration-200 ease-in-out ${
           filtersHidden ? "-translate-y-[130%]" : "translate-y-0"
         }`}
       >

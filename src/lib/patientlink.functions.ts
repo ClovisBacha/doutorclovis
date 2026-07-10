@@ -63,6 +63,8 @@ export type LinkedPatient = {
   display_name: string | null;
   due_date: string | null;
   created_at: string | null;
+  /** Aulas premium do quiz diário (revisão liberada). */
+  quiz_premium?: boolean | null;
 };
 
 const TokenSchema = z.object({ accessToken: z.string().min(10) });
@@ -293,12 +295,57 @@ export const listMyPatients = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, patients: [] as LinkedPatient[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: rows } = await (supabaseAdmin as any)
+    const first = await (supabaseAdmin as any)
       .from("patient_profiles")
-      .select("id,display_name,due_date,created_at")
+      .select("id,display_name,due_date,created_at,quiz_premium")
       .eq("doctor_id", user.id)
       .order("created_at", { ascending: false })
       .limit(500);
+    let rows = first.data;
+    if (first.error?.code === "42703") {
+      // Coluna quiz_premium ainda não aplicada no banco: segue sem ela.
+      const fallback = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("id,display_name,due_date,created_at")
+        .eq("doctor_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      rows = fallback.data;
+    }
 
     return { ok: true as const, patients: (rows ?? []) as LinkedPatient[] };
+  });
+
+/**
+ * Liga/desliga o premium do quiz diário de UMA paciente do médico logado
+ * (ativação manual após o PIX — o médico confirma o pagamento e libera).
+ */
+export const setPatientQuizPremium = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        patientId: z.string().uuid(),
+        premium: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireDoctor(data.accessToken);
+    if (!user) return { ok: false as const, error: "Sem permissão." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .update({ quiz_premium: data.premium })
+      .eq("id", data.patientId)
+      .eq("doctor_id", user.id); // tenancy: só as próprias pacientes
+    if (error?.code === "42703") {
+      return {
+        ok: false as const,
+        error: "Aplique a migração quiz_premium no Supabase (APLICAR_PENDENTES.sql).",
+      };
+    }
+    return error
+      ? { ok: false as const, error: error.message }
+      : { ok: true as const, error: null };
   });

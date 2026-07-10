@@ -161,7 +161,13 @@ function Index() {
   return (
     <>
       {/* ── Hero: céu dinâmico + telefone ─────────────────────────── */}
-      <section className="relative -mt-[73px] overflow-hidden pt-[73px]">
+      <section
+        className="relative overflow-hidden"
+        style={{
+          marginTop: "calc(-73px - var(--safe-top))",
+          paddingTop: "calc(73px + var(--safe-top))",
+        }}
+      >
         <SkyCanvas sky={sky} />
         <div className="relative mx-auto grid max-w-6xl items-center gap-8 px-5 pt-6 pb-24 md:gap-10 md:grid-cols-[1.1fr_1fr] md:pt-20 md:pb-32">
           {/* Painel Liquid Glass atrás do texto do hero: refrata o céu vivo e

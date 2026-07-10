@@ -1537,3 +1537,9 @@ DROP TRIGGER IF EXISTS trg_protect_doctor_id ON public.patient_profiles;
 CREATE TRIGGER trg_protect_doctor_id
   BEFORE INSERT OR UPDATE ON public.patient_profiles
   FOR EACH ROW EXECUTE FUNCTION public.protect_patient_doctor_id();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2026-07-10 · Premium do quiz diário (aulas da professora)
+-- Grátis: só a aula do dia. Premium: revisão de qualquer aula liberada.
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS quiz_premium boolean NOT NULL DEFAULT false;
