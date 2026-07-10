@@ -297,7 +297,7 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
         .select("room_name")
         .eq("id", data.id)
         .single();
-      meetUrl = `https://meet.jit.si/drclovis-${row?.room_name ?? data.id}`;
+      meetUrl = `https://meet.jit.si/obstetrica-${row?.room_name ?? data.id}`;
     }
 
     const { error } = await supabaseAdmin

@@ -28,7 +28,8 @@ export function SiteFooter() {
             rel="noopener noreferrer"
             className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
-            <Instagram className="h-3.5 w-3.5" /> @drclovisbacha
+            <Instagram className="h-3.5 w-3.5" />{" "}
+            {`@${DOCTOR.instagram.replace(/\/$/, "").split("/").pop()}`}
           </a>
         </div>
 
