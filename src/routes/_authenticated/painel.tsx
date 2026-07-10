@@ -67,7 +67,7 @@ import {
 } from "@/lib/patientlink.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
-  head: () => ({ meta: [{ title: "Painel do médico — Obstétrica by Dr. Clóvis" }] }),
+  head: () => ({ meta: [{ title: "Painel do médico — Obstétrica" }] }),
   component: PainelPage,
 });
 
@@ -1000,7 +1000,7 @@ function AppointmentsSection({
   function pixWhatsApp(a: AdminAppointment) {
     const price = (a as any).price_brl ? ((a as any).price_brl / 100).toFixed(2) : "___";
     const msg = encodeURIComponent(
-      `Olá, ${a.patient_name}! Para confirmar sua consulta no dia ${(a as any).confirmed_date ? new Date((a as any).confirmed_date + "T00:00:00").toLocaleDateString("pt-BR") : new Date(a.preferred_date + "T00:00:00").toLocaleDateString("pt-BR")} às ${(a as any).confirmed_time ?? a.preferred_time}, envie R$ ${price} via PIX para a chave: bachaclovis@gmail.com (Dr. Clóvis Bacha). Após o pagamento, envie o comprovante aqui. Obrigado!`,
+      `Olá, ${a.patient_name}! Para confirmar sua consulta no dia ${(a as any).confirmed_date ? new Date((a as any).confirmed_date + "T00:00:00").toLocaleDateString("pt-BR") : new Date(a.preferred_date + "T00:00:00").toLocaleDateString("pt-BR")} às ${(a as any).confirmed_time ?? a.preferred_time}, envie R$ ${price} via PIX para a chave: ${DOCTOR.pixKey} (${DOCTOR.pixName}). Após o pagamento, envie o comprovante aqui. Obrigado!`,
     );
     window.open(`https://wa.me/55${a.patient_phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
   }
@@ -1016,7 +1016,7 @@ function AppointmentsSection({
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Dr Clovis Bacha//Agenda//PT-BR",
+      "PRODID:-//Obstetrica//Agenda//PT-BR",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
     ];

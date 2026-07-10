@@ -5,7 +5,7 @@ import { useState } from "react";
 export const Route = createFileRoute("/hospitais")({
   head: () => ({
     meta: [
-      { title: "Hospitais e maternidades — Obstétrica by Dr. Clóvis" },
+      { title: "Hospitais e maternidades — Obstétrica" },
       {
         name: "description",
         content:

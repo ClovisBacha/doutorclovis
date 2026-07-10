@@ -141,7 +141,7 @@ const PAIN_POINTS = [
 
 const TESTIMONIALS = [
   {
-    name: "Dr. Clóvis Bacha",
+    name: "O obstetra fundador",
     role: "Ginecologista e Obstetra — Criador da plataforma",
     text: "Construí essa ferramenta porque não encontrei nada no mercado focado nas necessidades reais de uma gestação de alto risco. O agente IA respondeu mais de 200 mensagens de WhatsApp na primeira semana, liberando horas do meu dia.",
     avatar: "CB",
@@ -435,12 +435,12 @@ function MedicosPage() {
                 {[
                   {
                     from: "patient",
-                    text: "Oi, gostaria de marcar consulta com o Dr. Clóvis",
+                    text: "Oi, gostaria de marcar uma consulta com a Dra. Ana",
                     time: "23:14",
                   },
                   {
                     from: "agent",
-                    text: "Olá! Sou a assistente virtual do Dr. Clóvis Bacha 👋 Com quem estou falando?",
+                    text: "Olá! Sou a assistente virtual da Dra. Ana 👋 Com quem estou falando?",
                     time: "23:14",
                   },
                   { from: "patient", text: "Ana Lima", time: "23:15" },

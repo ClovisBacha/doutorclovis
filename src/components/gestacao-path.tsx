@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
+import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
+import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -212,13 +214,13 @@ function challengeForPosDay(D: number): Challenge {
 
 const POSDATA_GUIDANCE =
   "Pós-data: consultas 2x por semana com cardiotocografia e avaliação do líquido amniótico. " +
-  "Converse com o Dr. Clóvis sobre o planejamento da indução. Conte os movimentos do bebê " +
+  "Converse com o seu médico sobre o planejamento da indução. Conte os movimentos do bebê " +
   "todos os dias — se diminuírem, vá direto à maternidade.";
 
 const POS_GUIDANCE: Record<number, string> = {
   1: "Descanso e amamentação em livre demanda. Teste do pezinho entre o 3º e o 5º dia. Agende a revisão pós-parto (7–10 dias).",
   2: "Atenção aos sinais de alerta: febre, sangramento intenso, dor forte ou tristeza persistente. Se a amamentação doer, procure ajuda com a pega.",
-  3: "Baby blues costuma passar até aqui. Se a tristeza persistir ou piorar, faça o check-in emocional e fale com o Dr. Clóvis — você não está sozinha.",
+  3: "Baby blues costuma passar até aqui. Se a tristeza persistir ou piorar, faça o check-in emocional e fale com o seu médico — você não está sozinha.",
   4: "Agende a consulta puerperal completa (30–40 dias): revisão geral, contracepção e liberação de atividades.",
   5: "As vacinas de 2 meses do bebê estão chegando — deixe agendadas (penta, VIP, pneumo 10, rotavírus).",
   6: "Consulta puerperal em dia? É nela que se libera exercício físico e se define contracepção. Cuide também do seu sono.",
@@ -249,6 +251,7 @@ const LS = {
   posDoneDays: "dc-path-pos-done-days",
   dayTasks: (d: number) => `dc-path-day-${d}`,
   posDayTasks: (d: number) => `dc-path-pos-day-${d}`,
+  lessons: "dc-path-lessons",
   welcomed: "dc-path-welcomed",
   birth: "dc-path-birth",
   celebrated: "dc-path-birth-celebrated",
@@ -510,11 +513,16 @@ const IDAY_ROW = 104;
 const IALBUM_ROW = 112;
 const IWEEK_HEADER = 72; // folga para o balão "Desafio de hoje" não cobrir o pill da semana
 const IBANNER_ROW = 120;
+const ILESSON_ROW = 116;
+
+/** Semana → lição da Escola do Bebê (o aprendizado agora vive DENTRO do caminho). */
+const LESSON_BY_WEEK = new Map<number, CourseModule>(COURSE_MODULES.map((m) => [m.week, m]));
 
 type JourneyNode =
   | PathNode
   | { kind: "phase-banner"; phase: Phase; y: number }
-  | { kind: "mascot"; emoji: string; y: number; x: number };
+  | { kind: "mascot"; emoji: string; y: number; x: number }
+  | { kind: "lesson"; week: number; y: number; x: number; row: number };
 
 const MASCOTS = ["🧸", "🦢", "🌷", "🍼", "🐘", "🌈", "🐥", "🧦"];
 
@@ -562,6 +570,14 @@ function buildFullJourney(
           y += IDAY_ROW;
           row++;
         }
+      }
+      // Lição da semana (Escola do Bebê) — uma moeda especial no próprio caminho,
+      // logo após os dias da semana: aprender faz parte da jornada.
+      if (LESSON_BY_WEEK.has(w)) {
+        const x = xOf(row);
+        nodes.push({ kind: "lesson", week: w, y: y + ILESSON_ROW / 2, x, row });
+        y += ILESSON_ROW;
+        row++;
       }
     }
   }
@@ -641,13 +657,19 @@ function BabyFootprint({ color }: { color: string }) {
 }
 
 /** Gera as pegadas entre pares consecutivos de nós já percorridos. */
-function buildFootsteps(nodes: JourneyNode[], doneDays: number[], pathWidthPx: number): Footstep[] {
+function buildFootsteps(
+  nodes: JourneyNode[],
+  doneDays: number[],
+  lessonsDoneWeeks: number[],
+  pathWidthPx: number,
+): Footstep[] {
   const walkable = nodes.filter(
-    (n): n is Extract<JourneyNode, { kind: "day" | "album-week" }> =>
-      n.kind === "day" || n.kind === "album-week",
+    (n): n is Extract<JourneyNode, { kind: "day" | "album-week" | "lesson" }> =>
+      n.kind === "day" || n.kind === "album-week" || n.kind === "lesson",
   );
   const walked = (n: (typeof walkable)[number]) =>
-    n.kind === "album-week" || doneDays.includes(n.D);
+    n.kind === "album-week" ||
+    (n.kind === "lesson" ? lessonsDoneWeeks.includes(n.week) : doneDays.includes(n.D));
 
   const steps: Footstep[] = [];
   for (let i = 0; i < walkable.length - 1; i++) {
@@ -665,7 +687,7 @@ function buildFootsteps(nodes: JourneyNode[], doneDays: number[], pathWidthPx: n
     // perpendicular unitária (para afastar pé esquerdo/direito da linha)
     const px = -dyPx / len;
     const py = dxPx / len;
-    const week = a.kind === "day" ? a.week : a.kind === "album-week" ? a.week : 20;
+    const week = a.week;
     const color = `color-mix(in oklab, ${trimMeta(week).main} 52%, white)`;
 
     // 4 passos entre as bordas das moedas (raio ~34px de folga)
@@ -674,7 +696,7 @@ function buildFootsteps(nodes: JourneyNode[], doneDays: number[], pathWidthPx: n
     const count = 4;
     // Identidade estável do segmento: completar um dia antigo não desloca
     // as keys das pegadas seguintes (evita saltos/re-animação indevida)
-    const segId = a.kind === "day" ? `d${a.D}` : `w${a.week}`;
+    const segId = a.kind === "day" ? `d${a.D}` : a.kind === "lesson" ? `l${a.week}` : `w${a.week}`;
     for (let s = 0; s < count; s++) {
       const t = t0 + ((t1 - t0) * s) / (count - 1);
       const side = s % 2 === 0 ? 1 : -1;
@@ -707,6 +729,10 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     { kind: "day"; D: number } | { kind: "album"; week: number } | null
   >(null);
   const [revealing, setRevealing] = useState(false);
+  // Lições da Escola do Bebê dentro do caminho: semana → nota do quiz (0–100).
+  // Cache local (entra no sync do journey_state); o servidor é a fonte da verdade.
+  const [lessonsDone, setLessonsDone] = useState<Record<number, number>>({});
+  const [lessonSheet, setLessonSheet] = useState<CourseModule | null>(null);
 
   const [journeyStart, setJourneyStart] = useState<JourneyStart | null>(null);
   const [stickers, setStickers] = useState<number[]>([]);
@@ -743,6 +769,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     const hydrateFromLocal = () => {
       setStickers(lsGet<number[]>(LS.stickers, []));
       setDoneDays(lsGet<number[]>(LS.doneDays, []));
+      setLessonsDone(lsGet<Record<number, number>>(LS.lessons, {}));
       setCheckin(lsGet<Checkin>(LS.checkin, { last: "", streak: 0 }));
       setBirth(lsGet<Birth | null>(LS.birth, null));
       setCelebrated(lsGet<boolean>(LS.celebrated, false));
@@ -780,6 +807,26 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         }
       }
       if (!cancelled) setJourneyStart(js);
+
+      // Progresso das lições: o servidor (course_progress) é a fonte da verdade —
+      // mescla por cima do cache local e regrava para os próximos offline.
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        if (s.session && !cancelled) {
+          const res = await getCourseProgress({
+            data: { accessToken: s.session.access_token },
+          });
+          if (res.ok && !cancelled) {
+            const merged = { ...lsGet<Record<number, number>>(LS.lessons, {}) };
+            for (const row of res.progress) merged[row.module_week] = row.quiz_score;
+            setLessonsDone(merged);
+            lsSet(LS.lessons, merged);
+          }
+        }
+      } catch {
+        /* offline: o cache local segue valendo */
+      }
     })();
 
     return () => {
@@ -818,7 +865,11 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  const footsteps = useMemo(() => buildFootsteps(nodes, doneDays, pathW), [nodes, doneDays, pathW]);
+  const lessonsDoneWeeks = useMemo(() => Object.keys(lessonsDone).map(Number), [lessonsDone]);
+  const footsteps = useMemo(
+    () => buildFootsteps(nodes, doneDays, lessonsDoneWeeks, pathW),
+    [nodes, doneDays, lessonsDoneWeeks, pathW],
+  );
 
   // Centraliza o nó de HOJE na tela ao abrir (scroll da própria página)
   useEffect(() => {
@@ -886,6 +937,28 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     }
   }
 
+  /** Salva a lição concluída: otimista no aparelho, canônico no servidor. */
+  async function completeLesson(week: number, score: number) {
+    if (lessonsDone[week] != null) return;
+    const next = { ...lessonsDone, [week]: score };
+    setLessonsDone(next);
+    lsSet(LS.lessons, next);
+    setRevealing(true);
+    setTimeout(() => setRevealing(false), 1800);
+    toast.success(`📚 Lição da semana ${week} completa!`);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      if (s.session) {
+        await markModuleComplete({
+          data: { accessToken: s.session.access_token, moduleWeek: week, quizScore: score },
+        });
+      }
+    } catch {
+      /* offline: fica no cache e o próximo sync resolve */
+    }
+  }
+
   function openAlbum(week: number) {
     setSheet({ kind: "album", week });
     if (week <= currentWeek) collectSticker(week);
@@ -920,7 +993,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   async function share(week: number) {
     const baby = babyForWeek(week);
     const name = profile?.baby_name || "Meu bebê";
-    const text = `🤰 Semana ${week}: ${name} está do tamanho de ${baby.fruit.toLowerCase()}! ${FRUIT_EMOJI[week] ?? ""}\n📏 ${baby.size} · ⚖️ ${baby.weight}\n\nAcompanhamento pré-natal com Dr. Clóvis Bacha 🩺`;
+    const text = `🤰 Semana ${week}: ${name} está do tamanho de ${baby.fruit.toLowerCase()}! ${FRUIT_EMOJI[week] ?? ""}\n📏 ${baby.size} · ⚖️ ${baby.weight}\n\nAcompanhando cada semana no app Obstétrica 💜`;
     try {
       if (navigator.share) await navigator.share({ text });
       else {
@@ -1052,7 +1125,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           </p>
           <p className="mt-2 text-lg font-bold text-amber-900">Sua gestação passou de 42 semanas</p>
           <p className="mt-2 text-sm leading-relaxed text-amber-800">
-            Entre em contato com o consultório do Dr. Clóvis <strong>hoje</strong> para avaliação do
+            Entre em contato com o consultório do seu médico <strong>hoje</strong> para avaliação do
             bem-estar do bebê e decisão sobre o parto. Se notar diminuição dos movimentos, perda de
             líquido ou sangramento, vá direto à maternidade.
           </p>
@@ -1134,7 +1207,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           <p className="mt-1 text-sm leading-relaxed text-amber-800">
             Isso é normal — acontece em 1 a cada 10 gestações. A partir de agora o acompanhamento
             fica mais próximo: consultas <strong>2x por semana</strong> com cardiotocografia, e a
-            conversa sobre indução acontece com o Dr. Clóvis.
+            conversa sobre indução acontece com o seu médico.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <a
@@ -1310,6 +1383,60 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                   {MILESTONES[node.week] ? ` · ${MILESTONES[node.week].emoji}` : ""}
                 </span>
               </div>
+            );
+          }
+
+          if (node.kind === "lesson") {
+            const m = LESSON_BY_WEEK.get(node.week)!;
+            const done = lessonsDone[node.week] != null;
+            const unlocked = node.week <= currentWeek;
+            const tm = trimMeta(node.week);
+            return (
+              <button
+                key={`l${node.week}`}
+                onClick={() => unlocked && setLessonSheet(m)}
+                disabled={!unlocked}
+                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none disabled:cursor-not-allowed"
+                style={{ left: `${node.x}%`, top: `${node.y}px` }}
+                aria-label={`Lição da semana ${node.week}: ${m.title}`}
+              >
+                <div className="relative">
+                  {/* Lição disponível e não feita: halo dourado convida o toque */}
+                  {unlocked && !done && (
+                    <span
+                      className="dc-halo pointer-events-none absolute inset-0 rounded-2xl"
+                      style={{ boxShadow: "0 0 26px 5px rgba(245,158,11,0.4)" }}
+                    />
+                  )}
+                  <div
+                    className="duo3d relative flex h-[68px] w-[68px] items-center justify-center rounded-2xl"
+                    style={
+                      {
+                        background: !unlocked
+                          ? `linear-gradient(180deg, color-mix(in oklab, ${LOCKED.main} 88%, white) 0%, ${LOCKED.main} 60%)`
+                          : done
+                            ? "linear-gradient(180deg, #fcd34d 0%, #f59e0b 60%)"
+                            : `linear-gradient(180deg, color-mix(in oklab, ${tm.main} 78%, white) 0%, ${tm.main} 55%)`,
+                        "--lip": !unlocked ? LOCKED.lip : done ? "#b45309" : tm.lip,
+                        boxShadow: "0 6px 0 var(--lip)",
+                      } as React.CSSProperties
+                    }
+                  >
+                    <span className="text-3xl">{!unlocked ? "🔒" : done ? "⭐" : "📚"}</span>
+                  </div>
+                </div>
+                <span
+                  className={`mt-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide shadow-sm ${
+                    !unlocked
+                      ? "bg-white/80 text-slate-400"
+                      : done
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-white/90 " + tm.softText
+                  }`}
+                >
+                  {done ? "Lição completa" : "Lição"}
+                </span>
+              </button>
             );
           }
 
@@ -1542,7 +1669,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                 {/* PONTO 1 · Orientação pós-data mais séria nas semanas 41–42 */}
                 <div className="mb-4 rounded-2xl border border-sky-100 bg-sky-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-sky-600">
-                    🩺 Orientação do Dr. Clóvis
+                    🩺 Orientação médica
                   </p>
                   <p className="mt-1.5 text-sm leading-relaxed text-sky-900">
                     {week >= 41 ? POSDATA_GUIDANCE : consultaForWeek(week)}
@@ -1581,6 +1708,17 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           revealing={revealing}
           onClose={() => setSheet(null)}
           onShare={share}
+        />
+      )}
+
+      {/* Sheet de LIÇÃO (Escola do Bebê dentro do caminho) */}
+      {lessonSheet && (
+        <LessonSheet
+          module={lessonSheet}
+          savedScore={lessonsDone[lessonSheet.week] ?? null}
+          revealing={revealing}
+          onComplete={(score) => completeLesson(lessonSheet.week, score)}
+          onClose={() => setLessonSheet(null)}
         />
       )}
     </div>
@@ -1661,6 +1799,160 @@ function AlbumSheet({
             </p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ Sheet de lição (Escola do Bebê no caminho) ══════════════════ */
+
+function LessonSheet({
+  module: m,
+  savedScore,
+  revealing,
+  onComplete,
+  onClose,
+}: {
+  module: CourseModule;
+  savedScore: number | null;
+  revealing: boolean;
+  onComplete: (score: number) => void;
+  onClose: () => void;
+}) {
+  const alreadyDone = savedScore != null;
+  const [answers, setAnswers] = useState<(number | null)[]>(Array(m.quiz.length).fill(null));
+  const [checked, setChecked] = useState(false);
+  const tm = trimMeta(m.week);
+  const score = checked
+    ? Math.round((m.quiz.filter((q, i) => answers[i] === q.correct).length / m.quiz.length) * 100)
+    : 0;
+
+  function verify() {
+    const s = Math.round(
+      (m.quiz.filter((q, i) => answers[i] === q.correct).length / m.quiz.length) * 100,
+    );
+    setChecked(true);
+    if (!alreadyDone) onComplete(s);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end"
+      style={{ background: "rgba(0,0,0,0.2)", backdropFilter: "blur(2px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="relative max-h-[88vh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 pb-10 shadow-2xl"
+        style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {revealing && <ConfettiBurst />}
+        <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
+
+        <div className="mb-4 flex items-center gap-3">
+          <div
+            className="duo3d flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-3xl"
+            style={
+              {
+                background: alreadyDone ? "#f59e0b" : tm.main,
+                "--lip": alreadyDone ? "#b45309" : tm.lip,
+              } as React.CSSProperties
+            }
+          >
+            {alreadyDone ? "⭐" : "📚"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Lição · Semana {m.week}
+              {alreadyDone && (
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-600">
+                  completa · {savedScore}%
+                </span>
+              )}
+            </p>
+            <h3 className="mt-0.5 text-xl font-extrabold">{m.title}</h3>
+            <p className="text-xs text-muted-foreground">{m.theme}</p>
+          </div>
+        </div>
+
+        {/* Conteúdo da lição */}
+        <div className="mb-4 rounded-2xl bg-violet-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
+            📖 Para aprender hoje
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-violet-950">{m.content}</p>
+        </div>
+
+        {/* Quiz — responda as 3 para ganhar a estrela */}
+        <div className="mb-2 rounded-2xl bg-emerald-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+            ✏️ Quiz — responda para ganhar a estrela
+          </p>
+          {m.quiz.map((q, qi) => (
+            <div key={qi} className="mt-3">
+              <p className="text-sm font-bold text-emerald-950">
+                {qi + 1}. {q.question}
+              </p>
+              <div className="mt-1.5 flex flex-col gap-1.5">
+                {q.options.map((opt, oi) => {
+                  let cls = "border-emerald-200 bg-white text-emerald-950";
+                  if (checked) {
+                    if (oi === q.correct)
+                      cls = "border-emerald-500 bg-emerald-100 text-emerald-800";
+                    else if (oi === answers[qi]) cls = "border-rose-300 bg-rose-50 text-rose-700";
+                    else cls = "border-emerald-100 bg-white text-slate-400";
+                  } else if (answers[qi] === oi) {
+                    cls = "border-emerald-500 bg-emerald-100 text-emerald-900";
+                  }
+                  return (
+                    <button
+                      key={oi}
+                      disabled={checked}
+                      onClick={() =>
+                        setAnswers((prev) => {
+                          const next = [...prev];
+                          next[qi] = oi;
+                          return next;
+                        })
+                      }
+                      className={`press rounded-xl border-2 px-3 py-2 text-left text-sm font-medium transition-colors ${cls}`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {!checked ? (
+            <button
+              onClick={verify}
+              disabled={answers.some((a) => a === null)}
+              className="press mt-4 w-full rounded-full bg-emerald-500 py-3 text-sm font-extrabold text-white disabled:opacity-40"
+            >
+              Verificar respostas
+            </button>
+          ) : (
+            <div className="mt-4 rounded-2xl bg-white p-4 text-center">
+              <p className="text-2xl">{score === 100 ? "🏆" : score >= 67 ? "🎉" : "💪"}</p>
+              <p className="mt-1 text-sm font-extrabold">
+                {score === 100
+                  ? "Perfeito! Você acertou tudo!"
+                  : score >= 67
+                    ? "Muito bem! Lição completa."
+                    : "Lição completa — releia o conteúdo para fixar!"}
+              </p>
+              <p className="text-xs text-muted-foreground">{score}% de acerto</p>
+              <button
+                onClick={onClose}
+                className="press mt-3 rounded-full bg-pink-500 px-6 py-2.5 text-sm font-extrabold text-white"
+              >
+                Voltar ao caminho
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2106,7 +2398,7 @@ function PosPartoJourney({
 
                 <div className="mb-4 rounded-2xl border border-sky-100 bg-sky-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-sky-600">
-                    🩺 Orientação do Dr. Clóvis
+                    🩺 Orientação médica
                   </p>
                   <p className="mt-1.5 text-sm leading-relaxed text-sky-900">
                     {POS_GUIDANCE[week] ?? POS_GUIDANCE[12]}

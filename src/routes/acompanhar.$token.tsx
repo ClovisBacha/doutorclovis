@@ -5,7 +5,7 @@ import { babyForWeek, computeGestation, dueDateFromLmp, trimesterForWeek } from 
 import { getRecentPanicByToken } from "@/lib/escola.functions";
 
 export const Route = createFileRoute("/acompanhar/$token")({
-  head: () => ({ meta: [{ title: "Painel do Papai — Obstétrica by Dr. Clóvis" }] }),
+  head: () => ({ meta: [{ title: "Painel do Papai — Obstétrica" }] }),
   component: CompanionView,
 });
 
@@ -356,7 +356,7 @@ function CompanionView() {
       </div>
 
       <p className="mt-10 text-center text-xs text-muted-foreground">
-        Acompanhamento médico com Dr. Clóvis Bacha · Obstetrícia e Alto Risco
+        Acompanhamento médico · Obstetrícia e Alto Risco
       </p>
     </section>
   );

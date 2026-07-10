@@ -1,11 +1,12 @@
 /**
- * Segundo Cérebro do Dr. Clóvis — server functions do painel do médico.
+ * Segundo Cérebro do médico — server functions do painel do médico.
  *
  * CRUD de brain_settings/brain_entries, treino a partir das perguntas das
  * pacientes (doctor_questions) e teste do cérebro com o mesmo modelo do chat.
  * Todas as funções exigem admin (ADMIN_EMAILS), como em admin.functions.ts.
  */
 
+import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -379,7 +380,7 @@ export const testBrain = createServerFn({ method: "POST" })
 
     const brain = await getBrainContext(data.question, await ownerDoctorId(user), "teste");
     const system = [
-      "Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra especialista em gestação de alto risco.",
+      `Você é o assistente virtual do consultório de ${DOCTOR.name}, ginecologista e obstetra especialista em gestação de alto risco.`,
       "Responda em português brasileiro, com tom acolhedor, claro e profissional. Seja conciso (3 a 6 frases).",
       "NUNCA dê diagnóstico ou prescrição. Em urgência, oriente ligar 192 (SAMU) ou ir ao pronto-socorro.",
       brain.block,

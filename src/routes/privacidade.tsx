@@ -4,7 +4,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 export const Route = createFileRoute("/privacidade")({
   head: () => ({
     meta: [
-      { title: "Política de Privacidade — Obstétrica by Dr. Clóvis" },
+      { title: "Política de Privacidade — Obstétrica" },
       {
         name: "description",
         content:
@@ -29,8 +29,8 @@ function PrivacidadePage() {
       <div className="mt-10 space-y-10 text-sm leading-relaxed text-foreground">
         <Block title="1. Quem somos">
           <p>
-            O aplicativo <strong>Obstétrica by Dr. Clóvis</strong> é operado por{" "}
-            <strong>{DOCTOR.name}</strong>, {DOCTOR.title}, com contato disponível em{" "}
+            O aplicativo <strong>Obstétrica</strong> é operado por <strong>{DOCTOR.name}</strong>,{" "}
+            {DOCTOR.title}, com contato disponível em{" "}
             <a href={`mailto:${DOCTOR.email}`} className="text-primary hover:underline">
               {DOCTOR.email}
             </a>

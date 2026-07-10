@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar — Obstétrica by Dr. Clóvis" },
+      { title: "Entrar — Obstétrica" },
       {
         name: "description",
         content: "Acesse sua conta para acompanhar semana a semana o desenvolvimento do seu bebê.",

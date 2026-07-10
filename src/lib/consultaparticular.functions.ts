@@ -1,3 +1,4 @@
+import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
@@ -77,7 +78,7 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
           },
           body: JSON.stringify({
             transaction_amount: amount,
-            description: `${consultType?.label ?? data.consultType} — Dr. Clóvis Bacha`,
+            description: `${consultType?.label ?? data.consultType} — ${DOCTOR.name}`,
             payment_method_id: "pix",
             payer: { email: u.user.email },
           }),

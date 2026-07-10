@@ -4,7 +4,7 @@ import { HeartHandshake, Users, BookOpen, Phone, Shield, Sparkles } from "lucide
 export const Route = createFileRoute("/acompanhante")({
   head: () => ({
     meta: [
-      { title: "Programa do Acompanhante — Obstétrica by Dr. Clóvis" },
+      { title: "Programa do Acompanhante — Obstétrica" },
       {
         name: "description",
         content:

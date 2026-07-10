@@ -6,13 +6,13 @@ import { SpotlightCard } from "@/components/motion-fx";
 export const Route = createFileRoute("/depoimentos")({
   head: () => ({
     meta: [
-      { title: "Depoimentos de pacientes — Obstétrica by Dr. Clóvis" },
+      { title: "Depoimentos de pacientes — Obstétrica" },
       {
         name: "description",
         content:
           "Relatos reais de pacientes acompanhadas pelo Dr. Clóvis Bacha em gestações de alto risco.",
       },
-      { property: "og:title", content: "Depoimentos — Obstétrica by Dr. Clóvis" },
+      { property: "og:title", content: "Depoimentos — Obstétrica" },
       {
         property: "og:description",
         content: "Experiências de pacientes durante o pré-natal e a gestação de alto risco.",

@@ -4,7 +4,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 export const Route = createFileRoute("/mural")({
   head: () => ({
     meta: [
-      { title: "Mural dos bebês — Obstétrica by Dr. Clóvis" },
+      { title: "Mural dos bebês — Obstétrica" },
       {
         name: "description",
         content:

@@ -1,5 +1,5 @@
 /**
- * Segundo Cérebro do Dr. Clóvis — módulo server puro (sem createServerFn).
+ * Segundo Cérebro do médico — módulo server puro (sem createServerFn).
  *
  * Monta o bloco de contexto injetado no system prompt do chatbot do site
  * (api/chat.ts) e do agente WhatsApp (whatsapp-agent.server.ts), a partir de:
@@ -211,8 +211,8 @@ export async function getBrainContext(
     }
 
     const parts: string[] = [
-      "## Segundo Cérebro do Dr. Clóvis",
-      "Você responde COMO O PRÓPRIO Dr. Clóvis responderia, seguindo o estilo, as frases e as condutas registradas abaixo.",
+      "## Segundo Cérebro do médico",
+      "Você responde COMO O PRÓPRIO médico responderia, seguindo o estilo, as frases e as condutas registradas abaixo.",
     ];
     if (persona) parts.push("### Estilo", persona);
     if (samplePhrases) parts.push("### Frases típicas", samplePhrases);

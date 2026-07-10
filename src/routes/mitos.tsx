@@ -6,7 +6,7 @@ import { SpotlightCard } from "@/components/motion-fx";
 export const Route = createFileRoute("/mitos")({
   head: () => ({
     meta: [
-      { title: "Mitos x Verdades na gestação — Obstétrica by Dr. Clóvis" },
+      { title: "Mitos x Verdades na gestação — Obstétrica" },
       {
         name: "description",
         content: "Desfazendo crenças comuns sobre a gestação com base em evidências científicas.",

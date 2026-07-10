@@ -7,7 +7,7 @@ import { PricingGlass, type PricingGlassTier } from "@/components/ui/pricing-gla
 export const Route = createFileRoute("/empresas")({
   head: () => ({
     meta: [
-      { title: "Benefício Corporativo — Obstétrica by Dr. Clóvis" },
+      { title: "Benefício Corporativo — Obstétrica" },
       {
         name: "description",
         content:
@@ -115,7 +115,7 @@ function EmpresasPage() {
       <div className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
           <Link to="/" className="font-serif text-lg font-semibold text-primary">
-            Dr. Clóvis Bacha
+            Obstétrica
           </Link>
           <a
             href="#contato"
@@ -137,8 +137,7 @@ function EmpresasPage() {
           </h1>
           <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
             Ofereça às suas funcionárias grávidas o acompanhamento pré-natal mais completo do
-            Brasil, com tecnologia e a expertise do Dr. Clóvis Bacha — especialista em gestação de
-            alto risco.
+            Brasil, com tecnologia e a expertise de especialistas em gestação de alto risco.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a
@@ -183,7 +182,7 @@ function EmpresasPage() {
               {
                 emoji: "⚕️",
                 title: "Médico especialista",
-                desc: "Dr. Clóvis Bacha é especialista em gestação de alto risco com mais de 20 anos de experiência.",
+                desc: "Cada gestante é acompanhada pelo próprio obstetra, com o suporte de especialistas em gestação de alto risco.",
               },
               {
                 emoji: "📱",

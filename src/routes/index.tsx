@@ -36,13 +36,13 @@ export const Route = createFileRoute("/")({
   head: () => {
     return {
       meta: [
-        { title: "Obstétrica by Dr. Clóvis — App de Gestação e Saúde da Mulher" },
+        { title: "Obstétrica — App de Gestação e Saúde da Mulher" },
         {
           name: "description",
           content:
-            "O app que acompanha sua gestação semana a semana: clima em tempo real, IA obstétrica 24h, monitoramento de saúde, teleconsulta e o cuidado do Dr. Clóvis Bacha.",
+            "O app que acompanha sua gestação semana a semana: clima em tempo real, IA obstétrica 24h, monitoramento de saúde, teleconsulta e o cuidado do seu médico.",
         },
-        { property: "og:title", content: "Obstétrica by Dr. Clóvis — o app da sua gestação" },
+        { property: "og:title", content: "Obstétrica — o app da sua gestação" },
         {
           property: "og:description",
           content: "O app completo para acompanhar sua gestação com segurança e cuidado.",
@@ -72,7 +72,7 @@ const APP_FEATURES = [
   {
     icon: Video,
     title: "Teleconsulta integrada",
-    text: "Consultas por vídeo com o Dr. Clóvis sem sair do app — link automático no seu e-mail.",
+    text: "Consultas por vídeo com o seu médico sem sair do app — link automático no seu e-mail.",
   },
   {
     icon: Activity,
@@ -127,7 +127,7 @@ const SHOWCASE = [
   {
     badge: "Saúde",
     title: "Seus números, acompanhados de perto",
-    text: "Registre peso, pressão e os chutes do bebê. O app monta os gráficos e o Dr. Clóvis acompanha tudo do painel médico — sua consulta começa antes de você chegar.",
+    text: "Registre peso, pressão e os chutes do bebê. O app monta os gráficos e o seu médico acompanha tudo do painel — sua consulta começa antes de você chegar.",
     bullets: [
       "Gráficos de evolução automáticos",
       "Contador de chutes do bebê",
@@ -163,7 +163,7 @@ function Index() {
       {/* ── Hero: céu dinâmico + telefone ─────────────────────────── */}
       <section className="relative -mt-[73px] overflow-hidden pt-[73px]">
         <SkyCanvas sky={sky} />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pt-12 pb-24 md:grid-cols-[1.1fr_1fr] md:pt-20 md:pb-32">
+        <div className="relative mx-auto grid max-w-6xl items-center gap-8 px-5 pt-6 pb-24 md:gap-10 md:grid-cols-[1.1fr_1fr] md:pt-20 md:pb-32">
           {/* Painel Liquid Glass atrás do texto do hero: refrata o céu vivo e
               garante contraste do texto em qualquer clima/hora do dia. */}
           <div className="liquid-glass rounded-[2rem] p-6 md:p-9">
@@ -179,15 +179,17 @@ function Index() {
             </Reveal>
             <Reveal variant="up" delay={120}>
               <h1
-                className={`mt-4 font-serif text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl ${heroText}`}
+                className={`mt-4 font-serif text-3xl font-extrabold leading-[1.08] tracking-tight md:text-6xl ${heroText}`}
               >
                 A gestação inteira <ShimmerText className="not-italic">no seu bolso</ShimmerText>.
               </h1>
             </Reveal>
             <Reveal variant="up" delay={240}>
-              <p className={`mt-6 max-w-lg text-lg leading-relaxed ${heroMuted}`}>
+              <p
+                className={`mt-4 max-w-lg text-base leading-relaxed md:mt-6 md:text-lg ${heroMuted}`}
+              >
                 Acompanhamento semana a semana, IA obstétrica 24h, teleconsulta e monitoramento de
-                saúde — criado pelo Dr. Clóvis Bacha, especialista em gestação de alto risco.
+                saúde — criado por especialistas em gestação de alto risco.
               </p>
             </Reveal>
             <Reveal variant="up" delay={360}>
@@ -198,7 +200,7 @@ function Index() {
                     className="press group relative block overflow-hidden rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-float)]"
                   >
                     <span className="relative z-10 flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" /> Criar conta grátis
+                      <Smartphone className="h-4 w-4" /> Criar meu perfil grátis
                     </span>
                     <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
                   </Link>
@@ -215,8 +217,8 @@ function Index() {
                 </Link>
               </div>
             </Reveal>
-            {/* selo de clima ao vivo — prova do diferencial */}
-            <Reveal variant="fade" delay={500}>
+            {/* selo de clima ao vivo — prova do diferencial (desktop) */}
+            <Reveal variant="fade" delay={500} className="hidden md:block">
               <div
                 className={`mt-8 inline-flex items-center gap-2.5 rounded-full px-4 py-2 text-sm backdrop-blur-md ${
                   sky.isDark
@@ -238,8 +240,8 @@ function Index() {
                 )}
               </div>
             </Reveal>
-            {/* Seletor dos 4 períodos — experimente o céu de cada hora do dia */}
-            <Reveal variant="fade" delay={620}>
+            {/* Seletor dos 4 períodos — experimente o céu de cada hora do dia (desktop) */}
+            <Reveal variant="fade" delay={620} className="hidden md:block">
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className={`text-xs ${heroMuted}`}>Experimente:</span>
                 {PERIODS.map((p) => {
@@ -264,13 +266,26 @@ function Index() {
             </Reveal>
           </div>
 
-          {/* Telefone flutuante — o app dentro dele acompanha o céu do site */}
-          <Reveal variant="scale" delay={250} className="relative flex justify-center">
-            <div className="animate-[phoneFloat_7s_ease-in-out_infinite]">
+          {/* Telefone flutuante — o app dentro dele acompanha o céu do site.
+              No celular ele vem PRIMEIRO: a visitante vê o perfil da gestante
+              antes de qualquer texto, com a chamada para criar o dela. */}
+          <Reveal
+            variant="scale"
+            delay={250}
+            className="order-first relative flex flex-col items-center md:order-none"
+          >
+            <div className="animate-[phoneFloat_7s_ease-in-out_infinite] scale-[0.88] -mb-2 md:scale-100 md:mb-0">
               <PhoneFrame>
                 <AppHomeMockupScreen period={sky.period} />
               </PhoneFrame>
             </div>
+            <p
+              className={`mt-1 text-center text-sm font-medium md:hidden ${
+                sky.isDark ? "text-white/85" : "text-foreground/75"
+              }`}
+            >
+              👆 Assim é o seu perfil de gestação — crie o seu em 1 minuto
+            </p>
           </Reveal>
         </div>
       </section>
@@ -286,7 +301,7 @@ function Index() {
               Tecnologia que sente o seu momento.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Cada tela foi desenhada com o Dr. Clóvis para a rotina real de uma gestante — do
+              Cada tela foi desenhada com médicos obstetras para a rotina real de uma gestante — do
               positivo ao pós-parto.
             </p>
           </div>
@@ -414,7 +429,7 @@ function Index() {
             <div className="absolute -inset-3 rounded-[2.3rem] bg-gradient-to-tr from-primary/20 via-transparent to-accent/30 blur-lg" />
             <img
               src={portrait}
-              alt="Dr. Clóvis Bacha"
+              alt="O obstetra fundador da plataforma"
               loading="lazy"
               width={1024}
               height={1024}
@@ -428,15 +443,15 @@ function Index() {
               O especialista
             </p>
             <h2 className="mt-3 font-serif text-3xl md:text-4xl">
-              Dr. Clóvis Bacha, ginecologista e obstetra de alto risco.
+              Feito por quem vive a obstetrícia todos os dias.
             </h2>
           </Reveal>
           <Reveal variant="up" delay={120}>
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-              Com mais de 20 anos de prática especializada em gestações complexas — diabetes
-              gestacional, hipertensão, gemelaridade e malformações fetais — o Dr. Clóvis
-              desenvolveu o Obstétrica para que cada paciente tenha ao seu lado o mesmo cuidado que
-              recebe no consultório, a qualquer momento.
+              Criado por um ginecologista e obstetra com mais de 20 anos de prática em gestações
+              complexas — diabetes gestacional, hipertensão, gemelaridade e malformações fetais —
+              para que cada paciente tenha ao seu lado o mesmo cuidado que recebe no consultório do
+              seu médico, a qualquer momento.
             </p>
           </Reveal>
           <Reveal variant="up" delay={220}>

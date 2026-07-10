@@ -7,6 +7,8 @@
 // - MAIL_FROM: remetente. Padrão "onboarding@resend.dev" (só envia para o dono
 //   da conta enquanto você não verifica um domínio próprio no Resend).
 
+import { DOCTOR } from "@/lib/doctor.config";
+
 type SendArgs = { to: string | string[]; subject: string; html: string; replyTo?: string };
 
 export async function sendEmail({ to, subject, html, replyTo }: SendArgs): Promise<boolean> {
@@ -15,7 +17,7 @@ export async function sendEmail({ to, subject, html, replyTo }: SendArgs): Promi
     console.warn(`[email] RESEND_API_KEY ausente — e-mail não enviado: "${subject}"`);
     return false;
   }
-  const from = process.env.MAIL_FROM || "Dr. Clóvis Bacha <onboarding@resend.dev>";
+  const from = process.env.MAIL_FROM || `${DOCTOR.name} <onboarding@resend.dev>`;
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -44,7 +46,7 @@ export function emailLayout(title: string, bodyHtml: string): string {
   return `<!doctype html><html><body style="margin:0;background:#f7efe8;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#3a2a25">
   <div style="max-width:520px;margin:0 auto;padding:32px 20px">
     <div style="background:#fff;border-radius:18px;padding:28px;box-shadow:0 6px 24px rgba(120,60,40,.08)">
-      <p style="margin:0 0 4px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#a85a44">Dr. Clóvis Bacha</p>
+      <p style="margin:0 0 4px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#a85a44">${DOCTOR.name}</p>
       <h1 style="margin:0 0 16px;font-size:22px;color:#7a3d2c">${title}</h1>
       ${bodyHtml}
     </div>

@@ -10,7 +10,7 @@ export const Route = createFileRoute("/gestacao")({
   head: () => {
     return {
       meta: [
-        { title: "Sua gestação semana a semana — Obstétrica by Dr. Clóvis" },
+        { title: "Sua gestação semana a semana — Obstétrica" },
         {
           name: "description",
           content:

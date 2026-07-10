@@ -52,6 +52,7 @@ import {
   savePanicEvent,
   type CourseProgress,
 } from "@/lib/escola.functions";
+import { COURSE_MODULES } from "@/lib/course-modules";
 import {
   checkAndAwardAchievements,
   ACHIEVEMENT_DEFS,
@@ -108,7 +109,7 @@ import {
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
     meta: [
-      { title: "Minha Conta — Obstétrica by Dr. Clóvis" },
+      { title: "Minha Conta — Obstétrica" },
       { name: "description", content: "Acompanhe semana a semana o desenvolvimento do seu bebê." },
     ],
   }),
@@ -661,7 +662,7 @@ function MinhaContaPage() {
               )}
               {tab === "Álbum" && <AlbumTab profile={profile} />}
               {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
-              {tab === "Escola" && <EscolaBebêTab gest={gest} />}
+              {tab === "Escola" && <EscolaBebêTab gest={gest} onNavigate={goToTab} />}
               {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
               {tab === "Pânico" && <PânicoTab profile={profile} onNavigate={goToTab} />}
               {tab === "Carteirinha" && (
@@ -828,7 +829,7 @@ function BabyTab({
                 <span className="text-primary text-base">🍬</span>
                 <p>
                   Você teve <strong>diabetes gestacional</strong> anteriormente. O risco de
-                  recorrência é maior — converse com Dr. Clóvis sobre o teste de glicemia antecipado
+                  recorrência é maior — converse com seu médico sobre o teste de glicemia antecipado
                   (semanas 20–24).
                 </p>
               </div>
@@ -837,7 +838,7 @@ function BabyTab({
               <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
                 <span className="text-primary text-base">👶</span>
                 <p>
-                  Histórico de <strong>parto prematuro</strong>. Dr. Clóvis acompanhará o
+                  Histórico de <strong>parto prematuro</strong>. Seu médico acompanhará o
                   comprimento cervical com mais frequência nesta gestação.
                 </p>
               </div>
@@ -847,7 +848,7 @@ function BabyTab({
                 <span className="text-primary text-base">🏥</span>
                 <p>
                   Cesariana anterior registrada. A via de parto desta gestação será planejada em
-                  conjunto com Dr. Clóvis.
+                  conjunto com o seu médico.
                 </p>
               </div>
             )}
@@ -3235,7 +3236,7 @@ function CardTab({
         `Alergias: ${profile.allergies ?? "Nenhuma"}`,
         `Medicamentos: ${profile.medications ?? "Nenhum"}`,
         `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
-        `Médico: Dr. Clóvis Bacha | CRM-MG`,
+        `Médico: ${DOCTOR.name} | ${DOCTOR.crm}`,
         `Atualizado: ${updatedAt}`,
       ].join("\n")
     : "";
@@ -3298,7 +3299,7 @@ function CardTab({
           {profile.emergency_phone && (
             <Info label="Tel. emergência" value={profile.emergency_phone} />
           )}
-          <Info label="Médico" value="Dr. Clóvis Bacha" />
+          <Info label="Médico" value={DOCTOR.name} />
         </div>
 
         <div className="mt-5 rounded-xl bg-card/60 p-3 text-xs text-muted-foreground">
@@ -3319,7 +3320,7 @@ function CardTab({
             Escaneie para ver todos os dados em caso de emergência
           </p>
           <p className="mt-2 text-xs font-medium text-primary">
-            Dr. Clóvis Bacha — Ginecologia & Obstetrícia
+            {DOCTOR.name} — Ginecologia & Obstetrícia
           </p>
         </div>
       </div>
@@ -3733,7 +3734,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             className="text-[15px] font-semibold leading-tight"
             style={{ color: "rgba(255,255,255,0.95)" }}
           >
-            Assistente Dr. Clóvis
+            Assistente do seu médico
           </p>
           <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
             Dúvidas gerais sobre gestação
@@ -4100,7 +4101,7 @@ function toGoogleCalUrl(label: string, date: Date) {
     action: "TEMPLATE",
     text: `Pré-natal: ${label}`,
     dates: `${ymd}/${ymd}`,
-    details: "Acompanhamento pré-natal — Obstétrica by Dr. Clóvis",
+    details: "Acompanhamento pré-natal — Obstétrica",
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
@@ -4155,7 +4156,7 @@ function PrenatalCalendarTab({
     const ics = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Dr Clovis Bacha//Prenatal Calendar//PT-BR",
+      "PRODID:-//Obstetrica//Prenatal Calendar//PT-BR",
       ...events,
       "END:VCALENDAR",
     ].join("\r\n");
@@ -4686,7 +4687,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         <p className="text-4xl">✓</p>
         <h2 className="mt-3 font-serif text-2xl text-emerald-800">Formulário enviado!</h2>
         <p className="mt-2 text-sm text-emerald-700">
-          O Dr. Clóvis receberá seu resumo antes da consulta. Pode chegar com tranquilidade!
+          Seu médico receberá seu resumo antes da consulta. Pode chegar com tranquilidade!
         </p>
         <button
           onClick={() => {
@@ -4713,7 +4714,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
-        <strong>Para o Dr. Clóvis Bacha:</strong> preencha antes de cada consulta. Seu resumo chega
+        <strong>Para o seu médico:</strong> preencha antes de cada consulta. Seu resumo chega
         formatado para o médico — sem precisar lembrar de tudo na hora!
         {gest && (
           <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
@@ -4810,7 +4811,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
             value={form.questions}
             onChange={(e) => setForm((f) => ({ ...f, questions: e.target.value }))}
             rows={3}
-            placeholder="Anote suas dúvidas aqui — elas chegam direto para o Dr. Clóvis antes da consulta."
+            placeholder="Anote suas dúvidas aqui — elas chegam direto para o seu médico antes da consulta."
             className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
@@ -5772,7 +5773,7 @@ const MOOD_SUGGESTIONS: Record<number, string[]> = {
     "Gengibre, torradas secas e pequenas refeições frequentes podem ajudar no mal-estar.",
   ],
   1: [
-    "Seus sentimentos são válidos. Se a tristeza ou ansiedade persistir, conversar com o Dr. Clóvis pode ajudar.",
+    "Seus sentimentos são válidos. Se a tristeza ou ansiedade persistir, conversar com o seu médico pode ajudar.",
     "Técnicas de respiração profunda e meditação guiada (aba Meditações) podem aliviar a ansiedade.",
   ],
 };
@@ -6395,7 +6396,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Teleconsulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Quando o Dr. Clóvis abrir a sala, você receberá um e-mail com o link do Google Meet e
+          Quando o seu médico abrir a sala, você receberá um e-mail com o link do Google Meet e
           poderá entrar também por aqui com um clique.
         </p>
         <p className="mt-3 text-xs text-muted-foreground">
@@ -8431,386 +8432,9 @@ function NomeTab({ profile }: { profile: Profile | null }) {
    Feature 36 — Escola do Bebê
 ───────────────────────────────────────────────────────────────────────────── */
 
-type CourseModule = {
-  week: number;
-  title: string;
-  theme: string;
-  content: string;
-  videoSearch: string;
-  quiz: { question: string; options: [string, string, string, string]; correct: number }[];
-};
-
-const COURSE_MODULES: CourseModule[] = [
-  {
-    week: 6,
-    title: "O coração começa a bater",
-    theme: "Sistema cardiovascular",
-    content:
-      "Na semana 6, o coração do seu bebê já bate cerca de 100-160 vezes por minuto — é o som mais emocionante da gestação! O embrião mede cerca de 5mm e está se formando rapidamente. O tubo neural, que dará origem ao cérebro e medula espinhal, está se fechando. Os brotos dos braços e pernas também começam a aparecer. Nessa fase é fundamental a suplementação de ácido fólico para prevenir defeitos do tubo neural.",
-    videoSearch: "Dr Clóvis Bacha semana 6 gestação desenvolvimento embrião",
-    quiz: [
-      {
-        question: "Quantas vezes por minuto bate o coração fetal na semana 6?",
-        options: ["40-60 bpm", "100-160 bpm", "200-240 bpm", "60-80 bpm"],
-        correct: 1,
-      },
-      {
-        question: "Qual suplemento é essencial para fechar o tubo neural?",
-        options: ["Vitamina C", "Ferro", "Ácido fólico", "Cálcio"],
-        correct: 2,
-      },
-      {
-        question: "O que está se formando na semana 6?",
-        options: [
-          "Dentes e cabelos",
-          "Brotos de braços e pernas",
-          "Pulmões completos",
-          "Sistema imune",
-        ],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 8,
-    title: "De embrião a feto",
-    theme: "Transição embrião→feto",
-    content:
-      "A semana 8 marca uma virada: seu bebê passa a ser chamado de feto! Mede cerca de 1,6cm e todos os órgãos vitais estão formados — agora vêm amadurecer. Os dedos das mãos começam a se separar, os olhos migram para a frente do rosto, e o rabo embrionário desaparece. O cérebro está se desenvolvendo rapidamente com divisões específicas. Você provavelmente já está sentindo as náuseas do 1º trimestre, causadas pelo hormônio hCG.",
-    videoSearch: "Dr Clóvis Bacha semana 8 feto náuseas primeiro trimestre",
-    quiz: [
-      {
-        question: "Como o bebê é chamado a partir da semana 8?",
-        options: ["Zigoto", "Embrião", "Feto", "Neonato"],
-        correct: 2,
-      },
-      {
-        question: "O que causa as náuseas do 1º trimestre?",
-        options: ["Progesterona", "hCG", "Estrogênio", "Oxitocina"],
-        correct: 1,
-      },
-      {
-        question: "Quanto mede o feto na semana 8?",
-        options: ["0,5 cm", "1,6 cm", "5 cm", "10 cm"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 10,
-    title: "Movimentos e reflexos",
-    theme: "Sistema nervoso",
-    content:
-      "Na semana 10, o feto já faz movimentos espontâneos — mas você ainda não os sente! Mede cerca de 3cm. Os dedos dos pés e das mãos estão completamente separados. O cérebro está produzindo neurônios a uma velocidade incrível: 250.000 por minuto! Os testículos ou ovários já estão se formando. A placenta está assumindo a produção de hormônios, o que geralmente marca o fim das náuseas mais intensas para muitas gestantes.",
-    videoSearch: "Dr Clóvis Bacha semana 10 movimentos feto placenta",
-    quiz: [
-      {
-        question: "Quantos neurônios por minuto são produzidos na semana 10?",
-        options: ["10.000", "100.000", "250.000", "1.000.000"],
-        correct: 2,
-      },
-      {
-        question: "Quando a placenta assume a produção hormonal?",
-        options: ["Semana 4", "Semana 10", "Semana 20", "Semana 30"],
-        correct: 1,
-      },
-      {
-        question: "O feto já se movimenta na semana 10?",
-        options: [
-          "Não, só na semana 20",
-          "Sim, mas a mãe ainda não sente",
-          "Sim, e a mãe já sente",
-          "Não, só após o nascimento",
-        ],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 12,
-    title: "Fim do 1º trimestre — Grande conquista!",
-    theme: "Marco gestacional",
-    content:
-      "Parabéns! O 1º trimestre é considerado o mais crítico e você chegou ao final dele. O risco de abortamento espontâneo cai significativamente. O bebê mede cerca de 5,5cm e pesa 14g. Todos os órgãos estão formados e agora crescem e amadurecem. O bebê já pode chupar o dedo, abrir a boca e fazer movimentos de respiração. A morfológica do 1º trimestre avalia a translucência nucal (risco de síndrome de Down) e é realizada entre as semanas 11 e 14.",
-    videoSearch: "Dr Clóvis Bacha semana 12 morfológica primeiro trimestre translucência nucal",
-    quiz: [
-      {
-        question: "O que avalia a translucência nucal?",
-        options: [
-          "Posição do bebê",
-          "Risco de síndrome de Down",
-          "Peso fetal",
-          "Batimentos cardíacos",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Quanto mede o bebê na semana 12?",
-        options: ["1 cm", "3 cm", "5,5 cm", "12 cm"],
-        correct: 2,
-      },
-      {
-        question: "Quando é feita a morfológica do 1º trimestre?",
-        options: ["Semanas 6-8", "Semanas 11-14", "Semanas 18-22", "Semanas 28-32"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 16,
-    title: "Primeiros movimentos sentidos",
-    theme: "Movimentos fetais",
-    content:
-      "Por volta da semana 16-18, a maioria das mães primíparas começa a sentir os primeiros movimentos do bebê — chamados de 'perceptio'. Parece um borbulhar ou borboleta no abdômen. O bebê mede cerca de 11,6cm e pesa 100g. O sistema auditivo está bem desenvolvido: o bebê pode ouvir sua voz! Sua pele ainda é transparente. É a época ideal para a amniocentese, se indicada. O bebê tem padrões de sono e vigília.",
-    videoSearch: "Dr Clóvis Bacha semana 16 primeiros movimentos bebê percepção",
-    quiz: [
-      {
-        question: "Como se chama a primeira percepção dos movimentos fetais?",
-        options: ["Quickening/Perceptio", "Braxton Hicks", "Expulsão", "Versão"],
-        correct: 0,
-      },
-      {
-        question: "O bebê consegue ouvir na semana 16?",
-        options: [
-          "Não, só na semana 30",
-          "Sim, o sistema auditivo já está desenvolvido",
-          "Só após o nascimento",
-          "Apenas sons muito altos",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Qual exame pode ser feito com segurança entre as semanas 15-18?",
-        options: ["Ecocardiograma", "Amniocentese", "Cordocentese", "Biópsia de vilo corial"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 20,
-    title: "Metade da jornada — Morfológica do 2º tri",
-    theme: "Anatomia fetal",
-    content:
-      "Metade da gestação! O bebê mede cerca de 25cm e pesa 300g. A morfológica do 2º trimestre (semanas 20-24) é o exame mais completo: avalia todos os órgãos, face, coluna, coração em detalhes. Você já deve estar sentindo os chutes claramente. O bebê cobre-se de vernix caseosa (substância branca protetora). Os neurônios continuam se multiplicando. É nessa época que muitas famílias descobrem o sexo do bebê.",
-    videoSearch: "Dr Clóvis Bacha semana 20 morfológica segundo trimestre anatomia fetal",
-    quiz: [
-      {
-        question: "O que é vernix caseosa?",
-        options: [
-          "Líquido amniótico",
-          "Substância branca que protege a pele fetal",
-          "Placenta prévia",
-          "Tampão mucoso",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Quando é feita a morfológica do 2º trimestre?",
-        options: ["Semanas 10-12", "Semanas 16-18", "Semanas 20-24", "Semanas 32-36"],
-        correct: 2,
-      },
-      {
-        question: "Quanto pesa o bebê na semana 20?",
-        options: ["100g", "300g", "800g", "1.500g"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 24,
-    title: "Viabilidade fetal",
-    theme: "Desenvolvimento pulmonar",
-    content:
-      "A semana 24 é um marco: o bebê atinge a chamada viabilidade fetal — com cuidados intensivos neonatais, tem chances de sobreviver fora do útero. Os pulmões começam a produzir surfactante, essencial para a respiração após o nascimento. O bebê abre e fecha os olhos. Pesa cerca de 600g e mede 30cm. O exame de glicemia (TOTG) para detectar diabetes gestacional é realizado entre 24-28 semanas.",
-    videoSearch: "Dr Clóvis Bacha semana 24 viabilidade fetal pulmões surfactante",
-    quiz: [
-      {
-        question: "O que é surfactante?",
-        options: [
-          "Hormônio da gravidez",
-          "Substância que amadurece os pulmões fetais",
-          "Tipo de antibiótico",
-          "Proteína do cordão umbilical",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Quando é feito o exame de diabetes gestacional (TOTG)?",
-        options: ["8-10 semanas", "14-16 semanas", "24-28 semanas", "36-38 semanas"],
-        correct: 2,
-      },
-      {
-        question: "A partir de qual semana o bebê tem chance de sobreviver com suporte intensivo?",
-        options: ["Semana 18", "Semana 24", "Semana 30", "Semana 36"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 28,
-    title: "Início do 3º trimestre",
-    theme: "Crescimento cerebral",
-    content:
-      "Bem-vinda ao 3º trimestre! O bebê pesa cerca de 1kg e mede 37cm. O cérebro está se desenvolvendo intensamente — as dobras e sulcos do córtex estão se formando. Os olhos respondem à luz. O bebê pode ter soluços que você sente. É hora de começar a contar os chutes (10 movimentos em 2 horas). O exame de streptococo B (GBS) será feito mais adiante. As consultas pré-natais ficam mais frequentes.",
-    videoSearch: "Dr Clóvis Bacha semana 28 terceiro trimestre crescimento cerebral",
-    quiz: [
-      {
-        question: "Quanto pesa o bebê na semana 28?",
-        options: ["300g", "600g", "1kg", "2kg"],
-        correct: 2,
-      },
-      {
-        question: "Quantos movimentos fetais em 2 horas são considerados normais?",
-        options: ["2 movimentos", "5 movimentos", "10 movimentos", "20 movimentos"],
-        correct: 2,
-      },
-      {
-        question: "O que está se formando intensamente no cérebro fetal no 3º trimestre?",
-        options: ["Neurônios", "Sulcos e dobras do córtex", "Nervos ópticos", "Hipófise"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 32,
-    title: "Posicionamento e preparação",
-    theme: "Posição fetal",
-    content:
-      "Na semana 32, o bebê pesa cerca de 1,7kg. A maioria já se vira para a posição cefálica (cabeça para baixo). As contrações de Braxton-Hicks ficam mais frequentes — são ensaios do útero para o parto. O bebê dorme 90% do tempo, com ciclos de sono REM. A gordura subcutânea está se depositando — o bebê está ficando menos enrugado. O ecocardiograma fetal avalia o coração com detalhes e geralmente é feito nessa época.",
-    videoSearch: "Dr Clóvis Bacha semana 32 posição fetal Braxton Hicks ecocardiograma",
-    quiz: [
-      {
-        question: "O que são contrações de Braxton-Hicks?",
-        options: [
-          "Contrações de trabalho de parto",
-          "Ensaios do útero, sem dor intensa regular",
-          "Sinal de pré-eclâmpsia",
-          "Contrações do diafragma",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Qual é a posição ideal do bebê para o parto vaginal?",
-        options: [
-          "Pélvica (nádegas para baixo)",
-          "Transversa",
-          "Cefálica (cabeça para baixo)",
-          "Oblíqua",
-        ],
-        correct: 2,
-      },
-      {
-        question: "Quando é realizado o ecocardiograma fetal?",
-        options: ["Semana 6", "Semana 14", "Semanas 28-32", "Semana 38"],
-        correct: 2,
-      },
-    ],
-  },
-  {
-    week: 36,
-    title: "Pré-termo tardio — Preparação final",
-    theme: "Maturidade fetal",
-    content:
-      "Na semana 36, o bebê pesa cerca de 2,6kg e está quase pronto. Os pulmões estão maduros na maioria dos casos. A cabeça geralmente encaixa na pelve materna (insinuação). O teste de estreptococo B (GBS) é feito entre as semanas 35-37 — se positivo, você receberá antibióticos durante o parto. O médico avaliará o colo do útero. Bebês nascidos entre 34-36 semanas são chamados de pré-termos tardios e podem precisar de cuidados especiais.",
-    videoSearch: "Dr Clóvis Bacha semana 36 pré-termo tardio estreptococo B parto",
-    quiz: [
-      {
-        question: "Quando é feito o exame de estreptococo B (GBS)?",
-        options: ["Semanas 12-14", "Semanas 20-22", "Semanas 35-37", "No dia do parto"],
-        correct: 2,
-      },
-      {
-        question: "O que é insinuação fetal?",
-        options: [
-          "Bebê virado de ponta-cabeça",
-          "Encaixamento da cabeça na pelve materna",
-          "Posição transversa",
-          "Bebê com soluço",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Bebês de que semanas são chamados pré-termos tardios?",
-        options: ["20-28 semanas", "28-32 semanas", "34-36 semanas", "37-39 semanas"],
-        correct: 2,
-      },
-    ],
-  },
-  {
-    week: 38,
-    title: "Gestação a termo — Sinais do parto",
-    theme: "Sinais de trabalho de parto",
-    content:
-      "A partir de 37 semanas, a gestação é considerada a termo. Agora é esperar os sinais do parto! Perda do tampão mucoso (rolha de muco com sangue — pode sair dias antes). Contrações regulares e progressivas (regra 5-1-1: a cada 5 min, duração de 1 min, por 1 hora). Ruptura da bolsa (líquido claro, inodoro — vá para o hospital). O bebê pesa em média 3,1kg. Fique atenta a movimentos reduzidos — relate ao médico imediatamente.",
-    videoSearch: "Dr Clóvis Bacha semana 38 sinais trabalho de parto tampão mucoso contrações",
-    quiz: [
-      {
-        question: "O que é a regra 5-1-1 das contrações?",
-        options: [
-          "5 respirações, 1 push, 1 hora",
-          "Contrações a cada 5 min, com 1 min de duração, por 1 hora",
-          "5 horas de trabalho, 1 médico, 1 hospital",
-          "Nenhuma das anteriores",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Se a bolsa rompeu, o líquido deve ser:",
-        options: [
-          "Verde ou com sangue",
-          "Claro e inodoro",
-          "Espesso e rosado",
-          "Amarelo e com odor",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Movimentos fetais reduzidos exigem:",
-        options: [
-          "Esperar 24 horas",
-          "Tomar líquidos e descansar",
-          "Contato imediato com o médico",
-          "Fazer exercícios",
-        ],
-        correct: 2,
-      },
-    ],
-  },
-  {
-    week: 40,
-    title: "Pré-natal completo — Você chegou!",
-    theme: "Pós-parto e amamentação",
-    content:
-      "Parabéns! Você completou as semanas essenciais do pré-natal. Esteja preparada: o parto pode acontecer em qualquer momento. O bebê pesa em média 3,4kg e mede 51cm. Nas semanas após o parto, você passará pelos lóquios (sangramento pós-parto normal), cuidados com a cicatriz (cesárea ou episiotomia), e início da amamentação. O leite materno exclusivo pelos primeiros 6 meses é a melhor nutrição para o bebê. Cuide de você também — o puerpério pode trazer desafios emocionais.",
-    videoSearch: "Dr Clóvis Bacha semana 40 parto pós-parto amamentação puerpério",
-    quiz: [
-      {
-        question: "Como se chama o sangramento normal após o parto?",
-        options: ["Menstruação", "Lóquios", "Epistaxis", "Metrorragia"],
-        correct: 1,
-      },
-      {
-        question: "Até quando é recomendado o aleitamento materno exclusivo?",
-        options: ["2 meses", "4 meses", "6 meses", "12 meses"],
-        correct: 2,
-      },
-      {
-        question: "Quanto pesa o bebê na semana 40?",
-        options: ["2,2kg", "2,8kg", "3,4kg", "4,2kg"],
-        correct: 2,
-      },
-    ],
-  },
-];
-
-type QuizState = { answered: boolean; answers: (number | null)[]; score: number };
-
-function EscolaBebêTab({ gest }: { gest: Gest }) {
+function EscolaBebêTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) => void }) {
   const [progress, setProgress] = useState<CourseProgress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeModule, setActiveModule] = useState<CourseModule | null>(null);
-  const [quizState, setQuizState] = useState<QuizState>({ answered: false, answers: [], score: 0 });
-  const [saving, setSaving] = useState(false);
   const currentWeek = gest?.weeks ?? 0;
 
   useEffect(() => {
@@ -8822,181 +8446,55 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
       }
       const res = await getCourseProgress({ data: { accessToken: s.session.access_token } });
       if (res.ok) setProgress(res.progress);
-      else toast.error("Não foi possível carregar seu progresso do curso. Tente novamente.");
       setLoading(false);
     })();
   }, []);
 
-  function isDone(week: number) {
-    return progress.some((p) => p.module_week === week);
-  }
-
-  function isUnlocked(week: number) {
-    return currentWeek >= week;
-  }
-
-  const completedCount = COURSE_MODULES.filter((m) => isDone(m.week)).length;
+  const completedCount = COURSE_MODULES.filter((m) =>
+    progress.some((p) => p.module_week === m.week),
+  ).length;
   const hasCertificate = COURSE_MODULES.length > 0 && completedCount >= COURSE_MODULES.length;
-
-  async function finishQuiz(score: number) {
-    if (!activeModule) return;
-    setSaving(true);
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session) {
-        toast.error("Não foi possível salvar seu progresso — faça login novamente.");
-        return;
-      }
-      const res = await markModuleComplete({
-        data: {
-          accessToken: s.session.access_token,
-          moduleWeek: activeModule.week,
-          quizScore: score,
-        },
-      });
-      if (!res.ok) {
-        toast.error("Não foi possível salvar seu progresso. Tente novamente.");
-        return;
-      }
-      setProgress((p) => [
-        ...p.filter((x) => x.module_week !== activeModule.week),
-        {
-          module_week: activeModule.week,
-          quiz_score: score,
-          completed_at: new Date().toISOString(),
-        },
-      ]);
-      triggerAchievementsCheck();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function openModule(m: CourseModule) {
-    setActiveModule(m);
-    setQuizState({ answered: false, answers: Array(m.quiz.length).fill(null), score: 0 });
-  }
-
-  if (activeModule) {
-    const done = isDone(activeModule.week);
-    return (
-      <div className="max-w-2xl space-y-6">
-        <button
-          onClick={() => setActiveModule(null)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
-        >
-          ← Voltar ao curso
-        </button>
-
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Semana {activeModule.week}
-          </p>
-          <h2 className="mt-1 font-serif text-2xl">{activeModule.title}</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">{activeModule.theme}</p>
-          <p className="mt-4 leading-relaxed text-sm">{activeModule.content}</p>
-
-          <a
-            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(activeModule.videoSearch)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-100"
-          >
-            ▶ Assistir vídeo do Dr. Clóvis — Semana {activeModule.week}
-          </a>
-        </div>
-
-        {/* Quiz */}
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <h3 className="font-semibold mb-4">Quiz — Semana {activeModule.week}</h3>
-          {activeModule.quiz.map((q, qi) => (
-            <div key={qi} className="mb-5">
-              <p className="text-sm font-medium mb-2">
-                {qi + 1}. {q.question}
-              </p>
-              <div className="space-y-2">
-                {q.options.map((opt, oi) => {
-                  let style = "border-border bg-background text-foreground";
-                  if (quizState.answered) {
-                    if (oi === q.correct) style = "border-green-400 bg-green-50 text-green-800";
-                    else if (oi === quizState.answers[qi] && oi !== q.correct)
-                      style = "border-red-300 bg-red-50 text-red-700";
-                    else style = "border-border bg-background text-muted-foreground";
-                  } else if (quizState.answers[qi] === oi) {
-                    style = "border-primary bg-primary/5 text-primary";
-                  }
-                  return (
-                    <button
-                      key={oi}
-                      disabled={quizState.answered}
-                      onClick={() => {
-                        if (quizState.answered) return;
-                        setQuizState((prev) => {
-                          const newAnswers = [...prev.answers];
-                          newAnswers[qi] = oi;
-                          return { ...prev, answers: newAnswers };
-                        });
-                      }}
-                      className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${style}`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-          {!quizState.answered ? (
-            <button
-              onClick={async () => {
-                const score = Math.round(
-                  (activeModule.quiz.filter((q, i) => quizState.answers[i] === q.correct).length /
-                    activeModule.quiz.length) *
-                    100,
-                );
-                setQuizState((prev) => ({ ...prev, answered: true, score }));
-                if (!done) await finishQuiz(score);
-              }}
-              disabled={quizState.answers.some((a) => a === null)}
-              className="mt-2 rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
-            >
-              Verificar respostas
-            </button>
-          ) : (
-            <div className="mt-4 rounded-2xl bg-secondary p-4 text-center">
-              <p className="text-lg font-bold">
-                {quizState.score >= 67 ? "🎉 Muito bem!" : "📚 Continue estudando!"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Módulo {done ? "já" : ""} concluído — semana {activeModule.week}
-              </p>
-              <button
-                onClick={() => setActiveModule(null)}
-                className="mt-3 rounded-full bg-primary px-6 py-2 text-sm font-medium text-white"
-              >
-                {saving ? "Salvando..." : "Próximo módulo"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const unlockedCount = COURSE_MODULES.filter((m) => currentWeek >= m.week).length;
+  const nextLesson = COURSE_MODULES.find(
+    (m) => currentWeek >= m.week && !progress.some((p) => p.module_week === m.week),
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Progress header */}
+    <div className="mx-auto max-w-2xl space-y-5">
+      {/* As lições agora moram DENTRO do caminho — esta aba vira a porta de entrada */}
+      <div className="glass-card glass-pink rounded-3xl p-8 text-center">
+        <p className="text-5xl">📚</p>
+        <h2 className="mt-3 font-serif text-2xl">As lições agora fazem parte da sua jornada!</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          Cada semana-chave da gestação tem uma <strong>moeda de lição</strong> no seu caminho:
+          aprenda o conteúdo, responda o quiz e ganhe a estrela — tudo dentro do jogo.
+        </p>
+        <button
+          onClick={() => onNavigate("Caminho")}
+          className="press mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3.5 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-float)]"
+        >
+          🗺️ Ir para o Caminho
+        </button>
+        {nextLesson && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Próxima lição disponível: <strong>semana {nextLesson.week}</strong> — {nextLesson.title}
+          </p>
+        )}
+      </div>
+
+      {/* Progresso resumido */}
       <div className="rounded-3xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="font-serif text-xl">Escola do Bebê</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {completedCount} de {COURSE_MODULES.length} módulos concluídos
+            <h3 className="font-serif text-lg">Seu progresso</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {loading
+                ? "Carregando..."
+                : `${completedCount} de ${COURSE_MODULES.length} lições · ${unlockedCount} já liberadas`}
             </p>
           </div>
           {hasCertificate && (
-            <div className="rounded-2xl bg-primary/6 border border-primary/30 px-4 py-2 text-center">
+            <div className="rounded-2xl border border-primary/30 bg-primary/6 px-4 py-2 text-center">
               <p className="text-lg">🎓</p>
               <p className="text-xs font-semibold text-primary">Certificado</p>
             </div>
@@ -9010,58 +8508,41 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
             }}
           />
         </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {COURSE_MODULES.map((m) => {
+            const done = progress.some((p) => p.module_week === m.week);
+            const unlocked = currentWeek >= m.week;
+            return (
+              <button
+                key={m.week}
+                onClick={() => onNavigate("Caminho")}
+                title={`Semana ${m.week}: ${m.title}`}
+                className={`press flex h-11 w-11 items-center justify-center rounded-xl text-lg ${
+                  done
+                    ? "bg-amber-100"
+                    : unlocked
+                      ? "bg-violet-50"
+                      : "bg-slate-50 opacity-40 grayscale"
+                }`}
+              >
+                {done ? "⭐" : unlocked ? "📚" : "🔒"}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {hasCertificate && (
         <div className="rounded-3xl border-2 border-primary/30 bg-gradient-to-br from-primary/6 to-primary/12 p-8 text-center">
-          <p className="text-4xl mb-2">🎓</p>
+          <p className="mb-2 text-4xl">🎓</p>
           <h3 className="font-serif text-2xl font-bold text-foreground">
             Certificado de Pré-natal
           </h3>
           <p className="mt-2 text-primary">
-            Parabéns! Você concluiu o curso de pré-natal da Escola do Bebê.
+            Parabéns! Você concluiu todas as lições do curso de pré-natal.
           </p>
-          <p className="mt-1 text-sm text-primary">Dr. Clóvis Bacha — Ginecologia & Obstetrícia</p>
         </div>
       )}
-
-      {/* Module grid */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {COURSE_MODULES.map((m) => {
-          const unlocked = isUnlocked(m.week);
-          const done = isDone(m.week);
-          const prog = progress.find((p) => p.module_week === m.week);
-          return (
-            <button
-              key={m.week}
-              onClick={() => unlocked && openModule(m)}
-              disabled={!unlocked}
-              className={`rounded-2xl border p-5 text-left transition-all ${
-                done
-                  ? "border-green-300 bg-green-50"
-                  : unlocked
-                    ? "border-border bg-card hover:border-primary/50 hover:bg-primary/5"
-                    : "border-border bg-secondary/30 opacity-50 cursor-not-allowed"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                  Semana {m.week}
-                </span>
-                <span className="text-lg">{done ? "✅" : unlocked ? "▶" : "🔒"}</span>
-              </div>
-              <p className="mt-2 font-medium text-sm">{m.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{m.theme}</p>
-              {done && prog && (
-                <p className="mt-1.5 text-xs text-green-600">Quiz: {prog.quiz_score}% de acerto</p>
-              )}
-              {!unlocked && (
-                <p className="mt-1.5 text-xs text-muted-foreground">Libera na semana {m.week}</p>
-              )}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -9104,7 +8585,7 @@ const FAQ_ITEMS: FAQItem[] = [
     tags: ["medicamentos"],
   },
   {
-    q: "Com que frequência preciso consultar o Dr. Clóvis?",
+    q: "Com que frequência preciso ir às consultas do pré-natal?",
     a: "O calendário mínimo do pré-natal: mensal até 32 semanas, quinzenal até 36, e semanal a partir daí. Gestações de alto risco têm consultas mais frequentes. Não pule nenhuma — cada consulta tem um objetivo específico.",
     weeks: [4, 40],
     tags: ["consultas", "pré-natal"],
@@ -9199,7 +8680,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "Posso ter epidural?",
-    a: "A anestesia peridural (epidural) é segura e muito usada no parto. Reduz a dor sem impedir os movimentos. Pode ser administrada em qualquer fase do trabalho de parto ativo. Converse com Dr. Clóvis sobre seu plano de parto.",
+    a: "A anestesia peridural (epidural) é segura e muito usada no parto. Reduz a dor sem impedir os movimentos. Pode ser administrada em qualquer fase do trabalho de parto ativo. Converse com o seu médico sobre seu plano de parto.",
     weeks: [34, 42],
     tags: ["parto", "epidural", "dor"],
   },
@@ -10194,7 +9675,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
                   </a>
                 </div>
                 <p className="mt-2 text-xs text-red-700">
-                  Informe o Dr. Clóvis sobre seu resultado na próxima consulta.
+                  Informe o seu médico sobre seu resultado na próxima consulta.
                 </p>
               </div>
             )}
@@ -10247,7 +9728,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
 
       <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-xs text-muted-foreground">
         A EPDS é um rastreio, não um diagnóstico. Apenas um profissional de saúde pode diagnosticar
-        depressão pós-parto. O resultado deve ser compartilhado com o Dr. Clóvis.
+        depressão pós-parto. O resultado deve ser compartilhado com o seu médico.
         {babyAgeDays < 42 && (
           <span> Recomenda-se repetir o rastreio com 6 semanas após o parto.</span>
         )}
@@ -11310,7 +10791,7 @@ function ProductSheet({
               {/* Recomendação médica */}
               <div className="rounded-xl bg-primary/[0.06] border border-primary/15 p-3">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-primary mb-1.5">
-                  👨‍⚕️ Por que Dr. Clóvis recomenda
+                  👨‍⚕️ Por que seu médico recomenda
                 </p>
                 <p className="text-[13px] text-gray-700 leading-relaxed">{product.description}</p>
               </div>
@@ -11331,8 +10812,8 @@ function ProductSheet({
 
               {/* Selo de confiança */}
               <p className="text-[10px] text-gray-400">
-                ✓ Curado e recomendado por Dr. Clóvis Bacha — Ginecologista e Obstetra especialista
-                em gestação de alto risco
+                ✓ Curado e recomendado pelo seu médico — Ginecologia e Obstetrícia, especialista em
+                gestação de alto risco
               </p>
 
               {/* CTA Amazon */}
@@ -11456,7 +10937,7 @@ function LojaTab({ gest }: { gest: Gest }) {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-primary/70">
-            Curado por Dr. Clóvis
+            Curadoria do seu médico
           </p>
           <h2 className="font-serif text-[22px] font-medium leading-tight text-gray-900 mt-0.5">
             Seleção da semana
@@ -11603,7 +11084,7 @@ function LojaTab({ gest }: { gest: Gest }) {
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[10px] font-medium text-[#00a650]">Envio grátis</span>
                     <span className="text-[9px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
-                      ✓ Dr. Clóvis
+                      ✓ Recomendado
                     </span>
                   </div>
                 </div>
@@ -11790,7 +11271,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                 ))}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Informe até 3 opções — Dr. Clóvis confirmará a disponibilidade.
+                Informe até 3 opções — o seu médico confirmará a disponibilidade.
               </p>
             </div>
 
@@ -11810,7 +11291,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
           <p className="font-semibold mb-3">💳 Pagamento via PIX</p>
           <p className="text-sm text-muted-foreground mb-3">
-            Após solicitar, efetue o pagamento via PIX e marque como pago. Dr. Clóvis confirmará e
+            Após solicitar, efetue o pagamento via PIX e marque como pago. Seu médico confirmará e
             entrará em contato.
           </p>
           <div className="space-y-2">
@@ -11848,7 +11329,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
           Consultas particulares
         </p>
-        <h2 className="font-serif text-2xl">Consulta com Dr. Clóvis</h2>
+        <h2 className="font-serif text-2xl">Consulta com {DOCTOR.name}</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Videochamadas particulares sem intermediário. Pagamento via PIX direto ao médico.
         </p>
@@ -11875,7 +11356,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
           <p className="text-sm text-green-600 mt-1">
             {consultations.find((c) => c.id === newId)?.pix_qr_code_base64
               ? "Escaneie o QR Code PIX abaixo ou copie o código para pagar. A confirmação é automática."
-              : "Use a chave PIX abaixo para pagar e depois toque em “Marquei o pagamento” — o Dr. Clóvis confirmará manualmente."}
+              : "Use a chave PIX abaixo para pagar e depois toque em “Marquei o pagamento” — seu médico confirmará manualmente."}
           </p>
         </div>
       )}
@@ -11977,7 +11458,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
       )}
 
       <p className="text-xs text-center text-muted-foreground">
-        Após confirmar o pagamento, Dr. Clóvis entrará em contato para confirmar o horário.
+        Após confirmar o pagamento, seu médico entrará em contato para confirmar o horário.
       </p>
     </div>
   );
@@ -12662,7 +12143,7 @@ function PreventivosTab() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MÉDICO TAB — perfil completo do Dr. Clóvis Bacha
+// MÉDICO TAB — perfil completo do médico associado (DOCTOR config)
 // ─────────────────────────────────────────────────────────────────────────────
 function MédicoTab() {
   const [token, setToken] = useState<string | null>(null);
@@ -13184,7 +12665,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-2xl">Plano de parto</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Registre suas preferências para compartilhar com o Dr. Clóvis e a equipe da maternidade. O
+          Registre suas preferências para compartilhar com o seu médico e a equipe da maternidade. O
           plano é um ponto de partida — decisões clínicas sempre prevalecem.
         </p>
       </div>
@@ -13307,7 +12788,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
 
       <p className="text-xs text-muted-foreground">
         Imprima ou tire um print para levar à maternidade. Leve também uma cópia para a consulta com
-        o Dr. Clóvis.
+        o seu médico.
       </p>
     </div>
   );
@@ -13351,7 +12832,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
         </p>
         <p className="mt-3 text-sm italic text-muted-foreground">
           "Cada gestação tem sua própria história. Cuidar de você é tão importante quanto cuidar do
-          bebê." — Dr. Clóvis Bacha
+          bebê." — {DOCTOR.name}
         </p>
       </div>
 
@@ -13391,7 +12872,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
           ))}
         </ul>
         <p className="mt-3 text-xs text-primary">
-          Converse com o Dr. Clóvis na sua próxima consulta. Ele pode indicar acompanhamento
+          Converse com o seu médico na sua próxima consulta. Ele pode indicar acompanhamento
           psicológico especializado em gestação.
         </p>
       </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 export const Route = createFileRoute("/tamanho-real")({
   head: () => ({
     meta: [
-      { title: "Tamanho real do bebê na tela — Obstétrica by Dr. Clóvis" },
+      { title: "Tamanho real do bebê na tela — Obstétrica" },
       {
         name: "description",
         content:

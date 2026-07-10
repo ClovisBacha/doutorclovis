@@ -17,7 +17,7 @@ import {
   CreditCard,
   FileText,
   Footprints,
-  GraduationCap,
+  Map,
   Heart,
   Home,
   MessageCircle,
@@ -39,6 +39,7 @@ import { babyForWeek } from "@/lib/gestacao";
 
 export type AppTab =
   | "Bebê"
+  | "Caminho"
   | "Carta do Bebê"
   | "Calendário"
   | "Linha do Tempo"
@@ -86,6 +87,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
   gestacao: [
     "Bebê",
+    "Caminho",
     "Carta do Bebê",
     "Calendário",
     "Linha do Tempo",
@@ -380,10 +382,10 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     color: "bg-orange-50 text-orange-600 ring-orange-200",
   },
   {
-    Icon: GraduationCap,
-    label: "Escola",
-    tab: "Escola",
-    color: "bg-teal-50 text-teal-600 ring-teal-200",
+    Icon: Map,
+    label: "Jornada",
+    tab: "Caminho",
+    color: "bg-fuchsia-50 text-fuchsia-600 ring-fuchsia-200",
   },
   {
     Icon: Stethoscope,
@@ -405,6 +407,28 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
   },
 ];
 
+/**
+ * Lê do cache local da jornada (dc-path-*) a chama e o estado do desafio de
+ * hoje. Leitura duplicada de propósito: não puxa o módulo pesado do jogo.
+ */
+function readJourneyStats(totalDays: number | null): { streak: number; todayDone: boolean } {
+  if (typeof window === "undefined" || totalDays == null) return { streak: 0, todayDone: false };
+  try {
+    const doneDays: number[] = JSON.parse(localStorage.getItem("dc-path-done-days") ?? "[]");
+    const todayD = Math.max(7, Math.min(300, totalDays));
+    const set = new Set(doneDays);
+    let s = 0;
+    let d = set.has(todayD) ? todayD : todayD - 1;
+    while (set.has(d)) {
+      s++;
+      d--;
+    }
+    return { streak: s, todayDone: set.has(todayD) };
+  } catch {
+    return { streak: 0, todayDone: false };
+  }
+}
+
 export function AppHomeScreen({
   firstName,
   babyName,
@@ -421,6 +445,7 @@ export function AppHomeScreen({
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
   const weather = useWeather();
+  const [journey] = useState(() => readJourneyStats(gest?.totalDays ?? null));
 
   const h = new Date().getHours();
   const isMadrugada = h < 5;
@@ -582,6 +607,37 @@ export function AppHomeScreen({
         </div>
       </div>
 
+      {/* ── Jornada do dia: o game em destaque (acesso principal) ───── */}
+      {gest && (
+        <button
+          onClick={() => onNavigate("Caminho")}
+          className="group w-full overflow-hidden rounded-3xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-violet-500 p-[2px] text-left shadow-[var(--shadow-card)] transition-all duration-300 active:scale-[0.98]"
+        >
+          <div className="flex items-center gap-3.5 rounded-[calc(1.5rem-2px)] bg-gradient-to-r from-pink-500/95 to-violet-500/95 px-4 py-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl shadow-inner">
+              {journey.todayDone ? "✅" : "🎁"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">
+                Jornada diária · Jogo
+              </p>
+              <p className="mt-0.5 text-[15px] font-extrabold leading-tight text-white">
+                {journey.todayDone
+                  ? "Desafio de hoje completo! 🎉"
+                  : "Seu desafio de hoje te espera!"}
+              </p>
+              <p className="mt-0.5 text-[11px] font-medium text-white/85">
+                🔥 {journey.streak} {journey.streak === 1 ? "dia seguido" : "dias seguidos"} · 📚
+                lições e figurinhas no caminho
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-fuchsia-600 shadow-md transition-transform duration-300 group-hover:scale-105">
+              Jogar
+            </span>
+          </div>
+        </button>
+      )}
+
       {/* ── Próxima consulta (#10) ──────────────────────────────────── */}
       {nextAppointment ? (
         <button
@@ -662,7 +718,7 @@ export function AppHomeScreen({
         <div className="flex items-center gap-4 p-4">
           <img
             src={portrait}
-            alt="Dr. Clóvis Bacha"
+            alt={DOCTOR.name}
             className="h-16 w-16 shrink-0 rounded-2xl object-cover"
           />
           <div className="min-w-0 flex-1">

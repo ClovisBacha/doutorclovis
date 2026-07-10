@@ -2,9 +2,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
 
 const WHATSAPP_NUMBER = "5531986342903";
-const WHATSAPP_MESSAGE = encodeURIComponent(
-  "Olá, Dr. Clóvis! Vim pelo site e gostaria de mais informações.",
-);
+const WHATSAPP_MESSAGE = encodeURIComponent("Olá! Vim pelo site e gostaria de mais informações.");
 
 export const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MESSAGE}`;
 export const WHATSAPP_DISPLAY = "(31) 98634-2903";

@@ -310,8 +310,8 @@ export function AppSaudeMockupScreen() {
           Triagem inteligente
         </p>
         <p className="mt-1 text-[9px] leading-snug text-foreground">
-          Seus registros estão saudáveis. Qualquer sintoma de alerta, o app avisa você — e o Dr.
-          Clóvis também. 💛
+          Seus registros estão saudáveis. Qualquer sintoma de alerta, o app avisa você — e o seu
+          médico também. 💛
         </p>
       </div>
     </div>

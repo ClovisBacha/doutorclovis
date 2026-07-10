@@ -4,7 +4,7 @@ import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1";
 
 const testimonials = [
   {
-    text: "Tive pré-eclâmpsia na primeira gestação. O Dr. Clóvis me acompanhou semanalmente, com calma e firmeza. Cheguei ao parto segura.",
+    text: "Tive pré-eclâmpsia na primeira gestação. Meu obstetra me acompanhou semanalmente pelo app, com calma e firmeza. Cheguei ao parto segura.",
     image: "https://randomuser.me/api/portraits/women/12.jpg",
     name: "Marina S.",
     role: "Belo Horizonte · MG",
@@ -16,7 +16,7 @@ const testimonials = [
     role: "São Paulo · SP",
   },
   {
-    text: "Diabetes gestacional descoberta tarde. Em duas semanas com o protocolo do Dr. Clóvis estávamos com tudo sob controle.",
+    text: "Diabetes gestacional descoberta tarde. Em duas semanas com o protocolo do meu médico estávamos com tudo sob controle.",
     image: "https://randomuser.me/api/portraits/women/33.jpg",
     name: "Ana Carolina M.",
     role: "Rio de Janeiro · RJ",
@@ -52,7 +52,7 @@ const testimonials = [
     role: "Brasília · DF",
   },
   {
-    text: "O Dr. Clóvis transformou uma gestação de risco em uma jornada confiante. Gratidão eterna pela nossa família.",
+    text: "Meu obstetra transformou uma gestação de risco em uma jornada confiante. Gratidão eterna pela nossa família.",
     image: "https://randomuser.me/api/portraits/women/90.jpg",
     name: "Renata V.",
     role: "Contagem · MG",
@@ -81,9 +81,7 @@ export function TestimonialsSection() {
           <h2 className="mt-5 font-serif text-4xl md:text-5xl tracking-tight text-foreground">
             Histórias reais de quem foi acompanhada
           </h2>
-          <p className="mt-4 text-muted-foreground">
-            O que as pacientes do Dr. Clóvis dizem sobre a jornada.
-          </p>
+          <p className="mt-4 text-muted-foreground">O que as pacientes dizem sobre a jornada.</p>
         </motion.div>
 
         <div className="flex justify-center gap-6 mt-12 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] max-h-[740px] overflow-hidden">

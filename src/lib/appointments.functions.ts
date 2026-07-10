@@ -48,7 +48,7 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
         subject: "Recebemos seu pedido de consulta 💛",
         html: emailLayout(
           `Olá, ${data.patient_name.split(" ")[0]}!`,
-          `<p style="margin:0 0 14px">Recebemos sua solicitação de consulta. Nossa equipe vai confirmar o horário disponível com o Dr. Clóvis em até 1 dia útil.</p>
+          `<p style="margin:0 0 14px">Recebemos sua solicitação de consulta. Nossa equipe vai confirmar o horário disponível com o seu médico em até 1 dia útil.</p>
            ${resumo}
            <p style="margin:14px 0 0;font-size:13px;color:#9b8178">Em caso de urgência, ligue 192 (SAMU) ou procure o pronto-socorro.</p>`,
         ),

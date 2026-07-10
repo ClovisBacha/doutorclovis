@@ -1,3 +1,4 @@
+import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -255,18 +256,18 @@ async function sendPatientMeetEmail(
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: process.env.MAIL_FROM ?? "Dr. Clóvis Bacha <onboarding@resend.dev>",
+      from: process.env.MAIL_FROM ?? `${DOCTOR.name} <onboarding@resend.dev>`,
       to: patientEmail,
-      subject: "Sua teleconsulta está pronta — Dr. Clóvis Bacha",
+      subject: `Sua teleconsulta está pronta — ${DOCTOR.name}`,
       html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto">
         <h2 style="color:#7c3aed">Sua teleconsulta está pronta</h2>
         <p>Olá, ${patientName}!</p>
-        <p>O Dr. Clóvis abriu sua sala de teleconsulta para <strong>${dateStr}</strong>.</p>
+        <p>Seu médico abriu sua sala de teleconsulta para <strong>${dateStr}</strong>.</p>
         <p>Clique no botão abaixo para entrar:</p>
         <a href="${meetUrl}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;margin:16px 0">Entrar na teleconsulta</a>
         <p style="color:#666;font-size:12px">Ou acesse o portal → Minha Conta → Teleconsulta e clique no link da sessão.</p>
         <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-        <p style="color:#666;font-size:12px">Dr. Clóvis Bacha — Ginecologista e Obstetra</p>
+        <p style="color:#666;font-size:12px">${DOCTOR.name} — Ginecologista e Obstetra</p>
       </div>`,
     }),
   });

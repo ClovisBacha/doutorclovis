@@ -85,7 +85,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Entitlements> = {
 
 /**
  * A equipe da instalação (ADMIN_EMAILS) tem acesso total — é a conta dona
- * da plataforma (ex.: Dr. Clóvis + secretária), nunca um assinante limitado.
+ * da plataforma (ex.: o médico fundador + secretária), nunca um assinante limitado.
  */
 export const OWNER_ENTITLEMENTS: Entitlements = { ...CLINICA, label: "Instalação" };
 

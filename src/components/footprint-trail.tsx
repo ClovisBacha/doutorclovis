@@ -28,9 +28,10 @@ export function BabyFootprint({
 
 /**
  * Trilha de pezinhos que "caminha" de uma tela do celular até a próxima
- * conforme a pessoa rola a página: ao entrar na viewport, cada pegada faz um
- * fade-in em sequência (revelando o caminho), alternando pé esquerdo/direito e
- * driftando na direção do próximo celular.
+ * AMARRADA AO SCROLL: cada pegada aparece conforme a página desce — quanto
+ * mais devagar você rola, mais devagar o bebê caminha. Rolar para cima faz o
+ * caminho recuar, como se o bebê voltasse. Funciona igual no celular e no
+ * desktop (scroll é a única fonte do progresso; nada de timer).
  *
  * `dir` = para qual lado o caminho segue ("ltr" desce da esquerda p/ direita).
  */
@@ -44,31 +45,45 @@ export function FootprintTrail({
   color?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  // Quantas pegadas estão visíveis agora (0..count), dirigido pelo scroll
+  const [shown, setShown] = useState(0);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Respeita "reduzir movimento": mostra o caminho já revelado, sem stagger.
+    // Respeita "reduzir movimento": mostra o caminho inteiro, sem animação.
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setVisible(true);
+      setShown(count);
       return;
     }
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            setVisible(true);
-            io.disconnect();
-            break;
-          }
-        }
-      },
-      { threshold: 0.35 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight || 1;
+      // Progresso 0→1 enquanto a trilha percorre a janela: começa a andar
+      // quando o topo dela entra em ~85% da tela e completa quando chega a
+      // ~35% — um trecho longo de scroll, para a caminhada ser bem calma.
+      const start = vh * 0.85;
+      const end = vh * 0.35;
+      const p = Math.min(1, Math.max(0, (start - rect.top) / (start - end)));
+      setShown(Math.round(p * count));
+    };
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [count]);
 
   const startX = dir === "ltr" ? 32 : 68;
   const endX = dir === "ltr" ? 68 : 32;
@@ -83,7 +98,6 @@ export function FootprintTrail({
       y: t * 100,
       angle: 180 + tilt, // 180 = pontas dos dedos apontando para baixo
       left: side === 1,
-      delay: i * 130,
     };
   });
 
@@ -91,25 +105,27 @@ export function FootprintTrail({
     <div
       ref={ref}
       aria-hidden
-      className="pointer-events-none relative mx-auto h-28 w-full max-w-sm md:h-40 md:max-w-md"
+      className="pointer-events-none relative mx-auto h-32 w-full max-w-sm md:h-40 md:max-w-md"
     >
-      {steps.map((s, i) => (
-        <span
-          key={i}
-          className="absolute transition-all duration-500 ease-out"
-          style={{
-            left: `${s.x}%`,
-            top: `${s.y}%`,
-            transform: `translate(-50%,-50%) rotate(${s.angle}deg)${
-              s.left ? " scaleX(-1)" : ""
-            } scale(${visible ? 1 : 0.35})`,
-            opacity: visible ? 0.85 : 0,
-            transitionDelay: `${s.delay}ms`,
-          }}
-        >
-          <BabyFootprint color={color} className="h-[15px] w-auto md:h-[19px]" />
-        </span>
-      ))}
+      {steps.map((s, i) => {
+        const visible = i < shown;
+        return (
+          <span
+            key={i}
+            className="absolute transition-all duration-700 ease-out"
+            style={{
+              left: `${s.x}%`,
+              top: `${s.y}%`,
+              transform: `translate(-50%,-50%) rotate(${s.angle}deg)${
+                s.left ? " scaleX(-1)" : ""
+              } scale(${visible ? 1 : 0.35})`,
+              opacity: visible ? 0.85 : 0,
+            }}
+          >
+            <BabyFootprint color={color} className="h-[15px] w-auto md:h-[19px]" />
+          </span>
+        );
+      })}
     </div>
   );
 }
