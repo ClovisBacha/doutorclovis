@@ -67,10 +67,15 @@ export function quizEmojiForDay(D: number) {
   return QUIZ_EMOJIS[D % 7];
 }
 
+/** "Marque todas"? True quando é kind:"multi" OU o gabarito é uma lista. */
+export function isMultiQuestion(q: QuizQuestion): boolean {
+  return q.kind === "multi" || Array.isArray(q.a);
+}
+
 /** Uma resposta está correta? Lida com escolha única e "marque todas". */
 export function isAnswerCorrect(q: QuizQuestion, answer: number | number[] | null): boolean {
   if (answer == null) return false;
-  if (q.kind === "multi") {
+  if (isMultiQuestion(q)) {
     const correct = Array.isArray(q.a) ? q.a : [q.a];
     const given = Array.isArray(answer) ? answer : [answer];
     if (given.length !== correct.length) return false;

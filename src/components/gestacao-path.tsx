@@ -3,7 +3,13 @@ import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
-import { quizForDay, quizEmojiForDay, isAnswerCorrect, type DailyQuiz } from "@/lib/daily-quizzes";
+import {
+  quizForDay,
+  quizEmojiForDay,
+  isAnswerCorrect,
+  isMultiQuestion,
+  type DailyQuiz,
+} from "@/lib/daily-quizzes";
 import { DOCTOR } from "@/lib/doctor.config";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
@@ -2614,7 +2620,7 @@ function DailyQuizBlock({
   }
 
   const allAnswered = answers.every((a, i) =>
-    questions[i].kind === "multi" ? Array.isArray(a) && a.length > 0 : a != null,
+    isMultiQuestion(questions[i]) ? Array.isArray(a) && a.length > 0 : a != null,
   );
 
   function verify() {
@@ -2651,7 +2657,7 @@ function DailyQuizBlock({
       )}
 
       {questions.map((q, qi) => {
-        const isMulti = q.kind === "multi";
+        const isMulti = isMultiQuestion(q);
         const correct = isAnswerCorrect(q, answers[qi]);
         return (
           <div key={qi} className="mt-3">
