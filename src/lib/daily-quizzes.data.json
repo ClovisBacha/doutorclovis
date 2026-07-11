@@ -1443,13 +1443,13 @@
     ]
   },
   "37": {
-    "teach": "Momento-chave: o tubo neural do bebê termina de se fechar por volta da semana 6. É exatamente por isso que o ácido fólico é tão importante agora e não pode faltar. A recomendação é manter cerca de 400 mcg por dia, idealmente até pelo menos 12 semanas, junto de uma alimentação variada com folhas verde-escuras, feijões e frutas. Se você ainda não começou, converse com seu médico: nunca é tarde para cuidar.",
+    "teach": "Momento-chave: o tubo neural do bebê termina de se fechar por volta da semana 5. É exatamente por isso que o ácido fólico é tão importante agora e não pode faltar. A recomendação é manter cerca de 400 mcg por dia, idealmente até pelo menos 12 semanas, junto de uma alimentação variada com folhas verde-escuras, feijões e frutas. Se você ainda não começou, converse com seu médico: nunca é tarde para cuidar.",
     "funFact": "Você sabia? O nome 'ácido fólico' vem de 'folha' — ele foi descoberto justamente em folhas verdes, como o espinafre.",
     "questions": [
       {
         "type": "choice",
         "q": "Até quando o tubo neural do bebê termina de se fechar?",
-        "o": ["Por volta da semana 6", "Por volta da semana 20", "Apenas perto do parto"],
+        "o": ["Por volta da semana 5", "Por volta da semana 20", "Apenas perto do parto"],
         "a": 0,
         "why": "O fechamento ocorre até cerca de 6 semanas, fase em que o ácido fólico é mais crucial."
       },
@@ -1617,7 +1617,7 @@
         "o": [
           "Porque evita estrias",
           "Porque dá mais energia",
-          "Porque o tubo neural se fecha por volta da semana 6"
+          "Porque o tubo neural se fecha por volta da semana 5"
         ],
         "a": 2,
         "why": "O fólico protege justamente a formação e o fechamento do tubo neural, que ocorre agora."
@@ -2243,7 +2243,7 @@
     ]
   },
   "56": {
-    "teach": "Grande marco: a partir desta semana, seu bebê deixa de ser chamado de embrião e passa a ser FETO! Ele mede cerca de 1,6 cm e todos os órgãos vitais já estão formados — daqui em diante, eles vão amadurecer e crescer. Os dedinhos das mãos e dos pés estão começando a se separar, e o rostinho ganha traços cada vez mais definidos. É o fim da fase mais delicada da formação: a partir de agora, o trabalho é aperfeiçoar cada detalhe.",
+    "teach": "Grande marco: seu bebê está no auge da formação dos órgãos! Ele mede cerca de 1,6 cm e todos os principais sistemas do corpo já estão se formando com força total. Os dedinhos das mãos e dos pés começam a se separar, e o rostinho ganha traços cada vez mais definidos. Ainda é um embrião vivendo a fase mais delicada e importante do desenvolvimento: por volta da semana 10, quando essa formação estiver praticamente completa, ele passará a ser chamado de feto. A partir daí, o trabalho será amadurecer e aperfeiçoar cada detalhe.",
     "funFact": "Você sabia? Ao fim da semana 8, o bebê já tem cotovelos e joelhos se formando e consegue fazer pequenos movimentos, ainda imperceptíveis para a mãe.",
     "questions": [
       {
@@ -2508,7 +2508,7 @@
     ]
   },
   "62": {
-    "teach": "Revisão da semana 8! Seu bebê agora é um feto de cerca de 1,6 cm, com todos os órgãos vitais formados e os dedinhos se separando — o fim da fase mais delicada da formação. No seu corpo, a progesterona explica a digestão lenta, a azia e a prisão de ventre; fibras com água e refeições pequenas ajudam muito. E os exames do 1º trimestre organizam o cuidado de vocês dois. Você completou dois meses de gestação: que jornada linda!",
+    "teach": "Revisão da semana 8! Seu bebê agora mede cerca de 1,6 cm, com todos os principais órgãos em plena formação e os dedinhos se separando — vivendo a fase mais delicada do desenvolvimento (por volta da semana 10 ele passará a ser chamado de feto). No seu corpo, a progesterona explica a digestão lenta, a azia e a prisão de ventre; fibras com água e refeições pequenas ajudam muito. E os exames do 1º trimestre organizam o cuidado de vocês dois. Você completou dois meses de gestação: que jornada linda!",
     "funFact": "Você sabia? Ao completar a semana 8, você chega ao fim do 2º mês de gestação — e o período de formação dos órgãos, o mais delicado, fica para trás.",
     "questions": [
       {
@@ -4765,10 +4765,10 @@
       },
       {
         "type": "choice",
-        "q": "Você está na semana 16. Sobre o morfológico do 2º tri, o ideal é...",
+        "q": "Você está na semana 15. Sobre o morfológico do 2º tri, o ideal é...",
         "o": [
           "Já ir agendando para a janela de 20-24 semanas",
-          "Fazer agora mesmo, na semana 16",
+          "Fazer agora mesmo, na semana 15",
           "Deixar para depois das 30 semanas"
         ],
         "a": 0,
@@ -5296,7 +5296,7 @@
     ]
   },
   "120": {
-    "teach": "Tontura ao levantar rápido ainda pode aparecer, então mude de posição devagar. Há uma novidade importante: a partir de agora, evite passar muito tempo deitada de barriga para cima, porque o útero já tem peso para comprimir a veia cava, uma veia grande que devolve sangue ao coração. Prefira deitar de lado, de preferência o esquerdo, que favorece o fluxo de sangue para a placenta e para você. Um travesseiro entre os joelhos deixa tudo mais confortável.",
+    "teach": "Tontura ao levantar rápido ainda pode aparecer, então mude de posição devagar. Uma dica que vale ir incorporando: acostume-se a deitar de lado, de preferência o esquerdo. Conforme o útero cresce, sobretudo a partir da metade da gestação, deitar de barriga para cima por muito tempo pode comprimir a veia cava, uma veia grande que devolve sangue ao coração; o decúbito lateral favorece o fluxo de sangue para a placenta e para você. Um travesseiro entre os joelhos deixa tudo mais confortável.",
     "funFact": "Você sabia? Dormir de lado com um travesseiro apoiando a barriga alivia a coluna e melhora a circulação ao mesmo tempo.",
     "questions": [
       {
@@ -5901,7 +5901,7 @@
     ]
   },
   "132": {
-    "teach": "Na semana 19, o corpo do bebê se cobre de lanugo, uma penugem fininha que ajuda a fixar a vernix, e de vernix caseosa, uma camada branca e cremosa que protege a pele delicada dentro do líquido amniótico. Enquanto isso, o cérebro delimita áreas específicas para cada sentido: tato, paladar, audição, visão e olfato. É como se o bebê montasse, pouco a pouco, os 'departamentos' que vão permitir sentir o mundo depois do nascimento.",
+    "teach": "Na semana 18, o corpo do bebê se cobre de lanugo, uma penugem fininha que ajuda a fixar a vernix, e de vernix caseosa, uma camada branca e cremosa que protege a pele delicada dentro do líquido amniótico. Enquanto isso, o cérebro delimita áreas específicas para cada sentido: tato, paladar, audição, visão e olfato. É como se o bebê montasse, pouco a pouco, os 'departamentos' que vão permitir sentir o mundo depois do nascimento.",
     "funFact": "Você sabia? A vernix caseosa é tão protetora que inspirou pesquisas para criar cremes hidratantes de pele.",
     "questions": [
       {
@@ -5917,7 +5917,7 @@
       },
       {
         "type": "choice",
-        "q": "O cérebro do bebê na semana 19 está...",
+        "q": "O cérebro do bebê na semana 18 está...",
         "o": ["Parando de crescer", "Já totalmente maduro", "Delimitando áreas para os sentidos"],
         "a": 2,
         "why": "Regiões específicas para tato, paladar, audição, visão e olfato estão se organizando."
@@ -6237,19 +6237,19 @@
     ]
   },
   "139": {
-    "teach": "METADE da jornada, que conquista! Na semana 20 seu bebê mede cerca de 25 cm da cabeça ao calcanhar e pesa por volta de 300 g, mais ou menos como uma banana grande. Ele está coberto de vernix, deglute líquido amniótico treinando a digestão e tem períodos ativos que você já sente. A partir de agora as medidas costumam ser dadas da cabeça ao calcanhar, e não mais só até o bumbum. Um marco lindo para vocês dois comemorarem.",
-    "funFact": "Você sabia? Na semana 20 o bebê já tem sobrancelhas e o comecinho dos cabelos aparecendo.",
+    "teach": "METADE da jornada, que conquista! Na semana 19 seu bebê mede cerca de 25 cm da cabeça ao calcanhar e pesa por volta de 300 g, mais ou menos como uma banana grande. Ele está coberto de vernix, deglute líquido amniótico treinando a digestão e tem períodos ativos que você já sente. A partir de agora as medidas costumam ser dadas da cabeça ao calcanhar, e não mais só até o bumbum. Um marco lindo para vocês dois comemorarem.",
+    "funFact": "Você sabia? Na semana 19 o bebê já tem sobrancelhas e o comecinho dos cabelos aparecendo.",
     "questions": [
       {
         "type": "choice",
-        "q": "O que marca a semana 20?",
+        "q": "O que marca a semana 19?",
         "o": [
           "A metade da gestação, com o bebê em torno de 300 g",
           "O fim da gestação",
           "A formação dos órgãos"
         ],
         "a": 0,
-        "why": "A semana 20 é a metade do caminho; o bebê mede ~25 cm e pesa ~300 g."
+        "why": "A semana 19 é a metade do caminho; o bebê mede ~25 cm e pesa ~300 g."
       },
       {
         "type": "choice",
@@ -6260,7 +6260,7 @@
       },
       {
         "type": "multi",
-        "q": "Marque o que é verdade sobre o bebê na semana 20:",
+        "q": "Marque o que é verdade sobre o bebê na semana 19:",
         "o": [
           "Mede cerca de 25 cm",
           "Pesa por volta de 300 g",
@@ -6272,7 +6272,7 @@
       },
       {
         "type": "choice",
-        "q": "Verdadeiro ou falso: a semana 20 marca a metade da gestação.",
+        "q": "Verdadeiro ou falso: a semana 19 marca a metade da gestação.",
         "o": ["Verdadeiro", "Falso"],
         "a": 0,
         "why": "Verdadeiro. Com 20 semanas você chega ao meio do caminho de uma gestação de cerca de 40 semanas."
@@ -6524,12 +6524,12 @@
     ]
   },
   "145": {
-    "teach": "Na semana 21, o bebê deglute mais líquido amniótico e as papilas gustativas já funcionam: os sabores da sua alimentação passam para o líquido e ele começa a 'experimentar' o mundo pelo paladar! O sistema digestivo treina para o futuro, e no intestino já se forma o mecônio, as primeiras fezes. Ele mede cerca de 27 cm e está cada vez mais ativo, alternando cochilos e momentos de agito ao longo do dia.",
+    "teach": "Na semana 20, o bebê deglute mais líquido amniótico e as papilas gustativas já funcionam: os sabores da sua alimentação passam para o líquido e ele começa a 'experimentar' o mundo pelo paladar! O sistema digestivo treina para o futuro, e no intestino já se forma o mecônio, as primeiras fezes. Ele mede cerca de 27 cm e está cada vez mais ativo, alternando cochilos e momentos de agito ao longo do dia.",
     "funFact": "Você sabia? Estudos mostram que a variedade de sabores da dieta da mãe na gestação pode ajudar o bebê a aceitar mais alimentos depois de nascer.",
     "questions": [
       {
         "type": "choice",
-        "q": "O que o bebê consegue fazer na semana 21 com o líquido amniótico?",
+        "q": "O que o bebê consegue fazer na semana 20 com o líquido amniótico?",
         "o": [
           "Sentir sabores da dieta da mãe pelas papilas gustativas",
           "Respirar ar",
@@ -6547,7 +6547,7 @@
       },
       {
         "type": "multi",
-        "q": "Marque o que é verdade sobre o bebê na semana 21:",
+        "q": "Marque o que é verdade sobre o bebê na semana 20:",
         "o": [
           "As papilas gustativas funcionam",
           "Ele deglute líquido amniótico",
@@ -7567,11 +7567,11 @@
     ]
   },
   "167": {
-    "teach": "Marco importante: por volta da semana 24 o bebê atinge a viabilidade fetal, o que significa que, com o suporte de uma UTI neonatal, já existe chance de sobreviver fora do útero. Isso não quer dizer que ele esteja pronto para nascer, mas é uma fronteira relevante do desenvolvimento. Os pulmões começam a produzir surfactante, uma substância que mantém os pequenos sacos de ar abertos e é essencial para respirar depois. Ele pesa cerca de 600 g e mede uns 30 cm, crescendo firme a cada semana.",
+    "teach": "Marco importante: por volta da semana 23 o bebê atinge a viabilidade fetal, o que significa que, com o suporte de uma UTI neonatal, já existe chance de sobreviver fora do útero. Isso não quer dizer que ele esteja pronto para nascer, mas é uma fronteira relevante do desenvolvimento. Os pulmões começam a produzir surfactante, uma substância que mantém os pequenos sacos de ar abertos e é essencial para respirar depois. Ele pesa cerca de 600 g e mede uns 30 cm, crescendo firme a cada semana.",
     "funFact": "Você sabia? O surfactante é tão importante que sua ausência é a principal razão pela qual bebês muito prematuros têm dificuldade para respirar sozinhos.",
     "questions": [
       {
-        "q": "O que significa a 'viabilidade fetal' alcançada na semana 24?",
+        "q": "O que significa a 'viabilidade fetal' alcançada na semana 23?",
         "o": [
           "O bebê já pode nascer sem cuidados",
           "A gestação acabou",
@@ -7581,7 +7581,7 @@
         "why": "A partir de cerca de 24 semanas, com suporte intensivo, há chance de sobrevida fora do útero."
       },
       {
-        "q": "Marque o que é verdade sobre a semana 24:",
+        "q": "Marque o que é verdade sobre a semana 23:",
         "o": [
           "O bebê atinge a viabilidade fetal",
           "Os pulmões começam a produzir surfactante",
@@ -7604,7 +7604,7 @@
         "why": "O surfactante evita que os alvéolos colabem, essencial para respirar depois."
       },
       {
-        "q": "Na semana 24, o bebê pesa aproximadamente...",
+        "q": "Na semana 23, o bebê pesa aproximadamente...",
         "o": ["Cerca de 600 g", "Cerca de 60 g", "Cerca de 3 kg"],
         "a": 0,
         "why": "Por volta de 600 g e 30 cm, crescendo a cada semana."
@@ -7812,7 +7812,7 @@
     "funFact": "Você sabia? Esses movimentos de 'respirar' líquido amniótico ajudam os pulmões a se desenvolverem, mesmo sem trocar oxigênio de fato.",
     "questions": [
       {
-        "q": "O que muda na pele do bebê na semana 25?",
+        "q": "O que muda na pele do bebê na semana 24?",
         "o": [
           "Fica menos enrugada com o acúmulo de gordura",
           "Fica transparente de novo",
@@ -7822,7 +7822,7 @@
         "why": "A gordura que se deposita deixa a pele mais lisinha."
       },
       {
-        "q": "Marque o que é verdade sobre o bebê na semana 25:",
+        "q": "Marque o que é verdade sobre o bebê na semana 24:",
         "o": [
           "Pesa cerca de 700 g",
           "Reconhece a voz da mãe",
@@ -7833,7 +7833,7 @@
         "why": "Peso, reconhecimento da voz e o treino respiratório com líquido são reais; a respiração de ar só ocorre após o nascimento."
       },
       {
-        "q": "Verdadeiro ou falso: na semana 25 o bebê já reconhece e pode responder à voz da mãe com movimentos.",
+        "q": "Verdadeiro ou falso: na semana 24 o bebê já reconhece e pode responder à voz da mãe com movimentos.",
         "o": ["Verdadeiro", "Falso"],
         "a": 0,
         "why": "A audição bem desenvolvida faz o bebê reconhecer a voz materna e reagir a ela."
@@ -8081,7 +8081,7 @@
     "questions": [
       {
         "type": "choice",
-        "q": "O que acontece com os olhos do bebê por volta da semana 26?",
+        "q": "O que acontece com os olhos do bebê por volta da semana 25?",
         "o": [
           "Começam a abrir e ele pisca",
           "Ficam selados até o parto",
@@ -8092,7 +8092,7 @@
       },
       {
         "type": "choice",
-        "q": "Na semana 26 o bebê pesa aproximadamente...",
+        "q": "Na semana 25 o bebê pesa aproximadamente...",
         "o": ["3 kg", "900 g", "15 g"],
         "a": 1,
         "why": "Cerca de 900 g, quase 1 kg."
@@ -8191,19 +8191,19 @@
     ]
   },
   "181": {
-    "teach": "Revisão da semana 26! O grande destaque é que os olhos do bebê começam a abrir e ele já pisca. Ele também reconhece vozes, a azia e a falta de ar podem aumentar com o útero acima do umbigo, e cálcio + vitamina D cuidam dos ossinhos em pleno crescimento. Falta pouco para o 3º trimestre — que jornada de descobertas você está fazendo!",
+    "teach": "Revisão da semana 25! O grande destaque é que os olhos do bebê começam a abrir e ele já pisca. Ele também reconhece vozes, a azia e a falta de ar podem aumentar com o útero acima do umbigo, e cálcio + vitamina D cuidam dos ossinhos em pleno crescimento. Falta pouco para o 3º trimestre — que jornada de descobertas você está fazendo!",
     "funFact": "Você sabia? No fim do 2º trimestre o bebê já pratica movimentos de respiração, 'inspirando' líquido amniótico para exercitar os pulmões que ainda vão amadurecer.",
     "questions": [
       {
         "type": "choice",
-        "q": "Qual é o marco do desenvolvimento na semana 26?",
+        "q": "Qual é o marco do desenvolvimento na semana 25?",
         "o": [
           "Os olhos começam a abrir",
           "Os pulmões ficam totalmente maduros",
           "O bebê encaixa na pelve"
         ],
         "a": 0,
-        "why": "A abertura dos olhos é o destaque da semana 26; pulmões maduros e encaixe vêm bem mais tarde."
+        "why": "A abertura dos olhos é o destaque da semana 25; pulmões maduros e encaixe vêm bem mais tarde."
       },
       {
         "type": "choice",
@@ -8214,7 +8214,7 @@
       },
       {
         "type": "multi",
-        "q": "O que é normal e esperado ao redor da semana 26? Marque todos.",
+        "q": "O que é normal e esperado ao redor da semana 25? Marque todos.",
         "o": [
           "Mais azia",
           "Leve falta de ar",
@@ -8226,7 +8226,7 @@
       },
       {
         "type": "choice",
-        "q": "Na semana 26 os pulmões do bebê já estão prontos para respirar ar sem ajuda.",
+        "q": "Na semana 25 os pulmões do bebê já estão prontos para respirar ar sem ajuda.",
         "o": ["Verdadeiro", "Falso"],
         "a": 1,
         "why": "Os pulmões ainda estão amadurecendo; a maturação completa acontece semanas depois."
@@ -8246,14 +8246,14 @@
       },
       {
         "type": "choice",
-        "q": "A semana 27 é a última do 2º trimestre.",
+        "q": "A semana 26 é a última do 2º trimestre.",
         "o": ["Verdadeiro", "Falso"],
         "a": 0,
         "why": "O 3º trimestre começa na semana 28."
       },
       {
         "type": "multi",
-        "q": "O que é verdade sobre o bebê na semana 27? Marque todas.",
+        "q": "O que é verdade sobre o bebê na semana 26? Marque todas.",
         "o": [
           "Tem ciclos de sono mais organizados",
           "Responde a som e toque",
@@ -8440,7 +8440,7 @@
     ]
   },
   "187": {
-    "teach": "Revisão da semana 27! Nela você aprendeu que os soluços fetais são normais e fofos, que o sono da mãe pede apoio de travesseiros e posição de lado, que os bons hábitos alimentares seguem essenciais e que a atenção aos sinais de parto prematuro antes de 37 semanas é importante. É o fim do 2º trimestre — dois terços do caminho concluídos. Você foi incrível até aqui!",
+    "teach": "Revisão da semana 26! Nela você aprendeu que os soluços fetais são normais e fofos, que o sono da mãe pede apoio de travesseiros e posição de lado, que os bons hábitos alimentares seguem essenciais e que a atenção aos sinais de parto prematuro antes de 37 semanas é importante. É o fim do 2º trimestre — dois terços do caminho concluídos. Você foi incrível até aqui!",
     "funFact": "Você sabia? Ao completar o 2º trimestre, o bebê já dobrou de peso em relação a poucas semanas atrás e continuará crescendo rápido até o fim.",
     "questions": [
       {
@@ -8459,7 +8459,7 @@
       },
       {
         "type": "multi",
-        "q": "O que você reviu na semana 27? Marque todos os temas corretos.",
+        "q": "O que você reviu na semana 26? Marque todos os temas corretos.",
         "o": [
           "Soluços fetais normais",
           "Sono e travesseiros de apoio",
@@ -8694,15 +8694,15 @@
     ]
   },
   "193": {
-    "teach": "Revisão da semana 28! Você entra no 3º trimestre com o bebê pesando cerca de 1 kg e o cérebro formando sulcos e dobras. Começa a contagem de movimentos (referência de 10 em até 2 horas num período ativo), o ganho de peso segue firme e a atenção aos sinais de pré-eclâmpsia fica redobrada. É também época de pensar no plano de parto com calma. A reta final começa com você preparada e confiante!",
-    "funFact": "Você sabia? Um bebê que nasce na semana 28 já tem chances muito boas de sobreviver com o suporte de uma UTI neonatal, embora o ideal seja seguir crescendo por mais semanas.",
+    "teach": "Revisão da semana 27! Você entra no 3º trimestre com o bebê pesando cerca de 1 kg e o cérebro formando sulcos e dobras. Começa a contagem de movimentos (referência de 10 em até 2 horas num período ativo), o ganho de peso segue firme e a atenção aos sinais de pré-eclâmpsia fica redobrada. É também época de pensar no plano de parto com calma. A reta final começa com você preparada e confiante!",
+    "funFact": "Você sabia? Um bebê que nasce na semana 27 já tem chances muito boas de sobreviver com o suporte de uma UTI neonatal, embora o ideal seja seguir crescendo por mais semanas.",
     "questions": [
       {
         "type": "choice",
-        "q": "Qual é o grande marco da semana 28?",
+        "q": "Qual é o grande marco da semana 27?",
         "o": ["O início do 3º trimestre", "O primeiro batimento", "A formação dos órgãos"],
         "a": 0,
-        "why": "A semana 28 abre o 3º trimestre."
+        "why": "A semana 27 abre o 3º trimestre."
       },
       {
         "type": "choice",
@@ -8713,7 +8713,7 @@
       },
       {
         "type": "multi",
-        "q": "O que você reviu na semana 28? Marque todos os temas corretos.",
+        "q": "O que você reviu na semana 27? Marque todos os temas corretos.",
         "o": [
           "Início do 3º trimestre",
           "Contagem de movimentos",
@@ -8725,7 +8725,7 @@
       },
       {
         "type": "choice",
-        "q": "Na semana 28 o bebê pesa aproximadamente...",
+        "q": "Na semana 27 o bebê pesa aproximadamente...",
         "o": ["1 kg", "3 kg", "300 g"],
         "a": 0,
         "why": "Em torno de 1 kg ao entrar no 3º trimestre."
@@ -10096,21 +10096,21 @@
     "questions": [
       {
         "type": "choice",
-        "q": "O que o bebê treina na semana 32?",
+        "q": "O que o bebê treina na semana 31?",
         "o": ["Respirar (movimentos do tórax), sugar e engolir", "Enxergar cores", "Falar"],
         "a": 0,
         "why": "Ele ensaia a respiração com líquido amniótico e pratica sugar e engolir."
       },
       {
         "type": "choice",
-        "q": "Na semana 32, o bebê pesa aproximadamente...",
+        "q": "Na semana 31, o bebê pesa aproximadamente...",
         "o": ["3,4 kg", "1,8 kg", "600 g"],
         "a": 1,
         "why": "Cerca de 1,8 kg, ficando mais 'fofinho' com a gordura."
       },
       {
         "type": "multi",
-        "q": "O que já aconteceu com o corpo do bebê na semana 32? (marque todas)",
+        "q": "O que já aconteceu com o corpo do bebê na semana 31? (marque todas)",
         "o": [
           "As unhas chegaram à ponta dos dedos",
           "Ele acumula mais gordura",
@@ -10413,7 +10413,7 @@
       },
       {
         "type": "multi",
-        "q": "O que está acontecendo com o bebê na semana 33? (marque todas)",
+        "q": "O que está acontecendo com o bebê na semana 32? (marque todas)",
         "o": [
           "Pesa cerca de 2 kg",
           "Pulmões amadurecem",
@@ -10432,7 +10432,7 @@
       },
       {
         "type": "choice",
-        "q": "Aproximadamente quanto pesa o bebê na semana 33?",
+        "q": "Aproximadamente quanto pesa o bebê na semana 32?",
         "o": ["1 kg", "2 kg", "3,5 kg"],
         "a": 1,
         "why": "Cerca de 2 kg, ganhando peso rápido nesta reta final."
@@ -10686,7 +10686,7 @@
       },
       {
         "type": "multi",
-        "q": "O que está amadurecendo no bebê por volta da semana 34? Marque tudo.",
+        "q": "O que está amadurecendo no bebê por volta da semana 33? Marque tudo.",
         "o": [
           "O sistema nervoso central",
           "Os pulmões, com produção de surfactante",
@@ -10698,7 +10698,7 @@
       },
       {
         "type": "choice",
-        "q": "Na semana 34, o bebê pesa aproximadamente...",
+        "q": "Na semana 33, o bebê pesa aproximadamente...",
         "o": ["3,4 kg", "2,2 kg", "1 kg"],
         "a": 1,
         "why": "Cerca de 2,2 kg, cada vez mais preparado para o encontro."
@@ -10756,7 +10756,7 @@
     ]
   },
   "237": {
-    "teach": "Revisão da semana 34! Seu bebê está com cerca de 2,2 kg, com a vernix mais espessa e o lanugo diminuindo. O sistema nervoso central e os pulmões seguem amadurecendo em ritmo acelerado, ganhando o surfactante que ajuda a respirar. No seu lado, a mala já pode estar pronta e a logística da maternidade organizada. Faltam poucas semanas para o encontro — e olha só quanta preparação caprichada você já tem no bolso!",
+    "teach": "Revisão da semana 33! Seu bebê está com cerca de 2,2 kg, com a vernix mais espessa e o lanugo diminuindo. O sistema nervoso central e os pulmões seguem amadurecendo em ritmo acelerado, ganhando o surfactante que ajuda a respirar. No seu lado, a mala já pode estar pronta e a logística da maternidade organizada. Faltam poucas semanas para o encontro — e olha só quanta preparação caprichada você já tem no bolso!",
     "funFact": "Você sabia? A partir da semana 34, muitos bebês já conseguiriam sugar e engolir de forma coordenada — um treino importante para a amamentação lá fora.",
     "questions": [
       {
@@ -10768,7 +10768,7 @@
       },
       {
         "type": "multi",
-        "q": "O que a revisão da semana 34 traz de verdadeiro? Marque tudo.",
+        "q": "O que a revisão da semana 33 traz de verdadeiro? Marque tudo.",
         "o": [
           "Bebê de cerca de 2,2 kg",
           "Vernix mais espessa",
@@ -10819,7 +10819,7 @@
       },
       {
         "type": "choice",
-        "q": "Na semana 35, o bebê pesa aproximadamente...",
+        "q": "Na semana 34, o bebê pesa aproximadamente...",
         "o": ["3,8 kg", "2,4 kg", "1 kg"],
         "a": 1,
         "why": "Cerca de 2,4 kg, quase pronto para nascer."
@@ -11013,7 +11013,7 @@
     ]
   },
   "243": {
-    "teach": "Revisão da semana 35! Seu bebê está com cerca de 2,4 kg, num espaço mais apertado que muda o estilo dos movimentos — mas eles seguem diários. Nesta janela (35-37 semanas) faz-se o exame do estreptococo B, com antibiótico no parto se der positivo. O plano de parto vai tomando forma, e o cuidado com o seu emocional entra na lista de prioridades. Você está quase lá, reunindo cada peça da preparação com carinho e informação!",
+    "teach": "Revisão da semana 34! Seu bebê está com cerca de 2,4 kg, num espaço mais apertado que muda o estilo dos movimentos — mas eles seguem diários. Nesta janela (35-37 semanas) faz-se o exame do estreptococo B, com antibiótico no parto se der positivo. O plano de parto vai tomando forma, e o cuidado com o seu emocional entra na lista de prioridades. Você está quase lá, reunindo cada peça da preparação com carinho e informação!",
     "funFact": "Você sabia? Nesta fase o cérebro do bebê está numa fase intensa de crescimento, formando dobras e conexões que continuarão se desenvolvendo por anos depois do nascimento.",
     "questions": [
       {
@@ -11029,7 +11029,7 @@
       },
       {
         "type": "multi",
-        "q": "O que resume a semana 35? Marque tudo que é verdadeiro.",
+        "q": "O que resume a semana 34? Marque tudo que é verdadeiro.",
         "o": [
           "Bebê de cerca de 2,4 kg",
           "Movimentos que continuam diários",
@@ -11041,7 +11041,7 @@
       },
       {
         "type": "choice",
-        "q": "Na semana 35, os movimentos do bebê devem...",
+        "q": "Na semana 34, os movimentos do bebê devem...",
         "o": [
           "Parar aos poucos",
           "Só acontecer à noite",
@@ -12361,7 +12361,7 @@
   },
   "273": {
     "teach": "Com 39 semanas, seu bebê está no termo completo: cerca de 3,0 a 3,4 kg, pulmões maduros e tudo pronto para a vida fora da barriga. O cérebro segue crescendo rápido e fará isso muito depois de nascer. A cabeça pode já estar encaixada na bacia, o que dá a sensação de que a barriga 'baixou' e alivia a respiração, mas aumenta a vontade de fazer xixi. Ele continua se movimentando todos os dias — e é assim até a hora de nascer.",
-    "funFact": "Você sabia? O cérebro do bebê a termo pesa cerca de dois terços do que pesará quando ele for adulto — ainda tem muito para crescer depois do nascimento!",
+    "funFact": "Você sabia? Ao nascer, o cérebro do bebê tem cerca de um quarto do peso que terá na vida adulta — e cresce rapidíssimo depois do nascimento, quase dobrando de tamanho já no primeiro ano de vida!",
     "questions": [
       {
         "type": "choice",
