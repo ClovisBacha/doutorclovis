@@ -41,8 +41,6 @@ export type Entitlements = {
   premiumInvitesPerMonth: number;
   /** Selo de verificação exibido às pacientes ("" = sem selo). */
   badge: "" | "Starter" | "Pro" | "Elite" | "Black";
-  /** Marca própria (white-label) — o app com o nome/cara do médico. */
-  whiteLabel: boolean;
   /** Gerente de conta dedicado. */
   dedicatedManager: boolean;
 };
@@ -58,7 +56,6 @@ const FREE: Entitlements = {
   teamSeats: false,
   premiumInvitesPerMonth: 0,
   badge: "",
-  whiteLabel: false,
   dedicatedManager: false,
 };
 
@@ -73,7 +70,6 @@ const STARTER: Entitlements = {
   teamSeats: false,
   premiumInvitesPerMonth: 0,
   badge: "Starter",
-  whiteLabel: false,
   dedicatedManager: false,
 };
 
@@ -88,7 +84,6 @@ const PRO: Entitlements = {
   teamSeats: false,
   premiumInvitesPerMonth: 0,
   badge: "Pro",
-  whiteLabel: false,
   dedicatedManager: false,
 };
 
@@ -108,14 +103,13 @@ const ELITE: Entitlements = {
   badge: "Elite",
 };
 
-// Black = o plano mais alto: tudo do Elite + 250 convites/mês, marca própria
-// (white-label), gerente dedicado e selo "Black" exclusivo. Topo da busca.
+// Black = o plano mais alto: tudo do Elite + 250 convites premium/mês, gerente
+// de conta dedicado e selo "Black" exclusivo. Topo absoluto da busca.
 const BLACK: Entitlements = {
   ...ELITE,
   label: "Black",
   premiumInvitesPerMonth: 250,
   badge: "Black",
-  whiteLabel: true,
   dedicatedManager: true,
 };
 

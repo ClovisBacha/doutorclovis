@@ -4258,7 +4258,7 @@ function DoctorBilling({
           monthly={1999}
           tagline="O plano mais completo"
           black
-          perk="🖤 250 convites/mês · marca própria · gerente dedicado · selo Black"
+          perk="🖤 250 convites/mês · gerente dedicado · topo da busca · selo Black"
         />
       </div>
 
