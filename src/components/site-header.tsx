@@ -10,6 +10,7 @@ const navPublic = [
   { to: "/gestacao", label: "Gestação" },
   { to: "/dpp", label: "DPP" },
   { to: "/batimentos", label: "Batimentos" },
+  { to: "/encontrar-medico", label: "Encontrar médico" },
   { to: "/agendamento", label: "Agendar" },
   { to: "/medicos", label: "Para Médicos" },
 ] as const;

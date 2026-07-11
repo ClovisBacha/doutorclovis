@@ -1632,3 +1632,17 @@ DROP POLICY IF EXISTS "patient reads own invites" ON public.premium_invites;
 CREATE POLICY "patient reads own invites" ON public.premium_invites
   FOR SELECT USING (auth.uid() = patient_user_id);
 GRANT SELECT ON public.premium_invites TO authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Diretório de médicos (busca) — ver 20260711020000_doctor_directory.sql
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS bio text;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS subspecialty text;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS years_experience integer;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS has_masters boolean DEFAULT false;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS has_doctorate boolean DEFAULT false;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS city text;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS state text;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS accepting_patients boolean DEFAULT true;
+CREATE INDEX IF NOT EXISTS idx_doctors_directory
+  ON public.doctors(active, accepting_patients, state);

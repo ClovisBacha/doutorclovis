@@ -22,6 +22,7 @@ import { Route as LivesRouteImport } from './routes/lives'
 import { Route as HospitaisRouteImport } from './routes/hospitais'
 import { Route as GestacaoRouteImport } from './routes/gestacao'
 import { Route as EpdsRouteImport } from './routes/epds'
+import { Route as EncontrarMedicoRouteImport } from './routes/encontrar-medico'
 import { Route as EmpresasRouteImport } from './routes/empresas'
 import { Route as DppRouteImport } from './routes/dpp'
 import { Route as DiabetesGestacionalRouteImport } from './routes/diabetes-gestacional'
@@ -113,6 +114,11 @@ const GestacaoRoute = GestacaoRouteImport.update({
 const EpdsRoute = EpdsRouteImport.update({
   id: '/epds',
   path: '/epds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EncontrarMedicoRoute = EncontrarMedicoRouteImport.update({
+  id: '/encontrar-medico',
+  path: '/encontrar-medico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmpresasRoute = EmpresasRouteImport.update({
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
@@ -304,6 +311,7 @@ export interface FileRoutesByTo {
   '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
@@ -347,6 +355,7 @@ export interface FileRoutesById {
   '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
@@ -390,6 +399,7 @@ export interface FileRouteTypes {
     | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/encontrar-medico'
     | '/epds'
     | '/gestacao'
     | '/hospitais'
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/encontrar-medico'
     | '/epds'
     | '/gestacao'
     | '/hospitais'
@@ -473,6 +484,7 @@ export interface FileRouteTypes {
     | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/encontrar-medico'
     | '/epds'
     | '/gestacao'
     | '/hospitais'
@@ -516,6 +528,7 @@ export interface RootRouteChildren {
   DiabetesGestacionalRoute: typeof DiabetesGestacionalRoute
   DppRoute: typeof DppRoute
   EmpresasRoute: typeof EmpresasRoute
+  EncontrarMedicoRoute: typeof EncontrarMedicoRoute
   EpdsRoute: typeof EpdsRoute
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
@@ -633,6 +646,13 @@ declare module '@tanstack/react-router' {
       path: '/epds'
       fullPath: '/epds'
       preLoaderRoute: typeof EpdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/encontrar-medico': {
+      id: '/encontrar-medico'
+      path: '/encontrar-medico'
+      fullPath: '/encontrar-medico'
+      preLoaderRoute: typeof EncontrarMedicoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/empresas': {
@@ -856,6 +876,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiabetesGestacionalRoute: DiabetesGestacionalRoute,
   DppRoute: DppRoute,
   EmpresasRoute: EmpresasRoute,
+  EncontrarMedicoRoute: EncontrarMedicoRoute,
   EpdsRoute: EpdsRoute,
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,

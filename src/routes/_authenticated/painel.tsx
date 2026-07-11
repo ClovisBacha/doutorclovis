@@ -61,6 +61,7 @@ import {
   type DoctorProfile,
 } from "@/lib/doctors.functions";
 import { getDoctorDashboard, type DoctorDashboard } from "@/lib/dashboard.functions";
+import { DoctorBadge } from "@/components/doctor-badge";
 import {
   listPatientRequests,
   respondPatientRequest,
@@ -4320,6 +4321,14 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     crm: "",
     whatsapp: "",
     pix_key: "",
+    bio: "",
+    subspecialty: "",
+    years_experience: null as number | null,
+    has_masters: false,
+    has_doctorate: false,
+    city: "",
+    state: "",
+    accepting_patients: true,
   });
 
   useEffect(() => {
@@ -4340,6 +4349,14 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             crm: d.crm,
             whatsapp: d.whatsapp,
             pix_key: d.pix_key,
+            bio: d.bio ?? "",
+            subspecialty: d.subspecialty ?? "",
+            years_experience: d.years_experience ?? null,
+            has_masters: !!d.has_masters,
+            has_doctorate: !!d.has_doctorate,
+            city: d.city ?? "",
+            state: d.state ?? "",
+            accepting_patients: d.accepting_patients ?? true,
           });
         }
       } finally {
@@ -4399,9 +4416,12 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               É com esses dados que suas pacientes veem você no app.
             </p>
           </div>
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            plano {plan}
-          </span>
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              plano {plan}
+            </span>
+            <DoctorBadge plan={plan} />
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -4454,6 +4474,96 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               onChange={(e) => setForm((f) => ({ ...f, pix_key: e.target.value }))}
               className={input}
             />
+          </div>
+        </div>
+
+        {/* Perfil público — aparece na busca de médicos das pacientes */}
+        <div className="mt-6 border-t border-border pt-5">
+          <p className="text-sm font-semibold">Perfil público (busca de médicos)</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Preencha para aparecer quando pacientes sem médico procurarem no app. Planos melhores
+            aparecem primeiro.
+          </p>
+          <div className="mt-3 grid gap-4 md:grid-cols-2">
+            <div>
+              <label className={label}>Subárea / atuação</label>
+              <input
+                value={form.subspecialty}
+                onChange={(e) => setForm((f) => ({ ...f, subspecialty: e.target.value }))}
+                placeholder="Medicina fetal, alto risco…"
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Anos de experiência</label>
+              <input
+                type="number"
+                min={0}
+                max={70}
+                value={form.years_experience ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    years_experience: e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Cidade</label>
+              <input
+                value={form.city}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Estado (UF)</label>
+              <input
+                value={form.state}
+                maxLength={2}
+                onChange={(e) => setForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))}
+                placeholder="SP"
+                className={input}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={label}>Sobre você (bio curta)</label>
+              <textarea
+                value={form.bio}
+                onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+                rows={3}
+                placeholder="Uma frase acolhedora sobre a sua forma de cuidar."
+                className={`${input} resize-none`}
+              />
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.has_masters}
+                onChange={(e) => setForm((f) => ({ ...f, has_masters: e.target.checked }))}
+              />
+              🎓 Mestrado
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.has_doctorate}
+                onChange={(e) => setForm((f) => ({ ...f, has_doctorate: e.target.checked }))}
+              />
+              🎓 Doutorado
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.accepting_patients}
+                onChange={(e) => setForm((f) => ({ ...f, accepting_patients: e.target.checked }))}
+              />
+              Aceitando novas pacientes
+            </label>
           </div>
         </div>
 

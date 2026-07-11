@@ -8,6 +8,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { PLAN_RANK, normalizePlan } from "@/lib/entitlements";
 
 export type DoctorProfile = {
   id: string;
@@ -20,7 +21,19 @@ export type DoctorProfile = {
   slug: string | null;
   plan: string;
   active: boolean;
+  bio: string;
+  subspecialty: string;
+  years_experience: number | null;
+  has_masters: boolean;
+  has_doctorate: boolean;
+  city: string;
+  state: string;
+  accepting_patients: boolean;
 };
+
+/** Colunas do perfil lidas em todas as consultas de médico. */
+const DOCTOR_COLS =
+  "id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,active,bio,subspecialty,years_experience,has_masters,has_doctorate,city,state,accepting_patients";
 
 function adminEmails() {
   return (process.env.ADMIN_EMAILS || "")
@@ -55,6 +68,14 @@ const ProfileSchema = z.object({
   crm: z.string().default(""),
   whatsapp: z.string().default(""),
   pix_key: z.string().default(""),
+  bio: z.string().default(""),
+  subspecialty: z.string().default(""),
+  years_experience: z.number().int().min(0).max(70).nullable().default(null),
+  has_masters: z.boolean().default(false),
+  has_doctorate: z.boolean().default(false),
+  city: z.string().default(""),
+  state: z.string().default(""),
+  accepting_patients: z.boolean().default(true),
 });
 
 const TokenSchema = z.object({ accessToken: z.string().min(10) });
@@ -69,7 +90,7 @@ export const getMyDoctor = createServerFn({ method: "POST" })
 
     const { data: row } = await (supabaseAdmin as any)
       .from("doctors")
-      .select("id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,active")
+      .select(DOCTOR_COLS)
       .eq("id", user.id)
       .maybeSingle();
 
@@ -136,7 +157,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
           slug: s,
           updated_at: new Date().toISOString(),
         })
-        .select("id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,active")
+        .select(DOCTOR_COLS)
         .single();
 
     let { data: row, error } = await doUpsert(slug);
@@ -196,4 +217,123 @@ export const updateMyDoctor = createServerFn({ method: "POST" })
       .update({ ...data.profile, updated_at: new Date().toISOString() })
       .eq("id", user.id);
     return { ok: !error };
+  });
+
+/* ══════════════════ Diretório: busca de médico pela paciente ══════════════════ */
+
+export type DirectoryDoctor = {
+  id: string;
+  display_name: string;
+  title: string;
+  specialty: string;
+  subspecialty: string;
+  city: string;
+  state: string;
+  years_experience: number | null;
+  has_masters: boolean;
+  has_doctorate: boolean;
+  plan: string; // para o selo
+  slug: string | null;
+  bio: string;
+  whatsapp: string;
+};
+
+const SearchSchema = z.object({
+  q: z.string().default(""),
+  state: z.string().default(""),
+  city: z.string().default(""),
+  minExperience: z.number().int().min(0).max(70).default(0),
+  hasMasters: z.boolean().default(false),
+  hasDoctorate: z.boolean().default(false),
+});
+
+/**
+ * Busca pública de médicos. Ranqueia SEMPRE por plano (Elite → Pro → Starter →
+ * …) e depois por experiência — os planos melhores aparecem primeiro, como
+ * pedido. Filtros são aplicados por cima; nenhum dado sensível (pix) é exposto.
+ */
+export const searchDoctors = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => SearchSchema.parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let query = (supabaseAdmin as any)
+      .from("doctors")
+      .select(
+        "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,slug,bio,whatsapp,active,accepting_patients",
+      )
+      .eq("active", true)
+      .eq("accepting_patients", true)
+      .not("display_name", "is", null);
+
+    if (data.state) query = query.ilike("state", data.state);
+    if (data.city) query = query.ilike("city", `%${data.city}%`);
+    if (data.hasMasters) query = query.eq("has_masters", true);
+    if (data.hasDoctorate) query = query.eq("has_doctorate", true);
+    if (data.minExperience > 0) query = query.gte("years_experience", data.minExperience);
+
+    const { data: rows, error } = await query.limit(200);
+    if (error) return { ok: false as const, error: error.message, doctors: [] };
+
+    const term = data.q.trim().toLowerCase();
+    let list = (rows ?? []) as (DirectoryDoctor & { active: boolean })[];
+    // Perfis reais só (com nome) e, se houver texto, casa nome/especialidade/cidade.
+    list = list.filter((d) => (d.display_name ?? "").trim().length >= 2);
+    if (term) {
+      list = list.filter((d) =>
+        `${d.display_name} ${d.specialty} ${d.subspecialty} ${d.city} ${d.bio}`
+          .toLowerCase()
+          .includes(term),
+      );
+    }
+    // Ranking: plano melhor primeiro, depois mais experiência, depois nome.
+    list.sort((a, b) => {
+      const pr = PLAN_RANK[normalizePlan(b.plan)] - PLAN_RANK[normalizePlan(a.plan)];
+      if (pr !== 0) return pr;
+      const ex = (b.years_experience ?? 0) - (a.years_experience ?? 0);
+      if (ex !== 0) return ex;
+      return (a.display_name ?? "").localeCompare(b.display_name ?? "");
+    });
+
+    const doctors: DirectoryDoctor[] = list.map((d) => ({
+      id: d.id,
+      display_name: d.display_name,
+      title: d.title ?? "",
+      specialty: d.specialty ?? "",
+      subspecialty: d.subspecialty ?? "",
+      city: d.city ?? "",
+      state: d.state ?? "",
+      years_experience: d.years_experience ?? null,
+      has_masters: !!d.has_masters,
+      has_doctorate: !!d.has_doctorate,
+      plan: d.plan ?? "free",
+      slug: d.slug ?? null,
+      bio: d.bio ?? "",
+      whatsapp: d.whatsapp ?? "",
+    }));
+    return { ok: true as const, doctors };
+  });
+
+/** A paciente escolhe um médico do diretório → vira paciente dele. */
+export const chooseDoctor = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), doctorId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireUser(data.accessToken);
+    if (!user) return { ok: false as const, error: "nao_autenticado" };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: doc } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("id,active,accepting_patients")
+      .eq("id", data.doctorId)
+      .maybeSingle();
+    if (!doc || !doc.active || !doc.accepting_patients) {
+      return { ok: false as const, error: "indisponivel" };
+    }
+    const { error } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .update({ doctor_id: data.doctorId })
+      .eq("id", user.id);
+    return { ok: !error, error: error?.message };
   });
