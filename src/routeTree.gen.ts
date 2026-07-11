@@ -39,6 +39,7 @@ import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
 import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
+import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -198,6 +199,11 @@ const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   path: '/api/transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
+  id: '/api/stripe-webhook',
+  path: '/api/stripe-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNutritionRoute = ApiNutritionRouteImport.update({
   id: '/api/nutrition',
   path: '/api/nutrition',
@@ -279,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
@@ -319,6 +326,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
@@ -361,6 +369,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos_/cadastro': typeof MedicosCadastroRoute
@@ -403,6 +412,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos/cadastro'
@@ -443,6 +453,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos/cadastro'
@@ -484,6 +495,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos_/cadastro'
@@ -523,6 +535,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
+  ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
   MedicosCadastroRoute: typeof MedicosCadastroRoute
@@ -741,6 +754,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTranscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/stripe-webhook': {
+      id: '/api/stripe-webhook'
+      path: '/api/stripe-webhook'
+      fullPath: '/api/stripe-webhook'
+      preLoaderRoute: typeof ApiStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/nutrition': {
       id: '/api/nutrition'
       path: '/api/nutrition'
@@ -855,6 +875,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
+  ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,
   MedicosCadastroRoute: MedicosCadastroRoute,
