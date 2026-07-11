@@ -4063,10 +4063,10 @@ function DoctorBilling({
 }) {
   const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [busy, setBusy] = useState<string | null>(null);
-  const isPaid = active && ["starter", "pro", "clinica", "elite"].includes(plan);
+  const isPaid = active && ["starter", "pro", "clinica", "elite", "black"].includes(plan);
   const isTeam = plan === "clinica";
 
-  async function checkout(planKey: "starter" | "pro" | "elite") {
+  async function checkout(planKey: "starter" | "pro" | "elite" | "black") {
     setBusy(planKey);
     try {
       const tk = await tokenFn();
@@ -4143,42 +4143,70 @@ function DoctorBilling({
     monthly,
     tagline,
     highlight,
+    black,
     perk,
   }: {
-    planKey: "starter" | "pro" | "elite";
+    planKey: "starter" | "pro" | "elite" | "black";
     name: string;
     monthly: number;
     tagline: string;
     highlight?: boolean;
+    black?: boolean;
     perk?: string;
   }) => (
     <div
-      className={`rounded-2xl border bg-card p-4 ${highlight ? "border-amber-400 ring-1 ring-amber-300" : "border-border"}`}
+      className={`rounded-2xl border p-4 ${
+        black
+          ? "border-neutral-700 bg-neutral-900 text-white"
+          : highlight
+            ? "border-amber-400 bg-card ring-1 ring-amber-300"
+            : "border-border bg-card"
+      }`}
     >
       <div className="flex items-center gap-2">
         <p className="font-serif text-base">{name}</p>
-        {highlight && (
+        {black ? (
+          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-neutral-900">
+            MÁXIMO
+          </span>
+        ) : highlight ? (
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700">
             TOP
           </span>
-        )}
+        ) : null}
       </div>
-      <p className="mt-0.5 text-xs text-muted-foreground">{tagline}</p>
+      <p className={`mt-0.5 text-xs ${black ? "text-white/60" : "text-muted-foreground"}`}>
+        {tagline}
+      </p>
       <p className="mt-2 text-2xl font-extrabold">
         R$ {monthly}
-        <span className="text-sm font-normal text-muted-foreground">/mês</span>
+        <span
+          className={`text-sm font-normal ${black ? "text-white/60" : "text-muted-foreground"}`}
+        >
+          /mês
+        </span>
       </p>
       {cycle === "annual" && (
-        <p className="text-[11px] font-semibold text-emerald-600">
+        <p className={`text-[11px] font-semibold ${black ? "text-amber-300" : "text-emerald-600"}`}>
           cobrado 1×/ano · 2 meses grátis
         </p>
       )}
-      {perk && <p className="mt-1.5 text-[11px] font-semibold text-amber-700">{perk}</p>}
+      {perk && (
+        <p
+          className={`mt-1.5 text-[11px] font-semibold ${black ? "text-amber-300" : "text-amber-700"}`}
+        >
+          {perk}
+        </p>
+      )}
       <button
         onClick={() => checkout(planKey)}
         disabled={!!busy}
         className={`press mt-3 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-60 ${
-          highlight ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground"
+          black
+            ? "bg-amber-400 text-neutral-900"
+            : highlight
+              ? "bg-amber-500 text-white"
+              : "bg-primary text-primary-foreground"
         }`}
       >
         {busy === planKey ? "Abrindo pagamento…" : `Assinar ${name}`}
@@ -4213,7 +4241,7 @@ function DoctorBilling({
         </button>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <PlanBtn planKey="starter" name="Starter" monthly={197} tagline="A sua IA no app" />
         <PlanBtn planKey="pro" name="Pro" monthly={347} tagline="A IA também no WhatsApp" />
         <PlanBtn
@@ -4222,7 +4250,15 @@ function DoctorBilling({
           monthly={697}
           tagline="Para clínicas de alto volume"
           highlight
-          perk="🎟️ 100 convites premium/mês + selo Elite"
+          perk="🎟️ 25 convites premium/mês + selo Elite"
+        />
+        <PlanBtn
+          planKey="black"
+          name="Black"
+          monthly={1999}
+          tagline="O plano mais completo"
+          black
+          perk="🖤 250 convites/mês · marca própria · gerente dedicado · selo Black"
         />
       </div>
 
@@ -4239,16 +4275,17 @@ function DoctorBilling({
   );
 }
 
-/** Card de convites premium do médico Elite: código + cota do mês. */
+/** Card de convites premium (Elite/Black): gera código na hora + cota do mês. */
 function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [info, setInfo] = useState<{
     eligible: boolean;
-    code: string | null;
     limit: number;
     used: number;
     remaining: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [code, setCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -4265,39 +4302,89 @@ function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading || !info || !info.eligible || !info.code) return null;
+  if (loading || !info || !info.eligible) return null;
+
+  async function generate() {
+    setGenerating(true);
+    setCopied(false);
+    try {
+      const tk = await tokenFn();
+      const { generateInviteCode } = await import("@/lib/invites.functions");
+      const res = await generateInviteCode({ data: { accessToken: tk } });
+      if (res.ok) {
+        setCode(res.code);
+        setInfo((prev) => (prev ? { ...prev, used: res.used, remaining: res.remaining } : prev));
+        // Copia automaticamente para facilitar o envio.
+        try {
+          await navigator.clipboard.writeText(res.code);
+          setCopied(true);
+        } catch {
+          /* sem clipboard: a paciente copia manualmente */
+        }
+      } else {
+        toast.error(
+          res.error === "cota_esgotada"
+            ? "Você já gerou todos os convites deste mês."
+            : "Não foi possível gerar o código. Tente novamente.",
+        );
+      }
+    } catch {
+      toast.error("Não foi possível gerar o código.");
+    }
+    setGenerating(false);
+  }
 
   const copy = async () => {
+    if (!code) return;
     try {
-      await navigator.clipboard.writeText(info.code!);
+      await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Não foi possível copiar. Código: " + info.code);
+      toast.error("Não foi possível copiar. Código: " + code);
     }
   };
 
+  const esgotado = info.remaining <= 0;
+
   return (
     <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6">
-      <div className="flex items-center gap-2">
-        <p className="font-serif text-lg text-amber-900">🎟️ Convites premium (Elite)</p>
-      </div>
+      <p className="font-serif text-lg text-amber-900">🎟️ Convites premium</p>
       <p className="mt-1 text-sm text-amber-800">
-        Passe este código para suas pacientes. Quem digitar no app ganha o Obstétrica Premium
-        completo — por sua conta.
+        Gere um código na hora e envie para a sua paciente do jeito que quiser (WhatsApp, e-mail…).
+        Cada código vale para <strong>uma paciente</strong> e libera o Obstétrica Premium completo —
+        por sua conta.
       </p>
+
+      {code && (
+        <button
+          onClick={copy}
+          className="press mt-4 flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-amber-300 bg-white px-4 py-3 font-mono text-xl font-black tracking-[0.3em] text-amber-900"
+        >
+          <span>{code}</span>
+          <span className="font-sans text-xs font-bold text-amber-600">
+            {copied ? "copiado ✓" : "copiar"}
+          </span>
+        </button>
+      )}
+
       <button
-        onClick={copy}
-        className="press mt-4 flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-amber-300 bg-white px-4 py-3 font-mono text-xl font-black tracking-[0.3em] text-amber-900"
+        onClick={generate}
+        disabled={generating || esgotado}
+        className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-50"
       >
-        <span>{info.code}</span>
-        <span className="font-sans text-xs font-bold text-amber-600">
-          {copied ? "copiado ✓" : "copiar"}
-        </span>
+        {generating
+          ? "Gerando…"
+          : esgotado
+            ? "Cota do mês esgotada"
+            : code
+              ? "Gerar outro código"
+              : "Gerar código para uma paciente"}
       </button>
+
       <div className="mt-3 flex items-center justify-between text-sm">
         <span className="text-amber-800">
-          Convites usados este mês: <strong>{info.used}</strong> de {info.limit}
+          Gerados este mês: <strong>{info.used}</strong> de {info.limit}
         </span>
         <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800">
           {info.remaining} restantes

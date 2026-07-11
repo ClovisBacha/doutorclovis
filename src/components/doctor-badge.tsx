@@ -15,11 +15,13 @@ export function DoctorBadge({
   if (!badge) return null;
 
   const style =
-    badge === "Elite"
-      ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-sm"
-      : badge === "Pro"
-        ? "bg-primary/15 text-primary"
-        : "bg-slate-100 text-slate-500";
+    badge === "Black"
+      ? "bg-gradient-to-r from-neutral-900 to-neutral-700 text-amber-300 shadow-sm ring-1 ring-amber-400/40"
+      : badge === "Elite"
+        ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-sm"
+        : badge === "Pro"
+          ? "bg-primary/15 text-primary"
+          : "bg-slate-100 text-slate-500";
 
   const dims = size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]";
 

@@ -23,6 +23,8 @@ const PLANS = [
   "pro_annual",
   "elite",
   "elite_annual",
+  "black",
+  "black_annual",
 ] as const;
 
 function siteUrl(): string {

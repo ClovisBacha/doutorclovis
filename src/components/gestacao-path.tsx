@@ -2345,6 +2345,7 @@ function QuizPaywall({ week, context = "past" }: { week: number; context?: "past
       }
       const msg: Record<string, string> = {
         codigo_invalido: "Código não encontrado. Confira com o seu médico.",
+        codigo_usado: "Este código já foi usado. Peça um novo ao seu médico.",
         codigo_inativo: "Este código não está mais ativo.",
         cota_esgotada: "O seu médico já usou todos os convites deste mês.",
         nao_autenticado: "Entre na sua conta para usar o código.",

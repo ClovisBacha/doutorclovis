@@ -41,6 +41,8 @@ const PLAN_PRICE: Record<string, number> = {
   starter: 197,
   pro: 347,
   clinica: 297,
+  elite: 697,
+  black: 1999,
 };
 
 export type PlatformDoctor = {
@@ -198,7 +200,7 @@ const SetStatusSchema = z.object({
   accessToken: z.string().min(10),
   doctorId: z.string().uuid(),
   active: z.boolean().optional(),
-  plan: z.enum(["trial", "free", "starter", "pro", "clinica", "elite"]).optional(),
+  plan: z.enum(["trial", "free", "starter", "pro", "clinica", "elite", "black"]).optional(),
 });
 
 /** Ativa/desativa ou muda o plano de um médico (super-admin). */

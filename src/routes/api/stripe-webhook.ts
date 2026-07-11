@@ -100,7 +100,13 @@ async function applySubscription(subscriptionId: string): Promise<void> {
       .eq("id", userId);
   } else if (product === "doctor_plan") {
     const p = plan ?? "";
-    const planKey = p.startsWith("elite") ? "elite" : p.startsWith("pro") ? "pro" : "starter";
+    const planKey = p.startsWith("black")
+      ? "black"
+      : p.startsWith("elite")
+        ? "elite"
+        : p.startsWith("pro")
+          ? "pro"
+          : "starter";
     if (grants) {
       await (supabaseAdmin as any)
         .from("doctors")

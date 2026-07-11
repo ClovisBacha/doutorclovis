@@ -76,6 +76,8 @@ export function priceIdFor(product: BillingProduct, plan: string): string | null
     "doctor_plan:pro_annual": env.STRIPE_PRICE_DOCTOR_PRO_ANNUAL,
     "doctor_plan:elite": env.STRIPE_PRICE_DOCTOR_ELITE_MONTHLY,
     "doctor_plan:elite_annual": env.STRIPE_PRICE_DOCTOR_ELITE_ANNUAL,
+    "doctor_plan:black": env.STRIPE_PRICE_DOCTOR_BLACK_MONTHLY,
+    "doctor_plan:black_annual": env.STRIPE_PRICE_DOCTOR_BLACK_ANNUAL,
   };
   return map[`${product}:${plan}`] ?? null;
 }

@@ -1,13 +1,13 @@
 /**
- * Convites premium — o médico Elite presenteia pacientes com o app premium.
+ * Convites premium — o médico Elite/Black gera um código NA HORA e envia como
+ * quiser. Cada código é de USO ÚNICO; a paciente digita e ganha o premium.
  *
- *   - getMyInviteInfo: (médico logado) o seu código + cota do mês. Gera o
- *     código na primeira vez que um médico Elite abre a área.
- *   - redeemInviteCode: (paciente logada) digita o código → ganha o premium,
- *     respeitando a cota mensal do médico. Idempotente por paciente/médico.
+ *   - getMyInviteInfo: (médico) elegibilidade + cota do mês (gerados/limite).
+ *   - generateInviteCode: (médico) cria um código novo e único na hora.
+ *   - redeemInviteCode: (paciente) resgata um código válido não usado.
  *
- * Só médicos com convites no plano (Elite) emitem; a liberação do premium é
- * feita aqui via service_role (o webhook do Stripe cuida do premium pago).
+ * A cota mensal conta os códigos GERADOS no mês (Elite 25, Black 250). Tudo
+ * escrito via service_role; a UI nunca concede acesso.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -27,9 +27,29 @@ function genCode(): string {
   return out;
 }
 
+async function loadDoctor(accessToken: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: u } = await supabaseAdmin.auth.getUser(accessToken);
+  if (!u.user) return { supabaseAdmin, user: null, doc: null as any };
+  const { data: doc } = await (supabaseAdmin as any)
+    .from("doctors")
+    .select("id,plan,active")
+    .eq("id", u.user.id)
+    .maybeSingle();
+  return { supabaseAdmin, user: u.user, doc };
+}
+
+async function monthlyUsed(supabaseAdmin: any, doctorId: string): Promise<number> {
+  const { count } = await supabaseAdmin
+    .from("invite_codes")
+    .select("id", { count: "exact", head: true })
+    .eq("doctor_id", doctorId)
+    .gte("created_at", monthStartISO());
+  return count ?? 0;
+}
+
 export type InviteInfo = {
   eligible: boolean; // o plano do médico dá convites?
-  code: string | null;
   limit: number;
   used: number;
   remaining: number;
@@ -38,49 +58,43 @@ export type InviteInfo = {
 export const getMyInviteInfo = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }): Promise<{ ok: false } | ({ ok: true } & InviteInfo)> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
-    if (!u.user) return { ok: false as const };
-
-    const { data: doc } = await (supabaseAdmin as any)
-      .from("doctors")
-      .select("id,plan,active,invite_code")
-      .eq("id", u.user.id)
-      .maybeSingle();
+    const { supabaseAdmin, doc } = await loadDoctor(data.accessToken);
     if (!doc) return { ok: false as const };
-
     const limit = doc.active ? entitlementsFor(doc.plan).premiumInvitesPerMonth : 0;
-    if (limit <= 0) {
-      return { ok: true as const, eligible: false, code: null, limit: 0, used: 0, remaining: 0 };
-    }
-
-    // Gera o código na primeira vez (garante unicidade com algumas tentativas).
-    let code: string | null = doc.invite_code ?? null;
-    if (!code) {
-      for (let attempt = 0; attempt < 6 && !code; attempt++) {
-        const candidate = genCode();
-        const { error } = await (supabaseAdmin as any)
-          .from("doctors")
-          .update({ invite_code: candidate })
-          .eq("id", u.user.id);
-        if (!error) code = candidate;
-      }
-    }
-
-    const { count } = await (supabaseAdmin as any)
-      .from("premium_invites")
-      .select("id", { count: "exact", head: true })
-      .eq("doctor_id", u.user.id)
-      .gte("created_at", monthStartISO());
-    const used = count ?? 0;
+    if (limit <= 0) return { ok: true as const, eligible: false, limit: 0, used: 0, remaining: 0 };
+    const used = await monthlyUsed(supabaseAdmin, doc.id);
     return {
       ok: true as const,
       eligible: true,
-      code,
       limit,
       used,
       remaining: Math.max(0, limit - used),
     };
+  });
+
+export const generateInviteCode = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin, doc } = await loadDoctor(data.accessToken);
+    if (!doc) return { ok: false as const, error: "sem_perfil" };
+    const limit = doc.active ? entitlementsFor(doc.plan).premiumInvitesPerMonth : 0;
+    if (limit <= 0) return { ok: false as const, error: "sem_convites" };
+
+    const used = await monthlyUsed(supabaseAdmin, doc.id);
+    if (used >= limit) return { ok: false as const, error: "cota_esgotada" };
+
+    // Gera um código único (retenta em colisão de UNIQUE).
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const code = genCode();
+      const { error } = await (supabaseAdmin as any)
+        .from("invite_codes")
+        .insert({ code, doctor_id: doc.id });
+      if (!error) {
+        return { ok: true as const, code, used: used + 1, limit, remaining: limit - used - 1 };
+      }
+      if (error.code !== "23505") return { ok: false as const, error: "falha_geracao" };
+    }
+    return { ok: false as const, error: "falha_geracao" };
   });
 
 export const redeemInviteCode = createServerFn({ method: "POST" })
@@ -93,51 +107,40 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
     if (!u.user) return { ok: false as const, error: "nao_autenticado" };
 
     const code = data.code.trim().toUpperCase();
-    const { data: doc } = await (supabaseAdmin as any)
-      .from("doctors")
-      .select("id,plan,active,invite_code")
-      .eq("invite_code", code)
+    const { data: row } = await (supabaseAdmin as any)
+      .from("invite_codes")
+      .select("id,doctor_id,redeemed_by")
+      .eq("code", code)
       .maybeSingle();
-    if (!doc) return { ok: false as const, error: "codigo_invalido" };
+    if (!row) return { ok: false as const, error: "codigo_invalido" };
 
-    const limit = doc.active ? entitlementsFor(doc.plan).premiumInvitesPerMonth : 0;
-    if (limit <= 0) return { ok: false as const, error: "codigo_inativo" };
+    // Já usado por OUTRA paciente? Uso único.
+    if (row.redeemed_by && row.redeemed_by !== u.user.id) {
+      return { ok: false as const, error: "codigo_usado" };
+    }
 
-    // Já resgatou este código antes? Idempotente: garante o premium e sai.
-    const { data: prior } = await (supabaseAdmin as any)
-      .from("premium_invites")
-      .select("id")
-      .eq("doctor_id", doc.id)
-      .eq("patient_user_id", u.user.id)
-      .maybeSingle();
-
-    if (!prior) {
-      // Cota do mês do médico
-      const { count } = await (supabaseAdmin as any)
-        .from("premium_invites")
-        .select("id", { count: "exact", head: true })
-        .eq("doctor_id", doc.id)
-        .gte("created_at", monthStartISO());
-      if ((count ?? 0) >= limit) return { ok: false as const, error: "cota_esgotada" };
-
-      const { error: insErr } = await (supabaseAdmin as any)
-        .from("premium_invites")
-        .insert({ doctor_id: doc.id, patient_user_id: u.user.id });
-      // Corrida da MESMA paciente (duas abas): o UNIQUE barra a 2ª — o
-      // Postgres devolve 23505 (unique_violation); tratamos como sucesso
-      // (ela já tem o convite). Usar o CÓDIGO, não a mensagem (i18n-safe).
-      if (insErr && insErr.code !== "23505") {
-        return { ok: false as const, error: "falha_resgate" };
+    // Marca como resgatado (idempotente para a mesma paciente). A condição
+    // redeemed_by IS NULL evita corrida: só a 1ª resgata.
+    if (!row.redeemed_by) {
+      const { data: upd } = await (supabaseAdmin as any)
+        .from("invite_codes")
+        .update({ redeemed_by: u.user.id, redeemed_at: new Date().toISOString() })
+        .eq("id", row.id)
+        .is("redeemed_by", null)
+        .select("id");
+      if (!upd || upd.length === 0) {
+        // Alguém resgatou no meio-tempo.
+        return { ok: false as const, error: "codigo_usado" };
       }
     }
 
-    // Libera o premium (flag lida pelo resto do app).
+    // Libera o premium.
     await (supabaseAdmin as any)
       .from("patient_profiles")
       .update({ quiz_premium: true })
       .eq("id", u.user.id);
 
-    // Vincula ao médico só se a paciente ainda não tem um (não "rouba" médico).
+    // Vincula ao médico só se a paciente ainda não tem um (não "rouba").
     const { data: prof } = await (supabaseAdmin as any)
       .from("patient_profiles")
       .select("doctor_id")
@@ -146,11 +149,11 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
     if (prof && !prof.doctor_id) {
       await (supabaseAdmin as any)
         .from("patient_profiles")
-        .update({ doctor_id: doc.id })
+        .update({ doctor_id: row.doctor_id })
         .eq("id", u.user.id);
     }
 
-    // Registro em subscriptions (origem convite) — não trava se a tabela faltar.
+    // Registro em subscriptions (origem convite) — não trava se faltar a tabela.
     try {
       await (supabaseAdmin as any).from("subscriptions").upsert(
         {
@@ -159,7 +162,7 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
           plan: "invite",
           source: "doctor_invite",
           status: "active",
-          stripe_subscription_id: `invite_${doc.id}_${u.user.id}`,
+          stripe_subscription_id: `invite_${row.id}`,
         },
         { onConflict: "stripe_subscription_id" },
       );
