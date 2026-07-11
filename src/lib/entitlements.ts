@@ -93,8 +93,9 @@ const ELITE: Entitlements = {
   badge: "Elite",
 };
 
-// Trial = experimenta o Pro por 14 dias (mesmas capacidades do Pro).
-const TRIAL: Entitlements = { ...PRO, label: "Trial" };
+// Trial = experimenta o Pro por 14 dias (mesmas capacidades do Pro), mas SEM
+// selo — quem está só testando não exibe "Pro verificado" às pacientes.
+const TRIAL: Entitlements = { ...PRO, label: "Trial", badge: "" };
 
 export const PLAN_ENTITLEMENTS: Record<PlanKey, Entitlements> = {
   trial: TRIAL,

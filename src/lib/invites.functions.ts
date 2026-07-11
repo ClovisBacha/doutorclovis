@@ -123,8 +123,10 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       const { error: insErr } = await (supabaseAdmin as any)
         .from("premium_invites")
         .insert({ doctor_id: doc.id, patient_user_id: u.user.id });
-      // Corrida: se duas abas resgatarem juntas, o UNIQUE barra a 2ª — ok.
-      if (insErr && !String(insErr.message || "").includes("duplicate")) {
+      // Corrida da MESMA paciente (duas abas): o UNIQUE barra a 2ª — o
+      // Postgres devolve 23505 (unique_violation); tratamos como sucesso
+      // (ela já tem o convite). Usar o CÓDIGO, não a mensagem (i18n-safe).
+      if (insErr && insErr.code !== "23505") {
         return { ok: false as const, error: "falha_resgate" };
       }
     }
