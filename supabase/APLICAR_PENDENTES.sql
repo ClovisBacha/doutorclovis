@@ -1576,3 +1576,37 @@ DROP TRIGGER IF EXISTS trg_protect_doctor_id ON public.patient_profiles;
 CREATE TRIGGER trg_protect_doctor_id
   BEFORE INSERT OR UPDATE ON public.patient_profiles
   FOR EACH ROW EXECUTE FUNCTION public.protect_patient_doctor_id();
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Assinaturas (Stripe) — pagou → acesso na hora (paciente premium + médico)
+-- Idempotente; ver migração 20260711000000_subscriptions.sql
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                uuid NOT NULL,
+  product                text NOT NULL,
+  plan                   text,
+  source                 text NOT NULL DEFAULT 'stripe',
+  status                 text NOT NULL DEFAULT 'incomplete',
+  stripe_customer_id     text,
+  stripe_subscription_id text UNIQUE,
+  current_period_end     timestamptz,
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON public.subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON public.subscriptions(stripe_customer_id);
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own subscriptions read" ON public.subscriptions;
+CREATE POLICY "own subscriptions read" ON public.subscriptions
+  FOR SELECT USING (auth.uid() = user_id);
+GRANT SELECT ON public.subscriptions TO authenticated;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS plan_expires_at timestamptz;
+CREATE OR REPLACE FUNCTION public.touch_subscription_updated_at()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at := now(); RETURN NEW; END;
+$$;
+DROP TRIGGER IF EXISTS trg_touch_subscriptions ON public.subscriptions;
+CREATE TRIGGER trg_touch_subscriptions
+  BEFORE UPDATE ON public.subscriptions
+  FOR EACH ROW EXECUTE FUNCTION public.touch_subscription_updated_at();
