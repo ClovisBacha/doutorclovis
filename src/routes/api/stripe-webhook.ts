@@ -106,8 +106,13 @@ async function applySubscription(subscriptionId: string): Promise<void> {
         .update({ plan: planKey, active: true, plan_expires_at: periodEnd })
         .eq("id", userId);
     } else {
-      // cancelou / não pagou → suspende (entitlements caem para free)
-      await (supabaseAdmin as any).from("doctors").update({ active: false }).eq("id", userId);
+      // cancelou / não pagou → rebaixa para free MANTENDO active=true: o médico
+      // continua com o painel no plano grátis e pode reassinar quando quiser
+      // (entitlements caem para free por causa do plano, não por desativação).
+      await (supabaseAdmin as any)
+        .from("doctors")
+        .update({ plan: "free", plan_expires_at: null })
+        .eq("id", userId);
     }
   }
 }

@@ -198,6 +198,21 @@ function PainelPage() {
     load();
   }, []);
 
+  // Retorno do checkout do Stripe (assinatura do médico): o webhook ativa o
+  // plano em segundos. Avisa e recarrega uma vez para refletir o novo plano.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const st = new URLSearchParams(window.location.search).get("assinatura");
+    if (!st) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    if (st === "sucesso") {
+      toast.success("Pagamento recebido! Ativando seu plano…");
+      setTimeout(() => window.location.reload(), 3000);
+    } else if (st === "cancelada") {
+      toast("Pagamento não concluído. Você pode assinar quando quiser.");
+    }
+  }, []);
+
   useEffect(() => {
     if (!allowed) return;
     if (tab === "Engajamento" && !engagement) loadEngagement();
@@ -4033,11 +4048,178 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
 
 /* ---------- Meu Perfil (perfil do médico assinante) ---------- */
 
+/** Plano & assinatura do médico — assinatura recorrente por cartão (Stripe). */
+function DoctorBilling({
+  tokenFn,
+  plan,
+  active,
+  exists,
+}: {
+  tokenFn: () => Promise<string>;
+  plan: string;
+  active: boolean;
+  exists: boolean;
+}) {
+  const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
+  const [busy, setBusy] = useState<string | null>(null);
+  const isPaid = active && ["starter", "pro", "clinica"].includes(plan);
+  const isTeam = plan === "clinica";
+
+  async function checkout(planKey: "starter" | "pro") {
+    setBusy(planKey);
+    try {
+      const tk = await tokenFn();
+      const { createSubscriptionCheckout } = await import("@/lib/billing.functions");
+      const res = await createSubscriptionCheckout({
+        data: {
+          accessToken: tk,
+          product: "doctor_plan",
+          plan: cycle === "annual" ? (`${planKey}_annual` as const) : planKey,
+          returnPath: "/painel",
+        },
+      });
+      if (res.ok && res.url) {
+        window.location.href = res.url;
+        return;
+      }
+      toast.error(
+        res.error === "pagamento_indisponivel"
+          ? "O pagamento está sendo configurado. Tente em instantes."
+          : res.error === "plano_indisponivel"
+            ? "Este ciclo ainda não está disponível — tente o mensal."
+            : "Não foi possível abrir o pagamento.",
+      );
+    } catch {
+      toast.error("Não foi possível abrir o pagamento.");
+    }
+    setBusy(null);
+  }
+
+  async function portal() {
+    setBusy("portal");
+    try {
+      const tk = await tokenFn();
+      const { openBillingPortal } = await import("@/lib/billing.functions");
+      const res = await openBillingPortal({ data: { accessToken: tk, returnPath: "/painel" } });
+      if (res.ok && res.url) {
+        window.location.href = res.url;
+        return;
+      }
+      toast.error(
+        res.error === "sem_assinatura"
+          ? "Você ainda não tem uma assinatura ativa."
+          : "Não foi possível abrir o portal.",
+      );
+    } catch {
+      toast.error("Não foi possível abrir o portal.");
+    }
+    setBusy(null);
+  }
+
+  if (isPaid) {
+    return (
+      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+        <p className="font-serif text-lg text-emerald-900">
+          Assinatura ativa · plano {plan === "clinica" ? "Pro Equipe" : plan}
+        </p>
+        <p className="mt-1 text-sm text-emerald-800">
+          Sua cobrança é automática. Troque o cartão, veja faturas ou cancele quando quiser.
+        </p>
+        <button
+          onClick={portal}
+          disabled={busy === "portal"}
+          className="mt-4 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {busy === "portal" ? "Abrindo…" : "Gerenciar assinatura"}
+        </button>
+      </div>
+    );
+  }
+
+  const PlanBtn = ({
+    planKey,
+    name,
+    monthly,
+    tagline,
+  }: {
+    planKey: "starter" | "pro";
+    name: string;
+    monthly: number;
+    tagline: string;
+  }) => (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <p className="font-serif text-base">{name}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{tagline}</p>
+      <p className="mt-2 text-2xl font-extrabold">
+        R$ {monthly}
+        <span className="text-sm font-normal text-muted-foreground">/mês</span>
+      </p>
+      {cycle === "annual" && (
+        <p className="text-[11px] font-semibold text-emerald-600">
+          cobrado 1×/ano · 2 meses grátis
+        </p>
+      )}
+      <button
+        onClick={() => checkout(planKey)}
+        disabled={!!busy}
+        className="press mt-3 w-full rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+      >
+        {busy === planKey ? "Abrindo pagamento…" : `Assinar ${name}`}
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-serif text-lg">Ative sua assinatura</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {exists ? "Você está no período de teste." : ""} Assine por cartão — acesso liberado na
+            hora, renovação automática, cancele quando quiser.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 inline-flex rounded-full border border-border bg-card p-1 text-xs font-semibold">
+        <button
+          onClick={() => setCycle("monthly")}
+          className={`rounded-full px-3 py-1.5 ${cycle === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          Mensal
+        </button>
+        <button
+          onClick={() => setCycle("annual")}
+          className={`rounded-full px-3 py-1.5 ${cycle === "annual" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          Anual · 2 meses grátis
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <PlanBtn planKey="starter" name="Starter" monthly={197} tagline="A sua IA no app" />
+        <PlanBtn planKey="pro" name="Pro" monthly={347} tagline="A IA também no WhatsApp" />
+      </div>
+
+      {isTeam ? null : (
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Precisa de vários médicos (Pro Equipe)?{" "}
+          <a href="/medicos#contato" className="font-semibold text-primary">
+            Fale com a gente
+          </a>
+          .
+        </p>
+      )}
+    </div>
+  );
+}
+
 function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exists, setExists] = useState(false);
   const [plan, setPlan] = useState("trial");
+  const [active, setActive] = useState(false);
   const [slug, setSlug] = useState<string | null>(null);
   const [form, setForm] = useState({
     display_name: "",
@@ -4057,6 +4239,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           const d = res.doctor as DoctorProfile;
           setExists(true);
           setPlan(d.plan);
+          setActive(d.active);
           setSlug(d.slug);
           setForm({
             display_name: d.display_name,
@@ -4113,6 +4296,8 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
   return (
     <div className="max-w-2xl space-y-4">
+      <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
+
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
