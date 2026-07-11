@@ -2315,6 +2315,47 @@ const QUIZ_PRICE_ANNUAL_MONTH = 9.9; // 12x — cobrado anualmente (R$ 118,80/an
 function QuizPaywall({ week, context = "past" }: { week: number; context?: "past" | "ad" }) {
   const [plan, setPlan] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
+
+  // Código do médico Elite: a paciente digita e ganha o premium na hora.
+  async function redeem() {
+    if (code.trim().length < 4) {
+      toast.error("Digite o código do seu médico.");
+      return;
+    }
+    setRedeeming(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) {
+        toast.error("Entre na sua conta para usar o código.");
+        setRedeeming(false);
+        return;
+      }
+      const { redeemInviteCode } = await import("@/lib/invites.functions");
+      const res = await redeemInviteCode({
+        data: { accessToken: s.session.access_token, code: code.trim() },
+      });
+      if (res.ok) {
+        toast.success("Premium liberado pelo seu médico! 💛");
+        setTimeout(() => window.location.reload(), 1200);
+        return;
+      }
+      const msg: Record<string, string> = {
+        codigo_invalido: "Código não encontrado. Confira com o seu médico.",
+        codigo_inativo: "Este código não está mais ativo.",
+        cota_esgotada: "O seu médico já usou todos os convites deste mês.",
+        nao_autenticado: "Entre na sua conta para usar o código.",
+        falha_resgate: "Não foi possível resgatar. Tente novamente.",
+      };
+      toast.error(msg[res.error ?? ""] ?? "Não foi possível resgatar o código.");
+    } catch {
+      toast.error("Não foi possível resgatar o código.");
+    }
+    setRedeeming(false);
+  }
 
   // Assinatura recorrente por cartão (Stripe): paga → o webhook libera o
   // acesso na hora. A UI só leva ao checkout seguro, nunca concede nada.
@@ -2452,6 +2493,40 @@ function QuizPaywall({ week, context = "past" }: { week: number; context?: "past
         Pagamento seguro por cartão · acesso na hora · cancele quando quiser.
         <br />A aula de hoje continua grátis, todos os dias 💛
       </p>
+
+      {/* Código do médico Elite — libera o premium sem pagar */}
+      <div className="mt-3 border-t border-amber-200/70 pt-3">
+        {!codeOpen ? (
+          <button
+            onClick={() => setCodeOpen(true)}
+            className="w-full text-center text-xs font-semibold text-amber-800 underline decoration-amber-300 underline-offset-2"
+          >
+            Tenho um código do meu médico
+          </button>
+        ) : (
+          <div>
+            <p className="text-xs font-semibold text-amber-900">
+              Digite o código que seu médico te passou:
+            </p>
+            <div className="mt-1.5 flex gap-2">
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                maxLength={16}
+                placeholder="EX: ABCD2345"
+                className="min-w-0 flex-1 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-mono tracking-widest text-amber-900 outline-none"
+              />
+              <button
+                onClick={redeem}
+                disabled={redeeming}
+                className="press shrink-0 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-60"
+              >
+                {redeeming ? "…" : "Resgatar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

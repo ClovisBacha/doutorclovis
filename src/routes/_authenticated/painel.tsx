@@ -4238,6 +4238,74 @@ function DoctorBilling({
   );
 }
 
+/** Card de convites premium do médico Elite: código + cota do mês. */
+function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [info, setInfo] = useState<{
+    eligible: boolean;
+    code: string | null;
+    limit: number;
+    used: number;
+    remaining: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const tk = await tokenFn();
+        const { getMyInviteInfo } = await import("@/lib/invites.functions");
+        const res = await getMyInviteInfo({ data: { accessToken: tk } });
+        if (res.ok) setInfo(res);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading || !info || !info.eligible || !info.code) return null;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(info.code!);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar. Código: " + info.code);
+    }
+  };
+
+  return (
+    <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6">
+      <div className="flex items-center gap-2">
+        <p className="font-serif text-lg text-amber-900">🎟️ Convites premium (Elite)</p>
+      </div>
+      <p className="mt-1 text-sm text-amber-800">
+        Passe este código para suas pacientes. Quem digitar no app ganha o Obstétrica Premium
+        completo — por sua conta.
+      </p>
+      <button
+        onClick={copy}
+        className="press mt-4 flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-amber-300 bg-white px-4 py-3 font-mono text-xl font-black tracking-[0.3em] text-amber-900"
+      >
+        <span>{info.code}</span>
+        <span className="font-sans text-xs font-bold text-amber-600">
+          {copied ? "copiado ✓" : "copiar"}
+        </span>
+      </button>
+      <div className="mt-3 flex items-center justify-between text-sm">
+        <span className="text-amber-800">
+          Convites usados este mês: <strong>{info.used}</strong> de {info.limit}
+        </span>
+        <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800">
+          {info.remaining} restantes
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -4321,6 +4389,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   return (
     <div className="max-w-2xl space-y-4">
       <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
+      <DoctorInviteCard tokenFn={tokenFn} />
 
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-start justify-between gap-3">
