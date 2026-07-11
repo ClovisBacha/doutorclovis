@@ -14,7 +14,16 @@ import { DOCTOR } from "@/lib/doctor.config";
 
 const PRODUCTS = ["quiz_premium", "doctor_plan"] as const;
 // quiz: monthly|annual · médico: starter|pro (+ _annual)
-const PLANS = ["monthly", "annual", "starter", "starter_annual", "pro", "pro_annual"] as const;
+const PLANS = [
+  "monthly",
+  "annual",
+  "starter",
+  "starter_annual",
+  "pro",
+  "pro_annual",
+  "elite",
+  "elite_annual",
+] as const;
 
 function siteUrl(): string {
   return (process.env.SITE_URL || DOCTOR.siteUrl || "https://www.obstetrica.com.br").replace(

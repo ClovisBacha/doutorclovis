@@ -86,6 +86,23 @@ const PLANS = [
     cta: "Assinar Pro",
   },
   {
+    key: "elite",
+    name: "Elite",
+    tagline: "Para clínicas de alto volume",
+    monthly: 697,
+    isFrom: false,
+    perSuffix: "",
+    highlight: false,
+    desc: "O topo: tudo do Pro + convites premium para presentear suas pacientes com o app completo.",
+    features: [
+      "Tudo do Pro",
+      "🎟️ 100 convites premium/mês — a paciente entra com um código e ganha o app completo",
+      "✓ Selo Elite verificado no seu perfil",
+      "Prioridade máxima na busca de médicos do app",
+    ],
+    cta: "Assinar Elite",
+  },
+  {
     key: "enterprise",
     name: "Pro Equipe",
     tagline: "O Pro para a clínica",

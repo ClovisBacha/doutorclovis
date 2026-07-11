@@ -4062,10 +4062,10 @@ function DoctorBilling({
 }) {
   const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [busy, setBusy] = useState<string | null>(null);
-  const isPaid = active && ["starter", "pro", "clinica"].includes(plan);
+  const isPaid = active && ["starter", "pro", "clinica", "elite"].includes(plan);
   const isTeam = plan === "clinica";
 
-  async function checkout(planKey: "starter" | "pro") {
+  async function checkout(planKey: "starter" | "pro" | "elite") {
     setBusy(planKey);
     try {
       const tk = await tokenFn();
@@ -4141,14 +4141,27 @@ function DoctorBilling({
     name,
     monthly,
     tagline,
+    highlight,
+    perk,
   }: {
-    planKey: "starter" | "pro";
+    planKey: "starter" | "pro" | "elite";
     name: string;
     monthly: number;
     tagline: string;
+    highlight?: boolean;
+    perk?: string;
   }) => (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <p className="font-serif text-base">{name}</p>
+    <div
+      className={`rounded-2xl border bg-card p-4 ${highlight ? "border-amber-400 ring-1 ring-amber-300" : "border-border"}`}
+    >
+      <div className="flex items-center gap-2">
+        <p className="font-serif text-base">{name}</p>
+        {highlight && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700">
+            TOP
+          </span>
+        )}
+      </div>
       <p className="mt-0.5 text-xs text-muted-foreground">{tagline}</p>
       <p className="mt-2 text-2xl font-extrabold">
         R$ {monthly}
@@ -4159,10 +4172,13 @@ function DoctorBilling({
           cobrado 1×/ano · 2 meses grátis
         </p>
       )}
+      {perk && <p className="mt-1.5 text-[11px] font-semibold text-amber-700">{perk}</p>}
       <button
         onClick={() => checkout(planKey)}
         disabled={!!busy}
-        className="press mt-3 w-full rounded-full bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+        className={`press mt-3 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-60 ${
+          highlight ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground"
+        }`}
       >
         {busy === planKey ? "Abrindo pagamento…" : `Assinar ${name}`}
       </button>
@@ -4196,9 +4212,17 @@ function DoctorBilling({
         </button>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <PlanBtn planKey="starter" name="Starter" monthly={197} tagline="A sua IA no app" />
         <PlanBtn planKey="pro" name="Pro" monthly={347} tagline="A IA também no WhatsApp" />
+        <PlanBtn
+          planKey="elite"
+          name="Elite"
+          monthly={697}
+          tagline="Para clínicas de alto volume"
+          highlight
+          perk="🎟️ 100 convites premium/mês + selo Elite"
+        />
       </div>
 
       {isTeam ? null : (

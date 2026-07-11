@@ -4,7 +4,7 @@
  * para os gates no servidor quanto para mostrar/bloquear recursos na UI.
  *
  * Valores de plano gravados em `doctors.plan`:
- *   trial | free | starter | pro | clinica
+ *   trial | free | starter | pro | clinica | elite
  * O card "Pro Equipe" da página de vendas corresponde ao plano `clinica`.
  * Plano desconhecido cai em `free` (o mais restritivo) — nunca libera demais.
  *
@@ -13,10 +13,12 @@
  *   - Starter: a IA responde as pacientes no APP, pacientes ilimitadas.
  *   - Pro:     a IA também atende/agenda no WhatsApp + dashboard avançado.
  *   - Clínica: o Pro para vários médicos (assentos de equipe).
+ *   - Elite:   o topo — Pro + equipe + 100 convites premium/mês para dar
+ *              o app premium às pacientes, e selo "Elite" no perfil.
  *   - Trial:   experimenta o Pro por tempo limitado.
  */
 
-export type PlanKey = "trial" | "free" | "starter" | "pro" | "clinica";
+export type PlanKey = "trial" | "free" | "starter" | "pro" | "clinica" | "elite";
 
 export type Entitlements = {
   /** Rótulo curto para UI. */
@@ -35,6 +37,10 @@ export type Entitlements = {
   prioritySupport: boolean;
   /** Vários médicos numa conta só (assentos de equipe). */
   teamSeats: boolean;
+  /** Convites premium que o médico pode dar às pacientes por mês (0 = nenhum). */
+  premiumInvitesPerMonth: number;
+  /** Selo de verificação exibido às pacientes ("" = sem selo). */
+  badge: "" | "Starter" | "Pro" | "Elite";
 };
 
 const FREE: Entitlements = {
@@ -46,6 +52,8 @@ const FREE: Entitlements = {
   dashboardAdvanced: false,
   prioritySupport: false,
   teamSeats: false,
+  premiumInvitesPerMonth: 0,
+  badge: "",
 };
 
 const STARTER: Entitlements = {
@@ -57,6 +65,8 @@ const STARTER: Entitlements = {
   dashboardAdvanced: false,
   prioritySupport: false,
   teamSeats: false,
+  premiumInvitesPerMonth: 0,
+  badge: "Starter",
 };
 
 const PRO: Entitlements = {
@@ -68,9 +78,20 @@ const PRO: Entitlements = {
   dashboardAdvanced: true,
   prioritySupport: true,
   teamSeats: false,
+  premiumInvitesPerMonth: 0,
+  badge: "Pro",
 };
 
 const CLINICA: Entitlements = { ...PRO, label: "Pro Equipe", teamSeats: true };
+
+// Elite = o topo: Pro + equipe + 100 convites premium/mês + selo "Elite".
+const ELITE: Entitlements = {
+  ...PRO,
+  label: "Elite",
+  teamSeats: true,
+  premiumInvitesPerMonth: 100,
+  badge: "Elite",
+};
 
 // Trial = experimenta o Pro por 14 dias (mesmas capacidades do Pro).
 const TRIAL: Entitlements = { ...PRO, label: "Trial" };
@@ -81,18 +102,36 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Entitlements> = {
   starter: STARTER,
   pro: PRO,
   clinica: CLINICA,
+  elite: ELITE,
 };
 
 /**
  * A equipe da instalação (ADMIN_EMAILS) tem acesso total — é a conta dona
  * da plataforma (ex.: o médico fundador + secretária), nunca um assinante limitado.
  */
-export const OWNER_ENTITLEMENTS: Entitlements = { ...CLINICA, label: "Instalação" };
+export const OWNER_ENTITLEMENTS: Entitlements = { ...ELITE, label: "Instalação" };
+
+/** Ordem de prioridade dos planos (maior = melhor) — usado no ranking da busca. */
+export const PLAN_RANK: Record<PlanKey, number> = {
+  free: 0,
+  trial: 1,
+  starter: 2,
+  pro: 3,
+  clinica: 4,
+  elite: 5,
+};
 
 /** Normaliza um valor livre de `doctors.plan` para uma PlanKey conhecida. */
 export function normalizePlan(plan: string | null | undefined): PlanKey {
   const p = (plan ?? "").trim().toLowerCase();
-  if (p === "trial" || p === "free" || p === "starter" || p === "pro" || p === "clinica") {
+  if (
+    p === "trial" ||
+    p === "free" ||
+    p === "starter" ||
+    p === "pro" ||
+    p === "clinica" ||
+    p === "elite"
+  ) {
     return p;
   }
   // Aliases da página de vendas / legado → plano de clínica.
@@ -103,4 +142,9 @@ export function normalizePlan(plan: string | null | undefined): PlanKey {
 /** Entitlements de um valor de plano (aceita valores livres/legados). */
 export function entitlementsFor(plan: string | null | undefined): Entitlements {
   return PLAN_ENTITLEMENTS[normalizePlan(plan)];
+}
+
+/** Selo do médico (para as pacientes) a partir do valor de plano. */
+export function badgeForPlan(plan: string | null | undefined): "" | "Starter" | "Pro" | "Elite" {
+  return entitlementsFor(plan).badge;
 }
