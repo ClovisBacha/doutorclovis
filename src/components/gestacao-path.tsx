@@ -2313,25 +2313,79 @@ const QUIZ_PRICE_MONTHLY = 19.9;
 const QUIZ_PRICE_ANNUAL_MONTH = 9.9; // 12x — cobrado anualmente (R$ 118,80/ano)
 
 function QuizPaywall({ week, context = "past" }: { week: number; context?: "past" | "ad" }) {
-  const tm = trimMeta(week);
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  // Comprovante já enviado? Mostra o estado "aguardando ativação" (sincroniza
-  // entre aparelhos via journey_state, prefixo dc-path-).
-  const [pendingSince, setPendingSince] = useState<string>(() =>
-    lsGet<string>("dc-path-premium-pending", ""),
-  );
-  const pixKey = DOCTOR.pixKey;
+  const [plan, setPlan] = useState<"monthly" | "annual">("annual");
+  const [loading, setLoading] = useState(false);
 
-  async function copyPix() {
+  // Assinatura recorrente por cartão (Stripe): paga → o webhook libera o
+  // acesso na hora. A UI só leva ao checkout seguro, nunca concede nada.
+  async function subscribe() {
+    setLoading(true);
     try {
-      await navigator.clipboard.writeText(pixKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) {
+        toast.error("Entre na sua conta para assinar.");
+        setLoading(false);
+        return;
+      }
+      const { createSubscriptionCheckout } = await import("@/lib/billing.functions");
+      const res = await createSubscriptionCheckout({
+        data: {
+          accessToken: s.session.access_token,
+          product: "quiz_premium",
+          plan,
+          returnPath: "/minha-conta",
+        },
+      });
+      if (res.ok && res.url) {
+        window.location.href = res.url;
+        return;
+      }
+      toast.error(
+        res.error === "pagamento_indisponivel"
+          ? "O pagamento está sendo configurado. Tente em instantes."
+          : "Não foi possível abrir o pagamento. Tente novamente.",
+      );
     } catch {
-      toast.error("Não foi possível copiar — anote a chave: " + pixKey);
+      toast.error("Não foi possível abrir o pagamento. Tente novamente.");
     }
+    setLoading(false);
   }
+
+  const PlanCard = ({
+    id,
+    label,
+    price,
+    sub,
+    badge,
+  }: {
+    id: "monthly" | "annual";
+    label: string;
+    price: string;
+    sub: string;
+    badge?: string;
+  }) => {
+    const active = plan === id;
+    return (
+      <button
+        type="button"
+        onClick={() => setPlan(id)}
+        aria-pressed={active}
+        className={`relative rounded-xl border-2 p-2.5 text-center transition-colors ${
+          active ? "border-amber-500 bg-white" : "border-amber-200 bg-white/70"
+        }`}
+      >
+        {badge && (
+          <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black text-white">
+            {badge}
+          </span>
+        )}
+        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">{label}</p>
+        <p className="text-lg font-extrabold text-amber-900">{price}</p>
+        <p className="text-[10px] text-amber-700">{sub}</p>
+      </button>
+    );
+  };
 
   return (
     <div className="mb-4 overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-orange-50 p-4">
@@ -2369,103 +2423,34 @@ function QuizPaywall({ week, context = "past" }: { week: number; context?: "past
         </div>
       </div>
 
-      {pendingSince ? (
-        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
-          <p className="text-sm font-extrabold text-emerald-800">⏳ Comprovante enviado!</p>
-          <p className="mt-1 text-xs leading-relaxed text-emerald-700">
-            Seu acesso é liberado pelo consultório em até 24h (enviado em{" "}
-            {new Date(pendingSince + "T00:00:00").toLocaleDateString("pt-BR")}). Assim que liberar,
-            as aulas abrem sozinhas por aqui.
-          </p>
-          <div className="mt-2 flex justify-center gap-2">
-            <button
-              onClick={() => window.location.reload()}
-              className="press rounded-full bg-emerald-500 px-4 py-2 text-xs font-extrabold text-white"
-            >
-              Já fui liberada — atualizar
-            </button>
-            <button
-              onClick={() => {
-                lsSet("dc-path-premium-pending", "");
-                setPendingSince("");
-                setOpen(true);
-              }}
-              className="press rounded-full border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700"
-            >
-              Reenviar
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-amber-200 bg-white/70 p-2.5 text-center">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Mensal</p>
-              <p className="text-lg font-extrabold text-amber-900">
-                R$ {QUIZ_PRICE_MONTHLY.toFixed(2).replace(".", ",")}
-              </p>
-              <p className="text-[10px] text-amber-700">por mês</p>
-            </div>
-            <div className="relative rounded-xl border-2 border-amber-400 bg-white p-2.5 text-center">
-              <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black text-white">
-                ECONOMIZE 50%
-              </span>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Anual</p>
-              <p className="text-lg font-extrabold text-amber-900">
-                R$ {QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}
-              </p>
-              <p className="text-[10px] text-amber-700">por mês · cobrado anualmente</p>
-            </div>
-          </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <PlanCard
+          id="monthly"
+          label="Mensal"
+          price={`R$ ${QUIZ_PRICE_MONTHLY.toFixed(2).replace(".", ",")}`}
+          sub="por mês"
+        />
+        <PlanCard
+          id="annual"
+          label="Anual"
+          price={`R$ ${QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}`}
+          sub="por mês · no anual"
+          badge="ECONOMIZE 50%"
+        />
+      </div>
 
-          {!open ? (
-            <button
-              onClick={() => setOpen(true)}
-              className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
-              style={{ boxShadow: "0 4px 0 #b45309" }}
-            >
-              ✨ Desbloquear as aulas
-            </button>
-          ) : (
-            <div className="mt-3 rounded-xl bg-white/80 p-3">
-              <p className="text-xs font-bold text-amber-900">Como ativar (2 passos):</p>
-              <ol className="mt-1.5 space-y-1.5 text-xs text-amber-800">
-                <li>
-                  1. Pague via PIX — mensal R$ 19,90 ou anual R$ 118,80 — para a chave:
-                  <button
-                    onClick={copyPix}
-                    className="press mt-1 flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-2.5 py-2 font-mono text-[11px] text-amber-900"
-                  >
-                    <span className="truncate">{pixKey}</span>
-                    <span className="shrink-0 font-sans font-bold text-amber-600">
-                      {copied ? "copiado ✓" : "copiar"}
-                    </span>
-                  </button>
-                </li>
-                <li>
-                  2. Envie o comprovante no WhatsApp — seu acesso é liberado em até 24h.
-                  <a
-                    href={`${DOCTOR.whatsappUrl}?text=${encodeURIComponent("Olá! Paguei o desbloqueio das aulas premium do app (quiz diário). Segue o comprovante do PIX.")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => {
-                      const today = localDateStr();
-                      lsSet("dc-path-premium-pending", today);
-                      setPendingSince(today);
-                    }}
-                    className="press mt-1 block rounded-full bg-emerald-500 py-2.5 text-center text-xs font-extrabold text-white"
-                  >
-                    Enviar comprovante no WhatsApp
-                  </a>
-                </li>
-              </ol>
-            </div>
-          )}
-        </>
-      )}
+      <button
+        onClick={subscribe}
+        disabled={loading}
+        className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-60"
+        style={{ boxShadow: "0 4px 0 #b45309" }}
+      >
+        {loading ? "Abrindo pagamento seguro…" : "✨ Assinar e liberar as aulas"}
+      </button>
 
-      <p className="mt-2 text-center text-[10px] text-amber-700/80">
-        A aula de hoje continua grátis, todos os dias 💛
+      <p className="mt-2 text-center text-[10px] leading-relaxed text-amber-700/80">
+        Pagamento seguro por cartão · acesso na hora · cancele quando quiser.
+        <br />A aula de hoje continua grátis, todos os dias 💛
       </p>
     </div>
   );

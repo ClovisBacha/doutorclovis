@@ -438,6 +438,40 @@ function MinhaContaPage() {
     ensureInitialJourneyPull();
   }, []);
 
+  // Retorno do checkout do Stripe: o webhook libera o acesso em segundos.
+  // Reconsulta o perfil até o premium refletir e avisa a paciente.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const st = new URLSearchParams(window.location.search).get("assinatura");
+    if (!st) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    if (st === "cancelada") {
+      toast("Pagamento não concluído. Você pode tentar de novo quando quiser.");
+      return;
+    }
+    if (st !== "sucesso") return;
+    toast.success("Pagamento recebido! Ativando seu acesso…");
+    let tries = 0;
+    const tick = async () => {
+      tries++;
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const { data } = await (supabase as any)
+        .from("patient_profiles")
+        .select("*")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      if (data?.quiz_premium) {
+        setProfile(data);
+        toast.success("Premium ativado! Aproveite 💛");
+        return;
+      }
+      if (tries < 6) setTimeout(tick, 2000);
+      else if (data) setProfile(data);
+    };
+    setTimeout(tick, 1500);
+  }, []);
+
   useEffect(() => {
     (async () => {
       const { data: u } = await supabase.auth.getUser();
