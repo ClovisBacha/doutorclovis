@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
-import { quizForDay, quizEmojiForDay, type DailyQuiz } from "@/lib/daily-quizzes";
+import { quizForDay, quizEmojiForDay, isAnswerCorrect, type DailyQuiz } from "@/lib/daily-quizzes";
 import { DOCTOR } from "@/lib/doctor.config";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
@@ -2008,6 +2008,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
                       alreadyDone={!!state.desafio || done}
                       canEarn={isToday}
                       missingHint={missingHumorHint}
+                      showPremiumAd={isToday && !quizPremium}
                       onEarn={() => markDayTask(D, "desafio", true)}
                     />
                   ) : (
@@ -2305,7 +2306,7 @@ function LessonSheet({
 const QUIZ_PRICE_MONTHLY = 19.9;
 const QUIZ_PRICE_ANNUAL_MONTH = 9.9; // 12x — cobrado anualmente (R$ 118,80/ano)
 
-function QuizPaywall({ week }: { week: number }) {
+function QuizPaywall({ week, context = "past" }: { week: number; context?: "past" | "ad" }) {
   const tm = trimMeta(week);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -2340,12 +2341,25 @@ function QuizPaywall({ week }: { week: number }) {
           <span className="dc-coin-shine" aria-hidden />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-extrabold text-amber-900">Aula premium 🔒</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
-            Essa aula é de um dia que já passou. No plano grátis você faz{" "}
-            <strong>a aula de cada dia</strong> no próprio dia. Com o premium, você desbloqueia{" "}
-            <strong>todas as aulas já liberadas</strong> para fazer e revisar quando quiser.
-          </p>
+          {context === "ad" ? (
+            <>
+              <p className="text-sm font-extrabold text-amber-900">Gostou de aprender hoje? 🌟</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
+                No plano grátis você faz <strong>uma aula por dia</strong>. Com o{" "}
+                <strong>Obstétrica Premium</strong> você libera <strong>os próximos dias</strong> —
+                faça quando quiser, revise os anteriores e nunca perca o ritmo. 💛
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-extrabold text-amber-900">Aula premium 🔒</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
+                Essa aula é de um dia que já passou. No plano grátis você faz{" "}
+                <strong>a aula de cada dia</strong> no próprio dia. Com o premium, você desbloqueia{" "}
+                <strong>todas as aulas já liberadas</strong> para fazer e revisar quando quiser.
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -2546,9 +2560,13 @@ function QuizIntro({
 }
 
 /* ══════════════════ Quiz diário da professora (dentro do sheet do dia) ══════════════════
-   280 exercícios (semanas 1-40): mini-lição + 2 perguntas com explicação.
+   Um exercício por dia (semanas 1-40): mini-lição rica + curiosidade + 4-5
+   perguntas variadas (escolha única ou "marque todas"), estilo Duolingo.
    Responder no dia de HOJE completa a tarefa "desafio"; dias passados ficam
-   jogáveis em modo revisão (aprender vale sempre; a chama vale no dia). */
+   jogáveis em modo revisão (aprender vale sempre; a chama vale no dia).
+   Ao terminar, quem é do plano grátis recebe um convite para o Premium. */
+
+type QuizAnswer = number | number[] | null;
 
 function DailyQuizBlock({
   quiz,
@@ -2557,6 +2575,7 @@ function DailyQuizBlock({
   alreadyDone,
   canEarn,
   missingHint,
+  showPremiumAd = false,
   onEarn,
 }: {
   quiz: DailyQuiz;
@@ -2566,17 +2585,37 @@ function DailyQuizBlock({
   canEarn: boolean;
   /** Dica do que ainda falta para fechar o dia (ex.: check-in de humor). */
   missingHint?: string | null;
+  /** Mostra o convite ao Premium ao terminar (só para quem é do plano grátis). */
+  showPremiumAd?: boolean;
   onEarn: () => void;
 }) {
-  const [answers, setAnswers] = useState<(number | null)[]>([null, null]);
+  const questions = quiz.questions;
+  const [answers, setAnswers] = useState<QuizAnswer[]>(() => questions.map(() => null));
   const [checked, setChecked] = useState(false);
   // Congela "essa resposta valeu o desafio de hoje" no momento do Responder:
   // onEarn marca a tarefa e flipa alreadyDone no MESMO render, então o rodapé
   // não pode depender do prop ao vivo (viraria "modo revisão" na hora).
   const [earnedNow, setEarnedNow] = useState(false);
   const tm = trimMeta(week);
-  const questions = [quiz.q1, quiz.q2];
-  const score = checked ? questions.filter((q, i) => answers[i] === q.a).length : 0;
+  const total = questions.length;
+  const score = checked ? questions.filter((q, i) => isAnswerCorrect(q, answers[i])).length : 0;
+
+  // "Marque todas": alterna o índice dentro do array de respostas.
+  function toggleMulti(qi: number, oi: number) {
+    setAnswers((prev) => {
+      const next = [...prev];
+      const cur = Array.isArray(next[qi]) ? [...(next[qi] as number[])] : [];
+      const at = cur.indexOf(oi);
+      if (at >= 0) cur.splice(at, 1);
+      else cur.push(oi);
+      next[qi] = cur;
+      return next;
+    });
+  }
+
+  const allAnswered = answers.every((a, i) =>
+    questions[i].kind === "multi" ? Array.isArray(a) && a.length > 0 : a != null,
+  );
 
   function verify() {
     setChecked(true);
@@ -2585,6 +2624,11 @@ function DailyQuizBlock({
       onEarn();
     }
   }
+
+  const selected = (qi: number, oi: number) => {
+    const a = answers[qi];
+    return Array.isArray(a) ? a.includes(oi) : a === oi;
+  };
 
   return (
     <div className="mb-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
@@ -2600,78 +2644,120 @@ function DailyQuizBlock({
       </div>
       <p className="mt-2 text-sm leading-relaxed text-violet-950">{quiz.teach}</p>
 
-      {questions.map((q, qi) => (
-        <div key={qi} className="mt-3">
-          <p className="text-sm font-bold text-violet-950">
-            {qi + 1}. {q.q}
-          </p>
-          <div className="mt-1.5 flex flex-col gap-1.5">
-            {q.o.map((opt, oi) => {
-              let cls = "border-violet-200 bg-white text-violet-950";
-              if (checked) {
-                if (oi === q.a) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
-                else if (oi === answers[qi]) cls = "border-rose-300 bg-rose-50 text-rose-700";
-                else cls = "border-violet-100 bg-white text-slate-400";
-              } else if (answers[qi] === oi) {
-                cls = "border-violet-500 bg-violet-100 text-violet-900";
-              }
-              return (
-                <button
-                  key={oi}
-                  disabled={checked}
-                  onClick={() =>
-                    setAnswers((prev) => {
-                      const next = [...prev];
-                      next[qi] = oi;
-                      return next;
-                    })
-                  }
-                  className={`press rounded-xl border-2 px-3 py-2 text-left text-sm font-medium transition-colors ${cls}`}
-                >
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-          {checked && (
-            <p
-              className={`mt-1.5 rounded-xl px-3 py-2 text-xs leading-relaxed ${
-                answers[qi] === q.a
-                  ? "bg-emerald-100/70 text-emerald-800"
-                  : "bg-amber-100/70 text-amber-800"
-              }`}
-            >
-              {answers[qi] === q.a ? "✓ Isso! " : "💡 "}
-              {q.why}
-            </p>
-          )}
+      {quiz.funFact && (
+        <div className="mt-2.5 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+          <span className="font-bold">💡 Você sabia?</span> {quiz.funFact}
         </div>
-      ))}
+      )}
+
+      {questions.map((q, qi) => {
+        const isMulti = q.kind === "multi";
+        const correct = isAnswerCorrect(q, answers[qi]);
+        return (
+          <div key={qi} className="mt-3">
+            <p className="text-sm font-bold text-violet-950">
+              {qi + 1}. {q.q}
+            </p>
+            {isMulti && (
+              <p className="mt-0.5 text-[11px] font-semibold text-violet-500">
+                Marque todas as corretas
+              </p>
+            )}
+            <div className="mt-1.5 flex flex-col gap-1.5">
+              {q.o.map((opt, oi) => {
+                const isCorrectOpt = Array.isArray(q.a) ? q.a.includes(oi) : q.a === oi;
+                const isPicked = selected(qi, oi);
+                let cls = "border-violet-200 bg-white text-violet-950";
+                if (checked) {
+                  if (isCorrectOpt) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
+                  else if (isPicked) cls = "border-rose-300 bg-rose-50 text-rose-700";
+                  else cls = "border-violet-100 bg-white text-slate-400";
+                } else if (isPicked) {
+                  cls = "border-violet-500 bg-violet-100 text-violet-900";
+                }
+                return (
+                  <button
+                    key={oi}
+                    disabled={checked}
+                    onClick={() => (isMulti ? toggleMulti(qi, oi) : setAnswerAt(qi, oi))}
+                    className={`press flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-left text-sm font-medium transition-colors ${cls}`}
+                  >
+                    {isMulti && (
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 text-[10px] ${
+                          isPicked
+                            ? "border-violet-500 bg-violet-500 text-white"
+                            : "border-violet-300 bg-white"
+                        }`}
+                      >
+                        {isPicked ? "✓" : ""}
+                      </span>
+                    )}
+                    <span>{opt}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {checked && (
+              <p
+                className={`mt-1.5 rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                  correct ? "bg-emerald-100/70 text-emerald-800" : "bg-amber-100/70 text-amber-800"
+                }`}
+              >
+                {correct ? "✓ Isso! " : "💡 "}
+                {q.why}
+              </p>
+            )}
+          </div>
+        );
+      })}
 
       {!checked ? (
         <button
           onClick={verify}
-          disabled={answers.some((a) => a === null)}
+          disabled={!allAnswered}
           className="press mt-4 w-full rounded-full py-3 text-sm font-extrabold text-white disabled:opacity-40"
           style={{ background: tm.main, boxShadow: `0 4px 0 ${tm.lip}` }}
         >
           Responder
         </button>
       ) : (
-        <div className="mt-3 rounded-2xl bg-white p-3 text-center">
-          <p className="text-sm font-extrabold">
-            {score === 2 ? "🏆 Acertou tudo!" : score === 1 ? "🎉 Quase perfeito!" : "💪 Anotado!"}{" "}
-            {score}/2
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {earnedNow
-              ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
-              : "Modo revisão — o desafio vale no próprio dia, mas aprender vale sempre 💜"}
-          </p>
-        </div>
+        <>
+          <div className="mt-3 rounded-2xl bg-white p-3 text-center">
+            <p className="text-sm font-extrabold">
+              {score === total
+                ? "🏆 Acertou tudo!"
+                : score >= total - 1
+                  ? "🎉 Quase perfeito!"
+                  : score > 0
+                    ? "👏 Muito bem!"
+                    : "💪 Anotado!"}{" "}
+              {score}/{total}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {earnedNow
+                ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
+                : "Modo revisão — o desafio vale no próprio dia, mas aprender vale sempre 💜"}
+            </p>
+          </div>
+          {showPremiumAd && (
+            <div className="mt-3">
+              <QuizPaywall week={week} context="ad" />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
+
+  // Escolha única: define a resposta do quiz qi.
+  function setAnswerAt(qi: number, oi: number) {
+    setAnswers((prev) => {
+      const next = [...prev];
+      next[qi] = oi;
+      return next;
+    });
+  }
 }
 
 /* ══════════════════ PONTO 2 · Jornada do 4º trimestre ══════════════════ */
