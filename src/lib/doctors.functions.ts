@@ -331,9 +331,16 @@ export const chooseDoctor = createServerFn({ method: "POST" })
     if (!doc || !doc.active || !doc.accepting_patients) {
       return { ok: false as const, error: "indisponivel" };
     }
-    const { error } = await (supabaseAdmin as any)
+    // Garante que a paciente tem perfil (linha em patient_profiles): faz o
+    // upsert por id (PK = uid), assim o vínculo grava mesmo se a linha ainda
+    // não existir, e confirmamos que uma linha foi de fato afetada.
+    const { data: updated, error } = await (supabaseAdmin as any)
       .from("patient_profiles")
-      .update({ doctor_id: data.doctorId })
-      .eq("id", user.id);
-    return { ok: !error, error: error?.message };
+      .upsert({ id: user.id, doctor_id: data.doctorId }, { onConflict: "id" })
+      .select("id");
+    if (error) return { ok: false as const, error: error.message };
+    if (!updated || updated.length === 0) {
+      return { ok: false as const, error: "vinculo_falhou" };
+    }
+    return { ok: true as const };
   });
