@@ -1612,28 +1612,6 @@ CREATE TRIGGER trg_touch_subscriptions
   FOR EACH ROW EXECUTE FUNCTION public.touch_subscription_updated_at();
 
 -- ════════════════════════════════════════════════════════════════════════
--- Convites premium (plano Elite) — ver 20260711010000_premium_invites.sql
--- ════════════════════════════════════════════════════════════════════════
-ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS invite_code text UNIQUE;
-CREATE TABLE IF NOT EXISTS public.premium_invites (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  doctor_id       uuid NOT NULL,
-  patient_user_id uuid NOT NULL,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (doctor_id, patient_user_id)
-);
-CREATE INDEX IF NOT EXISTS idx_premium_invites_doctor_month
-  ON public.premium_invites(doctor_id, created_at);
-ALTER TABLE public.premium_invites ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "doctor reads own invites" ON public.premium_invites;
-CREATE POLICY "doctor reads own invites" ON public.premium_invites
-  FOR SELECT USING (auth.uid() = doctor_id);
-DROP POLICY IF EXISTS "patient reads own invites" ON public.premium_invites;
-CREATE POLICY "patient reads own invites" ON public.premium_invites
-  FOR SELECT USING (auth.uid() = patient_user_id);
-GRANT SELECT ON public.premium_invites TO authenticated;
-
--- ════════════════════════════════════════════════════════════════════════
 -- Diretório de médicos (busca) — ver 20260711020000_doctor_directory.sql
 -- ════════════════════════════════════════════════════════════════════════
 ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS bio text;

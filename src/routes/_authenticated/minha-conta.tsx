@@ -141,6 +141,7 @@ type Profile = {
   prior_notes?: string | null;
   corporate_account_id?: string | null;
   quiz_premium?: boolean | null;
+  doctor_id?: string | null;
 };
 
 type JournalEntry = {
@@ -627,6 +628,28 @@ function MinhaContaPage() {
             </button>
           </div>
         </div>
+
+        {/* ── Sem médico vinculado? Convida a encontrar um ── */}
+        {!loading && profile && !profile.doctor_id && (
+          <Link
+            to="/encontrar-medico"
+            className="mb-4 flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 transition-colors hover:border-primary/60"
+          >
+            <span className="text-2xl">👩‍⚕️</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">
+                Você ainda não tem um médico no app
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Encontre um obstetra por experiência, formação e cidade — ele passa a te acompanhar
+                por aqui.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+              Encontrar
+            </span>
+          </Link>
+        )}
 
         {/* ── Mobile: home screen ──────────────────────────────── */}
         {mobileHome && (

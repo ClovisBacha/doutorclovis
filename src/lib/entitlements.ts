@@ -4,7 +4,7 @@
  * para os gates no servidor quanto para mostrar/bloquear recursos na UI.
  *
  * Valores de plano gravados em `doctors.plan`:
- *   trial | free | starter | pro | clinica | elite
+ *   trial | free | starter | pro | clinica | elite | black
  * O card "Pro Equipe" da página de vendas corresponde ao plano `clinica`.
  * Plano desconhecido cai em `free` (o mais restritivo) — nunca libera demais.
  *
@@ -13,8 +13,9 @@
  *   - Starter: a IA responde as pacientes no APP, pacientes ilimitadas.
  *   - Pro:     a IA também atende/agenda no WhatsApp + dashboard avançado.
  *   - Clínica: o Pro para vários médicos (assentos de equipe).
- *   - Elite:   o topo — Pro + equipe + 100 convites premium/mês para dar
- *              o app premium às pacientes, e selo "Elite" no perfil.
+ *   - Elite:   Pro + equipe + 25 convites premium/mês + selo "Elite".
+ *   - Black:   o topo — Elite + 250 convites/mês + gerente dedicado + selo
+ *              "Black" + prioridade máxima na busca de médicos.
  *   - Trial:   experimenta o Pro por tempo limitado.
  */
 
