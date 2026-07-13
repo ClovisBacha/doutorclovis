@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CalendarClock, Instagram } from "lucide-react";
 import { useEffect, useState } from "react";
+import { DOCTOR } from "@/lib/doctor.config";
 
 export const Route = createFileRoute("/lives")({
   head: () => ({
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/lives")({
 const proximaLive = {
   titulo: "Sangramento no início da gestação: quando se preocupar",
   data: "2026-06-20T20:00:00-03:00",
-  link: "https://instagram.com/drclovisbacha",
+  link: DOCTOR.instagram,
 };
 
 const anteriores = [

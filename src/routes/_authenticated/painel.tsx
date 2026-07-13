@@ -3972,7 +3972,8 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
             <h1 className="font-serif text-2xl text-gray-900">{DOCTOR.name}</h1>
             <p className="text-sm text-gray-500 mt-0.5">{DOCTOR.title}</p>
             <p className="text-xs text-gray-400">
-              {DOCTOR.crm} · {DOCTOR.rqe}
+              {DOCTOR.crm}
+              {DOCTOR.rqe ? ` · ${DOCTOR.rqe}` : ""}
             </p>
           </div>
 

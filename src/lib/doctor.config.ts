@@ -5,7 +5,7 @@ export const DOCTOR = {
   /** Número real do CRM-MG — ex: "CRM-MG 12.345" */
   crm: "CRM-MG 22.333",
   /** RQE da especialidade de GO */
-  rqe: "RQE ●●●●",
+  rqe: "",
   /** E-mail profissional público */
   email: "contato@drclovisbacha.com.br",
   /** E-mail de SUPORTE da plataforma Obstétrica (chat primeiro, e-mail depois) */
