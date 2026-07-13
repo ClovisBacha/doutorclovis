@@ -40,9 +40,23 @@ async function requireDoctorUser(accessToken: string): Promise<string | null> {
 
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 min para concluir o consentimento
 
-async function signState(userId: string): Promise<string> {
+/** Segredo do HMAC do state. Fail-closed: sem ele (nunca em prod), retorna null. */
+function hmacSecret(): string | null {
+  const s = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return s && s.length >= 16 ? s : null;
+}
+
+/** Redirect URI do callback — fixado no servidor (SITE_URL) quando disponível,
+ *  para não depender do origin vindo do cliente. */
+function callbackRedirectUri(originFallback: string): string {
+  const base = (process.env.SITE_URL || "").trim().replace(/\/+$/, "");
+  return `${base || originFallback}/medicos/google-callback`;
+}
+
+async function signState(userId: string): Promise<string | null> {
+  const secret = hmacSecret();
+  if (!secret) return null;
   const { createHmac } = await import("node:crypto");
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || "dev-secret";
   const payload = `${userId}.${Date.now() + STATE_TTL_MS}`;
   const sig = createHmac("sha256", secret).update(payload).digest("base64url");
   return `${Buffer.from(payload).toString("base64url")}.${sig}`;
@@ -51,11 +65,12 @@ async function signState(userId: string): Promise<string> {
 /** Valida o state assinado e devolve o uid, ou null se inválido/expirado. */
 async function verifyState(state: string): Promise<string | null> {
   try {
+    const secret = hmacSecret();
+    if (!secret) return null;
     const [payloadB64, sig] = state.split(".");
     if (!payloadB64 || !sig) return null;
     const payload = Buffer.from(payloadB64, "base64url").toString("utf8");
     const { createHmac, timingSafeEqual } = await import("node:crypto");
-    const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || "dev-secret";
     const expected = createHmac("sha256", secret).update(payload).digest("base64url");
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
@@ -84,8 +99,9 @@ export const startGoogleCalendarConnect = createServerFn({ method: "POST" })
     const clientId = process.env.GOOGLE_MEET_CLIENT_ID;
     if (!clientId) return { ok: false as const, error: "Google não configurado" };
 
-    const redirectUri = `${data.origin}/medicos/google-callback`;
+    const redirectUri = callbackRedirectUri(data.origin);
     const state = await signState(userId);
+    if (!state) return { ok: false as const, error: "Servidor mal configurado." };
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -125,7 +141,7 @@ export const finishGoogleCalendarConnect = createServerFn({ method: "POST" })
     const clientSecret = process.env.GOOGLE_MEET_CLIENT_SECRET;
     if (!clientId || !clientSecret) return { ok: false as const, error: "Google não configurado" };
 
-    const redirectUri = `${data.origin}/medicos/google-callback`;
+    const redirectUri = callbackRedirectUri(data.origin);
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
