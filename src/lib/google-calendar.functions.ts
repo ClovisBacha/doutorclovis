@@ -104,6 +104,7 @@ export const finishGoogleCalendarConnect = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
       .object({
+        accessToken: z.string().min(10),
         code: z.string().min(10),
         state: z.string().min(10),
         origin: z.string().url(),
@@ -113,6 +114,12 @@ export const finishGoogleCalendarConnect = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const userId = await verifyState(data.state);
     if (!userId) return { ok: false as const, error: "Sessão de conexão expirada. Tente de novo." };
+    // Anti-CSRF: o médico logado no callback precisa ser o MESMO do state
+    // assinado — impede amarrar a Agenda de uma vítima a outra conta.
+    const caller = await requireDoctorUser(data.accessToken);
+    if (!caller || caller !== userId) {
+      return { ok: false as const, error: "Não autorizado." };
+    }
 
     const clientId = process.env.GOOGLE_MEET_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_MEET_CLIENT_SECRET;

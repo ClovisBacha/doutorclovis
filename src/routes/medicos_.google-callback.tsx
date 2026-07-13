@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { finishGoogleCalendarConnect } from "@/lib/google-calendar.functions";
 
 export const Route = createFileRoute("/medicos_/google-callback")({
@@ -28,10 +29,20 @@ function GoogleCallbackPage() {
       setErrorMsg(oauthErr === "access_denied" ? "Você cancelou a autorização." : "Link inválido.");
       return;
     }
-    finishGoogleCalendarConnect({
-      data: { code, state: st, origin: window.location.origin },
-    })
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      const accessToken = s.session?.access_token;
+      if (!accessToken) {
+        setState("error");
+        setErrorMsg("Sua sessão expirou. Entre novamente e reconecte a Agenda.");
+        return;
+      }
+      return finishGoogleCalendarConnect({
+        data: { accessToken, code, state: st, origin: window.location.origin },
+      });
+    })()
       .then((res) => {
+        if (!res) return;
         if (res.ok) {
           setState("ok");
           setEmail(res.email ?? null);
