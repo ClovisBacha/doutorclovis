@@ -110,7 +110,11 @@ function EncontrarMedicoPage() {
       toast.success(`${d.display_name} agora é o seu médico 💛`);
       navigate({ to: "/minha-conta" });
     } else {
-      toast.error("Não foi possível escolher este médico agora.");
+      toast.error(
+        res.error === "medico_lotado"
+          ? "Este médico já atingiu o limite de pacientes. Escolha outro."
+          : "Não foi possível escolher este médico agora.",
+      );
     }
   }
 

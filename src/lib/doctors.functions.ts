@@ -8,7 +8,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { PLAN_RANK, normalizePlan } from "@/lib/entitlements";
+import { PLAN_RANK, normalizePlan, entitlementsFor } from "@/lib/entitlements";
 
 export type DoctorProfile = {
   id: string;
@@ -334,11 +334,23 @@ export const chooseDoctor = createServerFn({ method: "POST" })
 
     const { data: doc } = await (supabaseAdmin as any)
       .from("doctors")
-      .select("id,active,accepting_patients")
+      .select("id,active,accepting_patients,plan")
       .eq("id", data.doctorId)
       .maybeSingle();
     if (!doc || !doc.active || !doc.accepting_patients) {
       return { ok: false as const, error: "indisponivel" };
+    }
+
+    // Limite de pacientes do plano (free = 5): não deixa passar do teto.
+    const limit = entitlementsFor(doc.plan).maxPatients;
+    if (limit != null) {
+      const { count } = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", data.doctorId);
+      if ((count ?? 0) >= limit) {
+        return { ok: false as const, error: "medico_lotado" };
+      }
     }
     // Garante que a paciente tem perfil (linha em patient_profiles): faz o
     // upsert por id (PK = uid), assim o vínculo grava mesmo se a linha ainda
