@@ -504,6 +504,19 @@ function MinhaContaPage() {
 
   async function signOut() {
     await supabase.auth.signOut();
+    // Limpa a jornada local (dc-path-*) e o marcador de sync: num aparelho
+    // compartilhado, a próxima conta NÃO pode ver nem re-subir os dados de
+    // saúde da conta anterior (vazamento entre contas).
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("dc-path-") || k === "dc-journey-synced-at")) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch {
+      /* modo privado/quota: sem cache local a limpar */
+    }
     navigate({ to: "/" });
   }
 

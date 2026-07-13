@@ -2447,9 +2447,10 @@ function QuizPaywall({ week, context = "past" }: { week: number; context?: "past
             <>
               <p className="text-sm font-extrabold text-amber-900">Gostou de aprender hoje? 🌟</p>
               <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
-                No plano grátis você faz <strong>uma aula por dia</strong>. Com o{" "}
-                <strong>Obstétrica Premium</strong> você libera <strong>os próximos dias</strong> —
-                faça quando quiser, revise os anteriores e nunca perca o ritmo. 💛
+                No plano grátis você faz <strong>só a aula de hoje</strong>. Com o{" "}
+                <strong>Obstétrica Premium</strong> você libera{" "}
+                <strong>todas as aulas já disponíveis</strong> — faça e revise as de qualquer dia
+                que já passou, quando quiser. 💛
               </p>
             </>
           ) : (
