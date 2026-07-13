@@ -2900,9 +2900,15 @@ function QuestionsTab({ gest }: { gest: Gest }) {
       toast.error("Sua sessão expirou. Faça login novamente.");
       return;
     }
+    // Carimba o médico vinculado para o assinante ver a pergunta da SUA paciente.
+    const { data: prof } = await (supabase as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", u.user.id)
+      .maybeSingle();
     const { error } = await (supabase as any)
       .from("doctor_questions")
-      .insert({ user_id: u.user.id, question: q });
+      .insert({ user_id: u.user.id, question: q, doctor_id: prof?.doctor_id ?? null });
     if (error) {
       toast.error("Não foi possível salvar a pergunta. Tente novamente.");
       return;

@@ -36,8 +36,16 @@ export const submitPreConsulta = createServerFn({ method: "POST" })
     const { data: auth } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (!auth.user) return { ok: false as const, error: "Não autenticado" };
 
+    // Carimba o médico da paciente para que o assinante veja a SUA pré-consulta.
+    const { data: prof } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+
     const { error } = await supabaseAdmin.from("preconsulta_forms").insert({
       user_id: auth.user.id,
+      doctor_id: prof?.doctor_id ?? null,
       weeks_at_submission: data.weeks ?? null,
       current_weight: data.weight ? parseFloat(data.weight) : null,
       systolic: data.systolic ? parseInt(data.systolic) : null,
