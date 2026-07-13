@@ -1870,6 +1870,9 @@ function TeleconsultasSection({
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [openingRoom, setOpeningRoom] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState<string | null>(null);
+  // Se a sala foi criada via Google Agenda (convida médico + paciente por
+  // e-mail) ou via fallback (só e-mail à paciente) — muda o texto de confirmação.
+  const [invitedBoth, setInvitedBoth] = useState(false);
   const [noteBullets, setNoteBullets] = useState<Record<string, string>>({});
   const [generatedNote, setGeneratedNote] = useState<Record<string, string>>({});
   const [generatingNote, setGeneratingNote] = useState<string | null>(null);
@@ -1899,8 +1902,9 @@ function TeleconsultasSection({
     });
     setOpeningRoom(null);
     if (res.ok) {
+      setInvitedBoth("invited" in res ? !!res.invited : false);
       setEmailSent(s.id);
-      setTimeout(() => setEmailSent(null), 4000);
+      setTimeout(() => setEmailSent(null), 5000);
     }
     onRefresh();
   }
@@ -2148,7 +2152,9 @@ function TeleconsultasSection({
                     )}
                     {emailSent === s.id && (
                       <span className="text-xs text-emerald-700 font-medium">
-                        ✓ Email enviado ao paciente
+                        {invitedBoth
+                          ? "✓ Convite (Google Agenda) enviado ao médico e à paciente"
+                          : "✓ Link enviado à paciente por e-mail"}
                       </span>
                     )}
                     {s.status === "sala_aberta" && s.meet_url && (
