@@ -107,10 +107,21 @@ const PANEL_TABS = [
 ] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 
-// Médicos assinantes (fora da equipe da instalação) só veem as abas já
-// escopadas por perfil — as demais mostram dados da instalação inteira e
-// abrem por médico conforme o roadmap (docs/MULTI_TENANT.md, etapa 2).
-const DOCTOR_TABS: readonly PanelTab[] = ["Painel 📊", "Cérebro 🧠", "Pacientes 👩‍🍼", "Meu Perfil"];
+// Médicos assinantes (fora da equipe da instalação) veem as abas já escopadas
+// por doctor_id: painel, agendamentos, perguntas, pré-consultas, engajamento,
+// cérebro, pacientes e perfil — todas recortadas ao PRÓPRIO médico no servidor.
+// As abas de dados da instalação inteira (Teleconsultas, Consultas Pagas,
+// Empresas, Calendário/Agenda/Ferramentas globais) seguem só para a equipe.
+const DOCTOR_TABS: readonly PanelTab[] = [
+  "Painel 📊",
+  "Agendamentos",
+  "Perguntas",
+  "Pré-consultas",
+  "Engajamento",
+  "Cérebro 🧠",
+  "Pacientes 👩‍🍼",
+  "Meu Perfil",
+];
 
 async function token() {
   const { data } = await supabase.auth.getSession();
@@ -143,13 +154,15 @@ function PainelPage() {
       const tk = await token();
       const res = await getAdminData({ data: { accessToken: tk } });
       if (res.ok) {
+        // getAdminData já autoriza equipe da instalação E médico assinante ativo,
+        // devolvendo os dados recortados (isTeam distingue quem é quem para a UI).
         setAllowed(true);
-        setIsPlatformTeam(true);
+        setIsPlatformTeam(res.isTeam);
         setAppointments(res.appointments);
         setQuestions(res.questions);
         return;
       }
-      // Não é da equipe da instalação: é um médico assinante?
+      // Fallback (getAdminData negou): médico assinante inativo/sem linha ativa?
       const me = await getMyDoctor({ data: { accessToken: tk } });
       if (me.ok && me.doctor?.active) {
         setAllowed(true);
@@ -277,10 +290,9 @@ function PainelPage() {
       </p>
       <h1 className="mt-2 font-serif text-3xl md:text-4xl">Gestão do consultório</h1>
 
-      {/* Summary stats (dados da instalação — só para a equipe) */}
-      <div
-        className={`mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 ${isPlatformTeam ? "" : "hidden"}`}
-      >
+      {/* Resumo — números já recortados por médico no servidor (equipe vê a
+          instalação inteira; assinante vê só os próprios). */}
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Pedidos pendentes" value={pendingAppts} highlight={pendingAppts > 0} />
         <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
         <Stat label="Pré-consultas novas" value={unseenForms} highlight={unseenForms > 0} />
