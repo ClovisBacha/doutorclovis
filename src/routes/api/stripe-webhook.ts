@@ -94,9 +94,23 @@ async function applySubscription(subscriptionId: string): Promise<void> {
 
   // 2) flag derivado que o resto do app já lê
   if (product === "quiz_premium") {
+    // Ao REVOGAR, não apaga o premium se a paciente tem OUTRA assinatura ativa
+    // (ex.: convite do médico) — subscriptions é a fonte de verdade.
+    let keep = grants;
+    if (!grants) {
+      const { data: other } = await (supabaseAdmin as any)
+        .from("subscriptions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("product", "quiz_premium")
+        .neq("stripe_subscription_id", sub.id)
+        .in("status", ["active", "trialing"])
+        .limit(1);
+      if (other && other.length > 0) keep = true;
+    }
     await (supabaseAdmin as any)
       .from("patient_profiles")
-      .update({ quiz_premium: grants })
+      .update({ quiz_premium: keep })
       .eq("id", userId);
   } else if (product === "doctor_plan") {
     const p = plan ?? "";

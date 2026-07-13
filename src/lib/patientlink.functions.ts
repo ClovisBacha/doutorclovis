@@ -334,6 +334,33 @@ export const setPatientQuizPremium = createServerFn({ method: "POST" })
     const user = await requireDoctor(data.accessToken);
     if (!user) return { ok: false as const, error: "Sem permissão." };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Proteção: o toggle manual NÃO pode revogar quem tem assinatura ativa
+    // (Stripe) ou convite ativo — o acesso pago é gerido pelo webhook, não
+    // pela mão do médico. (Se a tabela subscriptions ainda não existe, ignora.)
+    if (!data.premium) {
+      try {
+        const { data: subs } = await (supabaseAdmin as any)
+          .from("subscriptions")
+          .select("source,status")
+          .eq("user_id", data.patientId)
+          .eq("product", "quiz_premium")
+          .in("status", ["active", "trialing"]);
+        const paga = (subs ?? []).some(
+          (s: any) => s.source === "stripe" || s.source === "doctor_invite",
+        );
+        if (paga) {
+          return {
+            ok: false as const,
+            error:
+              "Esta paciente tem uma assinatura ativa — o acesso é gerido pelo pagamento (cancele pelo Stripe).",
+          };
+        }
+      } catch {
+        /* subscriptions ausente: sem estado pago a proteger */
+      }
+    }
+
     const { error } = await (supabaseAdmin as any)
       .from("patient_profiles")
       .update({ quiz_premium: data.premium })
