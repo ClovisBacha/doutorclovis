@@ -21,11 +21,37 @@ const Schema = z.object({
   notes: z.string().max(1000).optional().nullable(),
 });
 
+/**
+ * Resolve o médico dono desta consulta pelo e-mail da paciente (a consulta é
+ * pública, sem sessão — o e-mail é a chave). email → uid (RPC
+ * get_user_id_by_email, a mesma de secondbrain.server.ts) → doctor_id do perfil.
+ * Best-effort: qualquer falha ou paciente sem médico escolhido → null (a
+ * consulta ainda é criada; só não fica vinculada a um médico assinante).
+ */
+async function resolveDoctorIdForEmail(email: string): Promise<string | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: uid, error } = await (supabaseAdmin as any).rpc("get_user_id_by_email", {
+      p_email: email.toLowerCase(),
+    });
+    if (error || !uid) return null;
+    const { data: profile } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", uid)
+      .maybeSingle();
+    return (profile?.doctor_id as string | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const submitAppointmentRequest = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Schema.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("appointment_requests").insert({
+    const doctorId = await resolveDoctorIdForEmail(data.patient_email);
+    const { error } = await (supabaseAdmin as any).from("appointment_requests").insert({
       patient_name: data.patient_name,
       patient_email: data.patient_email.toLowerCase(),
       patient_phone: data.patient_phone,
@@ -33,6 +59,7 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
       preferred_time: data.preferred_time,
       reason: data.reason,
       notes: data.notes ?? null,
+      doctor_id: doctorId,
     });
     if (error) {
       console.error("appointment insert failed", error);
