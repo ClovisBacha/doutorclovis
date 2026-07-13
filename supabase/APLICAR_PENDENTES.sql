@@ -1644,3 +1644,28 @@ DROP POLICY IF EXISTS "doctor reads own codes" ON public.invite_codes;
 CREATE POLICY "doctor reads own codes" ON public.invite_codes
   FOR SELECT USING (auth.uid() = doctor_id);
 GRANT SELECT ON public.invite_codes TO authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Segurança: protege plan/active do médico (ver 20260713000000)
+-- ════════════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.protect_doctor_billing()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF current_user <> 'service_role' THEN
+    IF TG_OP = 'INSERT' THEN
+      NEW.plan := 'trial';
+      NEW.active := true;
+      NEW.plan_expires_at := NULL;
+    ELSE
+      NEW.plan := OLD.plan;
+      NEW.active := OLD.active;
+      NEW.plan_expires_at := OLD.plan_expires_at;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_protect_doctor_billing ON public.doctors;
+CREATE TRIGGER trg_protect_doctor_billing
+  BEFORE INSERT OR UPDATE ON public.doctors
+  FOR EACH ROW EXECUTE FUNCTION public.protect_doctor_billing();
