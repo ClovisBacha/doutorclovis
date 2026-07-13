@@ -334,15 +334,24 @@ export const chooseDoctor = createServerFn({ method: "POST" })
 
     const { data: doc } = await (supabaseAdmin as any)
       .from("doctors")
-      .select("id,active,accepting_patients,plan")
+      .select("id,active,accepting_patients,plan,plan_expires_at")
       .eq("id", data.doctorId)
       .maybeSingle();
     if (!doc || !doc.active || !doc.accepting_patients) {
       return { ok: false as const, error: "indisponivel" };
     }
 
+    // Plano EFETIVO (trial vencido conta como free) para o limite bater com os
+    // demais gates — senão um trial expirado teria pacientes ilimitados.
+    const effectivePlan =
+      doc.plan === "trial" &&
+      doc.plan_expires_at &&
+      new Date(doc.plan_expires_at).getTime() < Date.now()
+        ? "free"
+        : doc.plan;
+
     // Limite de pacientes do plano (free = 5): não deixa passar do teto.
-    const limit = entitlementsFor(doc.plan).maxPatients;
+    const limit = entitlementsFor(effectivePlan).maxPatients;
     if (limit != null) {
       const { count } = await (supabaseAdmin as any)
         .from("patient_profiles")
