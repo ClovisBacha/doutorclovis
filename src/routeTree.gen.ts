@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TamanhoRealRouteImport } from './routes/tamanho-real'
 import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -52,6 +53,11 @@ import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TamanhoRealRoute = TamanhoRealRouteImport.update({
   id: '/tamanho-real',
   path: '/tamanho-real',
@@ -289,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
+  '/termos': typeof TermosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/painel': typeof AuthenticatedPainelRoute
@@ -332,6 +339,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
+  '/termos': typeof TermosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/painel': typeof AuthenticatedPainelRoute
@@ -377,6 +385,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
+  '/termos': typeof TermosRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
@@ -422,6 +431,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
+    | '/termos'
     | '/admin'
     | '/minha-conta'
     | '/painel'
@@ -465,6 +475,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
+    | '/termos'
     | '/admin'
     | '/minha-conta'
     | '/painel'
@@ -509,6 +520,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
+    | '/termos'
     | '/_authenticated/admin'
     | '/_authenticated/minha-conta'
     | '/_authenticated/painel'
@@ -554,6 +566,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SobreRoute: typeof SobreRoute
   TamanhoRealRoute: typeof TamanhoRealRoute
+  TermosRoute: typeof TermosRoute
   AcompanharTokenRoute: typeof AcompanharTokenRoute
   AlbumTokenRoute: typeof AlbumTokenRoute
   ApiCartaSemanalRoute: typeof ApiCartaSemanalRoute
@@ -570,6 +583,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tamanho-real': {
       id: '/tamanho-real'
       path: '/tamanho-real'
@@ -910,6 +930,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SobreRoute: SobreRoute,
   TamanhoRealRoute: TamanhoRealRoute,
+  TermosRoute: TermosRoute,
   AcompanharTokenRoute: AcompanharTokenRoute,
   AlbumTokenRoute: AlbumTokenRoute,
   ApiCartaSemanalRoute: ApiCartaSemanalRoute,
