@@ -43,7 +43,7 @@ export const submitPreConsulta = createServerFn({ method: "POST" })
       .eq("id", auth.user.id)
       .maybeSingle();
 
-    const { error } = await supabaseAdmin.from("preconsulta_forms").insert({
+    const { error } = await (supabaseAdmin as any).from("preconsulta_forms").insert({
       user_id: auth.user.id,
       doctor_id: prof?.doctor_id ?? null,
       weeks_at_submission: data.weeks ?? null,
