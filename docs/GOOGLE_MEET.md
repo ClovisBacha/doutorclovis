@@ -14,6 +14,17 @@ Se as credenciais abaixo **não** estiverem configuradas, o sistema usa o
 paciente por e-mail (Resend). Ou seja: **funciona mesmo sem o Google** — o
 Google só deixa a experiência melhor (Meet + convite na agenda dos dois).
 
+## Dois níveis
+
+- **Nível 1 (conta central):** as reuniões são criadas numa conta Google única
+  da plataforma, definida pelas variáveis `GOOGLE_MEET_*` abaixo. Serve para uma
+  instalação de um consultório só.
+- **Nível 2 (conta de cada médico):** cada médico clica em **"Conectar Google
+  Agenda"** no painel (aba **Meu Perfil**) e autoriza a própria conta. A partir
+  daí, as teleconsultas DELE são criadas e hospedadas na agenda dele. Se um
+  médico não conectou, cai automaticamente na conta central (nível 1) e, sem
+  ela, no Jitsi. Ver a seção **"Nível 2"** no fim deste guia.
+
 ## O que configurar (uma vez)
 
 Três variáveis de ambiente (na Vercel → Settings → Environment Variables):
@@ -100,8 +111,45 @@ convida os dois.
   duração.
 - **Paciente sem conta Google:** recebe o convite por e-mail e entra no Meet
   como convidada pelo link — o médico admite na sala (fluxo normal do Meet).
-- **Conta única (hoje):** as reuniões são hospedadas na conta do refresh token
-  (o consultório). No modelo SaaS multi-médico, cada médico conectar a própria
-  conta Google é uma evolução futura (hoje é uma conta por instalação).
+- **Conta central vs. por médico:** sem o nível 2, as reuniões são hospedadas na
+  conta do `GOOGLE_MEET_REFRESH_TOKEN` (o consultório). Com o nível 2, cada
+  médico usa a própria conta (ver abaixo).
 - **Segurança:** as chaves são secretas (server-side); nunca vão para o bundle
   do navegador nem para o git (o `.env` está no `.gitignore`).
+
+## Nível 2 — cada médico conecta a própria Agenda
+
+Além das 3 variáveis acima (que reaproveitamos como o **app OAuth** da
+plataforma), o nível 2 precisa de dois ajustes na credencial OAuth:
+
+1. **Redirect URI do callback do app** — em _Google Cloud → Credentials → seu
+   OAuth client → Authorized redirect URIs_, adicione:
+
+   ```
+   https://www.obstetrica.com.br/medicos/google-callback
+   ```
+
+   (e as URLs de preview da Vercel, se for testar em branch). Isso é diferente
+   do redirect do login Supabase — os dois convivem no mesmo client.
+
+2. **Escopos** — a tela de consentimento precisa permitir
+   `https://www.googleapis.com/auth/calendar.events` (além de `openid`/`email`).
+   Enquanto o app OAuth estiver em "Testing", adicione a conta de cada médico em
+   **Test users** (ou publique o app para produção).
+
+Com isso, no painel do médico (**Meu Perfil → Google Agenda das teleconsultas**)
+aparece **"Conectar Google Agenda"**. Ao autorizar:
+
+- o portal troca o código por um **refresh token** e o guarda na tabela
+  `doctor_google_tokens` (RLS ligada, **sem policies** → só o service_role
+  acessa; o token nunca chega ao navegador);
+- a partir daí, `openTeleconsultaRoom` usa o token DAQUELE médico para criar o
+  evento/Meet na conta dele. Sem conexão, usa a conta central; sem central,
+  Jitsi.
+
+O médico pode **Reconectar** ou **Desconectar** a qualquer momento (o
+Desconectar apaga o token guardado).
+
+> **Migration:** requer a tabela `doctor_google_tokens`
+> (`supabase/migrations/20260713040000_*` — já incluída no
+> `APLICAR_PENDENTES.sql`).

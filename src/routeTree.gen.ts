@@ -37,6 +37,7 @@ import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
+import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
 import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
@@ -190,6 +191,11 @@ const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
   path: '/votar-nome/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MedicosGoogleCallbackRoute = MedicosGoogleCallbackRouteImport.update({
+  id: '/medicos_/google-callback',
+  path: '/medicos/google-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MedicosCadastroRoute = MedicosCadastroRouteImport.update({
   id: '/medicos_/cadastro',
   path: '/medicos/cadastro',
@@ -296,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
+  '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesByTo {
@@ -338,6 +345,7 @@ export interface FileRoutesByTo {
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
+  '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesById {
@@ -382,6 +390,7 @@ export interface FileRoutesById {
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos_/cadastro': typeof MedicosCadastroRoute
+  '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRouteTypes {
@@ -426,6 +435,7 @@ export interface FileRouteTypes {
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos/cadastro'
+    | '/medicos/google-callback'
     | '/votar-nome/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos/cadastro'
+    | '/medicos/google-callback'
     | '/votar-nome/$token'
   id:
     | '__root__'
@@ -511,6 +522,7 @@ export interface FileRouteTypes {
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos_/cadastro'
+    | '/medicos_/google-callback'
     | '/votar-nome/$token'
   fileRoutesById: FileRoutesById
 }
@@ -552,6 +564,7 @@ export interface RootRouteChildren {
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
   MedicosCadastroRoute: typeof MedicosCadastroRoute
+  MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
 }
 
@@ -753,6 +766,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VotarNomeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/medicos_/google-callback': {
+      id: '/medicos_/google-callback'
+      path: '/medicos/google-callback'
+      fullPath: '/medicos/google-callback'
+      preLoaderRoute: typeof MedicosGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/medicos_/cadastro': {
       id: '/medicos_/cadastro'
       path: '/medicos/cadastro'
@@ -900,6 +920,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,
   MedicosCadastroRoute: MedicosCadastroRoute,
+  MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
 }
 export const routeTree = rootRouteImport

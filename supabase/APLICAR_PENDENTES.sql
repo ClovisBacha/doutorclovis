@@ -1720,3 +1720,16 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.search_doctors(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.search_doctors(text) TO authenticated, service_role;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Google Agenda por médico (nível 2) — token seguro (ver 20260713040000)
+-- Refresh token é segredo: RLS ligada + zero policies = só service_role.
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.doctor_google_tokens (
+  user_id       uuid PRIMARY KEY,
+  refresh_token text NOT NULL,
+  google_email  text,
+  connected_at  timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.doctor_google_tokens ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.doctor_google_tokens FROM anon, authenticated;

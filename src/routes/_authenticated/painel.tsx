@@ -61,6 +61,11 @@ import {
   type DoctorProfile,
 } from "@/lib/doctors.functions";
 import { getDoctorDashboard, type DoctorDashboard } from "@/lib/dashboard.functions";
+import {
+  startGoogleCalendarConnect,
+  getGoogleCalendarStatus,
+  disconnectGoogleCalendar,
+} from "@/lib/google-calendar.functions";
 import { DoctorBadge } from "@/components/doctor-badge";
 import {
   listPatientRequests,
@@ -4413,6 +4418,126 @@ function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   );
 }
 
+function GoogleCalendarCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function refresh() {
+    try {
+      const tk = await tokenFn();
+      const res = await getGoogleCalendarStatus({ data: { accessToken: tk } });
+      if (res.ok) {
+        setConnected(res.connected);
+        setEmail(res.connected ? (res.email ?? null) : null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function connect() {
+    setBusy(true);
+    try {
+      const tk = await tokenFn();
+      const res = await startGoogleCalendarConnect({
+        data: { accessToken: tk, origin: window.location.origin },
+      });
+      if (res.ok && "url" in res) {
+        window.location.href = res.url;
+      } else {
+        toast.error(("error" in res && res.error) || "Não foi possível iniciar a conexão.");
+        setBusy(false);
+      }
+    } catch {
+      toast.error("Falha de conexão. Tente novamente.");
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    try {
+      const tk = await tokenFn();
+      await disconnectGoogleCalendar({ data: { accessToken: tk } });
+      setConnected(false);
+      setEmail(null);
+      toast.success("Agenda desconectada.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) return <div className="skeleton h-28 rounded-3xl" />;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-serif text-lg">Google Agenda das teleconsultas</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {connected
+              ? "Conectada — as salas de teleconsulta são criadas na sua conta Google e o convite vai para você e para a paciente."
+              : "Conecte sua conta Google para que cada teleconsulta crie a reunião do Meet na SUA agenda e convide você e a paciente automaticamente."}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+            connected ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"
+          }`}
+        >
+          {connected ? "Conectada ✓" : "Não conectada"}
+        </span>
+      </div>
+
+      {connected && email && (
+        <p className="mt-3 rounded-xl bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
+          Conta: <strong>{email}</strong>
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {connected ? (
+          <>
+            <button
+              onClick={connect}
+              disabled={busy}
+              className="rounded-full border border-border px-4 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-60"
+            >
+              Reconectar
+            </button>
+            <button
+              onClick={disconnect}
+              disabled={busy}
+              className="rounded-full border border-destructive/30 px-4 py-2 text-xs text-destructive hover:bg-destructive/5 disabled:opacity-60"
+            >
+              Desconectar
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={connect}
+            disabled={busy}
+            className="press rounded-full bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+          >
+            {busy ? "Redirecionando…" : "Conectar Google Agenda"}
+          </button>
+        )}
+      </div>
+      <p className="mt-3 text-[11px] text-muted-foreground">
+        Sem conectar, as teleconsultas usam a conta Google central da plataforma (ou o Jitsi, se
+        nenhuma estiver configurada).
+      </p>
+    </div>
+  );
+}
+
 function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -4513,6 +4638,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     <div className="max-w-2xl space-y-4">
       <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
       <DoctorInviteCard tokenFn={tokenFn} />
+      <GoogleCalendarCard tokenFn={tokenFn} />
 
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-start justify-between gap-3">

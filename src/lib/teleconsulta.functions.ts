@@ -212,9 +212,9 @@ Gere a nota SOAP. Use formatação clara com cabeçalhos em negrito. Seja espec�
   });
 
 /** Sala Meet avulsa (API Meet spaces), sem evento de agenda. Fallback. */
-async function createGoogleMeetRoom(): Promise<string | null> {
+async function createGoogleMeetRoom(refreshOverride?: string | null): Promise<string | null> {
   try {
-    const accessToken = await googleAccessToken();
+    const accessToken = await googleAccessToken(refreshOverride);
     if (!accessToken) return null;
     const spaceRes = await fetch("https://meet.googleapis.com/v2/spaces", {
       method: "POST",
@@ -261,11 +261,15 @@ async function sendPatientMeetEmail(
   });
 }
 
-/** Troca o refresh token por um access token do Google (ou null). */
-async function googleAccessToken(): Promise<string | null> {
+/**
+ * Troca um refresh token por um access token do Google (ou null).
+ * `refreshOverride` = token da conta DO MÉDICO (nível 2); sem ele, cai na conta
+ * central da instalação (GOOGLE_MEET_REFRESH_TOKEN).
+ */
+async function googleAccessToken(refreshOverride?: string | null): Promise<string | null> {
   const clientId = process.env.GOOGLE_MEET_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_MEET_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_MEET_REFRESH_TOKEN;
+  const refreshToken = refreshOverride || process.env.GOOGLE_MEET_REFRESH_TOKEN;
   if (!clientId || !clientSecret || !refreshToken) return null;
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -295,9 +299,10 @@ async function createGoogleCalendarMeet(params: {
   patientEmail: string;
   patientName: string;
   scheduledFor: string | null;
+  refreshOverride?: string | null;
 }): Promise<{ meetUrl: string } | null> {
   try {
-    const accessToken = await googleAccessToken();
+    const accessToken = await googleAccessToken(params.refreshOverride);
     if (!accessToken) return null;
 
     const start = params.scheduledFor ? new Date(params.scheduledFor) : new Date();
@@ -364,6 +369,11 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
     if (!admin) return { ok: false as const, error: "Não autorizado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Nível 2: se o médico conectou a PRÓPRIA Agenda Google, a reunião é criada
+    // e hospedada na conta dele; senão usamos a conta central da instalação.
+    const { getDoctorGoogleRefreshToken } = await import("./google-calendar.functions");
+    const doctorRefresh = await getDoctorGoogleRefreshToken(admin.id);
+
     // Dados da paciente (e-mail + nome) — usados no convite da Agenda e no fallback.
     const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(data.patientUserId);
     const patientEmail = authUser?.user?.email ?? null;
@@ -384,6 +394,7 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
         patientEmail,
         patientName,
         scheduledFor: data.scheduledFor,
+        refreshOverride: doctorRefresh,
       });
       if (cal) {
         meetUrl = cal.meetUrl;
@@ -391,8 +402,8 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
       }
     }
 
-    // 2) Fallbacks: sala Meet avulsa (spaces) → Jitsi.
-    if (!meetUrl) meetUrl = await createGoogleMeetRoom();
+    // 2) Fallbacks: sala Meet avulsa (spaces, na mesma conta) → Jitsi.
+    if (!meetUrl) meetUrl = await createGoogleMeetRoom(doctorRefresh);
     if (!meetUrl) {
       const { data: row } = await supabaseAdmin
         .from("teleconsulta_sessions")
