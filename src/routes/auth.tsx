@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyDoctor } from "@/lib/doctors.functions";
+import { GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -264,11 +265,20 @@ function AuthPage() {
             O cadastro de médico tem uma etapa própria: conta profissional + perfil com CRM e
             especialidade — é com ele que suas pacientes encontram você.
           </p>
+          <div className="mt-5">
+            <GoogleButton role="medico" label="Continuar com Google" />
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Usar o Google já conecta seu e-mail — as teleconsultas caem na sua Agenda Google.
+            </p>
+          </div>
+          <div className="my-4">
+            <OrDivider />
+          </div>
           <Link
             to="/medicos/cadastro"
-            className="press mt-5 inline-block rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
+            className="press inline-block rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
           >
-            Continuar cadastro de médico →
+            Continuar com e-mail e senha →
           </Link>
           <p className="mt-3 text-xs text-muted-foreground">
             14 dias grátis · sem cartão de crédito
@@ -391,6 +401,8 @@ function AuthPage() {
           className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
           noValidate
         >
+          <GoogleButton role={role} />
+          <OrDivider />
           {mode === "signup" && (
             <div>
               <label

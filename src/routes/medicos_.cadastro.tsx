@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { registerDoctor } from "@/lib/doctors.functions";
+import { registerDoctor, getMyDoctor } from "@/lib/doctors.functions";
+import { GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/medicos_/cadastro")({
   head: () => ({
@@ -41,15 +42,31 @@ function CadastroMedicoPage() {
     pix_key: "",
   });
 
-  // Já logado? Vai para o perfil profissional, mas avisa qual conta está em
-  // uso e oferece trocar — evita paciente virando "médico" sem perceber.
+  // Já logado? Médico ativo vai direto ao painel (ex.: login com Google);
+  // senão mostra o perfil profissional, avisando qual conta está em uso e
+  // oferecendo trocar — evita paciente virando "médico" sem perceber.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        setExistingSession(data.session.user.email ?? "sua conta atual");
-        setStep("perfil");
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return;
+      try {
+        const me = await getMyDoctor({ data: { accessToken: data.session.access_token } });
+        if (me.ok && me.doctor?.active) {
+          navigate({ to: "/painel" });
+          return;
+        }
+      } catch {
+        /* sem rede/perfil: segue para a etapa de perfil */
       }
+      setExistingSession(data.session.user.email ?? "sua conta atual");
+      // Pré-preenche o nome com o do Google, se veio no cadastro social.
+      const gName =
+        (data.session.user.user_metadata?.full_name as string | undefined) ??
+        (data.session.user.user_metadata?.name as string | undefined) ??
+        "";
+      if (gName) setProfile((p) => (p.display_name ? p : { ...p, display_name: gName }));
+      setStep("perfil");
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function switchAccount() {
@@ -265,6 +282,12 @@ function CadastroMedicoPage() {
             onSubmit={submitAuth}
             className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
           >
+            <GoogleButton role="medico" />
+            <p className="-mt-1 text-[11px] text-muted-foreground">
+              Com o Google seu e-mail já fica conectado — as teleconsultas caem na sua Agenda Google
+              automaticamente.
+            </p>
+            <OrDivider />
             <div>
               <label className={label}>E-mail profissional</label>
               <input
