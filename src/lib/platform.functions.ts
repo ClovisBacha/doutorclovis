@@ -51,6 +51,7 @@ export type PlatformDoctor = {
   email: string | null;
   plan: string;
   active: boolean;
+  verified: boolean;
   created_at: string | null;
   patients: number;
   brainEntries: number;
@@ -97,6 +98,7 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
       display_name: string | null;
       plan: string | null;
       active: boolean | null;
+      verified: boolean | null;
       created_at: string | null;
     };
     const docRows = await safe<DocRow[]>(
@@ -104,7 +106,7 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
         ((
           await sb
             .from("doctors")
-            .select("id,display_name,plan,active,created_at")
+            .select("id,display_name,plan,active,verified,created_at")
             .order("created_at", { ascending: false })
         ).data ?? []) as DocRow[],
       [],
@@ -147,6 +149,7 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
       email: emailById.get(d.id) ?? null,
       plan: d.plan || "trial",
       active: d.active ?? true,
+      verified: d.verified ?? false,
       created_at: d.created_at,
       patients: patientsByDoctor.get(d.id) ?? 0,
       brainEntries: brainByDoctor.get(d.id) ?? 0,
@@ -200,6 +203,7 @@ const SetStatusSchema = z.object({
   accessToken: z.string().min(10),
   doctorId: z.string().uuid(),
   active: z.boolean().optional(),
+  verified: z.boolean().optional(),
   plan: z.enum(["trial", "free", "starter", "pro", "clinica", "elite", "black"]).optional(),
 });
 
@@ -213,6 +217,7 @@ export const setDoctorStatus = createServerFn({ method: "POST" })
 
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (data.active !== undefined) patch.active = data.active;
+    if (data.verified !== undefined) patch.verified = data.verified;
     if (data.plan !== undefined) patch.plan = data.plan;
     const { error } = await (supabaseAdmin as any)
       .from("doctors")

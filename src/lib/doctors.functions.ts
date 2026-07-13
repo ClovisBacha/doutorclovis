@@ -263,6 +263,7 @@ export const searchDoctors = createServerFn({ method: "POST" })
       )
       .eq("active", true)
       .eq("accepting_patients", true)
+      .eq("verified", true)
       .not("display_name", "is", null);
 
     if (data.state) query = query.ilike("state", data.state);

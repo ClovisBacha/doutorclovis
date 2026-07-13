@@ -1681,3 +1681,8 @@ CREATE INDEX IF NOT EXISTS idx_appointments_doctor ON public.appointment_request
 CREATE INDEX IF NOT EXISTS idx_questions_doctor     ON public.doctor_questions(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_preconsulta_doctor   ON public.preconsulta_forms(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_teleconsulta_doctor  ON public.teleconsulta_sessions(doctor_id);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Diretório seguro: médico verificado (ver 20260713020000)
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS verified boolean NOT NULL DEFAULT false;
