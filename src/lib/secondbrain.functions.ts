@@ -55,8 +55,12 @@ async function ownerDoctorId(user: { id: string; email?: string | null }): Promi
     .eq("id", user.id)
     .maybeSingle();
   if (doc?.id) return doc.id as string;
-  const { resolveOwnerDoctorId } = await import("./secondbrain.server");
-  return (await resolveOwnerDoctorId()) ?? user.id;
+  // Assinante sem linha resolvida (ex.: erro transitório no maybeSingle, que
+  // devolve data:null sem lançar): usa o PRÓPRIO uid — `doctors.id` é sempre o
+  // auth uid. NUNCA cair em resolveOwnerDoctorId() aqui, senão o assinante
+  // leria/gravaria o cérebro (persona, regras, Q&A) do médico DONO da
+  // instalação — vazamento e contaminação cruzada de perfis.
+  return user.id;
 }
 
 /** Só a equipe da instalação (ADMIN_EMAILS) — NÃO médicos assinantes. */
