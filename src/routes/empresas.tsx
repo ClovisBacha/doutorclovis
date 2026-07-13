@@ -91,21 +91,26 @@ function EmpresasPage() {
     if (!form.companyName || !form.contactName || !form.contactEmail) return;
     setSubmitting(true);
     setError(null);
-    const res = await submitCorporateLead({
-      data: {
-        companyName: form.companyName,
-        contactName: form.contactName,
-        contactEmail: form.contactEmail,
-        contactPhone: form.contactPhone || null,
-        employeeCount: form.employeeCount || null,
-        message: form.message || null,
-      },
-    });
-    setSubmitting(false);
-    if (res.ok) {
-      setSubmitted(true);
-    } else {
-      setError(res.error ?? "Erro ao enviar. Tente novamente.");
+    try {
+      const res = await submitCorporateLead({
+        data: {
+          companyName: form.companyName,
+          contactName: form.contactName,
+          contactEmail: form.contactEmail,
+          contactPhone: form.contactPhone || null,
+          employeeCount: form.employeeCount || null,
+          message: form.message || null,
+        },
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        setError(res.error ?? "Erro ao enviar. Tente novamente.");
+      }
+    } catch {
+      setError("Erro de conexão. Tente novamente em instantes.");
+    } finally {
+      setSubmitting(false);
     }
   }
 

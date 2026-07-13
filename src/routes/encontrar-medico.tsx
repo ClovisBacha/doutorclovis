@@ -68,18 +68,23 @@ function EncontrarMedicoPage() {
 
   async function run() {
     setLoading(true);
-    const res = await searchDoctors({
-      data: {
-        q,
-        state: uf,
-        city,
-        minExperience: minExp,
-        hasMasters: masters,
-        hasDoctorate: doctorate,
-      },
-    });
-    setResults(res.ok ? res.doctors : []);
-    setLoading(false);
+    try {
+      const res = await searchDoctors({
+        data: {
+          q,
+          state: uf,
+          city,
+          minExperience: minExp,
+          hasMasters: masters,
+          hasDoctorate: doctorate,
+        },
+      });
+      setResults(res.ok ? res.doctors : []);
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Busca inicial + a cada mudança de filtro (com um pequeno debounce no texto).

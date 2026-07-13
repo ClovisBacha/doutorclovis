@@ -1,6 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+/** Escapa texto do usuário antes de interpolar em HTML de e-mail (anti-injeção). */
+function esc(s: string | null | undefined): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const Schema = z.object({
   patient_name: z.string().min(2).max(120),
   patient_email: z.string().email().max(160),
@@ -38,16 +48,16 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
       const { sendEmail, emailLayout } = await import("@/lib/email.server");
       const dataBr = new Date(data.preferred_date + "T00:00:00").toLocaleDateString("pt-BR");
       const resumo = `
-        <p style="margin:0 0 6px"><strong>Data preferida:</strong> ${dataBr} às ${data.preferred_time}</p>
-        <p style="margin:0 0 6px"><strong>Motivo:</strong> ${data.reason}</p>
-        ${data.notes ? `<p style="margin:0 0 6px"><strong>Observações:</strong> ${data.notes}</p>` : ""}`;
+        <p style="margin:0 0 6px"><strong>Data preferida:</strong> ${dataBr} às ${esc(data.preferred_time)}</p>
+        <p style="margin:0 0 6px"><strong>Motivo:</strong> ${esc(data.reason)}</p>
+        ${data.notes ? `<p style="margin:0 0 6px"><strong>Observações:</strong> ${esc(data.notes)}</p>` : ""}`;
 
       await sendEmail({
         to: data.patient_email,
         replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
         subject: "Recebemos seu pedido de consulta 💛",
         html: emailLayout(
-          `Olá, ${data.patient_name.split(" ")[0]}!`,
+          `Olá, ${esc(data.patient_name.split(" ")[0])}!`,
           `<p style="margin:0 0 14px">Recebemos sua solicitação de consulta. Nossa equipe vai confirmar o horário disponível com o seu médico em até 1 dia útil.</p>
            ${resumo}
            <p style="margin:14px 0 0;font-size:13px;color:#9b8178">Em caso de urgência, ligue 192 (SAMU) ou procure o pronto-socorro.</p>`,
@@ -65,8 +75,8 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
           subject: `Novo pedido de consulta — ${data.patient_name}`,
           html: emailLayout(
             "Novo pedido de consulta",
-            `<p style="margin:0 0 6px"><strong>Paciente:</strong> ${data.patient_name}</p>
-             <p style="margin:0 0 6px"><strong>Contato:</strong> ${data.patient_phone} · ${data.patient_email}</p>
+            `<p style="margin:0 0 6px"><strong>Paciente:</strong> ${esc(data.patient_name)}</p>
+             <p style="margin:0 0 6px"><strong>Contato:</strong> ${esc(data.patient_phone)} · ${esc(data.patient_email)}</p>
              ${resumo}
              <p style="margin:14px 0 0"><a href="https://obstetrica.com.br/painel" style="color:#a85a44">Abrir o painel do médico →</a></p>`,
           ),

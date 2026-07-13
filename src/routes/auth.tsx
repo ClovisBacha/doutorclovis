@@ -36,7 +36,14 @@ function translateAuthError(msg: string): string {
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
+  // Veio do link de redefinição de senha? (Supabase põe type=recovery no hash.)
+  // Precisa ser detectado ANTES de qualquer redirect, senão a sessão de
+  // recovery joga a usuária para dentro do app sem deixar trocar a senha.
+  const isRecoveryLink =
+    typeof window !== "undefined" && window.location.hash.includes("type=recovery");
+  const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">(
+    isRecoveryLink ? "reset" : "login",
+  );
   // Papel escolhido: define o destino pós-login e o fluxo de cadastro.
   const [role, setRole] = useState<"paciente" | "medico">("paciente");
   const [email, setEmail] = useState("");
@@ -49,6 +56,8 @@ function AuthPage() {
   const [resendLoading, setResendLoading] = useState(false);
 
   useEffect(() => {
+    // Nunca redireciona durante o fluxo de redefinição de senha.
+    if (isRecoveryLink) return;
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
       // Conta com perfil de médico ATIVO vai para o painel;
@@ -64,7 +73,7 @@ function AuthPage() {
       }
       navigate({ to: "/minha-conta" });
     });
-  }, [navigate]);
+  }, [navigate, isRecoveryLink]);
 
   // Catch PASSWORD_RECOVERY event from the magic link in the reset email
   useEffect(() => {
