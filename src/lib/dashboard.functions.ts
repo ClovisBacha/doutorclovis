@@ -158,11 +158,11 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    // Isolamento por perfil: as pacientes/perguntas/consultas ainda pertencem à
-    // INSTALAÇÃO (o vínculo paciente→médico é a próxima etapa do multi-tenant).
-    // Enquanto isso, só a equipe da instalação vê esses dados; um médico
-    // assinante vê apenas as métricas do PRÓPRIO cérebro (nunca PII de pacientes
-    // de outro médico). Assim o dashboard nunca vaza entre perfis.
+    // Isolamento por perfil (multi-tenant): a equipe da instalação (isTeam) vê
+    // TODAS as pacientes/perguntas/consultas — inclusive as legadas sem
+    // doctor_id. Um médico assinante vê apenas o que está vinculado ao PRÓPRIO
+    // doctor_id (nunca PII de pacientes de outro médico). O filtro por doctor_id
+    // garante que o dashboard nunca vaze entre perfis.
     const isTeam = !!user.email && adminEmails().includes(user.email.toLowerCase());
 
     const now = new Date();
@@ -176,6 +176,10 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     // bloco brain (fallback user.id), sem derrubar o dashboard inteiro.
     const doctorId = await safe(() => ownerDoctorId(user), user.id);
 
+    // Aplica o recorte por médico quando NÃO é a equipe da instalação: o médico
+    // assinante só enxerga o que está vinculado ao próprio doctor_id.
+    const scoped = (qb: any) => (isTeam ? qb : qb.eq("doctor_id", doctorId));
+
     // ── Pacientes: carteira, fases da gestação, novas no mês ──────────────────
     type ProfileRow = {
       id: string;
@@ -184,17 +188,15 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
       due_date: string | null;
       created_at: string | null;
     };
-    const profiles = isTeam
-      ? await safe<ProfileRow[]>(
-          async () =>
-            ((
-              await sb
-                .from("patient_profiles")
-                .select("id,display_name,lmp_date,due_date,created_at")
-            ).data ?? []) as ProfileRow[],
-          [],
-        )
-      : [];
+    const profiles = await safe<ProfileRow[]>(
+      async () =>
+        ((
+          await scoped(
+            sb.from("patient_profiles").select("id,display_name,lmp_date,due_date,created_at"),
+          )
+        ).data ?? []) as ProfileRow[],
+      [],
+    );
 
     const stages = { t1: 0, t2: 0, t3: 0, postparto: 0, semData: 0 };
     let newThisMonth = 0;
@@ -220,7 +222,9 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     // janela aqui — precisamos da última atividade "de sempre" para o risco de
     // abandono (>10 dias sem registro).
     const activityMap = await safe<Map<string, number>>(async () => {
-      if (!isTeam) return new Map<string, number>();
+      // O mapa é consultado por p.id; como `profiles` já vem recortado por
+      // doctor_id no caminho do assinante, só as pacientes DELE são reveladas.
+      if (profiles.length === 0) return new Map<string, number>();
       const map = new Map<string, number>();
       const record = (uid: string, ts: string | null) => {
         if (!uid || !ts) return;
@@ -275,43 +279,49 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
       recentPending: [] as { id: string; question: string; created_at: string }[],
       topThemes: [] as { theme: string; count: number }[],
     };
-    const questions = !isTeam
-      ? emptyQuestions
-      : await safe(async () => {
-          const [pendingRes, answeredRes, recentRes, textsRes] = await Promise.all([
-            sb
-              .from("doctor_questions")
-              .select("*", { count: "exact", head: true })
-              .eq("answered", false),
-            sb
-              .from("doctor_questions")
-              .select("*", { count: "exact", head: true })
-              .eq("answered", true),
-            sb
-              .from("doctor_questions")
-              .select("id,question,created_at")
-              .eq("answered", false)
-              .order("created_at", { ascending: false })
-              .limit(5),
-            sb
-              .from("doctor_questions")
-              .select("question")
-              .order("created_at", { ascending: false })
-              .limit(500),
-          ]);
-          return {
-            pending: (pendingRes.count ?? 0) as number,
-            answered: (answeredRes.count ?? 0) as number,
-            recentPending: (recentRes.data ?? []) as {
-              id: string;
-              question: string;
-              created_at: string;
-            }[],
-            topThemes: extractTopThemes(
-              ((textsRes.data ?? []) as { question: string }[]).map((r) => r.question),
-            ),
-          };
-        }, emptyQuestions);
+    const questions = await safe(async () => {
+      const [pendingRes, answeredRes, recentRes, textsRes] = await Promise.all([
+        scoped(
+          sb
+            .from("doctor_questions")
+            .select("*", { count: "exact", head: true })
+            .eq("answered", false),
+        ),
+        scoped(
+          sb
+            .from("doctor_questions")
+            .select("*", { count: "exact", head: true })
+            .eq("answered", true),
+        ),
+        scoped(
+          sb
+            .from("doctor_questions")
+            .select("id,question,created_at")
+            .eq("answered", false)
+            .order("created_at", { ascending: false })
+            .limit(5),
+        ),
+        scoped(
+          sb
+            .from("doctor_questions")
+            .select("question")
+            .order("created_at", { ascending: false })
+            .limit(500),
+        ),
+      ]);
+      return {
+        pending: (pendingRes.count ?? 0) as number,
+        answered: (answeredRes.count ?? 0) as number,
+        recentPending: (recentRes.data ?? []) as {
+          id: string;
+          question: string;
+          created_at: string;
+        }[],
+        topThemes: extractTopThemes(
+          ((textsRes.data ?? []) as { question: string }[]).map((r) => r.question),
+        ),
+      };
+    }, emptyQuestions);
 
     // ── Segundo Cérebro: entradas, aprovadas, canais ligados, usos no mês ─────
     const brain = await safe(
@@ -356,48 +366,51 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
       confirmedUpcoming: 0,
       next: null as { dateLabel: string; patientName: string } | null,
     };
-    const appointments = !isTeam
-      ? emptyAppointments
-      : await safe(async () => {
-          const [pendingRes, upcomingRes, nextRes] = await Promise.all([
-            sb
-              .from("appointment_requests")
-              .select("*", { count: "exact", head: true })
-              .eq("status", "pending"),
-            sb
-              .from("appointment_requests")
-              .select("*", { count: "exact", head: true })
-              .eq("status", "confirmed")
-              .gte("preferred_date", todayStr),
-            sb
-              .from("appointment_requests")
-              .select("patient_name,preferred_date")
-              .eq("status", "confirmed")
-              .gte("preferred_date", todayStr)
-              .order("preferred_date", { ascending: true })
-              .limit(1),
-          ]);
-          const nextRow = (nextRes.data ?? [])[0] as
-            | { patient_name: string | null; preferred_date: string }
-            | undefined;
-          let next: { dateLabel: string; patientName: string } | null = null;
-          if (nextRow?.preferred_date) {
-            const dateLabel = new Date(`${nextRow.preferred_date}T12:00:00`).toLocaleDateString(
-              "pt-BR",
-              {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              },
-            );
-            next = { dateLabel, patientName: nextRow.patient_name ?? "Paciente" };
-          }
-          return {
-            pending: (pendingRes.count ?? 0) as number,
-            confirmedUpcoming: (upcomingRes.count ?? 0) as number,
-            next,
-          };
-        }, emptyAppointments);
+    const appointments = await safe(async () => {
+      const [pendingRes, upcomingRes, nextRes] = await Promise.all([
+        scoped(
+          sb
+            .from("appointment_requests")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "pending"),
+        ),
+        scoped(
+          sb
+            .from("appointment_requests")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "confirmed")
+            .gte("preferred_date", todayStr),
+        ),
+        scoped(
+          sb
+            .from("appointment_requests")
+            .select("patient_name,preferred_date")
+            .eq("status", "confirmed")
+            .gte("preferred_date", todayStr)
+            .order("preferred_date", { ascending: true })
+            .limit(1),
+        ),
+      ]);
+      const nextRow = (nextRes.data ?? [])[0] as
+        { patient_name: string | null; preferred_date: string } | undefined;
+      let next: { dateLabel: string; patientName: string } | null = null;
+      if (nextRow?.preferred_date) {
+        const dateLabel = new Date(`${nextRow.preferred_date}T12:00:00`).toLocaleDateString(
+          "pt-BR",
+          {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          },
+        );
+        next = { dateLabel, patientName: nextRow.patient_name ?? "Paciente" };
+      }
+      return {
+        pending: (pendingRes.count ?? 0) as number,
+        confirmedUpcoming: (upcomingRes.count ?? 0) as number,
+        next,
+      };
+    }, emptyAppointments);
 
     const dashboard: DoctorDashboard = {
       patients: {
