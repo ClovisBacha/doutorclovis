@@ -146,6 +146,13 @@ export const registerDoctor = createServerFn({ method: "POST" })
       }
     }
 
+    // Médico NOVO começa em trial com prazo de 14 dias (o "grátis por 14
+    // dias" prometido). Médico já existente NÃO tem o prazo redefinido aqui
+    // (pode ser um assinante pago só atualizando o perfil).
+    const trialFields = existing
+      ? {}
+      : { plan: "trial", plan_expires_at: new Date(Date.now() + 14 * 86400000).toISOString() };
+
     // Corrida de slug (dois homônimos simultâneos): na violação de UNIQUE,
     // tenta uma vez com sufixo aleatório antes de desistir.
     const doUpsert = (s: string | null) =>
@@ -154,6 +161,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
         .upsert({
           id: user.id,
           ...data.profile,
+          ...trialFields,
           slug: s,
           updated_at: new Date().toISOString(),
         })

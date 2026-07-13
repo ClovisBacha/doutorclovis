@@ -35,11 +35,19 @@ async function planRowFor(doctorId: string): Promise<string | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data } = await (supabaseAdmin as any)
     .from("doctors")
-    .select("plan,active")
+    .select("plan,active,plan_expires_at")
     .eq("id", doctorId)
     .maybeSingle();
   // Médico inativo (assinatura suspensa) perde as capacidades pagas → free.
   if (!data || data.active === false) return "free";
+  // Trial expirado (14 dias) cai para free — o "grátis por 14 dias" tem fim.
+  if (
+    data.plan === "trial" &&
+    data.plan_expires_at &&
+    new Date(data.plan_expires_at).getTime() < Date.now()
+  ) {
+    return "free";
+  }
   return (data.plan ?? null) as string | null;
 }
 
