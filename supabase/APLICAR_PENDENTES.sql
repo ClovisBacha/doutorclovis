@@ -1669,3 +1669,15 @@ DROP TRIGGER IF EXISTS trg_protect_doctor_billing ON public.doctors;
 CREATE TRIGGER trg_protect_doctor_billing
   BEFORE INSERT OR UPDATE ON public.doctors
   FOR EACH ROW EXECUTE FUNCTION public.protect_doctor_billing();
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Multi-tenant: doctor_id nos registros (ver 20260713010000)
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.appointment_requests  ADD COLUMN IF NOT EXISTS doctor_id uuid;
+ALTER TABLE public.doctor_questions       ADD COLUMN IF NOT EXISTS doctor_id uuid;
+ALTER TABLE public.preconsulta_forms      ADD COLUMN IF NOT EXISTS doctor_id uuid;
+ALTER TABLE public.teleconsulta_sessions  ADD COLUMN IF NOT EXISTS doctor_id uuid;
+CREATE INDEX IF NOT EXISTS idx_appointments_doctor ON public.appointment_requests(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_questions_doctor     ON public.doctor_questions(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_preconsulta_doctor   ON public.preconsulta_forms(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_teleconsulta_doctor  ON public.teleconsulta_sessions(doctor_id);
