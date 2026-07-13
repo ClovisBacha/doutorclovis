@@ -334,10 +334,13 @@ export const chooseDoctor = createServerFn({ method: "POST" })
 
     const { data: doc } = await (supabaseAdmin as any)
       .from("doctors")
-      .select("id,active,accepting_patients,plan,plan_expires_at")
+      .select("id,active,accepting_patients,verified,plan,plan_expires_at")
       .eq("id", data.doctorId)
       .maybeSingle();
-    if (!doc || !doc.active || !doc.accepting_patients) {
+    // Defense-in-depth: além de ativo e aceitando pacientes, o médico precisa
+    // estar VERIFICADO — igual à busca. Impede vínculo direto a um id de médico
+    // não verificado (que a vitrine e a busca já escondem).
+    if (!doc || !doc.active || !doc.accepting_patients || !doc.verified) {
       return { ok: false as const, error: "indisponivel" };
     }
 

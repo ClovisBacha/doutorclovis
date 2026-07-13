@@ -102,13 +102,14 @@ export const requestDoctor = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, reason: "auth" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // O médico precisa existir, estar ativo e aceitando pacientes.
+    // O médico precisa existir, estar ativo, aceitando pacientes e VERIFICADO
+    // (mesmo gate da busca — impede solicitar vínculo a médico não verificado).
     const { data: doc } = await (supabaseAdmin as any)
       .from("doctors")
-      .select("id,active,accepting_patients")
+      .select("id,active,accepting_patients,verified")
       .eq("id", data.doctorId)
       .maybeSingle();
-    if (!doc || doc.active === false || doc.accepting_patients === false) {
+    if (!doc || doc.active === false || doc.accepting_patients === false || doc.verified !== true) {
       return { ok: false as const, reason: "unavailable" as const };
     }
 
