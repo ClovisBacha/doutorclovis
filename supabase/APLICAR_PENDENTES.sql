@@ -1686,3 +1686,37 @@ CREATE INDEX IF NOT EXISTS idx_teleconsulta_doctor  ON public.teleconsulta_sessi
 -- Diretório seguro: médico verificado (ver 20260713020000)
 -- ════════════════════════════════════════════════════════════════════════
 ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS verified boolean NOT NULL DEFAULT false;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Busca de médicos (minha-conta) também respeita o selo (ver 20260713030000)
+-- Re-define search_doctors AQUI, depois da coluna verified existir.
+-- ════════════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.search_doctors(p_query text)
+RETURNS TABLE (
+  id           uuid,
+  display_name text,
+  title        text,
+  specialty    text,
+  slug         text
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT d.id, d.display_name, d.title, d.specialty, d.slug
+  FROM public.doctors d
+  WHERE d.active = true
+    AND d.accepting_patients = true
+    AND d.verified = true
+    AND d.display_name <> ''
+    AND (
+      p_query = ''
+      OR d.display_name ILIKE '%' || p_query || '%'
+      OR d.specialty   ILIKE '%' || p_query || '%'
+      OR d.title       ILIKE '%' || p_query || '%'
+    )
+  ORDER BY d.display_name
+  LIMIT 20;
+$$;
+REVOKE ALL ON FUNCTION public.search_doctors(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.search_doctors(text) TO authenticated, service_role;
