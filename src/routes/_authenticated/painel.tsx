@@ -114,14 +114,15 @@ type PanelTab = (typeof PANEL_TABS)[number];
 
 // Médicos assinantes (fora da equipe da instalação) veem as abas já escopadas
 // por doctor_id: painel, agendamentos, perguntas, pré-consultas, engajamento,
-// cérebro, pacientes e perfil — todas recortadas ao PRÓPRIO médico no servidor.
-// As abas de dados da instalação inteira (Teleconsultas, Consultas Pagas,
+// teleconsultas, cérebro, pacientes e perfil — todas recortadas ao PRÓPRIO
+// médico no servidor. As abas de dados da instalação inteira (Consultas Pagas,
 // Empresas, Calendário/Agenda/Ferramentas globais) seguem só para a equipe.
 const DOCTOR_TABS: readonly PanelTab[] = [
   "Painel 📊",
   "Agendamentos",
   "Perguntas",
   "Pré-consultas",
+  "Teleconsultas",
   "Engajamento",
   "Cérebro 🧠",
   "Pacientes 👩‍🍼",

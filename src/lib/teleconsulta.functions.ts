@@ -9,12 +9,46 @@ function adminEmails() {
     .filter(Boolean);
 }
 
-async function requireAdmin(accessToken: string) {
+/**
+ * Escopo multi-tenant da teleconsulta: equipe da instalação (ADMIN_EMAILS) OU
+ * médico assinante ativo. A equipe vê/muta tudo; o assinante só o que estiver
+ * vinculado ao PRÓPRIO doctor_id. Mesmo padrão de admin.functions.ts.
+ */
+type TeleScope = {
+  user: { id: string; email?: string | null };
+  isTeam: boolean;
+  doctorId: string | null;
+};
+
+async function requireScope(accessToken: string): Promise<TeleScope | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
   if (error || !data.user?.email) return null;
-  if (!adminEmails().includes(data.user.email.toLowerCase())) return null;
-  return data.user;
+  if (adminEmails().includes(data.user.email.toLowerCase())) {
+    return { user: data.user, isTeam: true, doctorId: null };
+  }
+  const { data: doc } = await (supabaseAdmin as any)
+    .from("doctors")
+    .select("id,active")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  if (doc?.active) return { user: data.user, isTeam: false, doctorId: doc.id as string };
+  return null;
+}
+
+function scopedBy(qb: any, scope: TeleScope) {
+  return scope.isTeam ? qb : qb.eq("doctor_id", scope.doctorId);
+}
+
+/** Fail-closed: a linha `id` pertence ao chamador? Equipe sempre; assinante só se doctor_id bate. */
+async function ownsTele(sb: any, id: string, scope: TeleScope): Promise<boolean> {
+  if (scope.isTeam) return true;
+  const { data } = await sb
+    .from("teleconsulta_sessions")
+    .select("doctor_id")
+    .eq("id", id)
+    .maybeSingle();
+  return !!data && data.doctor_id === scope.doctorId;
 }
 
 export type TeleconsultaSession = {
@@ -45,16 +79,32 @@ export const createTeleconsulta = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data }) => {
-    const admin = await requireAdmin(data.accessToken);
-    if (!admin) return { ok: false as const, error: "Não autorizado" };
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, error: "Não autorizado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await supabaseAdmin
+
+    // Assinante só cria teleconsulta para PACIENTE dele; a linha nasce com o
+    // doctor_id dele. Equipe pode para qualquer paciente (doctor_id = null/dono).
+    let doctorId: string | null = null;
+    if (!scope.isTeam) {
+      const { data: prof } = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("doctor_id")
+        .eq("id", data.patientUserId)
+        .maybeSingle();
+      if (!prof || prof.doctor_id !== scope.doctorId)
+        return { ok: false as const, error: "Paciente não é sua." };
+      doctorId = scope.doctorId;
+    }
+
+    const { data: row, error } = await (supabaseAdmin as any)
       .from("teleconsulta_sessions")
       .insert({
         patient_user_id: data.patientUserId,
         scheduled_for: data.scheduledFor,
         doctor_notes: data.doctorNotes,
         status: "agendada",
+        doctor_id: doctorId,
       })
       .select()
       .single();
@@ -65,17 +115,22 @@ export const createTeleconsulta = createServerFn({ method: "POST" })
 export const getTeleconsultasAdmin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => AdminTk.parse(i))
   .handler(async ({ data }) => {
-    const admin = await requireAdmin(data.accessToken);
-    if (!admin) return { ok: false as const, error: "Não autorizado" };
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, error: "Não autorizado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Sem FK entre teleconsulta_sessions e patient_profiles, o embed do
     // PostgREST falha (PGRST200) — buscamos os nomes em uma segunda query.
-    const { data: rows, error } = await supabaseAdmin
-      .from("teleconsulta_sessions")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data: rows, error } = await scopedBy(
+      (supabaseAdmin as any)
+        .from("teleconsulta_sessions")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      scope,
+    );
     if (error) return { ok: false as const, error: error.message };
-    const userIds = [...new Set((rows ?? []).map((r: any) => r.patient_user_id))];
+    const userIds = [
+      ...new Set((rows ?? []).map((r: any) => r.patient_user_id as string)),
+    ] as string[];
     const nameById = new Map<string, string | null>();
     if (userIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
@@ -103,9 +158,10 @@ export const updateTeleconsultaStatus = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data }) => {
-    const admin = await requireAdmin(data.accessToken);
-    if (!admin) return { ok: false as const };
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (!(await ownsTele(supabaseAdmin as any, data.id, scope))) return { ok: false as const };
     const { error } = await supabaseAdmin
       .from("teleconsulta_sessions")
       .update({ status: data.status })
@@ -140,9 +196,10 @@ export const saveDoctorClinicalNote = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data }) => {
-    const admin = await requireAdmin(data.accessToken);
-    if (!admin) return { ok: false as const };
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (!(await ownsTele(supabaseAdmin as any, data.id, scope))) return { ok: false as const };
     const { error } = await supabaseAdmin
       .from("teleconsulta_sessions")
       .update({ clinical_note: data.clinicalNote })
@@ -171,8 +228,8 @@ export const generateClinicalNote = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data }) => {
-    const admin = await requireAdmin(data.accessToken);
-    if (!admin) return { ok: false as const, error: "Não autorizado" };
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, error: "Não autorizado" };
 
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key) return { ok: false as const, error: "API key não configurada" };
@@ -365,9 +422,13 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data }) => {
-    const admin = await requireAdmin(data.accessToken);
-    if (!admin) return { ok: false as const, error: "Não autorizado" };
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, error: "Não autorizado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // A sessão precisa ser do chamador (assinante só abre a sala das suas).
+    if (!(await ownsTele(supabaseAdmin as any, data.id, scope)))
+      return { ok: false as const, error: "Não autorizado" };
+    const admin = scope.user;
 
     // Nível 2: se o médico conectou a PRÓPRIA Agenda Google, a reunião é criada
     // e hospedada na conta dele; senão usamos a conta central da instalação.
