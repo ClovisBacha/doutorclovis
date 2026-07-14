@@ -120,3 +120,26 @@ export function extractMessageText(message: Record<string, unknown>): string | n
 export function waConfigured(): boolean {
   return !!(process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_ACCESS_TOKEN);
 }
+
+/**
+ * WhatsApp por médico: dado o phone_number_id que RECEBEU a mensagem (Meta
+ * Cloud API), resolve o doctor_id mapeado em doctor_whatsapp_numbers. Retorna
+ * null se não houver número passado ou mapeamento — aí o agente usa o cérebro
+ * do dono (comportamento atual). Best-effort: qualquer falha → null.
+ */
+export async function resolveDoctorIdByWhatsappNumber(
+  phoneNumberId: string | null | undefined,
+): Promise<string | null> {
+  if (!phoneNumberId) return null;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await (supabaseAdmin as any)
+      .from("doctor_whatsapp_numbers")
+      .select("doctor_id")
+      .eq("phone_number_id", phoneNumberId)
+      .maybeSingle();
+    return (data?.doctor_id as string | null) ?? null;
+  } catch {
+    return null;
+  }
+}

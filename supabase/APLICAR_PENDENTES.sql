@@ -1762,3 +1762,18 @@ FROM auth.users u
 JOIN public.patient_profiles pp ON pp.id = u.id
 WHERE lower(a.patient_email) = lower(u.email)
   AND a.doctor_id IS NULL AND pp.doctor_id IS NOT NULL;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- WhatsApp por médico (scaffolding) — mapa número→médico (ver 20260714010000)
+-- Tabela vazia = comportamento atual (cérebro do dono). RLS sem policies.
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.doctor_whatsapp_numbers (
+  phone_number_id text PRIMARY KEY,
+  doctor_id       uuid NOT NULL,
+  label           text,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_doctor_whatsapp_doctor
+  ON public.doctor_whatsapp_numbers(doctor_id);
+ALTER TABLE public.doctor_whatsapp_numbers ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.doctor_whatsapp_numbers FROM anon, authenticated;

@@ -84,7 +84,11 @@ CONSULTÓRIO:
 /* Núcleo do agente                                                     */
 /* ------------------------------------------------------------------ */
 
-async function callAgent(conv: WaConversation, userMessage: string): Promise<AgentDecision> {
+async function callAgent(
+  conv: WaConversation,
+  userMessage: string,
+  doctorId?: string | null,
+): Promise<AgentDecision> {
   const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY não configurado");
 
@@ -95,7 +99,7 @@ async function callAgent(conv: WaConversation, userMessage: string): Promise<Age
   // getBrainContext é safe (falha vira block vazio) — nunca derruba o agente.
   // O block só influencia o TOM do campo "reply"; o formato JSON da resposta
   // e o fluxo de estados continuam regidos pelo prompt abaixo.
-  const brain = await getBrainContext(userMessage, undefined, "whatsapp");
+  const brain = await getBrainContext(userMessage, doctorId ?? undefined, "whatsapp");
   const system =
     brain.enabledWhatsapp && brain.block
       ? `${SYSTEM}\n\n${brain.block}\nO bloco acima orienta apenas o estilo e a conduta do texto enviado ao paciente. Continue seguindo o fluxo de estados e o formato de resposta em JSON exigidos na mensagem do usuário.`
@@ -237,9 +241,14 @@ export async function handleWhatsAppMessage(
   phone: string,
   messageText: string,
   messageId: string,
+  phoneNumberId?: string | null,
 ): Promise<void> {
   // Normaliza o telefone (remove + e espaços)
   const cleanPhone = phone.replace(/\D/g, "");
+
+  // WhatsApp por médico: o número que recebeu → doctor_id (null = cérebro do dono).
+  const { resolveDoctorIdByWhatsappNumber } = await import("./whatsapp.server");
+  const doctorId = await resolveDoctorIdByWhatsappNumber(phoneNumberId);
 
   const conv = await getOrCreateConversation(cleanPhone);
 
@@ -249,7 +258,11 @@ export async function handleWhatsAppMessage(
   const forceUrgent = urgentWords.test(messageText);
 
   // Chama o agente
-  const decision = await callAgent(forceUrgent ? { ...conv, state: "urgent" } : conv, messageText);
+  const decision = await callAgent(
+    forceUrgent ? { ...conv, state: "urgent" } : conv,
+    messageText,
+    doctorId,
+  );
 
   // Merge dos dados extraídos
   const newContext: ConvContext = {

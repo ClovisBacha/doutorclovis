@@ -86,6 +86,9 @@ async function processWebhook(body: unknown): Promise<void> {
       const value = c.value as Record<string, unknown>;
       const messages = (value?.messages as unknown[]) ?? [];
       const contacts = (value?.contacts as unknown[]) ?? [];
+      // Número (Meta) que recebeu a mensagem → roteia para o médico dele.
+      const metadata = value?.metadata as Record<string, unknown> | undefined;
+      const phoneNumberId = (metadata?.phone_number_id as string | undefined) ?? null;
 
       for (const msg of messages) {
         const m = msg as Record<string, unknown>;
@@ -114,7 +117,7 @@ async function processWebhook(body: unknown): Promise<void> {
         waMarkRead(messageId);
 
         // Processa com o agente de IA
-        await handleWhatsAppMessage(fromPhone, text, messageId);
+        await handleWhatsAppMessage(fromPhone, text, messageId, phoneNumberId);
       }
     }
   }
