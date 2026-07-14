@@ -1735,3 +1735,30 @@ CREATE TABLE IF NOT EXISTS public.doctor_google_tokens (
 );
 ALTER TABLE public.doctor_google_tokens ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.doctor_google_tokens FROM anon, authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Backfill do doctor_id nas linhas antigas (ver 20260714000000)
+-- Cada linha herda o médico ESCOLHIDO pela paciente; só toca linhas NULL.
+-- Idempotente.
+-- ════════════════════════════════════════════════════════════════════════
+UPDATE public.doctor_questions q
+SET doctor_id = pp.doctor_id
+FROM public.patient_profiles pp
+WHERE q.user_id = pp.id AND q.doctor_id IS NULL AND pp.doctor_id IS NOT NULL;
+
+UPDATE public.preconsulta_forms f
+SET doctor_id = pp.doctor_id
+FROM public.patient_profiles pp
+WHERE f.user_id = pp.id AND f.doctor_id IS NULL AND pp.doctor_id IS NOT NULL;
+
+UPDATE public.teleconsulta_sessions t
+SET doctor_id = pp.doctor_id
+FROM public.patient_profiles pp
+WHERE t.patient_user_id = pp.id AND t.doctor_id IS NULL AND pp.doctor_id IS NOT NULL;
+
+UPDATE public.appointment_requests a
+SET doctor_id = pp.doctor_id
+FROM auth.users u
+JOIN public.patient_profiles pp ON pp.id = u.id
+WHERE lower(a.patient_email) = lower(u.email)
+  AND a.doctor_id IS NULL AND pp.doctor_id IS NOT NULL;

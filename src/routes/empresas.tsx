@@ -45,7 +45,7 @@ const PLANS = [
       "Escola do Bebê (12 módulos)",
       "Portal da família / álbum",
       "Pós-parto e marcos do bebê",
-      "Relatórios de engajamento",
+      "Relatórios de engajamento (em breve)",
       "Suporte prioritário",
     ],
   },
@@ -59,8 +59,8 @@ const PLANS = [
       "Tudo do Standard",
       "Consultas particulares com desconto",
       "Teleconsulta dedicada",
-      "Dashboard de saúde para RH",
-      "Relatório de Alta Pré-natal",
+      "Dashboard de saúde para RH (em breve)",
+      "Relatório de Alta Pré-natal (em breve)",
       "Gerente de conta dedicado",
     ],
   },
@@ -167,7 +167,7 @@ function EmpresasPage() {
               {
                 emoji: "📊",
                 title: "ROI mensurável",
-                desc: "Painel de engajamento para RH acompanhar uso, satisfação e wellbeing das funcionárias gestantes.",
+                desc: "Relatórios de engajamento e uso para o RH acompanhar o programa das funcionárias gestantes (em desenvolvimento).",
               },
               {
                 emoji: "⚕️",
