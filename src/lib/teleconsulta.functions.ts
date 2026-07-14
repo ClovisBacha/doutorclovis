@@ -425,23 +425,34 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
     const scope = await requireScope(data.accessToken);
     if (!scope) return { ok: false as const, error: "Não autorizado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // A sessão precisa ser do chamador (assinante só abre a sala das suas).
-    if (!(await ownsTele(supabaseAdmin as any, data.id, scope)))
-      return { ok: false as const, error: "Não autorizado" };
     const admin = scope.user;
+
+    // Carrega a PRÓPRIA sessão (posse + dados vêm da linha, nunca do input:
+    // impede abrir a sala de outro médico OU convidar o e-mail de um usuário
+    // arbitrário passando um patientUserId qualquer).
+    const { data: sess } = await (supabaseAdmin as any)
+      .from("teleconsulta_sessions")
+      .select("patient_user_id, scheduled_for, room_name, doctor_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!sess) return { ok: false as const, error: "Sessão não encontrada" };
+    if (!scope.isTeam && sess.doctor_id !== scope.doctorId)
+      return { ok: false as const, error: "Não autorizado" };
+    const patientUserId = sess.patient_user_id as string;
+    const scheduledFor = (sess.scheduled_for as string | null) ?? null;
 
     // Nível 2: se o médico conectou a PRÓPRIA Agenda Google, a reunião é criada
     // e hospedada na conta dele; senão usamos a conta central da instalação.
     const { getDoctorGoogleRefreshToken } = await import("./google-calendar.functions");
     const doctorRefresh = await getDoctorGoogleRefreshToken(admin.id);
 
-    // Dados da paciente (e-mail + nome) — usados no convite da Agenda e no fallback.
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(data.patientUserId);
+    // Dados da paciente (e-mail + nome) — da PACIENTE da sessão, não do input.
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(patientUserId);
     const patientEmail = authUser?.user?.email ?? null;
     const { data: profile } = await supabaseAdmin
       .from("patient_profiles")
       .select("display_name")
-      .eq("id", data.patientUserId)
+      .eq("id", patientUserId)
       .maybeSingle();
     const patientName = (profile as any)?.display_name ?? "Paciente";
 
@@ -454,7 +465,7 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
         doctorEmail: admin.email ?? null,
         patientEmail,
         patientName,
-        scheduledFor: data.scheduledFor,
+        scheduledFor,
         refreshOverride: doctorRefresh,
       });
       if (cal) {
@@ -466,12 +477,7 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
     // 2) Fallbacks: sala Meet avulsa (spaces, na mesma conta) → Jitsi.
     if (!meetUrl) meetUrl = await createGoogleMeetRoom(doctorRefresh);
     if (!meetUrl) {
-      const { data: row } = await supabaseAdmin
-        .from("teleconsulta_sessions")
-        .select("room_name")
-        .eq("id", data.id)
-        .single();
-      meetUrl = `https://meet.jit.si/obstetrica-${row?.room_name ?? data.id}`;
+      meetUrl = `https://meet.jit.si/obstetrica-${sess.room_name ?? data.id}`;
     }
 
     const { error } = await supabaseAdmin
@@ -483,7 +489,7 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
     // 3) E-mail ao paciente: se o convite da Agenda já saiu (convida os dois),
     //    não duplica; senão manda o link por Resend (comportamento antigo).
     if (!invitedViaCalendar && patientEmail) {
-      await sendPatientMeetEmail(patientEmail, patientName, meetUrl, data.scheduledFor);
+      await sendPatientMeetEmail(patientEmail, patientName, meetUrl, scheduledFor);
     }
 
     return { ok: true as const, meetUrl, invited: invitedViaCalendar };
