@@ -377,3 +377,35 @@ export const setPatientQuizPremium = createServerFn({ method: "POST" })
       ? { ok: false as const, error: error.message }
       : { ok: true as const, error: null };
   });
+
+/**
+ * PIX do MÉDICO da paciente logada (para pagar consulta particular na chave
+ * dele, não numa central). Resolve pelo doctor_id do perfil. Devolve null se a
+ * paciente não escolheu médico ou ele não cadastrou chave PIX — aí a UI usa o
+ * PIX central de fallback. A chave PIX é feita para ser mostrada à paciente
+ * (é como ela paga), então não há PII sensível aqui.
+ */
+export const getMyDoctorPix = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireUser(data.accessToken);
+    if (!user) return { ok: false as const, pix: null };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: prof } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!prof?.doctor_id) return { ok: true as const, pix: null };
+    const { data: doc } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("pix_key,display_name")
+      .eq("id", prof.doctor_id)
+      .maybeSingle();
+    const pixKey = (doc?.pix_key as string | null)?.trim() || null;
+    if (!pixKey) return { ok: true as const, pix: null };
+    return {
+      ok: true as const,
+      pix: { key: pixKey, name: (doc?.display_name as string | null) ?? "" },
+    };
+  });

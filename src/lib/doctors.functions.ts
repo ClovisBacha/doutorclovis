@@ -61,6 +61,11 @@ function slugify(name: string): string {
     .slice(0, 48);
 }
 
+// display_name é obrigatório; os campos do formulário de cadastro têm default
+// (o cadastro sempre os envia). Os demais são OPCIONAIS (sem default): quando
+// um formulário parcial (ex.: o cadastro básico) NÃO envia esses campos, eles
+// ficam AUSENTES no objeto — e assim NÃO sobrescrevem (zeram) o que o médico
+// já preencheu em "Meu Perfil". Ver stripUndefined() no upsert/update.
 const ProfileSchema = z.object({
   display_name: z.string().min(2),
   title: z.string().default(""),
@@ -68,15 +73,22 @@ const ProfileSchema = z.object({
   crm: z.string().default(""),
   whatsapp: z.string().default(""),
   pix_key: z.string().default(""),
-  bio: z.string().default(""),
-  subspecialty: z.string().default(""),
-  years_experience: z.number().int().min(0).max(70).nullable().default(null),
-  has_masters: z.boolean().default(false),
-  has_doctorate: z.boolean().default(false),
-  city: z.string().default(""),
-  state: z.string().default(""),
-  accepting_patients: z.boolean().default(true),
+  bio: z.string().optional(),
+  subspecialty: z.string().optional(),
+  years_experience: z.number().int().min(0).max(70).nullable().optional(),
+  has_masters: z.boolean().optional(),
+  has_doctorate: z.boolean().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  accepting_patients: z.boolean().optional(),
 });
+
+/** Remove chaves com valor undefined (não sobrescrevem colunas no upsert/update). */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const [k, v] of Object.entries(obj)) if (v !== undefined) (out as any)[k] = v;
+  return out;
+}
 
 const TokenSchema = z.object({ accessToken: z.string().min(10) });
 
@@ -160,7 +172,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
         .from("doctors")
         .upsert({
           id: user.id,
-          ...data.profile,
+          ...stripUndefined(data.profile),
           ...trialFields,
           slug: s,
           updated_at: new Date().toISOString(),
@@ -222,7 +234,7 @@ export const updateMyDoctor = createServerFn({ method: "POST" })
 
     const { error } = await (supabaseAdmin as any)
       .from("doctors")
-      .update({ ...data.profile, updated_at: new Date().toISOString() })
+      .update({ ...stripUndefined(data.profile), updated_at: new Date().toISOString() })
       .eq("id", user.id);
     return { ok: !error };
   });

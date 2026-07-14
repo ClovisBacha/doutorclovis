@@ -63,6 +63,7 @@ import {
   requestDoctor,
   getMyDoctorLink,
   cancelDoctorRequest,
+  getMyDoctorPix,
   type DoctorPublic,
   type MyDoctorLink,
 } from "@/lib/patientlink.functions";
@@ -11457,8 +11458,14 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   const [newId, setNewId] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
 
-  const PIX_KEY = DOCTOR.pixKey;
-  const PIX_NAME = DOCTOR.pixName;
+  // PIX do PRÓPRIO médico da paciente (não uma chave central). Começa no
+  // fallback central e, se a paciente tiver médico com chave PIX, atualiza.
+  const [pix, setPix] = useState<{ key: string; name: string }>({
+    key: DOCTOR.pixKey,
+    name: DOCTOR.pixName,
+  });
+  const PIX_KEY = pix.key;
+  const PIX_NAME = pix.name;
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
@@ -11468,6 +11475,11 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
     }
     const res = await getMyPrivateConsultations({ data: { accessToken: s.session.access_token } });
     if (res.ok) setConsultations(res.consultations);
+    // PIX do médico da paciente (fallback central se não houver)
+    const pixRes = await getMyDoctorPix({ data: { accessToken: s.session.access_token } });
+    if (pixRes.ok && pixRes.pix?.key) {
+      setPix({ key: pixRes.pix.key, name: pixRes.pix.name || DOCTOR.pixName });
+    }
     setLoading(false);
   }
 
