@@ -23,18 +23,15 @@ import { PublicBottomNav } from "@/components/public-bottom-nav";
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "Physician",
-  name: "Dr. Clóvis Bacha",
+  "@type": "SoftwareApplication",
+  name: "Obstétrica",
+  applicationCategory: "HealthApplication",
+  operatingSystem: "Web",
   description:
-    "Ginecologista e Obstetra especialista em Gestação de Alto Risco. Mais de 20 anos de prática clínica acompanhando gestações de baixo e alto risco.",
-  medicalSpecialty: ["https://schema.org/Obstetrics", "https://schema.org/MidwiferyOrWomenSHealth"],
+    "App de acompanhamento gestacional: jornada semana a semana, IA obstétrica treinada pelo seu médico, monitoramento de saúde e teleconsulta.",
   url: DOCTOR.siteUrl,
   sameAs: [DOCTOR.instagram],
-  hasOfferCatalog: {
-    "@type": "OfferCatalog",
-    name: "Obstétrica by Dr. Clóvis — App de Saúde Gestacional",
-    url: DOCTOR.siteUrl,
-  },
+  offers: { "@type": "Offer", price: "0", priceCurrency: "BRL" },
 };
 
 function NotFoundComponent() {
@@ -103,20 +100,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "viewport",
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
-      { title: "Obstétrica by Dr. Clóvis — App de Gestação e Saúde da Mulher" },
+      { title: "Obstétrica — App de Gestação e Saúde da Mulher" },
       {
         name: "description",
         content:
-          "Acompanhe sua gestação semana a semana, converse com IA especializada, agende consultas e muito mais. Desenvolvido com Dr. Clóvis Bacha, especialista em gestação de alto risco.",
+          "Acompanhe sua gestação semana a semana, converse com IA especializada, agende consultas e muito mais. Desenvolvido com especialistas em gestação de alto risco.",
       },
-      { name: "author", content: "Dr. Clóvis Bacha" },
-      { name: "theme-color", content: "#8b5147" },
+      { name: "author", content: "Obstétrica" },
+      { name: "theme-color", content: "#a8574a" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "Obstétrica" },
-      { name: "msapplication-TileColor", content: "#8b5147" },
-      { property: "og:title", content: "Obstétrica by Dr. Clóvis" },
+      { name: "msapplication-TileColor", content: "#a8574a" },
+      { property: "og:title", content: "Obstétrica" },
       {
         property: "og:description",
         content: "O app completo para acompanhar sua gestação com segurança e cuidado.",
@@ -124,17 +121,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { property: "og:locale", content: "pt_BR" },
       { property: "og:url", content: DOCTOR.siteUrl },
-      { property: "og:image", content: `${DOCTOR.siteUrl}/og.svg` },
+      { property: "og:image", content: `${DOCTOR.siteUrl}/og.png` },
+      { property: "og:image:type", content: "image/png" },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Obstétrica by Dr. Clóvis" },
+      { name: "twitter:title", content: "Obstétrica" },
       {
         name: "twitter:description",
-        content:
-          "Acompanhe sua gestação semana a semana com o app desenvolvido pelo Dr. Clóvis Bacha.",
+        content: "Acompanhe sua gestação semana a semana com o app Obstétrica.",
       },
-      { name: "twitter:image", content: `${DOCTOR.siteUrl}/og.svg` },
+      { name: "twitter:image", content: `${DOCTOR.siteUrl}/og.png` },
       {
         name: "robots",
         content: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1",

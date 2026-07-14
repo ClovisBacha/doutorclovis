@@ -10,12 +10,15 @@ import {
   markPreConsultaSeen,
   setQuestionAnswered,
   updateAppointmentStatus,
+  confirmAppointment,
+  markAppointmentPaid,
   type AdminAppointment,
   type AdminPreConsulta,
   type AdminQuestion,
   type PatientEngagement,
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
+import { ymdLocal } from "@/lib/utils";
 import {
   getTeleconsultasAdmin,
   createTeleconsulta,
@@ -58,9 +61,23 @@ import {
   type DoctorProfile,
 } from "@/lib/doctors.functions";
 import { getDoctorDashboard, type DoctorDashboard } from "@/lib/dashboard.functions";
+import {
+  startGoogleCalendarConnect,
+  getGoogleCalendarStatus,
+  disconnectGoogleCalendar,
+} from "@/lib/google-calendar.functions";
+import { DoctorBadge } from "@/components/doctor-badge";
+import {
+  listPatientRequests,
+  respondPatientRequest,
+  listMyPatients,
+  setPatientQuizPremium,
+  type PatientRequest,
+  type LinkedPatient,
+} from "@/lib/patientlink.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
-  head: () => ({ meta: [{ title: "Painel do médico — Obstétrica by Dr. Clóvis" }] }),
+  head: () => ({ meta: [{ title: "Painel do médico — Obstétrica" }] }),
   component: PainelPage,
 });
 
@@ -90,14 +107,26 @@ const PANEL_TABS = [
   "Consultas Pagas",
   "Empresas",
   "Engajamento",
+  "Pacientes 👩‍🍼",
   "Meu Perfil",
 ] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 
-// Médicos assinantes (fora da equipe da instalação) só veem as abas já
-// escopadas por perfil — as demais mostram dados da instalação inteira e
-// abrem por médico conforme o roadmap (docs/MULTI_TENANT.md, etapa 2).
-const DOCTOR_TABS: readonly PanelTab[] = ["Painel 📊", "Cérebro 🧠", "Meu Perfil"];
+// Médicos assinantes (fora da equipe da instalação) veem as abas já escopadas
+// por doctor_id: painel, agendamentos, perguntas, pré-consultas, engajamento,
+// cérebro, pacientes e perfil — todas recortadas ao PRÓPRIO médico no servidor.
+// As abas de dados da instalação inteira (Teleconsultas, Consultas Pagas,
+// Empresas, Calendário/Agenda/Ferramentas globais) seguem só para a equipe.
+const DOCTOR_TABS: readonly PanelTab[] = [
+  "Painel 📊",
+  "Agendamentos",
+  "Perguntas",
+  "Pré-consultas",
+  "Engajamento",
+  "Cérebro 🧠",
+  "Pacientes 👩‍🍼",
+  "Meu Perfil",
+];
 
 async function token() {
   const { data } = await supabase.auth.getSession();
@@ -130,13 +159,15 @@ function PainelPage() {
       const tk = await token();
       const res = await getAdminData({ data: { accessToken: tk } });
       if (res.ok) {
+        // getAdminData já autoriza equipe da instalação E médico assinante ativo,
+        // devolvendo os dados recortados (isTeam distingue quem é quem para a UI).
         setAllowed(true);
-        setIsPlatformTeam(true);
+        setIsPlatformTeam(res.isTeam);
         setAppointments(res.appointments);
         setQuestions(res.questions);
         return;
       }
-      // Não é da equipe da instalação: é um médico assinante?
+      // Fallback (getAdminData negou): médico assinante inativo/sem linha ativa?
       const me = await getMyDoctor({ data: { accessToken: tk } });
       if (me.ok && me.doctor?.active) {
         setAllowed(true);
@@ -184,6 +215,21 @@ function PainelPage() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  // Retorno do checkout do Stripe (assinatura do médico): o webhook ativa o
+  // plano em segundos. Avisa e recarrega uma vez para refletir o novo plano.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const st = new URLSearchParams(window.location.search).get("assinatura");
+    if (!st) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    if (st === "sucesso") {
+      toast.success("Pagamento recebido! Ativando seu plano…");
+      setTimeout(() => window.location.reload(), 3000);
+    } else if (st === "cancelada") {
+      toast("Pagamento não concluído. Você pode assinar quando quiser.");
+    }
   }, []);
 
   useEffect(() => {
@@ -249,10 +295,9 @@ function PainelPage() {
       </p>
       <h1 className="mt-2 font-serif text-3xl md:text-4xl">Gestão do consultório</h1>
 
-      {/* Summary stats (dados da instalação — só para a equipe) */}
-      <div
-        className={`mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 ${isPlatformTeam ? "" : "hidden"}`}
-      >
+      {/* Resumo — números já recortados por médico no servidor (equipe vê a
+          instalação inteira; assinante vê só os próprios). */}
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Pedidos pendentes" value={pendingAppts} highlight={pendingAppts > 0} />
         <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
         <Stat label="Pré-consultas novas" value={unseenForms} highlight={unseenForms > 0} />
@@ -317,6 +362,7 @@ function PainelPage() {
             }
           />
         )}
+        {tab === "Pacientes 👩‍🍼" && <PacientesSection tokenFn={token} />}
         {tab === "Meu Perfil" && <MeuPerfilSection tokenFn={token} />}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
@@ -947,24 +993,21 @@ function AppointmentsSection({
   async function saveConfirmation(a: AdminAppointment) {
     if (!confirmForm.date || !confirmForm.time) return;
     setSaving(true);
-    // .select() para detectar update que não afetou nenhuma linha (ex.: RLS)
-    const { data, error } = await (supabase as any)
-      .from("appointment_requests")
-      .update({
-        status: "confirmed",
-        confirmed_date: confirmForm.date,
-        confirmed_time: confirmForm.time,
-        price_brl: confirmForm.price ? Math.round(Number(confirmForm.price) * 100) : null,
-        internal_notes: confirmForm.notes || null,
-      })
-      .eq("id", a.id)
-      .select("id");
+    // Server function com service role: o UPDATE direto do navegador dependia
+    // de claim is_admin no JWT (RLS) e falhava silenciosamente sem ele.
+    const res = await confirmAppointment({
+      data: {
+        accessToken: await token(),
+        id: a.id,
+        confirmedDate: confirmForm.date,
+        confirmedTime: confirmForm.time,
+        priceBrl: confirmForm.price ? Math.round(Number(confirmForm.price) * 100) : null,
+        internalNotes: confirmForm.notes || null,
+      },
+    });
     setSaving(false);
-    if (error || !data?.length) {
-      toast.error(
-        "Não foi possível confirmar a consulta. Verifique sua permissão de administrador e tente novamente." +
-          (error ? ` (${error.message})` : ""),
-      );
+    if (!res.ok) {
+      toast.error(res.error || "Não foi possível confirmar a consulta. Tente novamente.");
       return;
     }
     onChangeStatus(a.id, "confirmed");
@@ -973,16 +1016,9 @@ function AppointmentsSection({
   }
 
   async function markPaid(id: string) {
-    const { data, error } = await (supabase as any)
-      .from("appointment_requests")
-      .update({ payment_status: "pago" })
-      .eq("id", id)
-      .select("id");
-    if (error || !data?.length) {
-      toast.error(
-        "Não foi possível marcar como pago. Tente novamente." +
-          (error ? ` (${error.message})` : ""),
-      );
+    const res = await markAppointmentPaid({ data: { accessToken: await token(), id } });
+    if (!res.ok) {
+      toast.error(res.error || "Não foi possível marcar como pago. Tente novamente.");
       return;
     }
     onRefresh();
@@ -991,7 +1027,7 @@ function AppointmentsSection({
   function pixWhatsApp(a: AdminAppointment) {
     const price = (a as any).price_brl ? ((a as any).price_brl / 100).toFixed(2) : "___";
     const msg = encodeURIComponent(
-      `Olá, ${a.patient_name}! Para confirmar sua consulta no dia ${(a as any).confirmed_date ? new Date((a as any).confirmed_date + "T00:00:00").toLocaleDateString("pt-BR") : new Date(a.preferred_date + "T00:00:00").toLocaleDateString("pt-BR")} às ${(a as any).confirmed_time ?? a.preferred_time}, envie R$ ${price} via PIX para a chave: bachaclovis@gmail.com (Dr. Clóvis Bacha). Após o pagamento, envie o comprovante aqui. Obrigado!`,
+      `Olá, ${a.patient_name}! Para confirmar sua consulta no dia ${(a as any).confirmed_date ? new Date((a as any).confirmed_date + "T00:00:00").toLocaleDateString("pt-BR") : new Date(a.preferred_date + "T00:00:00").toLocaleDateString("pt-BR")} às ${(a as any).confirmed_time ?? a.preferred_time}, envie R$ ${price} via PIX para a chave: ${DOCTOR.pixKey} (${DOCTOR.pixName}). Após o pagamento, envie o comprovante aqui. Obrigado!`,
     );
     window.open(`https://wa.me/55${a.patient_phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
   }
@@ -1007,20 +1043,36 @@ function AppointmentsSection({
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Dr Clovis Bacha//Agenda//PT-BR",
+      "PRODID:-//Obstetrica//Agenda//PT-BR",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
+      // VTIMEZONE é obrigatório quando DTSTART usa TZID (RFC 5545).
+      // Brasil não tem horário de verão desde 2019: offset fixo -03.
+      "BEGIN:VTIMEZONE",
+      "TZID:America/Sao_Paulo",
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      "TZOFFSETFROM:-0300",
+      "TZOFFSETTO:-0300",
+      "TZNAME:-03",
+      "END:STANDARD",
+      "END:VTIMEZONE",
     ];
+    const dtstamp = `${ymdLocal().replace(/-/g, "")}T000000Z`;
     for (const a of confirmed) {
       const d = (a as any).confirmed_date as string;
       const t = ((a as any).confirmed_time ?? "08:00") as string;
       const start = `${d.replace(/-/g, "")}T${t.replace(":", "")}00`;
+      // Fim = início + 1h via aritmética de Date: vira o dia corretamente
+      // (23:00 → 00:00 do dia seguinte, sem gerar hora 24 inválida).
       const [h, m] = t.split(":").map(Number);
-      const endH = String(h + 1).padStart(2, "0");
-      const end = `${d.replace(/-/g, "")}T${endH}${String(m).padStart(2, "0")}00`;
+      const endDate = new Date(`${d}T00:00:00`);
+      endDate.setHours(h + 1, m);
+      const end = `${ymdLocal(endDate).replace(/-/g, "")}T${String(endDate.getHours()).padStart(2, "0")}${String(endDate.getMinutes()).padStart(2, "0")}00`;
       lines.push(
         "BEGIN:VEVENT",
         `UID:${a.id}@doutorclovis`,
+        `DTSTAMP:${dtstamp}`,
         `DTSTART;TZID=America/Sao_Paulo:${start}`,
         `DTEND;TZID=America/Sao_Paulo:${end}`,
         `SUMMARY:Consulta — ${a.patient_name}`,
@@ -1033,7 +1085,7 @@ function AppointmentsSection({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "agenda-dr-clovis.ics";
+    link.download = "agenda-obstetrica.ics";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -1823,6 +1875,9 @@ function TeleconsultasSection({
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [openingRoom, setOpeningRoom] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState<string | null>(null);
+  // Se a sala foi criada via Google Agenda (convida médico + paciente por
+  // e-mail) ou via fallback (só e-mail à paciente) — muda o texto de confirmação.
+  const [invitedBoth, setInvitedBoth] = useState(false);
   const [noteBullets, setNoteBullets] = useState<Record<string, string>>({});
   const [generatedNote, setGeneratedNote] = useState<Record<string, string>>({});
   const [generatingNote, setGeneratingNote] = useState<string | null>(null);
@@ -1852,8 +1907,9 @@ function TeleconsultasSection({
     });
     setOpeningRoom(null);
     if (res.ok) {
+      setInvitedBoth("invited" in res ? !!res.invited : false);
       setEmailSent(s.id);
-      setTimeout(() => setEmailSent(null), 4000);
+      setTimeout(() => setEmailSent(null), 5000);
     }
     onRefresh();
   }
@@ -2101,7 +2157,9 @@ function TeleconsultasSection({
                     )}
                     {emailSent === s.id && (
                       <span className="text-xs text-emerald-700 font-medium">
-                        ✓ Email enviado ao paciente
+                        {invitedBoth
+                          ? "✓ Convite (Google Agenda) enviado ao médico e à paciente"
+                          : "✓ Link enviado à paciente por e-mail"}
                       </span>
                     )}
                     {s.status === "sala_aberta" && s.meet_url && (
@@ -2874,7 +2932,7 @@ function CalendárioSection({
   );
 
   function getAppts(day: Date) {
-    const iso = day.toISOString().slice(0, 10);
+    const iso = ymdLocal(day);
     return confirmedAppts
       .filter((a) => (a as any).confirmed_date === iso)
       .sort((a, b) =>
@@ -2882,7 +2940,7 @@ function CalendárioSection({
       );
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymdLocal();
 
   const weekLabel = `${weekDays[0].toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} — ${weekDays[6].toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}`;
 
@@ -2922,7 +2980,7 @@ function CalendárioSection({
       {/* Week grid */}
       <div className="grid grid-cols-7 gap-1.5">
         {weekDays.map((day, i) => {
-          const iso = day.toISOString().slice(0, 10);
+          const iso = ymdLocal(day);
           const isToday = iso === today;
           const dayAppts = getAppts(day);
           return (
@@ -3937,7 +3995,8 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
             <h1 className="font-serif text-2xl text-gray-900">{DOCTOR.name}</h1>
             <p className="text-sm text-gray-500 mt-0.5">{DOCTOR.title}</p>
             <p className="text-xs text-gray-400">
-              {DOCTOR.crm} · {DOCTOR.rqe}
+              {DOCTOR.crm}
+              {DOCTOR.rqe ? ` · ${DOCTOR.rqe}` : ""}
             </p>
           </div>
 
@@ -4014,11 +4073,477 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
 
 /* ---------- Meu Perfil (perfil do médico assinante) ---------- */
 
+/** Plano & assinatura do médico — assinatura recorrente por cartão (Stripe). */
+function DoctorBilling({
+  tokenFn,
+  plan,
+  active,
+  exists,
+}: {
+  tokenFn: () => Promise<string>;
+  plan: string;
+  active: boolean;
+  exists: boolean;
+}) {
+  const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
+  const [busy, setBusy] = useState<string | null>(null);
+  const isPaid = active && ["starter", "pro", "clinica", "elite", "black"].includes(plan);
+  const isTeam = plan === "clinica";
+
+  async function checkout(planKey: "starter" | "pro" | "elite" | "black") {
+    setBusy(planKey);
+    try {
+      const tk = await tokenFn();
+      const { createSubscriptionCheckout } = await import("@/lib/billing.functions");
+      const res = await createSubscriptionCheckout({
+        data: {
+          accessToken: tk,
+          product: "doctor_plan",
+          plan: cycle === "annual" ? (`${planKey}_annual` as const) : planKey,
+          returnPath: "/painel",
+        },
+      });
+      if (res.ok && res.url) {
+        window.location.href = res.url;
+        return;
+      }
+      toast.error(
+        res.error === "pagamento_indisponivel"
+          ? "O pagamento está sendo configurado. Tente em instantes."
+          : res.error === "plano_indisponivel"
+            ? "Este ciclo ainda não está disponível — tente o mensal."
+            : "Não foi possível abrir o pagamento.",
+      );
+    } catch {
+      toast.error("Não foi possível abrir o pagamento.");
+    }
+    setBusy(null);
+  }
+
+  async function portal() {
+    setBusy("portal");
+    try {
+      const tk = await tokenFn();
+      const { openBillingPortal } = await import("@/lib/billing.functions");
+      const res = await openBillingPortal({ data: { accessToken: tk, returnPath: "/painel" } });
+      if (res.ok && res.url) {
+        window.location.href = res.url;
+        return;
+      }
+      toast.error(
+        res.error === "sem_assinatura"
+          ? "Você ainda não tem uma assinatura ativa."
+          : "Não foi possível abrir o portal.",
+      );
+    } catch {
+      toast.error("Não foi possível abrir o portal.");
+    }
+    setBusy(null);
+  }
+
+  if (isPaid) {
+    return (
+      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+        <p className="font-serif text-lg text-emerald-900">
+          Assinatura ativa · plano {plan === "clinica" ? "Pro Equipe" : plan}
+        </p>
+        <p className="mt-1 text-sm text-emerald-800">
+          Sua cobrança é automática. Troque o cartão, veja faturas ou cancele quando quiser.
+        </p>
+        <button
+          onClick={portal}
+          disabled={busy === "portal"}
+          className="mt-4 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {busy === "portal" ? "Abrindo…" : "Gerenciar assinatura"}
+        </button>
+      </div>
+    );
+  }
+
+  const PlanBtn = ({
+    planKey,
+    name,
+    monthly,
+    tagline,
+    highlight,
+    black,
+    perk,
+  }: {
+    planKey: "starter" | "pro" | "elite" | "black";
+    name: string;
+    monthly: number;
+    tagline: string;
+    highlight?: boolean;
+    black?: boolean;
+    perk?: string;
+  }) => (
+    <div
+      className={`rounded-2xl border p-4 ${
+        black
+          ? "border-neutral-700 bg-neutral-900 text-white"
+          : highlight
+            ? "border-amber-400 bg-card ring-1 ring-amber-300"
+            : "border-border bg-card"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <p className="font-serif text-base">{name}</p>
+        {black ? (
+          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-neutral-900">
+            MÁXIMO
+          </span>
+        ) : highlight ? (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700">
+            TOP
+          </span>
+        ) : null}
+      </div>
+      <p className={`mt-0.5 text-xs ${black ? "text-white/60" : "text-muted-foreground"}`}>
+        {tagline}
+      </p>
+      <p className="mt-2 text-2xl font-extrabold">
+        R$ {monthly}
+        <span
+          className={`text-sm font-normal ${black ? "text-white/60" : "text-muted-foreground"}`}
+        >
+          /mês
+        </span>
+      </p>
+      {cycle === "annual" && (
+        <p className={`text-[11px] font-semibold ${black ? "text-amber-300" : "text-emerald-600"}`}>
+          cobrado 1×/ano · 2 meses grátis
+        </p>
+      )}
+      {perk && (
+        <p
+          className={`mt-1.5 text-[11px] font-semibold ${black ? "text-amber-300" : "text-amber-700"}`}
+        >
+          {perk}
+        </p>
+      )}
+      <button
+        onClick={() => checkout(planKey)}
+        disabled={!!busy}
+        className={`press mt-3 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-60 ${
+          black
+            ? "bg-amber-400 text-neutral-900"
+            : highlight
+              ? "bg-amber-500 text-white"
+              : "bg-primary text-primary-foreground"
+        }`}
+      >
+        {busy === planKey ? "Abrindo pagamento…" : `Assinar ${name}`}
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-serif text-lg">Ative sua assinatura</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {exists ? "Você está no período de teste." : ""} Assine por cartão — acesso liberado na
+            hora, renovação automática, cancele quando quiser.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 inline-flex rounded-full border border-border bg-card p-1 text-xs font-semibold">
+        <button
+          onClick={() => setCycle("monthly")}
+          className={`rounded-full px-3 py-1.5 ${cycle === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          Mensal
+        </button>
+        <button
+          onClick={() => setCycle("annual")}
+          className={`rounded-full px-3 py-1.5 ${cycle === "annual" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          Anual · 2 meses grátis
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <PlanBtn planKey="starter" name="Starter" monthly={197} tagline="A sua IA no app" />
+        <PlanBtn planKey="pro" name="Pro" monthly={347} tagline="A IA também no WhatsApp" />
+        <PlanBtn
+          planKey="elite"
+          name="Elite"
+          monthly={697}
+          tagline="Para clínicas de alto volume"
+          highlight
+          perk="🎟️ 25 convites premium/mês + selo Elite"
+        />
+        <PlanBtn
+          planKey="black"
+          name="Black"
+          monthly={1999}
+          tagline="O plano mais completo"
+          black
+          perk="🖤 250 convites/mês · gerente dedicado · topo da busca · selo Black"
+        />
+      </div>
+
+      {isTeam ? null : (
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Precisa de vários médicos (Pro Equipe)?{" "}
+          <a href="/medicos#contato" className="font-semibold text-primary">
+            Fale com a gente
+          </a>
+          .
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Card de convites premium (Elite/Black): gera código na hora + cota do mês. */
+function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [info, setInfo] = useState<{
+    eligible: boolean;
+    limit: number;
+    used: number;
+    remaining: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [code, setCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const tk = await tokenFn();
+        const { getMyInviteInfo } = await import("@/lib/invites.functions");
+        const res = await getMyInviteInfo({ data: { accessToken: tk } });
+        if (res.ok) setInfo(res);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading || !info || !info.eligible) return null;
+
+  async function generate() {
+    setGenerating(true);
+    setCopied(false);
+    try {
+      const tk = await tokenFn();
+      const { generateInviteCode } = await import("@/lib/invites.functions");
+      const res = await generateInviteCode({ data: { accessToken: tk } });
+      if (res.ok) {
+        setCode(res.code);
+        setInfo((prev) => (prev ? { ...prev, used: res.used, remaining: res.remaining } : prev));
+        // Copia automaticamente para facilitar o envio.
+        try {
+          await navigator.clipboard.writeText(res.code);
+          setCopied(true);
+        } catch {
+          /* sem clipboard: a paciente copia manualmente */
+        }
+      } else {
+        toast.error(
+          res.error === "cota_esgotada"
+            ? "Você já gerou todos os convites deste mês."
+            : "Não foi possível gerar o código. Tente novamente.",
+        );
+      }
+    } catch {
+      toast.error("Não foi possível gerar o código.");
+    }
+    setGenerating(false);
+  }
+
+  const copy = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar. Código: " + code);
+    }
+  };
+
+  const esgotado = info.remaining <= 0;
+
+  return (
+    <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6">
+      <p className="font-serif text-lg text-amber-900">🎟️ Convites premium</p>
+      <p className="mt-1 text-sm text-amber-800">
+        Gere um código na hora e envie para a sua paciente do jeito que quiser (WhatsApp, e-mail…).
+        Cada código vale para <strong>uma paciente</strong> e libera o Obstétrica Premium completo —
+        por sua conta.
+      </p>
+
+      {code && (
+        <button
+          onClick={copy}
+          className="press mt-4 flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-amber-300 bg-white px-4 py-3 font-mono text-xl font-black tracking-[0.3em] text-amber-900"
+        >
+          <span>{code}</span>
+          <span className="font-sans text-xs font-bold text-amber-600">
+            {copied ? "copiado ✓" : "copiar"}
+          </span>
+        </button>
+      )}
+
+      <button
+        onClick={generate}
+        disabled={generating || esgotado}
+        className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-50"
+      >
+        {generating
+          ? "Gerando…"
+          : esgotado
+            ? "Cota do mês esgotada"
+            : code
+              ? "Gerar outro código"
+              : "Gerar código para uma paciente"}
+      </button>
+
+      <div className="mt-3 flex items-center justify-between text-sm">
+        <span className="text-amber-800">
+          Gerados este mês: <strong>{info.used}</strong> de {info.limit}
+        </span>
+        <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800">
+          {info.remaining} restantes
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function GoogleCalendarCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function refresh() {
+    try {
+      const tk = await tokenFn();
+      const res = await getGoogleCalendarStatus({ data: { accessToken: tk } });
+      if (res.ok) {
+        setConnected(res.connected);
+        setEmail(res.connected ? (res.email ?? null) : null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function connect() {
+    setBusy(true);
+    try {
+      const tk = await tokenFn();
+      const res = await startGoogleCalendarConnect({
+        data: { accessToken: tk, origin: window.location.origin },
+      });
+      if (res.ok && "url" in res) {
+        window.location.href = res.url;
+      } else {
+        toast.error(("error" in res && res.error) || "Não foi possível iniciar a conexão.");
+        setBusy(false);
+      }
+    } catch {
+      toast.error("Falha de conexão. Tente novamente.");
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    try {
+      const tk = await tokenFn();
+      await disconnectGoogleCalendar({ data: { accessToken: tk } });
+      setConnected(false);
+      setEmail(null);
+      toast.success("Agenda desconectada.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) return <div className="skeleton h-28 rounded-3xl" />;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-serif text-lg">Google Agenda das teleconsultas</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {connected
+              ? "Conectada — as salas de teleconsulta são criadas na sua conta Google e o convite vai para você e para a paciente."
+              : "Conecte sua conta Google para que cada teleconsulta crie a reunião do Meet na SUA agenda e convide você e a paciente automaticamente."}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+            connected ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"
+          }`}
+        >
+          {connected ? "Conectada ✓" : "Não conectada"}
+        </span>
+      </div>
+
+      {connected && email && (
+        <p className="mt-3 rounded-xl bg-secondary/50 px-3 py-2 text-xs text-muted-foreground">
+          Conta: <strong>{email}</strong>
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {connected ? (
+          <>
+            <button
+              onClick={connect}
+              disabled={busy}
+              className="rounded-full border border-border px-4 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-60"
+            >
+              Reconectar
+            </button>
+            <button
+              onClick={disconnect}
+              disabled={busy}
+              className="rounded-full border border-destructive/30 px-4 py-2 text-xs text-destructive hover:bg-destructive/5 disabled:opacity-60"
+            >
+              Desconectar
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={connect}
+            disabled={busy}
+            className="press rounded-full bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+          >
+            {busy ? "Redirecionando…" : "Conectar Google Agenda"}
+          </button>
+        )}
+      </div>
+      <p className="mt-3 text-[11px] text-muted-foreground">
+        Sem conectar, as teleconsultas usam a conta Google central da plataforma (ou o Jitsi, se
+        nenhuma estiver configurada).
+      </p>
+    </div>
+  );
+}
+
 function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exists, setExists] = useState(false);
   const [plan, setPlan] = useState("trial");
+  const [active, setActive] = useState(false);
   const [slug, setSlug] = useState<string | null>(null);
   const [form, setForm] = useState({
     display_name: "",
@@ -4027,6 +4552,14 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     crm: "",
     whatsapp: "",
     pix_key: "",
+    bio: "",
+    subspecialty: "",
+    years_experience: null as number | null,
+    has_masters: false,
+    has_doctorate: false,
+    city: "",
+    state: "",
+    accepting_patients: true,
   });
 
   useEffect(() => {
@@ -4038,6 +4571,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           const d = res.doctor as DoctorProfile;
           setExists(true);
           setPlan(d.plan);
+          setActive(d.active);
           setSlug(d.slug);
           setForm({
             display_name: d.display_name,
@@ -4046,6 +4580,14 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             crm: d.crm,
             whatsapp: d.whatsapp,
             pix_key: d.pix_key,
+            bio: d.bio ?? "",
+            subspecialty: d.subspecialty ?? "",
+            years_experience: d.years_experience ?? null,
+            has_masters: !!d.has_masters,
+            has_doctorate: !!d.has_doctorate,
+            city: d.city ?? "",
+            state: d.state ?? "",
+            accepting_patients: d.accepting_patients ?? true,
           });
         }
       } finally {
@@ -4094,6 +4636,10 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
   return (
     <div className="max-w-2xl space-y-4">
+      <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
+      <DoctorInviteCard tokenFn={tokenFn} />
+      <GoogleCalendarCard tokenFn={tokenFn} />
+
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -4102,9 +4648,12 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               É com esses dados que suas pacientes veem você no app.
             </p>
           </div>
-          <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            plano {plan}
-          </span>
+          <div className="flex flex-col items-end gap-1.5">
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              plano {plan}
+            </span>
+            <DoctorBadge plan={plan} />
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -4160,6 +4709,96 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           </div>
         </div>
 
+        {/* Perfil público — aparece na busca de médicos das pacientes */}
+        <div className="mt-6 border-t border-border pt-5">
+          <p className="text-sm font-semibold">Perfil público (busca de médicos)</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Preencha para aparecer quando pacientes sem médico procurarem no app. Planos melhores
+            aparecem primeiro.
+          </p>
+          <div className="mt-3 grid gap-4 md:grid-cols-2">
+            <div>
+              <label className={label}>Subárea / atuação</label>
+              <input
+                value={form.subspecialty}
+                onChange={(e) => setForm((f) => ({ ...f, subspecialty: e.target.value }))}
+                placeholder="Medicina fetal, alto risco…"
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Anos de experiência</label>
+              <input
+                type="number"
+                min={0}
+                max={70}
+                value={form.years_experience ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    years_experience: e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Cidade</label>
+              <input
+                value={form.city}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Estado (UF)</label>
+              <input
+                value={form.state}
+                maxLength={2}
+                onChange={(e) => setForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))}
+                placeholder="SP"
+                className={input}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={label}>Sobre você (bio curta)</label>
+              <textarea
+                value={form.bio}
+                onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+                rows={3}
+                placeholder="Uma frase acolhedora sobre a sua forma de cuidar."
+                className={`${input} resize-none`}
+              />
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.has_masters}
+                onChange={(e) => setForm((f) => ({ ...f, has_masters: e.target.checked }))}
+              />
+              🎓 Mestrado
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.has_doctorate}
+                onChange={(e) => setForm((f) => ({ ...f, has_doctorate: e.target.checked }))}
+              />
+              🎓 Doutorado
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.accepting_patients}
+                onChange={(e) => setForm((f) => ({ ...f, accepting_patients: e.target.checked }))}
+              />
+              Aceitando novas pacientes
+            </label>
+          </div>
+        </div>
+
         {slug && (
           <p className="mt-4 text-xs text-muted-foreground">
             Seu endereço na plataforma:{" "}
@@ -4175,6 +4814,230 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         >
           {saving ? "Salvando..." : "Salvar perfil"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Pacientes (vínculo paciente ↔ médico) ---------- */
+function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [loading, setLoading] = useState(true);
+  const [requests, setRequests] = useState<PatientRequest[]>([]);
+  const [patients, setPatients] = useState<LinkedPatient[]>([]);
+  // id da solicitação sendo respondida (desabilita os botões enquanto em voo)
+  const [respondingId, setRespondingId] = useState<string | null>(null);
+
+  async function loadPatients() {
+    const tk = await tokenFn();
+    const res = await listMyPatients({ data: { accessToken: tk } });
+    if (res.ok) setPatients(res.patients);
+  }
+
+  // Ativa/desativa o premium do quiz (após o PIX, o médico libera aqui)
+  const [premiumBusyId, setPremiumBusyId] = useState<string | null>(null);
+  async function togglePremium(p: LinkedPatient) {
+    setPremiumBusyId(p.id);
+    try {
+      const tk = await tokenFn();
+      const res = await setPatientQuizPremium({
+        data: { accessToken: tk, patientId: p.id, premium: !p.quiz_premium },
+      });
+      if (!res.ok) {
+        toast.error(res.error ?? "Não foi possível alterar o premium.");
+        return;
+      }
+      setPatients((ps) =>
+        ps.map((x) => (x.id === p.id ? { ...x, quiz_premium: !p.quiz_premium } : x)),
+      );
+      toast.success(!p.quiz_premium ? "Aulas premium ativadas ⭐" : "Premium desativado.");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setPremiumBusyId(null);
+    }
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const tk = await tokenFn();
+        const [reqRes, patRes] = await Promise.all([
+          listPatientRequests({ data: { accessToken: tk } }),
+          listMyPatients({ data: { accessToken: tk } }),
+        ]);
+        if (reqRes.ok) setRequests(reqRes.requests);
+        if (patRes.ok) setPatients(patRes.patients);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function respond(req: PatientRequest, accept: boolean) {
+    setRespondingId(req.id);
+    try {
+      const tk = await tokenFn();
+      const res = await respondPatientRequest({
+        data: { accessToken: tk, requestId: req.id, accept },
+      });
+      if (!res.ok) {
+        toast.error("Não foi possível responder à solicitação. Tente novamente.");
+        return;
+      }
+      // Remove o card otimisticamente e, ao aceitar, atualiza as pacientes.
+      setRequests((rs) => rs.filter((r) => r.id !== req.id));
+      if (accept) {
+        toast.success("Paciente vinculada ✓");
+        await loadPatients();
+      } else {
+        toast.success("Solicitação recusada.");
+      }
+    } finally {
+      setRespondingId(null);
+    }
+  }
+
+  if (loading) return <div className="skeleton h-64 rounded-3xl" />;
+
+  const fmtDate = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+
+  return (
+    <div className="space-y-8">
+      {/* Solicitações pendentes */}
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="font-serif text-xl">Solicitações pendentes</h2>
+          {requests.length > 0 && (
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+              {requests.length}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pacientes que pediram para acompanhar você no app. Aceite para vinculá-las.
+        </p>
+
+        {requests.length === 0 ? (
+          <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-3xl">📭</p>
+            <p className="mt-2 text-sm text-muted-foreground">Nenhuma solicitação pendente</p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {requests.map((r) => {
+              const busy = respondingId === r.id;
+              return (
+                <div
+                  key={r.id}
+                  className="rounded-2xl border border-primary/40 bg-card p-5 shadow-[var(--shadow-card)]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{r.patient_name ?? "Paciente"}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Solicitado em{" "}
+                        {new Date(r.created_at).toLocaleDateString("pt-BR", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                      {r.message && (
+                        <p className="mt-2 rounded-xl bg-secondary/40 p-3 text-sm text-foreground">
+                          “{r.message}”
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={() => respond(r, true)}
+                        disabled={busy}
+                        className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                      >
+                        {busy ? "…" : "Aceitar"}
+                      </button>
+                      <button
+                        onClick={() => respond(r, false)}
+                        disabled={busy}
+                        className="rounded-full border border-border px-4 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary disabled:opacity-50"
+                      >
+                        Recusar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Minhas pacientes */}
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="font-serif text-xl">Minhas pacientes</h2>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+            {patients.length}
+          </span>
+        </div>
+
+        {patients.length === 0 ? (
+          <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-3xl">👩‍🍼</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Você ainda não tem pacientes vinculadas. Compartilhe seu perfil para que elas
+              encontrem você e enviem uma solicitação.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+            <ul className="divide-y divide-border">
+              {patients.map((p) => {
+                const due = fmtDate(p.due_date);
+                return (
+                  <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                        {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {p.display_name ?? "Sem nome"}
+                        </p>
+                        {due && <p className="text-xs text-muted-foreground">DPP {due}</p>}
+                      </div>
+                    </div>
+                    {/* Premium do quiz: liberar após confirmar o PIX da paciente */}
+                    <button
+                      onClick={() => togglePremium(p)}
+                      disabled={premiumBusyId === p.id}
+                      title={
+                        p.quiz_premium
+                          ? "Aulas premium ativas — clique para desativar"
+                          : "Ativar aulas premium (após confirmar o PIX)"
+                      }
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
+                        p.quiz_premium
+                          ? "bg-amber-100 text-amber-700"
+                          : "border border-border text-muted-foreground hover:border-amber-400 hover:text-amber-600"
+                      }`}
+                    >
+                      {premiumBusyId === p.id ? "…" : p.quiz_premium ? "⭐ Premium" : "☆ Premium"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,11 +1,12 @@
 /**
- * Segundo Cérebro do Dr. Clóvis — server functions do painel do médico.
+ * Segundo Cérebro do médico — server functions do painel do médico.
  *
  * CRUD de brain_settings/brain_entries, treino a partir das perguntas das
  * pacientes (doctor_questions) e teste do cérebro com o mesmo modelo do chat.
  * Todas as funções exigem admin (ADMIN_EMAILS), como em admin.functions.ts.
  */
 
+import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -54,13 +55,27 @@ async function ownerDoctorId(user: { id: string; email?: string | null }): Promi
     .eq("id", user.id)
     .maybeSingle();
   if (doc?.id) return doc.id as string;
-  const { resolveOwnerDoctorId } = await import("./secondbrain.server");
-  return (await resolveOwnerDoctorId()) ?? user.id;
+  // Assinante sem linha resolvida (ex.: erro transitório no maybeSingle, que
+  // devolve data:null sem lançar): usa o PRÓPRIO uid — `doctors.id` é sempre o
+  // auth uid. NUNCA cair em resolveOwnerDoctorId() aqui, senão o assinante
+  // leria/gravaria o cérebro (persona, regras, Q&A) do médico DONO da
+  // instalação — vazamento e contaminação cruzada de perfis.
+  return user.id;
 }
 
 /** Só a equipe da instalação (ADMIN_EMAILS) — NÃO médicos assinantes. */
 function isPlatformTeam(user: { email?: string | null }): boolean {
   return !!user.email && adminEmails().includes(user.email.toLowerCase());
+}
+
+/**
+ * O Segundo Cérebro (IA) é do plano Starter+ (Free organiza o consultório mas
+ * NÃO tem IA). Gate por entitlement: treinar/usar o cérebro exige `aiApp`.
+ * Retorna true se o médico pode operar o cérebro no plano atual.
+ */
+async function canUseBrain(user: { id: string; email?: string | null }): Promise<boolean> {
+  const { getEntitlements } = await import("./entitlements.server");
+  return (await getEntitlements(user)).aiApp;
 }
 
 export type BrainEntry = {
@@ -129,6 +144,8 @@ export const saveBrainSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    // Free não tem IA: não pode configurar o cérebro.
+    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const doctorId = await ownerDoctorId(user);
@@ -184,6 +201,8 @@ export const addBrainEntry = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    // Free não tem IA: não pode treinar o cérebro.
+    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const doctorId = await ownerDoctorId(user);
@@ -345,6 +364,12 @@ export const testBrain = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    // Free não tem IA: não pode testar o cérebro.
+    if (!(await canUseBrain(user)))
+      return {
+        ok: false as const,
+        answer: "O Segundo Cérebro está disponível a partir do plano Starter.",
+      };
 
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key)
@@ -359,7 +384,7 @@ export const testBrain = createServerFn({ method: "POST" })
 
     const brain = await getBrainContext(data.question, await ownerDoctorId(user), "teste");
     const system = [
-      "Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra especialista em gestação de alto risco.",
+      `Você é o assistente virtual do consultório de ${DOCTOR.name}, ginecologista e obstetra especialista em gestação de alto risco.`,
       "Responda em português brasileiro, com tom acolhedor, claro e profissional. Seja conciso (3 a 6 frases).",
       "NUNCA dê diagnóstico ou prescrição. Em urgência, oriente ligar 192 (SAMU) ou ir ao pronto-socorro.",
       brain.block,

@@ -40,7 +40,7 @@ export const assessSymptoms = createServerFn({ method: "POST" })
               : "Tranquilize e oriente manter o pré-natal.";
         const { text } = await generateText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
-          system: `Você é um assistente de orientação do consultório do Dr. Clóvis Bacha (obstetrícia, alto risco).
+          system: `Você é um assistente de orientação de um consultório de obstetrícia especializado em gestação de alto risco.
 Regras absolutas:
 - NUNCA dê diagnóstico, nome de doença como certeza, nem prescrição.
 - O nível de risco JÁ foi definido (${level}). NÃO contradiga nem minimize. ${orient}

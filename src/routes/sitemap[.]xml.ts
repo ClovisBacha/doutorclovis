@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const BASE_URL = process.env.VITE_PUBLIC_URL ?? "https://doutorclovis.vercel.app";
+const BASE_URL = process.env.VITE_PUBLIC_URL ?? "https://obstetrica.com.br";
 
 const entries = [
   { path: "/", priority: "1.0", changefreq: "weekly" },
   { path: "/sobre", priority: "0.9", changefreq: "monthly" },
   { path: "/agendamento", priority: "0.9", changefreq: "weekly" },
+  { path: "/medicos", priority: "0.9", changefreq: "weekly" },
   { path: "/empresas", priority: "0.8", changefreq: "monthly" },
   { path: "/gestacao", priority: "0.8", changefreq: "monthly" },
   { path: "/calculadora", priority: "0.8", changefreq: "monthly" },

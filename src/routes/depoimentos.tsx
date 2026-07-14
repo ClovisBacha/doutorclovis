@@ -6,13 +6,12 @@ import { SpotlightCard } from "@/components/motion-fx";
 export const Route = createFileRoute("/depoimentos")({
   head: () => ({
     meta: [
-      { title: "Depoimentos de pacientes — Obstétrica by Dr. Clóvis" },
+      { title: "Depoimentos de pacientes — Obstétrica" },
       {
         name: "description",
-        content:
-          "Relatos reais de pacientes acompanhadas pelo Dr. Clóvis Bacha em gestações de alto risco.",
+        content: "Relatos reais de pacientes acompanhadas em gestações de alto risco.",
       },
-      { property: "og:title", content: "Depoimentos — Obstétrica by Dr. Clóvis" },
+      { property: "og:title", content: "Depoimentos — Obstétrica" },
       {
         property: "og:description",
         content: "Experiências de pacientes durante o pré-natal e a gestação de alto risco.",
@@ -26,7 +25,7 @@ const reviews = [
   {
     name: "Marina S.",
     city: "Belo Horizonte · MG",
-    text: "Tive pré-eclâmpsia na primeira gestação. O Dr. Clóvis me acompanhou semanalmente, com calma e firmeza. Cheguei ao parto segura e meu bebê nasceu bem.",
+    text: "Tive pré-eclâmpsia na primeira gestação. Meu obstetra me acompanhou semanalmente pelo app, com calma e firmeza. Cheguei ao parto segura e meu bebê nasceu bem.",
   },
   {
     name: "Juliana R.",
@@ -36,7 +35,7 @@ const reviews = [
   {
     name: "Ana Carolina M.",
     city: "Rio de Janeiro · RJ",
-    text: "Diabetes gestacional descoberta tarde. Em duas semanas com o protocolo do Dr. Clóvis estávamos com tudo sob controle. Profissional excepcional.",
+    text: "Diabetes gestacional descoberta tarde. Em duas semanas com o protocolo do meu médico estávamos com tudo sob controle. Profissional excepcional.",
   },
   {
     name: "Fernanda L.",
@@ -72,8 +71,8 @@ function DepoimentosPage() {
         </Reveal>
         <Reveal variant="up" delay={120}>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-            Cada gestação é única — e cada depoimento abaixo é de uma paciente que confiou no Dr.
-            Clóvis em momentos delicados.
+            Cada gestação é única — e cada depoimento abaixo é de uma paciente que confiou no seu
+            médico em momentos delicados.
           </p>
         </Reveal>
       </section>

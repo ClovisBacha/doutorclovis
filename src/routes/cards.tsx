@@ -5,7 +5,7 @@ import { Download, Share2 } from "lucide-react";
 export const Route = createFileRoute("/cards")({
   head: () => ({
     meta: [
-      { title: "Cards da gestação — compartilhe seu momento | Dr. Clóvis Bacha" },
+      { title: "Cards da gestação — compartilhe seu momento | Obstétrica" },
       {
         name: "description",
         content:
@@ -39,7 +39,7 @@ function CardsPage() {
   const marco = marcos[semana] ?? "Mais uma semana de amor";
 
   async function compartilhar() {
-    const text = `${semana} semanas! ${marco} ${nome ? `— ${nome}` : ""}\nAcompanhamento com Dr. Clóvis Bacha`;
+    const text = `${semana} semanas! ${marco} ${nome ? `— ${nome}` : ""}\nAcompanhando cada semana no app Obstétrica 💜`;
     const url = typeof window !== "undefined" ? window.location.origin : "";
     if (navigator.share) {
       try {
@@ -138,7 +138,7 @@ function CardsPage() {
               <p className="mt-6 font-serif text-2xl">{marco}</p>
               {nome && <p className="mt-4 text-sm opacity-90">{nome}</p>}
             </div>
-            <p className="text-xs opacity-80">Dr. Clóvis Bacha · Alto Risco</p>
+            <p className="text-xs opacity-80">Obstétrica · app da gestação</p>
           </div>
         </div>
       </div>

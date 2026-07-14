@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Reveal } from "@/components/reveal";
 import { SpotlightCard } from "@/components/motion-fx";
+import { PricingGlass, type PricingGlassTier } from "@/components/ui/pricing-glass";
 
 export const Route = createFileRoute("/medicos")({
   head: () => ({
@@ -13,15 +16,22 @@ export const Route = createFileRoute("/medicos")({
       {
         name: "description",
         content:
-          "Agendamento inteligente, agente de IA no WhatsApp e cobrança PIX integrada. A plataforma feita por obstetra para obstetras. Sem contrato anual.",
+          "Uma IA treinada nas suas respostas atende suas pacientes 24h, no app e no WhatsApp. Feita por obstetra para obstetras. Sem contrato anual.",
       },
     ],
   }),
   component: MedicosPage,
 });
 
+// Promoção de lançamento: enquanto ativa, o anual dá 25% off (em vez dos
+// 2 meses grátis ≈ 17%). Basta trocar active para false quando encerrar.
+const LAUNCH_PROMO = { active: true, off: 0.25, label: "🚀 Lançamento" };
+
 // monthly = preço no plano mensal (0 = grátis). No plano ANUAL o médico paga
 // 10 meses e usa 12 (2 meses grátis ≈ 17% off) → mensal equivalente arredondado.
+// Regra de ouro dos planos: cada bullet é algo que o produto FAZ hoje (ou é
+// entregue com implantação assistida, e diz isso). Nada de promessa vaga,
+// número inventado ou recurso de roadmap vendido como pronto.
 const PLANS = [
   {
     key: "free",
@@ -31,52 +41,85 @@ const PLANS = [
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "Tudo o que você precisa para sair do caderno — de graça, para sempre.",
+    desc: "Saia do caderno e do zap pessoal — de graça, para sempre.",
     features: [
-      "Agenda online + confirmações",
-      "App de pré-natal para as suas pacientes",
-      "Prontuário gestacional + calculadoras clínicas",
+      "App de pré-natal completo para as suas pacientes",
+      "Solicitações de consulta organizadas em um só lugar",
+      "Calculadoras e ferramentas clínicas básicas",
       "Até 5 pacientes ativas",
-      "Sem fidelidade, sem cartão",
     ],
     cta: "Criar conta grátis",
   },
   {
     key: "starter",
     name: "Starter",
-    tagline: "A IA responde por você",
+    tagline: "A sua IA no app",
     monthly: 197,
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "Suas pacientes tiram dúvidas com a sua IA no app — você para de repetir as mesmas respostas.",
+    desc: "Uma IA treinada nas SUAS respostas atende suas pacientes no app — você para de repetir as mesmas orientações.",
     features: [
-      "Tudo do Free, pacientes ilimitadas",
-      "🧠 A sua IA responde as pacientes 24h (no app)",
-      "Ferramentas clínicas: biometria, EPDS, DMG, pré-eclâmpsia",
-      "Confirmações automáticas por WhatsApp",
-      "Cobrança PIX integrada",
+      "Pacientes ilimitadas",
+      "🧠 IA com as suas respostas, 24h no app",
+      "Pré-consulta digital + monitoramento (peso, pressão, chutes)",
+      "Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia)",
     ],
     cta: "Começar grátis por 14 dias",
   },
   {
     key: "pro",
     name: "Pro",
-    tagline: "A IA vira sua secretária",
+    tagline: "A IA também no WhatsApp",
     monthly: 347,
     isFrom: false,
     perSuffix: "",
     highlight: true,
-    desc: "A mesma IA agora atende e agenda no WhatsApp — menos faltas, menos trabalho de recepção.",
+    desc: "A mesma IA atende e agenda no WhatsApp do consultório — implantada junto com a nossa equipe.",
     features: [
       "Tudo do Starter",
-      "💬 A sua IA atende e agenda no WhatsApp (não só no app)",
-      "Detecta urgência e orienta SAMU/UPA sozinha",
-      "Lembretes automáticos → até 38% menos faltas",
-      "Dashboard: FAQ inteligente e risco de abandono",
+      "💬 IA atende e agenda no WhatsApp (implantação assistida)",
+      "Triagem de urgência com orientação SAMU/UPA",
+      "Dashboard do consultório: dúvidas frequentes e engajamento",
       "Suporte prioritário",
     ],
     cta: "Assinar Pro",
+  },
+  {
+    key: "elite",
+    name: "Elite",
+    tagline: "Para clínicas de alto volume",
+    monthly: 697,
+    isFrom: false,
+    perSuffix: "",
+    highlight: false,
+    desc: "Tudo do Pro + convites premium para presentear suas pacientes com o app completo.",
+    features: [
+      "Tudo do Pro",
+      "🎟️ 25 convites premium/mês — gere o código na hora e envie para a paciente",
+      "✓ Selo Elite verificado no seu perfil",
+      "Prioridade na busca de médicos do app",
+    ],
+    cta: "Assinar Elite",
+  },
+  {
+    key: "black",
+    name: "Black",
+    tagline: "O plano mais completo",
+    monthly: 1999,
+    isFrom: false,
+    perSuffix: "",
+    highlight: false,
+    desc: "O mais alto de todos: presenteie centenas de pacientes com o app completo e tenha prioridade máxima.",
+    features: [
+      "Tudo do Elite",
+      "🖤 250 convites premium/mês (gerados na hora)",
+      "👤 Gerente de conta dedicado + suporte prioritário",
+      "🥇 Topo absoluto na busca de médicos + selo Black exclusivo",
+      "🚀 Acesso antecipado a novos recursos + treinamento da equipe",
+      "Onboarding e migração assistidos",
+    ],
+    cta: "Assinar Black",
   },
   {
     key: "enterprise",
@@ -86,13 +129,12 @@ const PLANS = [
     isFrom: true,
     perSuffix: "/médico",
     highlight: false,
-    desc: "O Pro para vários médicos numa conta só — mais barato quanto maior a equipe.",
+    desc: "O Pro para vários médicos, cada um com a sua própria IA.",
     features: [
       "Tudo do Pro, para cada médico da equipe",
-      "Cada médico com a sua própria IA",
-      "Painel consolidado por médico",
-      "Preço por assento: 2–4 médicos R$297, 5+ R$247",
-      "Gerente de conta dedicado",
+      "Cada médico com a sua própria IA e o seu painel",
+      "Preço por assento: 2–4 médicos R$297 · 5+ R$247",
+      "Onboarding e migração assistidos",
     ],
     cta: "Falar com a equipe",
   },
@@ -120,7 +162,8 @@ const PAIN_POINTS = [
   {
     icon: "💸",
     problem: "Perda de milhares por mês com faltas",
-    solution: "Lembretes e confirmação automática no WhatsApp reduzem o no-show em até 38%.",
+    solution:
+      "A IA confirma a consulta e lembra a paciente no canal onde ela já está — menos cadeira vazia.",
   },
   {
     icon: "📵",
@@ -130,13 +173,13 @@ const PAIN_POINTS = [
   {
     icon: "💳",
     problem: "Taxa de cartão comendo o faturamento",
-    solution: "PIX nativo sem taxa. Recibo digital automático após a confirmação.",
+    solution: "Consultas particulares pagas por PIX, direto na sua chave — sem taxa de cartão.",
   },
 ];
 
 const TESTIMONIALS = [
   {
-    name: "Dr. Clóvis Bacha",
+    name: "O obstetra fundador",
     role: "Ginecologista e Obstetra — Criador da plataforma",
     text: "Construí essa ferramenta porque não encontrei nada no mercado focado nas necessidades reais de uma gestação de alto risco. O agente IA respondeu mais de 200 mensagens de WhatsApp na primeira semana, liberando horas do meu dia.",
     avatar: "CB",
@@ -162,7 +205,7 @@ const FAQS = [
   },
   {
     q: "Funciona com meu sistema atual (iClinic, Feegow)?",
-    a: "No Pro Equipe oferecemos integrações via API. Para Free, Starter e Pro, a plataforma funciona de forma independente — a migração de dados pode ser feita com ajuda da nossa equipe.",
+    a: "A plataforma funciona de forma independente do seu sistema atual — você pode usar os dois em paralelo. A migração de dados é feita com a ajuda da nossa equipe; integrações diretas são avaliadas caso a caso no Pro Equipe.",
   },
   {
     q: "Quantas pacientes posso ter?",
@@ -190,7 +233,8 @@ function MedicosPage() {
     e.preventDefault();
     if (!leadForm.name || !leadForm.email) return;
     setSubmitting(true);
-    await (supabase as any).from("doctor_leads").insert({
+    // Nunca engolir o erro: um lead perdido em silêncio é um cliente perdido.
+    const { error } = await (supabase as any).from("doctor_leads").insert({
       name: leadForm.name,
       email: leadForm.email,
       phone: leadForm.phone || null,
@@ -198,8 +242,12 @@ function MedicosPage() {
       city: leadForm.city || null,
       message: leadForm.message || null,
     });
-    setSubmitted(true);
     setSubmitting(false);
+    if (error) {
+      toast.error("Não conseguimos enviar seu contato. Tente de novo ou chame no WhatsApp.");
+      return;
+    }
+    setSubmitted(true);
   }
 
   return (
@@ -430,12 +478,12 @@ function MedicosPage() {
                 {[
                   {
                     from: "patient",
-                    text: "Oi, gostaria de marcar consulta com o Dr. Clóvis",
+                    text: "Oi, gostaria de marcar uma consulta com a Dra. Ana",
                     time: "23:14",
                   },
                   {
                     from: "agent",
-                    text: "Olá! Sou a assistente virtual do Dr. Clóvis Bacha 👋 Com quem estou falando?",
+                    text: "Olá! Sou a assistente virtual da Dra. Ana 👋 Com quem estou falando?",
                     time: "23:14",
                   },
                   { from: "patient", text: "Ana Lima", time: "23:15" },
@@ -640,117 +688,77 @@ function MedicosPage() {
       </section>
 
       {/* ── Pricing ───────────────────────────────────────────── */}
-      <section id="planos" className="px-6 py-20">
-        <div className="mx-auto max-w-5xl">
+      <section
+        id="planos"
+        className="relative overflow-hidden px-6 py-24 text-white"
+        style={{
+          background: "radial-gradient(120% 90% at 50% 0%, #2a151a 0%, #1a0e12 45%, #120a0d 100%)",
+        }}
+      >
+        <div className="relative z-10 mx-auto max-w-6xl">
           <Reveal>
-            <h2 className="text-center font-serif text-3xl md:text-4xl">
+            <h2 className="text-center font-serif text-3xl text-white md:text-4xl">
               Escolha pelo que quer tirar do seu prato
             </h2>
-            <p className="mx-auto mt-3 max-w-lg text-center text-muted-foreground">
+            <p className="mx-auto mt-3 max-w-lg text-center text-white/60">
               Sem contrato, sem taxa de implantação, sem fidelidade. Suba ou desça de plano quando
               quiser — cancele num clique.
             </p>
           </Reveal>
 
-          {/* Seletor Mensal / Anual */}
-          <Reveal>
-            <div className="mt-8 flex flex-col items-center gap-2">
-              <div className="inline-flex rounded-full border border-border bg-card p-1">
-                {(["mensal", "anual"] as const).map((b) => (
-                  <button
-                    key={b}
-                    onClick={() => setBilling(b)}
-                    className={`rounded-full px-5 py-1.5 text-sm font-semibold transition ${
-                      billing === b
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-primary"
-                    }`}
-                  >
-                    {b === "mensal" ? "Mensal" : "Anual"}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs font-medium text-primary">
-                💚 No anual, 2 meses grátis — economize ~17%
-              </p>
-            </div>
-          </Reveal>
-
-          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            {PLANS.map((plan, i) => {
-              const annual = billing === "anual";
-              // No anual paga 10 e usa 12 → mensal equivalente arredondado.
+          {(() => {
+            const annual = billing === "anual";
+            const promo = LAUNCH_PROMO.active;
+            // Anual: com promoção de lançamento = 25% off; sem = 2 meses grátis (≈17%).
+            const annualFactor = promo ? 1 - LAUNCH_PROMO.off : 10 / 12;
+            const glassTiers: PricingGlassTier[] = PLANS.map((plan) => {
               const shown =
                 plan.monthly === 0
                   ? 0
                   : annual
-                    ? Math.round((plan.monthly * 10) / 12)
+                    ? Math.round(plan.monthly * annualFactor)
                     : plan.monthly;
-              const savings = plan.monthly === 0 ? 0 : plan.monthly * 2; // 2 meses grátis/ano
-              return (
-                <Reveal key={plan.key} delay={i * 0.07}>
-                  <div
-                    className={`relative flex h-full flex-col rounded-3xl border p-6 shadow-[var(--shadow-card)] ${
-                      plan.highlight ? "border-primary bg-primary/5" : "border-border bg-card"
-                    }`}
-                  >
-                    {plan.highlight && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-0.5 text-xs font-bold text-primary-foreground">
-                        Mais popular
-                      </span>
-                    )}
-                    <p className="text-sm font-semibold uppercase tracking-widest text-primary">
-                      {plan.name}
-                    </p>
-                    <p className="mt-1 font-serif text-lg text-foreground">{plan.tagline}</p>
-                    <div className="mt-3">
-                      {plan.isFrom && (
-                        <span className="text-xs text-muted-foreground">a partir de </span>
-                      )}
-                      <div className="flex items-end gap-1">
-                        <span className="font-serif text-4xl font-bold">R$ {shown}</span>
-                        <span className="mb-1 text-sm text-muted-foreground">
-                          {plan.monthly === 0 ? "/sempre" : `/mês${plan.perSuffix}`}
-                        </span>
-                      </div>
-                      {annual && plan.monthly > 0 ? (
-                        <p className="mt-1 text-xs text-primary">
-                          cobrado anualmente · você economiza R$ {savings.toLocaleString("pt-BR")}
-                          /ano
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {plan.monthly === 0 ? "grátis, para sempre" : "sem fidelidade"}
-                        </p>
-                      )}
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">{plan.desc}</p>
-                    <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-start gap-2">
-                          <span className="mt-0.5 shrink-0 text-primary">✓</span>
-                          <span>{f}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <a
-                      href={plan.key === "enterprise" ? "#contato" : "/medicos/cadastro"}
-                      className={`mt-8 block rounded-full py-3 text-center text-sm font-semibold transition ${
-                        plan.highlight
-                          ? "bg-primary text-primary-foreground hover:opacity-90"
-                          : "border border-primary/40 text-primary hover:bg-primary/5"
-                      }`}
-                    >
-                      {plan.cta}
-                    </a>
-                  </div>
-                </Reveal>
-              );
-            })}
-          </div>
+              // Economia no ano inteiro (12 meses do cheio − 12 meses do promocional).
+              const savings = plan.monthly === 0 ? 0 : (plan.monthly - shown) * 12;
+              return {
+                name: plan.name,
+                tagline: plan.tagline,
+                price: String(shown),
+                oldPrice: annual && promo && plan.monthly > 0 ? String(plan.monthly) : undefined,
+                // O sufixo por assento (ex.: "/médico") vai para a nota — inline,
+                // ao lado do número de 60px, estouraria o card estreito.
+                period: plan.monthly === 0 ? "/sempre" : "/mês",
+                fromPrefix: plan.isFrom,
+                footnote:
+                  (plan.monthly === 0
+                    ? "grátis, para sempre"
+                    : annual
+                      ? `cobrado anualmente · economize R$ ${savings.toLocaleString("pt-BR")}/ano`
+                      : "sem fidelidade") + (plan.perSuffix ? " · por médico" : ""),
+                isPopular: plan.highlight,
+                features: plan.features,
+                ctaLabel: plan.cta,
+                ctaHref: plan.key === "enterprise" ? "#contato" : "/medicos/cadastro",
+              };
+            });
+            return (
+              <PricingGlass
+                className="mt-8"
+                tiers={glassTiers}
+                annual={annual}
+                onAnnualChange={(a) => setBilling(a ? "anual" : "mensal")}
+                saveBadge={promo ? "25% OFF" : "2 MESES"}
+                toggleNote={
+                  promo
+                    ? "🚀 Promoção de lançamento — 25% OFF no plano anual, por tempo limitado"
+                    : "💚 No anual, 2 meses grátis — economize ~17%"
+                }
+              />
+            );
+          })()}
 
           <Reveal>
-            <p className="mt-8 text-center text-xs text-muted-foreground">
+            <p className="mt-10 text-center text-xs text-white/50">
               Todo plano pago começa com 14 dias grátis, sem cartão de crédito. · Valores em BRL. ·
               O WhatsApp usa a conta Meta Business do próprio médico (grátis até 1.000
               conversas/mês).
@@ -792,11 +800,10 @@ function MedicosPage() {
                     className="flex w-full items-center justify-between px-6 py-4 text-left text-sm font-medium hover:bg-secondary/40"
                   >
                     <span>{faq.q}</span>
-                    <span
-                      className={`ml-4 shrink-0 transition-transform ${openFaq === i ? "rotate-180" : ""}`}
-                    >
-                      ▾
-                    </span>
+                    <ChevronDown
+                      aria-hidden
+                      className={`ml-4 h-4 w-4 shrink-0 transition-transform ${openFaq === i ? "rotate-180" : ""}`}
+                    />
                   </button>
                   {openFaq === i && (
                     <div className="border-t border-border px-6 pb-5 pt-3 text-sm text-muted-foreground">

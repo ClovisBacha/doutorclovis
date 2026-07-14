@@ -1187,3 +1187,551 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.get_user_id_by_email(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_id_by_email(text) TO service_role;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MIGRATION: 20260707180000_second_brain.sql
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Segundo Cérebro — POR PERFIL DE MÉDICO
+-- Base de conhecimento de cada médico (persona + Q&A reais) usada pela IA do
+-- chatbot do site e do agente WhatsApp para responder como o próprio doutor.
+-- Tabelas chaveadas por doctor_id (uid do médico no auth): cada perfil de
+-- médico tem o SEU cérebro, com estilo e respostas próprios.
+-- Acesso EXCLUSIVO via service_role (server functions com gate de admin) —
+-- nenhuma policy para anon/authenticated.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Transformação do shape antigo (linha única id=1), se houver de uma aplicação
+-- anterior desta mesma migration — feature nunca lançada, sem dados a preservar.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brain_settings' AND column_name = 'id'
+  ) THEN
+    DROP TABLE public.brain_settings;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'brain_entries'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brain_entries' AND column_name = 'doctor_id'
+  ) THEN
+    DROP TABLE public.brain_entries;
+  END IF;
+END $$;
+
+-- Configurações do cérebro de cada médico (uma linha por médico)
+CREATE TABLE IF NOT EXISTS public.brain_settings (
+  doctor_id        uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  persona          text        NOT NULL DEFAULT '',
+  sample_phrases   text        NOT NULL DEFAULT '',
+  rules            text        NOT NULL DEFAULT '',
+  enabled_app      boolean     NOT NULL DEFAULT true,
+  enabled_whatsapp boolean     NOT NULL DEFAULT true,
+  updated_at       timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.brain_settings ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.brain_settings TO service_role;
+REVOKE ALL ON public.brain_settings FROM anon, authenticated;
+
+-- Entradas de conhecimento (pergunta + resposta na voz do médico dono)
+CREATE TABLE IF NOT EXISTS public.brain_entries (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  doctor_id  uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  question   text        NOT NULL,
+  answer     text        NOT NULL,
+  category   text,
+  source     text        NOT NULL DEFAULT 'manual',  -- manual | pergunta | import...
+  approved   boolean     NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_brain_entries_doctor_created
+  ON public.brain_entries(doctor_id, created_at DESC);
+
+ALTER TABLE public.brain_entries ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.brain_entries TO service_role;
+REVOKE ALL ON public.brain_entries FROM anon, authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MIGRATION: 20260707200000_multi_tenant_core.sql
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ─────────────────────────────────────────────────────────────────────────────
+-- NÚCLEO MULTI-TENANT — o app é uma plataforma para QUALQUER médico assinante
+-- (não mais exclusivo do Dr. Clóvis). Três peças:
+--   1. doctors            — o perfil de cada médico assinante
+--   2. patient_profiles.doctor_id — cada paciente pertence a um médico
+--   3. journey_state      — a jornada/gamificação da gestação salva NO PERFIL
+--      da paciente (não mais só no localStorage do aparelho)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- 1. Perfil do médico assinante (id = uid no auth)
+CREATE TABLE IF NOT EXISTS public.doctors (
+  id             uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  display_name   text        NOT NULL DEFAULT '',
+  title          text        NOT NULL DEFAULT '',      -- ex.: "Ginecologista e Obstetra"
+  specialty      text        NOT NULL DEFAULT '',      -- ex.: "Gestação de alto risco"
+  crm            text        NOT NULL DEFAULT '',
+  whatsapp       text        NOT NULL DEFAULT '',
+  pix_key        text        NOT NULL DEFAULT '',
+  slug           text        UNIQUE,                   -- ex.: "clovis-bacha" (URLs futuras)
+  plan           text        NOT NULL DEFAULT 'trial', -- trial | pro | ...
+  active         boolean     NOT NULL DEFAULT true,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.doctors ENABLE ROW LEVEL SECURITY;
+-- O médico lê/edita o próprio perfil; escrita administrativa via service_role
+DROP POLICY IF EXISTS "doctor reads own profile" ON public.doctors;
+CREATE POLICY "doctor reads own profile" ON public.doctors
+  FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
+CREATE POLICY "doctor updates own profile" ON public.doctors
+  FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+GRANT SELECT, UPDATE ON public.doctors TO authenticated;
+GRANT ALL ON public.doctors TO service_role;
+
+-- 2. Cada paciente pertence a um médico (null = médico dono da instalação,
+--    para compatibilidade com as contas existentes)
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS doctor_id uuid REFERENCES public.doctors(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_patient_profiles_doctor
+  ON public.patient_profiles(doctor_id);
+
+-- 3. Jornada/gamificação da gestação POR PERFIL (blob versionado por updated_at;
+--    o localStorage do aparelho vira apenas cache offline)
+CREATE TABLE IF NOT EXISTS public.journey_state (
+  user_id    uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  data       jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.journey_state ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own journey" ON public.journey_state;
+CREATE POLICY "own journey" ON public.journey_state
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.journey_state TO authenticated;
+GRANT ALL ON public.journey_state TO service_role;
+
+-- updated_at SEMPRE do relógio do SERVIDOR: o last-write-wins entre aparelhos
+-- não pode depender do relógio (possivelmente errado) de cada celular
+CREATE OR REPLACE FUNCTION public.touch_journey_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_journey_touch ON public.journey_state;
+CREATE TRIGGER trg_journey_touch
+  BEFORE INSERT OR UPDATE ON public.journey_state
+  FOR EACH ROW EXECUTE FUNCTION public.touch_journey_updated_at();
+
+-- 4. Resolução robusta de uid por e-mail (para achar o médico dono sem varrer
+--    listUsers, que inclui todas as pacientes). SECURITY DEFINER, exposta só
+--    ao service_role — as server functions chamam via supabaseAdmin.rpc.
+CREATE OR REPLACE FUNCTION public.get_user_id_by_email(p_email text)
+RETURNS uuid
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+  SELECT id FROM auth.users WHERE lower(email) = lower(p_email) LIMIT 1;
+$$;
+REVOKE ALL ON FUNCTION public.get_user_id_by_email(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_user_id_by_email(text) TO service_role;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MIGRATION: 20260708120000_dashboard_brain_hits.sql
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ─────────────────────────────────────────────────────────────────────────────
+-- brain_hits — telemetria do Segundo Cérebro para o dashboard do médico.
+-- Cada linha registra um "acerto": um momento em que o cérebro do médico foi
+-- realmente montado e injetado no prompt (chat do app ou agente WhatsApp).
+-- Serve para o dashboard mostrar o VALOR do cérebro (quantas vezes ele
+-- respondeu no mês). Acesso EXCLUSIVO via service_role (logging server-side) —
+-- nenhuma policy para anon/authenticated.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.brain_hits (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  doctor_id  uuid,
+  channel    text        NOT NULL,  -- app | whatsapp | teste
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_brain_hits_doctor_created
+  ON public.brain_hits(doctor_id, created_at DESC);
+
+ALTER TABLE public.brain_hits ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.brain_hits TO service_role;
+REVOKE ALL ON public.brain_hits FROM anon, authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MIGRATION: 20260708130000_persistencia_paciente.sql
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Persistência da paciente na CONTA (não no aparelho).
+-- Corrige gaps do auditor em que dados/preferências viviam só em useState ou
+-- localStorage e sumiam ao trocar de dispositivo.
+--
+-- 1. triage_logs — cada triagem de sintomas (Alertas) vira registro na conta.
+--    Numa plataforma de ALTO RISCO, um alerta vermelho/amarelo (sangramento,
+--    PA alta) PRECISA ficar gravado — para a paciente e para o médico enxergar
+--    no dashboard (contagem de triagens do mês).
+-- 2. patient_profiles.checklist_seeded — tira a flag de "já semeei o checklist"
+--    do localStorage e coloca na conta, pra não re-semear itens num aparelho
+--    novo de quem apagou tudo de propósito.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- 1. Triagem de sintomas (Alertas) — histórico na conta
+CREATE TABLE IF NOT EXISTS public.triage_logs (
+  id         uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  level      text        NOT NULL,               -- vermelho | amarelo | verde
+  symptoms   text[]      NOT NULL DEFAULT '{}',
+  systolic   integer,
+  diastolic  integer,
+  note       text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_triage_logs_user_created
+  ON public.triage_logs(user_id, created_at DESC);
+ALTER TABLE public.triage_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own triage logs" ON public.triage_logs;
+CREATE POLICY "Patient manages own triage logs"
+  ON public.triage_logs FOR ALL TO authenticated
+  USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages triage logs" ON public.triage_logs;
+CREATE POLICY "Service manages triage logs"
+  ON public.triage_logs FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+GRANT ALL ON public.triage_logs TO authenticated, service_role;
+
+-- 2. Flag de seed do checklist na conta (em vez de localStorage)
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS checklist_seeded boolean NOT NULL DEFAULT false;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MIGRATION: 20260709000000_patient_doctor_link.sql
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ─────────────────────────────────────────────────────────────────────────────
+-- VÍNCULO PACIENTE ↔ MÉDICO (individual por conta)
+--
+-- Modelo: a paciente BUSCA o médico e ENVIA uma solicitação; o médico ACEITA,
+-- e só então a paciente passa a pertencer a ele (patient_profiles.doctor_id).
+-- Assim cada conta é individual: o chat/cérebro que a paciente usa no app é o
+-- do SEU médico, e o médico só enxerga as pacientes que ele aceitou.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- O médico pode se ocultar da busca (ex.: agenda cheia) sem ficar inativo.
+ALTER TABLE public.doctors
+  ADD COLUMN IF NOT EXISTS accepting_patients boolean NOT NULL DEFAULT true;
+
+CREATE TABLE IF NOT EXISTS public.patient_link_requests (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id  uuid        NOT NULL REFERENCES auth.users(id)     ON DELETE CASCADE,
+  doctor_id   uuid        NOT NULL REFERENCES public.doctors(id) ON DELETE CASCADE,
+  status      text        NOT NULL DEFAULT 'pending',  -- pending | accepted | declined | cancelled
+  message     text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  decided_at  timestamptz
+);
+
+-- No máximo UMA solicitação pendente por (paciente, médico).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_link_pending
+  ON public.patient_link_requests(patient_id, doctor_id)
+  WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_link_doctor_pending
+  ON public.patient_link_requests(doctor_id)
+  WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_link_patient
+  ON public.patient_link_requests(patient_id);
+
+ALTER TABLE public.patient_link_requests ENABLE ROW LEVEL SECURITY;
+
+-- A paciente gerencia as próprias solicitações (criar, ver, cancelar).
+DROP POLICY IF EXISTS "patient manages own requests" ON public.patient_link_requests;
+CREATE POLICY "patient manages own requests" ON public.patient_link_requests
+  FOR ALL USING (auth.uid() = patient_id) WITH CHECK (auth.uid() = patient_id);
+
+-- O médico vê e responde as solicitações destinadas a ele.
+DROP POLICY IF EXISTS "doctor reads incoming requests" ON public.patient_link_requests;
+CREATE POLICY "doctor reads incoming requests" ON public.patient_link_requests
+  FOR SELECT USING (auth.uid() = doctor_id);
+DROP POLICY IF EXISTS "doctor updates incoming requests" ON public.patient_link_requests;
+CREATE POLICY "doctor updates incoming requests" ON public.patient_link_requests
+  FOR UPDATE USING (auth.uid() = doctor_id) WITH CHECK (auth.uid() = doctor_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.patient_link_requests TO authenticated;
+GRANT ALL ON public.patient_link_requests TO service_role;
+
+-- Busca de médicos pela paciente (nome/especialidade), sem expor toda a tabela
+-- via RLS. SECURITY DEFINER, só campos públicos, só médicos ativos e visíveis.
+CREATE OR REPLACE FUNCTION public.search_doctors(p_query text)
+RETURNS TABLE (
+  id           uuid,
+  display_name text,
+  title        text,
+  specialty    text,
+  slug         text
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT d.id, d.display_name, d.title, d.specialty, d.slug
+  FROM public.doctors d
+  WHERE d.active = true
+    AND d.accepting_patients = true
+    AND d.display_name <> ''
+    AND (
+      p_query = ''
+      OR d.display_name ILIKE '%' || p_query || '%'
+      OR d.specialty   ILIKE '%' || p_query || '%'
+      OR d.title       ILIKE '%' || p_query || '%'
+    )
+  ORDER BY d.display_name
+  LIMIT 20;
+$$;
+REVOKE ALL ON FUNCTION public.search_doctors(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.search_doctors(text) TO authenticated, service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- BLINDAGEM DO VÍNCULO: só o service_role (as server functions, após o médico
+-- ACEITAR) pode gravar patient_profiles.doctor_id. A paciente edita o próprio
+-- perfil pelo navegador (role `authenticated`, RLS "own profile update"), então
+-- sem esta trava ela poderia se autovincular a QUALQUER médico via update direto
+-- no Supabase — furando o fluxo de aprovação e puxando o cérebro pago dele.
+--
+-- IMPORTANTE: SECURITY INVOKER (padrão) — o gatilho precisa enxergar o papel
+-- REAL de quem escreve (current_user). SECURITY DEFINER quebraria a checagem.
+CREATE OR REPLACE FUNCTION public.protect_patient_doctor_id()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF current_user <> 'service_role' THEN
+    IF TG_OP = 'INSERT' THEN
+      -- A paciente nunca se vincula sozinha ao criar o perfil.
+      NEW.doctor_id := NULL;
+    ELSIF NEW.doctor_id IS DISTINCT FROM OLD.doctor_id THEN
+      -- Nem troca/define o médico depois: mantém o valor definido pelo servidor.
+      NEW.doctor_id := OLD.doctor_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_doctor_id ON public.patient_profiles;
+CREATE TRIGGER trg_protect_doctor_id
+  BEFORE INSERT OR UPDATE ON public.patient_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.protect_patient_doctor_id();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2026-07-10 · Premium do quiz diário (aulas da professora)
+-- Premium do quiz diário da paciente: grátis = só a aula do dia de hoje;
+-- premium = revisitar/fazer qualquer aula já liberada quando quiser.
+-- Ativação manual pelo médico no painel (pagamento via PIX, fluxo assistido).
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS quiz_premium boolean NOT NULL DEFAULT false;
+
+-- SEGURANÇA: a paciente tem UPDATE no próprio perfil (RLS), então sem esta
+-- proteção ela poderia se dar premium pelo console do navegador. Mesmo padrão
+-- do doctor_id: colunas sensíveis só mudam via service role (servidor).
+CREATE OR REPLACE FUNCTION public.protect_patient_doctor_id()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF current_user <> 'service_role' THEN
+    IF TG_OP = 'INSERT' THEN
+      -- A paciente nunca se vincula sozinha nem nasce premium.
+      NEW.doctor_id := NULL;
+      NEW.quiz_premium := false;
+    ELSE
+      IF NEW.doctor_id IS DISTINCT FROM OLD.doctor_id THEN
+        NEW.doctor_id := OLD.doctor_id;
+      END IF;
+      IF NEW.quiz_premium IS DISTINCT FROM OLD.quiz_premium THEN
+        NEW.quiz_premium := OLD.quiz_premium;
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_doctor_id ON public.patient_profiles;
+CREATE TRIGGER trg_protect_doctor_id
+  BEFORE INSERT OR UPDATE ON public.patient_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.protect_patient_doctor_id();
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Assinaturas (Stripe) — pagou → acesso na hora (paciente premium + médico)
+-- Idempotente; ver migração 20260711000000_subscriptions.sql
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id                uuid NOT NULL,
+  product                text NOT NULL,
+  plan                   text,
+  source                 text NOT NULL DEFAULT 'stripe',
+  status                 text NOT NULL DEFAULT 'incomplete',
+  stripe_customer_id     text,
+  stripe_subscription_id text UNIQUE,
+  current_period_end     timestamptz,
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON public.subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON public.subscriptions(stripe_customer_id);
+ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own subscriptions read" ON public.subscriptions;
+CREATE POLICY "own subscriptions read" ON public.subscriptions
+  FOR SELECT USING (auth.uid() = user_id);
+GRANT SELECT ON public.subscriptions TO authenticated;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS plan_expires_at timestamptz;
+CREATE OR REPLACE FUNCTION public.touch_subscription_updated_at()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at := now(); RETURN NEW; END;
+$$;
+DROP TRIGGER IF EXISTS trg_touch_subscriptions ON public.subscriptions;
+CREATE TRIGGER trg_touch_subscriptions
+  BEFORE UPDATE ON public.subscriptions
+  FOR EACH ROW EXECUTE FUNCTION public.touch_subscription_updated_at();
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Diretório de médicos (busca) — ver 20260711020000_doctor_directory.sql
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS bio text;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS subspecialty text;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS years_experience integer;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS has_masters boolean DEFAULT false;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS has_doctorate boolean DEFAULT false;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS city text;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS state text;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS accepting_patients boolean DEFAULT true;
+CREATE INDEX IF NOT EXISTS idx_doctors_directory
+  ON public.doctors(active, accepting_patients, state);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Códigos de convite gerados na hora (uso único) — ver 20260711030000
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.invite_codes (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code         text UNIQUE NOT NULL,
+  doctor_id    uuid NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  redeemed_by  uuid,
+  redeemed_at  timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_invite_codes_doctor_month
+  ON public.invite_codes(doctor_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_invite_codes_code ON public.invite_codes(code);
+ALTER TABLE public.invite_codes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "doctor reads own codes" ON public.invite_codes;
+CREATE POLICY "doctor reads own codes" ON public.invite_codes
+  FOR SELECT USING (auth.uid() = doctor_id);
+GRANT SELECT ON public.invite_codes TO authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Segurança: protege plan/active do médico (ver 20260713000000)
+-- ════════════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.protect_doctor_billing()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF current_user <> 'service_role' THEN
+    IF TG_OP = 'INSERT' THEN
+      NEW.plan := 'trial';
+      NEW.active := true;
+      NEW.plan_expires_at := NULL;
+    ELSE
+      NEW.plan := OLD.plan;
+      NEW.active := OLD.active;
+      NEW.plan_expires_at := OLD.plan_expires_at;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_protect_doctor_billing ON public.doctors;
+CREATE TRIGGER trg_protect_doctor_billing
+  BEFORE INSERT OR UPDATE ON public.doctors
+  FOR EACH ROW EXECUTE FUNCTION public.protect_doctor_billing();
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Multi-tenant: doctor_id nos registros (ver 20260713010000)
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.appointment_requests  ADD COLUMN IF NOT EXISTS doctor_id uuid;
+ALTER TABLE public.doctor_questions       ADD COLUMN IF NOT EXISTS doctor_id uuid;
+ALTER TABLE public.preconsulta_forms      ADD COLUMN IF NOT EXISTS doctor_id uuid;
+ALTER TABLE public.teleconsulta_sessions  ADD COLUMN IF NOT EXISTS doctor_id uuid;
+CREATE INDEX IF NOT EXISTS idx_appointments_doctor ON public.appointment_requests(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_questions_doctor     ON public.doctor_questions(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_preconsulta_doctor   ON public.preconsulta_forms(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_teleconsulta_doctor  ON public.teleconsulta_sessions(doctor_id);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Diretório seguro: médico verificado (ver 20260713020000)
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS verified boolean NOT NULL DEFAULT false;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Busca de médicos (minha-conta) também respeita o selo (ver 20260713030000)
+-- Re-define search_doctors AQUI, depois da coluna verified existir.
+-- ════════════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.search_doctors(p_query text)
+RETURNS TABLE (
+  id           uuid,
+  display_name text,
+  title        text,
+  specialty    text,
+  slug         text
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT d.id, d.display_name, d.title, d.specialty, d.slug
+  FROM public.doctors d
+  WHERE d.active = true
+    AND d.accepting_patients = true
+    AND d.verified = true
+    AND d.display_name <> ''
+    AND (
+      p_query = ''
+      OR d.display_name ILIKE '%' || p_query || '%'
+      OR d.specialty   ILIKE '%' || p_query || '%'
+      OR d.title       ILIKE '%' || p_query || '%'
+    )
+  ORDER BY d.display_name
+  LIMIT 20;
+$$;
+REVOKE ALL ON FUNCTION public.search_doctors(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.search_doctors(text) TO authenticated, service_role;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Google Agenda por médico (nível 2) — token seguro (ver 20260713040000)
+-- Refresh token é segredo: RLS ligada + zero policies = só service_role.
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.doctor_google_tokens (
+  user_id       uuid PRIMARY KEY,
+  refresh_token text NOT NULL,
+  google_email  text,
+  connected_at  timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.doctor_google_tokens ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.doctor_google_tokens FROM anon, authenticated;

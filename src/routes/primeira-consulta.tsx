@@ -8,11 +8,11 @@ export const Route = createFileRoute("/primeira-consulta")({
   head: () => {
     return {
       meta: [
-        { title: "Primeira consulta — o que esperar | Dr. Clóvis Bacha" },
+        { title: "Primeira consulta — o que esperar | Obstétrica" },
         {
           name: "description",
           content:
-            "Guia passo a passo da sua primeira consulta com o Dr. Clóvis Bacha: o que levar, duração, e como funciona o acolhimento.",
+            "Guia passo a passo da sua primeira consulta de pré-natal: o que levar, duração, e como funciona o acolhimento.",
         },
         { property: "og:title", content: "Primeira consulta — o que esperar" },
         { property: "og:description", content: "Guia passo a passo da sua primeira visita." },

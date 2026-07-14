@@ -10,11 +10,11 @@ export const Route = createFileRoute("/gestacao")({
   head: () => {
     return {
       meta: [
-        { title: "Sua gestação semana a semana — Obstétrica by Dr. Clóvis" },
+        { title: "Sua gestação semana a semana — Obstétrica" },
         {
           name: "description",
           content:
-            "Linha do tempo da gestação e conteúdo educativo por trimestre, com orientação especializada do Dr. Clóvis Bacha.",
+            "Linha do tempo da gestação e conteúdo educativo por trimestre, com orientação médica especializada.",
         },
         { property: "og:title", content: "Sua gestação semana a semana" },
         { property: "og:description", content: "Linha do tempo e conteúdo por trimestre." },
@@ -173,7 +173,7 @@ function GestacaoPage() {
         </Reveal>
         <Reveal variant="up" delay={60}>
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            Conteúdo educativo curado pelo Dr. Clóvis para cada fase da gestação.
+            Conteúdo educativo com curadoria médica para cada fase da gestação.
           </p>
         </Reveal>
         <div className="mt-10 grid gap-6 md:grid-cols-3">

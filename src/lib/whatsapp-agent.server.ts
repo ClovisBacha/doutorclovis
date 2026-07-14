@@ -1,5 +1,5 @@
 /**
- * Agente de IA para WhatsApp — Dr. Clóvis Bacha.
+ * Agente de IA para WhatsApp — consultório do médico associado.
  *
  * Fluxo de agendamento por mensagem:
  *   start → collecting_name → collecting_reason → collecting_date → confirming → done

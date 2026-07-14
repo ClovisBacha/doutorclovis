@@ -17,7 +17,7 @@ function rateLimited(ip: string) {
   return entry.count > RATE_LIMIT;
 }
 
-const NUTRITION_SYSTEM = `Você é uma nutricionista especializada em gestação, vinculada ao consultório do Dr. Clóvis Bacha (obstetrícia, alto risco). Seu papel é orientar gestantes sobre alimentação saudável.
+const NUTRITION_SYSTEM = `Você é uma nutricionista especializada em gestação, vinculada ao consultório de um obstetra especialista em gestação de alto risco. Seu papel é orientar gestantes sobre alimentação saudável.
 
 Regras absolutas:
 - Responda em português brasileiro, tom acolhedor e prático.

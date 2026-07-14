@@ -5,7 +5,7 @@ import { AppCtaBanner } from "@/components/app-cta-banner";
 export const Route = createFileRoute("/epds")({
   head: () => ({
     meta: [
-      { title: "Rastreio de Depressão Pós-Parto (EPDS) — Obstétrica by Dr. Clóvis" },
+      { title: "Rastreio de Depressão Pós-Parto (EPDS) — Obstétrica" },
       {
         name: "description",
         content:

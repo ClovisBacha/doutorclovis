@@ -6,7 +6,7 @@ import { AppCtaBanner } from "@/components/app-cta-banner";
 export const Route = createFileRoute("/batimentos")({
   head: () => ({
     meta: [
-      { title: "Som do coração do bebê — Obstétrica by Dr. Clóvis" },
+      { title: "Som do coração do bebê — Obstétrica" },
       {
         name: "description",
         content:

@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "Obstétrica by Dr. Clóvis",
+  "name": "Obstétrica",
   "short_name": "Obstétrica",
-  "description": "Acompanhe sua gestação semana a semana com o app desenvolvido pelo Dr. Clóvis Bacha, especialista em gestação de alto risco.",
+  "description": "Acompanhe sua gestação semana a semana com o app Obstétrica, desenvolvido com especialistas em gestação de alto risco.",
   "start_url": "/minha-conta",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#faf7f5",
-  "theme_color": "#8b5147",
+  "theme_color": "#a8574a",
   "orientation": "portrait-primary",
   "lang": "pt-BR",
   "dir": "ltr",
@@ -56,16 +56,16 @@
     {
       "name": "Agendar consulta",
       "short_name": "Agendar",
-      "description": "Solicitar consulta com Dr. Clóvis Bacha",
+      "description": "Solicitar consulta com o seu médico",
       "url": "/agendamento",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "screenshots": [
     {
-      "src": "/og.svg",
+      "src": "/og.png",
       "sizes": "1200x630",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "form_factor": "wide",
       "label": "Tela inicial do app de gestação"
     }

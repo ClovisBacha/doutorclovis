@@ -1,3 +1,4 @@
+import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -204,40 +205,28 @@ Gere a nota SOAP. Use formatação clara com cabeçalhos em negrito. Seja espec�
     const result = await generateText({
       model: google(process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL),
       prompt,
-      maxTokens: 600,
+      maxOutputTokens: 600,
     });
 
     return { ok: true as const, note: result.text };
   });
 
-async function createGoogleMeetRoom(): Promise<string | null> {
-  const clientId = process.env.GOOGLE_MEET_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_MEET_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_MEET_REFRESH_TOKEN;
-  if (!clientId || !clientSecret || !refreshToken) return null;
-
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-  if (!tokenRes.ok) return null;
-  const { access_token } = (await tokenRes.json()) as { access_token?: string };
-  if (!access_token) return null;
-
-  const spaceRes = await fetch("https://meet.googleapis.com/v2/spaces", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!spaceRes.ok) return null;
-  const space = (await spaceRes.json()) as { meetingUri?: string };
-  return space.meetingUri ?? null;
+/** Sala Meet avulsa (API Meet spaces), sem evento de agenda. Fallback. */
+async function createGoogleMeetRoom(refreshOverride?: string | null): Promise<string | null> {
+  try {
+    const accessToken = await googleAccessToken(refreshOverride);
+    if (!accessToken) return null;
+    const spaceRes = await fetch("https://meet.googleapis.com/v2/spaces", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (!spaceRes.ok) return null;
+    const space = (await spaceRes.json()) as { meetingUri?: string };
+    return space.meetingUri ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function sendPatientMeetEmail(
@@ -255,21 +244,113 @@ async function sendPatientMeetEmail(
     method: "POST",
     headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: process.env.MAIL_FROM ?? "Dr. Clóvis Bacha <onboarding@resend.dev>",
+      from: process.env.MAIL_FROM ?? `${DOCTOR.name} <onboarding@resend.dev>`,
       to: patientEmail,
-      subject: "Sua teleconsulta está pronta — Dr. Clóvis Bacha",
+      subject: `Sua teleconsulta está pronta — ${DOCTOR.name}`,
       html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto">
         <h2 style="color:#7c3aed">Sua teleconsulta está pronta</h2>
         <p>Olá, ${patientName}!</p>
-        <p>O Dr. Clóvis abriu sua sala de teleconsulta para <strong>${dateStr}</strong>.</p>
+        <p>Seu médico abriu sua sala de teleconsulta para <strong>${dateStr}</strong>.</p>
         <p>Clique no botão abaixo para entrar:</p>
         <a href="${meetUrl}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;margin:16px 0">Entrar na teleconsulta</a>
         <p style="color:#666;font-size:12px">Ou acesse o portal → Minha Conta → Teleconsulta e clique no link da sessão.</p>
         <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-        <p style="color:#666;font-size:12px">Dr. Clóvis Bacha — Ginecologista e Obstetra</p>
+        <p style="color:#666;font-size:12px">${DOCTOR.name} — Ginecologista e Obstetra</p>
       </div>`,
     }),
   });
+}
+
+/**
+ * Troca um refresh token por um access token do Google (ou null).
+ * `refreshOverride` = token da conta DO MÉDICO (nível 2); sem ele, cai na conta
+ * central da instalação (GOOGLE_MEET_REFRESH_TOKEN).
+ */
+async function googleAccessToken(refreshOverride?: string | null): Promise<string | null> {
+  const clientId = process.env.GOOGLE_MEET_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_MEET_CLIENT_SECRET;
+  const refreshToken = refreshOverride || process.env.GOOGLE_MEET_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) return null;
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!res.ok) return null;
+  const { access_token } = (await res.json()) as { access_token?: string };
+  return access_token ?? null;
+}
+
+/**
+ * Cria um evento no Google Agenda com Google Meet embutido e convida médico +
+ * paciente por e-mail — o próprio Google envia o convite (com data/hora e link
+ * do Meet). Reutiliza as credenciais GOOGLE_MEET_*; o refresh token precisa ter
+ * o escopo https://www.googleapis.com/auth/calendar.events (ver docs/GOOGLE_MEET.md).
+ * Retorna a URL do Meet + os e-mails convidados, ou null (não configurado/falha)
+ * para o chamador cair no fallback.
+ */
+async function createGoogleCalendarMeet(params: {
+  doctorEmail: string | null;
+  patientEmail: string;
+  patientName: string;
+  scheduledFor: string | null;
+  refreshOverride?: string | null;
+}): Promise<{ meetUrl: string } | null> {
+  try {
+    const accessToken = await googleAccessToken(params.refreshOverride);
+    if (!accessToken) return null;
+
+    const start = params.scheduledFor ? new Date(params.scheduledFor) : new Date();
+    if (Number.isNaN(start.getTime())) return null;
+    const end = new Date(start.getTime() + 40 * 60 * 1000); // 40 min de duração
+
+    const attendees = [
+      { email: params.patientEmail },
+      ...(params.doctorEmail ? [{ email: params.doctorEmail }] : []),
+    ];
+    const requestId = `dc-tele-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+
+    // conferenceDataVersion=1 habilita a criação do Meet; sendUpdates=all força
+    // o Google a e-mailar o convite aos participantes.
+    const res = await fetch(
+      "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: `Teleconsulta — ${params.patientName}`,
+          description:
+            "Sala de teleconsulta gerada pelo portal. Entre pelo link do Google Meet no horário combinado.",
+          start: { dateTime: start.toISOString(), timeZone: "America/Sao_Paulo" },
+          end: { dateTime: end.toISOString(), timeZone: "America/Sao_Paulo" },
+          attendees,
+          conferenceData: {
+            createRequest: {
+              requestId,
+              conferenceSolutionKey: { type: "hangoutsMeet" },
+            },
+          },
+        }),
+      },
+    );
+    if (!res.ok) return null;
+    const event = (await res.json()) as {
+      hangoutLink?: string;
+      conferenceData?: { entryPoints?: { entryPointType?: string; uri?: string }[] };
+    };
+    const meetUrl =
+      event.hangoutLink ??
+      event.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri ??
+      null;
+    return meetUrl ? { meetUrl } : null;
+  } catch {
+    return null;
+  }
 }
 
 export const openTeleconsultaRoom = createServerFn({ method: "POST" })
@@ -288,15 +369,48 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
     if (!admin) return { ok: false as const, error: "Não autorizado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Try Google Meet; fall back to Jitsi
-    let meetUrl = await createGoogleMeetRoom();
+    // Nível 2: se o médico conectou a PRÓPRIA Agenda Google, a reunião é criada
+    // e hospedada na conta dele; senão usamos a conta central da instalação.
+    const { getDoctorGoogleRefreshToken } = await import("./google-calendar.functions");
+    const doctorRefresh = await getDoctorGoogleRefreshToken(admin.id);
+
+    // Dados da paciente (e-mail + nome) — usados no convite da Agenda e no fallback.
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(data.patientUserId);
+    const patientEmail = authUser?.user?.email ?? null;
+    const { data: profile } = await supabaseAdmin
+      .from("patient_profiles")
+      .select("display_name")
+      .eq("id", data.patientUserId)
+      .maybeSingle();
+    const patientName = (profile as any)?.display_name ?? "Paciente";
+
+    // 1) Google Agenda + Meet: cria o evento e convida médico + paciente por
+    //    e-mail (o próprio Google envia o convite com data/hora e link).
+    let meetUrl: string | null = null;
+    let invitedViaCalendar = false;
+    if (patientEmail) {
+      const cal = await createGoogleCalendarMeet({
+        doctorEmail: admin.email ?? null,
+        patientEmail,
+        patientName,
+        scheduledFor: data.scheduledFor,
+        refreshOverride: doctorRefresh,
+      });
+      if (cal) {
+        meetUrl = cal.meetUrl;
+        invitedViaCalendar = true;
+      }
+    }
+
+    // 2) Fallbacks: sala Meet avulsa (spaces, na mesma conta) → Jitsi.
+    if (!meetUrl) meetUrl = await createGoogleMeetRoom(doctorRefresh);
     if (!meetUrl) {
       const { data: row } = await supabaseAdmin
         .from("teleconsulta_sessions")
         .select("room_name")
         .eq("id", data.id)
         .single();
-      meetUrl = `https://meet.jit.si/drclovis-${row?.room_name ?? data.id}`;
+      meetUrl = `https://meet.jit.si/obstetrica-${row?.room_name ?? data.id}`;
     }
 
     const { error } = await supabaseAdmin
@@ -305,23 +419,13 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) return { ok: false as const, error: error.message };
 
-    // Email patient
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(data.patientUserId);
-    if (authUser?.user?.email) {
-      const { data: profile } = await supabaseAdmin
-        .from("patient_profiles")
-        .select("display_name")
-        .eq("id", data.patientUserId)
-        .maybeSingle();
-      await sendPatientMeetEmail(
-        authUser.user.email,
-        (profile as any)?.display_name ?? "Paciente",
-        meetUrl,
-        data.scheduledFor,
-      );
+    // 3) E-mail ao paciente: se o convite da Agenda já saiu (convida os dois),
+    //    não duplica; senão manda o link por Resend (comportamento antigo).
+    if (!invitedViaCalendar && patientEmail) {
+      await sendPatientMeetEmail(patientEmail, patientName, meetUrl, data.scheduledFor);
     }
 
-    return { ok: true as const, meetUrl };
+    return { ok: true as const, meetUrl, invited: invitedViaCalendar };
   });
 
 export const savePatientNotes = createServerFn({ method: "POST" })

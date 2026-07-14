@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TamanhoRealRouteImport } from './routes/tamanho-real'
 import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -22,6 +23,7 @@ import { Route as LivesRouteImport } from './routes/lives'
 import { Route as HospitaisRouteImport } from './routes/hospitais'
 import { Route as GestacaoRouteImport } from './routes/gestacao'
 import { Route as EpdsRouteImport } from './routes/epds'
+import { Route as EncontrarMedicoRouteImport } from './routes/encontrar-medico'
 import { Route as EmpresasRouteImport } from './routes/empresas'
 import { Route as DppRouteImport } from './routes/dpp'
 import { Route as DiabetesGestacionalRouteImport } from './routes/diabetes-gestacional'
@@ -36,10 +38,13 @@ import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
+import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
 import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
+import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
+import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
 import { Route as AlbumTokenRouteImport } from './routes/album.$token'
@@ -48,6 +53,11 @@ import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TamanhoRealRoute = TamanhoRealRouteImport.update({
   id: '/tamanho-real',
   path: '/tamanho-real',
@@ -111,6 +121,11 @@ const GestacaoRoute = GestacaoRouteImport.update({
 const EpdsRoute = EpdsRouteImport.update({
   id: '/epds',
   path: '/epds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EncontrarMedicoRoute = EncontrarMedicoRouteImport.update({
+  id: '/encontrar-medico',
+  path: '/encontrar-medico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmpresasRoute = EmpresasRouteImport.update({
@@ -182,6 +197,11 @@ const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
   path: '/votar-nome/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MedicosGoogleCallbackRoute = MedicosGoogleCallbackRouteImport.update({
+  id: '/medicos_/google-callback',
+  path: '/medicos/google-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MedicosCadastroRoute = MedicosCadastroRouteImport.update({
   id: '/medicos_/cadastro',
   path: '/medicos/cadastro',
@@ -197,9 +217,19 @@ const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   path: '/api/transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
+  id: '/api/stripe-webhook',
+  path: '/api/stripe-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNutritionRoute = ApiNutritionRouteImport.update({
   id: '/api/nutrition',
   path: '/api/nutrition',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMpWebhookRoute = ApiMpWebhookRouteImport.update({
+  id: '/api/mp-webhook',
+  path: '/api/mp-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -251,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
@@ -264,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
+  '/termos': typeof TermosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/painel': typeof AuthenticatedPainelRoute
@@ -271,10 +303,13 @@ export interface FileRoutesByFullPath {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
+  '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesByTo {
@@ -290,6 +325,7 @@ export interface FileRoutesByTo {
   '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
@@ -303,6 +339,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
+  '/termos': typeof TermosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/painel': typeof AuthenticatedPainelRoute
@@ -310,10 +347,13 @@ export interface FileRoutesByTo {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
+  '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRoutesById {
@@ -331,6 +371,7 @@ export interface FileRoutesById {
   '/diabetes-gestacional': typeof DiabetesGestacionalRoute
   '/dpp': typeof DppRoute
   '/empresas': typeof EmpresasRoute
+  '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
@@ -344,6 +385,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sobre': typeof SobreRoute
   '/tamanho-real': typeof TamanhoRealRoute
+  '/termos': typeof TermosRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
@@ -351,10 +393,13 @@ export interface FileRoutesById {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos_/cadastro': typeof MedicosCadastroRoute
+  '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
 }
 export interface FileRouteTypes {
@@ -372,6 +417,7 @@ export interface FileRouteTypes {
     | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/encontrar-medico'
     | '/epds'
     | '/gestacao'
     | '/hospitais'
@@ -385,6 +431,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
+    | '/termos'
     | '/admin'
     | '/minha-conta'
     | '/painel'
@@ -392,10 +439,13 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos/cadastro'
+    | '/medicos/google-callback'
     | '/votar-nome/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -411,6 +461,7 @@ export interface FileRouteTypes {
     | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/encontrar-medico'
     | '/epds'
     | '/gestacao'
     | '/hospitais'
@@ -424,6 +475,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
+    | '/termos'
     | '/admin'
     | '/minha-conta'
     | '/painel'
@@ -431,10 +483,13 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos/cadastro'
+    | '/medicos/google-callback'
     | '/votar-nome/$token'
   id:
     | '__root__'
@@ -451,6 +506,7 @@ export interface FileRouteTypes {
     | '/diabetes-gestacional'
     | '/dpp'
     | '/empresas'
+    | '/encontrar-medico'
     | '/epds'
     | '/gestacao'
     | '/hospitais'
@@ -464,6 +520,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sobre'
     | '/tamanho-real'
+    | '/termos'
     | '/_authenticated/admin'
     | '/_authenticated/minha-conta'
     | '/_authenticated/painel'
@@ -471,10 +528,13 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/whatsapp'
     | '/medicos_/cadastro'
+    | '/medicos_/google-callback'
     | '/votar-nome/$token'
   fileRoutesById: FileRoutesById
 }
@@ -492,6 +552,7 @@ export interface RootRouteChildren {
   DiabetesGestacionalRoute: typeof DiabetesGestacionalRoute
   DppRoute: typeof DppRoute
   EmpresasRoute: typeof EmpresasRoute
+  EncontrarMedicoRoute: typeof EncontrarMedicoRoute
   EpdsRoute: typeof EpdsRoute
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
@@ -505,19 +566,30 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SobreRoute: typeof SobreRoute
   TamanhoRealRoute: typeof TamanhoRealRoute
+  TermosRoute: typeof TermosRoute
   AcompanharTokenRoute: typeof AcompanharTokenRoute
   AlbumTokenRoute: typeof AlbumTokenRoute
   ApiCartaSemanalRoute: typeof ApiCartaSemanalRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
+  ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
   MedicosCadastroRoute: typeof MedicosCadastroRoute
+  MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tamanho-real': {
       id: '/tamanho-real'
       path: '/tamanho-real'
@@ -607,6 +679,13 @@ declare module '@tanstack/react-router' {
       path: '/epds'
       fullPath: '/epds'
       preLoaderRoute: typeof EpdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/encontrar-medico': {
+      id: '/encontrar-medico'
+      path: '/encontrar-medico'
+      fullPath: '/encontrar-medico'
+      preLoaderRoute: typeof EncontrarMedicoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/empresas': {
@@ -707,6 +786,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VotarNomeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/medicos_/google-callback': {
+      id: '/medicos_/google-callback'
+      path: '/medicos/google-callback'
+      fullPath: '/medicos/google-callback'
+      preLoaderRoute: typeof MedicosGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/medicos_/cadastro': {
       id: '/medicos_/cadastro'
       path: '/medicos/cadastro'
@@ -728,11 +814,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTranscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/stripe-webhook': {
+      id: '/api/stripe-webhook'
+      path: '/api/stripe-webhook'
+      fullPath: '/api/stripe-webhook'
+      preLoaderRoute: typeof ApiStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/nutrition': {
       id: '/api/nutrition'
       path: '/api/nutrition'
       fullPath: '/api/nutrition'
       preLoaderRoute: typeof ApiNutritionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mp-webhook': {
+      id: '/api/mp-webhook'
+      path: '/api/mp-webhook'
+      fullPath: '/api/mp-webhook'
+      preLoaderRoute: typeof ApiMpWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -816,6 +916,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiabetesGestacionalRoute: DiabetesGestacionalRoute,
   DppRoute: DppRoute,
   EmpresasRoute: EmpresasRoute,
+  EncontrarMedicoRoute: EncontrarMedicoRoute,
   EpdsRoute: EpdsRoute,
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,
@@ -829,14 +930,18 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SobreRoute: SobreRoute,
   TamanhoRealRoute: TamanhoRealRoute,
+  TermosRoute: TermosRoute,
   AcompanharTokenRoute: AcompanharTokenRoute,
   AlbumTokenRoute: AlbumTokenRoute,
   ApiCartaSemanalRoute: ApiCartaSemanalRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
+  ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,
   MedicosCadastroRoute: MedicosCadastroRoute,
+  MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
 }
 export const routeTree = rootRouteImport

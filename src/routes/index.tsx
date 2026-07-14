@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   Activity,
   Baby,
@@ -29,18 +29,20 @@ import {
   AppSaudeMockupScreen,
   PhoneFrame,
 } from "@/components/app-phone-mockup";
+import { FootprintTrail } from "@/components/footprint-trail";
+import { setHeroDark } from "@/components/hero-theme";
 
 export const Route = createFileRoute("/")({
   head: () => {
     return {
       meta: [
-        { title: "Obstétrica by Dr. Clóvis — App de Gestação e Saúde da Mulher" },
+        { title: "Obstétrica — App de Gestação e Saúde da Mulher" },
         {
           name: "description",
           content:
-            "O app que acompanha sua gestação semana a semana: clima em tempo real, IA obstétrica 24h, monitoramento de saúde, teleconsulta e o cuidado do Dr. Clóvis Bacha.",
+            "O app que acompanha sua gestação semana a semana: clima em tempo real, IA obstétrica 24h, monitoramento de saúde, teleconsulta e o cuidado do seu médico.",
         },
-        { property: "og:title", content: "Obstétrica by Dr. Clóvis — o app da sua gestação" },
+        { property: "og:title", content: "Obstétrica — o app da sua gestação" },
         {
           property: "og:description",
           content: "O app completo para acompanhar sua gestação com segurança e cuidado.",
@@ -70,7 +72,7 @@ const APP_FEATURES = [
   {
     icon: Video,
     title: "Teleconsulta integrada",
-    text: "Consultas por vídeo com o Dr. Clóvis sem sair do app — link automático no seu e-mail.",
+    text: "Consultas por vídeo com o seu médico sem sair do app — link automático no seu e-mail.",
   },
   {
     icon: Activity,
@@ -101,24 +103,13 @@ const APP_FEATURES = [
 
 const SHOWCASE = [
   {
-    badge: "Tela inicial",
-    title: "Um app que vive o seu momento",
-    text: "A home muda com a hora do dia e o clima da sua cidade: amanhecer dourado, tarde azul, noite estrelada. O bebê cresce na tela junto com a sua gestação — semana a semana, com tamanho, peso e progresso até o parto.",
-    bullets: [
-      "Clima e dicas em tempo real",
-      "Bebê ilustrado por semana",
-      "Progresso estilo fitness",
-    ],
-    screen: "home" as const,
-  },
-  {
     badge: "Chat IA",
-    title: "Respostas na hora, a qualquer hora",
-    text: "A IA treinada em obstetrícia responde dúvidas com base em protocolos médicos e sabe quando acionar o alerta: se o sintoma for sério, ela orienta você a procurar atendimento — e avisa o médico.",
+    title: "Fale a qualquer hora com a IA do seu médico",
+    text: "Dúvida às 3h da manhã? Converse a qualquer momento com uma inteligência artificial treinada nas respostas que o seu próprio obstetra já validou — como se ele respondesse por você, na hora, sem esperar a próxima consulta.",
     bullets: [
-      "Disponível 24h, inclusive feriados",
-      "Triagem inteligente de sintomas",
-      "Histórico vai para o médico",
+      "Disponível 24h, todos os dias",
+      "Respostas no estilo e nas condutas do seu médico",
+      "Triagem de sintomas e alerta quando é sério",
     ],
     screen: "chat" as const,
   },
@@ -136,7 +127,7 @@ const SHOWCASE = [
   {
     badge: "Saúde",
     title: "Seus números, acompanhados de perto",
-    text: "Registre peso, pressão e os chutes do bebê. O app monta os gráficos e o Dr. Clóvis acompanha tudo do painel médico — sua consulta começa antes de você chegar.",
+    text: "Registre peso, pressão e os chutes do bebê. O app monta os gráficos e o seu médico acompanha tudo do painel — sua consulta começa antes de você chegar.",
     bullets: [
       "Gráficos de evolução automáticos",
       "Contador de chutes do bebê",
@@ -161,19 +152,31 @@ function Index() {
   const heroText = sky.isDark ? "text-white" : "text-foreground";
   const heroMuted = sky.isDark ? "text-white/70" : "text-muted-foreground";
 
+  // Publica se o hero está escuro → header troca a logo (branca no escuro).
+  useEffect(() => {
+    setHeroDark(sky.isDark);
+    return () => setHeroDark(false);
+  }, [sky.isDark]);
+
   return (
     <>
       {/* ── Hero: céu dinâmico + telefone ─────────────────────────── */}
-      <section className="relative -mt-[73px] overflow-hidden pt-[73px]">
+      <section
+        className="relative overflow-hidden"
+        style={{
+          marginTop: "calc(-73px - var(--safe-top))",
+          paddingTop: "calc(73px + var(--safe-top))",
+        }}
+      >
         <SkyCanvas sky={sky} />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 pt-12 pb-24 md:grid-cols-[1.1fr_1fr] md:pt-20 md:pb-32">
-          <div>
+        <div className="relative mx-auto grid max-w-6xl items-center gap-8 px-5 pt-6 pb-24 md:gap-10 md:grid-cols-[1.1fr_1fr] md:pt-20 md:pb-32">
+          {/* Painel Liquid Glass atrás do texto do hero: refrata o céu vivo e
+              garante contraste do texto em qualquer clima/hora do dia. */}
+          <div className="liquid-glass rounded-[2rem] p-6 md:p-9">
             <Reveal variant="blur">
               <p
-                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] backdrop-blur-md ${
-                  sky.isDark
-                    ? "border border-white/20 bg-white/10 text-white"
-                    : "border border-primary/20 bg-white/60 text-primary"
+                className={`glass-chip text-[11px] font-bold uppercase tracking-[0.22em] ${
+                  sky.isDark ? "text-white" : "text-primary"
                 }`}
               >
                 <Sparkles className="h-3 w-3 animate-[sparkle_2.4s_ease-in-out_infinite]" />O app da
@@ -181,14 +184,18 @@ function Index() {
               </p>
             </Reveal>
             <Reveal variant="up" delay={120}>
-              <h1 className={`mt-4 font-serif text-4xl leading-[1.05] md:text-6xl ${heroText}`}>
+              <h1
+                className={`mt-4 font-serif text-3xl font-extrabold leading-[1.08] tracking-tight md:text-6xl ${heroText}`}
+              >
                 A gestação inteira <ShimmerText className="not-italic">no seu bolso</ShimmerText>.
               </h1>
             </Reveal>
             <Reveal variant="up" delay={240}>
-              <p className={`mt-6 max-w-lg text-lg leading-relaxed ${heroMuted}`}>
+              <p
+                className={`mt-4 max-w-lg text-base leading-relaxed md:mt-6 md:text-lg ${heroMuted}`}
+              >
                 Acompanhamento semana a semana, IA obstétrica 24h, teleconsulta e monitoramento de
-                saúde — criado pelo Dr. Clóvis Bacha, especialista em gestação de alto risco.
+                saúde — criado por especialistas em gestação de alto risco.
               </p>
             </Reveal>
             <Reveal variant="up" delay={360}>
@@ -199,7 +206,7 @@ function Index() {
                     className="press group relative block overflow-hidden rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-float)]"
                   >
                     <span className="relative z-10 flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" /> Criar conta grátis
+                      <Smartphone className="h-4 w-4" /> Criar meu perfil grátis
                     </span>
                     <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
                   </Link>
@@ -216,8 +223,8 @@ function Index() {
                 </Link>
               </div>
             </Reveal>
-            {/* selo de clima ao vivo — prova do diferencial */}
-            <Reveal variant="fade" delay={500}>
+            {/* selo de clima ao vivo — prova do diferencial (desktop) */}
+            <Reveal variant="fade" delay={500} className="hidden md:block">
               <div
                 className={`mt-8 inline-flex items-center gap-2.5 rounded-full px-4 py-2 text-sm backdrop-blur-md ${
                   sky.isDark
@@ -239,8 +246,8 @@ function Index() {
                 )}
               </div>
             </Reveal>
-            {/* Seletor dos 4 períodos — experimente o céu de cada hora do dia */}
-            <Reveal variant="fade" delay={620}>
+            {/* Seletor dos 4 períodos — experimente o céu de cada hora do dia (desktop) */}
+            <Reveal variant="fade" delay={620} className="hidden md:block">
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <span className={`text-xs ${heroMuted}`}>Experimente:</span>
                 {PERIODS.map((p) => {
@@ -265,13 +272,26 @@ function Index() {
             </Reveal>
           </div>
 
-          {/* Telefone flutuante — o app dentro dele acompanha o céu do site */}
-          <Reveal variant="scale" delay={250} className="relative flex justify-center">
-            <div className="animate-[phoneFloat_7s_ease-in-out_infinite]">
+          {/* Telefone flutuante — o app dentro dele acompanha o céu do site.
+              No celular ele vem PRIMEIRO: a visitante vê o perfil da gestante
+              antes de qualquer texto, com a chamada para criar o dela. */}
+          <Reveal
+            variant="scale"
+            delay={250}
+            className="order-first relative flex flex-col items-center md:order-none"
+          >
+            <div className="animate-[phoneFloat_7s_ease-in-out_infinite] scale-[0.88] -mb-2 md:scale-100 md:mb-0">
               <PhoneFrame>
                 <AppHomeMockupScreen period={sky.period} />
               </PhoneFrame>
             </div>
+            <p
+              className={`mt-1 text-center text-sm font-medium md:hidden ${
+                sky.isDark ? "text-white/85" : "text-foreground/75"
+              }`}
+            >
+              👆 Assim é o seu perfil de gestação — crie o seu em 1 minuto
+            </p>
           </Reveal>
         </div>
       </section>
@@ -280,53 +300,56 @@ function Index() {
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
         <Reveal variant="up">
           <div className="mx-auto mb-16 max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
               Por dentro do app
             </p>
             <h2 className="mt-3 font-serif text-3xl md:text-5xl">
               Tecnologia que sente o seu momento.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Cada tela foi desenhada com o Dr. Clóvis para a rotina real de uma gestante — do
+              Cada tela foi desenhada com médicos obstetras para a rotina real de uma gestante — do
               positivo ao pós-parto.
             </p>
           </div>
         </Reveal>
 
-        <div className="space-y-20 md:space-y-28">
+        <div className="space-y-8 md:space-y-12">
           {SHOWCASE.map((item, i) => (
-            <div
-              key={item.badge}
-              className={`grid items-center gap-10 md:grid-cols-2 ${
-                i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
-              }`}
-            >
-              <Reveal variant={i % 2 === 1 ? "left" : "up"} className="flex justify-center">
-                <PhoneFrame tilt={i % 2 === 1 ? "right" : "left"}>
-                  {item.screen === "home" && <AppHomeMockupScreen />}
-                  {item.screen === "chat" && <AppChatMockupScreen />}
-                  {item.screen === "jogo" && <AppJogoMockupScreen />}
-                  {item.screen === "saude" && <AppSaudeMockupScreen />}
-                </PhoneFrame>
-              </Reveal>
-              <Reveal variant="up" delay={120}>
-                <span className="inline-block rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
-                  {item.badge}
-                </span>
-                <h3 className="mt-4 font-serif text-2xl md:text-4xl">{item.title}</h3>
-                <p className="mt-4 text-base leading-relaxed text-muted-foreground">{item.text}</p>
-                <ul className="mt-6 space-y-2.5">
-                  {item.bullets.map((b) => (
-                    <li key={b} className="flex items-center gap-2.5 text-sm text-foreground">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                        ✓
-                      </span>
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </Reveal>
-            </div>
+            <Fragment key={item.badge}>
+              {i > 0 && <FootprintTrail dir={i % 2 === 1 ? "ltr" : "rtl"} />}
+              <div
+                className={`grid items-center gap-10 md:grid-cols-2 ${
+                  i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
+                }`}
+              >
+                <Reveal variant={i % 2 === 1 ? "left" : "up"} className="flex justify-center">
+                  <PhoneFrame tilt={i % 2 === 1 ? "right" : "left"}>
+                    {item.screen === "chat" && <AppChatMockupScreen />}
+                    {item.screen === "jogo" && <AppJogoMockupScreen />}
+                    {item.screen === "saude" && <AppSaudeMockupScreen />}
+                  </PhoneFrame>
+                </Reveal>
+                <Reveal variant="up" delay={120}>
+                  <span className="glass-chip text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
+                    {item.badge}
+                  </span>
+                  <h3 className="mt-4 font-serif text-2xl md:text-4xl">{item.title}</h3>
+                  <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+                    {item.text}
+                  </p>
+                  <ul className="mt-6 space-y-2.5">
+                    {item.bullets.map((b) => (
+                      <li key={b} className="flex items-center gap-2.5 text-sm text-foreground">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                          ✓
+                        </span>
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </Reveal>
+              </div>
+            </Fragment>
           ))}
         </div>
       </section>
@@ -336,7 +359,7 @@ function Index() {
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <Reveal variant="up">
             <div className="mb-10 max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 Tudo que o app faz
               </p>
               <h2 className="mt-3 font-serif text-3xl md:text-4xl">
@@ -376,7 +399,7 @@ function Index() {
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <Reveal variant="up">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
               Em números
             </p>
             <h2 className="mt-3 font-serif text-3xl md:text-4xl">A experiência por trás do app.</h2>
@@ -412,7 +435,7 @@ function Index() {
             <div className="absolute -inset-3 rounded-[2.3rem] bg-gradient-to-tr from-primary/20 via-transparent to-accent/30 blur-lg" />
             <img
               src={portrait}
-              alt="Dr. Clóvis Bacha"
+              alt="O obstetra fundador da plataforma"
               loading="lazy"
               width={1024}
               height={1024}
@@ -422,19 +445,19 @@ function Index() {
         </Reveal>
         <div>
           <Reveal variant="up">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
               O especialista
             </p>
             <h2 className="mt-3 font-serif text-3xl md:text-4xl">
-              Dr. Clóvis Bacha, ginecologista e obstetra de alto risco.
+              Feito por quem vive a obstetrícia todos os dias.
             </h2>
           </Reveal>
           <Reveal variant="up" delay={120}>
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-              Com mais de 20 anos de prática especializada em gestações complexas — diabetes
-              gestacional, hipertensão, gemelaridade e malformações fetais — o Dr. Clóvis
-              desenvolveu o Obstétrica para que cada paciente tenha ao seu lado o mesmo cuidado que
-              recebe no consultório, a qualquer momento.
+              Criado por um ginecologista e obstetra com mais de 20 anos de prática em gestações
+              complexas — diabetes gestacional, hipertensão, gemelaridade e malformações fetais —
+              para que cada paciente tenha ao seu lado o mesmo cuidado que recebe no consultório do
+              seu médico, a qualquer momento.
             </p>
           </Reveal>
           <Reveal variant="up" delay={220}>
@@ -454,7 +477,7 @@ function Index() {
               to="/sobre"
               className="group mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary underline underline-offset-4"
             >
-              Ver currículo completo{" "}
+              Conhecer nossa história{" "}
               <span className="transition-transform duration-300 [transition-timing-function:var(--ease-out-expo)] group-hover:translate-x-1">
                 →
               </span>

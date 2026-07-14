@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CalendarClock, Instagram } from "lucide-react";
 import { useEffect, useState } from "react";
+import { DOCTOR } from "@/lib/doctor.config";
 
 export const Route = createFileRoute("/lives")({
   head: () => ({
     meta: [
-      { title: "Lives e encontros com Dr. Clóvis Bacha" },
+      { title: "Lives e encontros — Obstétrica" },
       {
         name: "description",
         content:
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/lives")({
 const proximaLive = {
   titulo: "Sangramento no início da gestação: quando se preocupar",
   data: "2026-06-20T20:00:00-03:00",
-  link: "https://instagram.com/drclovisbacha",
+  link: DOCTOR.instagram,
 };
 
 const anteriores = [
@@ -63,7 +64,7 @@ function LivesPage() {
       </p>
       <h1 className="mt-3 font-serif text-4xl">Lives no Instagram</h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">
-        Uma vez por mês, o Dr. Clóvis abre uma conversa ao vivo para tirar dúvidas reais. Gratuito,
+        Uma vez por mês, o seu médico abre uma conversa ao vivo para tirar dúvidas reais. Gratuito,
         sem inscrição.
       </p>
 

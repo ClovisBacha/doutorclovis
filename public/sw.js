@@ -1,4 +1,4 @@
-const CACHE = "obstetricia-v2";
+const CACHE = "obstetricia-v3";
 const SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -6,7 +6,7 @@ const SHELL = [
   "/icon-192.png",
   "/icon-512.png",
   "/apple-touch-icon.png",
-  "/og.svg",
+  "/og.png",
   "/robots.txt",
 ];
 const STATIC_RE = /\.(js|css|woff2?|svg|png|ico|webmanifest|jpg|jpeg|webp)(\?|$)/;

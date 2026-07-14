@@ -110,7 +110,7 @@ function LinkCard({ path, label }: { path: string; label: string }) {
   );
 }
 
-const PLANS = ["trial", "free", "starter", "pro", "clinica"] as const;
+const PLANS = ["trial", "free", "starter", "pro", "clinica", "elite", "black"] as const;
 
 function AdminConsole() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -288,7 +288,11 @@ function DoctorsTab({ data, onChanged }: { data: PlatformOverview; onChanged: ()
 function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
 
-  async function change(patch: { active?: boolean; plan?: (typeof PLANS)[number] }) {
+  async function change(patch: {
+    active?: boolean;
+    verified?: boolean;
+    plan?: (typeof PLANS)[number];
+  }) {
     setBusy(true);
     const res = await setDoctorStatus({
       data: { accessToken: await token(), doctorId: d.id, ...patch },
@@ -312,6 +316,15 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
               inativo
             </span>
           )}
+          {d.verified ? (
+            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+              ✓ verificado
+            </span>
+          ) : (
+            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+              não verificado
+            </span>
+          )}
         </p>
         <p className="truncate text-xs text-muted-foreground">
           {d.email ?? "—"} · {d.patients} pacientes · {d.brainEntries} no cérebro
@@ -329,6 +342,18 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
           </option>
         ))}
       </select>
+      <button
+        onClick={() => change({ verified: !d.verified })}
+        disabled={busy}
+        className={`rounded-full px-4 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+          d.verified
+            ? "border border-amber-300 bg-amber-50 text-amber-700"
+            : "bg-emerald-600 text-white"
+        }`}
+        title="Só médicos verificados aparecem na busca pública de médicos"
+      >
+        {d.verified ? "Remover selo" : "Verificar"}
+      </button>
       <button
         onClick={() => change({ active: !d.active })}
         disabled={busy}

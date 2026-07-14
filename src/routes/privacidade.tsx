@@ -4,13 +4,12 @@ import { DOCTOR } from "@/lib/doctor.config";
 export const Route = createFileRoute("/privacidade")({
   head: () => ({
     meta: [
-      { title: "Política de Privacidade — Obstétrica by Dr. Clóvis" },
+      { title: "Política de Privacidade — Obstétrica" },
       {
         name: "description",
         content:
           "Como coletamos, usamos e protegemos seus dados no app Obstétrica, em conformidade com a LGPD.",
       },
-      { name: "robots", content: "noindex" },
     ],
   }),
   component: PrivacidadePage,
@@ -22,15 +21,15 @@ function PrivacidadePage() {
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Legal</p>
       <h1 className="mt-3 font-serif text-4xl">Política de Privacidade</h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        Última atualização: junho de 2026 · Em conformidade com a Lei Geral de Proteção de Dados
+        Última atualização: julho de 2026 · Em conformidade com a Lei Geral de Proteção de Dados
         (LGPD — Lei nº 13.709/2018)
       </p>
 
       <div className="mt-10 space-y-10 text-sm leading-relaxed text-foreground">
         <Block title="1. Quem somos">
           <p>
-            O aplicativo <strong>Obstétrica by Dr. Clóvis</strong> é operado por{" "}
-            <strong>{DOCTOR.name}</strong>, {DOCTOR.title}, com contato disponível em{" "}
+            O aplicativo <strong>Obstétrica</strong> é operado por <strong>{DOCTOR.name}</strong>,{" "}
+            {DOCTOR.title}, com contato disponível em{" "}
             <a href={`mailto:${DOCTOR.email}`} className="text-primary hover:underline">
               {DOCTOR.email}
             </a>
@@ -125,6 +124,11 @@ function PrivacidadePage() {
               enviados ao chat são processados conforme a política do Google AI.
             </li>
             <li>
+              <strong>Google LLC — Google Agenda / Google Meet</strong> (opcional, apenas para o
+              médico): quando o médico conecta a própria conta Google, o app cria os eventos das
+              teleconsultas na agenda dele e gera a sala do Meet. Ver a seção 6.
+            </li>
+            <li>
               <strong>Resend Inc.</strong> (envio de e-mails transacionais) — somente e-mail e nome
               para envio de confirmações.
             </li>
@@ -135,7 +139,64 @@ function PrivacidadePage() {
           </p>
         </Block>
 
-        <Block title="6. Por quanto tempo guardamos seus dados">
+        <Block title="6. Uso de dados do Google (Google Agenda e Google Meet)">
+          <p>
+            De forma <strong>opcional e exclusiva para o médico</strong>, o app permite conectar uma
+            conta Google para hospedar as teleconsultas. Ao conectar, você autoriza o app a{" "}
+            <strong>criar e gerenciar eventos na sua Google Agenda</strong> (escopo{" "}
+            <code>calendar.events</code>), unicamente para:
+          </p>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5">
+            <li>criar o evento da teleconsulta com um link do Google Meet;</li>
+            <li>convidar você (médico) e a paciente por e-mail para esse evento.</li>
+          </ul>
+          <p className="mt-3">
+            O uso e a transferência, pelo app Obstétrica, de informações recebidas das APIs do
+            Google seguem a{" "}
+            <a
+              href="https://developers.google.com/terms/api-services-user-data-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Política de Dados do Usuário dos Serviços de API do Google
+            </a>
+            , incluindo os requisitos de <strong>Uso Limitado</strong> (Limited Use). Em concreto:
+          </p>
+          <ul className="mt-2 list-disc space-y-1.5 pl-5">
+            <li>
+              usamos os dados da sua Agenda <strong>apenas</strong> para criar/gerenciar os eventos
+              de teleconsulta descritos acima;
+            </li>
+            <li>
+              <strong>não</strong> vendemos, alugamos ou transferimos esses dados a terceiros, nem
+              os usamos para publicidade;
+            </li>
+            <li>
+              <strong>não</strong> permitimos que humanos leiam esses dados, exceto com o seu
+              consentimento explícito, para segurança, ou quando exigido por lei;
+            </li>
+            <li>
+              o <strong>token de acesso</strong> é guardado de forma segura no servidor (nunca é
+              exposto ao navegador) e usado só para as ações acima.
+            </li>
+          </ul>
+          <p className="mt-3">
+            Você pode <strong>desconectar</strong> a conta Google a qualquer momento no painel (Meu
+            Perfil → Google Agenda), ou revogar o acesso diretamente em{" "}
+            <a
+              href="https://myaccount.google.com/permissions"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              myaccount.google.com/permissions
+            </a>
+            . Ao desconectar, o token guardado é apagado.
+          </p>
+        </Block>
+
+        <Block title="7. Por quanto tempo guardamos seus dados">
           <ul className="mt-2 list-disc space-y-1.5 pl-5">
             <li>
               Dados de conta e saúde: enquanto a conta estiver ativa, e por até{" "}
@@ -154,7 +215,7 @@ function PrivacidadePage() {
           </p>
         </Block>
 
-        <Block title="7. Seus direitos (LGPD — Art. 18)">
+        <Block title="8. Seus direitos (LGPD — Art. 18)">
           <p>Você tem direito a:</p>
           <ul className="mt-2 list-disc space-y-1.5 pl-5">
             <li>Confirmar a existência de tratamento e acessar seus dados.</li>
@@ -173,7 +234,7 @@ function PrivacidadePage() {
           </p>
         </Block>
 
-        <Block title="8. Segurança">
+        <Block title="9. Segurança">
           <p>
             Adotamos medidas técnicas e organizacionais para proteger seus dados: conexões
             criptografadas (TLS/HTTPS), senhas armazenadas com hash bcrypt, Row-Level Security no
@@ -182,7 +243,7 @@ function PrivacidadePage() {
           </p>
         </Block>
 
-        <Block title="9. Cookies e armazenamento local">
+        <Block title="10. Cookies e armazenamento local">
           <p>
             Utilizamos cookies de sessão essenciais para autenticação. Não utilizamos cookies de
             rastreamento ou publicidade. O app pode armazenar dados localmente no seu dispositivo
@@ -190,7 +251,7 @@ function PrivacidadePage() {
           </p>
         </Block>
 
-        <Block title="10. Alterações nesta política">
+        <Block title="11. Alterações nesta política">
           <p>
             Esta política pode ser atualizada periodicamente. Quando isso ocorrer, notificaremos por
             e-mail cadastrado ou via aviso no app. A data de última atualização sempre estará
@@ -198,7 +259,7 @@ function PrivacidadePage() {
           </p>
         </Block>
 
-        <Block title="11. Contato e DPO">
+        <Block title="12. Contato e DPO">
           <p>
             Encarregado de proteção de dados (DPO):{" "}
             <a href={`mailto:${DOCTOR.email}`} className="text-primary hover:underline">

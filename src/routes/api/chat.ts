@@ -21,28 +21,65 @@ function rateLimited(ip: string) {
   return entry.count > RATE_LIMIT;
 }
 
-const SYSTEM_PROMPT = `Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra brasileiro especialista em gestação de alto risco.
+// Chat do SITE PÚBLICO: assistente geral da plataforma (dúvidas do app e do
+// site, suporte). NÃO fala como um médico específico e NÃO dá conduta clínica.
+const SUPPORT_SYSTEM_PROMPT = `Você é o assistente da plataforma Obstétrica — um app de acompanhamento de gestação para pacientes e um painel para obstetras.
 
-Sobre o Dr. Clóvis:
-- Formado em Medicina, com residência em Ginecologia e Obstetrícia.
-- Especialista em medicina fetal e gestação de alto risco (hipertensão gestacional, diabetes gestacional, gemelaridade, malformações fetais, prematuridade, etc).
-- Atendimento humanizado, acolhedor e baseado em evidências.
+O que você faz:
+- Explica como usar o app (perfil, cálculo de idade gestacional, contrações, exames, chat com o obstetra, teleconsulta, etc).
+- Orienta a paciente a se vincular ao próprio obstetra: ela busca o médico no app e envia uma solicitação; ao ser aceita, passa a conversar com a IA do consultório dela.
+- Tira dúvidas gerais sobre a plataforma e encaminha para o suporte quando necessário.
 
-Sobre o atendimento:
-- Consultas presenciais e online (telemedicina).
-- Exames e ultrassonografia obstétrica acompanhados pelo doutor.
-- Acompanhamento pré-natal completo e pós-parto.
+Regras de resposta:
+- Responda em português brasileiro, com tom acolhedor, claro e conciso (3 a 6 frases).
+- NÃO dê diagnóstico, prescrição ou conduta médica. Para dúvidas clínicas, oriente falar com o obstetra pelo app; em urgência, ligar 192 (SAMU) ou ir ao pronto-socorro.
+- Não invente dados (telefone, endereço, valores). Se não souber, encaminhe para o suporte.`;
 
-Agendamento:
-- O paciente pode solicitar consulta pela página /agendamento do site.
-- O consultório confirma horário por telefone/e-mail.
+/** Assistente médico do consultório de UM médico (usado no app da paciente). */
+function medicalSystemPrompt(doctorName?: string | null): string {
+  const consultorio = doctorName ? `do consultório do(a) ${doctorName}` : "do seu obstetra";
+  return `Você é o assistente virtual ${consultorio}, no app de acompanhamento de gestação da paciente.
 
 Regras de resposta:
 - Responda em português brasileiro, com tom acolhedor, claro e profissional.
 - Seja conciso (3 a 6 frases) salvo se a paciente pedir mais detalhe.
-- NUNCA dê diagnóstico, prescrição ou conduta médica. Para sintomas, oriente buscar avaliação presencial e, em urgência, ligar 192 (SAMU) ou ir ao pronto-socorro.
-- Se a pessoa quiser marcar consulta, direcione para a página /agendamento.
-- Não invente dados (telefone, endereço, valores). Se não souber, peça para a paciente entrar em contato pelo site.`;
+- NUNCA dê diagnóstico, prescrição ou conduta médica. Para sintomas, oriente buscar avaliação e, em urgência, ligar 192 (SAMU) ou ir ao pronto-socorro.
+- Responda seguindo o estilo e as condutas já validadas pelo médico (bloco abaixo, se houver). Nada fora disso: encaminhe para a consulta.
+- Não invente dados (telefone, endereço, valores).`;
+}
+
+/**
+ * Resolve o médico da PACIENTE logada a partir do token do Supabase enviado no
+ * header Authorization. Sem token (site público) → null. Devolve o doctor_id
+ * (para injetar o cérebro DAQUELE médico) e o nome dele (para a persona).
+ */
+async function resolvePatientDoctor(
+  request: Request,
+): Promise<{ doctorId: string | null; doctorName: string | null } | null> {
+  const auth = request.headers.get("authorization") || request.headers.get("Authorization");
+  const token = auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : null;
+  if (!token) return null; // site público (anônimo)
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !data.user) return null;
+    const { data: prof } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    const doctorId = (prof?.doctor_id ?? null) as string | null;
+    if (!doctorId) return { doctorId: null, doctorName: null };
+    const { data: doc } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("display_name")
+      .eq("id", doctorId)
+      .maybeSingle();
+    return { doctorId, doctorName: (doc?.display_name || null) as string | null };
+  } catch {
+    return null;
+  }
+}
 
 /** Extrai o texto da última mensagem de usuário (formato UIMessage com parts). */
 function lastUserText(messages: UIMessage[]): string {
@@ -78,13 +115,29 @@ export const Route = createFileRoute("/api/chat")({
         const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         if (!key) return new Response("Missing GOOGLE_GENERATIVE_AI_API_KEY", { status: 500 });
 
-        // Segundo Cérebro: contexto de estilo/conduta do médico injetado no
-        // system prompt. getBrainContext é safe (falha vira block vazio),
-        // então nunca derruba o chat.
         const messages = body.messages as UIMessage[];
-        const brain = await getBrainContext(lastUserText(messages), undefined, "app");
-        const system =
-          brain.enabledApp && brain.block ? `${SYSTEM_PROMPT}\n\n${brain.block}` : SYSTEM_PROMPT;
+
+        // Quem está falando? Paciente logada (token no Authorization) fala com a
+        // IA do PRÓPRIO médico; site público (anônimo) fala com o assistente
+        // geral da plataforma. Assim cada conta é individual.
+        const patient = await resolvePatientDoctor(request);
+
+        let system: string;
+        if (patient && patient.doctorId) {
+          // App: injeta o Segundo Cérebro DAQUELE médico (respeitando o plano).
+          // getBrainContext é safe (falha vira block vazio), nunca derruba o chat.
+          const brain = await getBrainContext(lastUserText(messages), patient.doctorId, "app");
+          const base = medicalSystemPrompt(patient.doctorName);
+          system = brain.enabledApp && brain.block ? `${base}\n\n${brain.block}` : base;
+        } else if (patient) {
+          // App, mas a paciente ainda não se vinculou a um médico → sem cérebro.
+          system =
+            medicalSystemPrompt() +
+            "\n\nA paciente ainda não está vinculada a um obstetra. Se fizer sentido, convide-a a buscar o médico dela no app e enviar uma solicitação de vínculo.";
+        } else {
+          // Site público (anônimo): assistente geral / suporte da plataforma.
+          system = SUPPORT_SYSTEM_PROMPT;
+        }
 
         const google = createChatProvider(key);
         const result = streamText({
