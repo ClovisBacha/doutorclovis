@@ -105,7 +105,7 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
             `<p style="margin:0 0 6px"><strong>Paciente:</strong> ${esc(data.patient_name)}</p>
              <p style="margin:0 0 6px"><strong>Contato:</strong> ${esc(data.patient_phone)} · ${esc(data.patient_email)}</p>
              ${resumo}
-             <p style="margin:14px 0 0"><a href="https://obstetrica.com.br/painel" style="color:#a85a44">Abrir o painel do médico →</a></p>`,
+             <p style="margin:14px 0 0"><a href="https://www.obstetrica.com.br/painel" style="color:#a85a44">Abrir o painel do médico →</a></p>`,
           ),
         });
       }

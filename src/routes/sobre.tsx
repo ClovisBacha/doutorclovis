@@ -98,12 +98,39 @@ const breadcrumb = {
   ],
 };
 
+// Dado estruturado do médico — é o que o Google usa quando alguém pesquisa o
+// nome dele (painel de conhecimento, resultado com foto/especialidade).
+const physician = {
+  "@context": "https://schema.org",
+  "@type": "Physician",
+  name: DOCTOR.name,
+  medicalSpecialty: "Gynecologic",
+  description: `${DOCTOR.title} — ${DOCTOR.specialty}.`,
+  url: `${DOCTOR.siteUrl}/sobre`,
+  image: `${DOCTOR.siteUrl}/og.png`,
+  telephone: DOCTOR.whatsappDisplay,
+  email: DOCTOR.email,
+  sameAs: [DOCTOR.instagram],
+  knowsAbout: [
+    "Gestação de alto risco",
+    "Pré-natal",
+    "Medicina fetal",
+    "Ultrassonografia obstétrica",
+    "Ginecologia",
+    "Obstetrícia",
+  ],
+};
+
 function SobrePage() {
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumb) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(physician) }}
       />
 
       {/* Hero — a razão de existir */}
