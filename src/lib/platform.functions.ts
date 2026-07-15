@@ -225,3 +225,132 @@ export const setDoctorStatus = createServerFn({ method: "POST" })
       .eq("id", data.doctorId);
     return { ok: !error };
   });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ativação & Retenção (instrumentação) — para o fundador parar de "estar cego".
+// Tudo calculado a partir das tabelas de atividade que já existem (sem novo
+// pipeline de eventos). Só super-admin.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type RetentionMetrics = {
+  patients: {
+    total: number;
+    activated: number; // fez ≥1 registro (diário/saúde/chutes) alguma vez
+    activatedPct: number;
+    active7d: number;
+    active30d: number;
+    returning: number; // teve atividade em ≥2 dias distintos
+    returningPct: number;
+  };
+  doctors: {
+    total: number;
+    active: number;
+    trained: number; // ≥1 entrada no Segundo Cérebro
+    trainedPct: number;
+    withPatients: number; // ≥1 paciente vinculada
+  };
+  generatedAt: string;
+};
+
+/** Métricas de ativação/retenção da plataforma (super-admin). */
+export const getRetentionMetrics = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const nowMs = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+
+    // Atividade por paciente: dias distintos + última atividade.
+    const activity = await safe(async () => {
+      const map = new Map<string, { days: Set<string>; last: number }>();
+      const record = (uid: string, ts: string | null) => {
+        if (!uid || !ts) return;
+        const ms = new Date(ts).getTime();
+        if (Number.isNaN(ms)) return;
+        const day = new Date(ts).toISOString().slice(0, 10);
+        const e = map.get(uid) ?? { days: new Set<string>(), last: 0 };
+        e.days.add(day);
+        if (ms > e.last) e.last = ms;
+        map.set(uid, e);
+      };
+      const [health, journals, kicks] = await Promise.all([
+        sb.from("health_logs").select("user_id,created_at").limit(8000),
+        sb.from("journal_entries").select("user_id,created_at").limit(8000),
+        sb.from("kick_sessions").select("user_id,started_at").limit(8000),
+      ]);
+      (health.data ?? []).forEach((r: any) => record(r.user_id, r.created_at));
+      (journals.data ?? []).forEach((r: any) => record(r.user_id, r.created_at));
+      (kicks.data ?? []).forEach((r: any) => record(r.user_id, r.started_at));
+      return map;
+    }, new Map<string, { days: Set<string>; last: number }>());
+
+    const patientsTotal = await safe(async () => {
+      const { count } = await sb
+        .from("patient_profiles")
+        .select("*", { count: "exact", head: true });
+      return (count ?? 0) as number;
+    }, 0);
+
+    let active7d = 0;
+    let active30d = 0;
+    let returning = 0;
+    for (const e of activity.values()) {
+      if (e.last >= nowMs - 7 * DAY) active7d += 1;
+      if (e.last >= nowMs - 30 * DAY) active30d += 1;
+      if (e.days.size >= 2) returning += 1;
+    }
+    const activated = activity.size;
+    const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
+
+    // Médicos: ativos, treinaram a IA, têm pacientes.
+    const docRows = await safe<{ id: string; active: boolean | null }[]>(async () => {
+      return ((await sb.from("doctors").select("id,active")).data ?? []) as {
+        id: string;
+        active: boolean | null;
+      }[];
+    }, []);
+    const trainedSet = await safe<Set<string>>(async () => {
+      const { data: rows } = await sb.from("brain_entries").select("doctor_id");
+      const s = new Set<string>();
+      for (const r of (rows ?? []) as { doctor_id: string | null }[])
+        if (r.doctor_id) s.add(r.doctor_id);
+      return s;
+    }, new Set<string>());
+    const withPatientsSet = await safe<Set<string>>(async () => {
+      const { data: rows } = await sb.from("patient_profiles").select("doctor_id");
+      const s = new Set<string>();
+      for (const r of (rows ?? []) as { doctor_id: string | null }[])
+        if (r.doctor_id) s.add(r.doctor_id);
+      return s;
+    }, new Set<string>());
+
+    const doctorsTotal = docRows.length;
+    const doctorsActive = docRows.filter((d) => d.active).length;
+    const trained = docRows.filter((d) => trainedSet.has(d.id)).length;
+    const withPatients = docRows.filter((d) => withPatientsSet.has(d.id)).length;
+
+    const metrics: RetentionMetrics = {
+      patients: {
+        total: patientsTotal,
+        activated,
+        activatedPct: pct(activated, patientsTotal),
+        active7d,
+        active30d,
+        returning,
+        returningPct: pct(returning, activated),
+      },
+      doctors: {
+        total: doctorsTotal,
+        active: doctorsActive,
+        trained,
+        trainedPct: pct(trained, doctorsTotal),
+        withPatients,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+    return { ok: true as const, metrics };
+  });

@@ -4,9 +4,11 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPlatformOverview,
+  getRetentionMetrics,
   setDoctorStatus,
   type PlatformOverview,
   type PlatformDoctor,
+  type RetentionMetrics,
 } from "@/lib/platform.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -260,6 +262,83 @@ function OverviewTab({ data }: { data: PlatformOverview }) {
       <p className="text-xs text-muted-foreground">
         Atualizado {new Date(data.generatedAt).toLocaleString("pt-BR")}. A receita usa os preços de
         referência por plano (ajustáveis em <code>platform.functions.ts</code>).
+      </p>
+
+      <RetentionCard />
+    </div>
+  );
+}
+
+/**
+ * Ativação & Retenção (instrumentação): mostra se paciente/médico ATIVAM e
+ * VOLTAM. É o painel que tira o fundador da cegueira (crítica do comitê).
+ * Busca sozinho (getRetentionMetrics, super-admin).
+ */
+function RetentionCard() {
+  const [m, setM] = useState<RetentionMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        const tk = s.session?.access_token;
+        if (!tk) return;
+        const res = await getRetentionMetrics({ data: { accessToken: tk } });
+        if (res.ok && res.metrics) setM(res.metrics);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <div className="skeleton h-40 rounded-3xl" />;
+  if (!m) return null;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <p className="font-serif text-lg">Ativação & Retenção</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        A pergunta que decide a empresa: as pessoas ativam e voltam?
+      </p>
+
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Pacientes
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <KpiCard label="Total" value={m.patients.total} />
+        <KpiCard
+          label="Ativaram (fizeram algo)"
+          value={`${m.patients.activated} · ${m.patients.activatedPct}%`}
+          tone="emerald"
+        />
+        <KpiCard
+          label="Voltaram (2+ dias)"
+          value={`${m.patients.returning} · ${m.patients.returningPct}%`}
+          tone="primary"
+          hint="% sobre quem ativou"
+        />
+        <KpiCard label="Ativas 7 dias" value={m.patients.active7d} tone="sky" />
+        <KpiCard label="Ativas 30 dias" value={m.patients.active30d} tone="sky" />
+      </div>
+
+      <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Médicos
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <KpiCard label="Total" value={m.doctors.total} />
+        <KpiCard label="Ativos" value={m.doctors.active} tone="emerald" />
+        <KpiCard
+          label="Treinaram a IA"
+          value={`${m.doctors.trained} · ${m.doctors.trainedPct}%`}
+          tone="primary"
+          hint="≥1 entrada no cérebro"
+        />
+        <KpiCard label="Com pacientes" value={m.doctors.withPatients} tone="sky" />
+      </div>
+
+      <p className="mt-4 text-[11px] text-muted-foreground">
+        "Ativar" = fez ao menos 1 registro (diário/saúde/chutes). "Voltar" = teve atividade em 2+
+        dias distintos. Sinais de PMF: retenção alta e crescente.
       </p>
     </div>
   );
