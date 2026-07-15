@@ -189,9 +189,9 @@ export const registerDoctor = createServerFn({ method: "POST" })
       return { ok: false as const, error: error.message as string };
     }
 
-    // Cadastro NOVO avisa a equipe para fazer a ativação do painel (o gate do
-    // painel é operado manualmente enquanto o multi-tenant não chega às
-    // consultas). Não bloqueia o fluxo se o e-mail falhar.
+    // Cadastro NOVO: o painel já nasce ativo (doctors.active default true), então
+    // isto é só um AVISO à equipe para dar as boas-vindas/ajudar no onboarding —
+    // não há ativação manual. Não bloqueia o fluxo se o e-mail falhar.
     if (!existing) {
       try {
         const { sendEmail, emailLayout } = await import("@/lib/email.server");
