@@ -501,6 +501,75 @@ function DashboardSection({
   return <DashboardView data={data} onNavigate={onNavigate} onRefresh={load} />;
 }
 
+/**
+ * "Valor gerado este mês": reenquadra os números do painel como retorno (tempo
+ * economizado, dúvidas resolvidas pela IA) — o médico lembra POR QUE paga. Se
+ * ainda não há uso, vira um empurrão para treinar a IA.
+ */
+function ValorGeradoBanner({
+  aiHits,
+  answered,
+  activePatients,
+  onNavigate,
+}: {
+  aiHits: number;
+  answered: number;
+  activePatients: number;
+  onNavigate: (tab: PanelTab) => void;
+}) {
+  const assists = aiHits + answered;
+
+  if (assists === 0 && activePatients === 0) {
+    return (
+      <div className="fade-slide-up rounded-3xl border border-primary/20 bg-primary/5 p-5">
+        <p className="font-serif text-lg">💚 Comece a gerar valor</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Treine o seu <strong>Segundo Cérebro</strong> e convide suas pacientes — assim que a IA
+          começar a responder, este espaço mostra quanto tempo você economizou.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => onNavigate("Cérebro 🧠")}
+            className="press rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+          >
+            Treinar minha IA
+          </button>
+          <button
+            onClick={() => onNavigate("Meu Perfil")}
+            className="rounded-full border border-border px-4 py-2 text-xs font-medium hover:bg-secondary"
+          >
+            Convidar pacientes
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-slide-up rounded-3xl border border-primary/20 bg-primary/5 p-5">
+      <p className="font-serif text-lg">💚 Valor gerado este mês</p>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <ValueTile big={aiHits} label="dúvidas respondidas pela sua IA" />
+        <ValueTile big={answered} label="perguntas de pacientes resolvidas" />
+        <ValueTile big={savedTimeLabel(assists)} label="do seu tempo economizado (estimativa)" />
+        <ValueTile big={activePatients} label="pacientes ativas nos últimos 7 dias" />
+      </div>
+      <p className="mt-3 text-[11px] text-muted-foreground">
+        Estimativa: cada atendimento da IA equivale a ~3 min seus. É por isso que o plano se paga.
+      </p>
+    </div>
+  );
+}
+
+function ValueTile({ big, label }: { big: number | string; label: string }) {
+  return (
+    <div className="rounded-2xl bg-card/70 p-3">
+      <p className="font-serif text-2xl font-bold text-primary">{big}</p>
+      <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
 /** Parte visual do dashboard — recebe os dados prontos (permite preview isolado). */
 export function DashboardView({
   data,
@@ -542,6 +611,14 @@ export function DashboardView({
           ↺ Atualizar
         </button>
       </div>
+
+      {/* Valor gerado no mês — reenquadra os números como ROI (retenção). */}
+      <ValorGeradoBanner
+        aiHits={brain.hitsThisMonth}
+        answered={questions.answered}
+        activePatients={patients.active7d}
+        onNavigate={onNavigate}
+      />
 
       {/* 2. Cards de destaque */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
