@@ -164,12 +164,24 @@ async function rewardReferrer(referredDoctorId: string): Promise<void> {
   const referrerId = referred?.referred_by as string | null | undefined;
   if (!referrerId || referred?.referral_rewarded || referrerId === referredDoctorId) return;
 
+  // Claim ATÔMICO: o UPDATE ... WHERE referral_rewarded=false só afeta a linha
+  // se ninguém tiver recompensado antes. Em corrida (checkout.session.completed
+  // e customer.subscription.created chegam quase juntos no 1º pagamento), só um
+  // vencedor recebe a linha de volta — impede recompensa dupla (+60).
+  const { data: claimed } = await sb
+    .from("doctors")
+    .update({ referral_rewarded: true })
+    .eq("id", referredDoctorId)
+    .eq("referral_rewarded", false)
+    .select("id");
+  if (!claimed || claimed.length === 0) return; // já recompensado / perdeu a corrida
+
   const { data: referrer } = await sb
     .from("doctors")
     .select("plan_expires_at")
     .eq("id", referrerId)
     .maybeSingle();
-  if (!referrer) return; // indicador não existe mais → não recompensa
+  if (!referrer) return; // indicador não existe mais → recompensa se perde (raro)
 
   const now = Date.now();
   const currentMs = referrer.plan_expires_at
@@ -179,6 +191,4 @@ async function rewardReferrer(referredDoctorId: string): Promise<void> {
   const newExpiry = new Date(base + 30 * 24 * 60 * 60 * 1000).toISOString();
 
   await sb.from("doctors").update({ plan_expires_at: newExpiry }).eq("id", referrerId);
-  // Marca ANTES de qualquer nova execução (idempotência), na linha do indicado.
-  await sb.from("doctors").update({ referral_rewarded: true }).eq("id", referredDoctorId);
 }
