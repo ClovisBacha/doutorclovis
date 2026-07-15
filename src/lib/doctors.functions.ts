@@ -121,10 +121,35 @@ export const getMyDoctor = createServerFn({ method: "POST" })
     };
   });
 
+/** Contagem de indicações do médico logado (para o card "Indique um colega"). */
+export const getMyReferrals = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireUser(data.accessToken);
+    if (!user) return { ok: false as const, invited: 0, rewarded: 0 };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("referral_rewarded")
+      .eq("referred_by", user.id);
+    const list = (rows ?? []) as { referral_rewarded: boolean | null }[];
+    return {
+      ok: true as const,
+      invited: list.length,
+      rewarded: list.filter((r) => r.referral_rewarded).length,
+    };
+  });
+
 /** Cria (ou completa) o perfil de médico do usuário logado — plano trial. */
 export const registerDoctor = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), profile: ProfileSchema }).parse(i),
+    z
+      .object({
+        accessToken: z.string().min(10),
+        profile: ProfileSchema,
+        ref: z.string().uuid().optional(), // indicação: doctor_id de quem indicou
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const user = await requireUser(data.accessToken);
@@ -137,6 +162,18 @@ export const registerDoctor = createServerFn({ method: "POST" })
       .select("id,slug")
       .eq("id", user.id)
       .maybeSingle();
+
+    // Indicação (só no cadastro NOVO): o `ref` precisa ser um médico REAL e
+    // diferente do próprio (sem auto-indicação). Best-effort — não bloqueia.
+    let referredBy: string | null = null;
+    if (!existing && data.ref && data.ref !== user.id) {
+      const { data: refDoc } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("id")
+        .eq("id", data.ref)
+        .maybeSingle();
+      if (refDoc?.id) referredBy = refDoc.id as string;
+    }
 
     // Slug único: tenta o base; em conflito, sufixa -2, -3...
     let slug: string | null = existing?.slug ?? null;
@@ -163,7 +200,11 @@ export const registerDoctor = createServerFn({ method: "POST" })
     // (pode ser um assinante pago só atualizando o perfil).
     const trialFields = existing
       ? {}
-      : { plan: "trial", plan_expires_at: new Date(Date.now() + 14 * 86400000).toISOString() };
+      : {
+          plan: "trial",
+          plan_expires_at: new Date(Date.now() + 14 * 86400000).toISOString(),
+          ...(referredBy ? { referred_by: referredBy } : {}),
+        };
 
     // Corrida de slug (dois homônimos simultâneos): na violação de UNIQUE,
     // tenta uma vez com sufixo aleatório antes de desistir.

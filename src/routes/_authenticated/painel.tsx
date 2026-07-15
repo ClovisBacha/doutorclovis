@@ -58,6 +58,7 @@ import {
   getMyDoctor,
   registerDoctor,
   updateMyDoctor,
+  getMyReferrals,
   type DoctorProfile,
 } from "@/lib/doctors.functions";
 import { getDoctorDashboard, type DoctorDashboard } from "@/lib/dashboard.functions";
@@ -4496,6 +4497,71 @@ function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   );
 }
 
+/**
+ * "Indique um colega": link de indicação (/medicos/cadastro?ref=<meuId>) +
+ * contagem. Quando o indicado assina um plano pago, o médico ganha +30 dias.
+ * É o canal de crescimento médico→médico dentro do produto.
+ */
+function ReferralCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [link, setLink] = useState<string>("");
+  const [invited, setInvited] = useState(0);
+  const [rewarded, setRewarded] = useState(0);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      const uid = s.session?.user.id;
+      if (uid && typeof window !== "undefined") {
+        setLink(`${window.location.origin}/medicos/cadastro?ref=${uid}`);
+      }
+      const tk = await tokenFn();
+      const res = await getMyReferrals({ data: { accessToken: tk } });
+      if (res.ok) {
+        setInvited(res.invited);
+        setRewarded(res.rewarded);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <p className="font-serif text-lg">Indique um colega 💛</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Compartilhe seu link com outros obstetras. Quando um deles <strong>assinar</strong> um plano
+        pago, você ganha <strong>1 mês grátis</strong> (aplicado no seu plano).
+      </p>
+
+      <div className="mt-3 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2">
+        <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+          {link || "gerando seu link…"}
+        </span>
+        <button
+          disabled={!link}
+          onClick={() => {
+            navigator.clipboard.writeText(link);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+          className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {copied ? "Copiado ✓" : "Copiar"}
+        </button>
+      </div>
+
+      <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
+        <span>
+          <strong className="text-foreground">{invited}</strong> colega(s) indicado(s)
+        </span>
+        <span>
+          <strong className="text-foreground">{rewarded}</strong> assinaram — meses grátis ganhos
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function GoogleCalendarCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -4716,6 +4782,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     <div className="max-w-2xl space-y-4">
       <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
       <DoctorInviteCard tokenFn={tokenFn} />
+      <ReferralCard tokenFn={tokenFn} />
       <GoogleCalendarCard tokenFn={tokenFn} />
 
       <div className="rounded-3xl border border-border bg-card p-6">

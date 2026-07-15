@@ -1777,3 +1777,10 @@ CREATE INDEX IF NOT EXISTS idx_doctor_whatsapp_doctor
   ON public.doctor_whatsapp_numbers(doctor_id);
 ALTER TABLE public.doctor_whatsapp_numbers ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.doctor_whatsapp_numbers FROM anon, authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Indicação médico→médico (referral) — ver 20260714020000
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS referred_by uuid;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS referral_rewarded boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_doctors_referred_by ON public.doctors(referred_by);

@@ -126,6 +126,14 @@ async function applySubscription(subscriptionId: string): Promise<void> {
         .from("doctors")
         .update({ plan: planKey, active: true, plan_expires_at: periodEnd })
         .eq("id", userId);
+      // Indicação: se este médico foi indicado e ainda não gerou recompensa,
+      // dá +30 dias ao indicador. Idempotente (referral_rewarded). Nunca
+      // derruba o fluxo principal se falhar (colunas podem não existir ainda).
+      try {
+        await rewardReferrer(userId);
+      } catch (e) {
+        console.error("[webhook] referral reward failed", e);
+      }
     } else {
       // cancelou / não pagou → rebaixa para free MANTENDO active=true: o médico
       // continua com o painel no plano grátis e pode reassinar quando quiser
@@ -136,4 +144,41 @@ async function applySubscription(subscriptionId: string): Promise<void> {
         .eq("id", userId);
     }
   }
+}
+
+/**
+ * Recompensa de indicação: quando o médico `referredDoctorId` assina um plano
+ * pago, o médico que o indicou (referred_by) ganha +30 dias — uma única vez
+ * (referral_rewarded). Sem auto-indicação. Estende a partir de max(hoje, prazo
+ * atual) para não encurtar quem já tem prazo à frente.
+ */
+async function rewardReferrer(referredDoctorId: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const sb = supabaseAdmin as any;
+
+  const { data: referred } = await sb
+    .from("doctors")
+    .select("referred_by, referral_rewarded")
+    .eq("id", referredDoctorId)
+    .maybeSingle();
+  const referrerId = referred?.referred_by as string | null | undefined;
+  if (!referrerId || referred?.referral_rewarded || referrerId === referredDoctorId) return;
+
+  const { data: referrer } = await sb
+    .from("doctors")
+    .select("plan_expires_at")
+    .eq("id", referrerId)
+    .maybeSingle();
+  if (!referrer) return; // indicador não existe mais → não recompensa
+
+  const now = Date.now();
+  const currentMs = referrer.plan_expires_at
+    ? new Date(referrer.plan_expires_at as string).getTime()
+    : 0;
+  const base = Number.isNaN(currentMs) ? now : Math.max(now, currentMs);
+  const newExpiry = new Date(base + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  await sb.from("doctors").update({ plan_expires_at: newExpiry }).eq("id", referrerId);
+  // Marca ANTES de qualquer nova execução (idempotência), na linha do indicado.
+  await sb.from("doctors").update({ referral_rewarded: true }).eq("id", referredDoctorId);
 }

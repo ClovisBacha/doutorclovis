@@ -146,8 +146,13 @@ function CadastroMedicoPage() {
         setStep("auth");
         return;
       }
+      // Indicação: ?ref=<doctorId> na URL vira o médico que indicou.
+      const ref =
+        typeof window !== "undefined"
+          ? (new URLSearchParams(window.location.search).get("ref") ?? undefined)
+          : undefined;
       const res = await registerDoctor({
-        data: { accessToken: s.session.access_token, profile },
+        data: { accessToken: s.session.access_token, profile, ref: ref || undefined },
       });
       if (!res.ok) {
         toast.error(
