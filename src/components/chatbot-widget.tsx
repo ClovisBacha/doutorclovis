@@ -119,6 +119,9 @@ export function ChatbotWidget() {
               <Send className="h-4 w-4" />
             </button>
           </form>
+          <p className="border-t border-border bg-background px-3 pb-2 text-center text-[10px] leading-tight text-muted-foreground">
+            Assistente de IA — não substitui a consulta médica. Em urgência, ligue 192 (SAMU).
+          </p>
         </div>
       )}
     </>
