@@ -233,24 +233,24 @@ function CadastroMedicoPage() {
         {step === "pronto" && (
           <div className="mt-8 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
             <p className="text-4xl">🎉</p>
-            <h2 className="mt-3 font-serif text-xl">Consultório criado com sucesso!</h2>
+            <h2 className="mt-3 font-serif text-xl">Seu painel já está ativo!</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Seu perfil de médico está registrado. Agora a nossa equipe faz a{" "}
-              <strong>ativação do seu painel</strong> — entramos em contato pelo seu WhatsApp em até
-              1 dia útil para concluir a configuração (IA, agenda e pacientes).
+              Seus <strong>14 dias grátis</strong> começaram agora. Você já pode entrar no painel,
+              treinar a sua IA (Segundo Cérebro), abrir a agenda e convidar suas pacientes — sem
+              esperar por ninguém.
             </p>
             <div className="mt-5 space-y-2 rounded-2xl bg-secondary/50 p-4 text-left text-xs text-muted-foreground">
               <p>✅ Conta e perfil profissional criados</p>
-              <p>⏳ Ativação do painel pela equipe (você recebe aviso)</p>
-              <p>📱 Depois, é só convidar suas pacientes para o app</p>
+              <p>✅ Painel liberado — trial de 14 dias ativo</p>
+              <p>👉 Agora: treine sua IA e convide suas pacientes pelo painel</p>
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <button
                 type="button"
                 onClick={() => navigate({ to: "/painel" })}
-                className="press rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground"
+                className="press glow-cta rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground"
               >
-                Tentar abrir o painel
+                Abrir meu painel →
               </button>
               <button
                 type="button"

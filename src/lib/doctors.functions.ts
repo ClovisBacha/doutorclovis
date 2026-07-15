@@ -210,7 +210,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
                <p style="margin:0 0 6px"><strong>CRM:</strong> ${data.profile.crm}</p>
                <p style="margin:0 0 6px"><strong>WhatsApp:</strong> ${data.profile.whatsapp ?? "—"}</p>
                <p style="margin:0 0 6px"><strong>E-mail:</strong> ${user.email ?? "—"}</p>
-               <p style="margin:14px 0 0">Entre em contato para ativar o painel e concluir o onboarding.</p>`,
+               <p style="margin:14px 0 0">O painel dele já está ativo (trial 14 dias) — vale dar as boas-vindas e ajudar no onboarding.</p>`,
             ),
           });
         }
