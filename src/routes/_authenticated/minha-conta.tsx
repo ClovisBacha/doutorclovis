@@ -3075,11 +3075,17 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
   async function create() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const token = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    // Token criptográfico (não-enumerável) — dá acesso ao painel do papai,
+    // álbum e alerta de pânico. Validade de 1 ano cobre gestação + pós-parto;
+    // o backend já rejeita convites vencidos (expires_at) e o "Revogar" segue
+    // sendo o controle imediato.
+    const token = crypto.randomUUID().replace(/-/g, "");
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
     await (supabase as any).from("companion_invites").insert({
       user_id: u.user.id,
       token,
       companion_name: name || null,
+      expires_at: expiresAt,
     });
     setName("");
     load();
