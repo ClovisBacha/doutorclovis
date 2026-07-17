@@ -118,6 +118,7 @@ function AgendamentoPage() {
           preferred_time: String(fd.get("time") ?? ""),
           reason: String(fd.get("reason") ?? ""),
           notes: String(fd.get("notes") ?? "") || null,
+          website: String(fd.get("website") ?? "") || null,
         },
       });
       if (res.ok) {
@@ -214,6 +215,16 @@ function AgendamentoPage() {
               onSubmit={onSubmit}
               className="mt-10 grid gap-5 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] sm:p-8"
             >
+              {/* Honeypot anti-spam: invisível p/ humanos; bot que preencher é
+                  descartado no servidor sem disparar e-mails. */}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute -left-[9999px] h-0 w-0 opacity-0"
+              />
               <Field label="Nome completo" name="name" required />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field

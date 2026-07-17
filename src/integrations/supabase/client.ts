@@ -4,10 +4,15 @@ import type { Database } from "./types";
 
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  // Fall back to process.env for SSR (server-side rendering). O guard de
+  // typeof evita "process is not defined" no browser quando a var VITE_
+  // não foi embutida no build — sem ele o erro claro abaixo nunca aparecia.
+  const hasProcess = typeof process !== "undefined";
+  const SUPABASE_URL =
+    import.meta.env.VITE_SUPABASE_URL || (hasProcess ? process.env.SUPABASE_URL : undefined);
   const SUPABASE_PUBLISHABLE_KEY =
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    (hasProcess ? process.env.SUPABASE_PUBLISHABLE_KEY : undefined);
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     const missing = [

@@ -266,7 +266,7 @@ function SiteShell() {
       <div className="print:hidden">
         <PublicBottomNav />
       </div>
-      <Toaster position="bottom-right" richColors />
+      <Toaster position="bottom-right" richColors mobileOffset={{ bottom: 96 }} />
       <PWAInstallBanner />
     </div>
   );

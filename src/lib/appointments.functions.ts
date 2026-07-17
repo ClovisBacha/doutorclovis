@@ -19,6 +19,8 @@ const Schema = z.object({
   preferred_time: z.string().min(3).max(20),
   reason: z.string().min(3).max(200),
   notes: z.string().max(1000).optional().nullable(),
+  /** Honeypot anti-spam: campo invisível no form — humano nunca preenche. */
+  website: z.string().max(200).optional().nullable(),
 });
 
 /**
@@ -49,6 +51,10 @@ async function resolveDoctorIdForEmail(email: string): Promise<string | null> {
 export const submitAppointmentRequest = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Schema.parse(input))
   .handler(async ({ data }) => {
+    // Bot preencheu o honeypot → finge sucesso e descarta (sem insert, sem
+    // e-mail). Responder "ok" evita que o script perceba e mude de tática.
+    if (data.website) return { ok: true as const };
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const doctorId = await resolveDoctorIdForEmail(data.patient_email);
     const { error } = await (supabaseAdmin as any).from("appointment_requests").insert({

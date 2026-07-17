@@ -671,7 +671,9 @@ export function AppHomeScreen({
               )}
             </>
           ) : (
-            <div className="mt-3">
+            /* flex-1 centrado: sem isso o texto ficava colado no topo com
+               ~380px de gradiente vazio abaixo (hero tem min-h de 66svh). */
+            <div className="mt-3 flex flex-1 flex-col items-center justify-center text-center">
               <p className={`text-sm ${heroMuted}`}>
                 Configure sua data de gestação em <strong>Perfil</strong> para ver o
                 desenvolvimento.

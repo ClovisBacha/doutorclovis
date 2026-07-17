@@ -488,23 +488,28 @@ function MinhaContaPage() {
         .eq("id", u.user.id)
         .maybeSingle();
       setProfile(data);
-      setLoading(false);
 
-      const { data: s } = await supabase.auth.getSession();
-      if (s.session?.access_token) {
-        const r = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
-        setIsAdmin(r.isAdmin);
-        // Médico cadastrado (ativo OU não) é médico — não usa o app da
-        // gestante (o render abaixo troca o app pela tela de redirecionamento
-        // ao /painel). Admin nunca entra aqui: continua vendo tudo p/ testar.
-        if (!r.isAdmin) {
-          try {
-            const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
-            if (me.ok && me.doctor) setIsDoctor(true);
-          } catch {
-            /* sem perfil de médico → é gestante, segue no app */
+      // Papel ANTES de liberar o render: sem isso o médico via o app da
+      // gestante piscar por 2-3 round-trips até o bloqueio assumir.
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (s.session?.access_token) {
+          const r = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
+          setIsAdmin(r.isAdmin);
+          // Médico cadastrado (ativo OU não) é médico — não usa o app da
+          // gestante (o render abaixo troca o app pela tela de redirecionamento
+          // ao /painel). Admin nunca entra aqui: continua vendo tudo p/ testar.
+          if (!r.isAdmin) {
+            try {
+              const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
+              if (me.ok && me.doctor) setIsDoctor(true);
+            } catch {
+              /* sem perfil de médico → é gestante, segue no app */
+            }
           }
         }
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);

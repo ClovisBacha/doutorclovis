@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   getPublicNameSession,
   addPublicNameEntry,
@@ -57,46 +58,63 @@ function VotarNomePage() {
 
   async function load() {
     setLoading(true);
-    const res = await getPublicNameSession({ data: { shareToken } });
-    if (!res.ok) {
-      setError(res.error ?? "Erro desconhecido.");
+    try {
+      const res = await getPublicNameSession({ data: { shareToken } });
+      if (!res.ok) {
+        setError(res.error ?? "Erro desconhecido.");
+        return;
+      }
+      setSession(res.session);
+      setEntries(res.entries);
+      setMotherName(res.motherName ?? null);
+    } catch {
+      // Falha de rede: sem isso a tela ficava em "Carregando..." p/ sempre.
+      setError("Não foi possível carregar a votação. Verifique a conexão e recarregue.");
+    } finally {
       setLoading(false);
-      return;
     }
-    setSession(res.session);
-    setEntries(res.entries);
-    setMotherName(res.motherName ?? null);
-    setLoading(false);
   }
 
   async function handleVote(entryId: string) {
     if (!voterName.trim()) return;
     setSubmittingVote(entryId);
-    localStorage.setItem("voter_name", voterName);
-    const voterToken = getVoterToken();
-    await voteForName({
-      data: { shareToken, entryId, voterName: voterName.trim(), voterToken },
-    });
-    localStorage.setItem(`voted_${shareToken}`, entryId);
-    setVotedEntryId(entryId);
-    await load();
-    setSubmittingVote(null);
+    try {
+      localStorage.setItem("voter_name", voterName);
+      const voterToken = getVoterToken();
+      await voteForName({
+        data: { shareToken, entryId, voterName: voterName.trim(), voterToken },
+      });
+      localStorage.setItem(`voted_${shareToken}`, entryId);
+      setVotedEntryId(entryId);
+      await load();
+    } catch {
+      toast.error("Não foi possível registrar o voto — tente novamente.");
+    } finally {
+      setSubmittingVote(null);
+    }
   }
 
   async function handleAddName() {
     if (!newName.trim() || !voterName.trim()) return;
     setSubmittingName(true);
-    localStorage.setItem("voter_name", voterName);
-    const res = await addPublicNameEntry({
-      data: { shareToken, name: newName.trim(), suggestedBy: voterName.trim() },
-    });
-    if (res.ok) {
-      setNewName("");
-      setAddedName(true);
-      setTimeout(() => setAddedName(false), 3000);
-      await load();
+    try {
+      localStorage.setItem("voter_name", voterName);
+      const res = await addPublicNameEntry({
+        data: { shareToken, name: newName.trim(), suggestedBy: voterName.trim() },
+      });
+      if (res.ok) {
+        setNewName("");
+        setAddedName(true);
+        setTimeout(() => setAddedName(false), 3000);
+        await load();
+      } else {
+        toast.error("Não foi possível sugerir o nome — tente novamente.");
+      }
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setSubmittingName(false);
     }
-    setSubmittingName(false);
   }
 
   if (loading) {

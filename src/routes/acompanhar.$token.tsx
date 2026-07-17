@@ -105,21 +105,31 @@ function CompanionView() {
 
   useEffect(() => {
     (async () => {
-      const res = await getCompanionView({ data: { token } });
-      if (!res.ok) {
-        setErr(
-          res.reason === "expired"
-            ? "Este convite expirou. Peça um novo link à gestante."
-            : "Convite inválido.",
-        );
-        setLoading(false);
+      try {
+        const res = await getCompanionView({ data: { token } });
+        if (!res.ok) {
+          setErr(
+            res.reason === "expired"
+              ? "Este convite expirou. Peça um novo link à gestante."
+              : "Convite inválido.",
+          );
+          return;
+        }
+        setProfile(res.profile);
+      } catch {
+        // Falha de rede: sem isso a tela ficava em "Carregando..." p/ sempre.
+        setErr("Não foi possível carregar. Verifique a conexão e recarregue.");
         return;
+      } finally {
+        setLoading(false);
       }
-      setProfile(res.profile);
-      setLoading(false);
-      // Check for recent panic events
-      const panicRes = await getRecentPanicByToken({ data: { token } });
-      if (panicRes.ok && panicRes.event) setPanicEvent(panicRes.event as any);
+      // Alerta de pânico é secundário: falha dele não derruba o painel.
+      try {
+        const panicRes = await getRecentPanicByToken({ data: { token } });
+        if (panicRes.ok && panicRes.event) setPanicEvent(panicRes.event as any);
+      } catch {
+        /* sem alerta */
+      }
     })();
   }, [token]);
 
