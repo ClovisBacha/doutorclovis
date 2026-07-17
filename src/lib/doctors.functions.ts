@@ -29,11 +29,25 @@ export type DoctorProfile = {
   city: string;
   state: string;
   accepting_patients: boolean;
+  /* Perfil rico — o que as pacientes mais querem saber (migração
+     20260717030000; opcionais para tolerar banco ainda não migrado). */
+  instagram?: string | null;
+  rqe?: string | null;
+  education?: string | null;
+  hospitals?: string | null;
+  insurances?: string | null;
+  languages?: string | null;
+  approach?: string | null;
+  consultation_price_brl?: number | null;
+  offers_telehealth?: boolean | null;
 };
 
 /** Colunas do perfil lidas em todas as consultas de médico. */
-const DOCTOR_COLS =
+const RICH_COLS =
+  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,offers_telehealth";
+const BASE_COLS =
   "id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,active,bio,subspecialty,years_experience,has_masters,has_doctorate,city,state,accepting_patients";
+const DOCTOR_COLS = `${BASE_COLS},${RICH_COLS}`;
 
 function adminEmails() {
   return (process.env.ADMIN_EMAILS || "")
@@ -81,6 +95,16 @@ const ProfileSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   accepting_patients: z.boolean().optional(),
+  // Perfil rico (tudo opcional — o stripUndefined não sobrescreve ausentes)
+  instagram: z.string().max(200).optional(),
+  rqe: z.string().max(60).optional(),
+  education: z.string().max(2000).optional(),
+  hospitals: z.string().max(1000).optional(),
+  insurances: z.string().max(1000).optional(),
+  languages: z.string().max(200).optional(),
+  approach: z.string().max(1500).optional(),
+  consultation_price_brl: z.number().int().min(0).max(100000).nullable().optional(),
+  offers_telehealth: z.boolean().optional(),
 });
 
 /** Remove chaves com valor undefined (não sobrescrevem colunas no upsert/update). */
@@ -100,11 +124,21 @@ export const getMyDoctor = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, doctor: null, isPlatformAdmin: false };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: row } = await (supabaseAdmin as any)
+    const first = await (supabaseAdmin as any)
       .from("doctors")
       .select(DOCTOR_COLS)
       .eq("id", user.id)
       .maybeSingle();
+    let row = first.data;
+    if (first.error?.code === "42703") {
+      // Colunas do perfil rico ainda não migradas: segue com as básicas.
+      const fb = await (supabaseAdmin as any)
+        .from("doctors")
+        .select(BASE_COLS)
+        .eq("id", user.id)
+        .maybeSingle();
+      row = fb.data;
+    }
 
     const isPlatformAdmin = !!user.email && adminEmails().includes(user.email.toLowerCase());
 
@@ -208,22 +242,49 @@ export const registerDoctor = createServerFn({ method: "POST" })
 
     // Corrida de slug (dois homônimos simultâneos): na violação de UNIQUE,
     // tenta uma vez com sufixo aleatório antes de desistir.
-    const doUpsert = (s: string | null) =>
-      (supabaseAdmin as any)
+    const RICH_KEYS = [
+      "instagram",
+      "rqe",
+      "education",
+      "hospitals",
+      "insurances",
+      "languages",
+      "approach",
+      "consultation_price_brl",
+      "offers_telehealth",
+    ] as const;
+    const doUpsert = (s: string | null, richOk: boolean) => {
+      const profile = stripUndefined(data.profile) as Record<string, unknown>;
+      if (!richOk) for (const k of RICH_KEYS) delete profile[k];
+      return (supabaseAdmin as any)
         .from("doctors")
         .upsert({
           id: user.id,
-          ...stripUndefined(data.profile),
+          ...profile,
           ...trialFields,
           slug: s,
           updated_at: new Date().toISOString(),
         })
-        .select(DOCTOR_COLS)
+        .select(richOk ? DOCTOR_COLS : BASE_COLS)
         .single();
+    };
 
-    let { data: row, error } = await doUpsert(slug);
+    let { data: row, error } = await doUpsert(slug, true);
+    if (error && error.code === "42703") {
+      // Colunas do perfil rico ainda não migradas: salva o básico mesmo assim.
+      ({ data: row, error } = await doUpsert(slug, false));
+    }
     if (error && error.code === "23505" && slug) {
-      ({ data: row, error } = await doUpsert(`${slug}-${Math.random().toString(36).slice(2, 6)}`));
+      ({ data: row, error } = await doUpsert(
+        `${slug}-${Math.random().toString(36).slice(2, 6)}`,
+        true,
+      ));
+      if (error && error.code === "42703") {
+        ({ data: row, error } = await doUpsert(
+          `${slug}-${Math.random().toString(36).slice(2, 6)}`,
+          false,
+        ));
+      }
     }
     if (error) {
       console.error("[registerDoctor]", error);
@@ -297,6 +358,18 @@ export type DirectoryDoctor = {
   slug: string | null;
   bio: string;
   whatsapp: string;
+  /* Perfil rico (opcionais até a migração rodar) */
+  instagram?: string | null;
+  rqe?: string | null;
+  education?: string | null;
+  hospitals?: string | null;
+  insurances?: string | null;
+  languages?: string | null;
+  approach?: string | null;
+  consultation_price_brl?: number | null;
+  offers_telehealth?: boolean | null;
+  /** Preenchido pela busca com IA: por que este médico deu match. */
+  matchReasons?: string[];
 };
 
 const SearchSchema = z.object({
@@ -317,23 +390,29 @@ export const searchDoctors = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => SearchSchema.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    let query = (supabaseAdmin as any)
-      .from("doctors")
-      .select(
-        "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,slug,bio,whatsapp,active,accepting_patients",
-      )
-      .eq("active", true)
-      .eq("accepting_patients", true)
-      .eq("verified", true)
-      .not("display_name", "is", null);
+    const DIR_BASE =
+      "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,slug,bio,whatsapp,active,accepting_patients";
+    const buildQuery = (cols: string) => {
+      let q = (supabaseAdmin as any)
+        .from("doctors")
+        .select(cols)
+        .eq("active", true)
+        .eq("accepting_patients", true)
+        .eq("verified", true)
+        .not("display_name", "is", null);
+      if (data.state) q = q.ilike("state", data.state);
+      if (data.city) q = q.ilike("city", `%${data.city}%`);
+      if (data.hasMasters) q = q.eq("has_masters", true);
+      if (data.hasDoctorate) q = q.eq("has_doctorate", true);
+      if (data.minExperience > 0) q = q.gte("years_experience", data.minExperience);
+      return q.limit(200);
+    };
 
-    if (data.state) query = query.ilike("state", data.state);
-    if (data.city) query = query.ilike("city", `%${data.city}%`);
-    if (data.hasMasters) query = query.eq("has_masters", true);
-    if (data.hasDoctorate) query = query.eq("has_doctorate", true);
-    if (data.minExperience > 0) query = query.gte("years_experience", data.minExperience);
-
-    const { data: rows, error } = await query.limit(200);
+    let { data: rows, error } = await buildQuery(`${DIR_BASE},${RICH_COLS}`);
+    if (error?.code === "42703") {
+      // Perfil rico ainda não migrado: busca com as colunas básicas.
+      ({ data: rows, error } = await buildQuery(DIR_BASE));
+    }
     if (error) return { ok: false as const, error: error.message, doctors: [] };
 
     const term = data.q.trim().toLowerCase();
@@ -356,23 +435,228 @@ export const searchDoctors = createServerFn({ method: "POST" })
       return (a.display_name ?? "").localeCompare(b.display_name ?? "");
     });
 
-    const doctors: DirectoryDoctor[] = list.map((d) => ({
-      id: d.id,
-      display_name: d.display_name,
-      title: d.title ?? "",
-      specialty: d.specialty ?? "",
-      subspecialty: d.subspecialty ?? "",
-      city: d.city ?? "",
-      state: d.state ?? "",
-      years_experience: d.years_experience ?? null,
-      has_masters: !!d.has_masters,
-      has_doctorate: !!d.has_doctorate,
-      plan: d.plan ?? "free",
-      slug: d.slug ?? null,
-      bio: d.bio ?? "",
-      whatsapp: d.whatsapp ?? "",
-    }));
+    const doctors: DirectoryDoctor[] = list.map((d) => toDirectoryDoctor(d));
     return { ok: true as const, doctors };
+  });
+
+/** Normaliza uma linha crua de doctors para o card público do diretório. */
+function toDirectoryDoctor(d: any): DirectoryDoctor {
+  return {
+    id: d.id,
+    display_name: d.display_name,
+    title: d.title ?? "",
+    specialty: d.specialty ?? "",
+    subspecialty: d.subspecialty ?? "",
+    city: d.city ?? "",
+    state: d.state ?? "",
+    years_experience: d.years_experience ?? null,
+    has_masters: !!d.has_masters,
+    has_doctorate: !!d.has_doctorate,
+    plan: d.plan ?? "free",
+    slug: d.slug ?? null,
+    bio: d.bio ?? "",
+    whatsapp: d.whatsapp ?? "",
+    instagram: d.instagram ?? null,
+    rqe: d.rqe ?? null,
+    education: d.education ?? null,
+    hospitals: d.hospitals ?? null,
+    insurances: d.insurances ?? null,
+    languages: d.languages ?? null,
+    approach: d.approach ?? null,
+    consultation_price_brl: d.consultation_price_brl ?? null,
+    offers_telehealth: d.offers_telehealth ?? null,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Busca com IA: a paciente descreve em linguagem natural ("obstetra de BH
+   especialista em alto risco com mestrado e doutorado") e a IA extrai os
+   critérios; o ranking pontua cada médico e explica o porquê do match.
+   Fallback determinístico por palavras-chave quando a IA está indisponível
+   — a busca NUNCA quebra.
+   ══════════════════════════════════════════════════════════════════════ */
+
+type ParsedCriteria = {
+  city?: string;
+  state?: string;
+  keywords: string[];
+  wantsMasters?: boolean;
+  wantsDoctorate?: boolean;
+  minExperience?: number;
+  wantsTelehealth?: boolean;
+  insurance?: string;
+};
+
+const UF_LIST =
+  "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
+
+/** Fallback sem IA: heurística de palavras-chave sobre o texto da paciente. */
+function heuristicParse(q: string): ParsedCriteria {
+  const lower = q.toLowerCase();
+  const crit: ParsedCriteria = { keywords: [] };
+  // Cidades comuns por apelido + UF explícita
+  if (/\bbh\b|belo horizonte/.test(lower)) crit.city = "Belo Horizonte";
+  if (/\bsp\b|são paulo|sao paulo/.test(lower)) crit.city = "São Paulo";
+  if (/\brj\b|rio de janeiro/.test(lower)) crit.city = "Rio de Janeiro";
+  for (const uf of UF_LIST) {
+    if (new RegExp(`\\b${uf.toLowerCase()}\\b`).test(lower)) crit.state = uf;
+  }
+  if (/mestrado|mestre/.test(lower)) crit.wantsMasters = true;
+  if (/doutorado|doutora?\b.*(titulo|título)|phd/.test(lower)) crit.wantsDoctorate = true;
+  if (/teleconsulta|online|a distância|a distancia|remoto/.test(lower)) crit.wantsTelehealth = true;
+  const exp = lower.match(/(\d{1,2})\s*(\+|anos)/);
+  if (exp) crit.minExperience = Number(exp[1]);
+  for (const kw of [
+    "alto risco",
+    "gestação de alto risco",
+    "medicina fetal",
+    "ultrassom",
+    "ultrassonografia",
+    "parto normal",
+    "parto humanizado",
+    "cesárea",
+    "cesariana",
+    "endometriose",
+    "fertilidade",
+    "reprodução",
+    "gemelar",
+    "diabetes",
+    "pré-eclâmpsia",
+    "pos-parto",
+    "pós-parto",
+  ]) {
+    if (lower.includes(kw)) crit.keywords.push(kw);
+  }
+  return crit;
+}
+
+/** Tenta extrair critérios com o Gemini; falhou → heurística. */
+async function parseCriteria(q: string): Promise<ParsedCriteria> {
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!apiKey) return heuristicParse(q);
+  try {
+    const { generateText } = await import("ai");
+    const { createChatProvider, DEFAULT_CHAT_MODEL } = await import("./ai-gateway.server");
+    const google = createChatProvider(apiKey);
+    const result = await generateText({
+      model: google(process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL),
+      system:
+        `Você extrai critérios de busca de médicos obstetras a partir do texto de uma paciente brasileira. ` +
+        `Responda APENAS um JSON válido, sem markdown, no formato: ` +
+        `{"city":string|null,"state":string|null (sigla UF),"keywords":string[] (especialidades/temas, ex "alto risco","medicina fetal","parto humanizado"),` +
+        `"wantsMasters":boolean,"wantsDoctorate":boolean,"minExperience":number|null,"wantsTelehealth":boolean,"insurance":string|null (nome do convênio se citado)}. ` +
+        `"BH"=Belo Horizonte/MG. Não invente critérios que a paciente não pediu.`,
+      prompt: q,
+      maxOutputTokens: 300,
+    });
+    const raw = result.text.trim().replace(/^```json?\s*|\s*```$/g, "");
+    const p = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      city: typeof p.city === "string" && p.city ? p.city : undefined,
+      state: typeof p.state === "string" && p.state ? p.state.toUpperCase() : undefined,
+      keywords: Array.isArray(p.keywords) ? p.keywords.filter((k) => typeof k === "string") : [],
+      wantsMasters: p.wantsMasters === true,
+      wantsDoctorate: p.wantsDoctorate === true,
+      minExperience: typeof p.minExperience === "number" ? p.minExperience : undefined,
+      wantsTelehealth: p.wantsTelehealth === true,
+      insurance: typeof p.insurance === "string" && p.insurance ? p.insurance : undefined,
+    };
+  } catch (e) {
+    console.error("[aiSearchDoctors] parse via IA falhou, usando heurística", e);
+    return heuristicParse(q);
+  }
+}
+
+export const aiSearchDoctors = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ prompt: z.string().min(3).max(500) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const DIR_BASE =
+      "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,slug,bio,whatsapp";
+    let { data: rows, error } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select(`${DIR_BASE},${RICH_COLS}`)
+      .eq("active", true)
+      .eq("accepting_patients", true)
+      .eq("verified", true)
+      .not("display_name", "is", null)
+      .limit(300);
+    if (error?.code === "42703") {
+      ({ data: rows, error } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select(DIR_BASE)
+        .eq("active", true)
+        .eq("accepting_patients", true)
+        .eq("verified", true)
+        .not("display_name", "is", null)
+        .limit(300));
+    }
+    if (error) return { ok: false as const, doctors: [] as DirectoryDoctor[], criteria: null };
+
+    const crit = await parseCriteria(data.prompt);
+    const norm = (s: unknown) =>
+      String(s ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "");
+
+    const scored = ((rows ?? []) as any[])
+      .filter((d) => (d.display_name ?? "").trim().length >= 2)
+      .map((d) => {
+        let score = 0;
+        const reasons: string[] = [];
+        const haystack = norm(
+          `${d.specialty} ${d.subspecialty} ${d.bio} ${d.education} ${d.approach} ${d.hospitals}`,
+        );
+        if (crit.city && norm(d.city).includes(norm(crit.city))) {
+          score += 30;
+          reasons.push(`📍 ${d.city}`);
+        }
+        if (crit.state && norm(d.state) === norm(crit.state)) {
+          score += 10;
+          if (!crit.city) reasons.push(`📍 ${d.state}`);
+        }
+        for (const kw of crit.keywords) {
+          if (haystack.includes(norm(kw))) {
+            score += 20;
+            reasons.push(`✓ ${kw}`);
+          }
+        }
+        if (crit.wantsMasters && d.has_masters) {
+          score += 15;
+          reasons.push("🎓 mestrado");
+        }
+        if (crit.wantsDoctorate && d.has_doctorate) {
+          score += 15;
+          reasons.push("🎓 doutorado");
+        }
+        if (crit.minExperience && (d.years_experience ?? 0) >= crit.minExperience) {
+          score += 10;
+          reasons.push(`⏱ ${d.years_experience}+ anos`);
+        }
+        if (crit.wantsTelehealth && d.offers_telehealth) {
+          score += 10;
+          reasons.push("💻 teleconsulta");
+        }
+        if (crit.insurance && norm(d.insurances).includes(norm(crit.insurance))) {
+          score += 20;
+          reasons.push(`🏥 ${crit.insurance}`);
+        }
+        // Desempate leve por plano/experiência (mesma lógica do diretório)
+        score += PLAN_RANK[normalizePlan(d.plan)] ?? 0;
+        score += Math.min(5, (d.years_experience ?? 0) / 10);
+        return { d, score, reasons };
+      })
+      .filter((x) => x.score > 0 || crit.keywords.length === 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+
+    const doctors: DirectoryDoctor[] = scored.map((x) => ({
+      ...toDirectoryDoctor(x.d),
+      matchReasons: x.reasons,
+    }));
+    return { ok: true as const, doctors, criteria: crit };
   });
 
 /** A paciente escolhe um médico do diretório → vira paciente dele. */

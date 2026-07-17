@@ -1847,3 +1847,17 @@ CREATE TABLE IF NOT EXISTS public.lives (
 );
 ALTER TABLE public.lives ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.lives TO service_role;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Perfil rico do médico (busca com IA) — ver 20260717030000
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.doctors
+  ADD COLUMN IF NOT EXISTS instagram text,
+  ADD COLUMN IF NOT EXISTS rqe text,
+  ADD COLUMN IF NOT EXISTS education text,
+  ADD COLUMN IF NOT EXISTS hospitals text,
+  ADD COLUMN IF NOT EXISTS insurances text,
+  ADD COLUMN IF NOT EXISTS languages text,
+  ADD COLUMN IF NOT EXISTS approach text,
+  ADD COLUMN IF NOT EXISTS consultation_price_brl integer,
+  ADD COLUMN IF NOT EXISTS offers_telehealth boolean NOT NULL DEFAULT false;

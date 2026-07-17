@@ -1,7 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { searchDoctors, chooseDoctor, type DirectoryDoctor } from "@/lib/doctors.functions";
+import {
+  searchDoctors,
+  aiSearchDoctors,
+  chooseDoctor,
+  type DirectoryDoctor,
+} from "@/lib/doctors.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { DoctorBadge } from "@/components/doctor-badge";
 
@@ -61,6 +66,39 @@ function EncontrarMedicoPage() {
   const [loading, setLoading] = useState(true);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
+  // Busca com IA: a paciente descreve o que procura em linguagem natural.
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMode, setAiMode] = useState(false);
+
+  async function runAiSearch() {
+    const q = aiPrompt.trim();
+    if (q.length < 3 || aiLoading) return;
+    setAiLoading(true);
+    setLoading(true);
+    try {
+      const res = await aiSearchDoctors({ data: { prompt: q } });
+      if (res.ok) {
+        setResults(res.doctors);
+        setAiMode(true);
+        if (res.doctors.length === 0)
+          toast("Nenhum médico bateu com todos os critérios — tente ampliar a descrição.");
+      } else {
+        toast.error("A busca inteligente falhou — use os filtros abaixo.");
+      }
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setAiLoading(false);
+      setLoading(false);
+    }
+  }
+
+  function clearAiSearch() {
+    setAiMode(false);
+    setAiPrompt("");
+    run();
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setLoggedIn(!!data.session));
@@ -68,6 +106,7 @@ function EncontrarMedicoPage() {
 
   async function run() {
     setLoading(true);
+    setAiMode(false);
     try {
       const res = await searchDoctors({
         data: {
@@ -133,8 +172,46 @@ function EncontrarMedicoPage() {
       </section>
 
       <section className="mx-auto max-w-3xl px-5 py-6">
+        {/* Busca com IA — descreva com suas palavras */}
+        <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
+            ✨ Busca inteligente
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Descreva com as suas palavras — ex.:{" "}
+            <em>"obstetra de BH especialista em alto risco com mestrado e doutorado"</em>
+          </p>
+          <div className="mt-3 flex gap-2">
+            <input
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && runAiSearch()}
+              placeholder="O que você procura no seu obstetra?"
+              aria-label="Descreva o médico que você procura"
+              className="flex-1 rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+            />
+            <button
+              onClick={runAiSearch}
+              disabled={aiLoading || aiPrompt.trim().length < 3}
+              className="shrink-0 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {aiLoading ? "Buscando…" : "✨ Buscar"}
+            </button>
+          </div>
+          {aiMode && (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-background/70 px-3 py-2 text-xs">
+              <span className="text-muted-foreground">
+                Mostrando os médicos que mais combinam com o seu pedido, em ordem de match.
+              </span>
+              <button onClick={clearAiSearch} className="shrink-0 font-semibold text-primary">
+                Limpar
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Filtros */}
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="mt-4 rounded-2xl border border-border bg-card p-4">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -209,6 +286,19 @@ function EncontrarMedicoPage() {
                       {[d.title, d.specialty].filter(Boolean).join(" · ") || "Obstetra"}
                       {d.subspecialty ? ` · ${d.subspecialty}` : ""}
                     </p>
+                    {/* Por que este médico deu match (busca com IA) */}
+                    {d.matchReasons && d.matchReasons.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
+                        {d.matchReasons.slice(0, 6).map((r) => (
+                          <span
+                            key={r}
+                            className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary"
+                          >
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
                       {d.city || d.state ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">
@@ -220,14 +310,62 @@ function EncontrarMedicoPage() {
                           {d.years_experience} anos de experiência
                         </span>
                       ) : null}
+                      {d.rqe ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5">🩺 {d.rqe}</span>
+                      ) : null}
                       {d.has_doctorate ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">🎓 Doutorado</span>
                       ) : d.has_masters ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">🎓 Mestrado</span>
                       ) : null}
+                      {d.offers_telehealth ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5">
+                          💻 Teleconsulta
+                        </span>
+                      ) : null}
+                      {d.consultation_price_brl ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5">
+                          💰 R$ {d.consultation_price_brl}
+                        </span>
+                      ) : null}
                     </div>
                     {d.bio ? (
                       <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{d.bio}</p>
+                    ) : null}
+                    {d.approach ? (
+                      <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground/70">Abordagem:</span>{" "}
+                        {d.approach}
+                      </p>
+                    ) : null}
+                    {d.hospitals ? (
+                      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                        🏥 {d.hospitals}
+                      </p>
+                    ) : null}
+                    {d.insurances ? (
+                      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                        💳 Convênios: {d.insurances}
+                      </p>
+                    ) : null}
+                    {d.education ? (
+                      <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-muted-foreground">
+                        🎓 {d.education}
+                      </p>
+                    ) : null}
+                    {d.instagram ? (
+                      <a
+                        href={
+                          d.instagram.startsWith("http")
+                            ? d.instagram
+                            : `https://instagram.com/${d.instagram.replace(/^@/, "")}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1.5 inline-block text-xs font-semibold text-primary hover:underline"
+                      >
+                        📷 {d.instagram.startsWith("http") ? "Instagram" : d.instagram}
+                      </a>
                     ) : null}
                   </div>
                 </div>

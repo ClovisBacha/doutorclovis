@@ -4708,6 +4708,16 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     city: "",
     state: "",
     accepting_patients: true,
+    // Perfil rico — o que as pacientes mais querem saber
+    instagram: "",
+    rqe: "",
+    education: "",
+    hospitals: "",
+    insurances: "",
+    languages: "",
+    approach: "",
+    consultation_price_brl: null as number | null,
+    offers_telehealth: false,
   });
 
   useEffect(() => {
@@ -4736,6 +4746,15 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             city: d.city ?? "",
             state: d.state ?? "",
             accepting_patients: d.accepting_patients ?? true,
+            instagram: d.instagram ?? "",
+            rqe: d.rqe ?? "",
+            education: d.education ?? "",
+            hospitals: d.hospitals ?? "",
+            insurances: d.insurances ?? "",
+            languages: d.languages ?? "",
+            approach: d.approach ?? "",
+            consultation_price_brl: d.consultation_price_brl ?? null,
+            offers_telehealth: !!d.offers_telehealth,
           });
         }
       } finally {
@@ -4919,6 +4938,92 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                 className={`${input} resize-none`}
               />
             </div>
+            {/* ── O que as pacientes mais querem saber ─────────────────── */}
+            <div>
+              <label className={label}>Instagram</label>
+              <input
+                value={form.instagram}
+                onChange={(e) => setForm((f) => ({ ...f, instagram: e.target.value }))}
+                placeholder="@seuperfil ou link completo"
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>RQE (registro de especialista)</label>
+              <input
+                value={form.rqe}
+                onChange={(e) => setForm((f) => ({ ...f, rqe: e.target.value }))}
+                placeholder="RQE 12345"
+                className={input}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={label}>Formação (uma por linha)</label>
+              <textarea
+                value={form.education}
+                onChange={(e) => setForm((f) => ({ ...f, education: e.target.value }))}
+                rows={3}
+                placeholder={
+                  "Residência em GO — UFMG\nMestrado em Medicina Fetal — USP\nTítulo de especialista FEBRASGO"
+                }
+                className={`${input} resize-none`}
+              />
+            </div>
+            <div>
+              <label className={label}>Maternidades / hospitais onde atende</label>
+              <textarea
+                value={form.hospitals}
+                onChange={(e) => setForm((f) => ({ ...f, hospitals: e.target.value }))}
+                rows={2}
+                placeholder="Ex: Unimed BH, Mater Dei, Vila da Serra"
+                className={`${input} resize-none`}
+              />
+            </div>
+            <div>
+              <label className={label}>Convênios aceitos</label>
+              <textarea
+                value={form.insurances}
+                onChange={(e) => setForm((f) => ({ ...f, insurances: e.target.value }))}
+                rows={2}
+                placeholder="Ex: Unimed, Bradesco Saúde, particular"
+                className={`${input} resize-none`}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={label}>Sua abordagem (filosofia de cuidado)</label>
+              <textarea
+                value={form.approach}
+                onChange={(e) => setForm((f) => ({ ...f, approach: e.target.value }))}
+                rows={2}
+                placeholder="Ex: pré-natal humanizado, incentivo ao parto normal quando seguro, decisões compartilhadas."
+                className={`${input} resize-none`}
+              />
+            </div>
+            <div>
+              <label className={label}>Idiomas</label>
+              <input
+                value={form.languages}
+                onChange={(e) => setForm((f) => ({ ...f, languages: e.target.value }))}
+                placeholder="Português, inglês…"
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Consulta particular (R$, opcional)</label>
+              <input
+                type="number"
+                min={0}
+                value={form.consultation_price_brl ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    consultation_price_brl: e.target.value === "" ? null : Number(e.target.value),
+                  }))
+                }
+                placeholder="Ex: 450"
+                className={input}
+              />
+            </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-4 text-sm">
             <label className="flex items-center gap-2">
@@ -4944,6 +5049,14 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                 onChange={(e) => setForm((f) => ({ ...f, accepting_patients: e.target.checked }))}
               />
               Aceitando novas pacientes
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.offers_telehealth}
+                onChange={(e) => setForm((f) => ({ ...f, offers_telehealth: e.target.checked }))}
+              />
+              💻 Atendo por teleconsulta
             </label>
           </div>
         </div>
