@@ -182,6 +182,8 @@ function significantWords(message: string): string[] {
 
 const MAX_ENTRIES_LOADED = 200;
 const MAX_ENTRIES_SCORED = 6;
+/** Corte de similaridade de cosseno da busca semântica (abaixo = irrelevante). */
+const SEMANTIC_MIN_SIMILARITY = 0.55;
 
 /**
  * Carrega settings + entries DO MÉDICO e monta o bloco para o prompt.
@@ -243,24 +245,57 @@ export async function getBrainContext(
     }
     if (channel === "teste" && !ent.aiApp) return { block: "", enabledApp, enabledWhatsapp };
 
-    // Pontua cada entry pelas palavras da mensagem presentes em pergunta+resposta.
-    const words = significantWords(userMessage);
-    const scored = entries.map((entry) => {
-      const haystack = normalize(`${entry.question} ${entry.answer}`);
-      let score = 0;
-      for (const w of words) if (haystack.includes(w)) score += 1;
-      return { entry, score };
-    });
+    // ── Seleção em 2 camadas ─────────────────────────────────────────────
+    // 1ª) SEMÂNTICA (pgvector + embedding da pergunta): entende sinônimos —
+    //     "tô enjoada" encontra "náuseas no 1º trimestre". Busca em TODAS as
+    //     entradas aprovadas com vetor (sem o teto de 200 do fallback).
+    // 2ª) PALAVRAS (fallback): sem chave de IA, sem extensão/migração ou
+    //     nenhum match acima do corte → o ranking clássico assume.
+    // A mensagem da paciente vira só o VETOR de consulta — segue nunca
+    // entrando no texto do bloco (anti prompt-injection preservado).
+    let selected: BrainEntryRow[] = [];
+    if (entries.length > 0) {
+      try {
+        const { embedText } = await import("./embeddings.server");
+        const qvec = await embedText(userMessage);
+        if (qvec) {
+          const { data: matches, error } = await (supabaseAdmin as any).rpc("match_brain_entries", {
+            p_doctor_id: target,
+            p_embedding: qvec,
+            p_limit: MAX_ENTRIES_SCORED,
+          });
+          if (!error && Array.isArray(matches)) {
+            selected = (matches as { question: string; answer: string; similarity: number }[])
+              .filter((m) => m.similarity >= SEMANTIC_MIN_SIMILARITY)
+              .map((m) => ({ question: m.question, answer: m.answer }));
+          }
+        }
+      } catch {
+        /* RPC/extensão ausente ou falha de embedding → fallback por palavras */
+      }
+    }
 
-    // Top 6 com score > 0. SEM fallback de "mais recentes": injetar entradas
-    // aleatórias quando nada casa é ruído no prompt — em vez disso o miss vira
-    // uma LACUNA registrada para o médico responder no painel (autoaprendizado
-    // com o médico no loop).
-    const selected = scored
-      .filter((s) => s.score > 0)
-      .sort((a, b) => b.score - a.score) // sort estável: empates mantêm as mais recentes primeiro
-      .slice(0, MAX_ENTRIES_SCORED)
-      .map((s) => s.entry);
+    if (selected.length === 0) {
+      // Pontua cada entry pelas palavras da mensagem presentes em pergunta+resposta.
+      const words = significantWords(userMessage);
+      const scored = entries.map((entry) => {
+        const haystack = normalize(`${entry.question} ${entry.answer}`);
+        let score = 0;
+        for (const w of words) if (haystack.includes(w)) score += 1;
+        return { entry, score };
+      });
+
+      // Top 6 com score > 0. SEM fallback de "mais recentes": injetar entradas
+      // aleatórias quando nada casa é ruído no prompt — em vez disso o miss vira
+      // uma LACUNA registrada para o médico responder no painel (autoaprendizado
+      // com o médico no loop).
+      selected = scored
+        .filter((s) => s.score > 0)
+        .sort((a, b) => b.score - a.score) // sort estável: empates mantêm as mais recentes primeiro
+        .slice(0, MAX_ENTRIES_SCORED)
+        .map((s) => s.entry);
+    }
+
     if (selected.length === 0 && channel !== "teste") {
       logBrainGap(target, userMessage, channel);
     }

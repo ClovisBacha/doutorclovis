@@ -184,6 +184,13 @@ export const listBrainEntries = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await query;
     if (error) return { ok: false as const };
+    // Backfill oportunista (fire-and-forget): abrir a base de conhecimento
+    // embeda as entradas sem vetor (kit de partida, entradas antigas, salvas
+    // sem chave de IA) — o cérebro "se cura" a cada visita ao painel.
+    {
+      const { backfillBrainEmbeddings } = await import("./embeddings.server");
+      backfillBrainEmbeddings(doctorId);
+    }
     return { ok: true as const, entries: (rows ?? []) as BrainEntry[] };
   });
 
@@ -219,6 +226,9 @@ export const addBrainEntry = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) return { ok: false as const };
+    // Vetor semântico (fire-and-forget): a entrada já nasce "encontrável".
+    const { embedBrainEntry } = await import("./embeddings.server");
+    embedBrainEntry(row.id, data.question, data.answer);
     return { ok: true as const, entry: row as BrainEntry };
   });
 
@@ -249,6 +259,11 @@ export const updateBrainEntry = createServerFn({ method: "POST" })
       })
       .eq("id", data.id)
       .eq("doctor_id", await ownerDoctorId(user));
+    if (!error) {
+      // Texto mudou → o vetor antigo mente; recalcula (fire-and-forget).
+      const { embedBrainEntry } = await import("./embeddings.server");
+      embedBrainEntry(data.id, data.question, data.answer);
+    }
     return { ok: !error };
   });
 
@@ -340,6 +355,10 @@ export const answerAndTrain = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (insertError || !entry) return { ok: false as const };
+    {
+      const { embedBrainEntry } = await import("./embeddings.server");
+      embedBrainEntry(entry.id, question.question, data.answer);
+    }
 
     // Grava TAMBÉM o texto na pergunta: a paciente vê a resposta do médico
     // na aba Perguntas (antes só alimentava a IA e ela via apenas o flag).
@@ -495,6 +514,11 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (insErr || !entry) return { ok: false as const };
+    {
+      // A lacuna respondida já nasce encontrável por significado.
+      const { embedBrainEntry } = await import("./embeddings.server");
+      embedBrainEntry(entry.id, gap.question, data.answer);
+    }
 
     const { error: updErr } = await sb
       .from("brain_gaps")

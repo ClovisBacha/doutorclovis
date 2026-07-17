@@ -1898,3 +1898,40 @@ ALTER TABLE public.brain_feedback ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.brain_feedback TO service_role;
 
 ALTER TABLE public.brain_entries ADD COLUMN IF NOT EXISTS source text;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Busca SEMÂNTICA do Segundo Cérebro (pgvector) — ver 20260717050000
+-- ════════════════════════════════════════════════════════════════════════
+CREATE EXTENSION IF NOT EXISTS vector;
+
+ALTER TABLE public.brain_entries
+  ADD COLUMN IF NOT EXISTS embedding vector(768);
+
+CREATE INDEX IF NOT EXISTS idx_brain_entries_embedding
+  ON public.brain_entries USING hnsw (embedding vector_cosine_ops);
+
+CREATE OR REPLACE FUNCTION public.match_brain_entries(
+  p_doctor_id uuid,
+  p_embedding vector(768),
+  p_limit int DEFAULT 6
+)
+RETURNS TABLE (question text, answer text, similarity double precision)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    e.question,
+    e.answer,
+    1 - (e.embedding <=> p_embedding) AS similarity
+  FROM public.brain_entries e
+  WHERE e.doctor_id = p_doctor_id
+    AND e.approved = true
+    AND e.embedding IS NOT NULL
+  ORDER BY e.embedding <=> p_embedding
+  LIMIT LEAST(GREATEST(p_limit, 1), 20);
+$$;
+
+REVOKE ALL ON FUNCTION public.match_brain_entries(uuid, vector, int) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.match_brain_entries(uuid, vector, int) FROM anon;
+REVOKE ALL ON FUNCTION public.match_brain_entries(uuid, vector, int) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.match_brain_entries(uuid, vector, int) TO service_role;
