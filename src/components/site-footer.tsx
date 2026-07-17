@@ -111,6 +111,14 @@ export function SiteFooter() {
             </li>
             <li>
               <Link
+                to="/experiencia"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Experiência 3D
+              </Link>
+            </li>
+            <li>
+              <Link
                 to="/empresas"
                 className="text-muted-foreground hover:text-primary transition-colors"
               >

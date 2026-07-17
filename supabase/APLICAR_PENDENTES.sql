@@ -1791,3 +1791,24 @@ CREATE INDEX IF NOT EXISTS idx_doctors_referred_by ON public.doctors(referred_by
 ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS fetal_bpm integer,
   ADD COLUMN IF NOT EXISTS fetal_bpm_at date;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Experiência Perinatal 3D: leads (gestantes + clínicas) — ver 20260717010000
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.experience_leads (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('gestante', 'clinica')),
+  name text not null,
+  phone text not null,
+  email text,
+  city text,
+  weeks integer,
+  clinic_name text,
+  clinic_ref text,
+  message text,
+  status text not null default 'novo',
+  created_at timestamptz not null default now()
+);
+ALTER TABLE public.experience_leads ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.experience_leads TO service_role;
+CREATE INDEX IF NOT EXISTS idx_experience_leads_kind ON public.experience_leads(kind, created_at DESC);

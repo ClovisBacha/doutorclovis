@@ -22,6 +22,7 @@ import { Route as MedicosRouteImport } from './routes/medicos'
 import { Route as LivesRouteImport } from './routes/lives'
 import { Route as HospitaisRouteImport } from './routes/hospitais'
 import { Route as GestacaoRouteImport } from './routes/gestacao'
+import { Route as ExperienciaRouteImport } from './routes/experiencia'
 import { Route as EpdsRouteImport } from './routes/epds'
 import { Route as EncontrarMedicoRouteImport } from './routes/encontrar-medico'
 import { Route as EmpresasRouteImport } from './routes/empresas'
@@ -116,6 +117,11 @@ const HospitaisRoute = HospitaisRouteImport.update({
 const GestacaoRoute = GestacaoRouteImport.update({
   id: '/gestacao',
   path: '/gestacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExperienciaRoute = ExperienciaRouteImport.update({
+  id: '/experiencia',
+  path: '/experiencia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EpdsRoute = EpdsRouteImport.update({
@@ -283,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/empresas': typeof EmpresasRoute
   '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
+  '/experiencia': typeof ExperienciaRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -327,6 +334,7 @@ export interface FileRoutesByTo {
   '/empresas': typeof EmpresasRoute
   '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
+  '/experiencia': typeof ExperienciaRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -373,6 +381,7 @@ export interface FileRoutesById {
   '/empresas': typeof EmpresasRoute
   '/encontrar-medico': typeof EncontrarMedicoRoute
   '/epds': typeof EpdsRoute
+  '/experiencia': typeof ExperienciaRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
   '/lives': typeof LivesRoute
@@ -419,6 +428,7 @@ export interface FileRouteTypes {
     | '/empresas'
     | '/encontrar-medico'
     | '/epds'
+    | '/experiencia'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -463,6 +473,7 @@ export interface FileRouteTypes {
     | '/empresas'
     | '/encontrar-medico'
     | '/epds'
+    | '/experiencia'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -508,6 +519,7 @@ export interface FileRouteTypes {
     | '/empresas'
     | '/encontrar-medico'
     | '/epds'
+    | '/experiencia'
     | '/gestacao'
     | '/hospitais'
     | '/lives'
@@ -554,6 +566,7 @@ export interface RootRouteChildren {
   EmpresasRoute: typeof EmpresasRoute
   EncontrarMedicoRoute: typeof EncontrarMedicoRoute
   EpdsRoute: typeof EpdsRoute
+  ExperienciaRoute: typeof ExperienciaRoute
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
   LivesRoute: typeof LivesRoute
@@ -672,6 +685,13 @@ declare module '@tanstack/react-router' {
       path: '/gestacao'
       fullPath: '/gestacao'
       preLoaderRoute: typeof GestacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/experiencia': {
+      id: '/experiencia'
+      path: '/experiencia'
+      fullPath: '/experiencia'
+      preLoaderRoute: typeof ExperienciaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/epds': {
@@ -918,6 +938,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmpresasRoute: EmpresasRoute,
   EncontrarMedicoRoute: EncontrarMedicoRoute,
   EpdsRoute: EpdsRoute,
+  ExperienciaRoute: ExperienciaRoute,
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,
   LivesRoute: LivesRoute,

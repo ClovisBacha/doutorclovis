@@ -12,6 +12,7 @@ const entries = [
   { path: "/medicos", priority: "0.9", changefreq: "weekly" },
   { path: "/encontrar-medico", priority: "0.9", changefreq: "weekly" },
   { path: "/agendamento", priority: "0.8", changefreq: "weekly" },
+  { path: "/experiencia", priority: "0.8", changefreq: "monthly" },
   { path: "/empresas", priority: "0.8", changefreq: "monthly" },
   { path: "/gestacao", priority: "0.8", changefreq: "monthly" },
   { path: "/calculadora", priority: "0.8", changefreq: "monthly" },
