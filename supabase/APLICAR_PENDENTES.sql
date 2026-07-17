@@ -1784,3 +1784,10 @@ REVOKE ALL ON TABLE public.doctor_whatsapp_numbers FROM anon, authenticated;
 ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS referred_by uuid;
 ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS referral_rewarded boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_doctors_referred_by ON public.doctors(referred_by);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- "Sentir o coração" v2: BPM fetal medido na consulta — ver 20260717000000
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS fetal_bpm integer,
+  ADD COLUMN IF NOT EXISTS fetal_bpm_at date;

@@ -73,6 +73,7 @@ import {
   respondPatientRequest,
   listMyPatients,
   setPatientQuizPremium,
+  setPatientFetalBpm,
   type PatientRequest,
   type LinkedPatient,
 } from "@/lib/patientlink.functions";
@@ -4965,6 +4966,96 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
 }
 
 /* ---------- Pacientes (vínculo paciente ↔ médico) ---------- */
+/**
+ * Chip de BPM fetal na lista de pacientes: o médico anota o valor medido na
+ * consulta e o "Sentir o coração" (app da paciente + Painel do Papai) passa a
+ * vibrar no ritmo exato do bebê.
+ */
+function FetalBpmChip({
+  p,
+  tokenFn,
+  onSaved,
+}: {
+  p: LinkedPatient;
+  tokenFn: () => Promise<string>;
+  onSaved: () => Promise<void> | void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const n = val.trim() === "" ? null : Number(val);
+    if (n !== null && (!Number.isInteger(n) || n < 60 || n > 220)) {
+      toast.error("BPM entre 60 e 220 (ou vazio para limpar).");
+      return;
+    }
+    setBusy(true);
+    try {
+      const tk = await tokenFn();
+      const res = await setPatientFetalBpm({ data: { accessToken: tk, patientId: p.id, bpm: n } });
+      if (!res.ok) {
+        toast.error(res.error ?? "Não foi possível salvar o BPM.");
+        return;
+      }
+      toast.success(n ? `Coração do bebê: ${n} bpm 💗` : "BPM removido.");
+      setEditing(false);
+      await onSaved();
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => {
+          setVal(p.fetal_bpm ? String(p.fetal_bpm) : "");
+          setEditing(true);
+        }}
+        title="BPM fetal da última consulta — a família sente esse ritmo no 'Sentir o coração'"
+        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+          p.fetal_bpm
+            ? "bg-rose-100 text-rose-700"
+            : "border border-border text-muted-foreground hover:border-rose-400 hover:text-rose-600"
+        }`}
+      >
+        {p.fetal_bpm ? `💗 ${p.fetal_bpm} bpm` : "💗 BPM"}
+      </button>
+    );
+  }
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      <input
+        type="number"
+        min={60}
+        max={220}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && save()}
+        placeholder="bpm"
+        autoFocus
+        className="w-16 rounded-md border border-input bg-background px-2 py-1 text-xs"
+      />
+      <button
+        onClick={save}
+        disabled={busy}
+        className="rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-primary-foreground disabled:opacity-50"
+      >
+        {busy ? "…" : "OK"}
+      </button>
+      <button
+        onClick={() => setEditing(false)}
+        className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground"
+      >
+        ✕
+      </button>
+    </span>
+  );
+}
+
 function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<PatientRequest[]>([]);
@@ -5160,6 +5251,8 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                         {due && <p className="text-xs text-muted-foreground">DPP {due}</p>}
                       </div>
                     </div>
+                    {/* BPM fetal da consulta → "Sentir o coração" da família */}
+                    <FetalBpmChip p={p} tokenFn={tokenFn} onSaved={loadPatients} />
                     {/* Premium do quiz: liberar após confirmar o PIX da paciente */}
                     <button
                       onClick={() => togglePremium(p)}

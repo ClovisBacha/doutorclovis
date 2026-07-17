@@ -17,10 +17,13 @@ export function HeartbeatFeel({
   defaultBpm = 140,
   babyName,
   compact = false,
+  sourceNote,
 }: {
   defaultBpm?: number;
   babyName?: string | null;
   compact?: boolean;
+  /** Origem do ritmo (ex.: "Medido pelo médico em 12/07") — some o hint de ajuste. */
+  sourceNote?: string;
 }) {
   const [bpm, setBpm] = useState(() => Math.min(180, Math.max(100, defaultBpm)));
   const [playing, setPlaying] = useState(false);
@@ -151,7 +154,7 @@ export function HeartbeatFeel({
           className="mt-3 w-full max-w-xs accent-primary"
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Ajuste para o valor da última consulta ou ultrassom.
+          {sourceNote ?? "Ajuste para o valor da última consulta ou ultrassom."}
         </p>
 
         <div className="mt-5 flex items-center gap-3">

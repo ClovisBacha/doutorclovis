@@ -267,12 +267,23 @@ function CompanionView() {
               <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{baby.desc}</p>
             </div>
 
-            {/* Sentir o coração: vibração háptica no ritmo típico da semana
-                gestacional (1º tri ~160, 2º ~145, 3º ~135). O acompanhante pode
-                ajustar para o BPM real da última consulta. */}
+            {/* Sentir o coração: se o médico registrou o BPM real da consulta,
+                vibra no ritmo EXATO do bebê; senão, usa o típico da semana
+                gestacional (1º tri ~160, 2º ~145, 3º ~135). */}
             <HeartbeatFeel
-              defaultBpm={trimester === 1 ? 160 : trimester === 2 ? 145 : 135}
+              defaultBpm={
+                profile.fetal_bpm ?? (trimester === 1 ? 160 : trimester === 2 ? 145 : 135)
+              }
               babyName={profile.baby_name}
+              sourceNote={
+                profile.fetal_bpm
+                  ? `Ritmo real medido pelo médico${
+                      profile.fetal_bpm_at
+                        ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
+                        : ""
+                    } 💗`
+                  : undefined
+              }
               compact
             />
 

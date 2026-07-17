@@ -65,6 +65,9 @@ export type LinkedPatient = {
   created_at: string | null;
   /** Aulas premium do quiz diário (revisão liberada). */
   quiz_premium?: boolean | null;
+  /** BPM fetal medido na consulta — alimenta o "Sentir o coração" da família. */
+  fetal_bpm?: number | null;
+  fetal_bpm_at?: string | null;
 };
 
 const TokenSchema = z.object({ accessToken: z.string().min(10) });
@@ -296,22 +299,26 @@ export const listMyPatients = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, patients: [] as LinkedPatient[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const first = await (supabaseAdmin as any)
-      .from("patient_profiles")
-      .select("id,display_name,due_date,created_at,quiz_premium")
-      .eq("doctor_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(500);
-    let rows = first.data;
-    if (first.error?.code === "42703") {
-      // Coluna quiz_premium ainda não aplicada no banco: segue sem ela.
-      const fallback = await (supabaseAdmin as any)
+    // Cascata de selects: colunas opcionais (quiz_premium, fetal_bpm) podem
+    // ainda não existir no banco de produção (42703) — degrada sem quebrar.
+    const selects = [
+      "id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at",
+      "id,display_name,due_date,created_at,quiz_premium",
+      "id,display_name,due_date,created_at",
+    ];
+    let rows: unknown[] | null = null;
+    for (const sel of selects) {
+      const res = await (supabaseAdmin as any)
         .from("patient_profiles")
-        .select("id,display_name,due_date,created_at")
+        .select(sel)
         .eq("doctor_id", user.id)
         .order("created_at", { ascending: false })
         .limit(500);
-      rows = fallback.data;
+      if (!res.error) {
+        rows = res.data;
+        break;
+      }
+      if (res.error.code !== "42703") break; // erro real, não coluna ausente
     }
 
     return { ok: true as const, patients: (rows ?? []) as LinkedPatient[] };
@@ -376,6 +383,50 @@ export const setPatientQuizPremium = createServerFn({ method: "POST" })
     return error
       ? { ok: false as const, error: error.message }
       : { ok: true as const, error: null };
+  });
+
+/**
+ * Registra o BPM fetal medido na consulta ("Sentir o coração" v2, estilo
+ * Trellis): o Painel do Papai e o app da paciente vibram no ritmo EXATO do
+ * bebê. Fail-closed: o UPDATE só afeta a linha se a paciente pertence ao
+ * médico logado (doctor_id no próprio WHERE) — sem checagem separada que
+ * poderia abrir corrida. bpm null limpa o registro.
+ */
+export const setPatientFetalBpm = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        patientId: z.string().uuid(),
+        bpm: z.number().int().min(60).max(220).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireDoctor(data.accessToken);
+    if (!user) return { ok: false as const, error: "Sem permissão." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: updated, error } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .update({
+        fetal_bpm: data.bpm,
+        fetal_bpm_at: data.bpm === null ? null : new Date().toISOString().slice(0, 10),
+      })
+      .eq("id", data.patientId)
+      .eq("doctor_id", user.id)
+      .select("id");
+
+    if (error?.code === "42703") {
+      return {
+        ok: false as const,
+        error: "Aplique a migração fetal_bpm no Supabase (APLICAR_PENDENTES.sql).",
+      };
+    }
+    if (error) return { ok: false as const, error: error.message };
+    if (!updated || updated.length === 0)
+      return { ok: false as const, error: "Paciente não encontrada ou não é sua." };
+    return { ok: true as const, error: null };
   });
 
 /**
