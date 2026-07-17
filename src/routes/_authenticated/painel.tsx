@@ -51,6 +51,11 @@ import {
   listUnansweredQuestions,
   answerAndTrain,
   testBrain,
+  listBrainGaps,
+  resolveBrainGap,
+  dismissBrainGap,
+  installStarterPack,
+  type BrainGap,
   type BrainEntry,
   type BrainSettings,
 } from "@/lib/secondbrain.functions";
@@ -3495,10 +3500,197 @@ function CerebroSection({
           atendimento no WhatsApp.
         </p>
       </div>
+      <BrainGapsCard tokenFn={tokenFn} />
       <BrainSettingsCard tokenFn={tokenFn} />
       {showTrainCard && <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />}
       <BrainKnowledgeCard tokenFn={tokenFn} />
       <BrainPlaygroundCard tokenFn={tokenFn} />
+    </div>
+  );
+}
+
+/**
+ * Fila de lacunas — o coração do autoaprendizado: perguntas reais que a IA
+ * NÃO soube cobrir (ou que receberam 👎 da paciente), deduplicadas e ordenadas
+ * pelas mais perguntadas. O médico responde aqui e vira conhecimento aprovado
+ * na hora.
+ */
+function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [gaps, setGaps] = useState<BrainGap[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [answering, setAnswering] = useState<string | null>(null); // gapId aberto
+  const [answer, setAnswer] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [installing, setInstalling] = useState(false);
+
+  async function load() {
+    try {
+      const tk = await tokenFn();
+      const res = await listBrainGaps({ data: { accessToken: tk } });
+      if (res.ok) setGaps(res.gaps);
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function resolve(gapId: string) {
+    if (answer.trim().length < 5 || busy) return;
+    setBusy(true);
+    try {
+      const tk = await tokenFn();
+      const res = await resolveBrainGap({
+        data: { accessToken: tk, gapId, answer: answer.trim() },
+      });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "plan"
+            ? "Seu plano atual não inclui a IA."
+            : "Não foi possível salvar — tente novamente.",
+        );
+        return;
+      }
+      toast.success("Respondida e aprendida pelo cérebro 🧠");
+      setAnswering(null);
+      setAnswer("");
+      setGaps((gs) => gs.filter((g) => g.id !== gapId));
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismiss(gapId: string) {
+    const tk = await tokenFn();
+    const res = await dismissBrainGap({ data: { accessToken: tk, gapId } });
+    if (res.ok) setGaps((gs) => gs.filter((g) => g.id !== gapId));
+    else toast.error("Não foi possível ignorar.");
+  }
+
+  async function installKit() {
+    setInstalling(true);
+    try {
+      const tk = await tokenFn();
+      const res = await installStarterPack({ data: { accessToken: tk } });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "plan"
+            ? "Seu plano atual não inclui a IA."
+            : "Não foi possível instalar o kit.",
+        );
+        return;
+      }
+      if ("already" in res && res.already) toast("O kit de partida já está instalado.");
+      else
+        toast.success(
+          `${res.installed} dúvidas clássicas instaladas como rascunho — revise e aprove na Base de conhecimento 👇`,
+        );
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setInstalling(false);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-amber-300/60 bg-amber-50/40 p-6 shadow-[var(--shadow-card)] dark:bg-amber-950/10">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-serif text-xl">
+            🕳️ O que a IA não soube responder
+            {gaps.length > 0 && (
+              <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+                {gaps.length}
+              </span>
+            )}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Perguntas reais das suas pacientes sem cobertura no cérebro (ou com 👎). Responda e a IA
+            aprende na hora — sempre com a sua aprovação.
+          </p>
+        </div>
+        <button
+          onClick={installKit}
+          disabled={installing}
+          title="Instala ~30 dúvidas clássicas do pré-natal como rascunho para você revisar"
+          className="shrink-0 rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+        >
+          {installing ? "Instalando…" : "📦 Instalar kit de partida"}
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="skeleton mt-4 h-20 rounded-2xl" />
+      ) : gaps.length === 0 ? (
+        <p className="mt-4 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+          Nenhuma lacuna aberta — o cérebro cobriu tudo que perguntaram até agora. ✅
+        </p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {gaps.map((g) => (
+            <div key={g.id} className="rounded-2xl border border-border bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="min-w-0 flex-1 text-sm font-medium">"{g.question}"</p>
+                <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
+                  {g.hits}× perguntada{g.channel === "whatsapp" ? " · WhatsApp" : ""}
+                </span>
+              </div>
+              {answering === g.id ? (
+                <div className="mt-3">
+                  <textarea
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    rows={3}
+                    autoFocus
+                    placeholder="Escreva a resposta como VOCÊ responderia à paciente…"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => resolve(g.id)}
+                      disabled={busy || answer.trim().length < 5}
+                      className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                    >
+                      {busy ? "Salvando…" : "Responder e treinar 🧠"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAnswering(null);
+                        setAnswer("");
+                      }}
+                      className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setAnswering(g.id);
+                      setAnswer("");
+                    }}
+                    className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+                  >
+                    Responder
+                  </button>
+                  <button
+                    onClick={() => dismiss(g.id)}
+                    className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Ignorar
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

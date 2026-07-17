@@ -43,6 +43,62 @@ function logBrainHit(doctorId: string, channel: BrainChannel): void {
   })();
 }
 
+/** Normaliza a pergunta para deduplicar lacunas ("Posso tomar café?" ≈ "posso tomar cafe"). */
+export function normalizeGapQuestion(q: string): string {
+  return q
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+}
+
+/**
+ * Registra (fire-and-forget) uma LACUNA: pergunta que o cérebro não cobriu.
+ * Deduplicada por (doctor_id, norm_question): repetição incrementa `hits` —
+ * a fila do painel ordena pelo que as pacientes mais perguntam. Best-effort:
+ * tabela ausente (migração pendente) ou corrida no insert nunca quebram o chat.
+ */
+export function logBrainGap(doctorId: string, question: string, channel: BrainChannel): void {
+  const clean = question.trim().slice(0, 300);
+  const norm = normalizeGapQuestion(clean);
+  if (norm.length < 8) return; // "oi", "ok" etc. não são lacunas
+  void (async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+      const { data: existing } = await sb
+        .from("brain_gaps")
+        .select("id,hits,status")
+        .eq("doctor_id", doctorId)
+        .eq("norm_question", norm)
+        .maybeSingle();
+      if (existing) {
+        // Reaparecer conta como novo hit; lacuna ignorada não reabre sozinha.
+        await sb
+          .from("brain_gaps")
+          .update({
+            hits: (existing.hits ?? 1) + 1,
+            updated_at: new Date().toISOString(),
+            ...(existing.status === "respondida" ? { status: "aberta" } : {}),
+          })
+          .eq("id", existing.id);
+      } else {
+        await sb.from("brain_gaps").insert({
+          doctor_id: doctorId,
+          question: clean,
+          norm_question: norm,
+          channel,
+        });
+      }
+    } catch {
+      /* best-effort — nunca afeta a resposta ao paciente */
+    }
+  })();
+}
+
 /* ── Multi-perfil: cada médico tem o SEU cérebro ─────────────────────────────
    As tabelas são chaveadas por doctor_id (uid do médico no auth). Nesta
    instalação single-doctor, o "dono" é o primeiro e-mail de ADMIN_EMAILS —
@@ -126,7 +182,6 @@ function significantWords(message: string): string[] {
 
 const MAX_ENTRIES_LOADED = 200;
 const MAX_ENTRIES_SCORED = 6;
-const MAX_ENTRIES_FALLBACK = 3;
 
 /**
  * Carrega settings + entries DO MÉDICO e monta o bloco para o prompt.
@@ -197,13 +252,18 @@ export async function getBrainContext(
       return { entry, score };
     });
 
-    // Top 6 com score > 0; se nada casar, cai nas 3 mais recentes.
-    let selected = scored
+    // Top 6 com score > 0. SEM fallback de "mais recentes": injetar entradas
+    // aleatórias quando nada casa é ruído no prompt — em vez disso o miss vira
+    // uma LACUNA registrada para o médico responder no painel (autoaprendizado
+    // com o médico no loop).
+    const selected = scored
       .filter((s) => s.score > 0)
       .sort((a, b) => b.score - a.score) // sort estável: empates mantêm as mais recentes primeiro
       .slice(0, MAX_ENTRIES_SCORED)
       .map((s) => s.entry);
-    if (selected.length === 0) selected = entries.slice(0, MAX_ENTRIES_FALLBACK);
+    if (selected.length === 0 && channel !== "teste") {
+      logBrainGap(target, userMessage, channel);
+    }
 
     // Sem settings nem entries → sem bloco.
     if (!persona && !samplePhrases && !rules && selected.length === 0) {

@@ -291,6 +291,29 @@ export const registerDoctor = createServerFn({ method: "POST" })
       return { ok: false as const, error: error.message as string };
     }
 
+    // Cadastro NOVO: instala o kit de partida do Segundo Cérebro como RASCUNHO
+    // (approved=false — a IA só usa depois que o médico revisar e aprovar).
+    // Mata o cold start: no dia 1 ele já tem ~30 dúvidas clássicas para editar
+    // no próprio estilo em vez de uma tela vazia. Fire-and-forget.
+    if (!existing) {
+      void (async () => {
+        try {
+          const { BRAIN_STARTER_PACK } = await import("./brain-starter-pack");
+          await (supabaseAdmin as any).from("brain_entries").insert(
+            BRAIN_STARTER_PACK.map((e) => ({
+              doctor_id: user.id,
+              question: e.question,
+              answer: e.answer,
+              source: "kit",
+              approved: false,
+            })),
+          );
+        } catch (e) {
+          console.error("[registerDoctor] starter pack seed failed", e);
+        }
+      })();
+    }
+
     // Cadastro NOVO: o painel já nasce ativo (doctors.active default true), então
     // isto é só um AVISO à equipe para dar as boas-vindas/ajudar no onboarding —
     // não há ativação manual. Não bloqueia o fluxo se o e-mail falhar.

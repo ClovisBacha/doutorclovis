@@ -17,6 +17,7 @@ import { ymdLocal } from "@/lib/utils";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { getMyAppointments, type MyAppointment } from "@/lib/appointments.functions";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
+import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
@@ -3670,7 +3671,17 @@ type WAMsg = {
   fileSize?: string;
 };
 
-function WABubble({ msg }: { msg: WAMsg }) {
+function WABubble({
+  msg,
+  feedback,
+  onFeedback,
+}: {
+  msg: WAMsg;
+  /** Voto já dado nesta resposta (persistido no estado do chat). */
+  feedback?: "up" | "down";
+  /** Presente só em respostas da IA elegíveis a avaliação. */
+  onFeedback?: (helpful: boolean) => void;
+}) {
   const isUser = msg.role === "user";
   const timeStr = msg.ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const [playing, setPlaying] = useState(false);
@@ -3794,8 +3805,34 @@ function WABubble({ msg }: { msg: WAMsg }) {
           </p>
         )}
 
-        {/* Timestamp */}
+        {/* Timestamp + feedback 👍👎 (só em respostas da IA) */}
         <div className="flex items-center justify-end gap-1 px-2.5 pb-1.5 pt-0.5">
+          {!isUser && onFeedback && (
+            <span className="mr-auto flex items-center gap-1.5 pl-0.5">
+              {feedback ? (
+                <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.7)" }}>
+                  {feedback === "up" ? "Obrigado! 💛" : "Anotado — seu médico vai ver 💛"}
+                </span>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onFeedback(true)}
+                    aria-label="Resposta útil"
+                    className="rounded-full px-1.5 py-0.5 text-[13px] leading-none opacity-60 transition-opacity hover:opacity-100"
+                  >
+                    👍
+                  </button>
+                  <button
+                    onClick={() => onFeedback(false)}
+                    aria-label="Resposta não ajudou"
+                    className="rounded-full px-1.5 py-0.5 text-[13px] leading-none opacity-60 transition-opacity hover:opacity-100"
+                  >
+                    👎
+                  </button>
+                </>
+              )}
+            </span>
+          )}
           <span className="text-[10px] leading-none" style={{ color: "rgba(255,255,255,0.7)" }}>
             {timeStr}
           </span>
@@ -3828,6 +3865,28 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
+  // Feedback 👍👎 por índice de mensagem — o 👎 vira lacuna na fila do médico.
+  const [votes, setVotes] = useState<Record<number, "up" | "down">>({});
+
+  function voteMessage(i: number, helpful: boolean) {
+    setVotes((v) => ({ ...v, [i]: helpful ? "up" : "down" }));
+    void (async () => {
+      try {
+        const q = messages
+          .slice(0, i)
+          .reverse()
+          .find((x) => x.role === "user")?.content;
+        if (!q) return;
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session?.access_token) return;
+        await submitBrainFeedback({
+          data: { accessToken: s.session.access_token, question: q, helpful },
+        });
+      } catch {
+        /* telemetria é best-effort */
+      }
+    })();
+  }
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -3996,9 +4055,21 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
 
       {/* Área de mensagens */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-0.5 px-3 py-3">
-        {messages.map((m, i) => (
-          <WABubble key={i} msg={m} />
-        ))}
+        {messages.map((m, i) => {
+          // Avaliável: resposta da IA com pergunta anterior, fora do streaming.
+          const canVote =
+            m.role === "assistant" &&
+            messages.slice(0, i).some((x) => x.role === "user") &&
+            !(loading && i === messages.length - 1);
+          return (
+            <WABubble
+              key={i}
+              msg={m}
+              feedback={votes[i]}
+              onFeedback={canVote ? (helpful) => voteMessage(i, helpful) : undefined}
+            />
+          );
+        })}
 
         {/* Indicador digitando */}
         {loading && (

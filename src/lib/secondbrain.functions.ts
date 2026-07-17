@@ -413,3 +413,199 @@ export const testBrain = createServerFn({ method: "POST" })
       return { ok: false as const, answer: "Falha ao consultar o modelo. Tente novamente." };
     }
   });
+
+/* ══════════════════════════════════════════════════════════════════════
+   Autoaprendizado (médico no loop)
+   - Lacunas: perguntas que o cérebro não cobriu → o médico responde e vira
+     conhecimento aprovado na hora.
+   - Feedback 👍👎 da paciente: registrado; o 👎 também alimenta a fila.
+   - Kit de partida: ~30 dúvidas clássicas do pré-natal instaladas como
+     RASCUNHO (approved=false) — a IA não usa nada sem o aval do médico.
+   ══════════════════════════════════════════════════════════════════════ */
+
+export type BrainGap = {
+  id: string;
+  question: string;
+  channel: string;
+  hits: number;
+  status: string;
+  updated_at: string;
+};
+
+/** Lacunas abertas DO médico logado, mais perguntadas primeiro. */
+export const listBrainGaps = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, gaps: [] as BrainGap[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const doctorId = await ownerDoctorId(user);
+    const { data: rows, error } = await (supabaseAdmin as any)
+      .from("brain_gaps")
+      .select("id,question,channel,hits,status,updated_at")
+      .eq("doctor_id", doctorId)
+      .eq("status", "aberta")
+      .order("hits", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    if (error?.code === "42P01")
+      return { ok: false as const, gaps: [] as BrainGap[], missingTable: true as const };
+    if (error) return { ok: false as const, gaps: [] as BrainGap[] };
+    return { ok: true as const, gaps: (rows ?? []) as BrainGap[] };
+  });
+
+/** Responde uma lacuna: cria conhecimento APROVADO e fecha a lacuna. */
+export const resolveBrainGap = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        gapId: z.string().uuid(),
+        answer: z.string().min(5).max(4000),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const doctorId = await ownerDoctorId(user);
+
+    // Escopo no WHERE: só resolve lacuna DO próprio médico, ainda aberta.
+    const { data: gap } = await sb
+      .from("brain_gaps")
+      .select("id,question")
+      .eq("id", data.gapId)
+      .eq("doctor_id", doctorId)
+      .eq("status", "aberta")
+      .maybeSingle();
+    if (!gap) return { ok: false as const };
+
+    const { data: entry, error: insErr } = await sb
+      .from("brain_entries")
+      .insert({
+        doctor_id: doctorId,
+        question: gap.question,
+        answer: data.answer,
+        source: "lacuna",
+        approved: true,
+      })
+      .select("id")
+      .single();
+    if (insErr || !entry) return { ok: false as const };
+
+    const { error: updErr } = await sb
+      .from("brain_gaps")
+      .update({ status: "respondida", updated_at: new Date().toISOString() })
+      .eq("id", gap.id);
+    if (updErr) {
+      // Compensação: não deixa conhecimento duplicar num retry.
+      await sb.from("brain_entries").delete().eq("id", entry.id);
+      return { ok: false as const };
+    }
+    return { ok: true as const };
+  });
+
+/** Ignora uma lacuna (não volta a aparecer; novo hit não reabre). */
+export const dismissBrainGap = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), gapId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const doctorId = await ownerDoctorId(user);
+    const { error } = await (supabaseAdmin as any)
+      .from("brain_gaps")
+      .update({ status: "ignorada", updated_at: new Date().toISOString() })
+      .eq("id", data.gapId)
+      .eq("doctor_id", doctorId);
+    return { ok: !error };
+  });
+
+/**
+ * Instala o kit de partida (~30 dúvidas clássicas) como RASCUNHO.
+ * Idempotente: se o médico já tem entradas source='kit', não duplica.
+ */
+export const installStarterPack = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, installed: 0 };
+    if (!(await canUseBrain(user)))
+      return { ok: false as const, installed: 0, reason: "plan" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const doctorId = await ownerDoctorId(user);
+
+    const { data: existing, error: exErr } = await sb
+      .from("brain_entries")
+      .select("id")
+      .eq("doctor_id", doctorId)
+      .eq("source", "kit")
+      .limit(1);
+    if (exErr) return { ok: false as const, installed: 0 };
+    if ((existing ?? []).length > 0)
+      return { ok: true as const, installed: 0, already: true as const };
+
+    const { BRAIN_STARTER_PACK } = await import("./brain-starter-pack");
+    const rows = BRAIN_STARTER_PACK.map((e) => ({
+      doctor_id: doctorId,
+      question: e.question,
+      answer: e.answer,
+      source: "kit",
+      approved: false, // RASCUNHO: a IA só usa depois que o médico aprovar
+    }));
+    const { error } = await sb.from("brain_entries").insert(rows);
+    if (error) return { ok: false as const, installed: 0 };
+    return { ok: true as const, installed: rows.length };
+  });
+
+/**
+ * Feedback 👍👎 da PACIENTE sobre uma resposta da IA do app. O 👎 também
+ * entra na fila de lacunas do médico (a pergunta original vira item de
+ * treino). Nunca lança: telemetria é best-effort.
+ */
+export const submitBrainFeedback = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        question: z.string().min(1).max(500),
+        helpful: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+      const { data: u, error: uerr } = await supabaseAdmin.auth.getUser(data.accessToken);
+      if (uerr || !u?.user) return { ok: false as const };
+      const { data: prof } = await sb
+        .from("patient_profiles")
+        .select("doctor_id")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      const doctorId = (prof?.doctor_id as string | null) ?? null;
+
+      await sb.from("brain_feedback").insert({
+        doctor_id: doctorId,
+        user_id: u.user.id,
+        question: data.question.slice(0, 500),
+        helpful: data.helpful,
+        channel: "app",
+      });
+
+      if (!data.helpful && doctorId) {
+        const { logBrainGap } = await import("./secondbrain.server");
+        logBrainGap(doctorId, data.question, "app");
+      }
+      return { ok: true as const };
+    } catch {
+      return { ok: false as const };
+    }
+  });

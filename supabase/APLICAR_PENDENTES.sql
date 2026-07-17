@@ -1861,3 +1861,40 @@ ALTER TABLE public.doctors
   ADD COLUMN IF NOT EXISTS approach text,
   ADD COLUMN IF NOT EXISTS consultation_price_brl integer,
   ADD COLUMN IF NOT EXISTS offers_telehealth boolean NOT NULL DEFAULT false;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Autoaprendizado do Segundo Cérebro (lacunas + feedback) — ver 20260717040000
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.brain_gaps (
+  id uuid primary key default gen_random_uuid(),
+  doctor_id uuid not null,
+  question text not null,
+  norm_question text not null,
+  channel text not null default 'app',
+  hits integer not null default 1,
+  status text not null default 'aberta' check (status in ('aberta', 'respondida', 'ignorada')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_brain_gaps_doctor_question
+  ON public.brain_gaps(doctor_id, norm_question);
+CREATE INDEX IF NOT EXISTS idx_brain_gaps_doctor_status
+  ON public.brain_gaps(doctor_id, status, updated_at DESC);
+ALTER TABLE public.brain_gaps ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.brain_gaps TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.brain_feedback (
+  id uuid primary key default gen_random_uuid(),
+  doctor_id uuid,
+  user_id uuid not null,
+  question text,
+  helpful boolean not null,
+  channel text not null default 'app',
+  created_at timestamptz not null default now()
+);
+CREATE INDEX IF NOT EXISTS idx_brain_feedback_doctor
+  ON public.brain_feedback(doctor_id, created_at DESC);
+ALTER TABLE public.brain_feedback ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON public.brain_feedback TO service_role;
+
+ALTER TABLE public.brain_entries ADD COLUMN IF NOT EXISTS source text;
