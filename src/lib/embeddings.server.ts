@@ -12,8 +12,13 @@ const EMBEDDING_DIMS = 768;
 /** Entrada truncada: perguntas/respostas longas não precisam de mais que isso. */
 const MAX_INPUT_CHARS = 2000;
 
-/** Gera o vetor de um texto. null em qualquer falha (sem chave, rede, cota). */
-export async function embedText(text: string): Promise<number[] | null> {
+/**
+ * Gera o vetor de um texto. null em qualquer falha (sem chave, rede, cota).
+ * `timeoutMs`: no caminho de ESCRITA/backfill o padrão de 6s é ok; no caminho
+ * de LEITURA do chat use um valor curto — a paciente está esperando a
+ * resposta, e um Gemini lento não pode congelar o chat até o fallback.
+ */
+export async function embedText(text: string, timeoutMs = 6000): Promise<number[] | null> {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   const clean = text.trim().slice(0, MAX_INPUT_CHARS);
   if (!apiKey || clean.length < 2) return null;
@@ -24,7 +29,7 @@ export async function embedText(text: string): Promise<number[] | null> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: { parts: [{ text: clean }] } }),
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(timeoutMs),
       },
     );
     if (!res.ok) return null;
@@ -48,7 +53,8 @@ export function embedBrainEntry(entryId: string, question: string, answer: strin
       const vec = await embedText(`${question}\n${answer}`);
       if (!vec) return;
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      // 42703 (coluna embedding ausente — migração pendente) cai no catch.
+      // Coluna embedding ausente (migração pendente): o supabase-js devolve
+      // {error} sem lançar — o update vira no-op silencioso, que é o desejado.
       await (supabaseAdmin as any)
         .from("brain_entries")
         .update({ embedding: vec })

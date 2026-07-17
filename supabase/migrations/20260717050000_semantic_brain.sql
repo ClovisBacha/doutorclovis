@@ -8,10 +8,6 @@ CREATE EXTENSION IF NOT EXISTS vector;
 ALTER TABLE public.brain_entries
   ADD COLUMN IF NOT EXISTS embedding vector(768);
 
--- HNSW: busca aproximada rápida por cosseno (escala além do seq scan).
-CREATE INDEX IF NOT EXISTS idx_brain_entries_embedding
-  ON public.brain_entries USING hnsw (embedding vector_cosine_ops);
-
 -- O PostgREST não expressa operadores de vetor — a similaridade roda no
 -- banco via RPC. Só o servidor (service_role) executa.
 CREATE OR REPLACE FUNCTION public.match_brain_entries(
@@ -39,3 +35,8 @@ REVOKE ALL ON FUNCTION public.match_brain_entries(uuid, vector, int) FROM PUBLIC
 REVOKE ALL ON FUNCTION public.match_brain_entries(uuid, vector, int) FROM anon;
 REVOKE ALL ON FUNCTION public.match_brain_entries(uuid, vector, int) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.match_brain_entries(uuid, vector, int) TO service_role;
+
+-- Índice por último: se o HNSW não estiver disponível nesta versão do
+-- pgvector, a falha NÃO impede a função (busca funciona via seq scan).
+CREATE INDEX IF NOT EXISTS idx_brain_entries_embedding
+  ON public.brain_entries USING hnsw (embedding vector_cosine_ops);

@@ -257,7 +257,9 @@ export async function getBrainContext(
     if (entries.length > 0) {
       try {
         const { embedText } = await import("./embeddings.server");
-        const qvec = await embedText(userMessage);
+        // Timeout CURTO: estamos no caminho crítico do chat — se o embedding
+        // não chegar em 1,8s, o fallback por palavras responde na hora.
+        const qvec = await embedText(userMessage, 1800);
         if (qvec) {
           const { data: matches, error } = await (supabaseAdmin as any).rpc("match_brain_entries", {
             p_doctor_id: target,
