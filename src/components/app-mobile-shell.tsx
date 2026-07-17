@@ -235,34 +235,48 @@ function weatherTip(code: number, temp: number): { tip: string; tipEmoji: string
 function useWeather(): WeatherState | null {
   const [weather, setWeather] = useState<WeatherState | null>(null);
   useEffect(() => {
-    if (typeof window === "undefined" || !("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        try {
-          const res = await fetch(
-            `https://api.open-meteo.com/v1/forecast` +
-              `?latitude=${coords.latitude.toFixed(4)}` +
-              `&longitude=${coords.longitude.toFixed(4)}` +
-              `&current=temperature_2m,weather_code` +
-              `&timezone=auto&forecast_days=1`,
-          );
-          if (!res.ok) return;
-          const data = (await res.json()) as {
-            current: { temperature_2m: number; weather_code: number };
-          };
-          const temp = Math.round(data.current.temperature_2m);
-          const code = data.current.weather_code;
-          const { condition, emoji } = wmoToInfo(code);
-          const overlay = weatherOverlay(code, temp);
-          const { tip, tipEmoji } = weatherTip(code, temp);
-          setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji });
-        } catch {
-          /* clima é enhancement — falha silenciosa */
-        }
-      },
-      () => {},
-      { timeout: 8000, maximumAge: 300_000 },
-    );
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+
+    async function load(lat: number, lon: number) {
+      try {
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast` +
+            `?latitude=${lat.toFixed(4)}` +
+            `&longitude=${lon.toFixed(4)}` +
+            `&current=temperature_2m,weather_code` +
+            `&timezone=auto&forecast_days=1`,
+        );
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          current: { temperature_2m: number; weather_code: number };
+        };
+        const temp = Math.round(data.current.temperature_2m);
+        const code = data.current.weather_code;
+        const { condition, emoji } = wmoToInfo(code);
+        const overlay = weatherOverlay(code, temp);
+        const { tip, tipEmoji } = weatherTip(code, temp);
+        if (!cancelled) setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji });
+      } catch {
+        /* clima é enhancement — falha silenciosa */
+      }
+    }
+
+    // Fallback: Belo Horizonte. Sem ele, quem nega a localização perdia o
+    // strip de clima inteiro (dado "sumido" relatado na auditoria de design).
+    const FALLBACK = { lat: -19.9167, lon: -43.9345 };
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => load(coords.latitude, coords.longitude),
+        () => load(FALLBACK.lat, FALLBACK.lon),
+        { timeout: 8000, maximumAge: 300_000 },
+      );
+    } else {
+      load(FALLBACK.lat, FALLBACK.lon);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
   return weather;
 }
@@ -286,45 +300,79 @@ export function AppBottomNav({
   activeSection: BottomSection;
   onSelect: (s: BottomSection) => void;
 }) {
+  // Estilo Instagram: rolando para BAIXO (lendo conteúdo) a barra encolhe e
+  // some com os rótulos; rolando para CIMA (procurando navegação) ela volta ao
+  // tamanho cheio. Perto do topo fica sempre expandida.
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let lastY = window.scrollY;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - lastY;
+        if (y < 48) setCompact(false);
+        else if (delta > 6) setCompact(true);
+        else if (delta < -6) setCompact(false);
+        lastY = y;
+        raf = 0;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   return (
     <nav
       aria-label="Navegação do app"
-      className="fixed inset-x-0 bottom-0 z-40 flex md:hidden items-center justify-around border-t border-border/70 bg-background/90 backdrop-blur-xl backdrop-saturate-150 print:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      className="pointer-events-none fixed inset-x-0 z-40 flex justify-center md:hidden print:hidden"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
     >
-      {NAV_ITEMS.map(({ id, Icon, label }) => {
-        const active = activeSection === id;
-        return (
-          <button
-            key={id}
-            onClick={() => onSelect(id)}
-            aria-current={active ? "page" : undefined}
-            className="flex flex-1 flex-col items-center gap-0.5 py-2 transition-colors duration-200"
-          >
-            {/* Pill de fundo — expande com mola quando ativa (key retrigger do pop-in) */}
-            <div
-              key={active ? "on" : "off"}
-              className={`flex h-8 w-14 items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-                active ? "pop-in bg-primary/12 scale-105" : "scale-100"
-              }`}
+      <div
+        className={`pointer-events-auto flex items-center justify-around rounded-full border border-border/60 bg-background/85 shadow-[0_10px_36px_rgba(0,0,0,0.14)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+          compact ? "w-[64%] px-1.5 py-1" : "w-[92%] max-w-md px-2 py-1.5"
+        }`}
+      >
+        {NAV_ITEMS.map(({ id, Icon, label }) => {
+          const active = activeSection === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onSelect(id)}
+              aria-current={active ? "page" : undefined}
+              aria-label={label}
+              className="flex min-w-0 flex-1 flex-col items-center py-1 transition-colors duration-200"
             >
-              <Icon
-                className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-                  active ? "text-primary scale-110" : "text-muted-foreground scale-100"
-                }`}
-                strokeWidth={active ? 2.5 : 1.8}
-              />
-            </div>
-            <span
-              className={`text-[10px] font-medium transition-colors duration-200 ${
-                active ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              {label}
-            </span>
-          </button>
-        );
-      })}
+              {/* Pill de fundo — expande com mola quando ativa (key retrigger do pop-in) */}
+              <div
+                key={active ? "on" : "off"}
+                className={`flex items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                  compact ? "h-9 w-9" : "h-9 w-12"
+                } ${active ? "pop-in bg-primary/12 scale-105" : "scale-100"}`}
+              >
+                <Icon
+                  className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                    active ? "text-primary scale-110" : "text-muted-foreground scale-100"
+                  }`}
+                  strokeWidth={active ? 2.5 : 1.8}
+                />
+              </div>
+              <span
+                className={`overflow-hidden text-[10px] font-medium transition-all duration-300 ${
+                  compact ? "max-h-0 opacity-0" : "mt-0.5 max-h-4 opacity-100"
+                } ${active ? "text-primary" : "text-muted-foreground"}`}
+              >
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 }
@@ -444,6 +492,14 @@ export function AppHomeScreen({
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
+  const daysLeft = gest ? Math.max(0, 280 - gest.totalDays) : null;
+  const trimestre = gest
+    ? gest.weeks < 14
+      ? "1º trimestre"
+      : gest.weeks < 28
+        ? "2º trimestre"
+        : "3º trimestre"
+    : null;
   const weather = useWeather();
   const [journey] = useState(() => readJourneyStats(gest?.totalDays ?? null));
 
@@ -465,7 +521,7 @@ export function AppHomeScreen({
     <div className="space-y-4 pb-2">
       {/* ── Hero card: céu real do momento + bebê + clima ──────────── */}
       <div
-        className="shine rounded-3xl relative overflow-hidden p-5 transition-[background] duration-1000"
+        className="shine relative flex min-h-[66svh] flex-col overflow-hidden rounded-3xl p-5 transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Céu vivo: sol/lua, estrelas à noite, nuvens à deriva, chuva */}
@@ -476,20 +532,36 @@ export function AppHomeScreen({
           period={period}
         />
 
-        <div className="relative">
+        <div className="relative flex flex-1 flex-col">
           {isMadrugada && (
             <p className="text-[11px] text-white/65">🌙 Madrugada — tente descansar um pouco</p>
           )}
 
           {gest && baby ? (
             <>
-              {/* Bebê protagonista — flutua devagar, como se boiasse */}
-              <div className="float-slow mt-1 flex justify-center">
+              {/* Dados de topo: trimestre + contagem regressiva p/ o parto */}
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                >
+                  {trimestre}
+                </span>
+                {daysLeft != null && (
+                  <span
+                    className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                  >
+                    {daysLeft === 0 ? "É hoje! 🎉" : `Parto em ${daysLeft} dias 💛`}
+                  </span>
+                )}
+              </div>
+
+              {/* Bebê protagonista — GRANDE, flutuando, dono da tela */}
+              <div className="float-slow flex flex-1 items-center justify-center py-2">
                 <BabyIllustration
                   week={gest.weeks}
                   showSac={false}
                   showInfo={false}
-                  className="h-40 w-40 drop-shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+                  className="h-56 w-56 drop-shadow-[0_14px_36px_rgba(0,0,0,0.16)]"
                 />
               </div>
 
@@ -575,8 +647,8 @@ export function AppHomeScreen({
                 </div>
               </div>
 
-              {/* Strip de clima — só aparece quando dados chegam */}
-              {!isMadrugada && weather && (
+              {/* Strip de clima — com fallback de cidade, sempre chega */}
+              {weather && (
                 <div
                   className={`mt-3 rounded-2xl backdrop-blur-sm px-3 py-2 flex items-start gap-2.5 ${
                     darkSky ? "bg-white/15" : "bg-white/40"

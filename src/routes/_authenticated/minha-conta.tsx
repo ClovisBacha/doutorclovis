@@ -586,7 +586,8 @@ function MinhaContaPage() {
       {/* ── App bottom nav (mobile only) ─────────────────────── */}
       <AppBottomNav activeSection={activeSection} onSelect={handleBottomNav} />
 
-      <section className="mx-auto max-w-5xl px-5 py-6 md:py-12">
+      {/* pb-28 no mobile: folga para a barra flutuante não cobrir o fim da página */}
+      <section className="mx-auto max-w-5xl px-5 py-6 pb-28 md:py-12">
         {/* ── Desktop header ───────────────────────────────────── */}
         <div className="hidden md:flex flex-wrap items-end justify-between gap-3 mb-2">
           <div>
