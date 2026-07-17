@@ -207,7 +207,21 @@ export const Route = createFileRoute("/api/chat")({
           // getBrainContext é safe (falha vira block vazio), nunca derruba o chat.
           const brain = await getBrainContext(lastUserText(messages), patient.doctorId, "app");
           const base = medicalSystemPrompt(patient.doctorName);
-          system = [base, patient.clinicalBlock, brain.enabledApp && brain.block ? brain.block : ""]
+          const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
+          // Confiança visível: com cobertura, cite a fonte; sem cobertura,
+          // escale com honestidade (a lacuna JÁ foi registrada pelo sistema).
+          const confianca =
+            brain.enabledApp && brain.hadCoverage
+              ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
+              : brain.enabledApp
+                ? `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. O sistema JÁ registrou a pergunta para ele responder no painel — diga isso com acolhimento (ex.: "essa é uma dúvida que ${medico} prefere responder pessoalmente; já registrei aqui para ele ver"). Limite-se a informações gerais seguras e sinais de alerta, sem improvisar conduta específica.`
+                : "";
+          system = [
+            base,
+            patient.clinicalBlock,
+            brain.enabledApp && brain.block ? brain.block : "",
+            confianca,
+          ]
             .filter(Boolean)
             .join("\n\n");
         } else if (patient) {

@@ -19,6 +19,13 @@ export type BrainContext = {
   block: string;
   enabledApp: boolean;
   enabledWhatsapp: boolean;
+  /**
+   * true = alguma orientação validada do médico casou com a pergunta.
+   * false = sem cobertura (a lacuna já foi registrada) — o chat usa isso para
+   * ESCALAR com honestidade ("registrei sua dúvida para o médico") em vez de
+   * improvisar conduta.
+   */
+  hadCoverage: boolean;
 };
 
 /** Canal em que o cérebro foi usado (telemetria do dashboard do médico). */
@@ -204,7 +211,7 @@ export async function getBrainContext(
     // chat segue sem cérebro.
     const ownerId = await resolveOwnerDoctorId();
     const target = doctorId ?? ownerId;
-    if (!target) return { block: "", enabledApp: true, enabledWhatsapp: true };
+    if (!target) return { block: "", enabledApp: true, enabledWhatsapp: true, hadCoverage: false };
     // A conta dona da instalação (ADMIN_EMAILS) tem acesso total; um assinante
     // usa as capacidades do próprio plano.
     const isOwner = !!ownerId && target === ownerId;
@@ -239,11 +246,13 @@ export async function getBrainContext(
     const enabledWhatsapp = (settings?.enabled_whatsapp ?? true) && ent.aiWhatsapp;
 
     // Canal não coberto pelo plano → bloco vazio (nada do cérebro vaza).
-    if (channel === "app" && !enabledApp) return { block: "", enabledApp, enabledWhatsapp };
+    if (channel === "app" && !enabledApp)
+      return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
     if (channel === "whatsapp" && !enabledWhatsapp) {
-      return { block: "", enabledApp, enabledWhatsapp };
+      return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
     }
-    if (channel === "teste" && !ent.aiApp) return { block: "", enabledApp, enabledWhatsapp };
+    if (channel === "teste" && !ent.aiApp)
+      return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
 
     // ── Seleção em 2 camadas ─────────────────────────────────────────────
     // 1ª) SEMÂNTICA (pgvector + embedding da pergunta): entende sinônimos —
@@ -304,7 +313,7 @@ export async function getBrainContext(
 
     // Sem settings nem entries → sem bloco.
     if (!persona && !samplePhrases && !rules && selected.length === 0) {
-      return { block: "", enabledApp, enabledWhatsapp };
+      return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
     }
 
     const parts: string[] = [
@@ -325,9 +334,14 @@ export async function getBrainContext(
     // hit (fire-and-forget; 'teste' é ignorado dentro de logBrainHit).
     logBrainHit(target, channel);
 
-    return { block: parts.join("\n") + "\n", enabledApp, enabledWhatsapp };
+    return {
+      block: parts.join("\n") + "\n",
+      enabledApp,
+      enabledWhatsapp,
+      hadCoverage: selected.length > 0,
+    };
   } catch {
     // Falha de banco não pode derrubar o chat: segue sem o segundo cérebro.
-    return { block: "", enabledApp: true, enabledWhatsapp: true };
+    return { block: "", enabledApp: true, enabledWhatsapp: true, hadCoverage: false };
   }
 }
