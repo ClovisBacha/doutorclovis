@@ -761,7 +761,7 @@ function MinhaContaPage() {
                       setTab(t);
                       setMobileHome(false);
                     }}
-                    className={`press flex-shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+                    className={`press flex-shrink-0 rounded-full px-3.5 py-2 text-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
                       tab === t
                         ? `${cs.pill} font-semibold`
                         : "text-foreground/60 hover:text-foreground/80"
@@ -1029,7 +1029,7 @@ function BabyTab({
           </p>
           <div className="space-y-2 text-sm">
             {profile.prior_bp_elevated && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-red-500 text-base">⚠️</span>
                 <p>
                   Na gestação anterior, você teve <strong>pressão elevada</strong>
@@ -1041,7 +1041,7 @@ function BabyTab({
               </div>
             )}
             {profile.prior_gestational_diabetes && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-primary text-base">🍬</span>
                 <p>
                   Você teve <strong>diabetes gestacional</strong> anteriormente. O risco de
@@ -1051,7 +1051,7 @@ function BabyTab({
               </div>
             )}
             {profile.prior_preterm && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-primary text-base">👶</span>
                 <p>
                   Histórico de <strong>parto prematuro</strong>. Seu médico acompanhará o
@@ -1060,7 +1060,7 @@ function BabyTab({
               </div>
             )}
             {profile.prior_cesarean && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-primary text-base">🏥</span>
                 <p>
                   Cesariana anterior registrada. A via de parto desta gestação será planejada em
@@ -1086,7 +1086,7 @@ function BabyTab({
                 </p>
               )}
             {profile.prior_notes && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-base">📋</span>
                 <p>
                   <strong>Observações:</strong> {profile.prior_notes}
