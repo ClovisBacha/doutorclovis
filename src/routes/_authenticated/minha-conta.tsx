@@ -494,13 +494,15 @@ function MinhaContaPage() {
       if (s.session?.access_token) {
         const r = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
         setIsAdmin(r.isAdmin);
-        // Médico cadastrado (ativo) também acessa o painel do consultório
+        // Médico cadastrado (ativo OU não) é médico — não usa o app da
+        // gestante (o render abaixo troca o app pela tela de redirecionamento
+        // ao /painel). Admin nunca entra aqui: continua vendo tudo p/ testar.
         if (!r.isAdmin) {
           try {
             const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
-            if (me.ok && me.doctor?.active) setIsDoctor(true);
+            if (me.ok && me.doctor) setIsDoctor(true);
           } catch {
-            /* sem perfil de médico */
+            /* sem perfil de médico → é gestante, segue no app */
           }
         }
       }
@@ -580,6 +582,35 @@ function MinhaContaPage() {
     consultas: "Consultas",
     eu: "Eu",
   };
+
+  // Médico (não-admin) NÃO usa o app da gestante: bebê, diário, jogo e afins
+  // são exclusivos das pacientes. O espaço dele é o /painel. A conta admin
+  // (ADMIN_EMAILS) segue vendo tudo para testar — isDoctor só é setado quando
+  // o usuário não é admin (ver efeito de carga acima).
+  if (isDoctor) {
+    return (
+      <section className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-5 text-center">
+        <p className="text-5xl">🩺</p>
+        <h1 className="mt-4 font-serif text-2xl">Esta área é da gestante</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Sua conta é de médico — o bebê, o diário e a jornada são exclusivos das pacientes. O seu
+          espaço de trabalho é o painel do consultório.
+        </p>
+        <Link
+          to="/painel"
+          className="mt-6 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Ir para o meu painel →
+        </Link>
+        <button
+          onClick={signOut}
+          className="mt-3 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >
+          Sair da conta
+        </button>
+      </section>
+    );
+  }
 
   return (
     <>
