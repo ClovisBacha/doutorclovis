@@ -633,3 +633,68 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
       return { ok: false as const };
     }
   });
+
+/**
+ * Rascunho automático para uma LACUNA: a IA escreve a resposta no estilo do
+ * médico (persona + entradas semanticamente próximas do cérebro dele) e o
+ * médico só revisa/edita/aprova — de "trabalho" vira "revisão de 10 segundos".
+ * O rascunho NUNCA entra no cérebro sozinho: só via resolveBrainGap, após o
+ * aval humano. Conservador por instrução: sem conduta inventada, sem doses,
+ * caso incerto → orientar consulta.
+ */
+export const draftGapAnswer = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), gapId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!key) return { ok: false as const, reason: "config" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const doctorId = await ownerDoctorId(user);
+    const { data: gap } = await (supabaseAdmin as any)
+      .from("brain_gaps")
+      .select("id,question")
+      .eq("id", data.gapId)
+      .eq("doctor_id", doctorId)
+      .eq("status", "aberta")
+      .maybeSingle();
+    if (!gap) return { ok: false as const };
+
+    // Canal 'teste': recupera persona + entradas semanticamente próximas SEM
+    // contar hit nem registrar lacuna (é uso interno do médico).
+    const [{ getBrainContext }, { generateText }, { createChatProvider, DEFAULT_CHAT_MODEL }] =
+      await Promise.all([
+        import("./secondbrain.server"),
+        import("ai"),
+        import("./ai-gateway.server"),
+      ]);
+    const brain = await getBrainContext(gap.question, doctorId, "teste");
+
+    const system = [
+      "Você redige um RASCUNHO de resposta que um obstetra dará à sua paciente gestante. O médico vai revisar e editar antes de aprovar — escreva na primeira pessoa, como se fosse ele.",
+      "Regras rígidas: use APENAS conhecimento obstétrico consolidado e o que estiver no bloco do médico abaixo; NUNCA invente conduta específica; NÃO prescreva doses ou medicamentos que não estejam no bloco; em situação de risco/incerteza, oriente procurar a consulta ou a maternidade.",
+      "Tom acolhedor e claro, português brasileiro, 3 a 6 frases, sem markdown.",
+      brain.block,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    try {
+      const google = createChatProvider(key);
+      const result = await generateText({
+        model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
+        system,
+        prompt: gap.question,
+        maxOutputTokens: 400,
+      });
+      const draft = result.text.trim();
+      if (!draft) return { ok: false as const };
+      return { ok: true as const, draft };
+    } catch {
+      return { ok: false as const };
+    }
+  });

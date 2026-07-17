@@ -54,6 +54,7 @@ import {
   listBrainGaps,
   resolveBrainGap,
   dismissBrainGap,
+  draftGapAnswer,
   installStarterPack,
   type BrainGap,
   type BrainEntry,
@@ -3525,6 +3526,33 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [busy, setBusy] = useState(false);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const [drafted, setDrafted] = useState<string | null>(null); // gapId com rascunho da IA
+
+  async function draft(gapId: string) {
+    if (drafting) return;
+    setDrafting(true);
+    try {
+      const tk = await tokenFn();
+      const res = await draftGapAnswer({ data: { accessToken: tk, gapId } });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "plan"
+            ? "Seu plano atual não inclui a IA."
+            : "reason" in res && res.reason === "config"
+              ? "IA não configurada nesta instalação."
+              : "Não foi possível gerar o rascunho — escreva manualmente.",
+        );
+        return;
+      }
+      setAnswer(res.draft);
+      setDrafted(gapId);
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setDrafting(false);
+    }
+  }
 
   async function load() {
     try {
@@ -3567,6 +3595,7 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
       }
       toast.success("Respondida e aprendida pelo cérebro 🧠");
       setAnswering(null);
+      setDrafted(null);
       setAnswer("");
       setGaps((gs) => gs.filter((g) => g.id !== gapId));
     } catch {
@@ -3676,12 +3705,26 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
                   <textarea
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
-                    rows={3}
+                    rows={4}
                     autoFocus
-                    placeholder="Escreva a resposta como VOCÊ responderia à paciente…"
+                    placeholder="Escreva a resposta como VOCÊ responderia à paciente… (ou gere um rascunho ✨)"
                     className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
                   />
-                  <div className="mt-2 flex gap-2">
+                  {drafted === g.id && (
+                    <p className="mt-1 text-[11px] text-amber-700">
+                      ✨ Rascunho da IA no seu estilo — revise e ajuste antes de aprovar. Nada entra
+                      no cérebro sem o seu aval.
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => draft(g.id)}
+                      disabled={drafting}
+                      title="A IA escreve um rascunho no seu estilo, usando o seu cérebro — você só revisa"
+                      className="rounded-full border border-primary/40 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary disabled:opacity-50"
+                    >
+                      {drafting ? "Gerando…" : "✨ Gerar rascunho"}
+                    </button>
                     <button
                       onClick={() => resolve(g.id)}
                       disabled={busy || answer.trim().length < 5}
@@ -3692,6 +3735,7 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
                     <button
                       onClick={() => {
                         setAnswering(null);
+                        setDrafted(null);
                         setAnswer("");
                       }}
                       className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground"
