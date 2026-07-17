@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
-import { getBrainContext } from "@/lib/secondbrain.server";
+import { getBrainContext, normalizeGapQuestion } from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
 
 // Rate limit simples por IP (janela fixa, em memória). Em ambiente serverless
@@ -79,9 +79,11 @@ async function resolvePatientDoctor(request: Request): Promise<{
       .eq("id", data.user.id)
       .maybeSingle();
     let prof = first.data;
-    if (first.error?.code === "42703") {
-      // Colunas clínicas ainda não migradas: NUNCA derrubar o vínculo com o
-      // médico (o cérebro do chat depende dele) — segue só com o essencial.
+    if (first.error) {
+      // QUALQUER falha nas colunas clínicas (42703, transitória) NUNCA pode
+      // derrubar o vínculo com o médico — o cérebro do chat depende dele.
+      // Re-consulta só o essencial; personalização é enriquecimento.
+      console.error("[chat] clinical select failed, fallback to essentials", first.error);
       const fb = await (supabaseAdmin as any)
         .from("patient_profiles")
         .select("doctor_id,lmp_date,reference_date,reference_weeks,reference_days")
@@ -216,16 +218,22 @@ export const Route = createFileRoute("/api/chat")({
           // App: injeta o Segundo Cérebro DAQUELE médico (respeitando o plano)
           // + o contexto clínico DELA (semana/histórico, direto do banco).
           // getBrainContext é safe (falha vira block vazio), nunca derruba o chat.
-          const brain = await getBrainContext(lastUserText(messages), patient.doctorId, "app");
+          const userText = lastUserText(messages);
+          const brain = await getBrainContext(userText, patient.doctorId, "app");
           const base = medicalSystemPrompt(patient.doctorName);
           const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
           // Confiança visível: com cobertura, cite a fonte; sem cobertura,
-          // escale com honestidade (a lacuna JÁ foi registrada pelo sistema).
+          // escale. O claim "já registrei" só entra quando a lacuna FOI de
+          // fato elegível a registro (mesma regra do logBrainGap: norm >= 8
+          // chars) — a IA nunca afirma um registro que não aconteceu.
+          const gapWasLogged = normalizeGapQuestion(userText).length >= 8;
           const confianca =
             brain.enabledApp && brain.hadCoverage
               ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
               : brain.enabledApp
-                ? `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. O sistema JÁ registrou a pergunta para ele responder no painel — diga isso com acolhimento (ex.: "essa é uma dúvida que ${medico} prefere responder pessoalmente; já registrei aqui para ele ver"). Limite-se a informações gerais seguras e sinais de alerta, sem improvisar conduta específica.`
+                ? gapWasLogged
+                  ? `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. O sistema registrou a pergunta para ele responder no painel — diga isso com acolhimento (ex.: "essa é uma dúvida que ${medico} prefere responder pessoalmente; registrei aqui para ele ver"). Limite-se a informações gerais seguras e sinais de alerta, sem improvisar conduta específica.`
+                  : `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. Peça com gentileza que ela detalhe a pergunta (assim você pode encaminhar ao médico) e limite-se a informações gerais seguras, sem improvisar conduta específica.`
                 : "";
           system = [
             base,

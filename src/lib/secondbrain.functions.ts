@@ -735,7 +735,7 @@ export const getBrainQualityStats = createServerFn({ method: "POST" })
           .eq("status", "aberta"),
         sb
           .from("brain_gaps")
-          .select("hits")
+          .select("hits,created_at")
           .eq("doctor_id", doctorId)
           .gte("updated_at", since)
           .limit(500),
@@ -752,10 +752,13 @@ export const getBrainQualityStats = createServerFn({ method: "POST" })
 
       const hitsMonth = hitsRes.count ?? 0;
       const gapsOpen = gapsOpenRes.count ?? 0;
-      const gapHitsMonth = ((gapRowsRes.data ?? []) as { hits: number }[]).reduce(
-        (s, g) => s + (g.hits ?? 1),
-        0,
-      );
+      // Misses SÓ do mês: lacuna criada no mês → todos os hits dela são do mês;
+      // lacuna antiga tocada no mês → conta 1 (não arrasta o histórico para o
+      // denominador — senão 1 hit novo numa lacuna velha de 40 derrubava a
+      // cobertura de 99% para 71%, distorção apontada em auditoria).
+      const gapHitsMonth = (
+        (gapRowsRes.data ?? []) as { hits: number; created_at: string }[]
+      ).reduce((s, g) => s + (g.created_at >= since ? (g.hits ?? 1) : 1), 0);
       const fb = (fbRes.data ?? []) as { helpful: boolean }[];
       const fbPos = fb.filter((f) => f.helpful).length;
 
@@ -822,9 +825,9 @@ export const extractKnowledgeFromTranscript = createServerFn({ method: "POST" })
         model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
         system,
         prompt: data.transcript,
-        maxOutputTokens: 2400,
+        maxOutputTokens: 4096,
       });
-      const raw = result.text.trim().replace(/^```json?\s*|\s*```$/g, "");
+      const raw = result.text.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
       const parsed = JSON.parse(raw) as { pairs?: unknown };
       if (Array.isArray(parsed.pairs)) {
         pairs = parsed.pairs
