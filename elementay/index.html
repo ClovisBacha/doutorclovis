@@ -69,8 +69,7 @@
       </div>
       <div class="stat-card reveal d3">
         <div class="stat-big">70%</div>
-        <div class="stat-label">do lucro destinado a doações</div>
-        <p class="stat-note">* Percentual ilustrativo desta primeira versão — será ajustado conforme o modelo definitivo da marca.</p>
+        <div class="stat-label">do lucro destinado a doações — meta da marca</div>
       </div>
     </div>
   </div>
@@ -199,7 +198,6 @@
       </div>
       <div class="causes reveal d3" id="ong-list"></div>
     </div>
-    <p class="ong-note reveal">* Instituições parceiras em fase de homologação — os nomes acima são exemplos ilustrativos do modelo.</p>
   </div>
 </section>
 
@@ -213,7 +211,6 @@
       <input type="email" required placeholder="seu@email.com" aria-label="Seu e-mail" />
       <button type="submit">Quero participar</button>
     </form>
-    <small>Versão conceitual — o cadastro ainda não está conectado a um sistema de envio.</small>
   </div>
 </section>
 
@@ -227,6 +224,9 @@
       <i style="background:var(--terra)"></i>
       <i style="background:var(--ar)"></i>
     </span>
+    <p class="legal">Versão conceitual: percentuais de doação, produtos e instituições parceiras são
+    ilustrativos e estão em homologação; nenhum pagamento real é processado e o cadastro de e-mail
+    ainda não está conectado a um sistema de envio.</p>
   </div>
 </footer>
 
@@ -242,7 +242,6 @@
     <div class="drawer-total"><span>Subtotal</span><strong id="drawer-subtotal">R$ 0,00</strong></div>
     <div class="drawer-donation" id="drawer-donation"></div>
     <button class="primary-btn" id="checkout-open" disabled>Finalizar compra</button>
-    <small>Demonstração — nenhum pagamento real é processado.</small>
   </div>
 </aside>
 
@@ -251,9 +250,9 @@
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
     <button class="icon-btn modal-close" id="checkout-close" aria-label="Fechar">✕</button>
     <div class="steps" id="checkout-steps">
-      <span class="step on" data-step="1">1 · Causa</span>
-      <span class="step" data-step="2">2 · Dados</span>
-      <span class="step" data-step="3">3 · Confirmação</span>
+      <span class="step on" data-step="1"><b>1</b> Causa</span>
+      <span class="step" data-step="2"><b>2</b> Dados</span>
+      <span class="step" data-step="3"><b>3</b> Confirmação</span>
     </div>
 
     <div class="pane" id="pane-1">
@@ -294,7 +293,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="app.js"></script>
 </body>

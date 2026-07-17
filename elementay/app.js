@@ -24,11 +24,17 @@ const PRODUCTS = [
 ];
 
 // Instituições parceiras (exemplos ilustrativos — em homologação).
+const NGO_ICO = {
+  livro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h13"/><path d="M8 7h7"/></svg>',
+  onda: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3"/><path d="M2 16c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3"/></svg>',
+  casa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-6h4v6"/></svg>',
+  broto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-8"/><path d="M12 13C12 9 9 7 4 7c0 5 3 7 8 6z"/><path d="M12 13c0-4 3-6 8-6 0 5-3 7-8 6z"/></svg>',
+};
 const NGOS = [
-  { id: 'semear',  ico: '📚', name: 'Instituto Semear Futuro', desc: 'Educação e reforço escolar para crianças em situação de vulnerabilidade.' },
-  { id: 'mar',     ico: '🌊', name: 'Mar Sem Plástico',        desc: 'Limpeza de praias e proteção da vida marinha no litoral brasileiro.' },
-  { id: 'abrigo',  ico: '🏠', name: 'Casa Abrigo Esperança',   desc: 'Acolhimento e recomeço para famílias em situação de rua.' },
-  { id: 'raizes',  ico: '🌱', name: 'Raízes Vivas',            desc: 'Reflorestamento e agrofloresta com comunidades rurais.' },
+  { id: 'semear', ico: NGO_ICO.livro, name: 'Instituto Semear Futuro', desc: 'Educação e reforço escolar para crianças em situação de vulnerabilidade.' },
+  { id: 'mar',    ico: NGO_ICO.onda,  name: 'Mar Sem Plástico',        desc: 'Limpeza de praias e proteção da vida marinha no litoral brasileiro.' },
+  { id: 'abrigo', ico: NGO_ICO.casa,  name: 'Casa Abrigo Esperança',   desc: 'Acolhimento e recomeço para famílias em situação de rua.' },
+  { id: 'raizes', ico: NGO_ICO.broto, name: 'Raízes Vivas',            desc: 'Reflorestamento e agrofloresta com comunidades rurais.' },
 ];
 
 const EL_META = {
@@ -40,6 +46,8 @@ const EL_META = {
 
 const BRL = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const donationOf = (subtotal) => subtotal * PROFIT_MARGIN * DONATION_SHARE;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /* =====================================================================
    ARTE DOS PRODUTOS — miniaturas SVG generativas por elemento
@@ -116,8 +124,20 @@ const CART_KEY = 'elementay_cart';
 const ORDERS_KEY = 'elementay_orders';
 
 function loadCart() {
-  try { return JSON.parse(localStorage.getItem(CART_KEY)) || {}; }
-  catch { return {}; }
+  // Blindado contra localStorage adulterado: precisa ser objeto simples,
+  // com ids conhecidos e quantidades numéricas positivas.
+  try {
+    const v = JSON.parse(localStorage.getItem(CART_KEY));
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    const clean = {};
+    for (const [id, q] of Object.entries(v)) {
+      const n = Math.floor(Number(q));
+      if (n > 0 && PRODUCTS.some((p) => p.id === id)) clean[id] = n;
+    }
+    return clean;
+  } catch {
+    return {};
+  }
 }
 let cart = loadCart();
 const saveCart = () => localStorage.setItem(CART_KEY, JSON.stringify(cart));
@@ -188,32 +208,59 @@ const drawer = document.getElementById('drawer');
 const checkout = document.getElementById('checkout');
 let selectedNgo = null;
 let buyer = null;
+let drawerTimer = null;
+let lastFocus = null;
 
 function openDrawer() {
+  clearTimeout(drawerTimer);
+  lastFocus = document.activeElement;
   overlay.hidden = false; drawer.hidden = false;
   requestAnimationFrame(() => drawer.classList.add('open'));
   document.body.style.overflow = 'hidden';
+  document.getElementById('cart-close').focus();
 }
-function closeDrawer() {
+function closeDrawer(restoreFocus = true) {
   drawer.classList.remove('open');
-  setTimeout(() => { drawer.hidden = true; overlay.hidden = true; }, 450);
+  overlay.hidden = true; // imediato: overlay invisível não pode engolir toques
+  clearTimeout(drawerTimer);
+  drawerTimer = setTimeout(() => { drawer.hidden = true; }, 450);
   document.body.style.overflow = '';
+  if (restoreFocus && lastFocus?.focus) lastFocus.focus();
 }
 function openCheckout() {
-  closeDrawer();
+  closeDrawer(false);
   checkout.hidden = false;
   document.body.style.overflow = 'hidden';
   goToStep(1);
   renderNgoGrid();
+  document.getElementById('checkout-close').focus();
 }
 function closeCheckout() {
   checkout.hidden = true;
   document.body.style.overflow = '';
+  if (lastFocus?.focus) lastFocus.focus();
 }
+
+// Mantém o Tab circulando dentro do drawer/modal aberto
+function trapFocus(container, e) {
+  const focusables = [...container.querySelectorAll('button, [href], input, select, textarea')]
+    .filter((el) => !el.disabled && el.offsetParent !== null);
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+  else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab') return;
+  if (!checkout.hidden) trapFocus(checkout.querySelector('.modal-card'), e);
+  else if (!drawer.hidden && drawer.classList.contains('open')) trapFocus(drawer, e);
+});
 
 function renderNgoGrid() {
   document.getElementById('ong-grid').innerHTML = NGOS.map((n) => `
-    <button type="button" class="ong-card ${selectedNgo === n.id ? 'sel' : ''}" data-ngo="${n.id}">
+    <button type="button" class="ong-card ${selectedNgo === n.id ? 'sel' : ''}"
+      data-ngo="${n.id}" aria-pressed="${selectedNgo === n.id}">
       <span class="ong-ico" aria-hidden="true">${n.ico}</span>
       <h4>${n.name}</h4>
       <p>${n.desc}</p>
@@ -233,7 +280,7 @@ function recapHTML() {
     `<div class="row"><span class="muted">${qty}× ${p.name}</span><span>${BRL(p.price * qty)}</span></div>`).join('');
   return `${items}
     <div class="row total"><span>Total</span><span>${BRL(subtotal)}</span></div>
-    <div class="row donate"><span>✦ Doação estimada para ${ngo.ico} ${ngo.name}</span><span>${BRL(donationOf(subtotal))}</span></div>
+    <div class="row donate"><span>✦ Doação estimada para ${ngo.name}</span><span>${BRL(donationOf(subtotal))}</span></div>
     <div class="row"><span class="muted" style="font-size:.72rem">Estimativa: ${Math.round(DONATION_SHARE * 100)}% do lucro (margem ilustrativa de ${Math.round(PROFIT_MARGIN * 100)}%). Demonstração — sem pagamento real.</span></div>`;
 }
 
@@ -255,9 +302,9 @@ function confirmOrder() {
 
   document.getElementById('success-recap').innerHTML = `
     <div class="row"><span class="muted">Pedido</span><span>${order.id}</span></div>
-    <div class="row"><span class="muted">Comprador</span><span>${buyer.nome}</span></div>
+    <div class="row"><span class="muted">Comprador</span><span>${esc(buyer.nome)}</span></div>
     <div class="row total"><span>Total</span><span>${BRL(subtotal)}</span></div>
-    <div class="row donate"><span>✦ Doação para ${ngo.ico} ${ngo.name}</span><span>${BRL(order.estimatedDonation)}</span></div>`;
+    <div class="row donate"><span>✦ Doação para ${ngo.name}</span><span>${BRL(order.estimatedDonation)}</span></div>`;
   cart = {};
   saveCart();
   renderCart();
