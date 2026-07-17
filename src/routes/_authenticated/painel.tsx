@@ -77,6 +77,7 @@ import {
   type PatientRequest,
   type LinkedPatient,
 } from "@/lib/patientlink.functions";
+import { listLivesAdmin, saveLive, deleteLive, type Live } from "@/lib/lives.functions";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({ meta: [{ title: "Painel do médico — Obstétrica" }] }),
@@ -108,6 +109,7 @@ const PANEL_TABS = [
   "Teleconsultas",
   "Consultas Pagas",
   "Empresas",
+  "Lives",
   "Engajamento",
   "Pacientes 👩‍🍼",
   "Meu Perfil",
@@ -366,6 +368,7 @@ function PainelPage() {
           />
         )}
         {tab === "Pacientes 👩‍🍼" && <PacientesSection tokenFn={token} />}
+        {tab === "Lives" && <LivesSection tokenFn={token} />}
         {tab === "Meu Perfil" && <MeuPerfilSection tokenFn={token} />}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
@@ -5053,6 +5056,191 @@ function FetalBpmChip({
         ✕
       </button>
     </span>
+  );
+}
+
+/**
+ * Gerenciador de Lives (equipe): cadastra título, data/hora e link — a página
+ * pública /lives passa a ler daqui em vez das datas fixas no código.
+ */
+function LivesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [lives, setLives] = useState<Live[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [missingTable, setMissingTable] = useState(false);
+  const [title, setTitle] = useState("");
+  const [when, setWhen] = useState("");
+  const [link, setLink] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const tk = await tokenFn();
+      const res = await listLivesAdmin({ data: { accessToken: tk } });
+      if (res.ok) setLives(res.lives);
+      else if ("missingTable" in res && res.missingTable) setMissingTable(true);
+    } catch {
+      toast.error("Não foi possível carregar as lives.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function create() {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      const tk = await tokenFn();
+      const res = await saveLive({
+        data: {
+          accessToken: tk,
+          title: title.trim(),
+          scheduledAt: when ? new Date(when).toISOString() : null,
+          link: link.trim() || null,
+          isPublished: true,
+        },
+      });
+      if (!res.ok) {
+        toast.error(res.error ?? "Não foi possível salvar.");
+        return;
+      }
+      toast.success("Live cadastrada 🎥");
+      setTitle("");
+      setWhen("");
+      setLink("");
+      await load();
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function togglePublish(l: Live) {
+    const tk = await tokenFn();
+    const res = await saveLive({
+      data: {
+        accessToken: tk,
+        id: l.id,
+        title: l.title,
+        scheduledAt: l.scheduled_at,
+        link: l.link,
+        isPublished: !l.is_published,
+      },
+    });
+    if (res.ok) await load();
+    else toast.error(res.error ?? "Não foi possível atualizar.");
+  }
+
+  async function removeLive(id: string) {
+    const tk = await tokenFn();
+    const res = await deleteLive({ data: { accessToken: tk, id } });
+    if (res.ok) setLives((ls) => ls.filter((l) => l.id !== id));
+    else toast.error("Não foi possível excluir.");
+  }
+
+  const fmtWhen = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "sem data";
+
+  if (loading) return <div className="skeleton h-64 rounded-3xl" />;
+
+  return (
+    <div className="space-y-6">
+      {missingTable && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+          A tabela <code>lives</code> ainda não existe no banco — rode o{" "}
+          <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar o gerenciador.
+        </div>
+      )}
+
+      <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <p className="font-serif text-xl">Nova live</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          O que você cadastrar aqui aparece na página pública /lives — com contagem regressiva
+          quando tiver data futura.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Título da live *"
+            aria-label="Título da live"
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+          <input
+            type="datetime-local"
+            value={when}
+            onChange={(e) => setWhen(e.target.value)}
+            aria-label="Data e hora"
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="Link (Instagram/YouTube)"
+            aria-label="Link da live"
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm md:w-64"
+          />
+          <button
+            onClick={create}
+            disabled={saving || !title.trim()}
+            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            {saving ? "Salvando…" : "Cadastrar"}
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+        {lives.length === 0 ? (
+          <p className="p-8 text-center text-sm text-muted-foreground">
+            Nenhuma live cadastrada ainda.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {lives.map((l) => (
+              <li key={l.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{l.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    📅 {fmtWhen(l.scheduled_at)}
+                    {l.link ? " · 🔗 com link" : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => togglePublish(l)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${
+                    l.is_published
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                >
+                  {l.is_published ? "Publicada" : "Oculta"}
+                </button>
+                <button
+                  onClick={() => removeLive(l.id)}
+                  className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-destructive hover:text-destructive"
+                >
+                  Excluir
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 

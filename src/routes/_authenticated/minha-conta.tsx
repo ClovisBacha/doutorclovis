@@ -193,7 +193,15 @@ type BirthPlan = {
   music: string;
   notes: string;
 };
-type DoctorQ = { id: string; question: string; answered: boolean; created_at: string };
+type DoctorQ = {
+  id: string;
+  question: string;
+  answered: boolean;
+  created_at: string;
+  /** Resposta escrita pelo médico (volta para a paciente na aba Perguntas). */
+  answer?: string | null;
+  answered_at?: string | null;
+};
 type Invite = { id: string; token: string; companion_name: string | null; created_at: string };
 
 type Gest = ReturnType<typeof computeGestation>;
@@ -3135,25 +3143,36 @@ function QuestionsTab({ gest }: { gest: Gest }) {
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
             Respondidas ({answered.length})
           </p>
-          <div className="space-y-2 opacity-60">
+          <div className="space-y-2">
             {answered.map((q) => (
-              <div
-                key={q.id}
-                className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4"
-              >
-                <input
-                  type="checkbox"
-                  checked
-                  onChange={() => toggle(q)}
-                  className="mt-1 h-4 w-4"
-                />
-                <p className="flex-1 text-sm line-through">{q.question}</p>
-                <button
-                  onClick={() => remove(q.id)}
-                  className="text-xs text-muted-foreground hover:text-destructive"
-                >
-                  ×
-                </button>
+              <div key={q.id} className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked
+                    onChange={() => toggle(q)}
+                    className="mt-1 h-4 w-4"
+                  />
+                  <p className={`flex-1 text-sm ${q.answer ? "" : "line-through"}`}>{q.question}</p>
+                  <button
+                    onClick={() => remove(q.id)}
+                    className="text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    ×
+                  </button>
+                </div>
+                {/* Resposta do médico — volta para a paciente aqui */}
+                {q.answer && (
+                  <div className="ml-7 mt-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                      💬 Resposta do seu médico
+                      {q.answered_at
+                        ? ` · ${new Date(q.answered_at).toLocaleDateString("pt-BR")}`
+                        : ""}
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-foreground">{q.answer}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>

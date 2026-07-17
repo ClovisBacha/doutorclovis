@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppCtaBanner } from "@/components/app-cta-banner";
+import { supabase } from "@/integrations/supabase/client";
+import { saveEpdsLog } from "@/lib/epds.functions";
 
 export const Route = createFileRoute("/epds")({
   head: () => ({
@@ -297,7 +299,32 @@ function EpdsPage() {
 
           <button
             disabled={!allAnswered}
-            onClick={() => setSubmitted(true)}
+            onClick={() => {
+              setSubmitted(true);
+              // Logada → grava na conta e alerta o médico se positivo.
+              // Fire-and-forget: anônima ou falha de rede não afetam o resultado.
+              void (async () => {
+                try {
+                  const { data: s } = await supabase.auth.getSession();
+                  if (!s.session?.access_token) return;
+                  const level = interpret(totalScore, q10Score).level as
+                    | "baixo"
+                    | "moderado"
+                    | "alto"
+                    | "urgente";
+                  await saveEpdsLog({
+                    data: {
+                      accessToken: s.session.access_token,
+                      score: totalScore,
+                      q10Score,
+                      level,
+                    },
+                  });
+                } catch {
+                  /* melhor esforço */
+                }
+              })();
+            }}
             className="w-full rounded-2xl bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-40 hover:shadow-[var(--shadow-soft)] active:scale-[0.98]"
           >
             {allAnswered

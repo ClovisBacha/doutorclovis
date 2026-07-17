@@ -341,10 +341,19 @@ export const answerAndTrain = createServerFn({ method: "POST" })
       .single();
     if (insertError || !entry) return { ok: false as const };
 
-    const { error: updateError } = await (supabaseAdmin as any)
+    // Grava TAMBÉM o texto na pergunta: a paciente vê a resposta do médico
+    // na aba Perguntas (antes só alimentava a IA e ela via apenas o flag).
+    let { error: updateError } = await (supabaseAdmin as any)
       .from("doctor_questions")
-      .update({ answered: true })
+      .update({ answered: true, answer: data.answer, answered_at: new Date().toISOString() })
       .eq("id", data.questionId);
+    if (updateError?.code === "42703") {
+      // Colunas answer/answered_at ainda não migradas: mantém o comportamento antigo.
+      ({ error: updateError } = await (supabaseAdmin as any)
+        .from("doctor_questions")
+        .update({ answered: true })
+        .eq("id", data.questionId));
+    }
     if (updateError) {
       // Compensação: desfaz a entry recém-criada para o retry não duplicar.
       await (supabaseAdmin as any).from("brain_entries").delete().eq("id", entry.id);
