@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 import { getBrainContext } from "@/lib/secondbrain.server";
+import { computeGestation } from "@/lib/gestacao";
 
 // Rate limit simples por IP (janela fixa, em memória). Em ambiente serverless
 // a memória não é compartilhada entre instâncias nem persiste entre cold starts,
@@ -54,9 +55,11 @@ Regras de resposta:
  * header Authorization. Sem token (site público) → null. Devolve o doctor_id
  * (para injetar o cérebro DAQUELE médico) e o nome dele (para a persona).
  */
-async function resolvePatientDoctor(
-  request: Request,
-): Promise<{ doctorId: string | null; doctorName: string | null } | null> {
+async function resolvePatientDoctor(request: Request): Promise<{
+  doctorId: string | null;
+  doctorName: string | null;
+  clinicalBlock: string;
+} | null> {
   const auth = request.headers.get("authorization") || request.headers.get("Authorization");
   const token = auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : null;
   if (!token) return null; // site público (anônimo)
@@ -64,22 +67,90 @@ async function resolvePatientDoctor(
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !data.user) return null;
+    // Prontuário resumido DIRETO do banco (fonte confiável — nunca do texto
+    // que o cliente envia): é o que permite personalizar a resposta ("dor de
+    // cabeça" numa paciente com histórico de pressão alta NÃO é a mesma
+    // resposta de uma sem histórico).
     const { data: prof } = await (supabaseAdmin as any)
       .from("patient_profiles")
-      .select("doctor_id")
+      .select(
+        "doctor_id,lmp_date,reference_date,reference_weeks,reference_days,pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm,prior_cesarean",
+      )
       .eq("id", data.user.id)
       .maybeSingle();
+    const clinicalBlock = buildClinicalBlock(prof ?? null);
     const doctorId = (prof?.doctor_id ?? null) as string | null;
-    if (!doctorId) return { doctorId: null, doctorName: null };
+    if (!doctorId) return { doctorId: null, doctorName: null, clinicalBlock };
     const { data: doc } = await (supabaseAdmin as any)
       .from("doctors")
       .select("display_name")
       .eq("id", doctorId)
       .maybeSingle();
-    return { doctorId, doctorName: (doc?.display_name || null) as string | null };
+    return {
+      doctorId,
+      doctorName: (doc?.display_name || null) as string | null,
+      clinicalBlock,
+    };
   } catch {
     return null;
   }
+}
+
+/**
+ * Monta o bloco de contexto clínico para o system prompt. Só entra o que
+ * existe no perfil; sem nome (privacidade no prompt) e com instrução de uso.
+ */
+function buildClinicalBlock(
+  prof: {
+    lmp_date?: string | null;
+    reference_date?: string | null;
+    reference_weeks?: number | null;
+    reference_days?: number | null;
+    pregnancy_number?: number | null;
+    prior_bp_elevated?: boolean | null;
+    prior_bp_week?: number | null;
+    prior_gestational_diabetes?: boolean | null;
+    prior_preterm?: boolean | null;
+    prior_cesarean?: boolean | null;
+  } | null,
+): string {
+  if (!prof) return "";
+  const lines: string[] = [];
+  try {
+    // Semana calculada NO SERVIDOR a partir do perfil (não confia no cliente).
+    // computeGestation é pura (sem browser APIs) — segura no server.
+    const gest = computeGestation({
+      lmp: prof.lmp_date,
+      referenceDate: prof.reference_date,
+      referenceWeeks: prof.reference_weeks,
+      referenceDays: prof.reference_days,
+    });
+    if (gest && gest.weeks >= 1 && gest.weeks <= 44) {
+      const tri = gest.weeks < 14 ? "1º" : gest.weeks < 28 ? "2º" : "3º";
+      lines.push(`- Semana gestacional: ${gest.weeks} (${tri} trimestre)`);
+    }
+  } catch {
+    /* sem semana calculável */
+  }
+  if ((prof.pregnancy_number ?? 1) >= 2) {
+    const prior: string[] = [];
+    if (prof.prior_bp_elevated)
+      prior.push(
+        `pressão elevada na gestação anterior${prof.prior_bp_week ? ` (a partir da semana ${prof.prior_bp_week})` : ""}`,
+      );
+    if (prof.prior_gestational_diabetes) prior.push("diabetes gestacional anterior");
+    if (prof.prior_preterm) prior.push("parto prematuro anterior");
+    if (prof.prior_cesarean) prior.push("cesariana anterior");
+    lines.push(
+      `- ${prof.pregnancy_number}ª gestação${prior.length ? `; histórico: ${prior.join(", ")}` : ""}`,
+    );
+  }
+  if (lines.length === 0) return "";
+  return [
+    "## Contexto clínico da paciente (fonte: sistema — confiável)",
+    ...lines,
+    "Use este contexto para calibrar a resposta (ex.: histórico de pressão alta muda a orientação sobre dor de cabeça/inchaço — reforce sinais de alerta e contato precoce). Não recite estes dados de volta sem necessidade.",
+  ].join("\n");
 }
 
 /** Extrai o texto da última mensagem de usuário (formato UIMessage com parts). */
@@ -131,11 +202,14 @@ export const Route = createFileRoute("/api/chat")({
 
         let system: string;
         if (patient && patient.doctorId) {
-          // App: injeta o Segundo Cérebro DAQUELE médico (respeitando o plano).
+          // App: injeta o Segundo Cérebro DAQUELE médico (respeitando o plano)
+          // + o contexto clínico DELA (semana/histórico, direto do banco).
           // getBrainContext é safe (falha vira block vazio), nunca derruba o chat.
           const brain = await getBrainContext(lastUserText(messages), patient.doctorId, "app");
           const base = medicalSystemPrompt(patient.doctorName);
-          system = brain.enabledApp && brain.block ? `${base}\n\n${brain.block}` : base;
+          system = [base, patient.clinicalBlock, brain.enabledApp && brain.block ? brain.block : ""]
+            .filter(Boolean)
+            .join("\n\n");
         } else if (patient) {
           // App, mas a paciente ainda não se vinculou a um médico → sem cérebro.
           system =
