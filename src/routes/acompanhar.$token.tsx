@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getCompanionView, type CompanionView as Profile } from "@/lib/companion.functions";
 import { babyForWeek, computeGestation, dueDateFromLmp, trimesterForWeek } from "@/lib/gestacao";
 import { getRecentPanicByToken } from "@/lib/escola.functions";
+import { HeartbeatFeel } from "@/components/heartbeat-feel";
 
 export const Route = createFileRoute("/acompanhar/$token")({
   head: () => ({ meta: [{ title: "Painel do Papai — Obstétrica" }] }),
@@ -265,6 +266,16 @@ function CompanionView() {
               </div>
               <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{baby.desc}</p>
             </div>
+
+            {/* Sentir o coração: vibração háptica no ritmo típico da semana
+                gestacional (1º tri ~160, 2º ~145, 3º ~135). O acompanhante pode
+                ajustar para o BPM real da última consulta. */}
+            <HeartbeatFeel
+              defaultBpm={trimester === 1 ? 160 : trimester === 2 ? 145 : 135}
+              babyName={profile.baby_name}
+              compact
+            />
+
             {due && (
               <div className="rounded-2xl border border-border bg-card p-4 text-sm">
                 <p className="text-muted-foreground">Data Provável do Parto</p>
