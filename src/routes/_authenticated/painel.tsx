@@ -57,6 +57,7 @@ import {
   draftGapAnswer,
   installStarterPack,
   getBrainQualityStats,
+  extractKnowledgeFromTranscript,
   type BrainGap,
   type BrainEntry,
   type BrainSettings,
@@ -3504,10 +3505,139 @@ function CerebroSection({
       </div>
       <BrainScoreCard tokenFn={tokenFn} />
       <BrainGapsCard tokenFn={tokenFn} />
+      <BrainConsultaCard tokenFn={tokenFn} />
       <BrainSettingsCard tokenFn={tokenFn} />
       {showTrainCard && <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />}
       <BrainKnowledgeCard tokenFn={tokenFn} />
       <BrainPlaygroundCard tokenFn={tokenFn} />
+    </div>
+  );
+}
+
+/**
+ * Consulta → conhecimento: o médico grava a consulta (ou cola a transcrição)
+ * e a IA extrai os pares pergunta→resposta que ELE deu, como rascunhos para
+ * aprovar. Uma consulta de 30 min rende ~10 entradas na voz literal dele —
+ * o jeito mais rápido de o cérebro virar o próprio médico.
+ */
+function BrainConsultaCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [transcript, setTranscript] = useState("");
+  const [transcribing, setTranscribing] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const audioRef = useRef<HTMLInputElement>(null);
+
+  async function transcribeAudio(file: File) {
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Áudio acima de 20MB — grave trechos menores.");
+      return;
+    }
+    setTranscribing(true);
+    try {
+      const fd = new FormData();
+      fd.append("audio", file);
+      const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+      if (!res.ok) {
+        toast.error("Não foi possível transcrever o áudio — tente novamente.");
+        return;
+      }
+      const data = (await res.json()) as { transcript?: string };
+      if (!data.transcript?.trim()) {
+        toast.error("A transcrição veio vazia — o áudio está audível?");
+        return;
+      }
+      setTranscript(data.transcript.trim());
+      toast.success("Transcrição pronta — revise e clique em Extrair conhecimento 👇");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setTranscribing(false);
+      if (audioRef.current) audioRef.current.value = "";
+    }
+  }
+
+  async function extract() {
+    const text = transcript.trim();
+    if (text.length < 80 || extracting) return;
+    setExtracting(true);
+    try {
+      const tk = await tokenFn();
+      const res = await extractKnowledgeFromTranscript({
+        data: { accessToken: tk, transcript: text.slice(0, 30000) },
+      });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "plan"
+            ? "Seu plano atual não inclui a IA."
+            : "reason" in res && res.reason === "config"
+              ? "IA não configurada nesta instalação."
+              : "Não foi possível extrair — tente novamente.",
+        );
+        return;
+      }
+      if (res.created === 0) {
+        toast("Nenhuma orientação reaproveitável encontrada nesta transcrição.");
+        return;
+      }
+      toast.success(
+        `${res.created} rascunhos criados na sua voz 🎙️ — revise e aprove na Base de conhecimento 👇`,
+      );
+      setTranscript("");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-xl">🎙️ Consulta vira conhecimento</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Grave a consulta no celular (com consentimento da paciente) e envie o áudio — a IA extrai as
+        orientações que <strong>você</strong> deu e cria rascunhos genéricos (sem nomes nem dados da
+        paciente) para você aprovar. Uma consulta rende ~10 entradas na sua voz.
+      </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <input
+          ref={audioRef}
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) transcribeAudio(f);
+          }}
+        />
+        <button
+          onClick={() => audioRef.current?.click()}
+          disabled={transcribing || extracting}
+          className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {transcribing ? "Transcrevendo…" : "🎙️ Enviar áudio da consulta"}
+        </button>
+        <span className="text-xs text-muted-foreground">ou cole a transcrição abaixo</span>
+      </div>
+
+      <textarea
+        value={transcript}
+        onChange={(e) => setTranscript(e.target.value)}
+        rows={4}
+        placeholder="Cole aqui a transcrição da consulta (mínimo ~80 caracteres)…"
+        className="mt-3 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+      />
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <p className="text-[11px] text-muted-foreground">
+          Nada entra no cérebro sem a sua aprovação — tudo nasce como rascunho.
+        </p>
+        <button
+          onClick={extract}
+          disabled={extracting || transcribing || transcript.trim().length < 80}
+          className="shrink-0 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {extracting ? "Extraindo…" : "🧠 Extrair conhecimento"}
+        </button>
+      </div>
     </div>
   );
 }

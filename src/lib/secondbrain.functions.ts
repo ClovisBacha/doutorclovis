@@ -776,3 +776,97 @@ export const getBrainQualityStats = createServerFn({ method: "POST" })
       return { ok: false as const };
     }
   });
+
+/**
+ * Consulta → conhecimento: recebe a TRANSCRIÇÃO de uma consulta e extrai os
+ * pares pergunta→resposta que o MÉDICO efetivamente deu, como RASCUNHOS
+ * (approved=false, source='consulta') para revisão na Base de conhecimento.
+ * Uma consulta de 30 min rende ~10 entradas na voz literal do médico.
+ *
+ * Privacidade: a instrução exige generalizar (sem nomes, sem dados pessoais
+ * da paciente — a pergunta vira a forma genérica da dúvida). Nada entra no
+ * cérebro ativo sem aprovação humana.
+ */
+export const extractKnowledgeFromTranscript = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        transcript: z.string().min(80).max(30000),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!key) return { ok: false as const, reason: "config" as const };
+
+    const [{ generateText }, { createChatProvider, DEFAULT_CHAT_MODEL }] = await Promise.all([
+      import("ai"),
+      import("./ai-gateway.server"),
+    ]);
+
+    const system = [
+      "Você extrai CONHECIMENTO REUTILIZÁVEL da transcrição de uma consulta de pré-natal.",
+      "Identifique cada dúvida que a paciente trouxe e a resposta/orientação que o MÉDICO deu, e transforme em pares genéricos pergunta→resposta que sirvam para QUALQUER paciente com a mesma dúvida.",
+      "REGRAS: (1) use SOMENTE o que o médico disse na transcrição — nunca complete com conhecimento seu; (2) GENERALIZE: remova nomes, semanas específicas e dados pessoais ('Maria, na sua semana 32' → pergunta genérica sobre o tema); (3) ignore conversa social, agendamento e casos únicos daquele prontuário; (4) resposta na 1ª pessoa, como o médico falaria; (5) no máximo 12 pares; se a transcrição não tiver orientações aproveitáveis, devolva lista vazia.",
+      'Responda APENAS um JSON válido, sem markdown: {"pairs":[{"question":"...","answer":"..."}]}',
+    ].join("\n");
+
+    let pairs: { question: string; answer: string }[] = [];
+    try {
+      const google = createChatProvider(key);
+      const result = await generateText({
+        model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
+        system,
+        prompt: data.transcript,
+        maxOutputTokens: 2400,
+      });
+      const raw = result.text.trim().replace(/^```json?\s*|\s*```$/g, "");
+      const parsed = JSON.parse(raw) as { pairs?: unknown };
+      if (Array.isArray(parsed.pairs)) {
+        pairs = parsed.pairs
+          .filter(
+            (p): p is { question: string; answer: string } =>
+              !!p &&
+              typeof (p as any).question === "string" &&
+              typeof (p as any).answer === "string" &&
+              (p as any).question.trim().length >= 8 &&
+              (p as any).answer.trim().length >= 15,
+          )
+          .slice(0, 12)
+          .map((p) => ({ question: p.question.trim(), answer: p.answer.trim() }));
+      }
+    } catch {
+      return { ok: false as const, reason: "ai" as const };
+    }
+    if (pairs.length === 0) return { ok: true as const, created: 0 };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const doctorId = await ownerDoctorId(user);
+    const { data: rows, error } = await (supabaseAdmin as any)
+      .from("brain_entries")
+      .insert(
+        pairs.map((p) => ({
+          doctor_id: doctorId,
+          question: p.question,
+          answer: p.answer,
+          source: "consulta",
+          approved: false, // RASCUNHO: nada entra no cérebro sem o aval do médico
+        })),
+      )
+      .select("id,question,answer");
+    if (error) return { ok: false as const };
+
+    // Vetores dos rascunhos (fire-and-forget) — já nascem "encontráveis"
+    // quando forem aprovados.
+    {
+      const { embedBrainEntry } = await import("./embeddings.server");
+      for (const r of (rows ?? []) as { id: string; question: string; answer: string }[]) {
+        embedBrainEntry(r.id, r.question, r.answer);
+      }
+    }
+    return { ok: true as const, created: pairs.length };
+  });
