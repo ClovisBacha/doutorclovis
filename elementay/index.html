@@ -1,300 +1,403 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ELEMENTAY — Moda guiada pelos elementos, movida pelo bem</title>
-<meta name="description" content="Elementay é uma marca de roupas inspirada nos quatro elementos da natureza — Fogo, Água, Terra e Ar — em que grande parte do lucro é doada a instituições de caridade escolhidas por você no checkout." />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Outfit:wght@300..700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-
-<nav id="nav">
-  <a class="logo" href="#top">ELEMENT<em>AY</em></a>
-  <div class="nav-links">
-    <a href="#fogo" data-el="fogo">Fogo</a>
-    <a href="#agua" data-el="agua">Água</a>
-    <a href="#terra" data-el="terra">Terra</a>
-    <a href="#ar" data-el="ar">Ar</a>
-    <a href="#impacto">Impacto</a>
-  </div>
-  <button class="cart-btn" id="cart-open" aria-label="Abrir carrinho">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l-1.2 12a2 2 0 0 1-2 1.8H9.2a2 2 0 0 1-2-1.8L6 7z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg>
-    <span class="cart-count" id="cart-count" hidden>0</span>
-  </button>
-</nav>
-
-<!-- ================= HERO ================= -->
-<header id="top">
-  <canvas id="veil" aria-hidden="true"></canvas>
-  <div class="hero-inner">
-    <p class="eyebrow hero-kicker reveal">Fogo · Água · Terra · Ar</p>
-    <h1 class="hero-title reveal d1">ELEMENTAY</h1>
-    <p class="hero-sub reveal d2">Moda guiada pelos elementos da natureza — e movida pelo bem.
-    Em cada compra, <strong>você escolhe a instituição</strong> que recebe a maior parte do lucro.</p>
-    <div class="hero-elements reveal d3">
-      <a class="hero-el f" href="#fogo"><i class="dot" style="background:var(--fogo)"></i><span>Fogo</span></a>
-      <a class="hero-el a" href="#agua"><i class="dot" style="background:var(--agua)"></i><span>Água</span></a>
-      <a class="hero-el t" href="#terra"><i class="dot" style="background:var(--terra)"></i><span>Terra</span></a>
-      <a class="hero-el r" href="#ar"><i class="dot" style="background:var(--ar)"></i><span>Ar</span></a>
-    </div>
-  </div>
-  <span class="scroll-hint">Deslize</span>
-</header>
-
-<div class="marquee" aria-hidden="true">
-  <div class="marquee-track">
-    <span>maior parte do lucro doada ✦ você escolhe a causa ✦ moda com propósito ✦ quatro elementos ✦&nbsp;</span>
-    <span>maior parte do lucro doada ✦ você escolhe a causa ✦ moda com propósito ✦ quatro elementos ✦&nbsp;</span>
-  </div>
-</div>
-
-<!-- ================= MANIFESTO ================= -->
-<section class="manifesto" id="manifesto">
-  <div class="wrap">
-    <p class="eyebrow reveal">Manifesto</p>
-    <h2 class="reveal d1">Uma marca que veste pessoas <b>para vestir causas</b>.</h2>
-    <div class="manifesto-grid">
-      <div class="reveal d2">
-        <p>A Elementay nasceu de uma ideia simples: moda pode ser bonita, ousada e,
-        ao mesmo tempo, generosa. Somos quase uma ONG com alma de ateliê —
-        <strong>grande parte do nosso lucro é doada a instituições de caridade</strong>,
-        e é você quem escolhe qual delas, no momento da compra.</p>
-        <p>Nossas linhas seguem os quatro elementos da natureza. Cada elemento é um
-        universo próprio: um jeito de vestir, de se mover e de estar no mundo.
-        Você escolhe o seu — ou vive todos.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ELEMENTAY — Moda guiada pelos elementos, movida pelo bem</title>
+    <meta
+      name="description"
+      content="Elementay é uma marca de roupas inspirada nos quatro elementos da natureza — Fogo, Água, Terra e Ar — em que grande parte do lucro é doada a instituições de caridade escolhidas por você no checkout."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Outfit:wght@300..700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav id="nav">
+      <a class="logo" href="#top">ELEMENT<em>AY</em></a>
+      <div class="nav-links">
+        <a href="#fogo" data-el="fogo">Fogo</a>
+        <a href="#agua" data-el="agua">Água</a>
+        <a href="#terra" data-el="terra">Terra</a>
+        <a href="#ar" data-el="ar">Ar</a>
+        <a href="#impacto">Impacto</a>
       </div>
-      <div class="stat-card reveal d3">
-        <div class="stat-big">70%</div>
-        <div class="stat-label">do lucro destinado a doações — meta da marca</div>
-      </div>
-    </div>
-  </div>
-</section>
+      <button class="cart-btn" id="cart-open" aria-label="Abrir carrinho">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M6 7h12l-1.2 12a2 2 0 0 1-2 1.8H9.2a2 2 0 0 1-2-1.8L6 7z" />
+          <path d="M9 9V6a3 3 0 0 1 6 0v3" />
+        </svg>
+        <span class="cart-count" id="cart-count" hidden>0</span>
+      </button>
+    </nav>
 
-<!-- ================= ELEMENT TILES ================= -->
-<div class="tiles" id="elementos">
-  <a class="tile fogo" href="#fogo">
-    <div>
-      <svg class="sym" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 4-4 5.5-4 10a4 4 0 0 0 8 0c0-2-1-3-1-3s3 1.5 3 5a7 7 0 0 1-14 0C4 8 10 6.5 12 2z"/></svg>
-      <h3>FOGO</h3>
-      <small>Linha exclusiva &amp; ousada</small>
-    </div>
-  </a>
-  <a class="tile agua" href="#agua">
-    <div>
-      <svg class="sym" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0C6 9.5 12 3 12 3z"/><path d="M9.5 13.5a2.5 2.5 0 0 0 2.5 2.5"/></svg>
-      <h3>ÁGUA</h3>
-      <small>Banho de mar &amp; leveza</small>
-    </div>
-  </a>
-  <a class="tile terra" href="#terra">
-    <div>
-      <svg class="sym" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20L9 8l4 7 3-4 5 9z"/><path d="M3 20h18"/></svg>
-      <h3>TERRA</h3>
-      <small>Performance outdoor</small>
-    </div>
-  </a>
-  <a class="tile ar" href="#ar">
-    <div>
-      <svg class="sym" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h16a3 3 0 1 1-3 3"/><path d="M3 16h7a2.5 2.5 0 1 1-2.5 2.5"/></svg>
-      <h3>AR</h3>
-      <small>Conforto absoluto</small>
-    </div>
-  </a>
-</div>
-
-<!-- ================= FOGO ================= -->
-<section class="col" id="fogo">
-  <canvas class="fx" data-fx="fogo" aria-hidden="true"></canvas>
-  <div class="wrap">
-    <div class="col-head reveal">
-      <span class="col-num">01</span>
-      <div>
-        <h2>FOGO</h2>
-        <p class="tag">Linha exclusiva · Peças ousadas · Edições limitadas</p>
-      </div>
-    </div>
-    <p class="col-desc reveal d1">A linha Fogo é o nosso lado mais intenso. Peças raras, cortes marcantes
-    e atitude para quem não quer passar despercebido. Edições limitadas, numeradas, feitas para durar —
-    e para incendiar qualquer ocasião.</p>
-    <div class="cards" data-element="fogo"></div>
-  </div>
-</section>
-
-<!-- ================= ÁGUA ================= -->
-<section class="col" id="agua">
-  <canvas class="fx" data-fx="agua" aria-hidden="true"></canvas>
-  <div class="wrap">
-    <div class="col-head reveal">
-      <span class="col-num">02</span>
-      <div>
-        <h2>ÁGUA</h2>
-        <p class="tag">Moda praia · Banho de mar · Fluidez</p>
-      </div>
-    </div>
-    <p class="col-desc reveal d1">A linha Água acompanha você até o mar. Biquínis, sungas, maiôs e saídas
-    de praia com tecidos leves, secagem rápida e proteção UV — feitos para dias de sol, sal e liberdade.</p>
-    <div class="cards" data-element="agua"></div>
-  </div>
-</section>
-
-<!-- ================= TERRA ================= -->
-<section class="col" id="terra">
-  <canvas class="fx" data-fx="terra" aria-hidden="true"></canvas>
-  <div class="wrap">
-    <div class="col-head reveal">
-      <span class="col-num">03</span>
-      <div>
-        <h2>TERRA</h2>
-        <p class="tag">Outdoor · Treinos pesados · Resistência</p>
-      </div>
-    </div>
-    <p class="col-desc reveal d1">A linha Terra é feita para quem treina de verdade: trilha, corrida, crossfit,
-    escalada. Tecidos resistentes à abrasão, costuras reforçadas e modelagem que acompanha o corpo
-    no esforço máximo — do asfalto à montanha.</p>
-    <div class="cards" data-element="terra"></div>
-  </div>
-</section>
-
-<!-- ================= AR ================= -->
-<section class="col" id="ar">
-  <canvas class="fx" data-fx="ar" aria-hidden="true"></canvas>
-  <div class="wrap">
-    <div class="col-head reveal">
-      <span class="col-num">04</span>
-      <div>
-        <h2>AR</h2>
-        <p class="tag">Leveza extrema · Conforto absoluto · Dia a dia</p>
-      </div>
-    </div>
-    <p class="col-desc reveal d1">A linha Ar é a mais leve e confortável que conseguimos criar. Malhas
-    macias, modelagens amplas e toque de nuvem — para relaxar, dormir, viajar ou simplesmente existir
-    em paz dentro da própria roupa.</p>
-    <div class="cards" data-element="ar"></div>
-  </div>
-</section>
-
-<!-- ================= IMPACT ================= -->
-<section class="impact" id="impacto">
-  <div class="wrap">
-    <p class="eyebrow reveal">Nosso propósito</p>
-    <h2 class="reveal d1">Vestir bem é bom. Fazer o bem é melhor ainda.</h2>
-    <div class="impact-grid">
-      <div class="reveal d2">
-        <p>A Elementay funciona quase como uma ONG: <strong>a maior parte do lucro de cada
-        peça é doada a instituições de caridade</strong>. Não é uma campanha pontual — é o
-        modelo da marca, desde o primeiro dia.</p>
-        <p>E o mais importante: <strong>quem escolhe a instituição é você</strong>, na hora de
-        finalizar a compra. A cada coleção publicaremos um relatório aberto: quanto foi vendido,
-        quanto foi doado e para quem. Transparência total, sempre.</p>
-        <div class="split">
-          <div class="split-bar"><i class="give"></i><i class="keep"></i></div>
-          <div class="split-legend"><span>Doado às instituições</span><span>Operação da marca</span></div>
+    <!-- ================= HERO ================= -->
+    <header id="top">
+      <canvas id="veil" aria-hidden="true"></canvas>
+      <div class="hero-inner">
+        <p class="eyebrow hero-kicker reveal">Fogo · Água · Terra · Ar</p>
+        <h1 class="hero-title reveal d1">ELEMENTAY</h1>
+        <p class="hero-sub reveal d2">
+          Moda guiada pelos elementos da natureza — e movida pelo bem. Em cada compra,
+          <strong>você escolhe a instituição</strong> que recebe a maior parte do lucro.
+        </p>
+        <div class="hero-elements reveal d3">
+          <a class="hero-el f" href="#fogo"
+            ><i class="dot" style="background: var(--fogo)"></i><span>Fogo</span></a
+          >
+          <a class="hero-el a" href="#agua"
+            ><i class="dot" style="background: var(--agua)"></i><span>Água</span></a
+          >
+          <a class="hero-el t" href="#terra"
+            ><i class="dot" style="background: var(--terra)"></i><span>Terra</span></a
+          >
+          <a class="hero-el r" href="#ar"
+            ><i class="dot" style="background: var(--ar)"></i><span>Ar</span></a
+          >
         </div>
       </div>
-      <div class="causes reveal d3" id="ong-list"></div>
-    </div>
-  </div>
-</section>
+      <span class="scroll-hint">Deslize</span>
+    </header>
 
-<!-- ================= JOIN ================= -->
-<section class="join" id="junte-se">
-  <div class="wrap">
-    <h2 class="reveal">Seja parte do primeiro capítulo.</h2>
-    <p class="reveal d1">Deixe seu e-mail para saber do lançamento das primeiras coleções
-    e acompanhar o impacto das doações desde o início.</p>
-    <form class="join-form reveal d2" id="join-form">
-      <input type="email" required placeholder="seu@email.com" aria-label="Seu e-mail" />
-      <button type="submit">Quero participar</button>
-    </form>
-  </div>
-</section>
-
-<footer>
-  <div class="wrap foot">
-    <span class="logo">ELEMENT<em>AY</em></span>
-    <span>Moda guiada pelos elementos · movida pelo bem</span>
-    <span class="foot-el">
-      <i style="background:var(--fogo)"></i>
-      <i style="background:var(--agua)"></i>
-      <i style="background:var(--terra)"></i>
-      <i style="background:var(--ar)"></i>
-    </span>
-    <p class="legal">Versão conceitual: percentuais de doação, produtos e instituições parceiras são
-    ilustrativos e estão em homologação; nenhum pagamento real é processado e o cadastro de e-mail
-    ainda não está conectado a um sistema de envio.</p>
-  </div>
-</footer>
-
-<!-- ================= CART DRAWER ================= -->
-<div class="overlay" id="overlay" hidden></div>
-<aside class="drawer" id="drawer" aria-label="Carrinho de compras" hidden>
-  <div class="drawer-head">
-    <h3>Seu carrinho</h3>
-    <button class="icon-btn" id="cart-close" aria-label="Fechar carrinho">✕</button>
-  </div>
-  <div class="drawer-items" id="drawer-items"></div>
-  <div class="drawer-foot">
-    <div class="drawer-total"><span>Subtotal</span><strong id="drawer-subtotal">R$ 0,00</strong></div>
-    <div class="drawer-donation" id="drawer-donation"></div>
-    <button class="primary-btn" id="checkout-open" disabled>Finalizar compra</button>
-  </div>
-</aside>
-
-<!-- ================= CHECKOUT MODAL ================= -->
-<div class="modal" id="checkout" hidden>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
-    <button class="icon-btn modal-close" id="checkout-close" aria-label="Fechar">✕</button>
-    <div class="steps" id="checkout-steps">
-      <span class="step on" data-step="1"><b>1</b> Causa</span>
-      <span class="step" data-step="2"><b>2</b> Dados</span>
-      <span class="step" data-step="3"><b>3</b> Confirmação</span>
-    </div>
-
-    <div class="pane" id="pane-1">
-      <h3 id="checkout-title">Escolha a instituição que recebe a doação desta compra</h3>
-      <p class="pane-sub">70% do lucro do seu pedido vai direto para a causa que você escolher.</p>
-      <div class="ong-grid" id="ong-grid"></div>
-      <button class="primary-btn" id="to-step-2" disabled>Continuar</button>
-    </div>
-
-    <div class="pane" id="pane-2" hidden>
-      <h3>Seus dados</h3>
-      <p class="pane-sub">Usados apenas para registrar o pedido de demonstração.</p>
-      <form id="checkout-form">
-        <label>Nome<input type="text" name="nome" required autocomplete="name" /></label>
-        <label>E-mail<input type="email" name="email" required autocomplete="email" /></label>
-        <div class="pane-actions">
-          <button type="button" class="ghost-btn" id="back-to-1">Voltar</button>
-          <button type="submit" class="primary-btn">Revisar pedido</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="pane" id="pane-3" hidden>
-      <h3>Confirme seu pedido</h3>
-      <div class="recap" id="recap"></div>
-      <div class="pane-actions">
-        <button type="button" class="ghost-btn" id="back-to-2">Voltar</button>
-        <button type="button" class="primary-btn" id="confirm-order">Confirmar pedido</button>
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span
+          >maior parte do lucro doada ✦ você escolhe a causa ✦ moda com propósito ✦ quatro elementos
+          ✦&nbsp;</span
+        >
+        <span
+          >maior parte do lucro doada ✦ você escolhe a causa ✦ moda com propósito ✦ quatro elementos
+          ✦&nbsp;</span
+        >
       </div>
     </div>
 
-    <div class="pane pane-success" id="pane-4" hidden>
-      <div class="success-mark">✦</div>
-      <h3>Pedido registrado!</h3>
-      <div class="recap" id="success-recap"></div>
-      <button type="button" class="primary-btn" id="success-close">Continuar navegando</button>
+    <!-- ================= MANIFESTO ================= -->
+    <section class="manifesto" id="manifesto">
+      <div class="wrap">
+        <p class="eyebrow reveal">Manifesto</p>
+        <h2 class="reveal d1">Uma marca que veste pessoas <b>para vestir causas</b>.</h2>
+        <div class="manifesto-grid">
+          <div class="reveal d2">
+            <p>
+              A Elementay nasceu de uma ideia simples: moda pode ser bonita, ousada e, ao mesmo
+              tempo, generosa. Somos quase uma ONG com alma de ateliê —
+              <strong>grande parte do nosso lucro é doada a instituições de caridade</strong>, e é
+              você quem escolhe qual delas, no momento da compra.
+            </p>
+            <p>
+              Nossas linhas seguem os quatro elementos da natureza. Cada elemento é um universo
+              próprio: um jeito de vestir, de se mover e de estar no mundo. Você escolhe o seu — ou
+              vive todos.
+            </p>
+          </div>
+          <div class="stat-card reveal d3">
+            <div class="stat-big">70%</div>
+            <div class="stat-label">do lucro destinado a doações — meta da marca</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ELEMENT TILES ================= -->
+    <div class="tiles" id="elementos">
+      <a class="tile fogo" href="#fogo">
+        <div>
+          <svg
+            class="sym"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M12 2c1 4-4 5.5-4 10a4 4 0 0 0 8 0c0-2-1-3-1-3s3 1.5 3 5a7 7 0 0 1-14 0C4 8 10 6.5 12 2z"
+            />
+          </svg>
+          <h3>FOGO</h3>
+          <small>Linha exclusiva &amp; ousada</small>
+        </div>
+      </a>
+      <a class="tile agua" href="#agua">
+        <div>
+          <svg
+            class="sym"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0C6 9.5 12 3 12 3z" />
+            <path d="M9.5 13.5a2.5 2.5 0 0 0 2.5 2.5" />
+          </svg>
+          <h3>ÁGUA</h3>
+          <small>Banho de mar &amp; leveza</small>
+        </div>
+      </a>
+      <a class="tile terra" href="#terra">
+        <div>
+          <svg
+            class="sym"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 20L9 8l4 7 3-4 5 9z" />
+            <path d="M3 20h18" />
+          </svg>
+          <h3>TERRA</h3>
+          <small>Performance outdoor</small>
+        </div>
+      </a>
+      <a class="tile ar" href="#ar">
+        <div>
+          <svg
+            class="sym"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 8h11a3 3 0 1 0-3-3" />
+            <path d="M3 12h16a3 3 0 1 1-3 3" />
+            <path d="M3 16h7a2.5 2.5 0 1 1-2.5 2.5" />
+          </svg>
+          <h3>AR</h3>
+          <small>Conforto absoluto</small>
+        </div>
+      </a>
     </div>
-  </div>
-</div>
 
-<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <!-- ================= FOGO ================= -->
+    <section class="col" id="fogo">
+      <canvas class="fx" data-fx="fogo" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="col-head reveal">
+          <span class="col-num">01</span>
+          <div>
+            <h2>FOGO</h2>
+            <p class="tag">Linha exclusiva · Peças ousadas · Edições limitadas</p>
+          </div>
+        </div>
+        <p class="col-desc reveal d1">
+          A linha Fogo é o nosso lado mais intenso. Peças raras, cortes marcantes e atitude para
+          quem não quer passar despercebido. Edições limitadas, numeradas, feitas para durar — e
+          para incendiar qualquer ocasião.
+        </p>
+        <div class="cards" data-element="fogo"></div>
+      </div>
+    </section>
 
-<script src="app.js"></script>
-</body>
+    <!-- ================= ÁGUA ================= -->
+    <section class="col" id="agua">
+      <canvas class="fx" data-fx="agua" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="col-head reveal">
+          <span class="col-num">02</span>
+          <div>
+            <h2>ÁGUA</h2>
+            <p class="tag">Moda praia · Banho de mar · Fluidez</p>
+          </div>
+        </div>
+        <p class="col-desc reveal d1">
+          A linha Água acompanha você até o mar. Biquínis, sungas, maiôs e saídas de praia com
+          tecidos leves, secagem rápida e proteção UV — feitos para dias de sol, sal e liberdade.
+        </p>
+        <div class="cards" data-element="agua"></div>
+      </div>
+    </section>
+
+    <!-- ================= TERRA ================= -->
+    <section class="col" id="terra">
+      <canvas class="fx" data-fx="terra" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="col-head reveal">
+          <span class="col-num">03</span>
+          <div>
+            <h2>TERRA</h2>
+            <p class="tag">Outdoor · Treinos pesados · Resistência</p>
+          </div>
+        </div>
+        <p class="col-desc reveal d1">
+          A linha Terra é feita para quem treina de verdade: trilha, corrida, crossfit, escalada.
+          Tecidos resistentes à abrasão, costuras reforçadas e modelagem que acompanha o corpo no
+          esforço máximo — do asfalto à montanha.
+        </p>
+        <div class="cards" data-element="terra"></div>
+      </div>
+    </section>
+
+    <!-- ================= AR ================= -->
+    <section class="col" id="ar">
+      <canvas class="fx" data-fx="ar" aria-hidden="true"></canvas>
+      <div class="wrap">
+        <div class="col-head reveal">
+          <span class="col-num">04</span>
+          <div>
+            <h2>AR</h2>
+            <p class="tag">Leveza extrema · Conforto absoluto · Dia a dia</p>
+          </div>
+        </div>
+        <p class="col-desc reveal d1">
+          A linha Ar é a mais leve e confortável que conseguimos criar. Malhas macias, modelagens
+          amplas e toque de nuvem — para relaxar, dormir, viajar ou simplesmente existir em paz
+          dentro da própria roupa.
+        </p>
+        <div class="cards" data-element="ar"></div>
+      </div>
+    </section>
+
+    <!-- ================= IMPACT ================= -->
+    <section class="impact" id="impacto">
+      <div class="wrap">
+        <p class="eyebrow reveal">Nosso propósito</p>
+        <h2 class="reveal d1">Vestir bem é bom. Fazer o bem é melhor ainda.</h2>
+        <div class="impact-grid">
+          <div class="reveal d2">
+            <p>
+              A Elementay funciona quase como uma ONG:
+              <strong>a maior parte do lucro de cada peça é doada a instituições de caridade</strong
+              >. Não é uma campanha pontual — é o modelo da marca, desde o primeiro dia.
+            </p>
+            <p>
+              E o mais importante: <strong>quem escolhe a instituição é você</strong>, na hora de
+              finalizar a compra. A cada coleção publicaremos um relatório aberto: quanto foi
+              vendido, quanto foi doado e para quem. Transparência total, sempre.
+            </p>
+            <div class="split">
+              <div class="split-bar"><i class="give"></i><i class="keep"></i></div>
+              <div class="split-legend">
+                <span>Doado às instituições</span><span>Operação da marca</span>
+              </div>
+            </div>
+          </div>
+          <div class="causes reveal d3" id="ong-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= JOIN ================= -->
+    <section class="join" id="junte-se">
+      <div class="wrap">
+        <h2 class="reveal">Seja parte do primeiro capítulo.</h2>
+        <p class="reveal d1">
+          Deixe seu e-mail para saber do lançamento das primeiras coleções e acompanhar o impacto
+          das doações desde o início.
+        </p>
+        <form class="join-form reveal d2" id="join-form">
+          <input type="email" required placeholder="seu@email.com" aria-label="Seu e-mail" />
+          <button type="submit">Quero participar</button>
+        </form>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap foot">
+        <span class="logo">ELEMENT<em>AY</em></span>
+        <span>Moda guiada pelos elementos · movida pelo bem</span>
+        <span class="foot-el">
+          <i style="background: var(--fogo)"></i>
+          <i style="background: var(--agua)"></i>
+          <i style="background: var(--terra)"></i>
+          <i style="background: var(--ar)"></i>
+        </span>
+        <p class="legal">
+          Versão conceitual: percentuais de doação, produtos e instituições parceiras são
+          ilustrativos e estão em homologação; nenhum pagamento real é processado e o cadastro de
+          e-mail ainda não está conectado a um sistema de envio.
+        </p>
+      </div>
+    </footer>
+
+    <!-- ================= CART DRAWER ================= -->
+    <div class="overlay" id="overlay" hidden></div>
+    <aside class="drawer" id="drawer" aria-label="Carrinho de compras" hidden>
+      <div class="drawer-head">
+        <h3>Seu carrinho</h3>
+        <button class="icon-btn" id="cart-close" aria-label="Fechar carrinho">✕</button>
+      </div>
+      <div class="drawer-items" id="drawer-items"></div>
+      <div class="drawer-foot">
+        <div class="drawer-total">
+          <span>Subtotal</span><strong id="drawer-subtotal">R$ 0,00</strong>
+        </div>
+        <div class="drawer-donation" id="drawer-donation"></div>
+        <button class="primary-btn" id="checkout-open" disabled>Finalizar compra</button>
+      </div>
+    </aside>
+
+    <!-- ================= CHECKOUT MODAL ================= -->
+    <div class="modal" id="checkout" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
+        <button class="icon-btn modal-close" id="checkout-close" aria-label="Fechar">✕</button>
+        <div class="steps" id="checkout-steps">
+          <span class="step on" data-step="1"><b>1</b> Causa</span>
+          <span class="step" data-step="2"><b>2</b> Dados</span>
+          <span class="step" data-step="3"><b>3</b> Confirmação</span>
+        </div>
+
+        <div class="pane" id="pane-1">
+          <h3 id="checkout-title">Escolha a instituição que recebe a doação desta compra</h3>
+          <p class="pane-sub">
+            70% do lucro do seu pedido vai direto para a causa que você escolher.
+          </p>
+          <div class="ong-grid" id="ong-grid"></div>
+          <button class="primary-btn" id="to-step-2" disabled>Continuar</button>
+        </div>
+
+        <div class="pane" id="pane-2" hidden>
+          <h3>Seus dados</h3>
+          <p class="pane-sub">Usados apenas para registrar o pedido de demonstração.</p>
+          <form id="checkout-form">
+            <label>Nome<input type="text" name="nome" required autocomplete="name" /></label>
+            <label>E-mail<input type="email" name="email" required autocomplete="email" /></label>
+            <div class="pane-actions">
+              <button type="button" class="ghost-btn" id="back-to-1">Voltar</button>
+              <button type="submit" class="primary-btn">Revisar pedido</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="pane" id="pane-3" hidden>
+          <h3>Confirme seu pedido</h3>
+          <div class="recap" id="recap"></div>
+          <div class="pane-actions">
+            <button type="button" class="ghost-btn" id="back-to-2">Voltar</button>
+            <button type="button" class="primary-btn" id="confirm-order">Confirmar pedido</button>
+          </div>
+        </div>
+
+        <div class="pane pane-success" id="pane-4" hidden>
+          <div class="success-mark">✦</div>
+          <h3>Pedido registrado!</h3>
+          <div class="recap" id="success-recap"></div>
+          <button type="button" class="primary-btn" id="success-close">Continuar navegando</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <script src="app.js"></script>
+  </body>
 </html>
