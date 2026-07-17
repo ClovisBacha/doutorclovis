@@ -58,6 +58,7 @@ import {
   installStarterPack,
   getBrainQualityStats,
   extractKnowledgeFromTranscript,
+  evalBrainQuestion,
   type BrainGap,
   type BrainEntry,
   type BrainSettings,
@@ -86,6 +87,7 @@ import {
   type LinkedPatient,
 } from "@/lib/patientlink.functions";
 import { listLivesAdmin, saveLive, deleteLive, type Live } from "@/lib/lives.functions";
+import { BRAIN_EVAL_QUESTIONS } from "@/lib/brain-eval";
 
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({ meta: [{ title: "Painel do médico — Obstétrica" }] }),
@@ -3506,10 +3508,172 @@ function CerebroSection({
       <BrainScoreCard tokenFn={tokenFn} />
       <BrainGapsCard tokenFn={tokenFn} />
       <BrainConsultaCard tokenFn={tokenFn} />
+      <BrainEvalCard tokenFn={tokenFn} />
       <BrainSettingsCard tokenFn={tokenFn} />
       {showTrainCard && <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />}
       <BrainKnowledgeCard tokenFn={tokenFn} />
       <BrainPlaygroundCard tokenFn={tokenFn} />
+    </div>
+  );
+}
+
+type EvalRow = {
+  id: string;
+  status: "pendente" | "rodando" | "aprovada" | "reprovada" | "erro";
+  issue?: string | null;
+  answer?: string;
+  usedBrain?: boolean;
+};
+
+/**
+ * Prova de qualidade (eval): roda a bateria de perguntas críticas contra o
+ * cérebro REAL e um juiz independente aprova/reprova cada resposta. É o que
+ * permite afirmar "zero conduta inventada" com evidência — sem esperar meses
+ * de uso. Rode após treinar o cérebro e antes de divulgar.
+ */
+function BrainEvalCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [rows, setRows] = useState<EvalRow[]>([]);
+  const [running, setRunning] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  async function runEval() {
+    if (running) return;
+    setRunning(true);
+    setRows(BRAIN_EVAL_QUESTIONS.map((q) => ({ id: q.id, status: "pendente" as const })));
+    try {
+      const tk = await tokenFn();
+      // Sequencial de propósito: progresso ao vivo e sem estourar cota.
+      for (const q of BRAIN_EVAL_QUESTIONS) {
+        setRows((rs) => rs.map((r) => (r.id === q.id ? { ...r, status: "rodando" } : r)));
+        try {
+          const res = await evalBrainQuestion({
+            data: {
+              accessToken: tk,
+              question: q.question,
+              expect: q.expect,
+              criterion: q.criterion,
+            },
+          });
+          if (!res.ok) {
+            if ("reason" in res && res.reason === "plan") {
+              toast.error("Seu plano atual não inclui a IA.");
+              setRows([]);
+              return;
+            }
+            if ("reason" in res && res.reason === "config") {
+              toast.error("IA não configurada nesta instalação.");
+              setRows([]);
+              return;
+            }
+            setRows((rs) => rs.map((r) => (r.id === q.id ? { ...r, status: "erro" } : r)));
+            continue;
+          }
+          setRows((rs) =>
+            rs.map((r) =>
+              r.id === q.id
+                ? {
+                    ...r,
+                    status: res.approved ? "aprovada" : "reprovada",
+                    issue: res.issue,
+                    answer: res.answer,
+                    usedBrain: res.usedBrain,
+                  }
+                : r,
+            ),
+          );
+        } catch {
+          setRows((rs) => rs.map((r) => (r.id === q.id ? { ...r, status: "erro" } : r)));
+        }
+      }
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const done =
+    rows.length > 0 && rows.every((r) => r.status !== "pendente" && r.status !== "rodando");
+  const approvedCount = rows.filter((r) => r.status === "aprovada").length;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-serif text-xl">🧪 Prova de qualidade</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {BRAIN_EVAL_QUESTIONS.length} perguntas críticas (urgências, pedidos de receita, exames)
+            rodam contra a sua IA e um juiz independente aprova ou reprova cada resposta. Rode após
+            treinar o cérebro.
+          </p>
+        </div>
+        <button
+          onClick={runEval}
+          disabled={running}
+          className="shrink-0 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {running ? "Avaliando…" : rows.length > 0 ? "Rodar de novo" : "▶ Rodar avaliação"}
+        </button>
+      </div>
+
+      {done && (
+        <p
+          className={`mt-4 rounded-2xl border p-3 text-sm font-semibold ${
+            approvedCount === rows.length
+              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+              : "border-amber-300 bg-amber-50 text-amber-800"
+          }`}
+        >
+          {approvedCount === rows.length
+            ? `✅ Aprovada em ${approvedCount}/${rows.length} — sua IA respondeu com segurança a toda a bateria.`
+            : `⚠️ ${approvedCount}/${rows.length} aprovadas — veja abaixo o que reprovou e ajuste o cérebro.`}
+        </p>
+      )}
+
+      {rows.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {BRAIN_EVAL_QUESTIONS.map((q) => {
+            const r = rows.find((x) => x.id === q.id);
+            if (!r) return null;
+            const icon =
+              r.status === "aprovada"
+                ? "✅"
+                : r.status === "reprovada"
+                  ? "❌"
+                  : r.status === "rodando"
+                    ? "⏳"
+                    : r.status === "erro"
+                      ? "⚠️"
+                      : "•";
+            return (
+              <div key={q.id} className="rounded-xl border border-border bg-background p-3">
+                <button
+                  onClick={() => setOpenId(openId === q.id ? null : q.id)}
+                  className="flex w-full items-start justify-between gap-2 text-left"
+                >
+                  <span className="min-w-0 flex-1 text-sm">
+                    {icon} "{q.question}"
+                    {r.usedBrain === true && (
+                      <span className="ml-1.5 text-[10px] font-bold uppercase text-primary">
+                        · seu cérebro
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    {q.expect}
+                  </span>
+                </button>
+                {r.issue && r.status === "reprovada" && (
+                  <p className="mt-1.5 text-xs text-destructive">↳ {r.issue}</p>
+                )}
+                {openId === q.id && r.answer && (
+                  <p className="mt-2 whitespace-pre-wrap rounded-lg bg-secondary/50 p-2.5 text-xs leading-relaxed text-muted-foreground">
+                    {r.answer}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
