@@ -71,13 +71,24 @@ async function resolvePatientDoctor(request: Request): Promise<{
     // que o cliente envia): é o que permite personalizar a resposta ("dor de
     // cabeça" numa paciente com histórico de pressão alta NÃO é a mesma
     // resposta de uma sem histórico).
-    const { data: prof } = await (supabaseAdmin as any)
+    const first = await (supabaseAdmin as any)
       .from("patient_profiles")
       .select(
         "doctor_id,lmp_date,reference_date,reference_weeks,reference_days,pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm,prior_cesarean",
       )
       .eq("id", data.user.id)
       .maybeSingle();
+    let prof = first.data;
+    if (first.error?.code === "42703") {
+      // Colunas clínicas ainda não migradas: NUNCA derrubar o vínculo com o
+      // médico (o cérebro do chat depende dele) — segue só com o essencial.
+      const fb = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("doctor_id,lmp_date,reference_date,reference_weeks,reference_days")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      prof = fb.data;
+    }
     const clinicalBlock = buildClinicalBlock(prof ?? null);
     const doctorId = (prof?.doctor_id ?? null) as string | null;
     if (!doctorId) return { doctorId: null, doctorName: null, clinicalBlock };
