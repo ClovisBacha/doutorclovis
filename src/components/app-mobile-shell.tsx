@@ -383,6 +383,97 @@ export function AppBottomNav({
 
 type GestInfo = { weeks: number; days: number; totalDays: number } | null;
 
+/**
+ * Marcos proativos por semana: o app INICIA o cuidado ("você entrou na semana
+ * 28 — hora de contar os movimentos") em vez de esperar a paciente procurar.
+ * Faixas em ordem; a primeira que contém a semana atual vence.
+ */
+const WEEK_MILESTONES: {
+  min: number;
+  max: number;
+  icon: string;
+  title: string;
+  text: string;
+  tab: AppTab;
+}[] = [
+  {
+    min: 6,
+    max: 10,
+    icon: "🩺",
+    title: "Hora do primeiro ultrassom",
+    text: "O exame inicial (6–9 semanas) data a gestação. Já agendou a primeira consulta?",
+    tab: "Consultas",
+  },
+  {
+    min: 11,
+    max: 13,
+    icon: "🔬",
+    title: "Janela do morfológico do 1º trimestre",
+    text: "Entre 11 e 14 semanas — guarde o resultado na aba Exames.",
+    tab: "Exames",
+  },
+  {
+    min: 16,
+    max: 19,
+    icon: "🦶",
+    title: "Os primeiros chutes estão chegando",
+    text: "Entre 18 e 22 semanas você deve começar a sentir — registre os movimentos.",
+    tab: "Chutes",
+  },
+  {
+    min: 20,
+    max: 23,
+    icon: "🔬",
+    title: "Janela do morfológico do 2º trimestre",
+    text: "Entre 20 e 24 semanas — o ultrassom mais detalhado do bebê.",
+    tab: "Exames",
+  },
+  {
+    min: 24,
+    max: 27,
+    icon: "🍬",
+    title: "Época do teste de glicose (TOTG)",
+    text: "Entre 24 e 28 semanas — rastreio de diabetes gestacional. Combine com seu médico.",
+    tab: "Exames",
+  },
+  {
+    min: 28,
+    max: 30,
+    icon: "👶",
+    title: "Comece a contagem de movimentos",
+    text: "No 3º trimestre, o padrão diário dos chutes é o melhor sinal de bem-estar do bebê.",
+    tab: "Chutes",
+  },
+  {
+    min: 31,
+    max: 33,
+    icon: "📋",
+    title: "Hora de montar o plano de parto",
+    text: "Registre suas preferências e converse com seu médico na próxima consulta.",
+    tab: "Plano de Parto",
+  },
+  {
+    min: 34,
+    max: 36,
+    icon: "🧳",
+    title: "Prepare a mala da maternidade",
+    text: "O checklist completo te guia peça por peça — deixe pronta até a semana 36.",
+    tab: "Checklist",
+  },
+  {
+    min: 37,
+    max: 42,
+    icon: "⏱️",
+    title: "Reta final: conheça os sinais do trabalho de parto",
+    text: "Registre as contrações — padrão 5-1-1 é hora de ir para a maternidade.",
+    tab: "Contrações",
+  },
+];
+
+function milestoneForWeek(weeks: number) {
+  return WEEK_MILESTONES.find((m) => weeks >= m.min && weeks <= m.max) ?? null;
+}
+
 export type NextAppointment = { dateLabel: string; typeLabel: string };
 
 const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = [
@@ -719,6 +810,35 @@ export function AppHomeScreen({
           </div>
         </button>
       )}
+
+      {/* ── Marco da semana: o app INICIA o cuidado (proatividade) ──── */}
+      {gest &&
+        (() => {
+          const m = milestoneForWeek(gest.weeks);
+          if (!m) return null;
+          return (
+            <button
+              onClick={() => onNavigate(m.tab)}
+              className="shine group w-full rounded-3xl border border-primary/25 bg-primary/6 text-left shadow-[var(--shadow-card)] transition-all duration-300 active:scale-[0.98] hover:border-primary/40 hover:bg-primary/10"
+            >
+              <div className="flex items-center gap-3.5 px-4 py-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-2xl ring-1 ring-primary/20">
+                  {m.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+                    Marco da semana {gest.weeks}
+                  </p>
+                  <p className="mt-0.5 text-[14px] font-bold leading-tight text-foreground">
+                    {m.title}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{m.text}</p>
+                </div>
+                <ChevronRight className="h-5 w-5 shrink-0 text-primary transition-transform duration-300 group-hover:translate-x-0.5" />
+              </div>
+            </button>
+          );
+        })()}
 
       {/* ── Próxima consulta (#10) ──────────────────────────────────── */}
       {nextAppointment ? (
