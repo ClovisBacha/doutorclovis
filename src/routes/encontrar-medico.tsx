@@ -139,10 +139,16 @@ function EncontrarMedicoPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar por nome, especialidade ou palavra-chave…"
+            aria-label="Buscar médico por nome, especialidade ou palavra-chave"
             className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
           />
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <select value={uf} onChange={(e) => setUf(e.target.value)} className={chip}>
+            <select
+              value={uf}
+              onChange={(e) => setUf(e.target.value)}
+              aria-label="Filtrar por estado (UF)"
+              className={chip}
+            >
               <option value="">UF</option>
               {UFS.map((u) => (
                 <option key={u} value={u}>
@@ -154,6 +160,7 @@ function EncontrarMedicoPage() {
               value={city}
               onChange={(e) => setCity(e.target.value)}
               placeholder="Cidade"
+              aria-label="Filtrar por cidade"
               className={`${chip} w-32`}
             />
             <select

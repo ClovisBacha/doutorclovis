@@ -16,6 +16,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 import { ymdLocal } from "@/lib/utils";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { getMyAppointments, type MyAppointment } from "@/lib/appointments.functions";
+import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
@@ -143,6 +144,9 @@ type Profile = {
   corporate_account_id?: string | null;
   quiz_premium?: boolean | null;
   doctor_id?: string | null;
+  /** BPM fetal medido pelo médico na consulta ("Sentir o coração"). */
+  fetal_bpm?: number | null;
+  fetal_bpm_at?: string | null;
 };
 
 type JournalEntry = {
@@ -842,44 +846,93 @@ function BabyTab({
   const exam = consultaForWeek(gest.weeks);
   const babyLabel = profile.baby_name ? profile.baby_name : "seu bebê";
 
-  return (
-    <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
-      <div className="rounded-3xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">{trimestre}</p>
-        <h2 className="mt-2 font-serif text-4xl">
-          {gest.weeks} <span className="text-2xl text-muted-foreground">semanas</span>
-          {gest.days > 0 && (
-            <span className="ml-2 text-xl text-muted-foreground">e {gest.days}d</span>
-          )}
-        </h2>
-        <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-secondary">
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {progress.toFixed(0)}% da jornada {daysToDue != null && `· faltam ${daysToDue} dias`}
-        </p>
+  const bpmDefault = profile.fetal_bpm ?? (gest.weeks < 14 ? 160 : gest.weeks < 28 ? 145 : 135);
 
-        <div className="mt-6 rounded-2xl bg-[image:var(--gradient-warm)] p-6">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">
-            {babyLabel} esta semana
-          </p>
-          {/* Baby illustration — grows week-by-week */}
-          <div className="my-3 flex justify-center">
-            <BabyIllustration week={gest.weeks} />
+  return (
+    <div className="space-y-6">
+      {/* ── Hero imersivo: o bebê é o protagonista ─────────────────────── */}
+      <div className="relative overflow-hidden rounded-3xl border border-border bg-[image:var(--gradient-warm)] p-6 shadow-[var(--shadow-card)] md:p-10">
+        {/* brilhos suaves ao fundo */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-primary/10 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 -left-14 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
+        />
+
+        <div className="relative grid items-center gap-6 md:grid-cols-[auto_1fr] md:gap-12">
+          {/* Bebê grande, flutuando devagar */}
+          <div className="float-slow mx-auto">
+            <BabyIllustration
+              week={gest.weeks}
+              showInfo={false}
+              className="h-60 w-60 drop-shadow-[0_18px_44px_rgba(168,90,68,0.22)] md:h-80 md:w-80"
+            />
           </div>
-          <p className="mt-1 font-serif text-xl text-primary">{baby.size}</p>
-          <p className="text-sm text-muted-foreground">
-            Peso: {baby.weight} · {baby.fruit}
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-foreground">{baby.desc}</p>
+
+          <div className="text-center md:text-left">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              {trimestre} · {babyLabel} esta semana
+            </p>
+            <h2 className="mt-2 font-serif leading-none">
+              <span className="text-6xl md:text-7xl">{gest.weeks}</span>
+              <span className="ml-2 text-xl text-muted-foreground md:text-2xl">
+                semanas{gest.days > 0 ? ` e ${gest.days}d` : ""}
+              </span>
+            </h2>
+
+            {/* Chips: tamanho · peso · comparação */}
+            <div className="mt-4 flex flex-wrap justify-center gap-2 md:justify-start">
+              {[
+                { icon: "📏", label: baby.size },
+                ...(baby.weight !== "—" ? [{ icon: "⚖️", label: baby.weight }] : []),
+                { icon: "🍓", label: baby.fruit },
+              ].map((c) => (
+                <span
+                  key={c.label}
+                  className="rounded-full border border-primary/15 bg-card/70 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur"
+                >
+                  {c.icon} {c.label}
+                </span>
+              ))}
+            </div>
+
+            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-foreground md:mx-0 md:text-base">
+              {baby.desc}
+            </p>
+
+            {/* Progresso da jornada */}
+            <div className="mt-5">
+              <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
+                <span>Início</span>
+                <span className="text-primary">{progress.toFixed(0)}% da jornada</span>
+                <span>Parto</span>
+              </div>
+              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-card/70">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              {daysToDue != null && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {daysToDue === 0
+                    ? "É hoje! 🎉"
+                    : daysToDue === 1
+                      ? "Amanhã! 🎉"
+                      : `Faltam ${daysToDue} dias para conhecer ${babyLabel} 💛`}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="rounded-3xl border border-border bg-card p-6">
+      {/* ── Linha de cards: DPP · próxima consulta · exame ─────────────── */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">
             DPP — Data provável do parto
           </p>
@@ -902,7 +955,7 @@ function BabyTab({
             </p>
           )}
         </div>
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Próxima consulta</p>
           <p className="mt-2 text-sm text-muted-foreground">
             {gest.weeks < 28
@@ -919,6 +972,23 @@ function BabyTab({
           <p className="mt-2 text-sm leading-relaxed text-foreground">{exam}</p>
         </div>
       </div>
+
+      {/* ── Sentir o coração: vibra no ritmo do bebê (BPM real se o médico
+             registrou na consulta; senão, o típico do trimestre) ─────────── */}
+      <HeartbeatFeel
+        defaultBpm={bpmDefault}
+        babyName={profile.baby_name}
+        sourceNote={
+          profile.fetal_bpm
+            ? `Ritmo real medido pelo seu médico${
+                profile.fetal_bpm_at
+                  ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
+                  : ""
+              } 💗`
+            : undefined
+        }
+        compact
+      />
       {/* Segunda gestação: historical alerts */}
       {(profile.pregnancy_number ?? 1) >= 2 && (
         <div className="col-span-full rounded-3xl border border-primary/25 bg-primary/8 p-6">
@@ -3554,7 +3624,7 @@ function WABubble({ msg }: { msg: WAMsg }) {
     <div className={`flex items-end gap-1.5 mb-0.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
       {!isUser && (
         <div
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white self-end mb-0.5"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white self-end mb-0.5"
           style={{
             background: "rgba(255,255,255,0.18)",
             backdropFilter: "blur(12px)",
@@ -3650,7 +3720,7 @@ function WABubble({ msg }: { msg: WAMsg }) {
                 {msg.fileName}
               </p>
               {msg.fileSize && (
-                <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+                <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.7)" }}>
                   {msg.fileSize}
                 </p>
               )}
@@ -3670,7 +3740,7 @@ function WABubble({ msg }: { msg: WAMsg }) {
 
         {/* Timestamp */}
         <div className="flex items-center justify-end gap-1 px-2.5 pb-1.5 pt-0.5">
-          <span className="text-[10px] leading-none" style={{ color: "rgba(255,255,255,0.45)" }}>
+          <span className="text-[10px] leading-none" style={{ color: "rgba(255,255,255,0.7)" }}>
             {timeStr}
           </span>
           {isUser && (
@@ -3878,7 +3948,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         {loading && (
           <div className="flex items-end gap-1.5">
             <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
               style={{
                 background: "rgba(255,255,255,0.18)",
                 backdropFilter: "blur(12px)",
@@ -4042,7 +4112,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             <button
               onClick={() => fileImageRef.current?.click()}
               className="ml-1 shrink-0 self-end text-xl"
-              style={{ color: "rgba(255,255,255,0.45)" }}
+              style={{ color: "rgba(255,255,255,0.7)" }}
             >
               📷
             </button>
@@ -11209,7 +11279,7 @@ function ProductSheet({
                               {r.name}
                             </p>
                             <div className="flex items-baseline gap-1 mt-1.5">
-                              <span className="text-[9px] text-gray-400 line-through">
+                              <span className="text-[10px] text-gray-400 line-through">
                                 {r.originalPrice}
                               </span>
                               <span className="text-[13px] font-bold text-gray-900 leading-none">
@@ -11278,7 +11348,7 @@ function LojaTab({ gest }: { gest: Gest }) {
       {/* ── Header ──────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-primary/70">
+          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-primary/70">
             Curadoria do seu médico
           </p>
           <h2 className="font-serif text-[22px] font-medium leading-tight text-gray-900 mt-0.5">
@@ -11316,7 +11386,7 @@ function LojaTab({ gest }: { gest: Gest }) {
                   <span className="text-[36px]">{vis.emoji}</span>
                 </div>
                 <div className="flex flex-col justify-center bg-white px-3 py-3 flex-1 min-w-0">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">
                     {vis.label}
                   </span>
                   <p className="text-[11px] font-medium leading-tight line-clamp-2 text-gray-800">
@@ -11394,13 +11464,13 @@ function LojaTab({ gest }: { gest: Gest }) {
                   </span>
 
                   {/* Label categoria — canto superior direito */}
-                  <span className="absolute top-2 right-2 text-[9px] font-semibold uppercase tracking-widest text-white/50">
+                  <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-white/50">
                     {vis.label}
                   </span>
 
                   {/* Badge destaque — canto superior esquerdo */}
                   {product.badge && (
-                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[8px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
+                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
                       {product.badge}
                     </span>
                   )}
@@ -11426,7 +11496,7 @@ function LojaTab({ gest }: { gest: Gest }) {
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[10px] font-medium text-[#00a650]">Envio grátis</span>
-                    <span className="text-[9px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
+                    <span className="text-[10px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
                       ✓ Recomendado
                     </span>
                   </div>

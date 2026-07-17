@@ -217,6 +217,7 @@ function LeadForm({ kind }: { kind: "gestante" | "clinica" }) {
           value={clinicName}
           onChange={(e) => setClinicName(e.target.value)}
           placeholder="Nome da clínica *"
+          aria-label="Nome da clínica"
           className={input}
         />
       )}
@@ -225,20 +226,29 @@ function LeadForm({ kind }: { kind: "gestante" | "clinica" }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder={kind === "gestante" ? "Seu nome *" : "Nome do responsável *"}
+        aria-label={kind === "gestante" ? "Seu nome" : "Nome do responsável"}
+        autoComplete="name"
         className={input}
       />
       <input
         required
+        type="tel"
+        inputMode="tel"
         value={phone}
         onChange={(e) => setPhone(e.target.value)}
         placeholder="WhatsApp com DDD *"
+        aria-label="WhatsApp com DDD"
+        autoComplete="tel"
         className={input}
       />
       <input
         type="email"
+        inputMode="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="E-mail (opcional)"
+        aria-label="E-mail"
+        autoComplete="email"
         className={input}
       />
       <div className="flex gap-3">
@@ -246,16 +256,19 @@ function LeadForm({ kind }: { kind: "gestante" | "clinica" }) {
           value={city}
           onChange={(e) => setCity(e.target.value)}
           placeholder="Cidade"
+          aria-label="Cidade"
           className={input}
         />
         {kind === "gestante" && (
           <input
             type="number"
+            inputMode="numeric"
             min={1}
             max={42}
             value={weeks}
             onChange={(e) => setWeeks(e.target.value)}
             placeholder="Semanas"
+            aria-label="Semanas de gestação"
             className={`${input} max-w-[110px]`}
           />
         )}
@@ -268,6 +281,7 @@ function LeadForm({ kind }: { kind: "gestante" | "clinica" }) {
             ? "Alguma dúvida ou pedido especial? (opcional)"
             : "Conte um pouco sobre a clínica (opcional)"
         }
+        aria-label="Mensagem"
         rows={3}
         className={input}
       />

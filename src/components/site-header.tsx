@@ -8,8 +8,8 @@ import { useHeroDark } from "@/components/hero-theme";
 
 const navPublic = [
   { to: "/gestacao", label: "Gestação" },
-  { to: "/dpp", label: "DPP" },
   { to: "/batimentos", label: "Batimentos" },
+  { to: "/experiencia", label: "Experiência 3D" },
   { to: "/encontrar-medico", label: "Encontrar médico" },
   { to: "/agendamento", label: "Agendar" },
   { to: "/medicos", label: "Para Médicos" },

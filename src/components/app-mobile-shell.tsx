@@ -316,7 +316,7 @@ export function AppBottomNav({
               />
             </div>
             <span
-              className={`text-[9px] font-medium transition-colors duration-200 ${
+              className={`text-[10px] font-medium transition-colors duration-200 ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
             >
@@ -450,8 +450,10 @@ export function AppHomeScreen({
   const h = new Date().getHours();
   const isMadrugada = h < 5;
   const period = periodFor(h);
-  // Céu escuro (noite/madrugada) ou de transição (entardecer) pede texto claro
-  const darkSky = period === "madrugada" || period === "noite" || period === "entardecer";
+  // Céu escuro (noite/madrugada) pede texto claro. O entardecer TERMINA claro
+  // na base do card (oklch ~0.8) — texto branco ali ficava ilegível, então ele
+  // conta como céu claro para o texto (auditoria de contraste).
+  const darkSky = period === "madrugada" || period === "noite";
 
   // Cores de texto adaptadas ao céu do momento
   const heroText = darkSky ? "text-white/95" : "text-foreground";
@@ -476,7 +478,7 @@ export function AppHomeScreen({
 
         <div className="relative">
           {isMadrugada && (
-            <p className="text-[11px] text-white/40">🌙 Madrugada — tente descansar um pouco</p>
+            <p className="text-[11px] text-white/65">🌙 Madrugada — tente descansar um pouco</p>
           )}
 
           {gest && baby ? (
@@ -501,18 +503,24 @@ export function AppHomeScreen({
                     fontWeight: 700,
                     letterSpacing: "-0.02em",
                     fontVariantNumeric: "tabular-nums lining-nums",
-                    backgroundImage:
-                      "linear-gradient(180deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.15) 100%)",
+                    // Vidro líquido legível nos DOIS céus: claro no escuro,
+                    // escuro-quente no claro (contraste auditado).
+                    backgroundImage: darkSky
+                      ? "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.45) 100%)"
+                      : "linear-gradient(180deg, rgba(62,38,28,0.9) 0%, rgba(62,38,28,0.55) 100%)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     color: "transparent",
-                    textShadow: [
-                      "0 -1px 1px rgba(255,255,255,0.55)", // reflexo de luz no topo
-                      "0 1px 1px rgba(255,255,255,0.25)", // segundo realce de refração
-                      "0 4px 10px rgba(0,0,0,0.06)", // profundidade esfumada
-                      "0 1px 3px rgba(0,0,0,0.05)", // volume sutil junto ao corpo
-                    ].join(", "),
+                    textShadow: darkSky
+                      ? [
+                          "0 -1px 1px rgba(255,255,255,0.55)",
+                          "0 1px 1px rgba(255,255,255,0.25)",
+                          "0 4px 10px rgba(0,0,0,0.18)",
+                        ].join(", ")
+                      : ["0 -1px 1px rgba(255,255,255,0.6)", "0 4px 10px rgba(0,0,0,0.08)"].join(
+                          ", ",
+                        ),
                   }}
                 >
                   {gest.weeks}
@@ -770,7 +778,7 @@ export function SectionHeader({
     <div className="mb-5 flex items-center gap-3 md:hidden">
       <button
         onClick={onHome}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-all duration-200 hover:bg-primary/15 active:scale-95"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-all duration-200 hover:bg-primary/15 active:scale-95"
         aria-label="Voltar ao início"
       >
         <ChevronLeft className="h-4 w-4" />

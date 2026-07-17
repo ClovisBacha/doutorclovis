@@ -25,7 +25,9 @@ export function HeartbeatFeel({
   /** Origem do ritmo (ex.: "Medido pelo médico em 12/07") — some o hint de ajuste. */
   sourceNote?: string;
 }) {
-  const [bpm, setBpm] = useState(() => Math.min(180, Math.max(100, defaultBpm)));
+  // Clamp igual ao do servidor (60–220): um BPM real de 200 registrado pelo
+  // médico não pode virar 180 silenciosamente.
+  const [bpm, setBpm] = useState(() => Math.min(220, Math.max(60, defaultBpm)));
   const [playing, setPlaying] = useState(false);
   const [sound, setSound] = useState(true);
   const [canVibrate, setCanVibrate] = useState(false);
@@ -73,6 +75,9 @@ export function HeartbeatFeel({
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ctx = new AC();
+    // Safari iOS às vezes cria o contexto já "suspended" mesmo dentro do
+    // gesto — resume() garante o som na primeira tentativa.
+    ctx.resume?.().catch(() => {});
     ctxRef.current = ctx;
     setPlaying(true);
     const tick = () => {
@@ -146,8 +151,8 @@ export function HeartbeatFeel({
 
         <input
           type="range"
-          min={110}
-          max={170}
+          min={Math.min(110, bpm)}
+          max={Math.max(170, bpm)}
           value={bpm}
           onChange={(e) => setBpmLive(Number(e.target.value))}
           aria-label="Batimentos por minuto"

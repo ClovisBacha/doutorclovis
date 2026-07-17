@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Heart, Pause, Play } from "lucide-react";
 import { AppCtaBanner } from "@/components/app-cta-banner";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
+import { Reveal } from "@/components/reveal";
 
 export const Route = createFileRoute("/batimentos")({
   head: () => ({
@@ -93,15 +94,17 @@ function BatimentosPage() {
 
   return (
     <section className="mx-auto max-w-4xl px-5 py-16">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-        Som do coração
-      </p>
-      <h1 className="mt-3 font-serif text-4xl">Sinta e ouça os batimentos do bebê</h1>
-      <p className="mt-4 max-w-2xl text-muted-foreground">
-        Anote o valor do BPM na próxima consulta ou ultrassom, ajuste abaixo e{" "}
-        <strong>segure o celular</strong>: ele vibra no ritmo exato do coraçãozinho — para você,
-        para o papai e para os avós, mesmo à distância.
-      </p>
+      <Reveal variant="up">
+        <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
+          Som do coração
+        </p>
+        <h1 className="mt-3 font-serif text-4xl">Sinta e ouça os batimentos do bebê</h1>
+        <p className="mt-4 max-w-2xl text-muted-foreground">
+          Anote o valor do BPM na próxima consulta ou ultrassom, ajuste abaixo e{" "}
+          <strong>segure o celular</strong>: ele vibra no ritmo exato do coraçãozinho — para você,
+          para o papai e para os avós, mesmo à distância.
+        </p>
+      </Reveal>
 
       <div className="mx-auto mt-10 max-w-lg">
         <HeartbeatFeel defaultBpm={140} />

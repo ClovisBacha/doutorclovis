@@ -226,6 +226,9 @@ function AgendamentoPage() {
                 <Field
                   label="Telefone / WhatsApp"
                   name="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   required
                   placeholder="(00) 00000-0000"
                 />
