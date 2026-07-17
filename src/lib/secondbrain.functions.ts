@@ -69,6 +69,26 @@ function isPlatformTeam(user: { email?: string | null }): boolean {
 }
 
 /**
+ * Nome de exibição do médico DONO do cérebro sendo operado — cada médico
+ * testa/avalia com a própria identidade (não a do dono da instalação).
+ * Fallback DOCTOR.name: dono da instalação sem linha em doctors.
+ */
+async function doctorDisplayName(doctorId: string): Promise<string> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: doc } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("display_name")
+      .eq("id", doctorId)
+      .maybeSingle();
+    const name = (doc?.display_name as string | undefined)?.trim();
+    return name || DOCTOR.name;
+  } catch {
+    return DOCTOR.name;
+  }
+}
+
+/**
  * O Segundo Cérebro (IA) é do plano Starter+ (Free organiza o consultório mas
  * NÃO tem IA). Gate por entitlement: treinar/usar o cérebro exige `aiApp`.
  * Retorna true se o médico pode operar o cérebro no plano atual.
@@ -318,6 +338,10 @@ const AnswerTrainSchema = z.object({
   accessToken: z.string().min(10),
   questionId: z.string().uuid(),
   answer: z.string().min(1),
+  // Versão editada/generalizada da pergunta para o conhecimento (a pergunta
+  // original da paciente pode conter dados pessoais e fica só em
+  // doctor_questions, nunca no cérebro reutilizável).
+  question: z.string().min(8).max(300).optional(),
 });
 
 /**
@@ -343,11 +367,12 @@ export const answerAndTrain = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!question) return { ok: false as const };
 
+    const questionText = data.question?.trim() || (question.question as string);
     const { data: entry, error: insertError } = await (supabaseAdmin as any)
       .from("brain_entries")
       .insert({
         doctor_id: await ownerDoctorId(user),
-        question: question.question,
+        question: questionText,
         answer: data.answer,
         source: "pergunta",
         approved: true,
@@ -357,7 +382,7 @@ export const answerAndTrain = createServerFn({ method: "POST" })
     if (insertError || !entry) return { ok: false as const };
     {
       const { embedBrainEntry } = await import("./embeddings.server");
-      embedBrainEntry(entry.id, question.question, data.answer);
+      embedBrainEntry(entry.id, questionText, data.answer);
     }
 
     // Grava TAMBÉM o texto na pergunta: a paciente vê a resposta do médico
@@ -410,9 +435,13 @@ export const testBrain = createServerFn({ method: "POST" })
         import("./ai-gateway.server"),
       ]);
 
-    const brain = await getBrainContext(data.question, await ownerDoctorId(user), "teste");
+    const doctorId = await ownerDoctorId(user);
+    const [brain, doctorName] = await Promise.all([
+      getBrainContext(data.question, doctorId, "teste"),
+      doctorDisplayName(doctorId),
+    ]);
     const system = [
-      `Você é o assistente virtual do consultório de ${DOCTOR.name}, ginecologista e obstetra especialista em gestação de alto risco.`,
+      `Você é o assistente virtual do consultório de ${doctorName}, ginecologista e obstetra especialista em gestação de alto risco.`,
       "Responda em português brasileiro, com tom acolhedor, claro e profissional. Seja conciso (3 a 6 frases).",
       "NUNCA dê diagnóstico ou prescrição. Em urgência, oriente ligar 192 (SAMU) ou ir ao pronto-socorro.",
       brain.block,
@@ -473,7 +502,12 @@ export const listBrainGaps = createServerFn({ method: "POST" })
     return { ok: true as const, gaps: (rows ?? []) as BrainGap[] };
   });
 
-/** Responde uma lacuna: cria conhecimento APROVADO e fecha a lacuna. */
+/**
+ * Responde uma lacuna: cria conhecimento APROVADO e fecha a lacuna.
+ * `question` opcional: versão editada/generalizada da pergunta — a lacuna
+ * chega com o texto CRU da paciente (pode conter nome, idade, detalhes
+ * pessoais) e o que vira conhecimento reutilizável não deve carregar isso.
+ */
 export const resolveBrainGap = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -481,6 +515,7 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
         accessToken: z.string().min(10),
         gapId: z.string().uuid(),
         answer: z.string().min(5).max(4000),
+        question: z.string().min(8).max(300).optional(),
       })
       .parse(i),
   )
@@ -502,11 +537,12 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!gap) return { ok: false as const };
 
+    const questionText = data.question?.trim() || (gap.question as string);
     const { data: entry, error: insErr } = await sb
       .from("brain_entries")
       .insert({
         doctor_id: doctorId,
-        question: gap.question,
+        question: questionText,
         answer: data.answer,
         source: "lacuna",
         approved: true,
@@ -517,7 +553,7 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
     {
       // A lacuna respondida já nasce encontrável por significado.
       const { embedBrainEntry } = await import("./embeddings.server");
-      embedBrainEntry(entry.id, gap.question, data.answer);
+      embedBrainEntry(entry.id, questionText, data.answer);
     }
 
     const { error: updErr } = await sb
@@ -905,11 +941,14 @@ export const evalBrainQuestion = createServerFn({ method: "POST" })
         import("./ai-gateway.server"),
       ]);
     const doctorId = await ownerDoctorId(user);
-    const brain = await getBrainContext(data.question, doctorId, "teste");
+    const [brain, doctorName] = await Promise.all([
+      getBrainContext(data.question, doctorId, "teste"),
+      doctorDisplayName(doctorId),
+    ]);
 
     // 1) Responde EXATAMENTE como o chat do app responderia.
     const system = [
-      `Você é o assistente virtual do consultório de ${DOCTOR.name}, ginecologista e obstetra especialista em gestação de alto risco.`,
+      `Você é o assistente virtual do consultório de ${doctorName}, ginecologista e obstetra especialista em gestação de alto risco.`,
       "Responda em português brasileiro, com tom acolhedor, claro e profissional. Seja conciso (3 a 6 frases).",
       "NUNCA dê diagnóstico ou prescrição. Em urgência, oriente ligar 192 (SAMU) ou ir ao pronto-socorro.",
       brain.block,

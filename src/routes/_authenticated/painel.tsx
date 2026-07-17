@@ -3894,6 +3894,9 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [loadError, setLoadError] = useState<"rede" | "migracao" | null>(null);
   const [answering, setAnswering] = useState<string | null>(null); // gapId aberto
   const [answer, setAnswer] = useState("");
+  // Pergunta editável: a lacuna chega com o texto CRU da paciente (pode ter
+  // nome/dados pessoais) — o médico generaliza antes de virar conhecimento.
+  const [editedQuestion, setEditedQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
@@ -3953,8 +3956,14 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     setBusy(true);
     try {
       const tk = await tokenFn();
+      const q = editedQuestion.trim();
       const res = await resolveBrainGap({
-        data: { accessToken: tk, gapId, answer: answer.trim() },
+        data: {
+          accessToken: tk,
+          gapId,
+          answer: answer.trim(),
+          ...(q.length >= 8 ? { question: q.slice(0, 300) } : {}),
+        },
       });
       if (!res.ok) {
         toast.error(
@@ -3968,6 +3977,7 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
       setAnswering(null);
       setDrafted(null);
       setAnswer("");
+      setEditedQuestion("");
       setGaps((gs) => gs.filter((g) => g.id !== gapId));
     } catch {
       toast.error("Falha de conexão — tente novamente.");
@@ -4073,6 +4083,16 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
               </div>
               {answering === g.id ? (
                 <div className="mt-3">
+                  <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                    Pergunta que entra no cérebro — generalize e remova nomes/dados pessoais
+                  </label>
+                  <input
+                    value={editedQuestion}
+                    onChange={(e) => setEditedQuestion(e.target.value)}
+                    maxLength={300}
+                    placeholder="Ex: Posso tomar dipirona na gestação?"
+                    className="mb-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
                   <textarea
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
@@ -4108,6 +4128,7 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
                         setAnswering(null);
                         setDrafted(null);
                         setAnswer("");
+                        setEditedQuestion("");
                       }}
                       className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground"
                     >
@@ -4121,6 +4142,7 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
                     onClick={() => {
                       setAnswering(g.id);
                       setAnswer("");
+                      setEditedQuestion(g.question.slice(0, 300));
                     }}
                     className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
                   >
@@ -4266,6 +4288,9 @@ function BrainTrainCard({
     { id: string; question: string; created_at: string }[] | null
   >(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Pergunta editável antes de virar conhecimento: a original (com possíveis
+  // dados pessoais) fica só no histórico da paciente.
+  const [editedQuestions, setEditedQuestions] = useState<Record<string, string>>({});
   const [sendingId, setSendingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -4281,8 +4306,14 @@ function BrainTrainCard({
     if (!answer || sendingId) return;
     setSendingId(q.id);
     try {
+      const edited = (editedQuestions[q.id] ?? q.question).trim();
       const res = await answerAndTrain({
-        data: { accessToken: await tokenFn(), questionId: q.id, answer },
+        data: {
+          accessToken: await tokenFn(),
+          questionId: q.id,
+          answer,
+          ...(edited.length >= 8 ? { question: edited.slice(0, 300) } : {}),
+        },
       });
       if (!res.ok) {
         toast.error("Não foi possível treinar com essa resposta. Tente novamente.");
@@ -4329,6 +4360,15 @@ function BrainTrainCard({
                 })}
               </p>
               <p className="mt-1 font-medium">{q.question}</p>
+              <label className="mt-3 block text-[11px] font-medium text-muted-foreground">
+                Pergunta que entra no cérebro — generalize e remova nomes/dados pessoais
+              </label>
+              <input
+                value={editedQuestions[q.id] ?? q.question}
+                onChange={(e) => setEditedQuestions((eq) => ({ ...eq, [q.id]: e.target.value }))}
+                maxLength={300}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+              />
               <textarea
                 value={answers[q.id] ?? ""}
                 onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
@@ -4359,6 +4399,12 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [newAnswer, setNewAnswer] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [adding, setAdding] = useState(false);
+  // Edição inline: revisar/generalizar pergunta e resposta (ex.: rascunho do
+  // kit ou de transcrição com detalhe pessoal) sem excluir e recriar.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editQ, setEditQ] = useState("");
+  const [editA, setEditA] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Busca com debounce; a primeira carga (search vazio) é imediata.
   useEffect(() => {
@@ -4399,6 +4445,38 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
         (prev ?? []).map((x) => (x.id === entry.id ? { ...x, approved: entry.approved } : x)),
       );
       toast.error("Não foi possível atualizar a entrada. Tente novamente.");
+    }
+  }
+
+  async function saveEdit(entry: BrainEntry) {
+    const q = editQ.trim();
+    const a = editA.trim();
+    if (!q || !a || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const res = await updateBrainEntry({
+        data: {
+          accessToken: await tokenFn(),
+          id: entry.id,
+          question: q,
+          answer: a,
+          category: entry.category,
+          approved: entry.approved,
+        },
+      });
+      if (!res.ok) {
+        toast.error("Não foi possível salvar a edição. Tente novamente.");
+        return;
+      }
+      setEntries((prev) =>
+        (prev ?? []).map((x) => (x.id === entry.id ? { ...x, question: q, answer: a } : x)),
+      );
+      setEditingId(null);
+      toast.success("Entrada atualizada.");
+    } catch {
+      toast.error("Não foi possível salvar a edição. Tente novamente.");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -4538,6 +4616,16 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
                     label={entry.approved ? "Ativa" : "Inativa"}
                   />
                   <button
+                    onClick={() => {
+                      setEditingId(entry.id);
+                      setEditQ(entry.question);
+                      setEditA(entry.answer);
+                    }}
+                    className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Editar
+                  </button>
+                  <button
                     onClick={() => remove(entry.id)}
                     className="rounded-full border border-rose-300 px-2.5 py-0.5 text-xs text-rose-600 hover:bg-rose-100"
                   >
@@ -4545,6 +4633,38 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
                   </button>
                 </div>
               </div>
+              {editingId === entry.id && (
+                <div className="mt-3 space-y-2 border-t border-border pt-3">
+                  <input
+                    value={editQ}
+                    onChange={(e) => setEditQ(e.target.value)}
+                    placeholder="Pergunta"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                  />
+                  <textarea
+                    value={editA}
+                    onChange={(e) => setEditA(e.target.value)}
+                    rows={3}
+                    placeholder="Resposta"
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => saveEdit(entry)}
+                      disabled={savingEdit || !editQ.trim() || !editA.trim()}
+                      className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
+                    >
+                      {savingEdit ? "Salvando..." : "Salvar"}
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="rounded-full border border-border px-4 py-1.5 text-xs text-muted-foreground"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
