@@ -3518,16 +3518,28 @@ function CerebroSection({
 function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [gaps, setGaps] = useState<BrainGap[]>([]);
   const [loading, setLoading] = useState(true);
+  // Erro/tabela ausente NÃO pode se disfarçar de "nenhuma lacuna ✅"
+  const [loadError, setLoadError] = useState<"rede" | "migracao" | null>(null);
   const [answering, setAnswering] = useState<string | null>(null); // gapId aberto
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
 
   async function load() {
     try {
       const tk = await tokenFn();
       const res = await listBrainGaps({ data: { accessToken: tk } });
-      if (res.ok) setGaps(res.gaps);
+      if (res.ok) {
+        setGaps(res.gaps);
+        setLoadError(null);
+      } else if ("missingTable" in res && res.missingTable) {
+        setLoadError("migracao");
+      } else {
+        setLoadError("rede");
+      }
+    } catch {
+      setLoadError("rede");
     } finally {
       setLoading(false);
     }
@@ -3565,10 +3577,18 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   }
 
   async function dismiss(gapId: string) {
-    const tk = await tokenFn();
-    const res = await dismissBrainGap({ data: { accessToken: tk, gapId } });
-    if (res.ok) setGaps((gs) => gs.filter((g) => g.id !== gapId));
-    else toast.error("Não foi possível ignorar.");
+    if (dismissingId) return;
+    setDismissingId(gapId);
+    try {
+      const tk = await tokenFn();
+      const res = await dismissBrainGap({ data: { accessToken: tk, gapId } });
+      if (res.ok) setGaps((gs) => gs.filter((g) => g.id !== gapId));
+      else toast.error("Não foi possível ignorar.");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setDismissingId(null);
+    }
   }
 
   async function installKit() {
@@ -3625,6 +3645,18 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
       {loading ? (
         <div className="skeleton mt-4 h-20 rounded-2xl" />
+      ) : loadError === "migracao" ? (
+        <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+          A tabela de lacunas ainda não existe no banco — rode o{" "}
+          <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar o autoaprendizado.
+        </p>
+      ) : loadError === "rede" ? (
+        <p className="mt-4 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
+          Não foi possível carregar as lacunas.{" "}
+          <button onClick={load} className="font-semibold text-primary underline">
+            Tentar de novo
+          </button>
+        </p>
       ) : gaps.length === 0 ? (
         <p className="mt-4 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
           Nenhuma lacuna aberta — o cérebro cobriu tudo que perguntaram até agora. ✅
@@ -3681,9 +3713,10 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
                   </button>
                   <button
                     onClick={() => dismiss(g.id)}
-                    className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground"
+                    disabled={dismissingId === g.id}
+                    className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
                   >
-                    Ignorar
+                    {dismissingId === g.id ? "…" : "Ignorar"}
                   </button>
                 </div>
               )}

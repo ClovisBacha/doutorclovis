@@ -87,10 +87,16 @@ function lastUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg?.role !== "user") continue;
-    return (msg.parts ?? [])
+    const raw = (msg.parts ?? [])
       .map((p) => (p.type === "text" ? p.text : ""))
       .join(" ")
       .trim();
+    // A 1ª mensagem do app vem prefixada com "[Contexto: Meu nome é X...
+    // semana N...]" (buildPatientContext no cliente). Esse prefixo NÃO pode
+    // entrar no cérebro: contamina o ranking (palavras como "semana" casam
+    // com qualquer entrada e engolem lacunas legítimas), vaza o nome da
+    // paciente para brain_gaps/painel e quebra a dedup por pergunta.
+    return raw.replace(/^\s*\[contexto:[\s\S]*?\]\s*/i, "").trim();
   }
   return "";
 }

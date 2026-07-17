@@ -298,6 +298,16 @@ export const registerDoctor = createServerFn({ method: "POST" })
     if (!existing) {
       void (async () => {
         try {
+          // Idempotência sob duplo-submit/retry do cadastro: dois
+          // registerDoctor concorrentes leem `existing=null` ao mesmo tempo —
+          // sem esta checagem, o kit seria semeado em dobro (60 rascunhos).
+          const { data: kitRows } = await (supabaseAdmin as any)
+            .from("brain_entries")
+            .select("id")
+            .eq("doctor_id", user.id)
+            .eq("source", "kit")
+            .limit(1);
+          if ((kitRows ?? []).length > 0) return;
           const { BRAIN_STARTER_PACK } = await import("./brain-starter-pack");
           await (supabaseAdmin as any).from("brain_entries").insert(
             BRAIN_STARTER_PACK.map((e) => ({

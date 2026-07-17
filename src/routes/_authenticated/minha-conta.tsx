@@ -3669,6 +3669,8 @@ type WAMsg = {
   audioDuration?: string;
   fileName?: string;
   fileSize?: string;
+  /** Mensagem de erro transitório — não votável. */
+  error?: boolean;
 };
 
 function WABubble({
@@ -3978,6 +3980,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           role: "assistant",
           content: "Desculpe, ocorreu um erro. Tente novamente.",
           ts: new Date(),
+          error: true, // falha transitória não é votável (senão 👎 vira lacuna falsa)
         },
       ]);
     } finally {
@@ -4059,6 +4062,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           // Avaliável: resposta da IA com pergunta anterior, fora do streaming.
           const canVote =
             m.role === "assistant" &&
+            !m.error &&
             messages.slice(0, i).some((x) => x.role === "user") &&
             !(loading && i === messages.length - 1);
           return (
