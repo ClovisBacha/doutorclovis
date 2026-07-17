@@ -56,6 +56,7 @@ import {
   dismissBrainGap,
   draftGapAnswer,
   installStarterPack,
+  getBrainQualityStats,
   type BrainGap,
   type BrainEntry,
   type BrainSettings,
@@ -3501,11 +3502,87 @@ function CerebroSection({
           atendimento no WhatsApp.
         </p>
       </div>
+      <BrainScoreCard tokenFn={tokenFn} />
       <BrainGapsCard tokenFn={tokenFn} />
       <BrainSettingsCard tokenFn={tokenFn} />
       {showTrainCard && <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />}
       <BrainKnowledgeCard tokenFn={tokenFn} />
       <BrainPlaygroundCard tokenFn={tokenFn} />
+    </div>
+  );
+}
+
+/**
+ * Placar de qualidade do cérebro — a prova numérica: cobertura das dúvidas,
+ * satisfação das pacientes e usos no mês. Some silenciosamente enquanto as
+ * tabelas de telemetria não existirem (migração pendente) ou sem dados.
+ */
+function BrainScoreCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [stats, setStats] = useState<{
+    hitsMonth: number;
+    gapsOpen: number;
+    coveragePct: number | null;
+    satisfactionPct: number | null;
+    feedbackCount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const tk = await tokenFn();
+        const res = await getBrainQualityStats({ data: { accessToken: tk } });
+        if (res.ok) setStats(res);
+      } catch {
+        /* placar é enhancement — sem dados, sem card */
+      }
+    })();
+  }, [tokenFn]);
+
+  // Sem nenhum sinal ainda (mês zerado e nada aberto) → não polui o painel.
+  if (!stats || (stats.hitsMonth === 0 && stats.gapsOpen === 0 && stats.feedbackCount === 0)) {
+    return null;
+  }
+
+  const tile = "rounded-2xl border border-border bg-card p-4 text-center";
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-xl">📊 Qualidade da sua IA — este mês</p>
+      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className={tile}>
+          <p className="font-serif text-3xl leading-none text-primary">
+            {stats.coveragePct != null ? `${stats.coveragePct}%` : "—"}
+          </p>
+          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Cobertura das dúvidas
+          </p>
+        </div>
+        <div className={tile}>
+          <p className="font-serif text-3xl leading-none text-primary">
+            {stats.satisfactionPct != null ? `${stats.satisfactionPct}%` : "—"}
+          </p>
+          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Satisfação (👍)
+          </p>
+        </div>
+        <div className={tile}>
+          <p className="font-serif text-3xl leading-none">{stats.hitsMonth}</p>
+          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Respostas com seu cérebro
+          </p>
+        </div>
+        <div className={tile}>
+          <p className="font-serif text-3xl leading-none">{stats.gapsOpen}</p>
+          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Lacunas abertas
+          </p>
+        </div>
+      </div>
+      {stats.coveragePct != null && stats.coveragePct < 70 && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          💡 Responda as lacunas abaixo para subir a cobertura — cada resposta vira conhecimento
+          permanente.
+        </p>
+      )}
     </div>
   );
 }

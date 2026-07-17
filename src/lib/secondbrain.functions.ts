@@ -698,3 +698,81 @@ export const draftGapAnswer = createServerFn({ method: "POST" })
       return { ok: false as const };
     }
   });
+
+/**
+ * Placar de qualidade do cérebro (mês corrente):
+ *   cobertura  = acertos / (acertos + perguntas sem cobertura)
+ *   satisfação = 👍 / (👍 + 👎)
+ * A prova numérica do valor ("sua IA cobriu 91% das dúvidas") — e o argumento
+ * de venda para os próximos médicos. Tolerante a migração pendente: qualquer
+ * tabela ausente → ok:false e a UI esconde o placar.
+ */
+export const getBrainQualityStats = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const doctorId = await ownerDoctorId(user);
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const since = monthStart.toISOString();
+
+    try {
+      const [hitsRes, gapsOpenRes, gapRowsRes, fbRes] = await Promise.all([
+        sb
+          .from("brain_hits")
+          .select("id", { count: "exact", head: true })
+          .eq("doctor_id", doctorId)
+          .gte("created_at", since),
+        sb
+          .from("brain_gaps")
+          .select("id", { count: "exact", head: true })
+          .eq("doctor_id", doctorId)
+          .eq("status", "aberta"),
+        sb
+          .from("brain_gaps")
+          .select("hits")
+          .eq("doctor_id", doctorId)
+          .gte("updated_at", since)
+          .limit(500),
+        sb
+          .from("brain_feedback")
+          .select("helpful")
+          .eq("doctor_id", doctorId)
+          .gte("created_at", since)
+          .limit(1000),
+      ]);
+      if (hitsRes.error || gapsOpenRes.error || gapRowsRes.error || fbRes.error) {
+        return { ok: false as const };
+      }
+
+      const hitsMonth = hitsRes.count ?? 0;
+      const gapsOpen = gapsOpenRes.count ?? 0;
+      const gapHitsMonth = ((gapRowsRes.data ?? []) as { hits: number }[]).reduce(
+        (s, g) => s + (g.hits ?? 1),
+        0,
+      );
+      const fb = (fbRes.data ?? []) as { helpful: boolean }[];
+      const fbPos = fb.filter((f) => f.helpful).length;
+
+      const denomCov = hitsMonth + gapHitsMonth;
+      const coveragePct = denomCov > 0 ? Math.round((hitsMonth / denomCov) * 100) : null;
+      const satisfactionPct = fb.length > 0 ? Math.round((fbPos / fb.length) * 100) : null;
+
+      return {
+        ok: true as const,
+        hitsMonth,
+        gapsOpen,
+        gapHitsMonth,
+        coveragePct,
+        satisfactionPct,
+        feedbackCount: fb.length,
+      };
+    } catch {
+      return { ok: false as const };
+    }
+  });
