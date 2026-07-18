@@ -105,7 +105,7 @@ export function FootprintTrail({
     <div
       ref={ref}
       aria-hidden
-      className="pointer-events-none relative mx-auto h-32 w-full max-w-sm md:h-40 md:max-w-md"
+      className="pointer-events-none relative mx-auto h-44 w-full max-w-md md:h-56 md:max-w-lg"
     >
       {steps.map((s, i) => {
         const visible = i < shown;
@@ -122,7 +122,7 @@ export function FootprintTrail({
               opacity: visible ? 0.85 : 0,
             }}
           >
-            <BabyFootprint color={color} className="h-[15px] w-auto md:h-[19px]" />
+            <BabyFootprint color={color} className="h-[22px] w-auto md:h-[28px]" />
           </span>
         );
       })}

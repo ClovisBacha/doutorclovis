@@ -316,7 +316,7 @@ function Index() {
         <div className="space-y-8 md:space-y-12">
           {SHOWCASE.map((item, i) => (
             <Fragment key={item.badge}>
-              {i > 0 && <FootprintTrail dir={i % 2 === 1 ? "ltr" : "rtl"} />}
+              {i > 0 && <FootprintTrail dir={i % 2 === 1 ? "ltr" : "rtl"} count={8} />}
               <div
                 className={`grid items-center gap-10 md:grid-cols-2 ${
                   i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""

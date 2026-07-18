@@ -63,11 +63,13 @@ import {
   evalBrainQuestion,
   listBrainConversations,
   getBrainConversation,
+  getBrainScore,
   type BrainGap,
   type BrainEntry,
   type BrainSettings,
   type BrainConversation,
   type BrainChatMessage,
+  type BrainScoreItem,
 } from "@/lib/secondbrain.functions";
 import {
   getMyDoctor,
@@ -3566,6 +3568,7 @@ function CerebroSection({
           cérebro é usado pelo chat do app e pelo atendimento no WhatsApp.
         </p>
       </div>
+      <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainConversationsCard tokenFn={tokenFn} asDoctor={asId} />
@@ -4037,6 +4040,166 @@ function BrainConsultaCard({
           {extracting ? "Extraindo…" : "🧠 Extrair conhecimento"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Nível do Cérebro — score de completude 0–100 com visual tecnológico
+ * (anel neural pulsante, grade de circuito, scanline) e o checklist exato
+ * do que preencher para subir. Gamifica a configuração do Segundo Cérebro.
+ */
+function BrainLevelCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
+  const [score, setScore] = useState<number | null>(null);
+  const [items, setItems] = useState<BrainScoreItem[]>([]);
+  const [expanded, setExpanded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getBrainScore({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+        });
+        if (res.ok) {
+          setScore(res.score);
+          setItems(res.items);
+        } else setFailed(true);
+      } catch {
+        setFailed(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenFn]);
+
+  if (failed) return null;
+
+  const pct = score ?? 0;
+  const R = 52;
+  const CIRC = 2 * Math.PI * R;
+  const level =
+    pct >= 90 ? "Elite" : pct >= 70 ? "Avançado" : pct >= 40 ? "Em treino" : "Iniciante";
+  const pending = items.filter((i) => !i.done);
+
+  return (
+    <div className="brain-tech relative overflow-hidden rounded-3xl p-6 text-white shadow-[var(--shadow-card)]">
+      {/* Grade de circuito + scanline (puramente decorativos) */}
+      <div className="brain-grid pointer-events-none absolute inset-0" aria-hidden />
+      <div
+        className="brain-scanline pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-transparent via-cyan-300/10 to-transparent"
+        aria-hidden
+      />
+      {/* Nós neurais piscando */}
+      {[
+        ["12%", "18%", "0s"],
+        ["85%", "12%", "0.8s"],
+        ["92%", "70%", "1.4s"],
+        ["6%", "78%", "0.4s"],
+      ].map(([l, t, d]) => (
+        <span
+          key={`${l}${t}`}
+          className="brain-node pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-cyan-300"
+          style={{ left: l, top: t, animationDelay: d }}
+          aria-hidden
+        />
+      ))}
+
+      <div className="relative flex flex-wrap items-center gap-6">
+        {/* Anel de score */}
+        <div className="relative h-32 w-32 shrink-0">
+          <svg viewBox="0 0 120 120" className="brain-ring h-full w-full -rotate-90">
+            <circle
+              cx="60"
+              cy="60"
+              r={R}
+              fill="none"
+              stroke="rgba(148,163,184,0.2)"
+              strokeWidth="9"
+            />
+            <circle
+              cx="60"
+              cy="60"
+              r={R}
+              fill="none"
+              stroke="url(#brainGrad)"
+              strokeWidth="9"
+              strokeLinecap="round"
+              strokeDasharray={CIRC}
+              strokeDashoffset={CIRC - (CIRC * pct) / 100}
+              style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.22,1,0.36,1)" }}
+            />
+            <defs>
+              <linearGradient id="brainGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#67e8f9" />
+                <stop offset="100%" stopColor="#a78bfa" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-4xl font-extrabold tabular-nums">
+              {score == null ? "…" : pct}
+            </span>
+            <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">
+              / 100
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300/90">
+            Nível do Segundo Cérebro
+          </p>
+          <p className="mt-1 font-serif text-2xl">
+            {level}
+            {pct >= 90 && " 🏆"}
+          </p>
+          <p className="mt-1 text-sm text-white/70">
+            {pending.length === 0
+              ? "Cérebro completo — continue respondendo lacunas para mantê-lo afiado."
+              : `${pending.length} ${pending.length === 1 ? "item pendente" : "itens pendentes"} para evoluir o cérebro.`}
+          </p>
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="mt-3 rounded-full border border-cyan-300/40 bg-cyan-400/10 px-4 py-1.5 text-xs font-semibold text-cyan-200 transition-colors hover:bg-cyan-400/20"
+          >
+            {expanded ? "Ocultar checklist" : "Como subir o score →"}
+          </button>
+        </div>
+      </div>
+
+      {/* Checklist do que preencher */}
+      {expanded && (
+        <div className="relative mt-5 space-y-2">
+          {items.map((it) => (
+            <div
+              key={it.key}
+              className={`flex items-start gap-3 rounded-xl border px-3.5 py-2.5 ${
+                it.done ? "border-emerald-300/25 bg-emerald-400/10" : "border-white/10 bg-white/5"
+              }`}
+            >
+              <span className="mt-0.5 text-sm">{it.done ? "✅" : "⬜"}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{it.label}</p>
+                {!it.done && <p className="mt-0.5 text-xs text-white/60">{it.hint}</p>}
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+                  it.done ? "bg-emerald-400/20 text-emerald-200" : "bg-white/10 text-white/70"
+                }`}
+              >
+                {it.earned}/{it.points}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -6707,6 +6870,9 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [patients, setPatients] = useState<LinkedPatient[]>([]);
   // id da solicitação sendo respondida (desabilita os botões enquanto em voo)
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  // Modal "+ adicionar paciente" (convite) e modal de detalhe da paciente
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [selected, setSelected] = useState<LinkedPatient | null>(null);
 
   async function loadPatients() {
     const tk = await tokenFn();
@@ -6877,19 +7043,37 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               Você ainda não tem pacientes vinculadas. Compartilhe seu perfil para que elas
               encontrem você e enviem uma solicitação.
             </p>
+            <button
+              onClick={() => setInviteOpen(true)}
+              className="mt-4 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              + Adicionar paciente
+            </button>
           </div>
         ) : (
           <>
             {/* Espelho: cada paciente pelo bebê que ela vê no app. O tamanho
                 do bebê cresce com a semana — identificação visual rápida.
-                4 por linha no computador. */}
+                2 por linha no celular, 4 no computador. Toque abre o detalhe
+                com a conversa dela com a IA. O último quadro é o "+". */}
             <p className="mt-3 text-xs text-muted-foreground">
               Cada quadro é o espelho da tela do bebê da paciente — o bebê cresce com a semana.
+              Toque para ver os detalhes e a conversa com a IA.
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {patients.map((p) => (
-                <PatientMirrorCard key={p.id} p={p} />
+                <PatientMirrorCard key={p.id} p={p} onOpen={() => setSelected(p)} />
               ))}
+              {/* "+" — adicionar paciente (convite) */}
+              <button
+                onClick={() => setInviteOpen(true)}
+                className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:border-primary hover:bg-primary/10"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-3xl font-light leading-none">
+                  +
+                </span>
+                <span className="px-2 text-center text-xs font-semibold">Adicionar paciente</span>
+              </button>
             </div>
 
             <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
@@ -6936,6 +7120,12 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           </>
         )}
       </div>
+
+      {/* Modais: convite de paciente e detalhe (dados + conversa com a IA) */}
+      {inviteOpen && <InvitePatientModal tokenFn={tokenFn} onClose={() => setInviteOpen(false)} />}
+      {selected && (
+        <PatientDetailModal p={selected} tokenFn={tokenFn} onClose={() => setSelected(null)} />
+      )}
     </div>
   );
 }
@@ -6944,12 +7134,15 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
  * Espelho da tela do bebê da paciente (mini). Mesmo céu dia/noite do app e o
  * bebê no tamanho da semana dela — o médico reconhece a paciente pelo bebê.
  */
-function PatientMirrorCard({ p }: { p: LinkedPatient }) {
+function PatientMirrorCard({ p, onOpen }: { p: LinkedPatient; onOpen?: () => void }) {
   const period = periodFor(new Date().getHours());
   const dark = period === "madrugada" || period === "noite";
   const weeks = p.weeks ?? null;
   return (
-    <div className="overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-card)]">
+    <button
+      onClick={onOpen}
+      className="overflow-hidden rounded-2xl border border-border text-left shadow-[var(--shadow-card)] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+    >
       <div
         className="relative flex aspect-square items-center justify-center"
         style={{ background: gradientFor(period, 1) }}
@@ -6982,6 +7175,246 @@ function PatientMirrorCard({ p }: { p: LinkedPatient }) {
           <p className="truncate text-[11px] font-semibold text-white">
             {p.display_name ?? "Paciente"}
           </p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/**
+ * "+ Adicionar paciente": a paciente é quem se vincula (ela cria a conta e
+ * envia a solicitação) — o modal entrega a mensagem-convite pronta com o
+ * link, para copiar ou mandar direto no WhatsApp.
+ */
+function InvitePatientModal({
+  tokenFn,
+  onClose,
+}: {
+  tokenFn: () => Promise<string>;
+  onClose: () => void;
+}) {
+  const [doctorName, setDoctorName] = useState<string>(DOCTOR.name);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getMyDoctor({ data: { accessToken: await tokenFn() } });
+        if (res.ok && res.doctor?.display_name) setDoctorName(res.doctor.display_name);
+      } catch {
+        /* mantém o nome padrão */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const link = `${DOCTOR.siteUrl}/encontrar-medico`;
+  const message = `Olá! Sou ${doctorName}. Para acompanhar sua gestação comigo pelo app Obstétrica: crie sua conta em ${DOCTOR.siteUrl}, toque em "Encontrar médico", busque meu nome (${doctorName}) e envie a solicitação — eu aceito por aqui. 💛`;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar — selecione e copie manualmente.");
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-card p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-serif text-xl">Adicionar paciente</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              A paciente cria a conta, busca você em "Encontrar médico" e envia a solicitação — você
+              aceita aqui na aba Pacientes. Envie o convite pronto:
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-4 text-sm leading-relaxed">
+          {message}
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white"
+          >
+            Enviar no WhatsApp
+          </a>
+          <button
+            onClick={copy}
+            className="rounded-full border border-border px-5 py-2 text-sm font-medium text-foreground hover:border-primary hover:text-primary"
+          >
+            {copied ? "Copiado ✓" : "Copiar mensagem"}
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Link direto: <span className="font-medium text-foreground">{link}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Detalhe da paciente: espelho grande do bebê + dados (semana, DPP, BPM) e a
+ * CONVERSA dela com a IA (somente leitura) — o mesmo acesso individual da aba
+ * Cérebro, agora a um toque do quadro dela.
+ */
+function PatientDetailModal({
+  p,
+  tokenFn,
+  onClose,
+}: {
+  p: LinkedPatient;
+  tokenFn: () => Promise<string>;
+  onClose: () => void;
+}) {
+  const [messages, setMessages] = useState<BrainChatMessage[] | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getBrainConversation({
+          data: { accessToken: await tokenFn(), patientId: p.id },
+        });
+        setMessages(res.ok ? res.messages : []);
+      } catch {
+        setMessages([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.id]);
+
+  const period = periodFor(new Date().getHours());
+  const weeks = p.weeks ?? null;
+  const due = p.due_date
+    ? new Date(p.due_date + "T00:00:00").toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "long",
+      })
+    : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[88svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Cabeçalho: espelho do céu + bebê da semana */}
+        <div
+          className="relative flex h-40 shrink-0 items-center justify-center"
+          style={{ background: gradientFor(period, 1) }}
+        >
+          {weeks ? (
+            <BabyIllustration
+              week={weeks}
+              showSac={false}
+              showInfo={false}
+              className="h-[80%] w-auto drop-shadow-[0_8px_20px_rgba(0,0,0,0.2)]"
+            />
+          ) : (
+            <span className="text-sm text-white/80">Sem data de gestação</span>
+          )}
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-3 rounded-full bg-black/25 px-2.5 py-1 text-xs text-white"
+          >
+            ✕
+          </button>
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 py-2.5">
+            <p className="truncate font-serif text-lg text-white">{p.display_name ?? "Paciente"}</p>
+          </div>
+        </div>
+
+        {/* Dados rápidos */}
+        <div className="flex flex-wrap gap-2 px-4 pt-3">
+          {weeks != null && (
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              {weeks} semanas
+            </span>
+          )}
+          {due && (
+            <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+              DPP {due}
+            </span>
+          )}
+          {p.fetal_bpm != null && (
+            <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">
+              💓 {p.fetal_bpm} bpm
+            </span>
+          )}
+          {p.quiz_premium && (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+              ⭐ Premium
+            </span>
+          )}
+        </div>
+
+        {/* Conversa com a IA (somente leitura) */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            💬 Conversa com a IA
+          </p>
+          {messages === null ? (
+            <div className="mt-2 space-y-2">
+              <div className="h-12 animate-pulse rounded-xl bg-secondary" />
+              <div className="h-12 animate-pulse rounded-xl bg-secondary" />
+            </div>
+          ) : messages.length === 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Ela ainda não conversou com a IA (ou o histórico ainda não foi ativado no banco).
+            </p>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
+                      m.role === "user"
+                        ? "rounded-br-sm bg-primary/10 text-foreground"
+                        : "rounded-bl-sm bg-secondary"
+                    }`}
+                  >
+                    {m.content}
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      {m.role === "user" ? "Paciente" : "IA"} ·{" "}
+                      {new Date(m.created_at).toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1221,3 +1221,149 @@ export const getBrainConversation = createServerFn({ method: "POST" })
     if (error) return { ok: false as const, messages: [] as BrainChatMessage[] };
     return { ok: true as const, messages: (rows ?? []) as BrainChatMessage[] };
   });
+
+/* ══════════════════════════════════════════════════════════════════════
+   Nível do Cérebro — score de completude (0–100) com checklist do que
+   preencher para subir. Gamifica a configuração: o médico VÊ o que falta.
+   ══════════════════════════════════════════════════════════════════════ */
+
+export type BrainScoreItem = {
+  key: string;
+  label: string;
+  /** Pontos possíveis do item. */
+  points: number;
+  /** Pontos conquistados (0..points — itens proporcionais pontuam parcial). */
+  earned: number;
+  done: boolean;
+  /** O que fazer para completar (mostrado quando não está 100%). */
+  hint: string;
+};
+
+/** Score de completude do cérebro do médico (ou do alvo asDoctor na clínica). */
+export const getBrainScore = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const doctorId = target.doctorId;
+
+    // Coletas em paralelo — cada uma é best-effort (tabela ausente = zero).
+    const [settingsRes, approvedRes, kitRes, gapsRes, statsRes] = await Promise.all([
+      sb
+        .from("brain_settings")
+        .select("persona,sample_phrases,rules,enabled_app")
+        .eq("doctor_id", doctorId)
+        .maybeSingle(),
+      sb
+        .from("brain_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .eq("approved", true),
+      sb
+        .from("brain_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .eq("source", "kit"),
+      sb
+        .from("brain_gaps")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .eq("status", "aberta"),
+      (async () => {
+        const { computeBrainQualityStats } = await import("./secondbrain.server");
+        return computeBrainQualityStats(doctorId);
+      })(),
+    ]);
+
+    const st = settingsRes?.data ?? null;
+    const persona = ((st?.persona as string) ?? "").trim();
+    const phrases = ((st?.sample_phrases as string) ?? "").trim();
+    const rules = ((st?.rules as string) ?? "").trim();
+    const enabledApp = st ? st.enabled_app !== false : true;
+    const approved = approvedRes?.count ?? 0;
+    const hasKit = (kitRes?.count ?? 0) > 0;
+    const gapsOpen = gapsRes?.error ? 0 : (gapsRes?.count ?? 0);
+    const coverage = statsRes?.coveragePct ?? null;
+
+    // Proporcionais: conhecimento até 30 entradas; cobertura até 80%.
+    const entriesEarned = Math.round(Math.min(1, approved / 30) * 20);
+    const coverageEarned = coverage == null ? 0 : Math.round(Math.min(1, coverage / 80) * 15);
+    const gapsEarned = gapsOpen === 0 ? 10 : gapsOpen <= 3 ? 5 : 0;
+
+    const items: BrainScoreItem[] = [
+      {
+        key: "persona",
+        label: "Estilo definido (persona)",
+        points: 15,
+        earned: persona.length >= 40 ? 15 : 0,
+        done: persona.length >= 40,
+        hint: "Descreva em Estilo do médico como você fala com as pacientes.",
+      },
+      {
+        key: "frases",
+        label: "Frases típicas suas",
+        points: 10,
+        earned: phrases.length >= 10 ? 10 : 0,
+        done: phrases.length >= 10,
+        hint: "Adicione 3–5 frases que você sempre usa (uma por linha).",
+      },
+      {
+        key: "regras",
+        label: "Regras de conduta",
+        points: 10,
+        earned: rules.length >= 10 ? 10 : 0,
+        done: rules.length >= 10,
+        hint: "Diga o que a IA nunca deve fazer (ex.: nunca indicar medicação).",
+      },
+      {
+        key: "kit",
+        label: "Kit de partida instalado",
+        points: 10,
+        earned: hasKit ? 10 : 0,
+        done: hasKit,
+        hint: "Instale as ~30 dúvidas clássicas e aprove as que combinam com você.",
+      },
+      {
+        key: "entradas",
+        label: `Conhecimento aprovado (${approved}/30)`,
+        points: 20,
+        earned: entriesEarned,
+        done: approved >= 30,
+        hint: "Aprove entradas na Base, responda lacunas ou envie uma consulta gravada.",
+      },
+      {
+        key: "lacunas",
+        label: gapsOpen === 0 ? "Lacunas em dia" : `Lacunas abertas (${gapsOpen})`,
+        points: 10,
+        earned: gapsEarned,
+        done: gapsOpen === 0,
+        hint: "Responda as perguntas que a IA não soube — o cérebro aprende na hora.",
+      },
+      {
+        key: "ativa",
+        label: "IA ativa no chat do app",
+        points: 10,
+        earned: enabledApp ? 10 : 0,
+        done: enabledApp,
+        hint: "Ligue 'Usar no chat do app' em Estilo do médico.",
+      },
+      {
+        key: "cobertura",
+        label:
+          coverage == null
+            ? "Cobertura do mês (sem dados ainda)"
+            : `Cobertura do mês (${coverage}%)`,
+        points: 15,
+        earned: coverageEarned,
+        done: (coverage ?? 0) >= 80,
+        hint: "Quanto mais o cérebro cobre as dúvidas reais, maior o score — alimente-o.",
+      },
+    ];
+
+    const score = items.reduce((s, i) => s + i.earned, 0);
+    return { ok: true as const, score, items };
+  });
