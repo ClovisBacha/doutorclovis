@@ -610,9 +610,12 @@ export function AppHomeScreen({
 
   return (
     <div className="space-y-4 pb-2">
-      {/* ── Hero card: céu real do momento + bebê + clima ──────────── */}
+      {/* ── Hero imersivo: céu real do momento + bebê + clima ────────
+          Full-bleed nas laterais (-mx-5 cancela o px-5 da página) e puxado
+          para cima (-mt-2) para o céu preencher quase a tela toda. Só a base
+          é arredondada — laterais e topo encostam na borda do celular. */}
       <div
-        className="shine relative flex min-h-[66svh] flex-col overflow-hidden rounded-3xl p-5 transition-[background] duration-1000"
+        className="shine relative -mx-5 -mt-2 flex min-h-[82svh] flex-col overflow-hidden rounded-b-[2rem] px-5 pb-6 pt-6 transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Céu vivo: sol/lua, estrelas à noite, nuvens à deriva, chuva */}
@@ -630,6 +633,20 @@ export function AppHomeScreen({
 
           {gest && baby ? (
             <>
+              {/* Nome do bebê no TOPO — protagonista da tela imersiva */}
+              {babyName && (
+                <div className="mb-3 text-center">
+                  <p
+                    className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${heroLabel}`}
+                  >
+                    Acompanhando
+                  </p>
+                  <p className={`mt-0.5 font-serif text-[1.75rem] leading-tight ${heroText}`}>
+                    {babyName}
+                  </p>
+                </div>
+              )}
+
               {/* Dados de topo: trimestre + contagem regressiva p/ o parto */}
               <div className="flex items-center justify-between gap-2">
                 <span
@@ -695,10 +712,6 @@ export function AppHomeScreen({
                   semanas{gest.days > 0 ? ` · ${gest.days} dias` : ""}
                 </p>
               </div>
-
-              {babyName && (
-                <p className={`mt-1 text-center text-xs ${heroMuted}`}>Acompanhando {babyName}</p>
-              )}
 
               {/* Badges liquid glass */}
               <div className="mt-3 flex flex-wrap justify-center gap-2">
