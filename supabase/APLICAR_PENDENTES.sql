@@ -2026,3 +2026,15 @@ GRANT ALL ON public.chat_memory TO service_role;
 
 ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS doctor_id uuid;
 CREATE INDEX IF NOT EXISTS idx_wa_conv_doctor ON public.whatsapp_conversations(doctor_id);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260718030000 — Reforço: REVOKE explícito nas tabelas server-only
+-- (já eram seguras via RLS; isto é cinto e suspensório)
+-- ════════════════════════════════════════════════════════════════════════
+
+REVOKE ALL ON public.brain_gaps            FROM anon, authenticated;
+REVOKE ALL ON public.brain_feedback        FROM anon, authenticated;
+REVOKE ALL ON public.brain_hits            FROM anon, authenticated;
+REVOKE ALL ON public.epds_logs             FROM anon, authenticated;
+REVOKE ALL ON public.experience_leads      FROM anon, authenticated;
+REVOKE ALL ON public.whatsapp_conversations FROM anon, authenticated;
