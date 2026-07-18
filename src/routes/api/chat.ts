@@ -56,6 +56,7 @@ Regras de resposta:
  * (para injetar o cérebro DAQUELE médico) e o nome dele (para a persona).
  */
 async function resolvePatientDoctor(request: Request): Promise<{
+  patientId: string;
   doctorId: string | null;
   doctorName: string | null;
   clinicalBlock: string;
@@ -93,13 +94,15 @@ async function resolvePatientDoctor(request: Request): Promise<{
     }
     const clinicalBlock = buildClinicalBlock(prof ?? null);
     const doctorId = (prof?.doctor_id ?? null) as string | null;
-    if (!doctorId) return { doctorId: null, doctorName: null, clinicalBlock };
+    if (!doctorId)
+      return { patientId: data.user.id, doctorId: null, doctorName: null, clinicalBlock };
     const { data: doc } = await (supabaseAdmin as any)
       .from("doctors")
       .select("display_name")
       .eq("id", doctorId)
       .maybeSingle();
     return {
+      patientId: data.user.id,
       doctorId,
       doctorName: (doc?.display_name || null) as string | null,
       clinicalBlock,
@@ -216,10 +219,16 @@ export const Route = createFileRoute("/api/chat")({
         let system: string;
         if (patient && patient.doctorId) {
           // App: injeta o Segundo Cérebro DAQUELE médico (respeitando o plano)
-          // + o contexto clínico DELA (semana/histórico, direto do banco).
-          // getBrainContext é safe (falha vira block vazio), nunca derruba o chat.
+          // + o contexto clínico DELA (semana/histórico, direto do banco)
+          // + a MEMÓRIA dela (o que já contou/perguntou em conversas passadas).
+          // getBrainContext/getChatMemory são safe (falha vira bloco vazio).
           const userText = lastUserText(messages);
-          const brain = await getBrainContext(userText, patient.doctorId, "app");
+          const { getChatMemory, memoryBlock } = await import("@/lib/chat-memory.server");
+          const [brain, memorySummary] = await Promise.all([
+            getBrainContext(userText, patient.doctorId, "app"),
+            getChatMemory(patient.patientId),
+          ]);
+          const memoria = memoryBlock(memorySummary);
           const base = medicalSystemPrompt(patient.doctorName);
           const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
           // Confiança visível: com cobertura, cite a fonte; sem cobertura,
@@ -238,6 +247,7 @@ export const Route = createFileRoute("/api/chat")({
           system = [
             base,
             patient.clinicalBlock,
+            memoria,
             brain.enabledApp && brain.block ? brain.block : "",
             confianca,
           ]
@@ -253,11 +263,41 @@ export const Route = createFileRoute("/api/chat")({
           system = SUPPORT_SYSTEM_PROMPT;
         }
 
+        // Conversa individual por paciente: grava a pergunta agora e a resposta
+        // no onFinish; depois atualiza a memória dela (tudo fire-and-forget —
+        // tabela ausente ou falha nunca afeta a resposta).
+        const persistFor = patient
+          ? { patientId: patient.patientId, doctorId: patient.doctorId ?? null }
+          : null;
+        if (persistFor) {
+          const { saveChatMessage } = await import("@/lib/chat-memory.server");
+          saveChatMessage(
+            persistFor.patientId,
+            persistFor.doctorId,
+            "user",
+            lastUserText(messages),
+          );
+        }
+
         const google = createChatProvider(key);
         const result = streamText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           system,
           messages: await convertToModelMessages(messages),
+          onFinish: persistFor
+            ? ({ text }) => {
+                void (async () => {
+                  try {
+                    const { saveChatMessage, maybeUpdateChatMemory } =
+                      await import("@/lib/chat-memory.server");
+                    saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text);
+                    maybeUpdateChatMemory(persistFor.patientId, persistFor.doctorId);
+                  } catch {
+                    /* best-effort */
+                  }
+                })();
+              }
+            : undefined,
         });
 
         return result.toUIMessageStreamResponse({

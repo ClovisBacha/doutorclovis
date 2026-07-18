@@ -230,32 +230,64 @@ Responda OBRIGATORIAMENTE em JSON válido com este formato exato:
 /* Persistência (Supabase service_role)                                 */
 /* ------------------------------------------------------------------ */
 
-async function getOrCreateConversation(phone: string): Promise<WaConversation> {
-  const sb = supabaseAdmin;
-  const { data } = await (sb as any)
-    .from("whatsapp_conversations")
-    .select("*")
-    .eq("phone", phone)
-    .maybeSingle();
-
+/**
+ * Conversa por (telefone, médico): a MESMA paciente falando com números de
+ * médicos diferentes tem conversas separadas no banco. Banco sem a coluna
+ * doctor_id (migração pendente) → comportamento antigo por telefone (o reset
+ * por contexto em handleWhatsAppMessage segue garantindo o isolamento).
+ */
+async function getOrCreateConversation(
+  phone: string,
+  doctorId?: string | null,
+): Promise<WaConversation> {
+  const sb = supabaseAdmin as any;
+  let query = sb.from("whatsapp_conversations").select("*").eq("phone", phone);
+  query = doctorId ? query.eq("doctor_id", doctorId) : query.is("doctor_id", null);
+  const first = await query.maybeSingle();
+  let data = first.data;
+  if (first.error?.code === "42703") {
+    ({ data } = await sb
+      .from("whatsapp_conversations")
+      .select("*")
+      .eq("phone", phone)
+      .maybeSingle());
+  }
   if (data) return data as WaConversation;
 
-  const { data: created } = await (sb as any)
+  const { data: created, error: insErr } = await sb
     .from("whatsapp_conversations")
-    .insert({ phone, state: "start", context: {} })
+    .insert({ phone, state: "start", context: {}, doctor_id: doctorId ?? null })
     .select()
     .single();
-
+  if (created) return created as WaConversation;
+  if (insErr) {
+    // 42703 (coluna ausente) ou 23505 (UNIQUE(phone) legado com outra conversa
+    // do mesmo telefone): reaproveita/cria a linha por telefone — o reset por
+    // contexto impede vazamento entre médicos.
+    const { data: legacy } = await sb
+      .from("whatsapp_conversations")
+      .select("*")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (legacy) return legacy as WaConversation;
+    const { data: legacyCreated } = await sb
+      .from("whatsapp_conversations")
+      .insert({ phone, state: "start", context: {} })
+      .select()
+      .single();
+    return legacyCreated as WaConversation;
+  }
   return created as WaConversation;
 }
 
 async function saveConversation(
-  phone: string,
+  conv: WaConversation,
   state: ConvState,
   context: ConvContext,
   patientName?: string | null,
 ): Promise<void> {
   const sb = supabaseAdmin;
+  // Por id: nunca atualiza a conversa do mesmo telefone com OUTRO médico.
   await (sb as any)
     .from("whatsapp_conversations")
     .update({
@@ -264,7 +296,7 @@ async function saveConversation(
       patient_name: patientName ?? undefined,
       last_message_at: new Date().toISOString(),
     })
-    .eq("phone", phone);
+    .eq("id", conv.id);
 }
 
 async function createAppointmentRequest(
@@ -320,10 +352,10 @@ export async function handleWhatsAppMessage(
   const { resolveDoctorIdByWhatsappNumber } = await import("./whatsapp.server");
   const doctorId = await resolveDoctorIdByWhatsappNumber(phoneNumberId);
 
-  let conv = await getOrCreateConversation(cleanPhone);
+  let conv = await getOrCreateConversation(cleanPhone, doctorId);
 
-  // Isolamento por médico: se a conversa existente pertence a OUTRO médico
-  // (paciente escreveu para outro número da plataforma), recomeça do zero —
+  // Isolamento por médico (defesa em profundidade p/ banco sem doctor_id):
+  // se a conversa existente pertence a OUTRO médico, recomeça do zero —
   // histórico, nome e motivo de um consultório nunca vazam para outro.
   const targetDoctor = doctorId ?? null;
   if (conv.context.doctor_id !== undefined && conv.context.doctor_id !== targetDoctor) {
@@ -362,7 +394,7 @@ export async function handleWhatsAppMessage(
 
   // Salva o estado atualizado
   await saveConversation(
-    cleanPhone,
+    conv,
     forceUrgent ? "urgent" : decision.next_state,
     newContext,
     newContext.name,

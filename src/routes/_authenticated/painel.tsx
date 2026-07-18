@@ -59,9 +59,13 @@ import {
   getBrainQualityStats,
   extractKnowledgeFromTranscript,
   evalBrainQuestion,
+  listBrainConversations,
+  getBrainConversation,
   type BrainGap,
   type BrainEntry,
   type BrainSettings,
+  type BrainConversation,
+  type BrainChatMessage,
 } from "@/lib/secondbrain.functions";
 import {
   getMyDoctor,
@@ -396,7 +400,6 @@ function PainelPage() {
         {tab === "Cérebro 🧠" && (
           <CerebroSection
             tokenFn={token}
-            showTrainCard={isPlatformTeam && !brainAsDoctor}
             asDoctor={brainAsDoctor}
             onExitAsDoctor={() => setBrainAsDoctor(null)}
             onTrained={(id) =>
@@ -3523,15 +3526,11 @@ function BrainToggle({
 function CerebroSection({
   tokenFn,
   onTrained,
-  showTrainCard,
   asDoctor,
   onExitAsDoctor,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
-  // Treinar respondendo lista perguntas das pacientes da INSTALAÇÃO —
-  // exclusivo da equipe até o escopo por médico (etapa 2 do roadmap)
-  showTrainCard: boolean;
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   asDoctor?: { id: string; name: string } | null;
   onExitAsDoctor?: () => void;
@@ -3567,10 +3566,11 @@ function CerebroSection({
       </div>
       <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainConversationsCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainConsultaCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainEvalCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainSettingsCard tokenFn={tokenFn} asDoctor={asId} />
-      {showTrainCard && <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />}
+      <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} asDoctor={asId} />
       <BrainKnowledgeCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainPlaygroundCard tokenFn={tokenFn} asDoctor={asId} />
     </div>
@@ -3740,6 +3740,160 @@ function BrainEvalCard({
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Conversas da IA por paciente: o médico vê o que a IA respondeu em cada
+ * chat, cada paciente com a SUA conversa individual. Controle e supervisão —
+ * o médico sabe exatamente o que está sendo dito em nome dele.
+ */
+function BrainConversationsCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
+  const [convs, setConvs] = useState<BrainConversation[] | null>(null);
+  const [missingTable, setMissingTable] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<BrainChatMessage[] | null>(null);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await listBrainConversations({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+        });
+        if (res.ok) setConvs(res.conversations);
+        else if ("missingTable" in res && res.missingTable) {
+          setMissingTable(true);
+          setConvs([]);
+        } else setConvs([]);
+      } catch {
+        setConvs([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenFn]);
+
+  async function openConversation(patientId: string) {
+    if (openId === patientId) {
+      setOpenId(null);
+      setMessages(null);
+      return;
+    }
+    setOpenId(patientId);
+    setMessages(null);
+    setLoadingMsgs(true);
+    try {
+      const res = await getBrainConversation({
+        data: {
+          accessToken: await tokenFn(),
+          patientId,
+          ...(asDoctor ? { asDoctor } : {}),
+        },
+      });
+      setMessages(res.ok ? res.messages : []);
+    } catch {
+      setMessages([]);
+    } finally {
+      setLoadingMsgs(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <p className="font-medium">💬 Conversas da IA com as pacientes</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        O que a IA respondeu em cada chat, paciente por paciente — supervisione e, se algo não
+        estiver do seu jeito, ajuste o estilo ou a base de conhecimento.
+      </p>
+
+      {convs === null ? (
+        <div className="mt-4 space-y-2">
+          <div className="h-14 animate-pulse rounded-xl bg-secondary" />
+          <div className="h-14 animate-pulse rounded-xl bg-secondary" />
+        </div>
+      ) : missingTable ? (
+        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+          O histórico de conversas ainda não existe no banco — rode o{" "}
+          <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar.
+        </p>
+      ) : convs.length === 0 ? (
+        <p className="mt-4 rounded-xl bg-secondary/60 p-4 text-sm text-muted-foreground">
+          Nenhuma conversa registrada ainda. Assim que uma paciente falar com a IA no app, a
+          conversa aparece aqui.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {convs.map((c) => (
+            <div key={c.patientId} className="rounded-xl border border-border">
+              <button
+                onClick={() => openConversation(c.patientId)}
+                className="flex w-full items-center justify-between gap-3 p-4 text-left"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{c.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">"{c.lastPreview}"</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(c.lastAt).toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {c.count} msg{c.count === 1 ? "" : "s"} {openId === c.patientId ? "▴" : "▾"}
+                  </p>
+                </div>
+              </button>
+              {openId === c.patientId && (
+                <div className="max-h-96 space-y-2 overflow-y-auto border-t border-border p-4">
+                  {loadingMsgs ? (
+                    <div className="h-16 animate-pulse rounded-xl bg-secondary" />
+                  ) : (messages ?? []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Não foi possível carregar as mensagens.
+                    </p>
+                  ) : (
+                    (messages ?? []).map((m, i) => (
+                      <div
+                        key={i}
+                        className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
+                            m.role === "user"
+                              ? "rounded-br-sm bg-primary/10 text-foreground"
+                              : "rounded-bl-sm bg-secondary"
+                          }`}
+                        >
+                          {m.content}
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            {m.role === "user" ? "Paciente" : "IA"} ·{" "}
+                            {new Date(m.created_at).toLocaleString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -4395,9 +4549,12 @@ function BrainSettingsCard({
 function BrainTrainCard({
   tokenFn,
   onTrained,
+  asDoctor,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
 }) {
   const [questions, setQuestions] = useState<
     { id: string; question: string; created_at: string }[] | null
@@ -4410,7 +4567,9 @@ function BrainTrainCard({
 
   useEffect(() => {
     (async () => {
-      const res = await listUnansweredQuestions({ data: { accessToken: await tokenFn() } });
+      const res = await listUnansweredQuestions({
+        data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+      });
       if (res.ok) setQuestions(res.questions);
       else toast.error("Não foi possível carregar as perguntas das pacientes.");
     })();
@@ -4428,6 +4587,7 @@ function BrainTrainCard({
           questionId: q.id,
           answer,
           ...(edited.length >= 8 ? { question: edited.slice(0, 300) } : {}),
+          ...(asDoctor ? { asDoctor } : {}),
         },
       });
       if (!res.ok) {
@@ -5134,7 +5294,7 @@ function ClinicaSection({
                   {d.plan || "free"}
                 </span>
               </div>
-              <div className="mt-3 flex gap-4 text-sm">
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 <span title="Entradas aprovadas no cérebro">🧠 {d.brainEntries} entradas</span>
                 <span
                   title="Perguntas de pacientes que a IA não soube responder"
@@ -5142,6 +5302,16 @@ function ClinicaSection({
                 >
                   🕳️ {d.brainGaps} lacunas
                 </span>
+                {d.coveragePct != null && (
+                  <span title="Cobertura do mês: % das dúvidas que a IA respondeu com o conhecimento do médico">
+                    🎯 {d.coveragePct}% cobertura
+                  </span>
+                )}
+                {d.satisfactionPct != null && (
+                  <span title="Satisfação do mês: % de 👍 das pacientes">
+                    💚 {d.satisfactionPct}% satisfação
+                  </span>
+                )}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button

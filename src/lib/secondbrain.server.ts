@@ -99,9 +99,55 @@ export function logBrainGap(doctorId: string, question: string, channel: BrainCh
           norm_question: norm,
           channel,
         });
+        // Fecha o ciclo em horas, não em dias: avisa o médico que a IA tem
+        // pergunta sem resposta. No máximo 1 e-mail por dia por médico (o
+        // primeiro gap do dia dispara; os demais só aparecem no painel).
+        notifyDoctorOfGap(doctorId, sb);
       }
     } catch {
       /* best-effort — nunca afeta a resposta ao paciente */
+    }
+  })();
+}
+
+/**
+ * E-mail "sua IA tem perguntas sem resposta" (fire-and-forget, ≤1/dia).
+ * Sem RESEND_API_KEY vira no-op (o painel continua sendo a fonte).
+ */
+function notifyDoctorOfGap(doctorId: string, sb: any): void {
+  void (async () => {
+    try {
+      if (!process.env.RESEND_API_KEY) return;
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const { count, error } = await sb
+        .from("brain_gaps")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .gte("created_at", dayStart.toISOString());
+      // Só o PRIMEIRO gap novo do dia notifica (throttle sem coluna extra).
+      if (error || (count ?? 0) !== 1) return;
+
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: u } = await supabaseAdmin.auth.admin.getUserById(doctorId);
+      const email = u?.user?.email;
+      if (!email) return;
+
+      const { sendEmail, emailLayout } = await import("./email.server");
+      const { DOCTOR } = await import("./doctor.config");
+      await sendEmail({
+        to: email,
+        subject: "🧠 Sua IA recebeu uma pergunta que não soube responder",
+        html: emailLayout(
+          "Sua paciente perguntou — a IA registrou para você",
+          `<p style="margin:0 0 12px;line-height:1.6">Uma paciente fez uma pergunta que ainda não está coberta pelo seu Segundo Cérebro. Ela foi avisada com acolhimento e a pergunta ficou registrada para você.</p>
+           <p style="margin:0 0 16px;line-height:1.6">Responda no painel (leva menos de 1 minuto com o rascunho da IA) e o cérebro aprende na hora — a próxima paciente com a mesma dúvida já recebe a SUA orientação.</p>
+           <p style="margin:0"><a href="${DOCTOR.siteUrl}/painel" style="display:inline-block;background:#a85a44;color:#fff;text-decoration:none;border-radius:999px;padding:10px 22px;font-size:14px">Responder no painel</a></p>
+           <p style="margin:16px 0 0;font-size:12px;color:#9b8178">Você recebe no máximo 1 aviso destes por dia.</p>`,
+        ),
+      });
+    } catch {
+      /* best-effort */
     }
   })();
 }
@@ -343,5 +389,76 @@ export async function getBrainContext(
   } catch {
     // Falha de banco não pode derrubar o chat: segue sem o segundo cérebro.
     return { block: "", enabledApp: true, enabledWhatsapp: true, hadCoverage: false };
+  }
+}
+
+/**
+ * Placar de qualidade do cérebro de UM médico (mês corrente) — usado no card
+ * do painel e no relatório por médico da aba Clínica. null = tabelas do
+ * autoaprendizado ainda não migradas / erro (o chamador esconde o placar).
+ */
+export async function computeBrainQualityStats(doctorId: string): Promise<{
+  hitsMonth: number;
+  gapsOpen: number;
+  gapHitsMonth: number;
+  coveragePct: number | null;
+  satisfactionPct: number | null;
+  feedbackCount: number;
+} | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const since = monthStart.toISOString();
+
+    const [hitsRes, gapsOpenRes, gapRowsRes, fbRes] = await Promise.all([
+      sb
+        .from("brain_hits")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .gte("created_at", since),
+      sb
+        .from("brain_gaps")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .eq("status", "aberta"),
+      sb
+        .from("brain_gaps")
+        .select("hits,created_at")
+        .eq("doctor_id", doctorId)
+        .gte("updated_at", since)
+        .limit(500),
+      sb
+        .from("brain_feedback")
+        .select("helpful")
+        .eq("doctor_id", doctorId)
+        .gte("created_at", since)
+        .limit(1000),
+    ]);
+    if (hitsRes.error || gapsOpenRes.error || gapRowsRes.error || fbRes.error) return null;
+
+    const hitsMonth = hitsRes.count ?? 0;
+    const gapsOpen = gapsOpenRes.count ?? 0;
+    // Misses SÓ do mês: lacuna criada no mês → todos os hits dela são do mês;
+    // lacuna antiga tocada no mês → conta 1 (não arrasta o histórico).
+    const gapHitsMonth = ((gapRowsRes.data ?? []) as { hits: number; created_at: string }[]).reduce(
+      (s, g) => s + (g.created_at >= since ? (g.hits ?? 1) : 1),
+      0,
+    );
+    const fb = (fbRes.data ?? []) as { helpful: boolean }[];
+    const fbPos = fb.filter((f) => f.helpful).length;
+    const denomCov = hitsMonth + gapHitsMonth;
+    return {
+      hitsMonth,
+      gapsOpen,
+      gapHitsMonth,
+      coveragePct: denomCov > 0 ? Math.round((hitsMonth / denomCov) * 100) : null,
+      satisfactionPct: fb.length > 0 ? Math.round((fbPos / fb.length) * 100) : null,
+      feedbackCount: fb.length,
+    };
+  } catch {
+    return null;
   }
 }

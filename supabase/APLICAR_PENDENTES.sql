@@ -1995,3 +1995,34 @@ DROP TRIGGER IF EXISTS trg_protect_doctor_billing ON public.doctors;
 CREATE TRIGGER trg_protect_doctor_billing
   BEFORE INSERT OR UPDATE ON public.doctors
   FOR EACH ROW EXECUTE FUNCTION public.protect_doctor_billing();
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260718020000 — Memória por paciente + conversas da IA no painel
+-- ════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id uuid NOT NULL,
+  doctor_id  uuid,
+  role       text NOT NULL CHECK (role IN ('user','assistant')),
+  content    text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_chat_msgs_patient ON public.chat_messages(patient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_msgs_doctor  ON public.chat_messages(doctor_id, created_at DESC);
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.chat_messages FROM anon, authenticated;
+GRANT ALL ON public.chat_messages TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.chat_memory (
+  patient_id uuid PRIMARY KEY,
+  doctor_id  uuid,
+  summary    text NOT NULL DEFAULT '',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.chat_memory ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.chat_memory FROM anon, authenticated;
+GRANT ALL ON public.chat_memory TO service_role;
+
+ALTER TABLE public.whatsapp_conversations ADD COLUMN IF NOT EXISTS doctor_id uuid;
+CREATE INDEX IF NOT EXISTS idx_wa_conv_doctor ON public.whatsapp_conversations(doctor_id);

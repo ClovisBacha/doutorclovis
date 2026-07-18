@@ -39,6 +39,9 @@ export type ClinicMember = {
   clinic_role: string;
   brainEntries: number;
   brainGaps: number;
+  // Relatório do mês por médico (null = sem dados/telemetria não migrada).
+  coveragePct: number | null;
+  satisfactionPct: number | null;
 };
 
 /**
@@ -113,10 +116,14 @@ export const getMyClinic = createServerFn({ method: "POST" })
         .select("id,display_name,specialty,plan,active,clinic_role")
         .eq("clinic_id", clinic.id)
         .order("display_name", { ascending: true });
-      const rows = (docs ?? []) as Omit<ClinicMember, "brainEntries" | "brainGaps">[];
+      const rows = (docs ?? []) as Omit<
+        ClinicMember,
+        "brainEntries" | "brainGaps" | "coveragePct" | "satisfactionPct"
+      >[];
+      const { computeBrainQualityStats } = await import("./secondbrain.server");
       members = await Promise.all(
         rows.map(async (d) => {
-          const [entries, gaps] = await Promise.all([
+          const [entries, gaps, quality] = await Promise.all([
             sb
               .from("brain_entries")
               .select("id", { count: "exact", head: true })
@@ -127,11 +134,16 @@ export const getMyClinic = createServerFn({ method: "POST" })
               .select("id", { count: "exact", head: true })
               .eq("doctor_id", d.id)
               .eq("status", "aberta"),
+            // Relatório do mês (cobertura/satisfação) — mesmo cálculo do
+            // placar individual, por médico, para a gestão da clínica.
+            computeBrainQualityStats(d.id),
           ]);
           return {
             ...d,
             brainEntries: entries?.count ?? 0,
             brainGaps: gaps?.count ?? 0,
+            coveragePct: quality?.coveragePct ?? null,
+            satisfactionPct: quality?.satisfactionPct ?? null,
           } as ClinicMember;
         }),
       );

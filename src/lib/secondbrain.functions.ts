@@ -408,29 +408,40 @@ export const deleteBrainEntry = createServerFn({ method: "POST" })
     return { ok: !error };
   });
 
-/** Lista as perguntas das pacientes ainda sem resposta (para treinar o cérebro). */
+/**
+ * Lista as perguntas das pacientes ainda sem resposta (para treinar o cérebro).
+ * Escopo por médico: equipe da instalação vê TODAS (inclui pacientes antigas
+ * sem doctor_id); assinante/clínica vê SÓ as das próprias pacientes
+ * (doctor_id carimbado quando a paciente pergunta). Coluna ausente → lista
+ * vazia para assinante (nunca vaza pergunta de outro médico).
+ */
 export const listUnansweredQuestions = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
-    // P1: doctor_questions ainda não tem doctor_id (etapa 2) — as perguntas
-    // são das pacientes da INSTALAÇÃO. Médico assinante recebe lista vazia.
-    if (!isPlatformTeam(user)) {
-      return {
-        ok: true as const,
-        questions: [] as { id: string; question: string; created_at: string }[],
-      };
-    }
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: rows } = await (supabaseAdmin as any)
+    let query = (supabaseAdmin as any)
       .from("doctor_questions")
       .select("id,question,created_at")
       .eq("answered", false)
       .order("created_at", { ascending: true })
       .limit(50);
+    // Equipe SEM asDoctor mantém a visão da instalação inteira.
+    const scoped = !(isPlatformTeam(user) && !data.asDoctor);
+    if (scoped) query = query.eq("doctor_id", target.doctorId);
 
+    const { data: rows, error } = await query;
+    if (error) {
+      // 42703 (doctor_id ainda não migrado) ou falha: fail-closed p/ escopado.
+      return {
+        ok: true as const,
+        questions: [] as { id: string; question: string; created_at: string }[],
+      };
+    }
     return {
       ok: true as const,
       questions: (rows ?? []) as { id: string; question: string; created_at: string }[],
@@ -445,36 +456,46 @@ const AnswerTrainSchema = z.object({
   // original da paciente pode conter dados pessoais e fica só em
   // doctor_questions, nunca no cérebro reutilizável).
   question: z.string().min(8).max(300).optional(),
+  asDoctor: z.string().uuid().optional(),
 });
 
 /**
  * Responde uma pergunta de paciente e treina o cérebro com ela: cria uma
- * brain_entry (source='pergunta') com a pergunta original + resposta e marca
- * a doctor_question como respondida (transação lógica: só marca se treinou).
+ * brain_entry (source='pergunta') com a pergunta + resposta e marca a
+ * doctor_question como respondida (transação lógica: só marca se treinou).
+ * Escopo por médico: equipe responde qualquer pergunta da instalação;
+ * assinante/clínica SÓ perguntas das próprias pacientes (doctor_id).
  */
 export const answerAndTrain = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => AnswerTrainSchema.parse(i))
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
-    // P1: responder perguntas de pacientes da instalação é exclusivo da equipe
-    if (!user || !isPlatformTeam(user)) return { ok: false as const };
+    if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    if (!(await brainPlanAllows(user, target)))
+      return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Só perguntas ainda não respondidas: evita entrada duplicada em
     // duplo clique/duas abas respondendo a mesma pergunta.
-    const { data: question } = await (supabaseAdmin as any)
+    let qQuery = (supabaseAdmin as any)
       .from("doctor_questions")
       .select("id,question")
       .eq("id", data.questionId)
-      .eq("answered", false)
-      .maybeSingle();
-    if (!question) return { ok: false as const };
+      .eq("answered", false);
+    // Fora da equipe (ou operando via clínica), a pergunta TEM que ser de
+    // paciente do médico-alvo — nunca de outro consultório.
+    const scoped = !(isPlatformTeam(user) && !data.asDoctor);
+    if (scoped) qQuery = qQuery.eq("doctor_id", target.doctorId);
+    const { data: question, error: qErr } = await qQuery.maybeSingle();
+    if (qErr || !question) return { ok: false as const };
 
     const questionText = data.question?.trim() || (question.question as string);
     const { data: entry, error: insertError } = await (supabaseAdmin as any)
       .from("brain_entries")
       .insert({
-        doctor_id: await ownerDoctorId(user),
+        doctor_id: target.doctorId,
         question: questionText,
         answer: data.answer,
         source: "pergunta",
@@ -881,72 +902,11 @@ export const getBrainQualityStats = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const target = await resolveBrainDoctor(user, data.asDoctor);
     if (!target) return { ok: false as const };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const sb = supabaseAdmin as any;
-    const doctorId = target.doctorId;
-
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-    const since = monthStart.toISOString();
-
-    try {
-      const [hitsRes, gapsOpenRes, gapRowsRes, fbRes] = await Promise.all([
-        sb
-          .from("brain_hits")
-          .select("id", { count: "exact", head: true })
-          .eq("doctor_id", doctorId)
-          .gte("created_at", since),
-        sb
-          .from("brain_gaps")
-          .select("id", { count: "exact", head: true })
-          .eq("doctor_id", doctorId)
-          .eq("status", "aberta"),
-        sb
-          .from("brain_gaps")
-          .select("hits,created_at")
-          .eq("doctor_id", doctorId)
-          .gte("updated_at", since)
-          .limit(500),
-        sb
-          .from("brain_feedback")
-          .select("helpful")
-          .eq("doctor_id", doctorId)
-          .gte("created_at", since)
-          .limit(1000),
-      ]);
-      if (hitsRes.error || gapsOpenRes.error || gapRowsRes.error || fbRes.error) {
-        return { ok: false as const };
-      }
-
-      const hitsMonth = hitsRes.count ?? 0;
-      const gapsOpen = gapsOpenRes.count ?? 0;
-      // Misses SÓ do mês: lacuna criada no mês → todos os hits dela são do mês;
-      // lacuna antiga tocada no mês → conta 1 (não arrasta o histórico para o
-      // denominador — senão 1 hit novo numa lacuna velha de 40 derrubava a
-      // cobertura de 99% para 71%, distorção apontada em auditoria).
-      const gapHitsMonth = (
-        (gapRowsRes.data ?? []) as { hits: number; created_at: string }[]
-      ).reduce((s, g) => s + (g.created_at >= since ? (g.hits ?? 1) : 1), 0);
-      const fb = (fbRes.data ?? []) as { helpful: boolean }[];
-      const fbPos = fb.filter((f) => f.helpful).length;
-
-      const denomCov = hitsMonth + gapHitsMonth;
-      const coveragePct = denomCov > 0 ? Math.round((hitsMonth / denomCov) * 100) : null;
-      const satisfactionPct = fb.length > 0 ? Math.round((fbPos / fb.length) * 100) : null;
-
-      return {
-        ok: true as const,
-        hitsMonth,
-        gapsOpen,
-        gapHitsMonth,
-        coveragePct,
-        satisfactionPct,
-        feedbackCount: fb.length,
-      };
-    } catch {
-      return { ok: false as const };
-    }
+    // Cálculo compartilhado com o relatório por médico da aba Clínica.
+    const { computeBrainQualityStats } = await import("./secondbrain.server");
+    const stats = await computeBrainQualityStats(target.doctorId);
+    if (!stats) return { ok: false as const };
+    return { ok: true as const, ...stats };
   });
 
 /**
@@ -1146,4 +1106,118 @@ export const evalBrainQuestion = createServerFn({ method: "POST" })
         usedBrain: brain.hadCoverage,
       };
     }
+  });
+
+/* ══════════════════════════════════════════════════════════════════════
+   Conversas da IA por paciente — o médico vê o que a IA respondeu a cada
+   paciente DELE, cada conversa individual. Plano Clínica: o admin entra no
+   cérebro do médico (asDoctor) e vê as conversas daquele médico.
+   ══════════════════════════════════════════════════════════════════════ */
+
+export type BrainConversation = {
+  patientId: string;
+  name: string;
+  lastAt: string;
+  lastPreview: string;
+  count: number;
+};
+
+export type BrainChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
+/** Conversas do app agrupadas por paciente (mais recente primeiro). */
+export const listBrainConversations = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, conversations: [] as BrainConversation[] };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const, conversations: [] as BrainConversation[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: rows, error } = await sb
+      .from("chat_messages")
+      .select("patient_id,role,content,created_at")
+      .eq("doctor_id", target.doctorId)
+      .order("created_at", { ascending: false })
+      .limit(600);
+    if (error?.code === "42P01")
+      return {
+        ok: false as const,
+        conversations: [] as BrainConversation[],
+        missingTable: true as const,
+      };
+    if (error) return { ok: false as const, conversations: [] as BrainConversation[] };
+
+    // Agrupa por paciente preservando a ordem (a 1ª ocorrência é a mais recente).
+    const byPatient = new Map<string, { lastAt: string; lastPreview: string; count: number }>();
+    for (const m of (rows ?? []) as {
+      patient_id: string;
+      content: string;
+      created_at: string;
+    }[]) {
+      const cur = byPatient.get(m.patient_id);
+      if (cur) cur.count += 1;
+      else
+        byPatient.set(m.patient_id, {
+          lastAt: m.created_at,
+          lastPreview: (m.content ?? "").slice(0, 120),
+          count: 1,
+        });
+    }
+    if (byPatient.size === 0)
+      return { ok: true as const, conversations: [] as BrainConversation[] };
+
+    const ids = [...byPatient.keys()];
+    const { data: profs } = await sb
+      .from("patient_profiles")
+      .select("id,display_name")
+      .in("id", ids);
+    const names = new Map<string, string>(
+      ((profs ?? []) as { id: string; display_name: string | null }[]).map((p) => [
+        p.id,
+        p.display_name || "Paciente",
+      ]),
+    );
+    const conversations: BrainConversation[] = ids.map((id) => ({
+      patientId: id,
+      name: names.get(id) ?? "Paciente",
+      ...byPatient.get(id)!,
+    }));
+    return { ok: true as const, conversations };
+  });
+
+/** Mensagens de UMA conversa (paciente × cérebro do médico-alvo). */
+export const getBrainConversation = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        patientId: z.string().uuid(),
+        asDoctor: z.string().uuid().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, messages: [] as BrainChatMessage[] };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const, messages: [] as BrainChatMessage[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Duplo WHERE: só mensagens DESTA paciente COM ESTE médico — uma paciente
+    // que trocou de médico não expõe as conversas antigas ao médico novo.
+    const { data: rows, error } = await (supabaseAdmin as any)
+      .from("chat_messages")
+      .select("role,content,created_at")
+      .eq("doctor_id", target.doctorId)
+      .eq("patient_id", data.patientId)
+      .order("created_at", { ascending: true })
+      .limit(200);
+    if (error) return { ok: false as const, messages: [] as BrainChatMessage[] };
+    return { ok: true as const, messages: (rows ?? []) as BrainChatMessage[] };
   });
