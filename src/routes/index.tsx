@@ -30,6 +30,7 @@ import {
   PhoneFrame,
 } from "@/components/app-phone-mockup";
 import { FootprintTrail } from "@/components/footprint-trail";
+import { BrainShowcase } from "@/components/brain-showcase";
 import { setHeroDark } from "@/components/hero-theme";
 
 export const Route = createFileRoute("/")({
@@ -295,6 +296,9 @@ function Index() {
           </Reveal>
         </div>
       </section>
+
+      {/* ── Segundo Cérebro: o produto mais forte, em destaque ──────── */}
+      <BrainShowcase />
 
       {/* ── Por dentro do app: 3 telas em destaque ─────────────────── */}
       <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">

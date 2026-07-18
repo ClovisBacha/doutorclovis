@@ -1010,3 +1010,53 @@ button:active > .duo3d {
     animation: none;
   }
 }
+
+/* ── Segundo Cérebro na home: sinapses, órbita e halo ─────────────────── */
+@keyframes synapseTravel {
+  to {
+    stroke-dashoffset: -84;
+  }
+}
+.synapse {
+  stroke-dasharray: 4 10;
+  animation: synapseTravel 2.8s linear infinite;
+}
+@keyframes orbitSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.brain-orbit {
+  animation: orbitSpin 18s linear infinite;
+  transform-origin: 110px 95px;
+}
+@keyframes haloBreathe {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+.brain-halo {
+  animation: haloBreathe 4.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .synapse,
+  .brain-orbit,
+  .brain-halo {
+    animation: none;
+  }
+}
+
+.brain-bubble {
+  animation: floatY 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-bubble {
+    animation: none;
+  }
+}
