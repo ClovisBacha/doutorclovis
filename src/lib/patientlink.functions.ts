@@ -68,6 +68,8 @@ export type LinkedPatient = {
   /** BPM fetal medido na consulta — alimenta o "Sentir o coração" da família. */
   fetal_bpm?: number | null;
   fetal_bpm_at?: string | null;
+  /** Semana gestacional atual (calculada no servidor) — espelho do bebê no painel. */
+  weeks?: number | null;
 };
 
 const TokenSchema = z.object({ accessToken: z.string().min(10) });
@@ -301,12 +303,15 @@ export const listMyPatients = createServerFn({ method: "POST" })
 
     // Cascata de selects: colunas opcionais (quiz_premium, fetal_bpm) podem
     // ainda não existir no banco de produção (42703) — degrada sem quebrar.
+    // lmp_date/reference_* alimentam a semana gestacional (espelho do bebê).
+    const gestCols = "lmp_date,reference_date,reference_weeks,reference_days";
     const selects = [
-      "id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at",
-      "id,display_name,due_date,created_at,quiz_premium",
+      `id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,${gestCols}`,
+      `id,display_name,due_date,created_at,quiz_premium,${gestCols}`,
+      `id,display_name,due_date,created_at,${gestCols}`,
       "id,display_name,due_date,created_at",
     ];
-    let rows: unknown[] | null = null;
+    let rows: any[] | null = null;
     for (const sel of selects) {
       const res = await (supabaseAdmin as any)
         .from("patient_profiles")
@@ -321,7 +326,28 @@ export const listMyPatients = createServerFn({ method: "POST" })
       if (res.error.code !== "42703") break; // erro real, não coluna ausente
     }
 
-    return { ok: true as const, patients: (rows ?? []) as LinkedPatient[] };
+    // Semana gestacional por paciente (mesma função pura do app).
+    const { computeGestation } = await import("./gestacao");
+    const patients = (rows ?? []).map((r) => {
+      const g = computeGestation({
+        lmp: r.lmp_date,
+        referenceDate: r.reference_date,
+        referenceWeeks: r.reference_weeks,
+        referenceDays: r.reference_days,
+      });
+      return {
+        id: r.id,
+        display_name: r.display_name ?? null,
+        due_date: r.due_date ?? null,
+        created_at: r.created_at ?? null,
+        quiz_premium: r.quiz_premium ?? null,
+        fetal_bpm: r.fetal_bpm ?? null,
+        fetal_bpm_at: r.fetal_bpm_at ?? null,
+        weeks: g && g.weeks >= 1 && g.weeks <= 44 ? g.weeks : null,
+      } as LinkedPatient;
+    });
+
+    return { ok: true as const, patients };
   });
 
 /**

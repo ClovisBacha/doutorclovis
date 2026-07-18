@@ -612,10 +612,10 @@ export function AppHomeScreen({
     <div className="space-y-4 pb-2">
       {/* ── Hero imersivo: céu real do momento + bebê + clima ────────
           Full-bleed nas laterais (-mx-5 cancela o px-5 da página) e puxado
-          para cima (-mt-2) para o céu preencher quase a tela toda. Só a base
-          é arredondada — laterais e topo encostam na borda do celular. */}
+          para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
+          encosta nas quatro bordas para máxima imersão no celular. */}
       <div
-        className="shine relative -mx-5 -mt-2 flex min-h-[82svh] flex-col overflow-hidden rounded-b-[2rem] px-5 pb-6 pt-6 transition-[background] duration-1000"
+        className="shine relative -mx-5 -mt-2 flex min-h-[88svh] flex-col overflow-hidden px-5 pb-7 pt-6 transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Céu vivo: sol/lua, estrelas à noite, nuvens à deriva, chuva */}

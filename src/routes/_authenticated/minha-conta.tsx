@@ -693,8 +693,10 @@ function MinhaContaPage() {
           </div>
         </div>
 
-        {/* ── Sem médico vinculado? Convida a encontrar um ── */}
-        {!loading && profile && !profile.doctor_id && (
+        {/* ── Sem médico vinculado? Convida a encontrar um ──
+            Some quando a paciente já escolheu um médico (doctor_id) e nunca
+            aparece para contas de médico/admin — elas são o próprio médico. */}
+        {!loading && profile && !profile.doctor_id && !isDoctor && !isAdmin && (
           <Link
             to="/encontrar-medico"
             className="mb-4 flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 transition-colors hover:border-primary/60"

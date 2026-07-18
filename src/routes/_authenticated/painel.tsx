@@ -18,6 +18,8 @@ import {
   type PatientEngagement,
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
+import { BabyIllustration } from "@/components/baby-illustration";
+import { gradientFor, periodFor } from "@/components/weather-sky";
 import { ymdLocal } from "@/lib/utils";
 import {
   getTeleconsultasAdmin,
@@ -6877,48 +6879,110 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             </p>
           </div>
         ) : (
-          <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-            <ul className="divide-y divide-border">
-              {patients.map((p) => {
-                const due = fmtDate(p.due_date);
-                return (
-                  <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                        {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {p.display_name ?? "Sem nome"}
-                        </p>
-                        {due && <p className="text-xs text-muted-foreground">DPP {due}</p>}
+          <>
+            {/* Espelho: cada paciente pelo bebê que ela vê no app. O tamanho
+                do bebê cresce com a semana — identificação visual rápida.
+                4 por linha no computador. */}
+            <p className="mt-3 text-xs text-muted-foreground">
+              Cada quadro é o espelho da tela do bebê da paciente — o bebê cresce com a semana.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {patients.map((p) => (
+                <PatientMirrorCard key={p.id} p={p} />
+              ))}
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+              <ul className="divide-y divide-border">
+                {patients.map((p) => {
+                  const due = fmtDate(p.due_date);
+                  return (
+                    <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                          {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {p.display_name ?? "Sem nome"}
+                          </p>
+                          {due && <p className="text-xs text-muted-foreground">DPP {due}</p>}
+                        </div>
                       </div>
-                    </div>
-                    {/* BPM fetal da consulta → "Sentir o coração" da família */}
-                    <FetalBpmChip p={p} tokenFn={tokenFn} onSaved={loadPatients} />
-                    {/* Premium do quiz: liberar após confirmar o PIX da paciente */}
-                    <button
-                      onClick={() => togglePremium(p)}
-                      disabled={premiumBusyId === p.id}
-                      title={
-                        p.quiz_premium
-                          ? "Aulas premium ativas — clique para desativar"
-                          : "Ativar aulas premium (após confirmar o PIX)"
-                      }
-                      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
-                        p.quiz_premium
-                          ? "bg-amber-100 text-amber-700"
-                          : "border border-border text-muted-foreground hover:border-amber-400 hover:text-amber-600"
-                      }`}
-                    >
-                      {premiumBusyId === p.id ? "…" : p.quiz_premium ? "⭐ Premium" : "☆ Premium"}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+                      {/* BPM fetal da consulta → "Sentir o coração" da família */}
+                      <FetalBpmChip p={p} tokenFn={tokenFn} onSaved={loadPatients} />
+                      {/* Premium do quiz: liberar após confirmar o PIX da paciente */}
+                      <button
+                        onClick={() => togglePremium(p)}
+                        disabled={premiumBusyId === p.id}
+                        title={
+                          p.quiz_premium
+                            ? "Aulas premium ativas — clique para desativar"
+                            : "Ativar aulas premium (após confirmar o PIX)"
+                        }
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
+                          p.quiz_premium
+                            ? "bg-amber-100 text-amber-700"
+                            : "border border-border text-muted-foreground hover:border-amber-400 hover:text-amber-600"
+                        }`}
+                      >
+                        {premiumBusyId === p.id ? "…" : p.quiz_premium ? "⭐ Premium" : "☆ Premium"}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Espelho da tela do bebê da paciente (mini). Mesmo céu dia/noite do app e o
+ * bebê no tamanho da semana dela — o médico reconhece a paciente pelo bebê.
+ */
+function PatientMirrorCard({ p }: { p: LinkedPatient }) {
+  const period = periodFor(new Date().getHours());
+  const dark = period === "madrugada" || period === "noite";
+  const weeks = p.weeks ?? null;
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-card)]">
+      <div
+        className="relative flex aspect-square items-center justify-center"
+        style={{ background: gradientFor(period, 1) }}
+      >
+        {weeks ? (
+          <>
+            <BabyIllustration
+              week={weeks}
+              showSac={false}
+              showInfo={false}
+              className="h-[70%] w-[70%] drop-shadow-[0_8px_20px_rgba(0,0,0,0.18)]"
+            />
+            <span
+              className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                dark ? "bg-white/15 text-white/90" : "bg-white/70 text-foreground"
+              }`}
+            >
+              {weeks} sem
+            </span>
+          </>
+        ) : (
+          <span
+            className={`px-2 text-center text-[11px] ${dark ? "text-white/70" : "text-muted-foreground"}`}
+          >
+            Sem data de gestação
+          </span>
+        )}
+        {/* Nome sobre um véu escuro na base — legível em qualquer céu */}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-2.5 py-2">
+          <p className="truncate text-[11px] font-semibold text-white">
+            {p.display_name ?? "Paciente"}
+          </p>
+        </div>
       </div>
     </div>
   );
