@@ -6102,10 +6102,10 @@ function DoctorBilling({
 
       {isTeam ? null : (
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Clínica com muitos médicos? O plano Clínica leva até 100 cérebros num painel só (R$
-          4.997/mês).{" "}
+          Clínica com vários médicos? O plano Clínica opera o cérebro de cada um num painel só — com
+          orçamento personalizado pelo tamanho da equipe.{" "}
           <a href="/medicos#contato" className="font-semibold text-primary">
-            Fale com a gente
+            Pedir orçamento
           </a>
           .
         </p>

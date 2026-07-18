@@ -212,11 +212,12 @@ async function rewardReferrer(referredDoctorId: string): Promise<void> {
 }
 
 /**
- * Premium para a paciente que convidou o médico: quando o médico convidado
- * assina um plano pago, a paciente ganha o Premium do app. Claim atômico em
- * invited_reward_given (retry do Stripe não duplica). O Premium entra também
- * como linha em `subscriptions` (source 'convite', status active) para o
- * "keep" do quiz_premium sobreviver a cancelamentos de outras assinaturas.
+ * Recompensa para a paciente que convidou o médico: quando o médico convidado
+ * assina um plano pago, a paciente ganha 1 ANO de Premium do app grátis (vale
+ * ~R$108). Claim atômico em invited_reward_given (retry do Stripe não duplica).
+ * O Premium entra como linha em `subscriptions` (source 'convite', com
+ * current_period_end +1 ano) para o "keep" do quiz_premium sobreviver a
+ * cancelamentos de outras assinaturas e o prazo ficar registrado.
  */
 async function rewardInvitingPatient(doctorId: string): Promise<void> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -238,14 +239,16 @@ async function rewardInvitingPatient(doctorId: string): Promise<void> {
     .select("id");
   if (!claimed || claimed.length === 0) return;
 
+  const oneYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
   await sb.from("subscriptions").upsert(
     {
       user_id: patientId,
       product: "quiz_premium",
-      plan: "convite_medico",
+      plan: "convite_medico_1ano",
       source: "convite",
       status: "active",
       stripe_subscription_id: `convite_${doctorId}`,
+      current_period_end: oneYear,
     },
     { onConflict: "stripe_subscription_id" },
   );

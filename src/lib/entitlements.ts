@@ -15,8 +15,8 @@
  *   - Pro:     150 pacientes · 1 cérebro · IA também no WhatsApp.
  *   - Elite:   300 pacientes/médico · até 5 cérebros (equipe) + 25 convites.
  *   - Black:   500 pacientes/médico · até 20 cérebros + 250 convites + topo.
- *   - Clínica: o MAIS CARO — até 100 cérebros · 500 pacientes/médico,
- *              painel da clínica operando cada cérebro individualmente.
+ *   - Clínica: personalizado (orçamento por contrato) — vários médicos,
+ *              sem tetos rígidos; painel operando cada cérebro individualmente.
  *   - Trial:   experimenta o Pro por tempo limitado.
  */
 
@@ -94,11 +94,14 @@ const PRO: Entitlements = {
   dedicatedManager: false,
 };
 
+// Clínica = plano personalizado (orçamento por contrato). Sem tetos rígidos:
+// pacientes e médicos são acordados no fechamento, então null/null (a conta é
+// provisionada pela nossa equipe já com o combinado).
 const CLINICA: Entitlements = {
   ...PRO,
   label: "Clínica",
-  maxPatients: 500,
-  maxBrains: 100,
+  maxPatients: null,
+  maxBrains: null,
   teamSeats: true,
   prioritySupport: true,
   dedicatedManager: true,

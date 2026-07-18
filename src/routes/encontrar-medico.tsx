@@ -9,6 +9,7 @@ import {
 } from "@/lib/doctors.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { DoctorBadge } from "@/components/doctor-badge";
+import { InviteDoctorCTA } from "@/components/invite-doctor-cta";
 
 export const Route = createFileRoute("/encontrar-medico")({
   head: () => ({
@@ -270,9 +271,13 @@ function EncontrarMedicoPage() {
           {loading ? (
             <div className="skeleton h-28 rounded-2xl" />
           ) : results.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              Nenhum médico encontrado com esses filtros. Tente ampliar a busca.
-            </p>
+            <div className="space-y-5 py-6">
+              <p className="text-center text-sm text-muted-foreground">
+                Nenhum médico encontrado com esses filtros. Tente ampliar a busca.
+              </p>
+              {/* Gatilho: não achou o médico dela → convide e ganhe 1 ano grátis */}
+              {loggedIn && <InviteDoctorCTA variant="hero" />}
+            </div>
           ) : (
             results.map((d) => (
               <div key={d.id} className="rounded-2xl border border-border bg-card p-4">

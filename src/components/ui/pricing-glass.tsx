@@ -21,6 +21,8 @@ export type PricingGlassTier = {
   tagline: string;
   /** Valor já formatado, sem moeda. Ex.: "347", "0", "1.500". */
   price: string;
+  /** Preço sob consulta: substitui R$/número/período por um texto (ex.: "Sob consulta"). */
+  customPrice?: string;
   /** Valor riscado (promoção). */
   oldPrice?: string;
   /** Moeda exibida antes do número. Padrão "R$". */
@@ -171,24 +173,34 @@ function PricingCard({ tier }: { tier: PricingGlassTier }) {
           variants={legoVariant}
           className={`mb-2 flex items-baseline gap-1 ${tier.fromPrefix || tier.oldPrice ? "mt-1" : "mt-4"}`}
         >
-          <span className="text-2xl font-medium tracking-tight text-white/60">{currency}</span>
-          {/* overflow-y-hidden clipa só o eixo vertical (slide da animação);
-              shrink-0 impede o flexbox de encolher e cortar o último dígito. */}
-          <div className="flex h-[60px] shrink-0 items-center overflow-y-hidden">
-            <AnimatePresence mode="popLayout">
-              <motion.span
-                key={tier.price}
-                initial={{ y: 40, opacity: 0, filter: "blur(4px)" }}
-                animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-                exit={{ y: -40, opacity: 0, filter: "blur(4px)" }}
-                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                className="block whitespace-nowrap text-[56px] font-bold leading-none tracking-tighter text-white md:text-[60px]"
-              >
-                {tier.price}
-              </motion.span>
-            </AnimatePresence>
-          </div>
-          <span className="ml-1 text-lg font-medium text-white/60">{period}</span>
+          {tier.customPrice ? (
+            <div className="flex h-[60px] items-center">
+              <span className="text-3xl font-bold leading-none tracking-tight text-white md:text-4xl">
+                {tier.customPrice}
+              </span>
+            </div>
+          ) : (
+            <>
+              <span className="text-2xl font-medium tracking-tight text-white/60">{currency}</span>
+              {/* overflow-y-hidden clipa só o eixo vertical (slide da animação);
+                  shrink-0 impede o flexbox de encolher e cortar o último dígito. */}
+              <div className="flex h-[60px] shrink-0 items-center overflow-y-hidden">
+                <AnimatePresence mode="popLayout">
+                  <motion.span
+                    key={tier.price}
+                    initial={{ y: 40, opacity: 0, filter: "blur(4px)" }}
+                    animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                    exit={{ y: -40, opacity: 0, filter: "blur(4px)" }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    className="block whitespace-nowrap text-[56px] font-bold leading-none tracking-tighter text-white md:text-[60px]"
+                  >
+                    {tier.price}
+                  </motion.span>
+                </AnimatePresence>
+              </div>
+              <span className="ml-1 text-lg font-medium text-white/60">{period}</span>
+            </>
+          )}
         </motion.div>
 
         {tier.footnote && (

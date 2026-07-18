@@ -123,20 +123,21 @@ const PLANS = [
   {
     key: "enterprise",
     name: "Clínica",
-    tagline: "O plano mais completo",
-    monthly: 4997,
+    tagline: "Para clínicas e grupos",
+    monthly: 0,
+    customPrice: "Sob consulta",
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "A clínica inteira num painel só: até 100 médicos, cada um com o próprio Segundo Cérebro — operados individualmente pela clínica.",
+    desc: "A clínica inteira num painel só: vários médicos, cada um com o próprio Segundo Cérebro — operados individualmente. Preço personalizado pelo tamanho da sua equipe.",
     features: [
-      "🧠 Até 100 cérebros (R$ 49,97/médico) · 👩‍🍼 500 pacientes por médico",
       "🏥 Painel da clínica: opere o cérebro de cada médico individualmente",
+      "🧠 Conversas ilimitadas com a IA para todas as pacientes",
       "📊 Relatório mensal por médico (cobertura e satisfação da IA)",
-      "O menor custo por médico da plataforma — R$ 49,97 por cérebro",
+      "💬 Orçamento sob medida pelo número de médicos — fale com a gente",
       "👤 Gerente dedicado + onboarding e migração assistidos",
     ],
-    cta: "Falar com a equipe",
+    cta: "Pedir orçamento",
   },
 ];
 
@@ -208,12 +209,12 @@ const FAQS = [
     a: "A plataforma funciona de forma independente do seu sistema atual — você pode usar os dois em paralelo. A migração de dados é feita com a ajuda da nossa equipe; integrações diretas são avaliadas caso a caso no Pro Equipe.",
   },
   {
-    q: "Existe limite de uso da IA?",
-    a: "Uso justo: cada paciente pode trocar até 60 mensagens com a IA por mês — o suficiente para 2 conversas por dia útil; ao atingir, a IA acolhe, registra a dúvida para o médico e orienta urgências normalmente. Contas com mais de 15 mil pacientes ativas/mês têm plano sob medida.",
+    q: "Existe limite de mensagens da IA?",
+    a: "Não. As pacientes conversam com a IA quantas vezes precisarem — sem cota, sem bloqueio. O que muda entre os planos é quantas pacientes e quantos médicos a conta comporta. Para clínicas grandes, o preço é personalizado (fale com a gente).",
   },
   {
     q: "Quantas pacientes posso ter?",
-    a: "Cada plano tem um teto que cresce com você: Free até 5 (para testar), Starter até 50, Pro até 150, Elite até 300 por médico e Black/Clínica até 500 por médico. Ao chegar perto do teto, é só subir de plano — as solicitações das pacientes ficam guardadas esperando você aceitar.",
+    a: "Cada plano tem um teto que cresce com você: Free até 5 (para testar), Starter até 50, Pro até 150, Elite até 300 por médico e Black até 500 por médico. No plano Clínica é sob medida, sem teto rígido. Ao chegar perto do limite, é só subir de plano — as solicitações das pacientes ficam guardadas esperando você aceitar.",
   },
 ];
 
@@ -744,6 +745,7 @@ function MedicosPage() {
             // Anual: com promoção de lançamento = 25% off; sem = 2 meses grátis (≈17%).
             const annualFactor = promo ? 1 - LAUNCH_PROMO.off : 10 / 12;
             const glassTiers: PricingGlassTier[] = PLANS.map((plan) => {
+              const customPrice = (plan as { customPrice?: string }).customPrice;
               const shown =
                 plan.monthly === 0
                   ? 0
@@ -756,17 +758,22 @@ function MedicosPage() {
                 name: plan.name,
                 tagline: plan.tagline,
                 price: String(shown),
-                oldPrice: annual && promo && plan.monthly > 0 ? String(plan.monthly) : undefined,
+                customPrice,
+                oldPrice:
+                  !customPrice && annual && promo && plan.monthly > 0
+                    ? String(plan.monthly)
+                    : undefined,
                 // O sufixo por assento (ex.: "/médico") vai para a nota — inline,
                 // ao lado do número de 60px, estouraria o card estreito.
                 period: plan.monthly === 0 ? "/sempre" : "/mês",
                 fromPrefix: plan.isFrom,
-                footnote:
-                  (plan.monthly === 0
-                    ? "grátis, para sempre"
-                    : annual
-                      ? `cobrado anualmente · economize R$ ${savings.toLocaleString("pt-BR")}/ano`
-                      : "sem fidelidade") + (plan.perSuffix ? " · por médico" : ""),
+                footnote: customPrice
+                  ? "orçamento pelo tamanho da equipe"
+                  : (plan.monthly === 0
+                      ? "grátis, para sempre"
+                      : annual
+                        ? `cobrado anualmente · economize R$ ${savings.toLocaleString("pt-BR")}/ano`
+                        : "sem fidelidade") + (plan.perSuffix ? " · por médico" : ""),
                 isPopular: plan.highlight,
                 features: plan.features,
                 ctaLabel: plan.cta,
