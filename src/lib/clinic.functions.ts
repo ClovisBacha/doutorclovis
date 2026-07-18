@@ -217,6 +217,25 @@ export const addClinicDoctor = createServerFn({ method: "POST" })
     if (doc.clinic_id === clinic.id)
       return { ok: true as const, already: true as const, name: doc.display_name as string };
 
+    // Escada de planos: teto de cérebros/médicos da clínica pelo plano do
+    // DONO da conta (Elite 5 → Black 20 → Clínica 100). Atingiu → upgrade.
+    const { getEntitlements } = await import("./entitlements.server");
+    const ent = await getEntitlements(user);
+    if (ent.maxBrains != null) {
+      const { count, error: cntErr } = await sb
+        .from("doctors")
+        .select("id", { count: "exact", head: true })
+        .eq("clinic_id", clinic.id);
+      if (!cntErr && (count ?? 0) >= ent.maxBrains) {
+        return {
+          ok: false as const,
+          reason: "limite" as const,
+          limit: ent.maxBrains,
+          plan: ent.label,
+        };
+      }
+    }
+
     const { error } = await sb
       .from("doctors")
       .update({ clinic_id: clinic.id, clinic_role: "member" })

@@ -5304,7 +5304,9 @@ function ClinicaSection({
               ? "Essa conta ainda não é de médico. Peça para completar o cadastro em /medicos/cadastro."
               : "reason" in res && res.reason === "outra_clinica"
                 ? "Esse médico já pertence a outra clínica."
-                : "Não foi possível adicionar o médico.",
+                : "reason" in res && res.reason === "limite"
+                  ? `Limite do plano ${res.plan} atingido (${res.limit} médicos na clínica). Faça upgrade para adicionar mais.`
+                  : "Não foi possível adicionar o médico.",
         );
         return;
       }
@@ -5856,13 +5858,23 @@ function DoctorBilling({
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <PlanBtn planKey="starter" name="Starter" monthly={197} tagline="A sua IA no app" />
-        <PlanBtn planKey="pro" name="Pro" monthly={347} tagline="A IA também no WhatsApp" />
+        <PlanBtn
+          planKey="starter"
+          name="Starter"
+          monthly={197}
+          tagline="Até 50 pacientes · 1 cérebro"
+        />
+        <PlanBtn
+          planKey="pro"
+          name="Pro"
+          monthly={347}
+          tagline="Até 150 pacientes · IA no WhatsApp"
+        />
         <PlanBtn
           planKey="elite"
           name="Elite"
           monthly={697}
-          tagline="Para clínicas de alto volume"
+          tagline="Até 5 cérebros · 300 pacientes/médico"
           highlight
           perk="🎟️ 25 convites premium/mês + selo Elite"
         />
@@ -5870,7 +5882,7 @@ function DoctorBilling({
           planKey="black"
           name="Black"
           monthly={1999}
-          tagline="O plano mais completo"
+          tagline="Até 20 cérebros · 500 pacientes/médico"
           black
           perk="🖤 250 convites/mês · gerente dedicado · topo da busca · selo Black"
         />
@@ -5878,7 +5890,8 @@ function DoctorBilling({
 
       {isTeam ? null : (
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Precisa de vários médicos (Pro Equipe)?{" "}
+          Clínica com muitos médicos? O plano Clínica leva até 100 cérebros num painel só (R$
+          4.997/mês).{" "}
           <a href="/medicos#contato" className="font-semibold text-primary">
             Fale com a gente
           </a>
@@ -6929,7 +6942,11 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         data: { accessToken: tk, requestId: req.id, accept },
       });
       if (!res.ok) {
-        toast.error("Não foi possível responder à solicitação. Tente novamente.");
+        toast.error(
+          "reason" in res && res.reason === "limit"
+            ? `Limite do plano ${res.plan} atingido (${res.limit} pacientes). Faça upgrade em Meu Perfil para aceitar mais pacientes.`
+            : "Não foi possível responder à solicitação. Tente novamente.",
+        );
         return;
       }
       // Remove o card otimisticamente e, ao aceitar, atualiza as pacientes.

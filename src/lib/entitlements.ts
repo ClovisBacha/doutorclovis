@@ -8,14 +8,15 @@
  * O card "Pro Equipe" da página de vendas corresponde ao plano `clinica`.
  * Plano desconhecido cai em `free` (o mais restritivo) — nunca libera demais.
  *
- * As capacidades espelham exatamente o que é prometido em /medicos:
- *   - Free:    organiza o consultório, até 5 pacientes, SEM IA.
- *   - Starter: a IA responde as pacientes no APP, pacientes ilimitadas.
- *   - Pro:     a IA também atende/agenda no WhatsApp + dashboard avançado.
- *   - Clínica: o Pro para vários médicos (assentos de equipe).
- *   - Elite:   Pro + equipe + 25 convites premium/mês + selo "Elite".
- *   - Black:   o topo — Elite + 250 convites/mês + gerente dedicado + selo
- *              "Black" + prioridade máxima na busca de médicos.
+ * As capacidades espelham exatamente o que é prometido em /medicos.
+ * Escada de LIMITES (pacientes por médico · cérebros por conta):
+ *   - Free:    5 pacientes  · 1 médico  · SEM IA (organiza o consultório).
+ *   - Starter: 50 pacientes · 1 cérebro · IA no app.
+ *   - Pro:     150 pacientes · 1 cérebro · IA também no WhatsApp.
+ *   - Elite:   300 pacientes/médico · até 5 cérebros (equipe) + 25 convites.
+ *   - Black:   500 pacientes/médico · até 20 cérebros + 250 convites + topo.
+ *   - Clínica: o MAIS CARO — até 100 cérebros · 500 pacientes/médico,
+ *              painel da clínica operando cada cérebro individualmente.
  *   - Trial:   experimenta o Pro por tempo limitado.
  */
 
@@ -26,6 +27,8 @@ export type Entitlements = {
   label: string;
   /** Máximo de pacientes ativas por médico (null = ilimitado). */
   maxPatients: number | null;
+  /** Máximo de cérebros/médicos na conta ou clínica (null = ilimitado). */
+  maxBrains: number | null;
   /** Segundo Cérebro (IA) responde as pacientes no app. */
   aiApp: boolean;
   /** Agente de IA atende e agenda no WhatsApp. */
@@ -49,6 +52,7 @@ export type Entitlements = {
 const FREE: Entitlements = {
   label: "Free",
   maxPatients: 5,
+  maxBrains: 1,
   aiApp: false,
   aiWhatsapp: false,
   clinicalToolsAdvanced: false,
@@ -62,7 +66,8 @@ const FREE: Entitlements = {
 
 const STARTER: Entitlements = {
   label: "Starter",
-  maxPatients: null,
+  maxPatients: 50,
+  maxBrains: 1,
   aiApp: true,
   aiWhatsapp: false,
   clinicalToolsAdvanced: true,
@@ -76,7 +81,8 @@ const STARTER: Entitlements = {
 
 const PRO: Entitlements = {
   label: "Pro",
-  maxPatients: null,
+  maxPatients: 150,
+  maxBrains: 1,
   aiApp: true,
   aiWhatsapp: true,
   clinicalToolsAdvanced: true,
@@ -90,8 +96,11 @@ const PRO: Entitlements = {
 
 const CLINICA: Entitlements = {
   ...PRO,
-  label: "Pro Equipe",
+  label: "Clínica",
+  maxPatients: 500,
+  maxBrains: 100,
   teamSeats: true,
+  prioritySupport: true,
   dedicatedManager: true,
 };
 
@@ -99,6 +108,8 @@ const CLINICA: Entitlements = {
 const ELITE: Entitlements = {
   ...PRO,
   label: "Elite",
+  maxPatients: 300,
+  maxBrains: 5,
   teamSeats: true,
   premiumInvitesPerMonth: 25,
   badge: "Elite",
@@ -109,6 +120,8 @@ const ELITE: Entitlements = {
 const BLACK: Entitlements = {
   ...ELITE,
   label: "Black",
+  maxPatients: 500,
+  maxBrains: 20,
   premiumInvitesPerMonth: 250,
   badge: "Black",
   dedicatedManager: true,
@@ -132,7 +145,12 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Entitlements> = {
  * A equipe da instalação (ADMIN_EMAILS) tem acesso total — é a conta dona
  * da plataforma (ex.: o médico fundador + secretária), nunca um assinante limitado.
  */
-export const OWNER_ENTITLEMENTS: Entitlements = { ...BLACK, label: "Instalação" };
+export const OWNER_ENTITLEMENTS: Entitlements = {
+  ...BLACK,
+  label: "Instalação",
+  maxPatients: null,
+  maxBrains: null,
+};
 
 /** Ordem de prioridade dos planos (maior = melhor) — usado no ranking da busca. */
 export const PLAN_RANK: Record<PlanKey, number> = {
@@ -140,9 +158,9 @@ export const PLAN_RANK: Record<PlanKey, number> = {
   trial: 1,
   starter: 2,
   pro: 3,
-  clinica: 4,
-  elite: 5,
-  black: 6,
+  elite: 4,
+  black: 5,
+  clinica: 6, // o plano mais caro/completo — topo da escada
 };
 
 /** Normaliza um valor livre de `doctors.plan` para uma PlanKey conhecida. */

@@ -278,6 +278,26 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
 
     const now = new Date().toISOString();
     if (data.accept) {
+      // Escada de planos: cada plano tem um teto de pacientes ativas por
+      // médico (Free 5 → Starter 50 → Pro 150 → Elite 300 → Black/Clínica
+      // 500). Ao atingir o teto, o aceite é bloqueado com o motivo — a
+      // solicitação fica pendente e o médico faz upgrade para aceitar.
+      const { getEntitlements } = await import("./entitlements.server");
+      const ent = await getEntitlements(user);
+      if (ent.maxPatients != null) {
+        const { count, error: cntErr } = await (supabaseAdmin as any)
+          .from("patient_profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("doctor_id", user.id);
+        if (!cntErr && (count ?? 0) >= ent.maxPatients) {
+          return {
+            ok: false as const,
+            reason: "limit" as const,
+            limit: ent.maxPatients,
+            plan: ent.label,
+          };
+        }
+      }
       // Vincula a paciente ao médico (denormalizado em patient_profiles).
       const { error: linkErr } = await (supabaseAdmin as any)
         .from("patient_profiles")

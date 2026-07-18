@@ -60,9 +60,11 @@ async function planRowFor(doctorId: string): Promise<string | null> {
   ) {
     plan = "free";
   }
-  // Assento de clínica: membro de clínica ATIVA herda o plano Clínica
-  // (nunca rebaixa quem já tem plano igual ou superior).
-  if (data.clinic_id && PLAN_RANK[normalizePlan(plan)] < PLAN_RANK["clinica"]) {
+  // Assento de clínica: membro de clínica ATIVA herda as capacidades do
+  // plano Clínica. SÓ sobe quem está abaixo do Elite — Elite/Black mantêm o
+  // próprio plano (têm convites premium e selo que o Clínica não substitui;
+  // trocar seria rebaixar por outro eixo).
+  if (data.clinic_id && PLAN_RANK[normalizePlan(plan)] < PLAN_RANK["elite"]) {
     try {
       const { data: clinic } = await sb
         .from("clinics")
