@@ -401,7 +401,9 @@ export const setPatientQuizPremium = createServerFn({ method: "POST" })
           .eq("product", "quiz_premium")
           .in("status", ["active", "trialing"]);
         const paga = (subs ?? []).some(
-          (s: any) => s.source === "stripe" || s.source === "doctor_invite",
+          // 'convite' = recompensa da paciente que convidou o médico (webhook)
+          (s: any) =>
+            s.source === "stripe" || s.source === "doctor_invite" || s.source === "convite",
         );
         if (paga) {
           return {
