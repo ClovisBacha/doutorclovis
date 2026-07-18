@@ -1286,13 +1286,15 @@ export const getBrainScore = createServerFn({ method: "POST" })
     const enabledApp = st ? st.enabled_app !== false : true;
     const approved = approvedRes?.count ?? 0;
     const hasKit = (kitRes?.count ?? 0) > 0;
-    const gapsOpen = gapsRes?.error ? 0 : (gapsRes?.count ?? 0);
+    // Tabela ausente (migração pendente) NÃO premia: sem dado ≠ em dia.
+    const gapsUnknown = !!gapsRes?.error;
+    const gapsOpen = gapsUnknown ? 0 : (gapsRes?.count ?? 0);
     const coverage = statsRes?.coveragePct ?? null;
 
     // Proporcionais: conhecimento até 30 entradas; cobertura até 80%.
     const entriesEarned = Math.round(Math.min(1, approved / 30) * 20);
     const coverageEarned = coverage == null ? 0 : Math.round(Math.min(1, coverage / 80) * 15);
-    const gapsEarned = gapsOpen === 0 ? 10 : gapsOpen <= 3 ? 5 : 0;
+    const gapsEarned = gapsUnknown ? 0 : gapsOpen === 0 ? 10 : gapsOpen <= 3 ? 5 : 0;
 
     const items: BrainScoreItem[] = [
       {
@@ -1337,11 +1339,17 @@ export const getBrainScore = createServerFn({ method: "POST" })
       },
       {
         key: "lacunas",
-        label: gapsOpen === 0 ? "Lacunas em dia" : `Lacunas abertas (${gapsOpen})`,
+        label: gapsUnknown
+          ? "Lacunas (ative o autoaprendizado)"
+          : gapsOpen === 0
+            ? "Lacunas em dia"
+            : `Lacunas abertas (${gapsOpen})`,
         points: 10,
         earned: gapsEarned,
-        done: gapsOpen === 0,
-        hint: "Responda as perguntas que a IA não soube — o cérebro aprende na hora.",
+        done: !gapsUnknown && gapsOpen === 0,
+        hint: gapsUnknown
+          ? "Rode o APLICAR_PENDENTES.sql no Supabase para ativar as lacunas."
+          : "Responda as perguntas que a IA não soube — o cérebro aprende na hora.",
       },
       {
         key: "ativa",

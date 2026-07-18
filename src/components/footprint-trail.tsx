@@ -47,12 +47,16 @@ export function FootprintTrail({
   const ref = useRef<HTMLDivElement>(null);
   // Quantas pegadas estão visíveis agora (0..count), dirigido pelo scroll
   const [shown, setShown] = useState(0);
+  // "Reduzir movimento": além de pular a caminhada, desliga a transição de
+  // entrada das pegadas (senão ainda haveria um fade/scale de ~0,7s).
+  const [reduced, setReduced] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     // Respeita "reduzir movimento": mostra o caminho inteiro, sem animação.
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setReduced(true);
       setShown(count);
       return;
     }
@@ -95,7 +99,9 @@ export function FootprintTrail({
     const side = i % 2 === 0 ? 1 : -1; // alterna pé esq/dir
     return {
       x: startX + (endX - startX) * t + side * 2.4, // afasta o pé da linha central
-      y: t * 100,
+      // 7%→93%: com translate(-50%,-50%), a pegada fica CONTIDA no container
+      // (em 0/100% metade dela vazava para fora).
+      y: 7 + t * 86,
       angle: 180 + tilt, // 180 = pontas dos dedos apontando para baixo
       left: side === 1,
     };
@@ -112,7 +118,7 @@ export function FootprintTrail({
         return (
           <span
             key={i}
-            className="absolute transition-all duration-700 ease-out"
+            className={`absolute ${reduced ? "" : "transition-all duration-700 ease-out"}`}
             style={{
               left: `${s.x}%`,
               top: `${s.y}%`,
