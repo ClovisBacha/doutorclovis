@@ -1959,3 +1959,39 @@ CREATE INDEX IF NOT EXISTS idx_doctors_clinic ON public.doctors(clinic_id);
 ALTER TABLE public.clinics ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.clinics FROM anon, authenticated;
 GRANT ALL ON public.clinics TO service_role;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260718010000 — Protege clinic_id/clinic_role contra auto-promoção
+-- (requer o bloco anterior, que cria as colunas). Sem isto, um médico logado
+-- poderia se tornar admin de clínica ou entrar numa clínica alheia via
+-- UPDATE direto na tabela doctors pelo console do navegador.
+-- ════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.protect_doctor_billing()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF current_user <> 'service_role' THEN
+    IF TG_OP = 'INSERT' THEN
+      NEW.plan := 'trial';
+      NEW.active := true;
+      NEW.plan_expires_at := NULL;
+      NEW.clinic_id := NULL;
+      NEW.clinic_role := 'member';
+    ELSE
+      NEW.plan := OLD.plan;
+      NEW.active := OLD.active;
+      NEW.plan_expires_at := OLD.plan_expires_at;
+      NEW.clinic_id := OLD.clinic_id;
+      NEW.clinic_role := OLD.clinic_role;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_doctor_billing ON public.doctors;
+CREATE TRIGGER trg_protect_doctor_billing
+  BEFORE INSERT OR UPDATE ON public.doctors
+  FOR EACH ROW EXECUTE FUNCTION public.protect_doctor_billing();
