@@ -1938,3 +1938,24 @@ GRANT EXECUTE ON FUNCTION public.match_brain_entries(uuid, vector, int) TO servi
 -- pgvector, a falha NÃO impede a função (busca funciona via seq scan).
 CREATE INDEX IF NOT EXISTS idx_brain_entries_embedding
   ON public.brain_entries USING hnsw (embedding vector_cosine_ops);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260718000000 — Plano Clínica (clínica controla o cérebro de cada médico)
+-- ════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.clinics (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name          text NOT NULL,
+  owner_user_id uuid NOT NULL UNIQUE,
+  active        boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS clinic_id uuid;
+ALTER TABLE public.doctors ADD COLUMN IF NOT EXISTS clinic_role text NOT NULL DEFAULT 'member';
+
+CREATE INDEX IF NOT EXISTS idx_doctors_clinic ON public.doctors(clinic_id);
+
+ALTER TABLE public.clinics ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.clinics FROM anon, authenticated;
+GRANT ALL ON public.clinics TO service_role;

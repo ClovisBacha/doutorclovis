@@ -15,6 +15,7 @@ import {
   entitlementsFor,
   OWNER_ENTITLEMENTS,
   normalizePlan,
+  PLAN_RANK,
   type Entitlements,
   type PlanKey,
 } from "./entitlements";
@@ -33,22 +34,47 @@ export function isPlatformTeamEmail(email?: string | null): boolean {
 
 async function planRowFor(doctorId: string): Promise<string | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await (supabaseAdmin as any)
+  const sb = supabaseAdmin as any;
+  const first = await sb
     .from("doctors")
-    .select("plan,active,plan_expires_at")
+    .select("plan,active,plan_expires_at,clinic_id")
     .eq("id", doctorId)
     .maybeSingle();
+  let data = first.data;
+  if (first.error?.code === "42703") {
+    // Coluna clinic_id ainda não migrada: segue sem o assento de clínica.
+    ({ data } = await sb
+      .from("doctors")
+      .select("plan,active,plan_expires_at")
+      .eq("id", doctorId)
+      .maybeSingle());
+  }
   // Médico inativo (assinatura suspensa) perde as capacidades pagas → free.
   if (!data || data.active === false) return "free";
+  let plan: string | null = (data.plan ?? null) as string | null;
   // Trial expirado (14 dias) cai para free — o "grátis por 14 dias" tem fim.
   if (
     data.plan === "trial" &&
     data.plan_expires_at &&
     new Date(data.plan_expires_at).getTime() < Date.now()
   ) {
-    return "free";
+    plan = "free";
   }
-  return (data.plan ?? null) as string | null;
+  // Assento de clínica: membro de clínica ATIVA herda o plano Clínica
+  // (nunca rebaixa quem já tem plano igual ou superior).
+  if (data.clinic_id && PLAN_RANK[normalizePlan(plan)] < PLAN_RANK["clinica"]) {
+    try {
+      const { data: clinic } = await sb
+        .from("clinics")
+        .select("active")
+        .eq("id", data.clinic_id)
+        .maybeSingle();
+      if (clinic?.active) plan = "clinica";
+    } catch {
+      /* tabela clinics ainda não migrada */
+    }
+  }
+  return plan;
 }
 
 /** Plano efetivo (PlanKey) do usuário logado. Equipe da instalação → clinica. */

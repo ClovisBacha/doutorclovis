@@ -70,6 +70,14 @@ import {
   getMyReferrals,
   type DoctorProfile,
 } from "@/lib/doctors.functions";
+import {
+  getMyClinic,
+  createClinic,
+  addClinicDoctor,
+  removeClinicDoctor,
+  type ClinicInfo,
+  type ClinicMember,
+} from "@/lib/clinic.functions";
 import { getDoctorDashboard, type DoctorDashboard } from "@/lib/dashboard.functions";
 import {
   startGoogleCalendarConnect,
@@ -122,6 +130,7 @@ const PANEL_TABS = [
   "Lives",
   "Engajamento",
   "Pacientes 👩‍🍼",
+  "Clínica 🏥",
   "Meu Perfil",
 ] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
@@ -140,6 +149,7 @@ const DOCTOR_TABS: readonly PanelTab[] = [
   "Engajamento",
   "Cérebro 🧠",
   "Pacientes 👩‍🍼",
+  "Clínica 🏥",
   "Meu Perfil",
 ];
 
@@ -154,6 +164,9 @@ function PainelPage() {
   // Equipe da instalação (ADMIN_EMAILS) vê tudo; médico assinante vê DOCTOR_TABS
   const [isPlatformTeam, setIsPlatformTeam] = useState(false);
   const [tab, setTab] = useState<PanelTab>("Painel 📊");
+  // Plano Clínica: admin operando o cérebro de um médico da clínica.
+  // null = o próprio cérebro (comportamento de sempre).
+  const [brainAsDoctor, setBrainAsDoctor] = useState<{ id: string; name: string } | null>(null);
   const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [preForms, setPreForms] = useState<AdminPreConsulta[]>([]);
@@ -188,6 +201,18 @@ function PainelPage() {
         setAllowed(true);
         setIsPlatformTeam(false);
         return;
+      }
+      // Dono de clínica sem conta de médico (gestor): entra para administrar
+      // a clínica e operar os cérebros dos médicos dela.
+      try {
+        const myClinic = await getMyClinic({ data: { accessToken: tk } });
+        if (myClinic.ok && myClinic.clinic) {
+          setAllowed(true);
+          setIsPlatformTeam(false);
+          return;
+        }
+      } catch {
+        /* segue para o bloqueio padrão */
       }
       setAllowed(false);
     } finally {
@@ -371,10 +396,21 @@ function PainelPage() {
         {tab === "Cérebro 🧠" && (
           <CerebroSection
             tokenFn={token}
-            showTrainCard={isPlatformTeam}
+            showTrainCard={isPlatformTeam && !brainAsDoctor}
+            asDoctor={brainAsDoctor}
+            onExitAsDoctor={() => setBrainAsDoctor(null)}
             onTrained={(id) =>
               setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered: true } : x)))
             }
+          />
+        )}
+        {tab === "Clínica 🏥" && (
+          <ClinicaSection
+            tokenFn={token}
+            onOperateBrain={(d) => {
+              setBrainAsDoctor(d);
+              setTab("Cérebro 🧠");
+            }}
           />
         )}
         {tab === "Pacientes 👩‍🍼" && <PacientesSection tokenFn={token} />}
@@ -3488,31 +3524,55 @@ function CerebroSection({
   tokenFn,
   onTrained,
   showTrainCard,
+  asDoctor,
+  onExitAsDoctor,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
   // Treinar respondendo lista perguntas das pacientes da INSTALAÇÃO —
   // exclusivo da equipe até o escopo por médico (etapa 2 do roadmap)
   showTrainCard: boolean;
+  // Plano Clínica: admin operando o cérebro de um médico da clínica.
+  asDoctor?: { id: string; name: string } | null;
+  onExitAsDoctor?: () => void;
 }) {
+  const asId = asDoctor?.id;
   return (
-    <div className="space-y-6">
+    // key: trocar de médico REMONTA todos os cards — cada cérebro carrega do
+    // zero, sem estado (lacunas, base, placar) vazando de um médico p/ outro.
+    <div key={asId ?? "own"} className="space-y-6">
+      {asDoctor && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-4">
+          <p className="text-sm">
+            🏥 Você está operando o cérebro de <strong>{asDoctor.name}</strong> (clínica). Tudo o
+            que fizer aqui vale só para o cérebro deste médico.
+          </p>
+          <button
+            onClick={onExitAsDoctor}
+            className="shrink-0 rounded-full border border-primary px-4 py-1.5 text-xs font-semibold text-primary hover:bg-primary hover:text-primary-foreground"
+          >
+            Voltar ao meu cérebro
+          </button>
+        </div>
+      )}
       <div>
-        <p className="font-serif text-xl">Seu Segundo Cérebro</p>
+        <p className="font-serif text-xl">
+          {asDoctor ? `Segundo Cérebro de ${asDoctor.name}` : "Seu Segundo Cérebro"}
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ensine a IA a responder como você responderia: defina seu estilo, responda perguntas reais
-          das pacientes e alimente a base de conhecimento. O cérebro é usado pelo chat do app e pelo
-          atendimento no WhatsApp.
+          Ensine a IA a responder como {asDoctor ? "este médico" : "você"} responderia: defina o
+          estilo, responda perguntas reais das pacientes e alimente a base de conhecimento. O
+          cérebro é usado pelo chat do app e pelo atendimento no WhatsApp.
         </p>
       </div>
-      <BrainScoreCard tokenFn={tokenFn} />
-      <BrainGapsCard tokenFn={tokenFn} />
-      <BrainConsultaCard tokenFn={tokenFn} />
-      <BrainEvalCard tokenFn={tokenFn} />
-      <BrainSettingsCard tokenFn={tokenFn} />
+      <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainConsultaCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainEvalCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainSettingsCard tokenFn={tokenFn} asDoctor={asId} />
       {showTrainCard && <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} />}
-      <BrainKnowledgeCard tokenFn={tokenFn} />
-      <BrainPlaygroundCard tokenFn={tokenFn} />
+      <BrainKnowledgeCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainPlaygroundCard tokenFn={tokenFn} asDoctor={asId} />
     </div>
   );
 }
@@ -3531,7 +3591,14 @@ type EvalRow = {
  * permite afirmar "zero conduta inventada" com evidência — sem esperar meses
  * de uso. Rode após treinar o cérebro e antes de divulgar.
  */
-function BrainEvalCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function BrainEvalCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
   const [rows, setRows] = useState<EvalRow[]>([]);
   const [running, setRunning] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -3552,6 +3619,7 @@ function BrainEvalCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
               question: q.question,
               expect: q.expect,
               criterion: q.criterion,
+              ...(asDoctor ? { asDoctor } : {}),
             },
           });
           if (!res.ok) {
@@ -3684,7 +3752,14 @@ function BrainEvalCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
  * aprovar. Uma consulta de 30 min rende ~10 entradas na voz literal dele —
  * o jeito mais rápido de o cérebro virar o próprio médico.
  */
-function BrainConsultaCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function BrainConsultaCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
   const [transcript, setTranscript] = useState("");
   const [transcribing, setTranscribing] = useState(false);
   const [extracting, setExtracting] = useState(false);
@@ -3726,7 +3801,11 @@ function BrainConsultaCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     try {
       const tk = await tokenFn();
       const res = await extractKnowledgeFromTranscript({
-        data: { accessToken: tk, transcript: text.slice(0, 30000) },
+        data: {
+          accessToken: tk,
+          transcript: text.slice(0, 30000),
+          ...(asDoctor ? { asDoctor } : {}),
+        },
       });
       if (!res.ok) {
         toast.error(
@@ -3811,7 +3890,14 @@ function BrainConsultaCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
  * satisfação das pacientes e usos no mês. Some silenciosamente enquanto as
  * tabelas de telemetria não existirem (migração pendente) ou sem dados.
  */
-function BrainScoreCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function BrainScoreCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
   const [stats, setStats] = useState<{
     hitsMonth: number;
     gapsOpen: number;
@@ -3824,7 +3910,9 @@ function BrainScoreCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     (async () => {
       try {
         const tk = await tokenFn();
-        const res = await getBrainQualityStats({ data: { accessToken: tk } });
+        const res = await getBrainQualityStats({
+          data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
+        });
         if (res.ok) setStats(res);
       } catch {
         /* placar é enhancement — sem dados, sem card */
@@ -3887,7 +3975,14 @@ function BrainScoreCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
  * pelas mais perguntadas. O médico responde aqui e vira conhecimento aprovado
  * na hora.
  */
-function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function BrainGapsCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
   const [gaps, setGaps] = useState<BrainGap[]>([]);
   const [loading, setLoading] = useState(true);
   // Erro/tabela ausente NÃO pode se disfarçar de "nenhuma lacuna ✅"
@@ -3908,7 +4003,9 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     setDrafting(true);
     try {
       const tk = await tokenFn();
-      const res = await draftGapAnswer({ data: { accessToken: tk, gapId } });
+      const res = await draftGapAnswer({
+        data: { accessToken: tk, gapId, ...(asDoctor ? { asDoctor } : {}) },
+      });
       if (!res.ok) {
         toast.error(
           "reason" in res && res.reason === "plan"
@@ -3931,7 +4028,9 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   async function load() {
     try {
       const tk = await tokenFn();
-      const res = await listBrainGaps({ data: { accessToken: tk } });
+      const res = await listBrainGaps({
+        data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
+      });
       if (res.ok) {
         setGaps(res.gaps);
         setLoadError(null);
@@ -3963,6 +4062,7 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
           gapId,
           answer: answer.trim(),
           ...(q.length >= 8 ? { question: q.slice(0, 300) } : {}),
+          ...(asDoctor ? { asDoctor } : {}),
         },
       });
       if (!res.ok) {
@@ -3991,7 +4091,9 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     setDismissingId(gapId);
     try {
       const tk = await tokenFn();
-      const res = await dismissBrainGap({ data: { accessToken: tk, gapId } });
+      const res = await dismissBrainGap({
+        data: { accessToken: tk, gapId, ...(asDoctor ? { asDoctor } : {}) },
+      });
       if (res.ok) setGaps((gs) => gs.filter((g) => g.id !== gapId));
       else toast.error("Não foi possível ignorar.");
     } catch {
@@ -4005,7 +4107,9 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     setInstalling(true);
     try {
       const tk = await tokenFn();
-      const res = await installStarterPack({ data: { accessToken: tk } });
+      const res = await installStarterPack({
+        data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
+      });
       if (!res.ok) {
         toast.error(
           "reason" in res && res.reason === "plan"
@@ -4166,13 +4270,22 @@ function BrainGapsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 }
 
 /** Card "Estilo do médico": persona, frases típicas, regras e onde usar o cérebro. */
-function BrainSettingsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function BrainSettingsCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
   const [settings, setSettings] = useState<BrainSettings | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const res = await getBrainSettings({ data: { accessToken: await tokenFn() } });
+      const res = await getBrainSettings({
+        data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+      });
       if (res.ok) setSettings(res.settings);
       else toast.error("Não foi possível carregar o estilo do médico.");
     })();
@@ -4186,7 +4299,9 @@ function BrainSettingsCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     if (!settings) return;
     setSaving(true);
     try {
-      const res = await saveBrainSettings({ data: { accessToken: await tokenFn(), settings } });
+      const res = await saveBrainSettings({
+        data: { accessToken: await tokenFn(), settings, ...(asDoctor ? { asDoctor } : {}) },
+      });
       if (!res.ok) {
         toast.error("Não foi possível salvar o estilo. Tente novamente.");
         return;
@@ -4392,7 +4507,14 @@ function BrainTrainCard({
 }
 
 /** Card "Base de conhecimento": busca, edição e novas entradas manuais. */
-function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function BrainKnowledgeCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
   const [entries, setEntries] = useState<BrainEntry[] | null>(null);
   const [search, setSearch] = useState("");
   const [newQuestion, setNewQuestion] = useState("");
@@ -4413,7 +4535,11 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     const t = setTimeout(
       async () => {
         const res = await listBrainEntries({
-          data: { accessToken: await tokenFn(), search: search.trim() || undefined },
+          data: {
+            accessToken: await tokenFn(),
+            search: search.trim() || undefined,
+            ...(asDoctor ? { asDoctor } : {}),
+          },
         });
         if (!alive) return;
         if (res.ok) setEntries(res.entries);
@@ -4438,6 +4564,7 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
         answer: entry.answer,
         category: entry.category,
         approved,
+        ...(asDoctor ? { asDoctor } : {}),
       },
     });
     if (!res.ok) {
@@ -4462,6 +4589,7 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
           answer: a,
           category: entry.category,
           approved: entry.approved,
+          ...(asDoctor ? { asDoctor } : {}),
         },
       });
       if (!res.ok) {
@@ -4482,7 +4610,9 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
   async function remove(id: string) {
     if (!window.confirm("Excluir esta entrada da base de conhecimento?")) return;
-    const res = await deleteBrainEntry({ data: { accessToken: await tokenFn(), id } });
+    const res = await deleteBrainEntry({
+      data: { accessToken: await tokenFn(), id, ...(asDoctor ? { asDoctor } : {}) },
+    });
     if (!res.ok) {
       toast.error("Não foi possível excluir a entrada. Tente novamente.");
       return;
@@ -4501,6 +4631,7 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
           question: newQuestion.trim(),
           answer: newAnswer.trim(),
           category: newCategory.trim() || null,
+          ...(asDoctor ? { asDoctor } : {}),
         },
       });
       if (!res.ok || !res.entry) {
@@ -4674,7 +4805,14 @@ function BrainKnowledgeCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 }
 
 /** Card "Playground": teste o cérebro como se fosse uma paciente. */
-function BrainPlaygroundCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function BrainPlaygroundCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
+  asDoctor?: string;
+}) {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [result, setResult] = useState<{ question: string; answer: string } | null>(null);
@@ -4684,7 +4822,9 @@ function BrainPlaygroundCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     if (!q || asking) return;
     setAsking(true);
     try {
-      const res = await testBrain({ data: { accessToken: await tokenFn(), question: q } });
+      const res = await testBrain({
+        data: { accessToken: await tokenFn(), question: q, ...(asDoctor ? { asDoctor } : {}) },
+      });
       if (!res.ok) {
         toast.error(
           "answer" in res && res.answer
@@ -4755,6 +4895,278 @@ function BrainPlaygroundCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Aba "Clínica": conta da clínica com os médicos dela. Cada médico mantém o
+ * PRÓPRIO cérebro; o admin da clínica opera cada um individualmente (botão
+ * "Operar cérebro" leva à aba Cérebro no modo asDoctor).
+ */
+function ClinicaSection({
+  tokenFn,
+  onOperateBrain,
+}: {
+  tokenFn: () => Promise<string>;
+  onOperateBrain: (d: { id: string; name: string }) => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [clinic, setClinic] = useState<ClinicInfo | null>(null);
+  const [members, setMembers] = useState<ClinicMember[]>([]);
+  const [migrate, setMigrate] = useState(false);
+  const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [email, setEmail] = useState("");
+  const [addingDoc, setAddingDoc] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  async function load() {
+    try {
+      const res = await getMyClinic({ data: { accessToken: await tokenFn() } });
+      if (res.ok) {
+        setClinic(res.clinic);
+        setMembers(res.members);
+        setMigrate("migrate" in res && !!res.migrate);
+      }
+    } catch {
+      toast.error("Não foi possível carregar a clínica.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function create() {
+    if (name.trim().length < 2 || creating) return;
+    setCreating(true);
+    try {
+      const res = await createClinic({ data: { accessToken: await tokenFn(), name: name.trim() } });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "plan"
+            ? "O plano Clínica (Pro Equipe) é necessário para criar uma clínica."
+            : "reason" in res && res.reason === "migracao"
+              ? "Rode o APLICAR_PENDENTES.sql no Supabase para ativar as clínicas."
+              : "Não foi possível criar a clínica.",
+        );
+        return;
+      }
+      toast.success("Clínica criada! Agora adicione os médicos pelo e-mail.");
+      setName("");
+      await load();
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function addDoctor() {
+    const em = email.trim().toLowerCase();
+    if (!em || addingDoc) return;
+    setAddingDoc(true);
+    try {
+      const res = await addClinicDoctor({ data: { accessToken: await tokenFn(), email: em } });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "sem_conta"
+            ? "Nenhuma conta com esse e-mail. Peça para o médico se cadastrar primeiro."
+            : "reason" in res && res.reason === "sem_conta_medico"
+              ? "Essa conta ainda não é de médico. Peça para completar o cadastro em /medicos/cadastro."
+              : "reason" in res && res.reason === "outra_clinica"
+                ? "Esse médico já pertence a outra clínica."
+                : "Não foi possível adicionar o médico.",
+        );
+        return;
+      }
+      if ("already" in res && res.already) toast(`${res.name} já está na clínica.`);
+      else toast.success(`${res.name} entrou na clínica 🏥`);
+      setEmail("");
+      await load();
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setAddingDoc(false);
+    }
+  }
+
+  async function removeDoctor(d: ClinicMember) {
+    if (
+      !window.confirm(`Remover ${d.display_name} da clínica? O cérebro dele fica intacto, com ele.`)
+    )
+      return;
+    setRemovingId(d.id);
+    try {
+      const res = await removeClinicDoctor({
+        data: { accessToken: await tokenFn(), doctorId: d.id },
+      });
+      if (res.ok) {
+        toast.success(`${d.display_name} saiu da clínica.`);
+        await load();
+      } else toast.error("Não foi possível remover.");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  if (loading) return <div className="skeleton h-40 rounded-3xl" />;
+
+  if (migrate)
+    return (
+      <p className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        As tabelas do plano Clínica ainda não existem no banco — rode o{" "}
+        <strong>APLICAR_PENDENTES.sql</strong> no SQL Editor do Supabase.
+      </p>
+    );
+
+  if (!clinic)
+    return (
+      <div className="space-y-6">
+        <div>
+          <p className="font-serif text-xl">Sua clínica</p>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            No plano Clínica, a conta da clínica agrupa os médicos e controla o Segundo Cérebro de
+            cada um DE FORMA INDIVIDUAL: cada médico tem o próprio cérebro, as pacientes dele
+            conversam só com o cérebro dele, e a clínica opera todos num painel só.
+          </p>
+        </div>
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+          <p className="font-medium">Criar a clínica</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && create()}
+              placeholder="Nome da clínica (ex: Clínica Vida Materna)"
+              className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+            />
+            <button
+              onClick={create}
+              disabled={creating || name.trim().length < 2}
+              className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+            >
+              {creating ? "Criando…" : "Criar clínica"}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Disponível no plano Clínica (Pro Equipe). Depois de criar, adicione os médicos pelo
+            e-mail da conta deles.
+          </p>
+        </div>
+      </div>
+    );
+
+  if (clinic.role === "member")
+    return (
+      <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <p className="font-serif text-xl">🏥 {clinic.name}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Você faz parte desta clínica. Seu Segundo Cérebro continua sendo só seu — a administração
+          da clínica pode ajudar a treiná-lo, e suas pacientes conversam sempre com o SEU cérebro.
+        </p>
+      </div>
+    );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="font-serif text-xl">🏥 {clinic.name}</p>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          Cada médico tem o PRÓPRIO Segundo Cérebro — as pacientes dele conversam só com o cérebro
+          dele. Aqui você opera cada cérebro individualmente, sem misturar nada entre médicos.
+        </p>
+      </div>
+
+      {/* Adicionar médico */}
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+        <p className="font-medium">Adicionar médico</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addDoctor()}
+            type="email"
+            placeholder="E-mail da conta do médico"
+            className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+          <button
+            onClick={addDoctor}
+            disabled={addingDoc || !email.trim()}
+            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+          >
+            {addingDoc ? "Adicionando…" : "+ Adicionar"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          O médico precisa ter conta na plataforma (cadastro em /medicos/cadastro). Ao entrar, ele
+          herda as capacidades do plano Clínica.
+        </p>
+      </div>
+
+      {/* Médicos da clínica */}
+      {members.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          Nenhum médico ainda — adicione o primeiro pelo e-mail acima.
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {members.map((d) => (
+            <div
+              key={d.id}
+              className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{d.display_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.specialty || "Obstetrícia"}
+                    {d.clinic_role === "admin" ? " · admin" : ""}
+                    {!d.active ? " · inativo" : ""}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
+                  {d.plan || "free"}
+                </span>
+              </div>
+              <div className="mt-3 flex gap-4 text-sm">
+                <span title="Entradas aprovadas no cérebro">🧠 {d.brainEntries} entradas</span>
+                <span
+                  title="Perguntas de pacientes que a IA não soube responder"
+                  className={d.brainGaps > 0 ? "text-amber-600" : ""}
+                >
+                  🕳️ {d.brainGaps} lacunas
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => onOperateBrain({ id: d.id, name: d.display_name })}
+                  className="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
+                >
+                  🧠 Operar cérebro
+                </button>
+                <button
+                  onClick={() => removeDoctor(d)}
+                  disabled={removingId === d.id}
+                  className="rounded-full border border-border px-4 py-1.5 text-xs text-muted-foreground hover:text-rose-600 disabled:opacity-50"
+                >
+                  {removingId === d.id ? "…" : "Remover"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        Privacidade: remover um médico não apaga nada — o cérebro, as pacientes e o histórico
+        continuam com ele. A clínica só perde o acesso de operação.
+      </p>
     </div>
   );
 }

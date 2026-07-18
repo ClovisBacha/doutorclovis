@@ -30,6 +30,14 @@ async function requireAdmin(accessToken: string) {
     .eq("id", data.user.id)
     .maybeSingle();
   if (doc?.active) return data.user;
+  // Dono de clínica ativa sem linha em doctors (gestor não-médico): entra no
+  // painel para operar os cérebros dos médicos da clínica (via asDoctor).
+  const { data: clinic } = await (supabaseAdmin as any)
+    .from("clinics")
+    .select("id,active")
+    .eq("owner_user_id", data.user.id)
+    .maybeSingle();
+  if (clinic?.active) return data.user;
   return null;
 }
 
@@ -66,6 +74,74 @@ async function ownerDoctorId(user: { id: string; email?: string | null }): Promi
 /** Só a equipe da instalação (ADMIN_EMAILS) — NÃO médicos assinantes. */
 function isPlatformTeam(user: { email?: string | null }): boolean {
   return !!user.email && adminEmails().includes(user.email.toLowerCase());
+}
+
+/**
+ * Plano Clínica — cérebro-alvo da operação.
+ *
+ * Sem `asDoctor` → o PRÓPRIO cérebro (regra ownerDoctorId de sempre).
+ * Com `asDoctor` → SÓ se o usuário for ADMIN da clínica ATIVA a que o médico
+ * alvo pertence (dono da conta da clínica ou médico com clinic_role='admin').
+ * Qualquer outra combinação → null (fail closed): ninguém opera o cérebro de
+ * um médico que não é da sua clínica. Cada cérebro segue individual —
+ * a clínica só ganha o direito de operá-los um a um.
+ */
+async function resolveBrainDoctor(
+  user: { id: string; email?: string | null },
+  asDoctor?: string,
+): Promise<{ doctorId: string; viaClinic: boolean } | null> {
+  const own = await ownerDoctorId(user);
+  if (!asDoctor || asDoctor === own) return { doctorId: own, viaClinic: false };
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    // Clínica que o usuário ADMINISTRA (ativa).
+    let clinicId: string | null = null;
+    const { data: owned } = await sb
+      .from("clinics")
+      .select("id,active")
+      .eq("owner_user_id", user.id)
+      .maybeSingle();
+    if (owned?.active) clinicId = owned.id as string;
+    if (!clinicId) {
+      const { data: me } = await sb
+        .from("doctors")
+        .select("clinic_id,clinic_role")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (me?.clinic_id && me.clinic_role === "admin") {
+        const { data: clinic } = await sb
+          .from("clinics")
+          .select("id,active")
+          .eq("id", me.clinic_id)
+          .maybeSingle();
+        if (clinic?.active) clinicId = clinic.id as string;
+      }
+    }
+    if (!clinicId) return null;
+    // O alvo tem que ser médico DESSA clínica.
+    const { data: target } = await sb
+      .from("doctors")
+      .select("id")
+      .eq("id", asDoctor)
+      .eq("clinic_id", clinicId)
+      .maybeSingle();
+    return target?.id ? { doctorId: asDoctor, viaClinic: true } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Gate de plano da operação: no próprio cérebro vale o plano do usuário;
+ * via clínica o assento Clínica já inclui a IA (a autorização acima exige
+ * clínica ativa).
+ */
+async function brainPlanAllows(
+  user: { id: string; email?: string | null },
+  target: { viaClinic: boolean },
+): Promise<boolean> {
+  return target.viaClinic ? true : await canUseBrain(user);
 }
 
 /**
@@ -124,7 +200,12 @@ const DEFAULT_SETTINGS: BrainSettings = {
   enabled_whatsapp: true,
 };
 
-const TokenSchema = z.object({ accessToken: z.string().min(10) });
+// asDoctor (opcional, plano Clínica): admin da clínica operando o cérebro de
+// um médico da clínica — sempre validado no servidor por resolveBrainDoctor.
+const TokenSchema = z.object({
+  accessToken: z.string().min(10),
+  asDoctor: z.string().uuid().optional(),
+});
 
 /** Carrega as configurações do segundo cérebro (defaults se ainda não salvas). */
 export const getBrainSettings = createServerFn({ method: "POST" })
@@ -132,9 +213,11 @@ export const getBrainSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
     const { data: row, error } = await (supabaseAdmin as any)
       .from("brain_settings")
       .select("persona,sample_phrases,rules,enabled_app,enabled_whatsapp")
@@ -149,6 +232,7 @@ export const getBrainSettings = createServerFn({ method: "POST" })
 
 const SettingsSchema = z.object({
   accessToken: z.string().min(10),
+  asDoctor: z.string().uuid().optional(),
   settings: z.object({
     persona: z.string(),
     sample_phrases: z.string(),
@@ -164,20 +248,25 @@ export const saveBrainSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     // Free não tem IA: não pode configurar o cérebro.
-    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    if (!(await brainPlanAllows(user, target)))
+      return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const doctorId = await ownerDoctorId(user);
-    const { error } = await (supabaseAdmin as any)
-      .from("brain_settings")
-      .upsert({ doctor_id: doctorId, ...data.settings, updated_at: new Date().toISOString() });
+    const { error } = await (supabaseAdmin as any).from("brain_settings").upsert({
+      doctor_id: target.doctorId,
+      ...data.settings,
+      updated_at: new Date().toISOString(),
+    });
     return { ok: !error };
   });
 
 const ListSchema = z.object({
   accessToken: z.string().min(10),
   search: z.string().optional(),
+  asDoctor: z.string().uuid().optional(),
 });
 
 /** Lista as entradas do cérebro (busca opcional em pergunta/resposta). */
@@ -186,9 +275,11 @@ export const listBrainEntries = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
     let query = (supabaseAdmin as any)
       .from("brain_entries")
       .select("*")
@@ -220,6 +311,7 @@ const AddSchema = z.object({
   answer: z.string().min(1),
   category: z.string().nullable().optional(),
   source: z.string().optional(),
+  asDoctor: z.string().uuid().optional(),
 });
 
 /** Adiciona uma entrada de conhecimento (pergunta + resposta do médico). */
@@ -228,15 +320,17 @@ export const addBrainEntry = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     // Free não tem IA: não pode treinar o cérebro.
-    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    if (!(await brainPlanAllows(user, target)))
+      return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const doctorId = await ownerDoctorId(user);
     const { data: row, error } = await (supabaseAdmin as any)
       .from("brain_entries")
       .insert({
-        doctor_id: doctorId,
+        doctor_id: target.doctorId,
         question: data.question,
         answer: data.answer,
         category: data.category ?? null,
@@ -259,6 +353,7 @@ const UpdateSchema = z.object({
   answer: z.string().min(1),
   category: z.string().nullable().optional(),
   approved: z.boolean(),
+  asDoctor: z.string().uuid().optional(),
 });
 
 /** Atualiza uma entrada de conhecimento. */
@@ -267,6 +362,8 @@ export const updateBrainEntry = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin as any)
@@ -278,7 +375,7 @@ export const updateBrainEntry = createServerFn({ method: "POST" })
         approved: data.approved,
       })
       .eq("id", data.id)
-      .eq("doctor_id", await ownerDoctorId(user));
+      .eq("doctor_id", target.doctorId);
     if (!error) {
       // Texto mudou → o vetor antigo mente; recalcula (fire-and-forget).
       const { embedBrainEntry } = await import("./embeddings.server");
@@ -287,7 +384,11 @@ export const updateBrainEntry = createServerFn({ method: "POST" })
     return { ok: !error };
   });
 
-const DeleteSchema = z.object({ accessToken: z.string().min(10), id: z.string().uuid() });
+const DeleteSchema = z.object({
+  accessToken: z.string().min(10),
+  id: z.string().uuid(),
+  asDoctor: z.string().uuid().optional(),
+});
 
 /** Remove uma entrada de conhecimento. */
 export const deleteBrainEntry = createServerFn({ method: "POST" })
@@ -295,13 +396,15 @@ export const deleteBrainEntry = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin as any)
       .from("brain_entries")
       .delete()
       .eq("id", data.id)
-      .eq("doctor_id", await ownerDoctorId(user));
+      .eq("doctor_id", target.doctorId);
     return { ok: !error };
   });
 
@@ -409,6 +512,7 @@ export const answerAndTrain = createServerFn({ method: "POST" })
 const TestSchema = z.object({
   accessToken: z.string().min(10),
   question: z.string().min(1).max(500),
+  asDoctor: z.string().uuid().optional(),
 });
 
 /** Testa o segundo cérebro: responde uma pergunta com o mesmo modelo do chat. */
@@ -417,8 +521,10 @@ export const testBrain = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const, answer: "Sem permissão para este cérebro." };
     // Free não tem IA: não pode testar o cérebro.
-    if (!(await canUseBrain(user)))
+    if (!(await brainPlanAllows(user, target)))
       return {
         ok: false as const,
         answer: "O Segundo Cérebro está disponível a partir do plano Starter.",
@@ -435,7 +541,7 @@ export const testBrain = createServerFn({ method: "POST" })
         import("./ai-gateway.server"),
       ]);
 
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
     const [brain, doctorName] = await Promise.all([
       getBrainContext(data.question, doctorId, "teste"),
       doctorDisplayName(doctorId),
@@ -482,12 +588,14 @@ export type BrainGap = {
 
 /** Lacunas abertas DO médico logado, mais perguntadas primeiro. */
 export const listBrainGaps = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const, gaps: [] as BrainGap[] };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const, gaps: [] as BrainGap[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("brain_gaps")
       .select("id,question,channel,hits,status,updated_at")
@@ -516,16 +624,20 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
         gapId: z.string().uuid(),
         answer: z.string().min(5).max(4000),
         question: z.string().min(8).max(300).optional(),
+        asDoctor: z.string().uuid().optional(),
       })
       .parse(i),
   )
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
-    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    if (!(await brainPlanAllows(user, target)))
+      return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
 
     // Escopo no WHERE: só resolve lacuna DO próprio médico, ainda aberta.
     const { data: gap } = await sb
@@ -571,13 +683,21 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
 /** Ignora uma lacuna (não volta a aparecer; novo hit não reabre). */
 export const dismissBrainGap = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), gapId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        accessToken: z.string().min(10),
+        gapId: z.string().uuid(),
+        asDoctor: z.string().uuid().optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
     const { error } = await (supabaseAdmin as any)
       .from("brain_gaps")
       .update({ status: "ignorada", updated_at: new Date().toISOString() })
@@ -591,15 +711,17 @@ export const dismissBrainGap = createServerFn({ method: "POST" })
  * Idempotente: se o médico já tem entradas source='kit', não duplica.
  */
 export const installStarterPack = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const, installed: 0 };
-    if (!(await canUseBrain(user)))
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const, installed: 0 };
+    if (!(await brainPlanAllows(user, target)))
       return { ok: false as const, installed: 0, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
 
     const { data: existing, error: exErr } = await sb
       .from("brain_entries")
@@ -680,17 +802,26 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
  */
 export const draftGapAnswer = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), gapId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        accessToken: z.string().min(10),
+        gapId: z.string().uuid(),
+        asDoctor: z.string().uuid().optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
-    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    if (!(await brainPlanAllows(user, target)))
+      return { ok: false as const, reason: "plan" as const };
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key) return { ok: false as const, reason: "config" as const };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
     const { data: gap } = await (supabaseAdmin as any)
       .from("brain_gaps")
       .select("id,question")
@@ -744,13 +875,15 @@ export const draftGapAnswer = createServerFn({ method: "POST" })
  * tabela ausente → ok:false e a UI esconde o placar.
  */
 export const getBrainQualityStats = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
 
     const monthStart = new Date();
     monthStart.setDate(1);
@@ -832,13 +965,17 @@ export const extractKnowledgeFromTranscript = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         transcript: z.string().min(80).max(30000),
+        asDoctor: z.string().uuid().optional(),
       })
       .parse(i),
   )
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
-    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    if (!(await brainPlanAllows(user, target)))
+      return { ok: false as const, reason: "plan" as const };
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key) return { ok: false as const, reason: "config" as const };
 
@@ -884,12 +1021,11 @@ export const extractKnowledgeFromTranscript = createServerFn({ method: "POST" })
     if (pairs.length === 0) return { ok: true as const, created: 0 };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const doctorId = await ownerDoctorId(user);
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("brain_entries")
       .insert(
         pairs.map((p) => ({
-          doctor_id: doctorId,
+          doctor_id: target.doctorId,
           question: p.question,
           answer: p.answer,
           source: "consulta",
@@ -924,13 +1060,17 @@ export const evalBrainQuestion = createServerFn({ method: "POST" })
         question: z.string().min(5).max(300),
         expect: z.enum(["urgencia", "limite", "cobertura"]),
         criterion: z.string().min(5).max(300),
+        asDoctor: z.string().uuid().optional(),
       })
       .parse(i),
   )
   .handler(async ({ data }) => {
     const user = await requireAdmin(data.accessToken);
     if (!user) return { ok: false as const };
-    if (!(await canUseBrain(user))) return { ok: false as const, reason: "plan" as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    if (!(await brainPlanAllows(user, target)))
+      return { ok: false as const, reason: "plan" as const };
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key) return { ok: false as const, reason: "config" as const };
 
@@ -940,7 +1080,7 @@ export const evalBrainQuestion = createServerFn({ method: "POST" })
         import("ai"),
         import("./ai-gateway.server"),
       ]);
-    const doctorId = await ownerDoctorId(user);
+    const doctorId = target.doctorId;
     const [brain, doctorName] = await Promise.all([
       getBrainContext(data.question, doctorId, "teste"),
       doctorDisplayName(doctorId),
