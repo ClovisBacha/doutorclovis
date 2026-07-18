@@ -35,16 +35,25 @@ export function saveChatMessage(
   })();
 }
 
-/** Resumo salvo da paciente (null se não houver / tabela ausente). */
-export async function getChatMemory(patientId: string): Promise<string | null> {
+/**
+ * Resumo salvo da paciente (null se não houver / tabela ausente).
+ * Escopado por médico: se a paciente TROCOU de médico, o resumo antigo
+ * (montado com orientações do médico anterior) NÃO entra no chat do novo —
+ * a memória renasce com as conversas do médico atual.
+ */
+export async function getChatMemory(
+  patientId: string,
+  doctorId: string | null,
+): Promise<string | null> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await (supabaseAdmin as any)
       .from("chat_memory")
-      .select("summary")
+      .select("summary,doctor_id")
       .eq("patient_id", patientId)
       .maybeSingle();
-    const s = (data?.summary as string | undefined)?.trim();
+    if (!data || (data.doctor_id ?? null) !== (doctorId ?? null)) return null;
+    const s = (data.summary as string | undefined)?.trim();
     return s || null;
   } catch {
     return null;
@@ -73,29 +82,38 @@ export function maybeUpdateChatMemory(patientId: string, doctorId: string | null
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const sb = supabaseAdmin as any;
 
-      const { data: mem } = await sb
+      const { data: memRow } = await sb
         .from("chat_memory")
-        .select("summary,updated_at")
+        .select("summary,updated_at,doctor_id")
         .eq("patient_id", patientId)
         .maybeSingle();
+      // Resumo de OUTRO médico (paciente trocou): ignora e reconstrói do zero
+      // só com as conversas do médico atual — conduta de um médico nunca
+      // "vaza" para a persona de outro via memória.
+      const mem = memRow && (memRow.doctor_id ?? null) === (doctorId ?? null) ? memRow : null;
 
-      // Quantas mensagens chegaram desde o último resumo?
+      // Quantas mensagens (com ESTE médico) chegaram desde o último resumo?
       let sinceQuery = sb
         .from("chat_messages")
         .select("id", { count: "exact", head: true })
         .eq("patient_id", patientId);
+      sinceQuery = doctorId
+        ? sinceQuery.eq("doctor_id", doctorId)
+        : sinceQuery.is("doctor_id", null);
       if (mem?.updated_at) sinceQuery = sinceQuery.gt("created_at", mem.updated_at);
       const { count, error: cntErr } = await sinceQuery;
       if (cntErr) return; // tabela ausente etc.
       const fresh = count ?? 0;
       if (fresh < SUMMARY_EVERY && (mem?.summary || fresh < 2)) return;
 
-      const { data: msgs } = await sb
+      let msgsQuery = sb
         .from("chat_messages")
         .select("role,content,created_at")
         .eq("patient_id", patientId)
         .order("created_at", { ascending: false })
         .limit(SUMMARY_SOURCE_LIMIT);
+      msgsQuery = doctorId ? msgsQuery.eq("doctor_id", doctorId) : msgsQuery.is("doctor_id", null);
+      const { data: msgs } = await msgsQuery;
       const history = ((msgs ?? []) as { role: string; content: string }[])
         .reverse()
         .map((m) => `[${m.role === "user" ? "PACIENTE" : "IA"}] ${m.content}`)

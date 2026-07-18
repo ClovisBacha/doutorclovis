@@ -3861,7 +3861,7 @@ function BrainConversationsCard({
                     <div className="h-16 animate-pulse rounded-xl bg-secondary" />
                   ) : (messages ?? []).length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Não foi possível carregar as mensagens.
+                      Sem mensagens nesta conversa (ou falha ao carregar — tente de novo).
                     </p>
                   ) : (
                     (messages ?? []).map((m, i) => (

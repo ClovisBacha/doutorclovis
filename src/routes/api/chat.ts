@@ -226,7 +226,7 @@ export const Route = createFileRoute("/api/chat")({
           const { getChatMemory, memoryBlock } = await import("@/lib/chat-memory.server");
           const [brain, memorySummary] = await Promise.all([
             getBrainContext(userText, patient.doctorId, "app"),
-            getChatMemory(patient.patientId),
+            getChatMemory(patient.patientId, patient.doctorId),
           ]);
           const memoria = memoryBlock(memorySummary);
           const base = medicalSystemPrompt(patient.doctorName);
