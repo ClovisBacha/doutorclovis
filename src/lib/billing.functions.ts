@@ -43,11 +43,13 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
         plan: z.enum(PLANS),
         // para onde voltar depois do checkout (rota do app)
         returnPath: z.string().default("/minha-conta"),
+        // código de afiliado (influenciador) capturado do link ?ref= no site
+        refCode: z.string().max(40).optional(),
       })
       .parse(i),
   )
   .handler(async ({ data }) => {
-    const { stripeConfigured, priceIdFor, createCheckoutSession } =
+    const { stripeConfigured, priceIdFor, createCheckoutSession, ensurePercentCoupon } =
       await import("@/lib/stripe.server");
     if (!stripeConfigured()) {
       return { ok: false as const, error: "pagamento_indisponivel" };
@@ -58,6 +60,49 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
 
     const priceId = priceIdFor(data.product, data.plan);
     if (!priceId) return { ok: false as const, error: "plano_indisponivel" };
+
+    // ── Afiliado (Premium da paciente): valida o código contra a tabela e
+    // carimba na assinatura — o webhook credita 50% de cada fatura paga.
+    let refCode: string | null = null;
+    if (data.product === "quiz_premium" && data.refCode?.trim()) {
+      try {
+        const code = data.refCode.trim().toUpperCase();
+        const { data: aff } = await (supabaseAdmin as any)
+          .from("affiliates")
+          .select("code,active")
+          .eq("code", code)
+          .maybeSingle();
+        if (aff?.active) {
+          refCode = aff.code as string;
+          // Atribuição persistida na paciente (relatório por influenciador).
+          await (supabaseAdmin as any)
+            .from("patient_profiles")
+            .update({ ref_code: refCode })
+            .eq("id", u.user.id)
+            .is("ref_code", null); // 1º afiliado vence; não sobrescreve
+        }
+      } catch {
+        /* tabela ausente → segue sem afiliado */
+      }
+    }
+
+    // ── Convite de paciente (+15% p/ sempre no plano do médico): se este
+    // médico foi convidado por uma paciente, o desconto entra no checkout.
+    let discountCoupon: string | null = null;
+    if (data.product === "doctor_plan") {
+      try {
+        const { data: doc } = await (supabaseAdmin as any)
+          .from("doctors")
+          .select("invited_by_patient")
+          .eq("id", u.user.id)
+          .maybeSingle();
+        if (doc?.invited_by_patient) {
+          discountCoupon = await ensurePercentCoupon("convite-paciente-15", 15);
+        }
+      } catch {
+        /* coluna ausente → segue sem desconto */
+      }
+    }
 
     // Reaproveita o customer do Stripe se o usuário já assinou algo antes.
     const { data: existing } = await (supabaseAdmin as any)
@@ -81,6 +126,8 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
         plan: data.plan,
         successUrl: `${base}${ret}?assinatura=sucesso`,
         cancelUrl: `${base}${ret}?assinatura=cancelada`,
+        refCode,
+        discountCoupon,
       });
       if (!url) return { ok: false as const, error: "checkout_sem_url" };
       return { ok: true as const, url };
@@ -143,4 +190,23 @@ export const getMyBilling = createServerFn({ method: "POST" })
       .eq("user_id", u.user.id)
       .order("updated_at", { ascending: false });
     return { ok: true as const, subscriptions: (rows ?? []) as MySubscription[] };
+  });
+
+/** O médico logado tem convite de paciente (+15% no checkout)? */
+export const getMyInviteDiscount = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (error || !u.user) return { ok: false as const, invited: false };
+    try {
+      const { data: doc } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("invited_by_patient")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      return { ok: true as const, invited: !!doc?.invited_by_patient };
+    } catch {
+      return { ok: true as const, invited: false };
+    }
   });

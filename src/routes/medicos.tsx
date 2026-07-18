@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Reveal } from "@/components/reveal";
 import { SpotlightCard } from "@/components/motion-fx";
@@ -133,7 +133,7 @@ const PLANS = [
       "🧠 Até 100 cérebros (R$ 49,97/médico) · 👩‍🍼 500 pacientes por médico",
       "🏥 Painel da clínica: opere o cérebro de cada médico individualmente",
       "📊 Relatório mensal por médico (cobertura e satisfação da IA)",
-      "Na casa cheia, a IA da clínica sai por menos de R$ 0,10 por paciente",
+      "O menor custo por médico da plataforma — R$ 49,97 por cérebro",
       "👤 Gerente dedicado + onboarding e migração assistidos",
     ],
     cta: "Falar com a equipe",
@@ -208,6 +208,10 @@ const FAQS = [
     a: "A plataforma funciona de forma independente do seu sistema atual — você pode usar os dois em paralelo. A migração de dados é feita com a ajuda da nossa equipe; integrações diretas são avaliadas caso a caso no Pro Equipe.",
   },
   {
+    q: "Existe limite de uso da IA?",
+    a: "Uso justo: cada paciente pode trocar até 60 mensagens com a IA por mês — o suficiente para 2 conversas por dia útil; ao atingir, a IA acolhe, registra a dúvida para o médico e orienta urgências normalmente. Contas com mais de 15 mil pacientes ativas/mês têm plano sob medida.",
+  },
+  {
     q: "Quantas pacientes posso ter?",
     a: "Cada plano tem um teto que cresce com você: Free até 5 (para testar), Starter até 50, Pro até 150, Elite até 300 por médico e Black/Clínica até 500 por médico. Ao chegar perto do teto, é só subir de plano — as solicitações das pacientes ficam guardadas esperando você aceitar.",
   },
@@ -228,6 +232,28 @@ function MedicosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  // Convite de PACIENTE (?convite=CODIGO): guarda por 90 dias e mostra o
+  // banner de +15% — o desconto real entra no checkout, via Stripe.
+  const [patientInvite, setPatientInvite] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const KEY = "obst_doc_invite";
+      const code = new URLSearchParams(window.location.search).get("convite");
+      if (code && /^[a-zA-Z0-9]{6,12}$/.test(code)) {
+        localStorage.setItem(KEY, JSON.stringify({ code: code.toUpperCase(), at: Date.now() }));
+        setPatientInvite(code.toUpperCase());
+        return;
+      }
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { code?: string; at?: number };
+        if (parsed?.code && Date.now() - (parsed.at ?? 0) < 90 * 86400000)
+          setPatientInvite(parsed.code);
+      }
+    } catch {
+      /* sem storage, sem banner */
+    }
+  }, []);
 
   async function submitLead(e: React.FormEvent) {
     e.preventDefault();
@@ -704,6 +730,12 @@ function MedicosPage() {
               Sem contrato, sem taxa de implantação, sem fidelidade. Suba ou desça de plano quando
               quiser — cancele num clique.
             </p>
+            {patientInvite && (
+              <p className="mx-auto mt-4 w-fit rounded-full border border-emerald-300/40 bg-emerald-400/10 px-5 py-2 text-center text-sm font-semibold text-emerald-200">
+                🎁 Convite de paciente ativo: <strong>+15% de desconto adicional</strong> em
+                qualquer plano, para sempre — aplicado automaticamente no checkout.
+              </p>
+            )}
           </Reveal>
 
           {(() => {

@@ -92,6 +92,10 @@ export async function createCheckoutSession(opts: {
   plan: string;
   successUrl: string;
   cancelUrl: string;
+  /** Código de afiliado (influenciador) a carimbar na assinatura. */
+  refCode?: string | null;
+  /** Cupom Stripe a aplicar (ex.: convite de paciente = 15% off p/ sempre). */
+  discountCoupon?: string | null;
 }): Promise<{ url: string | null }> {
   const params: Record<string, unknown> = {
     mode: "subscription",
@@ -100,7 +104,6 @@ export async function createCheckoutSession(opts: {
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
     client_reference_id: opts.userId,
-    allow_promotion_codes: true,
     // metadados no session E na assinatura → o webhook sabe quem/what liberar
     "metadata[user_id]": opts.userId,
     "metadata[product]": opts.product,
@@ -109,10 +112,41 @@ export async function createCheckoutSession(opts: {
     "subscription_data[metadata][product]": opts.product,
     "subscription_data[metadata][plan]": opts.plan,
   };
+  if (opts.refCode) {
+    params["metadata[ref_code]"] = opts.refCode;
+    params["subscription_data[metadata][ref_code]"] = opts.refCode;
+  }
+  // Stripe não aceita `discounts` junto com `allow_promotion_codes` — com
+  // desconto de convite aplicado, o campo de cupom manual sai do checkout.
+  if (opts.discountCoupon) params["discounts[0][coupon]"] = opts.discountCoupon;
+  else params.allow_promotion_codes = true;
   if (opts.customerId) params.customer = opts.customerId;
   else if (opts.email) params.customer_email = opts.email;
   const session = await stripeFetch<{ url?: string }>("/checkout/sessions", "POST", params);
   return { url: session.url ?? null };
+}
+
+/**
+ * Garante que o cupom de porcentagem existe no Stripe (idempotente por id).
+ * Usado no "+15% convite de paciente" — criado uma vez, reutilizado sempre.
+ */
+export async function ensurePercentCoupon(id: string, percentOff: number): Promise<string | null> {
+  try {
+    await stripeFetch<{ id: string }>(`/coupons/${id}`, "GET");
+    return id;
+  } catch {
+    try {
+      const c = await stripeFetch<{ id: string }>("/coupons", "POST", {
+        id,
+        percent_off: percentOff,
+        duration: "forever",
+        name: `Convite de paciente (-${percentOff}%)`,
+      });
+      return c.id;
+    } catch {
+      return null; // sem cupom, o checkout segue sem desconto (nunca bloqueia)
+    }
+  }
 }
 
 /** Abre o portal de cobrança (cancelar, trocar cartão) e devolve a URL. */

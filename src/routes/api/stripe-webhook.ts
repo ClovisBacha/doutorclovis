@@ -13,7 +13,8 @@ import { createFileRoute } from "@tanstack/react-router";
  * Configurar em Stripe → Developers → Webhooks:
  *   URL: https://www.obstetrica.com.br/api/stripe-webhook
  *   Eventos: checkout.session.completed, customer.subscription.created,
- *            customer.subscription.updated, customer.subscription.deleted
+ *            customer.subscription.updated, customer.subscription.deleted,
+ *            invoice.paid  ← comissão de afiliado (50% de cada fatura paga)
  */
 export const Route = createFileRoute("/api/stripe-webhook")({
   server: {
@@ -47,6 +48,16 @@ export const Route = createFileRoute("/api/stripe-webhook")({
           ) {
             const sub = event.data?.object ?? {};
             if (sub.id) await applySubscription(String(sub.id));
+          } else if (type === "invoice.paid") {
+            // Comissão de afiliado: 50% de CADA fatura paga de assinatura
+            // atribuída a um código (permuta com influenciador). Idempotente
+            // por (código, fatura) — retry do Stripe não duplica.
+            const invoice = event.data?.object ?? {};
+            try {
+              await creditAffiliate(invoice);
+            } catch (e) {
+              console.error("[webhook] affiliate credit failed", e);
+            }
           }
         } catch {
           // Erro ao aplicar → responde 500 para o Stripe re-tentar depois.
@@ -134,6 +145,13 @@ async function applySubscription(subscriptionId: string): Promise<void> {
       } catch (e) {
         console.error("[webhook] referral reward failed", e);
       }
+      // Convite de paciente: o médico que ela convidou assinou → ela ganha o
+      // Premium do app (uma única vez, claim atômico). Best-effort.
+      try {
+        await rewardInvitingPatient(userId);
+      } catch (e) {
+        console.error("[webhook] patient invite reward failed", e);
+      }
     } else {
       // cancelou / não pagou → rebaixa para free MANTENDO active=true: o médico
       // continua com o painel no plano grátis e pode reassinar quando quiser
@@ -191,4 +209,87 @@ async function rewardReferrer(referredDoctorId: string): Promise<void> {
   const newExpiry = new Date(base + 30 * 24 * 60 * 60 * 1000).toISOString();
 
   await sb.from("doctors").update({ plan_expires_at: newExpiry }).eq("id", referrerId);
+}
+
+/**
+ * Premium para a paciente que convidou o médico: quando o médico convidado
+ * assina um plano pago, a paciente ganha o Premium do app. Claim atômico em
+ * invited_reward_given (retry do Stripe não duplica). O Premium entra também
+ * como linha em `subscriptions` (source 'convite', status active) para o
+ * "keep" do quiz_premium sobreviver a cancelamentos de outras assinaturas.
+ */
+async function rewardInvitingPatient(doctorId: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const sb = supabaseAdmin as any;
+
+  const { data: doc } = await sb
+    .from("doctors")
+    .select("invited_by_patient, invited_reward_given")
+    .eq("id", doctorId)
+    .maybeSingle();
+  const patientId = doc?.invited_by_patient as string | null | undefined;
+  if (!patientId || doc?.invited_reward_given) return;
+
+  const { data: claimed } = await sb
+    .from("doctors")
+    .update({ invited_reward_given: true })
+    .eq("id", doctorId)
+    .eq("invited_reward_given", false)
+    .select("id");
+  if (!claimed || claimed.length === 0) return;
+
+  await sb.from("subscriptions").upsert(
+    {
+      user_id: patientId,
+      product: "quiz_premium",
+      plan: "convite_medico",
+      source: "convite",
+      status: "active",
+      stripe_subscription_id: `convite_${doctorId}`,
+    },
+    { onConflict: "stripe_subscription_id" },
+  );
+  await sb.from("patient_profiles").update({ quiz_premium: true }).eq("id", patientId);
+}
+
+/**
+ * Comissão de afiliado (permuta com influenciador): a assinatura carrega
+ * ref_code nos metadados; cada `invoice.paid` dessa assinatura credita
+ * commission_pct (padrão 50%) do valor pago no livro-razão. Idempotente por
+ * (código, fatura) via UNIQUE — o insert duplicado falha em silêncio.
+ */
+async function creditAffiliate(invoice: {
+  id?: string;
+  subscription?: string;
+  amount_paid?: number;
+}): Promise<void> {
+  const invoiceId = invoice?.id;
+  const subId = invoice?.subscription ? String(invoice.subscription) : null;
+  const amountPaid = Math.max(0, Math.round(Number(invoice?.amount_paid ?? 0)));
+  if (!invoiceId || !subId || amountPaid <= 0) return;
+
+  const { getSubscription } = await import("@/lib/stripe.server");
+  const sub = await getSubscription(subId);
+  const refCode = (sub.metadata?.ref_code || "").trim().toUpperCase();
+  if (!refCode) return;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const sb = supabaseAdmin as any;
+  const { data: aff } = await sb
+    .from("affiliates")
+    .select("code,commission_pct,active")
+    .eq("code", refCode)
+    .maybeSingle();
+  if (!aff?.active) return;
+
+  const pct = Math.min(100, Math.max(0, Number(aff.commission_pct ?? 50)));
+  const commission = Math.round((amountPaid * pct) / 100);
+  // UNIQUE(affiliate_code, stripe_invoice_id) → retry não duplica crédito.
+  await sb.from("affiliate_earnings").insert({
+    affiliate_code: refCode,
+    user_id: sub.metadata?.user_id ?? null,
+    stripe_invoice_id: invoiceId,
+    amount_paid_cents: amountPaid,
+    commission_cents: commission,
+  });
 }

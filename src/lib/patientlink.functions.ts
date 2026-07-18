@@ -506,3 +506,83 @@ export const getMyDoctorPix = createServerFn({ method: "POST" })
       pix: { key: pixKey, name: (doc?.display_name as string | null) ?? "" },
     };
   });
+
+/* ══════════════════════════════════════════════════════════════════════
+   Convite do médico pela PACIENTE: ela gera um link pessoal; o médico que
+   se cadastrar por ele ganha +15% de desconto em qualquer plano (mostrado
+   no checkout) e, quando ele assinar, ELA ganha o Premium do app.
+   ══════════════════════════════════════════════════════════════════════ */
+
+function randomInviteCode(): string {
+  // 8 chars legíveis (sem 0/O/1/I) — suficiente p/ unicidade com retry.
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 8; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return out;
+}
+
+/** Código/link pessoal da paciente para convidar o médico dela. */
+export const getMyDoctorInvite = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireUser(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: prof, error } = await sb
+      .from("patient_profiles")
+      .select("invite_code")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (error?.code === "42703") return { ok: false as const, missingColumn: true as const };
+    if (error) return { ok: false as const };
+
+    let code = (prof?.invite_code as string | null) ?? null;
+    if (!code) {
+      // Gera com retry por colisão (índice único parcial em invite_code).
+      for (let attempt = 0; attempt < 4 && !code; attempt++) {
+        const candidate = randomInviteCode();
+        const { error: upErr } = await sb
+          .from("patient_profiles")
+          .update({ invite_code: candidate })
+          .eq("id", user.id)
+          .is("invite_code", null);
+        if (!upErr) code = candidate;
+      }
+      // Corrida consigo mesma (duas abas): relê o que ficou gravado.
+      if (!code) {
+        const { data: again } = await sb
+          .from("patient_profiles")
+          .select("invite_code")
+          .eq("id", user.id)
+          .maybeSingle();
+        code = (again?.invite_code as string | null) ?? null;
+      }
+    }
+    if (!code) return { ok: false as const };
+
+    const { DOCTOR } = await import("@/lib/doctor.config");
+    const link = `${DOCTOR.siteUrl}/medicos?convite=${code}`;
+    return { ok: true as const, code, link };
+  });
+
+/**
+ * Resolve um código de convite de paciente → id dela (server-only; usado no
+ * cadastro do médico). Código inválido → null, sem vazar nada.
+ */
+export async function resolvePatientInviteCode(code: string): Promise<string | null> {
+  try {
+    const clean = code.trim().toUpperCase();
+    if (!/^[A-Z2-9]{6,12}$/.test(clean)) return null;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("id")
+      .eq("invite_code", clean)
+      .maybeSingle();
+    return (data?.id as string) ?? null;
+  } catch {
+    return null;
+  }
+}

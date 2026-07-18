@@ -151,8 +151,26 @@ function CadastroMedicoPage() {
         typeof window !== "undefined"
           ? (new URLSearchParams(window.location.search).get("ref") ?? undefined)
           : undefined;
+      // Convite de PACIENTE (obst_doc_invite): +15% no checkout p/ o médico
+      // e Premium para ela quando ele assinar — validado no servidor.
+      let patientInvite: string | undefined;
+      try {
+        const raw = localStorage.getItem("obst_doc_invite");
+        if (raw) {
+          const parsed = JSON.parse(raw) as { code?: string; at?: number };
+          if (parsed?.code && Date.now() - (parsed.at ?? 0) < 90 * 86400000)
+            patientInvite = parsed.code;
+        }
+      } catch {
+        /* sem storage, sem convite */
+      }
       const res = await registerDoctor({
-        data: { accessToken: s.session.access_token, profile, ref: ref || undefined },
+        data: {
+          accessToken: s.session.access_token,
+          profile,
+          ref: ref || undefined,
+          ...(patientInvite ? { patientInvite } : {}),
+        },
       });
       if (!res.ok) {
         toast.error(

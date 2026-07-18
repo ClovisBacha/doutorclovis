@@ -2371,12 +2371,17 @@ function QuizPaywall({ week, context = "past" }: { week: number; context?: "past
         return;
       }
       const { createSubscriptionCheckout } = await import("@/lib/billing.functions");
+      // Afiliado (influenciador): código guardado do link ?ref= vira
+      // atribuição/comissão — validado no servidor.
+      const { storedAffiliateCode } = await import("@/routes/__root");
+      const refCode = storedAffiliateCode();
       const res = await createSubscriptionCheckout({
         data: {
           accessToken: s.session.access_token,
           product: "quiz_premium",
           plan,
           returnPath: "/minha-conta",
+          ...(refCode ? { refCode } : {}),
         },
       });
       if (res.ok && res.url) {

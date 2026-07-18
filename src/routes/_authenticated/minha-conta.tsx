@@ -717,6 +717,9 @@ function MinhaContaPage() {
           </Link>
         )}
 
+        {/* ── Convide o SEU médico: ele ganha +15% e você ganha o Premium ── */}
+        {!loading && profile && !profile.doctor_id && !isDoctor && !isAdmin && <InviteDoctorCard />}
+
         {/* ── Mobile: home screen ──────────────────────────────── */}
         {mobileHome && (
           <div className="md:hidden">
@@ -851,6 +854,80 @@ function MinhaContaPage() {
         </div>
       </section>
     </>
+  );
+}
+
+/**
+ * Convite do médico pela paciente: link pessoal — o médico que entrar por ele
+ * ganha +15% de desconto em qualquer plano (no checkout) e, quando assinar,
+ * ELA ganha o Premium do app. Some sozinho se a migração ainda não rodou.
+ */
+function InviteDoctorCard() {
+  const [invite, setInvite] = useState<{ code: string; link: string } | null>(null);
+  const [hidden, setHidden] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return setHidden(true);
+        const { getMyDoctorInvite } = await import("@/lib/patientlink.functions");
+        const res = await getMyDoctorInvite({ data: { accessToken: s.session.access_token } });
+        if (res.ok) setInvite({ code: res.code, link: res.link });
+        else setHidden(true);
+      } catch {
+        setHidden(true);
+      }
+    })();
+  }, []);
+
+  if (hidden || !invite) return null;
+
+  const message = `Oi! Estou usando o app Obstétrica para acompanhar minha gestação e queria muito você lá comigo 💛 Entrando pelo meu link, você ganha 15% de desconto extra em qualquer plano: ${invite.link}`;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar — selecione e copie manualmente.");
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border border-emerald-300/60 bg-emerald-50/60 p-4 dark:bg-emerald-950/20">
+      <div className="flex items-start gap-3">
+        <span className="text-2xl">🎁</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-foreground">
+            Seu médico ainda não está aqui? Convide-o!
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pelo seu link, ele ganha <strong>15% de desconto extra</strong> em qualquer plano — e
+            quando ele assinar, <strong>você ganha o Premium do app</strong> de presente.
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-white"
+            >
+              Convidar no WhatsApp
+            </a>
+            <button
+              onClick={copy}
+              className="rounded-full border border-border bg-card px-4 py-1.5 text-xs font-medium text-foreground"
+            >
+              {copied ? "Copiado ✓" : "Copiar convite"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -207,6 +207,42 @@ function useSWRegistration() {
   }, []);
 }
 
+/**
+ * Afiliados (influenciadores): qualquer página aberta com ?ref=CODIGO guarda
+ * o código por 90 dias — no checkout do Premium ele vira atribuição e comissão.
+ * Primeiro código vence (não deixa um link posterior roubar a indicação).
+ */
+function useAffiliateCapture() {
+  useEffect(() => {
+    try {
+      const ref = new URLSearchParams(window.location.search).get("ref");
+      if (!ref || !/^[a-zA-Z0-9_-]{3,24}$/.test(ref)) return;
+      const KEY = "obst_ref";
+      const existing = localStorage.getItem(KEY);
+      if (existing) {
+        const parsed = JSON.parse(existing) as { code?: string; at?: number };
+        if (parsed?.code && Date.now() - (parsed.at ?? 0) < 90 * 86400000) return;
+      }
+      localStorage.setItem(KEY, JSON.stringify({ code: ref.toUpperCase(), at: Date.now() }));
+    } catch {
+      /* storage indisponível — sem atribuição */
+    }
+  }, []);
+}
+
+/** Lê o código de afiliado válido (≤90 dias) guardado no navegador. */
+export function storedAffiliateCode(): string | null {
+  try {
+    const raw = localStorage.getItem("obst_ref");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { code?: string; at?: number };
+    if (!parsed?.code || Date.now() - (parsed.at ?? 0) > 90 * 86400000) return null;
+    return parsed.code;
+  } catch {
+    return null;
+  }
+}
+
 // Captura o evento beforeinstallprompt para mostrar banner customizado depois
 let deferredInstallPrompt: Event | null = null;
 if (typeof window !== "undefined") {
@@ -237,6 +273,7 @@ function useScrollToTop() {
 
 function SiteShell() {
   useSWRegistration();
+  useAffiliateCapture();
   useScrollToTop();
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">

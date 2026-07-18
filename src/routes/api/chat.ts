@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  streamText,
+  type UIMessage,
+} from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 import { getBrainContext, normalizeGapQuestion } from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
@@ -269,6 +275,41 @@ export const Route = createFileRoute("/api/chat")({
         const persistFor = patient
           ? { patientId: patient.patientId, doctorId: patient.doctorId ?? null }
           : null;
+
+        // ── Uso justo de IA: 60 mensagens por paciente/mês. Protege o custo
+        // (o pior caso de IA fica limitado) sem punir uso real — gestante
+        // engajada manda 1–2/dia. No teto, responde com acolhimento SEM
+        // chamar o modelo; tabela ausente/erro → nunca bloqueia.
+        const FAIR_USE_MSGS = 60;
+        if (persistFor) {
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            const monthStart = new Date();
+            monthStart.setDate(1);
+            monthStart.setHours(0, 0, 0, 0);
+            const { count, error: fuErr } = await (supabaseAdmin as any)
+              .from("chat_messages")
+              .select("id", { count: "exact", head: true })
+              .eq("patient_id", persistFor.patientId)
+              .eq("role", "user")
+              .gte("created_at", monthStart.toISOString());
+            if (!fuErr && (count ?? 0) >= FAIR_USE_MSGS) {
+              const texto =
+                "Nós conversamos bastante este mês, e adorei cada mensagem 💛 O limite de conversas com a IA deste mês foi atingido — ele renova no dia 1º. Sua dúvida é importante: registre-a na aba Perguntas para o seu médico responder pessoalmente. E se for algo urgente (sangramento, dor forte, o bebê mexendo menos), não espere: ligue 192 (SAMU) ou vá ao pronto-socorro agora.";
+              const stream = createUIMessageStream({
+                execute({ writer }) {
+                  writer.write({ type: "text-start", id: "fairuse" });
+                  writer.write({ type: "text-delta", id: "fairuse", delta: texto });
+                  writer.write({ type: "text-end", id: "fairuse" });
+                },
+              });
+              return createUIMessageStreamResponse({ stream });
+            }
+          } catch {
+            /* fair use é best-effort — na dúvida, responde normalmente */
+          }
+        }
+
         if (persistFor) {
           const { saveChatMessage } = await import("@/lib/chat-memory.server");
           saveChatMessage(

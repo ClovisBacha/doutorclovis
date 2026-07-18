@@ -86,6 +86,12 @@ import {
   type ClinicInfo,
   type ClinicMember,
 } from "@/lib/clinic.functions";
+import {
+  listAffiliates,
+  createAffiliate,
+  toggleAffiliate,
+  type Affiliate,
+} from "@/lib/affiliates.functions";
 import { getDoctorDashboard, type DoctorDashboard } from "@/lib/dashboard.functions";
 import {
   startGoogleCalendarConnect,
@@ -2765,6 +2771,190 @@ function EmpresasSection({
           </div>
         )}
       </div>
+
+      {/* Afiliados (permuta com influenciadores) */}
+      <AffiliatesCard tokenFn={tokenFn} />
+    </div>
+  );
+}
+
+/**
+ * Afiliados: crie códigos para influenciadores (permuta). O link ?ref=CODIGO
+ * atribui a paciente; cada fatura paga do Premium credita a comissão (50%
+ * por padrão) automaticamente — aqui a equipe acompanha e acerta o repasse.
+ */
+function AffiliatesCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [affiliates, setAffiliates] = useState<Affiliate[] | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [pct, setPct] = useState("50");
+  const [creating, setCreating] = useState(false);
+
+  async function load() {
+    try {
+      const res = await listAffiliates({ data: { accessToken: await tokenFn() } });
+      if (res.ok) setAffiliates(res.affiliates);
+      else if ("missingTable" in res && res.missingTable) {
+        setMissing(true);
+        setAffiliates([]);
+      } else setAffiliates([]);
+    } catch {
+      setAffiliates([]);
+    }
+  }
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function create() {
+    if (creating || code.trim().length < 3 || name.trim().length < 2) return;
+    setCreating(true);
+    try {
+      const res = await createAffiliate({
+        data: {
+          accessToken: await tokenFn(),
+          code: code.trim(),
+          name: name.trim(),
+          commissionPct: Math.min(90, Math.max(1, parseInt(pct, 10) || 50)),
+        },
+      });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "duplicado"
+            ? "Esse código já existe."
+            : "reason" in res && res.reason === "migracao"
+              ? "Rode o APLICAR_PENDENTES.sql no Supabase para ativar os afiliados."
+              : "Não foi possível criar o código.",
+        );
+        return;
+      }
+      toast.success(`Código ${code.trim().toUpperCase()} criado 🎉`);
+      setCode("");
+      setName("");
+      await load();
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const brl = (cents: number) =>
+    (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  return (
+    <div>
+      <h3 className="font-semibold">Afiliados (influenciadores)</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Permuta: o influenciador divulga o link com o código dele e ganha a comissão de cada
+        mensalidade Premium paga pelas pacientes que ele trouxe — creditada automaticamente.
+      </p>
+
+      {missing && (
+        <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          Rode o <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar os afiliados.
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-4">
+        <div className="min-w-0">
+          <label className="block text-[11px] font-medium text-muted-foreground">Código</label>
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="MARIA"
+            className="mt-1 w-32 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <label className="block text-[11px] font-medium text-muted-foreground">Nome</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Maria Influencer"
+            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground">% comissão</label>
+          <input
+            value={pct}
+            onChange={(e) => setPct(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            className="mt-1 w-20 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <button
+          onClick={create}
+          disabled={creating || code.trim().length < 3 || name.trim().length < 2}
+          className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+        >
+          {creating ? "Criando…" : "+ Criar código"}
+        </button>
+      </div>
+
+      {affiliates === null ? (
+        <div className="mt-3 h-16 animate-pulse rounded-2xl bg-secondary" />
+      ) : affiliates.length === 0 ? (
+        !missing && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Nenhum afiliado ainda. Crie o primeiro código acima — o link fica{" "}
+            <span className="font-medium text-foreground">{DOCTOR.siteUrl}/?ref=CODIGO</span>.
+          </p>
+        )
+      ) : (
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-card">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="px-4 py-2.5">Código</th>
+                <th className="px-4 py-2.5">Nome</th>
+                <th className="px-4 py-2.5">%</th>
+                <th className="px-4 py-2.5">Pacientes</th>
+                <th className="px-4 py-2.5">Faturado</th>
+                <th className="px-4 py-2.5">Comissão</th>
+                <th className="px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {affiliates.map((a) => (
+                <tr key={a.code} className="border-b border-border/60 last:border-0">
+                  <td className="px-4 py-2.5 font-mono font-semibold">{a.code}</td>
+                  <td className="px-4 py-2.5">{a.name}</td>
+                  <td className="px-4 py-2.5">{a.commission_pct}%</td>
+                  <td className="px-4 py-2.5">{a.signups}</td>
+                  <td className="px-4 py-2.5">{brl(a.revenueCents)}</td>
+                  <td className="px-4 py-2.5 font-semibold text-emerald-600">
+                    {brl(a.commissionCents)}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={async () => {
+                        const res = await toggleAffiliate({
+                          data: {
+                            accessToken: await tokenFn(),
+                            code: a.code,
+                            active: !a.active,
+                          },
+                        });
+                        if (res.ok) load();
+                      }}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        a.active
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {a.active ? "Ativo" : "Inativo"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -5679,8 +5869,23 @@ function DoctorBilling({
 }) {
   const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [busy, setBusy] = useState<string | null>(null);
+  // Convite de paciente: +15% em qualquer plano (aplicado no checkout).
+  const [inviteDiscount, setInviteDiscount] = useState(false);
   const isPaid = active && ["starter", "pro", "clinica", "elite", "black"].includes(plan);
   const isTeam = plan === "clinica";
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { getMyInviteDiscount } = await import("@/lib/billing.functions");
+        const res = await getMyInviteDiscount({ data: { accessToken: await tokenFn() } });
+        if (res.ok && res.invited) setInviteDiscount(true);
+      } catch {
+        /* sem banner */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function checkout(planKey: "starter" | "pro" | "elite" | "black") {
     setBusy(planKey);
@@ -5856,6 +6061,13 @@ function DoctorBilling({
           Anual · 2 meses grátis
         </button>
       </div>
+
+      {inviteDiscount && (
+        <p className="mt-3 rounded-2xl border border-emerald-300/60 bg-emerald-50 p-3 text-center text-sm font-semibold text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300">
+          🎁 Convite de paciente ativo: <strong>+15% de desconto</strong> em qualquer plano, para
+          sempre — aplicado automaticamente no pagamento.
+        </p>
+      )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <PlanBtn

@@ -182,6 +182,8 @@ export const registerDoctor = createServerFn({ method: "POST" })
         accessToken: z.string().min(10),
         profile: ProfileSchema,
         ref: z.string().uuid().optional(), // indicação: doctor_id de quem indicou
+        // convite de PACIENTE (código): dá +15% no checkout e Premium a ela
+        patientInvite: z.string().max(16).optional(),
       })
       .parse(i),
   )
@@ -207,6 +209,16 @@ export const registerDoctor = createServerFn({ method: "POST" })
         .eq("id", data.ref)
         .maybeSingle();
       if (refDoc?.id) referredBy = refDoc.id as string;
+    }
+
+    // Convite de PACIENTE (só cadastro novo): resolve o código → id dela.
+    // O médico ganha +15% em qualquer plano (aplicado no checkout) e, quando
+    // assinar, ela ganha o Premium (webhook). Sem auto-convite.
+    let invitedByPatient: string | null = null;
+    if (!existing && data.patientInvite) {
+      const { resolvePatientInviteCode } = await import("./patientlink.functions");
+      const pid = await resolvePatientInviteCode(data.patientInvite);
+      if (pid && pid !== user.id) invitedByPatient = pid;
     }
 
     // Slug único: tenta o base; em conflito, sufixa -2, -3...
@@ -238,6 +250,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
           plan: "trial",
           plan_expires_at: new Date(Date.now() + 14 * 86400000).toISOString(),
           ...(referredBy ? { referred_by: referredBy } : {}),
+          ...(invitedByPatient ? { invited_by_patient: invitedByPatient } : {}),
         };
 
     // Corrida de slug (dois homônimos simultâneos): na violação de UNIQUE,
