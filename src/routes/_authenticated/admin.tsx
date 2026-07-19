@@ -14,6 +14,19 @@ import {
   type RetentionMetrics,
   type PlatformCoupon,
 } from "@/lib/platform.functions";
+import {
+  listAffiliates,
+  createAffiliate,
+  toggleAffiliate,
+  type Affiliate,
+} from "@/lib/affiliates.functions";
+import {
+  getCorporateLeadsAdmin,
+  createCorporateAccountAdmin,
+  updateLeadStatusAdmin,
+  type CorporateLead,
+  type CorporateAccount,
+} from "@/lib/corporativo.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ name: "robots", content: "noindex" }] }),
@@ -121,7 +134,9 @@ const PLANS = ["trial", "free", "starter", "pro", "clinica", "elite", "black"] a
 function AdminConsole() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [data, setData] = useState<PlatformOverview | null>(null);
-  const [tab, setTab] = useState<"visao" | "medicos" | "cupons" | "varredura">("visao");
+  const [tab, setTab] = useState<
+    "visao" | "medicos" | "cupons" | "afiliados" | "empresas" | "varredura"
+  >("visao");
 
   async function load() {
     const tk = await token();
@@ -181,6 +196,8 @@ function AdminConsole() {
             ["visao", "Visão geral"],
             ["medicos", "Médicos"],
             ["cupons", "Cupons"],
+            ["afiliados", "Afiliados"],
+            ["empresas", "Empresas"],
             ["varredura", "Varredura do site"],
           ] as const
         ).map(([k, label]) => (
@@ -202,6 +219,8 @@ function AdminConsole() {
         {tab === "visao" && data && <OverviewTab data={data} />}
         {tab === "medicos" && data && <DoctorsTab data={data} onChanged={load} />}
         {tab === "cupons" && <CuponsTab />}
+        {tab === "afiliados" && <AfiliadosTab />}
+        {tab === "empresas" && <EmpresasAdminTab />}
         {tab === "varredura" && <VarreduraTab />}
       </div>
     </section>
@@ -629,6 +648,364 @@ function CuponsTab() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Afiliados (influenciadores) no console do dono. Códigos ?ref= que atribuem
+ * a paciente e creditam comissão por fatura paga. Migrado do painel do médico
+ * para o /admin — é uma função da PLATAFORMA, não do consultório.
+ */
+function AfiliadosTab() {
+  const [rows, setRows] = useState<Affiliate[] | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [pct, setPct] = useState("50");
+  const [creating, setCreating] = useState(false);
+
+  async function load() {
+    try {
+      const res = await listAffiliates({ data: { accessToken: await token() } });
+      if (res.ok) setRows(res.affiliates);
+      else if ("missingTable" in res && res.missingTable) {
+        setMissing(true);
+        setRows([]);
+      } else setRows([]);
+    } catch {
+      setRows([]);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function create() {
+    if (creating || code.trim().length < 3 || name.trim().length < 2) return;
+    setCreating(true);
+    try {
+      const res = await createAffiliate({
+        data: {
+          accessToken: await token(),
+          code: code.trim(),
+          name: name.trim(),
+          commissionPct: Math.min(90, Math.max(1, parseInt(pct, 10) || 50)),
+        },
+      });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "duplicado"
+            ? "Esse código já existe."
+            : "reason" in res && res.reason === "migracao"
+              ? "Rode o APLICAR_PENDENTES.sql no Supabase."
+              : "Não foi possível criar o código.",
+        );
+        return;
+      }
+      toast.success(`Código ${code.trim().toUpperCase()} criado 🎉`);
+      setCode("");
+      setName("");
+      await load();
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const brl = (c: number) =>
+    (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="font-serif text-xl">Afiliados (influenciadores)</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          O influenciador divulga <span className="font-medium text-foreground">/?ref=CÓDIGO</span>{" "}
+          e ganha a comissão de cada Premium pago pelas pacientes que trouxe — creditada
+          automaticamente. Aqui você cria os códigos e acompanha o repasse.
+        </p>
+      </div>
+
+      {missing && (
+        <p className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          Rode o <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar os afiliados.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-4">
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground">Código</label>
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="MARIA"
+            className="mt-1 w-32 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <label className="block text-[11px] font-medium text-muted-foreground">Nome</label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Maria Influencer"
+            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground">% comissão</label>
+          <input
+            value={pct}
+            onChange={(e) => setPct(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            className="mt-1 w-20 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <button
+          onClick={create}
+          disabled={creating || code.trim().length < 3 || name.trim().length < 2}
+          className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+        >
+          {creating ? "Criando…" : "+ Criar código"}
+        </button>
+      </div>
+
+      {rows === null ? (
+        <div className="h-20 animate-pulse rounded-2xl bg-secondary" />
+      ) : rows.length === 0 ? (
+        !missing && <p className="text-sm text-muted-foreground">Nenhum afiliado ainda.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="px-4 py-2.5">Código</th>
+                <th className="px-4 py-2.5">Nome</th>
+                <th className="px-4 py-2.5">%</th>
+                <th className="px-4 py-2.5">Pacientes</th>
+                <th className="px-4 py-2.5">Faturado</th>
+                <th className="px-4 py-2.5">Comissão</th>
+                <th className="px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((a) => (
+                <tr key={a.code} className="border-b border-border/60 last:border-0">
+                  <td className="px-4 py-2.5 font-mono font-semibold">{a.code}</td>
+                  <td className="px-4 py-2.5">{a.name}</td>
+                  <td className="px-4 py-2.5">{a.commission_pct}%</td>
+                  <td className="px-4 py-2.5 tabular-nums">{a.signups}</td>
+                  <td className="px-4 py-2.5 tabular-nums">{brl(a.revenueCents)}</td>
+                  <td className="px-4 py-2.5 font-semibold tabular-nums text-emerald-600">
+                    {brl(a.commissionCents)}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={async () => {
+                        const res = await toggleAffiliate({
+                          data: { accessToken: await token(), code: a.code, active: !a.active },
+                        });
+                        if (res.ok) load();
+                      }}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        a.active
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {a.active ? "Ativo" : "Inativo"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Contas corporativas (empresas parceiras) no console do dono: leads recebidos
+ * e criação de contas com código de acesso. Também é função de PLATAFORMA.
+ */
+function EmpresasAdminTab() {
+  const [leads, setLeads] = useState<CorporateLead[]>([]);
+  const [accounts, setAccounts] = useState<CorporateAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({
+    companyName: "",
+    contactEmail: "",
+    planType: "basico" as "basico" | "standard" | "premium",
+    maxSeats: "10",
+    notes: "",
+  });
+  const [creating, setCreating] = useState(false);
+
+  async function load() {
+    try {
+      const res = await getCorporateLeadsAdmin({ data: { accessToken: await token() } });
+      if (res.ok) {
+        setLeads(res.leads);
+        setAccounts(res.accounts);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function create() {
+    if (creating || form.companyName.trim().length < 2 || !form.contactEmail.includes("@")) return;
+    setCreating(true);
+    try {
+      const res = await createCorporateAccountAdmin({
+        data: {
+          accessToken: await token(),
+          companyName: form.companyName.trim(),
+          contactEmail: form.contactEmail.trim(),
+          planType: form.planType,
+          maxSeats: Math.max(1, parseInt(form.maxSeats, 10) || 10),
+          notes: form.notes.trim() || null,
+        },
+      });
+      if (!res.ok) {
+        toast.error("Não foi possível criar a conta.");
+        return;
+      }
+      toast.success(`Conta criada · código ${res.account.access_code}`);
+      setForm({ companyName: "", contactEmail: "", planType: "basico", maxSeats: "10", notes: "" });
+      await load();
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  if (loading) return <div className="skeleton h-40 rounded-2xl" />;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-serif text-xl">Empresas parceiras</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Contas corporativas: crie um código de acesso e as funcionárias entram no app pelo código.
+          Leads chegam pela página /empresas.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <p className="text-sm font-medium">Nova conta corporativa</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <input
+            value={form.companyName}
+            onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+            placeholder="Nome da empresa"
+            className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+          <input
+            value={form.contactEmail}
+            onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+            placeholder="E-mail de contato"
+            className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+          <select
+            value={form.planType}
+            onChange={(e) => setForm({ ...form, planType: e.target.value as any })}
+            className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="basico">Básico</option>
+            <option value="standard">Standard</option>
+            <option value="premium">Premium</option>
+          </select>
+          <input
+            value={form.maxSeats}
+            onChange={(e) => setForm({ ...form, maxSeats: e.target.value.replace(/\D/g, "") })}
+            placeholder="Vagas"
+            className="rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <button
+          onClick={create}
+          disabled={creating}
+          className="mt-3 rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+        >
+          {creating ? "Criando…" : "+ Criar conta"}
+        </button>
+      </div>
+
+      <div>
+        <h3 className="mb-2 font-medium">Contas ativas ({accounts.length})</h3>
+        {accounts.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhuma conta corporativa ainda.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5">Empresa</th>
+                  <th className="px-4 py-2.5">Plano</th>
+                  <th className="px-4 py-2.5">Vagas</th>
+                  <th className="px-4 py-2.5">Código</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((a) => (
+                  <tr key={a.id} className="border-b border-border/60 last:border-0">
+                    <td className="px-4 py-2.5 font-medium">{a.company_name}</td>
+                    <td className="px-4 py-2.5">{a.plan_type}</td>
+                    <td className="px-4 py-2.5 tabular-nums">{a.max_seats}</td>
+                    <td className="px-4 py-2.5 font-mono font-semibold">{a.access_code}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h3 className="mb-2 font-medium">Leads recebidos ({leads.length})</h3>
+        {leads.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum lead ainda.</p>
+        ) : (
+          <div className="space-y-2">
+            {leads.map((l) => (
+              <div
+                key={l.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium">{l.company_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {l.contact_name} · {l.contact_email}
+                    {l.employee_count ? ` · ${l.employee_count} func.` : ""}
+                  </p>
+                </div>
+                <select
+                  value={l.status}
+                  onChange={async (e) => {
+                    const res = await updateLeadStatusAdmin({
+                      data: { accessToken: await token(), id: l.id, status: e.target.value },
+                    });
+                    if (res.ok) load();
+                  }}
+                  className="rounded-full border border-border bg-background px-3 py-1 text-xs"
+                >
+                  <option value="novo">Novo</option>
+                  <option value="contatado">Contatado</option>
+                  <option value="fechado">Fechado</option>
+                  <option value="perdido">Perdido</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
