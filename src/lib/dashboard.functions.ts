@@ -146,13 +146,8 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    // Isolamento por perfil (multi-tenant): a equipe da instalação (isTeam) vê
-    // TODAS as pacientes/perguntas/consultas — inclusive as legadas sem
-    // doctor_id. Um médico assinante vê apenas o que está vinculado ao PRÓPRIO
-    // doctor_id (nunca PII de pacientes de outro médico). O filtro por doctor_id
-    // garante que o dashboard nunca vaze entre perfis.
-    const isTeam = !!user.email && adminEmails().includes(user.email.toLowerCase());
-
+    // Multi-inquilino: o dashboard é SEMPRE recortado pelo doctor_id do médico
+    // logado — nunca vaza PII de pacientes de outro perfil.
     const now = new Date();
     const nowMs = now.getTime();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -166,7 +161,7 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
 
     // Aplica o recorte por médico quando NÃO é a equipe da instalação: o médico
     // assinante só enxerga o que está vinculado ao próprio doctor_id.
-    const scoped = (qb: any) => (isTeam ? qb : qb.eq("doctor_id", doctorId));
+    const scoped = (qb: any) => qb.eq("doctor_id", doctorId);
 
     // ── Pacientes: carteira, fases da gestação, novas no mês ──────────────────
     type ProfileRow = {

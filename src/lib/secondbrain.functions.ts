@@ -51,11 +51,6 @@ async function ownerDoctorId(user: { id: string; email?: string | null }): Promi
   return user.id;
 }
 
-/** Só a equipe da instalação (ADMIN_EMAILS) — NÃO médicos assinantes. */
-function isPlatformTeam(user: { email?: string | null }): boolean {
-  return !!user.email && adminEmails().includes(user.email.toLowerCase());
-}
-
 /**
  * Plano Clínica — cérebro-alvo da operação.
  *

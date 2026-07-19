@@ -152,57 +152,11 @@ function notifyDoctorOfGap(doctorId: string, sb: any): void {
   })();
 }
 
-/* ── Multi-perfil: cada médico tem o SEU cérebro ─────────────────────────────
-   As tabelas são chaveadas por doctor_id (uid do médico no auth). Nesta
-   instalação single-doctor, o "dono" é o primeiro e-mail de ADMIN_EMAILS —
-   toda a equipe (ex.: secretária) treina o cérebro DO médico, e o chat/
-   WhatsApp respondem com ele. Numa futura plataforma multi-médico, basta
-   passar o doctorId da conversa para getBrainContext.                       */
-
-let cachedOwnerId: string | null | undefined;
-
-/**
- * Resolve o uid do médico dono da instalação (1º e-mail de ADMIN_EMAILS).
- * Via RPC get_user_id_by_email (não varre listUsers, que inclui as pacientes).
- * O cache de módulo só guarda SUCESSO — ou null determinístico (ADMIN_EMAILS
- * vazio); falha transitória de rede não é cacheada, para a próxima chamada
- * tentar de novo (em serverless o módulo vive horas).
- */
-export async function resolveOwnerDoctorId(): Promise<string | null> {
-  if (cachedOwnerId !== undefined) return cachedOwnerId;
-  const ownerEmail = (process.env.ADMIN_EMAILS || "").split(",")[0]?.trim().toLowerCase();
-  if (!ownerEmail) {
-    cachedOwnerId = null; // determinístico: sem dono configurado
-    return null;
-  }
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await (supabaseAdmin as any).rpc("get_user_id_by_email", {
-      p_email: ownerEmail,
-    });
-    if (!error && data) {
-      cachedOwnerId = data as string;
-      return cachedOwnerId;
-    }
-    // Fallback (RPC ainda não aplicada no banco): varre as primeiras páginas
-    for (let page = 1; page <= 5; page++) {
-      const { data: pg, error: e } = await supabaseAdmin.auth.admin.listUsers({
-        page,
-        perPage: 200,
-      });
-      if (e || !pg?.users?.length) break;
-      const hit = pg.users.find((u) => u.email?.toLowerCase() === ownerEmail);
-      if (hit) {
-        cachedOwnerId = hit.id;
-        return hit.id;
-      }
-      if (pg.users.length < 200) break;
-    }
-  } catch {
-    /* falha transitória: NÃO cachear — tenta de novo na próxima chamada */
-  }
-  return null;
-}
+/* ── Multi-inquilino: cada médico tem o SEU cérebro ──────────────────────────
+   Todas as tabelas são chaveadas por doctor_id (uid do médico no auth). Não
+   existe mais "dono da instalação": o chat/WhatsApp usam o cérebro do médico
+   DAQUELA paciente (doctorId passado a getBrainContext); sem médico → genérico.
+   O admin da plataforma não é médico e não opera cérebro (ver /admin).       */
 
 type BrainSettingsRow = {
   persona: string | null;
