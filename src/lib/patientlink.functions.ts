@@ -70,6 +70,8 @@ export type LinkedPatient = {
   fetal_bpm_at?: string | null;
   /** Semana gestacional atual (calculada no servidor) — espelho do bebê no painel. */
   weeks?: number | null;
+  /** Tom de pele do bebê (0–4) escolhido pela paciente — espelho fiel. */
+  baby_skin_tone?: number | null;
 };
 
 const TokenSchema = z.object({ accessToken: z.string().min(10) });
@@ -326,6 +328,7 @@ export const listMyPatients = createServerFn({ method: "POST" })
     // lmp_date/reference_* alimentam a semana gestacional (espelho do bebê).
     const gestCols = "lmp_date,reference_date,reference_weeks,reference_days";
     const selects = [
+      `id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,baby_skin_tone,${gestCols}`,
       `id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,${gestCols}`,
       `id,display_name,due_date,created_at,quiz_premium,${gestCols}`,
       `id,display_name,due_date,created_at,${gestCols}`,
@@ -364,6 +367,7 @@ export const listMyPatients = createServerFn({ method: "POST" })
         fetal_bpm: r.fetal_bpm ?? null,
         fetal_bpm_at: r.fetal_bpm_at ?? null,
         weeks: g && g.weeks >= 1 && g.weeks <= 44 ? g.weeks : null,
+        baby_skin_tone: r.baby_skin_tone ?? null,
       } as LinkedPatient;
     });
 

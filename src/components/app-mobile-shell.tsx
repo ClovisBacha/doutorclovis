@@ -574,12 +574,18 @@ export function AppHomeScreen({
   gest,
   onNavigate,
   nextAppointment,
+  babyTone = 0,
+  onBabyTap,
 }: {
   firstName: string;
   babyName: string | null;
   gest: GestInfo;
   onNavigate: (tab: AppTab) => void;
   nextAppointment?: NextAppointment | null;
+  /** Tom de pele do bebê (índice na paleta BABY_TONES). */
+  babyTone?: number;
+  /** Toque na foto do bebê → abre a Jornada do Bebê (gatilho Premium). */
+  onBabyTap?: () => void;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
@@ -663,15 +669,21 @@ export function AppHomeScreen({
                 )}
               </div>
 
-              {/* Bebê protagonista — GRANDE, flutuando, dono da tela */}
-              <div className="float-slow flex flex-1 items-center justify-center py-2">
+              {/* Bebê protagonista — GRANDE, flutuando, dono da tela.
+                  Toque abre a Jornada do Bebê (estágios + gatilho Premium). */}
+              <button
+                onClick={onBabyTap}
+                aria-label="Ver a jornada do bebê"
+                className="float-slow flex flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
+              >
                 <BabyIllustration
                   week={gest.weeks}
+                  tone={babyTone}
                   showSac={false}
                   showInfo={false}
                   className="h-56 w-56 drop-shadow-[0_14px_36px_rgba(0,0,0,0.16)]"
                 />
-              </div>
+              </button>
 
               {/* Número de semana — lente de vidro líquido translúcida */}
               <div className="mt-1 flex flex-col items-center">

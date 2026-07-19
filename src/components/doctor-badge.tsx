@@ -14,6 +14,10 @@ export function DoctorBadge({
   const badge = badgeForPlan(plan);
   if (!badge) return null;
 
+  // O plano `elite` foi rebatizado como "Reconhecido" nas vendas — o selo
+  // que a paciente vê acompanha (o valor interno segue "Elite").
+  const label = badge === "Elite" ? "Reconhecido" : badge;
+
   const style =
     badge === "Black"
       ? "bg-gradient-to-r from-neutral-900 to-neutral-700 text-amber-300 shadow-sm ring-1 ring-amber-400/40"
@@ -28,10 +32,10 @@ export function DoctorBadge({
   return (
     <span
       className={`inline-flex items-center gap-0.5 rounded-full font-bold ${style} ${dims}`}
-      title={`Médico verificado · plano ${badge}`}
+      title={`Médico verificado · plano ${label}`}
     >
       <span aria-hidden>✓</span>
-      {badge}
+      {label}
     </span>
   );
 }

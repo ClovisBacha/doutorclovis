@@ -6073,27 +6073,27 @@ function DoctorBilling({
         <PlanBtn
           planKey="starter"
           name="Starter"
-          monthly={197}
+          monthly={149}
           tagline="Até 50 pacientes · 1 cérebro"
         />
         <PlanBtn
           planKey="pro"
           name="Pro"
-          monthly={347}
+          monthly={297}
           tagline="Até 150 pacientes · IA no WhatsApp"
         />
         <PlanBtn
           planKey="elite"
-          name="Elite"
-          monthly={697}
-          tagline="Até 5 cérebros · 300 pacientes/médico"
+          name="Reconhecido"
+          monthly={597}
+          tagline="Selo + topo da busca · até 5 cérebros"
           highlight
-          perk="🎟️ 25 convites premium/mês + selo Elite"
+          perk="🎟️ 25 convites premium/mês + selo verificado"
         />
         <PlanBtn
           planKey="black"
           name="Black"
-          monthly={1999}
+          monthly={1499}
           tagline="Até 20 cérebros · 500 pacientes/médico"
           black
           perk="🖤 250 convites/mês · gerente dedicado · topo da busca · selo Black"
@@ -7380,6 +7380,7 @@ function PatientMirrorCard({ p, onOpen }: { p: LinkedPatient; onOpen?: () => voi
           <>
             <BabyIllustration
               week={weeks}
+              tone={p.baby_skin_tone ?? 0}
               showSac={false}
               showInfo={false}
               className="h-[70%] w-[70%] drop-shadow-[0_8px_20px_rgba(0,0,0,0.18)]"
@@ -7559,6 +7560,7 @@ function PatientDetailModal({
           {weeks ? (
             <BabyIllustration
               week={weeks}
+              tone={p.baby_skin_tone ?? 0}
               showSac={false}
               showInfo={false}
               className="h-[80%] w-auto drop-shadow-[0_8px_20px_rgba(0,0,0,0.2)]"

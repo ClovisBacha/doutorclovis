@@ -5,7 +5,7 @@ import babyTardio from "@/assets/baby-tardio.png";
 import babyTermo from "@/assets/baby-termo.png";
 import { babyStage, babyForWeek, WEEK_MIN, WEEK_MAX, type BabyStage } from "@/lib/gestacao";
 
-const STAGE_LABEL: Record<BabyStage, string> = {
+export const STAGE_LABEL: Record<BabyStage, string> = {
   embriao: "Embrião",
   inicial: "Feto inicial",
   feto: "Feto",
@@ -13,7 +13,7 @@ const STAGE_LABEL: Record<BabyStage, string> = {
   termo: "Bebê a termo",
 };
 
-const STAGE_RANGES: Record<BabyStage, [number, number]> = {
+export const STAGE_RANGES: Record<BabyStage, [number, number]> = {
   embriao: [4, 9],
   inicial: [10, 15],
   feto: [16, 27],
@@ -40,6 +40,26 @@ const STAGE_IMG: Record<BabyStage, string> = {
 // embriao and termo images have white backgrounds — multiply blends white out on light bg
 const WHITE_BG_STAGES = new Set<BabyStage>(["embriao", "termo"]);
 
+/**
+ * Tons de pele do bebê (0 = arte original clara → 4 = pele retinta).
+ * Aplicados por filtro SVG de gamma por canal sobre a arte PNG: escurece a
+ * pele preservando o branco do fundo. `swatch` é a cor mostrada na paleta
+ * de escolha (cadastro/perfil).
+ */
+export const BABY_TONES: { label: string; swatch: string; exp: [number, number, number] }[] = [
+  { label: "Claro", swatch: "#f7d9c4", exp: [1, 1, 1] },
+  { label: "Claro médio", swatch: "#eec39a", exp: [1.18, 1.3, 1.42] },
+  { label: "Médio", swatch: "#d9a066", exp: [1.42, 1.62, 1.85] },
+  { label: "Moreno", swatch: "#a9714b", exp: [1.8, 2.15, 2.5] },
+  { label: "Retinto", swatch: "#7a4b32", exp: [2.3, 2.85, 3.4] },
+];
+
+/** Normaliza um valor livre (banco) para um índice válido da paleta. */
+export function clampTone(tone: number | null | undefined): number {
+  const t = Math.round(Number(tone ?? 0));
+  return Number.isFinite(t) ? Math.min(BABY_TONES.length - 1, Math.max(0, t)) : 0;
+}
+
 function growth(week: number) {
   return Math.max(0, Math.min(1, (week - WEEK_MIN) / (WEEK_MAX - WEEK_MIN)));
 }
@@ -49,6 +69,7 @@ export function BabyIllustration({
   showSac = true,
   showInfo = true,
   className,
+  tone = 0,
 }: {
   week: number;
   /** false = bebê "livre", sem o círculo do saco amniótico */
@@ -57,8 +78,13 @@ export function BabyIllustration({
   showInfo?: boolean;
   /** classes do <svg> — sobrescreve o tamanho padrão */
   className?: string;
+  /** Tom de pele do bebê (índice em BABY_TONES; 0 = arte original). */
+  tone?: number;
 }) {
   const stage = babyStage(week);
+  const toneIdx = clampTone(tone);
+  const [er, eg, eb] = BABY_TONES[toneIdx].exp;
+  const toneFilterId = `baby-tone-${toneIdx}`;
   const g = growth(week);
   const sacR = 72 + g * 16;
   const info = babyForWeek(week);
@@ -94,6 +120,15 @@ export function BabyIllustration({
           <filter id="blur-m">
             <feGaussianBlur stdDeviation="2.4" />
           </filter>
+          {toneIdx > 0 && (
+            <filter id={toneFilterId} colorInterpolationFilters="sRGB">
+              <feComponentTransfer>
+                <feFuncR type="gamma" amplitude="1" exponent={er} offset="0" />
+                <feFuncG type="gamma" amplitude="1" exponent={eg} offset="0" />
+                <feFuncB type="gamma" amplitude="1" exponent={eb} offset="0" />
+              </feComponentTransfer>
+            </filter>
+          )}
           {showSac && (
             <clipPath id="sac-clip">
               <circle cx="100" cy="100" r={sacR} />
@@ -150,6 +185,7 @@ export function BabyIllustration({
             width="200"
             height="200"
             preserveAspectRatio="xMidYMid meet"
+            filter={toneIdx > 0 ? `url(#${toneFilterId})` : undefined}
             style={isWhiteBg ? { mixBlendMode: "multiply" } : undefined}
           />
         </g>

@@ -12,6 +12,7 @@ import {
 import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { InviteDoctorCTA } from "@/components/invite-doctor-cta";
+import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
 import { ymdLocal } from "@/lib/utils";
@@ -28,7 +29,7 @@ import {
   dueDateFromLmp,
   trimesterForWeek,
 } from "@/lib/gestacao";
-import { BabyIllustration } from "@/components/baby-illustration";
+import { BabyIllustration, BABY_TONES } from "@/components/baby-illustration";
 import { assessSymptoms, saveTriageLog } from "@/lib/triage.functions";
 import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
 import {
@@ -146,6 +147,8 @@ type Profile = {
   corporate_account_id?: string | null;
   quiz_premium?: boolean | null;
   doctor_id?: string | null;
+  /** Tom de pele do bebê nas ilustrações (0–4, paleta BABY_TONES). */
+  baby_skin_tone?: number | null;
   /** BPM fetal medido pelo médico na consulta ("Sentir o coração"). */
   fetal_bpm?: number | null;
   fetal_bpm_at?: string | null;
@@ -409,6 +412,9 @@ function MinhaContaPage() {
   const [isDoctor, setIsDoctor] = useState(false);
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
+  // Jornada do Bebê (toque na foto do bebê) + popup do Premium (gatilho)
+  const [journeyOpen, setJourneyOpen] = useState(false);
+  const [premiumOpen, setPremiumOpen] = useState(false);
   // Navegação disparada de DENTRO de uma aba (ex.: "Configure em Perfil") —
   // troca a aba e sai da home mobile, senão o destino fica escondido no celular.
   const goToTab = (t: string) => {
@@ -632,6 +638,33 @@ function MinhaContaPage() {
       {/* ── App bottom nav (mobile only) ─────────────────────── */}
       <AppBottomNav activeSection={activeSection} onSelect={handleBottomNav} />
 
+      {/* ── Jornada do Bebê (toque na foto) + popup Premium ─────── */}
+      {journeyOpen && gest && (
+        <BabyJourneyModal
+          currentWeek={gest.weeks}
+          tone={profile?.baby_skin_tone ?? 0}
+          premium={!!profile?.quiz_premium}
+          onClose={() => setJourneyOpen(false)}
+          onWantPremium={() => setPremiumOpen(true)}
+        />
+      )}
+      {premiumOpen && (
+        <PremiumUpsellModal
+          onClose={() => setPremiumOpen(false)}
+          onUnlocked={async () => {
+            // Cupom aplicado: recarrega o perfil para o premium refletir já.
+            const { data: u } = await supabase.auth.getUser();
+            if (!u.user) return;
+            const { data } = await (supabase as any)
+              .from("patient_profiles")
+              .select("*")
+              .eq("id", u.user.id)
+              .maybeSingle();
+            if (data) setProfile(data);
+          }}
+        />
+      )}
+
       {/* pb-28 no mobile: folga para a barra flutuante não cobrir o fim da página */}
       <section className="mx-auto max-w-5xl px-5 py-6 pb-28 md:py-12">
         {/* ── Desktop header ───────────────────────────────────── */}
@@ -732,6 +765,8 @@ function MinhaContaPage() {
               gest={gest}
               onNavigate={mobileNavigate}
               nextAppointment={nextAppt}
+              babyTone={profile?.baby_skin_tone ?? 0}
+              onBabyTap={() => setJourneyOpen(true)}
             />
           </div>
         )}
@@ -798,7 +833,14 @@ function MinhaContaPage() {
 
           <div key={tab} className="mt-6 tab-enter">
             <TabErrorBoundary tabName={tab}>
-              {tab === "Bebê" && <BabyTab profile={profile} gest={gest} onNavigate={goToTab} />}
+              {tab === "Bebê" && (
+                <BabyTab
+                  profile={profile}
+                  gest={gest}
+                  onNavigate={goToTab}
+                  onBabyTap={() => setJourneyOpen(true)}
+                />
+              )}
               {tab === "Caminho" && (
                 <GestacaoPath profile={profile} gest={gest} quizPremium={!!profile?.quiz_premium} />
               )}
@@ -865,10 +907,13 @@ function BabyTab({
   profile,
   gest,
   onNavigate,
+  onBabyTap,
 }: {
   profile: Profile | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
+  /** Toque na foto do bebê → Jornada do Bebê (gatilho Premium). */
+  onBabyTap?: () => void;
 }) {
   if (!profile || !gest) {
     return (
@@ -917,14 +962,19 @@ function BabyTab({
         />
 
         <div className="relative grid items-center gap-6 md:grid-cols-[auto_1fr] md:gap-12">
-          {/* Bebê grande, flutuando devagar */}
-          <div className="float-slow mx-auto">
+          {/* Bebê grande, flutuando devagar — toque abre a Jornada */}
+          <button
+            onClick={onBabyTap}
+            aria-label="Ver a jornada do bebê"
+            className="float-slow mx-auto transition-transform active:scale-[0.97]"
+          >
             <BabyIllustration
               week={gest.weeks}
+              tone={profile.baby_skin_tone ?? 0}
               showInfo={false}
               className="h-60 w-60 drop-shadow-[0_18px_44px_rgba(168,90,68,0.22)] md:h-80 md:w-80"
             />
-          </div>
+          </button>
 
           <div className="text-center md:text-left">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
@@ -1753,6 +1803,7 @@ function ProfileTab({
   const [form, setForm] = useState({
     display_name: profile?.display_name ?? "",
     baby_name: profile?.baby_name ?? "",
+    baby_skin_tone: profile?.baby_skin_tone ?? 0,
     lmp_date: profile?.lmp_date ?? "",
     reference_date: profile?.reference_date ?? "",
     reference_weeks: profile?.reference_weeks?.toString() ?? "",
@@ -1811,6 +1862,7 @@ function ProfileTab({
         id: u.user.id,
         display_name: form.display_name || null,
         baby_name: form.baby_name || null,
+        baby_skin_tone: form.baby_skin_tone,
         lmp_date: form.lmp_date || null,
         due_date: form.lmp_date ? dueDateFromLmp(form.lmp_date) : null,
         reference_date: form.reference_date || null,
@@ -1835,11 +1887,20 @@ function ProfileTab({
         prior_notes: form.prior_notes || null,
         updated_at: new Date().toISOString(),
       };
-      const { data, error } = await (supabase as any)
+      let { data, error } = await (supabase as any)
         .from("patient_profiles")
         .upsert(payload)
         .select()
         .single();
+      if (error && String(error.message || "").includes("baby_skin_tone")) {
+        // Coluna do tom ainda não migrada no banco: salva o resto mesmo assim.
+        delete payload.baby_skin_tone;
+        ({ data, error } = await (supabase as any)
+          .from("patient_profiles")
+          .upsert(payload)
+          .select()
+          .single());
+      }
       if (error) {
         setMsg(error.message);
       } else {
@@ -1892,6 +1953,42 @@ function ProfileTab({
             value={form.baby_name}
             onChange={(v) => setForm({ ...form, baby_name: v })}
           />
+        </div>
+
+        {/* Tom de pele do bebê nas ilustrações — toda família se vê no app */}
+        <div className="mt-4">
+          <p className="mb-2 block text-sm font-medium">Tom de pele do bebê nas ilustrações</p>
+          <div className="flex flex-wrap items-center gap-3">
+            {BABY_TONES.map((t, i) => (
+              <button
+                key={t.label}
+                type="button"
+                onClick={() => setForm({ ...form, baby_skin_tone: i })}
+                title={t.label}
+                aria-label={`Tom ${t.label}`}
+                aria-pressed={form.baby_skin_tone === i}
+                className={`h-9 w-9 rounded-full border-2 transition-transform ${
+                  form.baby_skin_tone === i
+                    ? "scale-110 border-primary ring-2 ring-primary/30"
+                    : "border-border hover:scale-105"
+                }`}
+                style={{ backgroundColor: t.swatch }}
+              />
+            ))}
+            <div className="ml-1">
+              <BabyIllustration
+                week={30}
+                tone={form.baby_skin_tone}
+                showSac={false}
+                showInfo={false}
+                className="h-14 w-14"
+              />
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {BABY_TONES[form.baby_skin_tone]?.label ?? "Claro"} — muda o bebê em todas as telas. Dá
+            para trocar quando quiser.
+          </p>
         </div>
       </div>
 

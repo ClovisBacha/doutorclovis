@@ -110,7 +110,7 @@ const CLINICA: Entitlements = {
 // Elite = Pro + equipe + 25 convites premium/mês + selo "Elite".
 const ELITE: Entitlements = {
   ...PRO,
-  label: "Elite",
+  label: "Reconhecido",
   maxPatients: 300,
   maxBrains: 5,
   teamSeats: true,

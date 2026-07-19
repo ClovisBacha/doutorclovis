@@ -2115,3 +2115,10 @@ DROP TRIGGER IF EXISTS trg_protect_doctor_billing ON public.doctors;
 CREATE TRIGGER trg_protect_doctor_billing
   BEFORE INSERT OR UPDATE ON public.doctors
   FOR EACH ROW EXECUTE FUNCTION public.protect_doctor_billing();
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260719010000 — Tom de pele do bebê (paleta de 5 tons, escolha da paciente)
+-- ════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS baby_skin_tone smallint NOT NULL DEFAULT 0;
