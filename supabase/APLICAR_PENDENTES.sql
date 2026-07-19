@@ -2149,3 +2149,28 @@ REVOKE ALL ON public.platform_coupons FROM anon, authenticated;
 REVOKE ALL ON public.platform_coupon_redemptions FROM anon, authenticated;
 GRANT ALL ON public.platform_coupons TO service_role;
 GRANT ALL ON public.platform_coupon_redemptions TO service_role;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260719030000 — Lives e Consultas Pagas por médico (multi-inquilino)
+-- ════════════════════════════════════════════════════════════════════════
+-- Cada médico tem SUAS lives e SUAS consultas particulares (recorte por
+-- doctor_id). Super-admin vê tudo pelo /admin (financeiro por médico).
+-- doctor_id NULL em lives = "Live da Obstétrica" (global, conceito futuro).
+
+ALTER TABLE public.lives
+  ADD COLUMN IF NOT EXISTS doctor_id uuid;
+
+ALTER TABLE public.private_consultations
+  ADD COLUMN IF NOT EXISTS doctor_id uuid;
+
+UPDATE public.private_consultations pc
+   SET doctor_id = pp.doctor_id
+  FROM public.patient_profiles pp
+ WHERE pp.id = pc.patient_user_id
+   AND pc.doctor_id IS NULL
+   AND pp.doctor_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_lives_doctor_id
+  ON public.lives(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_private_consultations_doctor_id
+  ON public.private_consultations(doctor_id);

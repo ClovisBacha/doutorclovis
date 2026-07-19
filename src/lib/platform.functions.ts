@@ -195,6 +195,114 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
     return { ok: true as const, overview };
   });
 
+export type FinanceByDoctor = {
+  doctorId: string | null;
+  doctorName: string;
+  requested: number;
+  paid: number;
+  pending: number;
+  cancelled: number;
+  revenueCents: number;
+};
+
+export type PlatformFinance = {
+  isSuperAdmin: true;
+  totals: {
+    requested: number;
+    paid: number;
+    pending: number;
+    cancelled: number;
+    revenueCents: number;
+  };
+  byDoctor: FinanceByDoctor[];
+  generatedAt: string;
+};
+
+// "Pago" = pagamento confirmado pelo médico (ou consulta já realizada).
+const PAID_STATUS = new Set(["confirmado", "realizado"]);
+const CANCELLED_STATUS = new Set(["cancelado"]);
+
+/**
+ * Financeiro da plataforma (super-admin): TODAS as consultas pagas do site,
+ * agrupadas por médico. O dono enxerga quanto entrou por perfil de médico e
+ * quantas consultas foram efetivamente pagas através da Obstétrica.
+ */
+export const getPlatformFinance = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    type ConsultRow = {
+      doctor_id: string | null;
+      status: string | null;
+      amount_cents: number | null;
+    };
+    const rows = await safe<ConsultRow[]>(
+      async () =>
+        ((await sb.from("private_consultations").select("doctor_id,status,amount_cents")).data ??
+          []) as ConsultRow[],
+      [],
+    );
+
+    const nameById = await safe<Map<string, string>>(async () => {
+      const { data: docs } = await sb.from("doctors").select("id,display_name");
+      const m = new Map<string, string>();
+      for (const d of (docs ?? []) as { id: string; display_name: string | null }[])
+        m.set(d.id, d.display_name || "(sem nome)");
+      return m;
+    }, new Map());
+
+    const NO_DOCTOR = "__none__";
+    const acc = new Map<string, FinanceByDoctor>();
+    const totals = { requested: 0, paid: 0, pending: 0, cancelled: 0, revenueCents: 0 };
+
+    for (const r of rows) {
+      const key = r.doctor_id ?? NO_DOCTOR;
+      const entry =
+        acc.get(key) ??
+        ({
+          doctorId: r.doctor_id ?? null,
+          doctorName: r.doctor_id
+            ? (nameById.get(r.doctor_id) ?? "(médico removido)")
+            : "Sem médico",
+          requested: 0,
+          paid: 0,
+          pending: 0,
+          cancelled: 0,
+          revenueCents: 0,
+        } satisfies FinanceByDoctor);
+
+      entry.requested += 1;
+      totals.requested += 1;
+      const status = r.status ?? "";
+      if (PAID_STATUS.has(status)) {
+        entry.paid += 1;
+        totals.paid += 1;
+        entry.revenueCents += r.amount_cents ?? 0;
+        totals.revenueCents += r.amount_cents ?? 0;
+      } else if (CANCELLED_STATUS.has(status)) {
+        entry.cancelled += 1;
+        totals.cancelled += 1;
+      } else {
+        entry.pending += 1;
+        totals.pending += 1;
+      }
+      acc.set(key, entry);
+    }
+
+    const byDoctor = [...acc.values()].sort((a, b) => b.revenueCents - a.revenueCents);
+    const finance: PlatformFinance = {
+      isSuperAdmin: true,
+      totals,
+      byDoctor,
+      generatedAt: new Date().toISOString(),
+    };
+    return { ok: true as const, finance };
+  });
+
 /** Confere se o usuário logado é o super-admin (para gate de UI). */
 export const checkIsSuperAdmin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))

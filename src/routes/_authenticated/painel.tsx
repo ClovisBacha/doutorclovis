@@ -38,8 +38,8 @@ import {
   type CorporateAccount,
 } from "@/lib/corporativo.functions";
 import {
-  getPrivateConsultationsAdmin,
-  confirmPaymentAdmin,
+  getPrivateConsultationsForDoctor,
+  confirmPaymentForDoctor,
   CONSULT_TYPES as PRIVATE_CONSULT_TYPES,
   type PrivateConsultation,
 } from "@/lib/consultaparticular.functions";
@@ -149,17 +149,19 @@ const PANEL_TABS = [
 ] as const;
 type PanelTab = (typeof PANEL_TABS)[number];
 
-// Médicos assinantes (fora da equipe da instalação) veem as abas já escopadas
-// por doctor_id: painel, agendamentos, perguntas, pré-consultas, engajamento,
-// teleconsultas, cérebro, pacientes e perfil — todas recortadas ao PRÓPRIO
-// médico no servidor. As abas de dados da instalação inteira (Consultas Pagas,
-// Empresas, Calendário/Agenda/Ferramentas globais) seguem só para a equipe.
+// Cada médico (inclusive o Dr. Clóvis) é um inquilino: vê só as abas escopadas
+// por doctor_id no servidor — painel, agendamentos, perguntas, pré-consultas,
+// teleconsultas, engajamento, cérebro, pacientes, consultas pagas, lives e
+// perfil, todas recortadas ao PRÓPRIO médico. O financeiro da plataforma
+// inteira e as Empresas ficam no console do dono (/admin), não aqui.
 const DOCTOR_TABS: readonly PanelTab[] = [
   "Painel 📊",
   "Agendamentos",
   "Perguntas",
   "Pré-consultas",
   "Teleconsultas",
+  "Consultas Pagas",
+  "Lives",
   "Engajamento",
   "Cérebro 🧠",
   "Pacientes 👩‍🍼",
@@ -261,7 +263,7 @@ function PainelPage() {
 
   async function loadPrivateConsults() {
     const tk = await token();
-    const res = await getPrivateConsultationsAdmin({ data: { accessToken: tk } });
+    const res = await getPrivateConsultationsForDoctor({ data: { accessToken: tk } });
     if (res.ok) setPrivateConsults(res.consultations);
   }
 
@@ -2435,7 +2437,7 @@ function ConsultasPagasSection({
   async function handleConfirm(id: string, status: "confirmado" | "realizado" | "cancelado") {
     setUpdatingId(id);
     const tk = await tokenFn();
-    await confirmPaymentAdmin({ data: { accessToken: tk, id, status } });
+    await confirmPaymentForDoctor({ data: { accessToken: tk, id, status } });
     onRefresh();
     setUpdatingId(null);
   }

@@ -3,6 +3,7 @@ import { CalendarClock, Instagram } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DOCTOR } from "@/lib/doctor.config";
 import { listLivesPublic } from "@/lib/lives.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/lives")({
   head: () => ({
@@ -46,7 +47,10 @@ function LivesPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await listLivesPublic();
+        // Paciente logada → lives do médico dela; visitante anônimo → estático.
+        const { data: sess } = await supabase.auth.getSession();
+        const accessToken = sess.session?.access_token;
+        const res = await listLivesPublic(accessToken ? { data: { accessToken } } : undefined);
         if (!res.ok || res.lives.length === 0) return;
         const now = Date.now();
         const withDate = res.lives.filter((l) => l.scheduled_at);

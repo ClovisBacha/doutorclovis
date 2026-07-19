@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPlatformOverview,
+  getPlatformFinance,
   getRetentionMetrics,
   setDoctorStatus,
   listPlatformCoupons,
@@ -11,6 +12,7 @@ import {
   togglePlatformCoupon,
   type PlatformOverview,
   type PlatformDoctor,
+  type PlatformFinance,
   type RetentionMetrics,
   type PlatformCoupon,
 } from "@/lib/platform.functions";
@@ -135,7 +137,7 @@ function AdminConsole() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [data, setData] = useState<PlatformOverview | null>(null);
   const [tab, setTab] = useState<
-    "visao" | "medicos" | "cupons" | "afiliados" | "empresas" | "varredura"
+    "visao" | "financeiro" | "medicos" | "cupons" | "afiliados" | "empresas" | "varredura"
   >("visao");
 
   async function load() {
@@ -194,6 +196,7 @@ function AdminConsole() {
         {(
           [
             ["visao", "Visão geral"],
+            ["financeiro", "Financeiro"],
             ["medicos", "Médicos"],
             ["cupons", "Cupons"],
             ["afiliados", "Afiliados"],
@@ -217,6 +220,7 @@ function AdminConsole() {
 
       <div className="mt-8">
         {tab === "visao" && data && <OverviewTab data={data} />}
+        {tab === "financeiro" && <FinanceiroTab />}
         {tab === "medicos" && data && <DoctorsTab data={data} onChanged={load} />}
         {tab === "cupons" && <CuponsTab />}
         {tab === "afiliados" && <AfiliadosTab />}
@@ -290,6 +294,110 @@ function OverviewTab({ data }: { data: PlatformOverview }) {
       </p>
 
       <RetentionCard />
+    </div>
+  );
+}
+
+/**
+ * Financeiro da plataforma: TODAS as consultas pagas do site, agrupadas por
+ * médico. Dá ao dono o controle inteiro — quanto entrou por perfil de médico
+ * e quantas consultas foram efetivamente pagas através da Obstétrica.
+ */
+function FinanceiroTab() {
+  const [fin, setFin] = useState<PlatformFinance | null>(null);
+  const [loading, setLoading] = useState(true);
+  const brl = (cents: number) =>
+    `R$ ${(cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        const tk = s.session?.access_token;
+        if (!tk) return;
+        const res = await getPlatformFinance({ data: { accessToken: tk } });
+        if (res.ok && res.finance) setFin(res.finance);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <div className="skeleton h-40 rounded-3xl" />;
+  if (!fin)
+    return (
+      <p className="text-sm text-muted-foreground">
+        Não foi possível carregar o financeiro. Confira se a migração de <code>doctor_id</code> em
+        consultas foi aplicada.
+      </p>
+    );
+
+  const t = fin.totals;
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KpiCard
+          label="Faturamento (consultas pagas)"
+          value={brl(t.revenueCents)}
+          tone="amber"
+          hint="pagamentos confirmados no site"
+        />
+        <KpiCard label="Consultas pagas" value={t.paid} tone="emerald" />
+        <KpiCard label="Aguardando pagamento" value={t.pending} tone="sky" />
+        <KpiCard label="Solicitadas (total)" value={t.requested} tone="primary" />
+      </div>
+
+      <div className="overflow-x-auto rounded-3xl border border-border bg-card">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Médico</th>
+              <th className="px-4 py-3 text-right font-medium">Pagas</th>
+              <th className="px-4 py-3 text-right font-medium">Pendentes</th>
+              <th className="px-4 py-3 text-right font-medium">Solicitadas</th>
+              <th className="px-4 py-3 text-right font-medium">Faturamento</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fin.byDoctor.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                  Nenhuma consulta paga registrada ainda.
+                </td>
+              </tr>
+            )}
+            {fin.byDoctor.map((d) => (
+              <tr
+                key={d.doctorId ?? "__none__"}
+                className="border-b border-border/60 last:border-0"
+              >
+                <td className="px-4 py-3 font-medium">
+                  {d.doctorName}
+                  {!d.doctorId && (
+                    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      sem vínculo
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums text-emerald-600">{d.paid}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                  {d.pending}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">{d.requested}</td>
+                <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                  {brl(d.revenueCents)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Atualizado {new Date(fin.generatedAt).toLocaleString("pt-BR")}. "Pago" = pagamento
+        confirmado pelo médico ou consulta já realizada. Consultas antigas sem médico vinculado
+        aparecem em <em>Sem médico</em>.
+      </p>
     </div>
   );
 }
