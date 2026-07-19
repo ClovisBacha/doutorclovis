@@ -107,6 +107,63 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
     if (!u.user) return { ok: false as const, error: "nao_autenticado" };
 
     const code = data.code.trim().toUpperCase();
+
+    // 1) Cupom de PLATAFORMA (gerado pelo super-admin) tem prioridade. Pode
+    //    ter vários usos; 1 resgate por usuário (idempotente). Tabela ausente
+    //    (migração pendente) → cai para o convite do médico abaixo.
+    try {
+      const sb = supabaseAdmin as any;
+      const { data: pc } = await sb
+        .from("platform_coupons")
+        .select("id,active,max_redemptions")
+        .eq("code", code)
+        .maybeSingle();
+      if (pc) {
+        if (!pc.active) return { ok: false as const, error: "codigo_invalido" };
+        const { data: mine } = await sb
+          .from("platform_coupon_redemptions")
+          .select("user_id")
+          .eq("coupon_id", pc.id)
+          .eq("user_id", u.user.id)
+          .maybeSingle();
+        if (!mine) {
+          if (pc.max_redemptions != null) {
+            const { count } = await sb
+              .from("platform_coupon_redemptions")
+              .select("user_id", { count: "exact", head: true })
+              .eq("coupon_id", pc.id);
+            if ((count ?? 0) >= pc.max_redemptions)
+              return { ok: false as const, error: "codigo_usado" };
+          }
+          await sb
+            .from("platform_coupon_redemptions")
+            .insert({ coupon_id: pc.id, user_id: u.user.id });
+        }
+        await sb.from("patient_profiles").update({ quiz_premium: true }).eq("id", u.user.id);
+        // Origem 'cupom' → o premium sobrevive ao toggle manual (mesma
+        // proteção de stripe/doctor_invite/convite).
+        try {
+          await sb.from("subscriptions").upsert(
+            {
+              user_id: u.user.id,
+              product: "quiz_premium",
+              plan: "cupom",
+              source: "cupom",
+              status: "active",
+              stripe_subscription_id: `cupom_${pc.id}_${u.user.id}`,
+            },
+            { onConflict: "stripe_subscription_id" },
+          );
+        } catch {
+          /* opcional */
+        }
+        return { ok: true as const };
+      }
+    } catch {
+      /* tabela ausente → segue para o convite do médico */
+    }
+
+    // 2) Convite do MÉDICO (invite_codes) — uso único, vincula ao médico.
     const { data: row } = await (supabaseAdmin as any)
       .from("invite_codes")
       .select("id,doctor_id,redeemed_by")

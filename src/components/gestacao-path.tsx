@@ -2508,7 +2508,7 @@ function QuizPaywall({ week, context = "past" }: { week: number; context?: "past
             onClick={() => setCodeOpen(true)}
             className="w-full text-center text-xs font-semibold text-amber-800 underline decoration-amber-300 underline-offset-2"
           >
-            Tenho um código do meu médico
+            Tenho um cupom
           </button>
         ) : (
           <div>

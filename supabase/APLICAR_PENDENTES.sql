@@ -2122,3 +2122,30 @@ CREATE TRIGGER trg_protect_doctor_billing
 
 ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS baby_skin_tone smallint NOT NULL DEFAULT 0;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260719020000 — Cupons de plataforma (super-admin gera; libera Premium)
+-- ════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.platform_coupons (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code            text NOT NULL UNIQUE,
+  kind            text NOT NULL DEFAULT 'premium',
+  max_redemptions int,
+  active          boolean NOT NULL DEFAULT true,
+  note            text,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.platform_coupon_redemptions (
+  coupon_id   uuid NOT NULL,
+  user_id     uuid NOT NULL,
+  redeemed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (coupon_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_coupon ON public.platform_coupon_redemptions(coupon_id);
+ALTER TABLE public.platform_coupons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.platform_coupon_redemptions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.platform_coupons FROM anon, authenticated;
+REVOKE ALL ON public.platform_coupon_redemptions FROM anon, authenticated;
+GRANT ALL ON public.platform_coupons TO service_role;
+GRANT ALL ON public.platform_coupon_redemptions TO service_role;

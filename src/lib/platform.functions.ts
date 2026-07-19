@@ -357,3 +357,112 @@ export const getRetentionMetrics = createServerFn({ method: "POST" })
     };
     return { ok: true as const, metrics };
   });
+
+/* ══════════════════════════════════════════════════════════════════════
+   Cupons de plataforma — só o super-admin (dono) gera. Cada cupom libera o
+   Premium do app quando a paciente o resgata no popup. Diferente do convite
+   do médico: não pertence a um médico e pode ter vários usos.
+   ══════════════════════════════════════════════════════════════════════ */
+
+export type PlatformCoupon = {
+  id: string;
+  code: string;
+  max_redemptions: number | null;
+  active: boolean;
+  note: string | null;
+  created_at: string;
+  redemptions: number;
+};
+
+/** Lista os cupons de plataforma com a contagem de resgates (super-admin). */
+export const listPlatformCoupons = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const, coupons: [] as PlatformCoupon[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: rows, error } = await sb
+      .from("platform_coupons")
+      .select("id,code,max_redemptions,active,note,created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error?.code === "42P01")
+      return { ok: false as const, coupons: [] as PlatformCoupon[], missingTable: true as const };
+    if (error) return { ok: false as const, coupons: [] as PlatformCoupon[] };
+
+    const { data: reds } = await sb
+      .from("platform_coupon_redemptions")
+      .select("coupon_id")
+      .limit(10000);
+    const counts = new Map<string, number>();
+    for (const r of (reds ?? []) as { coupon_id: string }[]) {
+      counts.set(r.coupon_id, (counts.get(r.coupon_id) ?? 0) + 1);
+    }
+    const coupons: PlatformCoupon[] = ((rows ?? []) as any[]).map((c) => ({
+      ...c,
+      redemptions: counts.get(c.id) ?? 0,
+    }));
+    return { ok: true as const, coupons };
+  });
+
+/** Cria um cupom de Premium (código custom ou automático). */
+export const createPlatformCoupon = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        code: z
+          .string()
+          .min(4)
+          .max(16)
+          .regex(/^[a-zA-Z0-9-]+$/, "só letras, números e -")
+          .optional(),
+        note: z.string().max(80).optional(),
+        maxRedemptions: z.number().int().min(1).max(100000).nullable().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    // Código automático legível (sem 0/O/1/I) se o admin não digitar um.
+    let code = (data.code ?? "").trim().toUpperCase();
+    if (!code) {
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      code = "";
+      for (let i = 0; i < 8; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    const { error } = await sb.from("platform_coupons").insert({
+      code,
+      kind: "premium",
+      note: data.note?.trim() || null,
+      max_redemptions: data.maxRedemptions ?? null,
+    });
+    if (error?.code === "23505") return { ok: false as const, reason: "duplicado" as const };
+    if (error?.code === "42P01") return { ok: false as const, reason: "migracao" as const };
+    if (error) return { ok: false as const };
+    return { ok: true as const, code };
+  });
+
+/** Ativa/desativa um cupom (inativo não resgata mais). */
+export const togglePlatformCoupon = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({ accessToken: z.string().min(10), id: z.string().uuid(), active: z.boolean() })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("platform_coupons")
+      .update({ active: data.active })
+      .eq("id", data.id);
+    return { ok: !error };
+  });

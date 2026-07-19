@@ -391,11 +391,11 @@ export function PremiumUpsellModal({
                 onClick={() => setCouponOpen(true)}
                 className="text-xs font-semibold text-cyan-200 underline underline-offset-4"
               >
-                🎟️ Tenho um cupom (do meu médico)
+                🎟️ Tenho um cupom
               </button>
             )}
             <p className="mt-2 text-[10px] text-white/40">
-              Cancele quando quiser · seu médico pode te presentear com um cupom
+              Cancele quando quiser · tem um cupom? Aplique acima e libere na hora
             </p>
           </div>
         </div>

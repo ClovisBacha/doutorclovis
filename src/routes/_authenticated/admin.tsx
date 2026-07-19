@@ -6,9 +6,13 @@ import {
   getPlatformOverview,
   getRetentionMetrics,
   setDoctorStatus,
+  listPlatformCoupons,
+  createPlatformCoupon,
+  togglePlatformCoupon,
   type PlatformOverview,
   type PlatformDoctor,
   type RetentionMetrics,
+  type PlatformCoupon,
 } from "@/lib/platform.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -117,7 +121,7 @@ const PLANS = ["trial", "free", "starter", "pro", "clinica", "elite", "black"] a
 function AdminConsole() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [data, setData] = useState<PlatformOverview | null>(null);
-  const [tab, setTab] = useState<"visao" | "medicos" | "varredura">("visao");
+  const [tab, setTab] = useState<"visao" | "medicos" | "cupons" | "varredura">("visao");
 
   async function load() {
     const tk = await token();
@@ -176,6 +180,7 @@ function AdminConsole() {
           [
             ["visao", "Visão geral"],
             ["medicos", "Médicos"],
+            ["cupons", "Cupons"],
             ["varredura", "Varredura do site"],
           ] as const
         ).map(([k, label]) => (
@@ -196,6 +201,7 @@ function AdminConsole() {
       <div className="mt-8">
         {tab === "visao" && data && <OverviewTab data={data} />}
         {tab === "medicos" && data && <DoctorsTab data={data} onChanged={load} />}
+        {tab === "cupons" && <CuponsTab />}
         {tab === "varredura" && <VarreduraTab />}
       </div>
     </section>
@@ -442,6 +448,187 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
       >
         {d.active ? "Desativar" : "Ativar"}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Cupons de plataforma (só o super-admin): gere códigos que liberam o Premium
+ * do app. Use em campanhas, parcerias ou cortesias — a paciente aplica o código
+ * no popup "Tenho um cupom" e ganha o Premium na hora.
+ */
+function CuponsTab() {
+  const [coupons, setCoupons] = useState<PlatformCoupon[] | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [code, setCode] = useState("");
+  const [note, setNote] = useState("");
+  const [maxUses, setMaxUses] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  async function load() {
+    try {
+      const res = await listPlatformCoupons({ data: { accessToken: await token() } });
+      if (res.ok) setCoupons(res.coupons);
+      else if ("missingTable" in res && res.missingTable) {
+        setMissing(true);
+        setCoupons([]);
+      } else setCoupons([]);
+    } catch {
+      setCoupons([]);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function create() {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const max = maxUses.trim() ? parseInt(maxUses, 10) : null;
+      const res = await createPlatformCoupon({
+        data: {
+          accessToken: await token(),
+          ...(code.trim() ? { code: code.trim() } : {}),
+          ...(note.trim() ? { note: note.trim() } : {}),
+          maxRedemptions: max && max > 0 ? max : null,
+        },
+      });
+      if (!res.ok) {
+        toast.error(
+          "reason" in res && res.reason === "duplicado"
+            ? "Esse código já existe."
+            : "reason" in res && res.reason === "migracao"
+              ? "Rode o APLICAR_PENDENTES.sql no Supabase para ativar os cupons."
+              : "Não foi possível criar o cupom.",
+        );
+        return;
+      }
+      toast.success(`Cupom ${res.code} criado 🎟️`);
+      setCode("");
+      setNote("");
+      setMaxUses("");
+      await load();
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function toggle(c: PlatformCoupon) {
+    const res = await togglePlatformCoupon({
+      data: { accessToken: await token(), id: c.id, active: !c.active },
+    });
+    if (res.ok) load();
+    else toast.error("Não foi possível atualizar.");
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-serif text-xl">Cupons de Premium</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Códigos que VOCÊ gera para liberar o Premium do app (campanhas, parcerias, cortesias). A
+          paciente aplica em "Tenho um cupom" e ganha na hora. Deixe o código em branco para gerar
+          um automático; deixe usos em branco para ilimitado.
+        </p>
+      </div>
+
+      {missing && (
+        <p className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          Rode o <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar os cupons.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-4">
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground">
+            Código (opcional)
+          </label>
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="AUTO"
+            maxLength={16}
+            className="mt-1 w-36 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <label className="block text-[11px] font-medium text-muted-foreground">
+            Rótulo interno (opcional)
+          </label>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Ex: Campanha Instagram"
+            className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-muted-foreground">Usos</label>
+          <input
+            value={maxUses}
+            onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="∞"
+            className="mt-1 w-20 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <button
+          onClick={create}
+          disabled={creating}
+          className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+        >
+          {creating ? "Criando…" : "+ Gerar cupom"}
+        </button>
+      </div>
+
+      {coupons === null ? (
+        <div className="skeleton h-20 rounded-2xl" />
+      ) : coupons.length === 0 ? (
+        !missing && (
+          <p className="text-sm text-muted-foreground">
+            Nenhum cupom ainda. Gere o primeiro acima.
+          </p>
+        )
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="px-4 py-2.5">Código</th>
+                <th className="px-4 py-2.5">Rótulo</th>
+                <th className="px-4 py-2.5">Usos</th>
+                <th className="px-4 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {coupons.map((c) => (
+                <tr key={c.id} className="border-b border-border/60 last:border-0">
+                  <td className="px-4 py-2.5 font-mono font-semibold">{c.code}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{c.note ?? "—"}</td>
+                  <td className="px-4 py-2.5 tabular-nums">
+                    {c.redemptions}
+                    {c.max_redemptions != null ? ` / ${c.max_redemptions}` : " / ∞"}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={() => toggle(c)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        c.active
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-secondary text-muted-foreground"
+                      }`}
+                    >
+                      {c.active ? "Ativo" : "Inativo"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
