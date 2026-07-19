@@ -127,17 +127,28 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
           .eq("user_id", u.user.id)
           .maybeSingle();
         if (!mine) {
+          // Insere PRIMEIRO (a PK torna a contagem pós-insert autoritativa) e,
+          // se ultrapassou o teto, reverte o próprio resgate — fecha a janela
+          // TOCTOU em que dois usuários simultâneos furariam max_redemptions.
+          const ins = await sb
+            .from("platform_coupon_redemptions")
+            .insert({ coupon_id: pc.id, user_id: u.user.id });
+          if (ins.error && ins.error.code !== "23505")
+            return { ok: false as const, error: "codigo_usado" };
           if (pc.max_redemptions != null) {
             const { count } = await sb
               .from("platform_coupon_redemptions")
               .select("user_id", { count: "exact", head: true })
               .eq("coupon_id", pc.id);
-            if ((count ?? 0) >= pc.max_redemptions)
+            if ((count ?? 0) > pc.max_redemptions) {
+              await sb
+                .from("platform_coupon_redemptions")
+                .delete()
+                .eq("coupon_id", pc.id)
+                .eq("user_id", u.user.id);
               return { ok: false as const, error: "codigo_usado" };
+            }
           }
-          await sb
-            .from("platform_coupon_redemptions")
-            .insert({ coupon_id: pc.id, user_id: u.user.id });
         }
         await sb.from("patient_profiles").update({ quiz_premium: true }).eq("id", u.user.id);
         // Origem 'cupom' → o premium sobrevive ao toggle manual (mesma

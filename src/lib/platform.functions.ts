@@ -430,23 +430,39 @@ export const createPlatformCoupon = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    // Código automático legível (sem 0/O/1/I) se o admin não digitar um.
-    let code = (data.code ?? "").trim().toUpperCase();
-    if (!code) {
-      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-      code = "";
-      for (let i = 0; i < 8; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+    const custom = (data.code ?? "").trim().toUpperCase();
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const randomCode = () => {
+      let c = "";
+      for (let i = 0; i < 8; i++) c += alphabet[Math.floor(Math.random() * alphabet.length)];
+      return c;
+    };
+    const insert = (code: string) =>
+      sb.from("platform_coupons").insert({
+        code,
+        kind: "premium",
+        note: data.note?.trim() || null,
+        max_redemptions: data.maxRedemptions ?? null,
+      });
+
+    // Código custom: sem retry (o admin escolheu). Automático: retenta em
+    // colisão (23505) — como no generateInviteCode.
+    if (custom) {
+      const { error } = await insert(custom);
+      if (error?.code === "23505") return { ok: false as const, reason: "duplicado" as const };
+      if (error?.code === "42P01") return { ok: false as const, reason: "migracao" as const };
+      if (error) return { ok: false as const };
+      return { ok: true as const, code: custom };
     }
-    const { error } = await sb.from("platform_coupons").insert({
-      code,
-      kind: "premium",
-      note: data.note?.trim() || null,
-      max_redemptions: data.maxRedemptions ?? null,
-    });
-    if (error?.code === "23505") return { ok: false as const, reason: "duplicado" as const };
-    if (error?.code === "42P01") return { ok: false as const, reason: "migracao" as const };
-    if (error) return { ok: false as const };
-    return { ok: true as const, code };
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const code = randomCode();
+      const { error } = await insert(code);
+      if (!error) return { ok: true as const, code };
+      if (error.code === "42P01") return { ok: false as const, reason: "migracao" as const };
+      if (error.code !== "23505") return { ok: false as const };
+      // colisão improvável (32^8) → tenta outro código
+    }
+    return { ok: false as const };
   });
 
 /** Ativa/desativa um cupom (inativo não resgata mais). */
