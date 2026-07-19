@@ -2170,6 +2170,22 @@ UPDATE public.private_consultations pc
    AND pc.doctor_id IS NULL
    AND pp.doctor_id IS NOT NULL;
 
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lives_doctor_id_fkey') THEN
+    ALTER TABLE public.lives
+      ADD CONSTRAINT lives_doctor_id_fkey
+      FOREIGN KEY (doctor_id) REFERENCES public.doctors(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'private_consultations_doctor_id_fkey'
+  ) THEN
+    ALTER TABLE public.private_consultations
+      ADD CONSTRAINT private_consultations_doctor_id_fkey
+      FOREIGN KEY (doctor_id) REFERENCES public.doctors(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_lives_doctor_id
   ON public.lives(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_private_consultations_doctor_id

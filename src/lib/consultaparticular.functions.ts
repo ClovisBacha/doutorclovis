@@ -127,23 +127,28 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
 
     // Vincula a consulta ao médico da paciente (recorte multi-inquilino).
     const doctorId = await patientDoctorId(u.user.id);
-    const { data: row, error } = await db
+    const baseRow = {
+      patient_user_id: u.user.id,
+      consult_type: data.consultType,
+      preferred_dates: data.preferredDates,
+      message: data.message,
+      mp_payment_id: mpPaymentId,
+      pix_qr_code: pixQrCode,
+      pix_qr_code_base64: pixQrCodeBase64,
+      amount_cents: Math.round(amount * 100),
+    };
+    let ins = await db
       .from("private_consultations")
-      .insert({
-        patient_user_id: u.user.id,
-        doctor_id: doctorId,
-        consult_type: data.consultType,
-        preferred_dates: data.preferredDates,
-        message: data.message,
-        mp_payment_id: mpPaymentId,
-        pix_qr_code: pixQrCode,
-        pix_qr_code_base64: pixQrCodeBase64,
-        amount_cents: Math.round(amount * 100),
-      })
+      .insert({ ...baseRow, doctor_id: doctorId })
       .select()
       .single();
-    if (error) return { ok: false as const, error: error.message };
-    return { ok: true as const, consultation: row as PrivateConsultation };
+    // Migração pendente (coluna doctor_id ainda não aplicada): não deixa a
+    // paciente na mão — insere sem o recorte e o backfill vincula depois.
+    if (ins.error && (ins.error.code === "42703" || ins.error.code === "PGRST204")) {
+      ins = await db.from("private_consultations").insert(baseRow).select().single();
+    }
+    if (ins.error) return { ok: false as const, error: ins.error.message };
+    return { ok: true as const, consultation: ins.data as PrivateConsultation };
   });
 
 export const getMyPrivateConsultations = createServerFn({ method: "POST" })
@@ -197,6 +202,11 @@ export const getPrivateConsultationsForDoctor = createServerFn({ method: "POST" 
       .select("*")
       .eq("doctor_id", user.id)
       .order("created_at", { ascending: false });
+    if (error?.code === "42703" || error?.code === "42P01")
+      return {
+        ok: false as const,
+        error: "Aplique a migração de consultas (APLICAR_PENDENTES.sql) no Supabase.",
+      };
     if (error) return { ok: false as const, error: error.message };
     const userIds = [...new Set((rows ?? []).map((r: any) => r.patient_user_id))];
     const nameById = new Map<string, string | null>();
