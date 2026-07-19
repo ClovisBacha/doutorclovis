@@ -47,6 +47,15 @@ export function BabyJourneyModal({
   const currentStage = babyStage(currentWeek);
   const currentIdx = STAGE_ORDER.indexOf(currentStage);
 
+  // Trava o scroll da página atrás do sheet (evita scroll chaining no iOS).
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4"
@@ -72,7 +81,7 @@ export function BabyJourneyModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
           <div className="relative">
             {/* trilho vertical */}
             <div className="absolute bottom-6 left-[44px] top-6 w-0.5 bg-gradient-to-b from-primary/50 via-primary/25 to-border" />
@@ -253,6 +262,12 @@ export function PremiumUpsellModal({
   async function redeem() {
     const code = coupon.trim().toUpperCase();
     if (!code || redeeming) return;
+    // Mesmo formato do servidor (4–16 chars): valida aqui para o erro ser
+    // claro ("código inválido") e não um falso "falha de conexão".
+    if (code.length < 4 || code.length > 16) {
+      toast.error("Código inválido — confira o cupom que você recebeu (4 a 16 caracteres).");
+      return;
+    }
     setRedeeming(true);
     try {
       const { supabase } = await import("@/integrations/supabase/client");
@@ -374,6 +389,7 @@ export function PremiumUpsellModal({
                   value={coupon}
                   onChange={(e) => setCoupon(e.target.value.toUpperCase())}
                   onKeyDown={(e) => e.key === "Enter" && redeem()}
+                  maxLength={16}
                   placeholder="CÓDIGO DO CUPOM"
                   autoFocus
                   className="min-w-0 flex-1 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-center text-sm font-semibold uppercase tracking-widest text-white placeholder:text-white/40 focus:border-cyan-300/60 focus:outline-none"
