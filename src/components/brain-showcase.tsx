@@ -162,12 +162,8 @@ export function NeuralBrain({ className = "" }: { className?: string }) {
 export function BrainShowcase() {
   return (
     <section id="segundo-cerebro" className="brain-tech relative overflow-hidden text-white">
-      {/* Grade de circuito + scanline (mesma identidade do painel) */}
+      {/* Grade de circuito estática — sem varredura em movimento (conforto visual) */}
       <div className="brain-grid pointer-events-none absolute inset-0" aria-hidden />
-      <div
-        className="brain-scanline pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-transparent via-cyan-300/10 to-transparent"
-        aria-hidden
-      />
 
       <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 md:grid-cols-[1fr_1.05fr] md:gap-14 md:py-24">
         {/* ── Cérebro vivo + balões de conversa flutuando ── */}

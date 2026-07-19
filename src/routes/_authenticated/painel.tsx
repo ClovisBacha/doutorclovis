@@ -4280,26 +4280,8 @@ function BrainLevelCard({
 
   return (
     <div className="brain-tech relative overflow-hidden rounded-3xl p-6 text-white shadow-[var(--shadow-card)]">
-      {/* Grade de circuito + scanline (puramente decorativos) */}
+      {/* Grade de circuito estática — sem varredura em movimento (conforto visual) */}
       <div className="brain-grid pointer-events-none absolute inset-0" aria-hidden />
-      <div
-        className="brain-scanline pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-transparent via-cyan-300/10 to-transparent"
-        aria-hidden
-      />
-      {/* Nós neurais piscando */}
-      {[
-        ["12%", "18%", "0s"],
-        ["85%", "12%", "0.8s"],
-        ["92%", "70%", "1.4s"],
-        ["6%", "78%", "0.4s"],
-      ].map(([l, t, d]) => (
-        <span
-          key={`${l}${t}`}
-          className="brain-node pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-cyan-300"
-          style={{ left: l, top: t, animationDelay: d }}
-          aria-hidden
-        />
-      ))}
 
       <div className="relative flex flex-wrap items-center gap-6">
         {/* Anel de score */}
@@ -4364,27 +4346,37 @@ function BrainLevelCard({
         </div>
       </div>
 
-      {/* Checklist do que preencher */}
+      {/* Checklist do que preencher para subir o score */}
       {expanded && (
-        <div className="relative mt-5 space-y-2">
+        <div className="relative mt-5 space-y-2.5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200/90">
+            O que falta para o cérebro evoluir
+          </p>
           {items.map((it) => (
             <div
               key={it.key}
-              className={`flex items-start gap-3 rounded-xl border px-3.5 py-2.5 ${
-                it.done ? "border-emerald-300/25 bg-emerald-400/10" : "border-white/10 bg-white/5"
+              className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
+                it.done
+                  ? "border-emerald-300/30 bg-emerald-400/10"
+                  : "border-white/15 bg-white/[0.07]"
               }`}
             >
-              <span className="mt-0.5 text-sm">{it.done ? "✅" : "⬜"}</span>
+              <span className="mt-0.5 text-base leading-none">{it.done ? "✅" : "⬜"}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{it.label}</p>
-                {!it.done && <p className="mt-0.5 text-xs text-white/60">{it.hint}</p>}
+                <p className={`text-sm font-semibold ${it.done ? "text-white/70" : "text-white"}`}>
+                  {it.label}
+                </p>
+                {!it.done && (
+                  <p className="mt-1 text-[13px] leading-snug text-white/80">{it.hint}</p>
+                )}
               </div>
               <span
-                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
-                  it.done ? "bg-emerald-400/20 text-emerald-200" : "bg-white/10 text-white/70"
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums ${
+                  it.done ? "bg-emerald-400/25 text-emerald-100" : "bg-cyan-400/15 text-cyan-100"
                 }`}
               >
-                {it.earned}/{it.points}
+                {it.done ? "✓ " : "+"}
+                {it.done ? it.points : it.points - it.earned} pts
               </span>
             </div>
           ))}

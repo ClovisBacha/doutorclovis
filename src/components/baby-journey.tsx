@@ -303,24 +303,8 @@ export function PremiumUpsellModal({
         className="brain-tech relative w-full max-w-sm overflow-hidden rounded-t-3xl text-white sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* identidade tech: grade de circuito + scanline + nós de luz */}
+        {/* identidade tech: grade de circuito estática (sem varredura) */}
         <div className="brain-grid pointer-events-none absolute inset-0" aria-hidden />
-        <div
-          className="brain-scanline pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-transparent via-cyan-300/10 to-transparent"
-          aria-hidden
-        />
-        {[
-          ["10%", "14%", "0s"],
-          ["88%", "22%", "0.9s"],
-          ["92%", "78%", "0.4s"],
-        ].map(([l, t, d]) => (
-          <span
-            key={`${l}${t}`}
-            className="brain-node pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-cyan-300"
-            style={{ left: l, top: t, animationDelay: d }}
-            aria-hidden
-          />
-        ))}
 
         <button
           onClick={onClose}

@@ -964,14 +964,6 @@ button:active > .duo3d {
     filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.85));
   }
 }
-@keyframes brainScan {
-  0% {
-    transform: translateY(-120%);
-  }
-  100% {
-    transform: translateY(520%);
-  }
-}
 @keyframes brainDot {
   0%,
   100% {
@@ -997,15 +989,11 @@ button:active > .duo3d {
 .brain-ring {
   animation: brainPulse 3.2s ease-in-out infinite;
 }
-.brain-scanline {
-  animation: brainScan 5.5s linear infinite;
-}
 .brain-node {
   animation: brainDot 2.6s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .brain-ring,
-  .brain-scanline,
   .brain-node {
     animation: none;
   }
