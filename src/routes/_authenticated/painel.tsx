@@ -200,10 +200,17 @@ function PainelPage() {
       const res = await getAdminData({ data: { accessToken: tk } });
       if (res.ok) {
         // Conta da plataforma (ADMIN_EMAILS) NÃO é médico: seu lugar é o
-        // console /admin, não o painel do consultório. Multi-inquilino: o
-        // /painel é sempre de um médico recortado por doctor_id.
+        // console /admin. Só redireciona quem SERÁ admitido lá (o super-admin
+        // dono); um e-mail admin secundário sem conta de médico vê o bloqueio
+        // coerente em vez de um beco sem saída (redirect → /admin negado).
         if (res.isTeam) {
-          window.location.replace("/admin");
+          const { checkIsSuperAdmin } = await import("@/lib/platform.functions");
+          const sa = await checkIsSuperAdmin({ data: { accessToken: tk } });
+          if (sa.isSuperAdmin) {
+            window.location.replace("/admin");
+            return;
+          }
+          setAllowed(false);
           return;
         }
         setAllowed(true);

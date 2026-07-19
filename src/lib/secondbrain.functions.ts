@@ -385,10 +385,8 @@ export const deleteBrainEntry = createServerFn({ method: "POST" })
 
 /**
  * Lista as perguntas das pacientes ainda sem resposta (para treinar o cérebro).
- * Escopo por médico: equipe da instalação vê TODAS (inclui pacientes antigas
- * sem doctor_id); assinante/clínica vê SÓ as das próprias pacientes
- * (doctor_id carimbado quando a paciente pergunta). Coluna ausente → lista
- * vazia para assinante (nunca vaza pergunta de outro médico).
+ * Multi-inquilino: sempre escopado por doctor_id — só as perguntas das
+ * pacientes DESTE médico (nunca de outro consultório).
  */
 export const listUnansweredQuestions = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))
@@ -437,8 +435,7 @@ const AnswerTrainSchema = z.object({
  * Responde uma pergunta de paciente e treina o cérebro com ela: cria uma
  * brain_entry (source='pergunta') com a pergunta + resposta e marca a
  * doctor_question como respondida (transação lógica: só marca se treinou).
- * Escopo por médico: equipe responde qualquer pergunta da instalação;
- * assinante/clínica SÓ perguntas das próprias pacientes (doctor_id).
+ * Multi-inquilino: só perguntas das próprias pacientes (doctor_id).
  */
 export const answerAndTrain = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => AnswerTrainSchema.parse(i))
