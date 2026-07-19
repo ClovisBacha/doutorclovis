@@ -35,14 +35,17 @@ async function requireSuperAdmin(accessToken: string) {
 // vendas: preço POR MÉDICO (a partir de R$297) — como cada médico da equipe é
 // uma linha própria em `doctors`, a soma abaixo já reflete o preço por
 // assento automaticamente (não usa o desconto de 5+ médicos; é uma estimativa).
+// Tabela de preços vigente (jul/2026) — usada só para ESTIMAR o MRR no
+// console do dono. Clínica é sob consulta; 0 aqui = não entra na estimativa
+// (o valor real do contrato é somado à mão quando fechar).
 const PLAN_PRICE: Record<string, number> = {
   trial: 0,
   free: 0,
-  starter: 197,
-  pro: 347,
-  clinica: 297,
-  elite: 697,
-  black: 1999,
+  starter: 149,
+  pro: 297,
+  clinica: 0,
+  elite: 597,
+  black: 1499,
 };
 
 export type PlatformDoctor = {

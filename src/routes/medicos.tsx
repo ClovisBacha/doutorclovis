@@ -214,7 +214,7 @@ const FAQS = [
   },
   {
     q: "Quantas pacientes posso ter?",
-    a: "Cada plano tem um teto que cresce com você: Free até 5 (para testar), Starter até 50, Pro até 150, Elite até 300 por médico e Black até 500 por médico. No plano Clínica é sob medida, sem teto rígido. Ao chegar perto do limite, é só subir de plano — as solicitações das pacientes ficam guardadas esperando você aceitar.",
+    a: "Cada plano tem um teto que cresce com você: Free até 5 (para testar), Starter até 50, Pro até 150, Reconhecido até 300 por médico e Black até 500 por médico. No plano Clínica é sob medida, sem teto rígido. Ao chegar perto do limite, é só subir de plano — as solicitações das pacientes ficam guardadas esperando você aceitar.",
   },
 ];
 
