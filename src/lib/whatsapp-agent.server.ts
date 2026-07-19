@@ -305,17 +305,10 @@ async function createAppointmentRequest(
   doctorId?: string | null,
 ): Promise<void> {
   const sb = supabaseAdmin;
-  // Atribuição por médico: número sem mapeamento → dono da instalação, para
-  // o pedido aparecer no painel certo (e nunca no de outro médico).
-  let targetDoctor = doctorId ?? null;
-  if (!targetDoctor) {
-    try {
-      const { resolveOwnerDoctorId } = await import("./secondbrain.server");
-      targetDoctor = await resolveOwnerDoctorId();
-    } catch {
-      targetDoctor = null;
-    }
-  }
+  // Atribuição por médico: o número que recebeu → doctor_id. Número sem
+  // mapeamento fica sem médico (doctor_id null) — não existe mais "dono da
+  // instalação" para onde cair.
+  const targetDoctor = doctorId ?? null;
   const row = {
     patient_name: context.name ?? "Paciente WhatsApp",
     patient_phone: phone,

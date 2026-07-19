@@ -251,16 +251,11 @@ export async function getBrainContext(
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // P3: SEM fallback para "settings mais recente" — agora que qualquer
-    // usuário pode criar brain_settings via cadastro de médico, esse fallback
-    // permitiria sequestrar a persona do chat público. Dono não resolvido →
-    // chat segue sem cérebro.
-    const ownerId = await resolveOwnerDoctorId();
-    const target = doctorId ?? ownerId;
+    // Multi-inquilino puro: o cérebro é o do médico DAQUELA paciente. Sem
+    // médico vinculado (doctorId undefined) → chat genérico, sem cérebro.
+    // Não existe mais fallback para "o dono da instalação".
+    const target = doctorId ?? null;
     if (!target) return { block: "", enabledApp: true, enabledWhatsapp: true, hadCoverage: false };
-    // A conta dona da instalação (ADMIN_EMAILS) tem acesso total; um assinante
-    // usa as capacidades do próprio plano.
-    const isOwner = !!ownerId && target === ownerId;
 
     const { getEntitlementsByDoctorId } = await import("./entitlements.server");
     const [settingsRes, entriesRes, ent] = await Promise.all([
@@ -276,7 +271,7 @@ export async function getBrainContext(
         .eq("approved", true)
         .order("created_at", { ascending: false })
         .limit(MAX_ENTRIES_LOADED),
-      getEntitlementsByDoctorId(target, isOwner),
+      getEntitlementsByDoctorId(target),
     ]);
 
     const settings = (settingsRes.data ?? null) as BrainSettingsRow | null;

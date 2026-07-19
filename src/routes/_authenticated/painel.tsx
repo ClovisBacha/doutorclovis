@@ -175,8 +175,6 @@ async function token() {
 function PainelPage() {
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
-  // Equipe da instalação (ADMIN_EMAILS) vê tudo; médico assinante vê DOCTOR_TABS
-  const [isPlatformTeam, setIsPlatformTeam] = useState(false);
   const [tab, setTab] = useState<PanelTab>("Painel 📊");
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   // null = o próprio cérebro (comportamento de sempre).
@@ -201,10 +199,14 @@ function PainelPage() {
       const tk = await token();
       const res = await getAdminData({ data: { accessToken: tk } });
       if (res.ok) {
-        // getAdminData já autoriza equipe da instalação E médico assinante ativo,
-        // devolvendo os dados recortados (isTeam distingue quem é quem para a UI).
+        // Conta da plataforma (ADMIN_EMAILS) NÃO é médico: seu lugar é o
+        // console /admin, não o painel do consultório. Multi-inquilino: o
+        // /painel é sempre de um médico recortado por doctor_id.
+        if (res.isTeam) {
+          window.location.replace("/admin");
+          return;
+        }
         setAllowed(true);
-        setIsPlatformTeam(res.isTeam);
         setAppointments(res.appointments);
         setQuestions(res.questions);
         return;
@@ -213,7 +215,6 @@ function PainelPage() {
       const me = await getMyDoctor({ data: { accessToken: tk } });
       if (me.ok && me.doctor?.active) {
         setAllowed(true);
-        setIsPlatformTeam(false);
         return;
       }
       // Dono de clínica sem conta de médico (gestor): entra para administrar
@@ -222,7 +223,6 @@ function PainelPage() {
         const myClinic = await getMyClinic({ data: { accessToken: tk } });
         if (myClinic.ok && myClinic.clinic) {
           setAllowed(true);
-          setIsPlatformTeam(false);
           return;
         }
       } catch {
@@ -358,9 +358,9 @@ function PainelPage() {
         <Stat label="Total agendamentos" value={appointments.length} />
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — todo médico é inquilino, recortado por doctor_id */}
       <div className="mt-8 flex flex-wrap gap-2 border-b border-border">
-        {(isPlatformTeam ? PANEL_TABS : DOCTOR_TABS).map((t) => (
+        {DOCTOR_TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}

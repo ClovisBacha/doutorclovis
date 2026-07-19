@@ -38,24 +38,8 @@ async function requireAdmin(accessToken: string) {
   return null;
 }
 
-/** Resolve o uid do médico dono do cérebro (mesma regra de secondbrain.functions.ts). */
-async function ownerDoctorId(user: { id: string; email?: string | null }): Promise<string> {
-  if (user.email && adminEmails().includes(user.email.toLowerCase())) {
-    const { resolveOwnerDoctorId } = await import("./secondbrain.server");
-    return (await resolveOwnerDoctorId()) ?? user.id;
-  }
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: doc } = await (supabaseAdmin as any)
-    .from("doctors")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (doc?.id) return doc.id as string;
-  // Assinante sem linha resolvida (ex.: erro transitório no maybeSingle, que
-  // devolve data:null sem lançar): usa o PRÓPRIO uid — `doctors.id` é sempre
-  // igual ao auth uid. NUNCA cair em resolveOwnerDoctorId() aqui, senão o
-  // dashboard do assinante seria escopado por doctor_id do médico primário da
-  // instalação, vazando pacientes/perguntas/consultas de outro perfil.
+/** Multi-inquilino: o dashboard é sempre do próprio médico logado (auth uid). */
+async function ownerDoctorId(user: { id: string }): Promise<string> {
   return user.id;
 }
 

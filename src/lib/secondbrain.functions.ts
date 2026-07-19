@@ -42,32 +42,12 @@ async function requireAdmin(accessToken: string) {
 }
 
 /**
- * Cada perfil de médico tem o SEU cérebro (tabelas chaveadas por doctor_id).
- * Regra de identidade:
- *   - Médico assinante (linha em doctors) → treina/usa o PRÓPRIO cérebro.
- *   - Equipe da instalação (ADMIN_EMAILS, ex.: secretária) sem linha em
- *     doctors → treina o cérebro do médico DONO (1º e-mail de ADMIN_EMAILS).
+ * Cada médico tem o SEU cérebro (tabelas chaveadas por doctor_id). Multi-
+ * inquilino puro: o cérebro é SEMPRE o do próprio usuário logado (o `doctors.id`
+ * é o auth uid). Não existe mais "cérebro do dono da instalação" — o admin da
+ * plataforma não é médico e não opera cérebro nenhum (ver /admin).
  */
 async function ownerDoctorId(user: { id: string; email?: string | null }): Promise<string> {
-  // Equipe da instalação (ADMIN_EMAILS) SEMPRE opera o cérebro do dono —
-  // mesmo que algum membro tenha criado uma linha própria em doctors
-  // (senão a secretária passaria a treinar um cérebro fantasma).
-  if (user.email && adminEmails().includes(user.email.toLowerCase())) {
-    const { resolveOwnerDoctorId } = await import("./secondbrain.server");
-    return (await resolveOwnerDoctorId()) ?? user.id;
-  }
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: doc } = await (supabaseAdmin as any)
-    .from("doctors")
-    .select("id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (doc?.id) return doc.id as string;
-  // Assinante sem linha resolvida (ex.: erro transitório no maybeSingle, que
-  // devolve data:null sem lançar): usa o PRÓPRIO uid — `doctors.id` é sempre o
-  // auth uid. NUNCA cair em resolveOwnerDoctorId() aqui, senão o assinante
-  // leria/gravaria o cérebro (persona, regras, Q&A) do médico DONO da
-  // instalação — vazamento e contaminação cruzada de perfis.
   return user.id;
 }
 
@@ -430,9 +410,8 @@ export const listUnansweredQuestions = createServerFn({ method: "POST" })
       .eq("answered", false)
       .order("created_at", { ascending: true })
       .limit(50);
-    // Equipe SEM asDoctor mantém a visão da instalação inteira.
-    const scoped = !(isPlatformTeam(user) && !data.asDoctor);
-    if (scoped) query = query.eq("doctor_id", target.doctorId);
+    // Multi-inquilino: sempre só as perguntas das pacientes DESTE médico.
+    query = query.eq("doctor_id", target.doctorId);
 
     const { data: rows, error } = await query;
     if (error) {
@@ -484,10 +463,8 @@ export const answerAndTrain = createServerFn({ method: "POST" })
       .select("id,question")
       .eq("id", data.questionId)
       .eq("answered", false);
-    // Fora da equipe (ou operando via clínica), a pergunta TEM que ser de
-    // paciente do médico-alvo — nunca de outro consultório.
-    const scoped = !(isPlatformTeam(user) && !data.asDoctor);
-    if (scoped) qQuery = qQuery.eq("doctor_id", target.doctorId);
+    // Multi-inquilino: a pergunta TEM que ser de paciente do médico-alvo.
+    qQuery = qQuery.eq("doctor_id", target.doctorId);
     const { data: question, error: qErr } = await qQuery.maybeSingle();
     if (qErr || !question) return { ok: false as const };
 
