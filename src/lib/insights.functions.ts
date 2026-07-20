@@ -533,21 +533,22 @@ export const getChurnAlerts = createServerFn({ method: "POST" })
       }
     }
 
-    // Médicos pagando sem nenhuma paciente (onboarding travado = risco de churn)
+    // Médico ativo (pagante ou em teste) sem carteira/cérebro = onboarding
+    // travado, risco de churn. Inclui trials de propósito: é onde mais se perde.
     for (const id of paying) {
       if ((patientsByDoctor.get(id) ?? 0) === 0)
         alerts.push({
           kind: "no_patients",
           severity: "media",
           who: docName.get(id) ?? NAME_UNKNOWN,
-          detail: "Médico pagando, mas ainda sem pacientes vinculadas.",
+          detail: "Médico ativo, mas ainda sem pacientes vinculadas.",
         });
       if (!trainedSet.has(id))
         alerts.push({
           kind: "inactive_doctor",
           severity: "baixa",
           who: docName.get(id) ?? NAME_UNKNOWN,
-          detail: "Médico pagando, mas ainda não treinou o Segundo Cérebro.",
+          detail: "Médico ativo, mas ainda não treinou o Segundo Cérebro.",
         });
     }
 
