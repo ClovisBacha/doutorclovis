@@ -62,6 +62,8 @@ export const Route = createFileRoute("/api/doctorthink/ask")({
             OBSTETRICA_LABELS,
             { maxEntriesLoaded: 200, maxEntriesScored: 6 },
           );
+          const { logDoctorThinkUsage } = await import("@/lib/doctorthink/usage.server");
+          logDoctorThinkUsage(auth.tenantId, doctorId, "ask", result.hadCoverage);
           return jsonRes(result, 200);
         } catch {
           return jsonRes({ error: "internal_error" }, 500);

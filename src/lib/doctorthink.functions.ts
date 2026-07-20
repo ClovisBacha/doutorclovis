@@ -93,3 +93,88 @@ export const revokeDoctorThinkKey = createServerFn({ method: "POST" })
       await writeAudit({ id: user.id, email: user.email }, "doctorthink.key.revoke", data.id);
     return { ok: !error };
   });
+
+export type DoctorThinkUsage = {
+  isSuperAdmin: true;
+  totals: {
+    calls: number;
+    callsThisMonth: number;
+    ask: number;
+    train: number;
+    coveredPct: number | null;
+  };
+  byTenant: {
+    tenantId: string;
+    calls: number;
+    callsThisMonth: number;
+    ask: number;
+    train: number;
+  }[];
+  generatedAt: string;
+};
+
+/** Resumo de uso da API do DoctorThink (super-admin) — base para faturar. */
+export const getDoctorThinkUsage = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+
+    type Row = {
+      tenant_id: string;
+      endpoint: string;
+      had_coverage: boolean | null;
+      created_at: string;
+    };
+    const rows = await safe<Row[]>(
+      async () =>
+        ((
+          await (supabaseAdmin as any)
+            .from("doctorthink_usage")
+            .select("tenant_id,endpoint,had_coverage,created_at")
+            .limit(100000)
+        ).data ?? []) as Row[],
+      [],
+    );
+
+    const totals = { calls: 0, callsThisMonth: 0, ask: 0, train: 0 };
+    let askCovered = 0;
+    let askTotal = 0;
+    const byTenantMap = new Map<
+      string,
+      { calls: number; callsThisMonth: number; ask: number; train: number }
+    >();
+    for (const r of rows) {
+      totals.calls += 1;
+      const thisMonth = r.created_at >= monthStart;
+      if (thisMonth) totals.callsThisMonth += 1;
+      if (r.endpoint === "ask") {
+        totals.ask += 1;
+        askTotal += 1;
+        if (r.had_coverage === true) askCovered += 1;
+      } else if (r.endpoint === "train") {
+        totals.train += 1;
+      }
+      const t = byTenantMap.get(r.tenant_id) ?? { calls: 0, callsThisMonth: 0, ask: 0, train: 0 };
+      t.calls += 1;
+      if (thisMonth) t.callsThisMonth += 1;
+      if (r.endpoint === "ask") t.ask += 1;
+      else if (r.endpoint === "train") t.train += 1;
+      byTenantMap.set(r.tenant_id, t);
+    }
+
+    const usage: DoctorThinkUsage = {
+      isSuperAdmin: true,
+      totals: {
+        ...totals,
+        coveredPct: askTotal > 0 ? Math.round((askCovered / askTotal) * 100) : null,
+      },
+      byTenant: [...byTenantMap.entries()]
+        .map(([tenantId, v]) => ({ tenantId, ...v }))
+        .sort((a, b) => b.calls - a.calls),
+      generatedAt: new Date().toISOString(),
+    };
+    return { ok: true as const, usage };
+  });

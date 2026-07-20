@@ -52,6 +52,8 @@ export const Route = createFileRoute("/api/doctorthink/train")({
             await import("@/lib/doctorthink/obstetrica-store.server");
           const row = await createObstetricaBrainStore().addEntry(doctorId, question, answer);
           if (!row) return jsonRes({ error: "internal_error" }, 500);
+          const { logDoctorThinkUsage } = await import("@/lib/doctorthink/usage.server");
+          logDoctorThinkUsage(auth.tenantId, doctorId, "train");
           // approved:false — entrou como rascunho; o médico aprova no painel.
           return jsonRes({ ok: true, id: row.id, status: "pending_approval" }, 200);
         } catch {

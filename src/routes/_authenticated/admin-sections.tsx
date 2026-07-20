@@ -26,7 +26,9 @@ import {
   createDoctorThinkKey,
   listDoctorThinkKeys,
   revokeDoctorThinkKey,
+  getDoctorThinkUsage,
   type DoctorThinkKey,
+  type DoctorThinkUsage,
 } from "@/lib/doctorthink.functions";
 import {
   adminToken,
@@ -1029,10 +1031,16 @@ export function DoctorThinkTab() {
   const [doctorId, setDoctorId] = useState("");
   const [saving, setSaving] = useState(false);
   const [freshKey, setFreshKey] = useState<string | null>(null);
+  const [usage, setUsage] = useState<DoctorThinkUsage | null>(null);
 
   async function load() {
-    const res = await listDoctorThinkKeys({ data: { accessToken: await adminToken() } });
-    if (res.ok) setKeys(res.keys);
+    const tk = await adminToken();
+    const [k, u] = await Promise.all([
+      listDoctorThinkKeys({ data: { accessToken: tk } }),
+      getDoctorThinkUsage({ data: { accessToken: tk } }),
+    ]);
+    if (k.ok) setKeys(k.keys);
+    if (u.ok && u.usage) setUsage(u.usage);
     setLoading(false);
   }
   useEffect(() => {
@@ -1194,6 +1202,55 @@ export function DoctorThinkTab() {
           </div>
         )}
       </Panel>
+
+      {usage && (
+        <Panel title="Uso da API (metering)" subtitle="Base para faturar por chamada.">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Kpi label="Chamadas (total)" value={usage.totals.calls} tone="primary" />
+            <Kpi label="Neste mês" value={usage.totals.callsThisMonth} tone="emerald" />
+            <Kpi
+              label="Perguntas (ask)"
+              value={usage.totals.ask}
+              tone="sky"
+              hint={`treinos: ${usage.totals.train}`}
+            />
+            <Kpi
+              label="Cobertura"
+              value={usage.totals.coveredPct === null ? "—" : `${usage.totals.coveredPct}%`}
+              tone="amber"
+              hint="respostas cobertas"
+            />
+          </div>
+          {usage.byTenant.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">Inquilino</th>
+                    <th className="px-3 py-2 text-right font-medium">Chamadas</th>
+                    <th className="px-3 py-2 text-right font-medium">No mês</th>
+                    <th className="px-3 py-2 text-right font-medium">Ask</th>
+                    <th className="px-3 py-2 text-right font-medium">Train</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usage.byTenant.map((t) => (
+                    <tr key={t.tenantId} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2 font-mono text-xs">{t.tenantId}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.calls}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-emerald-600">
+                        {t.callsThisMonth}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.ask}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{t.train}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      )}
 
       <Panel title="Como o app cliente usa">
         <pre className="overflow-x-auto rounded-2xl bg-muted/50 p-4 text-xs leading-relaxed">
