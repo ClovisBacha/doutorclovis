@@ -1026,6 +1026,7 @@ export function DoctorThinkTab() {
   const [loading, setLoading] = useState(true);
   const [tenantId, setTenantId] = useState("");
   const [name, setName] = useState("");
+  const [doctorId, setDoctorId] = useState("");
   const [saving, setSaving] = useState(false);
   const [freshKey, setFreshKey] = useState<string | null>(null);
 
@@ -1047,6 +1048,7 @@ export function DoctorThinkTab() {
         accessToken: await adminToken(),
         tenantId: tenantId.trim(),
         name: name.trim() || undefined,
+        doctorId: doctorId.trim() || undefined,
       },
     });
     setSaving(false);
@@ -1054,6 +1056,7 @@ export function DoctorThinkTab() {
       setFreshKey(res.apiKey);
       setTenantId("");
       setName("");
+      setDoctorId("");
       load();
     } else {
       toast.error(
@@ -1091,6 +1094,15 @@ export function DoctorThinkTab() {
               onChange={(e) => setName(e.target.value)}
               placeholder="ex.: app da Obstétrica"
               className="mt-1 block w-56 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Trancar ao médico (opcional)</label>
+            <input
+              value={doctorId}
+              onChange={(e) => setDoctorId(e.target.value)}
+              placeholder="uuid do médico (recomendado p/ terceiros)"
+              className="mt-1 block w-72 rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </div>
           <button
@@ -1134,6 +1146,7 @@ export function DoctorThinkTab() {
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Inquilino</th>
+                  <th className="px-3 py-2 font-medium">Escopo</th>
                   <th className="px-3 py-2 font-medium">Nome</th>
                   <th className="px-3 py-2 font-medium">Último uso</th>
                   <th className="px-3 py-2 font-medium">Status</th>
@@ -1144,6 +1157,15 @@ export function DoctorThinkTab() {
                 {keys.map((k) => (
                   <tr key={k.id} className="border-b border-border/60 last:border-0">
                     <td className="px-3 py-2 font-mono text-xs">{k.tenant_id}</td>
+                    <td className="px-3 py-2 text-xs">
+                      {k.doctor_id ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">
+                          🔒 1 médico
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">tenant (1ª parte)</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2">{k.name ?? "—"}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {k.last_used_at ? new Date(k.last_used_at).toLocaleString("pt-BR") : "nunca"}

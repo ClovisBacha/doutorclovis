@@ -35,9 +35,18 @@ export const Route = createFileRoute("/api/doctorthink/ask")({
           message?: string;
           channel?: string;
         } | null;
-        if (!body?.doctorId || !body?.message) {
-          return jsonRes({ error: "doctorId e message são obrigatórios" }, 400);
+        if (!body?.message) return jsonRes({ error: "message é obrigatório" }, 400);
+
+        // Escopo tenant→médico: chave TRANCADA a um médico só opera nele; chave
+        // ampla (doctorId null, 1ª parte) usa o doctorId do corpo.
+        const doctorId = auth.doctorId ?? body.doctorId;
+        if (!doctorId) return jsonRes({ error: "doctorId é obrigatório" }, 400);
+        if (auth.doctorId && body.doctorId && body.doctorId !== auth.doctorId) {
+          return jsonRes({ error: "forbidden: chave trancada a outro médico" }, 403);
         }
+        // Whitelist de canal (default-deny fora do conjunto conhecido).
+        const channel =
+          body.channel === "whatsapp" || body.channel === "teste" ? body.channel : "app";
 
         const [{ createObstetricaBrainStore }, { runBrainQuery }, { OBSTETRICA_LABELS }] =
           await Promise.all([
@@ -48,12 +57,7 @@ export const Route = createFileRoute("/api/doctorthink/ask")({
 
         try {
           const result = await runBrainQuery(
-            {
-              tenantId: auth.tenantId,
-              doctorId: body.doctorId,
-              message: body.message,
-              channel: body.channel || "app",
-            },
+            { tenantId: auth.tenantId, doctorId, message: body.message, channel },
             createObstetricaBrainStore(),
             OBSTETRICA_LABELS,
             { maxEntriesLoaded: 200, maxEntriesScored: 6 },

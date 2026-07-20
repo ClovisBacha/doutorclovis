@@ -2309,3 +2309,5 @@ CREATE INDEX IF NOT EXISTS idx_dtk_keys_hash ON public.doctorthink_api_keys(key_
 ALTER TABLE public.doctorthink_api_keys ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.doctorthink_api_keys FROM anon, authenticated;
 GRANT ALL ON public.doctorthink_api_keys TO service_role;
+
+ALTER TABLE public.doctorthink_api_keys ADD COLUMN IF NOT EXISTS doctor_id uuid;

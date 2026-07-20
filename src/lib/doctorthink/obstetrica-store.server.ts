@@ -105,9 +105,13 @@ export function createObstetricaBrainStore(): BrainStore {
       answer: string,
     ): Promise<{ id: string } | null> {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      // SEGURANÇA MÉDICA: conteúdo que NÃO vem da sessão autenticada do médico
+      // (aqui: um app terceiro via API) entra como RASCUNHO (approved:false) —
+      // o cérebro só usa depois que o médico aprovar no painel. Mesmo padrão
+      // dos imports (source 'kit'/'consulta'). A IA nunca aprende sozinha.
       const { data: row, error } = await (supabaseAdmin as any)
         .from("brain_entries")
-        .insert({ doctor_id: doctorId, question, answer, source: "api", approved: true })
+        .insert({ doctor_id: doctorId, question, answer, source: "api", approved: false })
         .select("id")
         .single();
       if (error || !row) return null;

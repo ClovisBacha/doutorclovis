@@ -8,12 +8,15 @@
 CREATE TABLE IF NOT EXISTS public.doctorthink_api_keys (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id    text NOT NULL,               -- app cliente (ex.: 'obstetrica')
+  doctor_id    uuid,                         -- se preenchido: chave TRANCADA a este médico
   name         text,                        -- rótulo humano da chave
   key_hash     text NOT NULL UNIQUE,        -- sha256 hex da chave crua
   active       boolean NOT NULL DEFAULT true,
   last_used_at timestamptz,
   created_at   timestamptz NOT NULL DEFAULT now()
 );
+-- Idempotente: garante a coluna mesmo se a tabela já existir de uma versão anterior.
+ALTER TABLE public.doctorthink_api_keys ADD COLUMN IF NOT EXISTS doctor_id uuid;
 CREATE INDEX IF NOT EXISTS idx_dtk_keys_hash ON public.doctorthink_api_keys(key_hash);
 
 ALTER TABLE public.doctorthink_api_keys ENABLE ROW LEVEL SECURITY;

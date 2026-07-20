@@ -21,7 +21,7 @@ export function hashApiKey(raw: string): string {
  */
 export async function authApiKey(
   rawHeader: string | null | undefined,
-): Promise<{ tenantId: string } | null> {
+): Promise<{ tenantId: string; doctorId: string | null } | null> {
   if (!rawHeader) return null;
   const key = rawHeader.trim().replace(/^Bearer\s+/i, "");
   if (!key) return null;
@@ -29,15 +29,25 @@ export async function authApiKey(
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await (supabaseAdmin as any)
       .from("doctorthink_api_keys")
-      .select("id,tenant_id,active")
+      .select("id,tenant_id,doctor_id,active")
       .eq("key_hash", hashApiKey(key))
       .maybeSingle();
     if (!data || data.active === false) return null;
-    void (supabaseAdmin as any)
-      .from("doctorthink_api_keys")
-      .update({ last_used_at: new Date().toISOString() })
-      .eq("id", data.id);
-    return { tenantId: data.tenant_id as string };
+    // Marca uso (best-effort, sem propagar erro).
+    void (async () => {
+      try {
+        await (supabaseAdmin as any)
+          .from("doctorthink_api_keys")
+          .update({ last_used_at: new Date().toISOString() })
+          .eq("id", data.id);
+      } catch {
+        /* telemetria best-effort */
+      }
+    })();
+    return {
+      tenantId: data.tenant_id as string,
+      doctorId: (data.doctor_id ?? null) as string | null,
+    };
   } catch {
     return null;
   }

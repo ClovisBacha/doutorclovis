@@ -11,6 +11,7 @@ import { writeAudit } from "@/lib/audit.server";
 export type DoctorThinkKey = {
   id: string;
   tenant_id: string;
+  doctor_id: string | null;
   name: string | null;
   active: boolean;
   last_used_at: string | null;
@@ -29,6 +30,7 @@ export const createDoctorThinkKey = createServerFn({ method: "POST" })
           .max(40)
           .regex(/^[a-z0-9_-]+$/, "só minúsculas, números, - e _"),
         name: z.string().max(80).optional(),
+        doctorId: z.string().uuid().optional().nullable(),
       })
       .parse(i),
   )
@@ -40,6 +42,7 @@ export const createDoctorThinkKey = createServerFn({ method: "POST" })
     const rawKey = generateApiKey();
     const { error } = await (supabaseAdmin as any).from("doctorthink_api_keys").insert({
       tenant_id: data.tenantId,
+      doctor_id: data.doctorId ?? null,
       name: data.name?.trim() || null,
       key_hash: hashApiKey(rawKey),
     });
@@ -64,7 +67,7 @@ export const listDoctorThinkKeys = createServerFn({ method: "POST" })
         ((
           await (supabaseAdmin as any)
             .from("doctorthink_api_keys")
-            .select("id,tenant_id,name,active,last_used_at,created_at")
+            .select("id,tenant_id,doctor_id,name,active,last_used_at,created_at")
             .order("created_at", { ascending: false })
             .limit(200)
         ).data ?? []) as DoctorThinkKey[],

@@ -37,16 +37,23 @@ export const Route = createFileRoute("/api/doctorthink/train")({
         } | null;
         const question = body?.question?.trim();
         const answer = body?.answer?.trim();
-        if (!body?.doctorId || !question || !answer) {
-          return jsonRes({ error: "doctorId, question e answer são obrigatórios" }, 400);
+        if (!question || !answer) {
+          return jsonRes({ error: "question e answer são obrigatórios" }, 400);
+        }
+        // Escopo tenant→médico (igual ao /ask): chave trancada só opera no seu médico.
+        const doctorId = auth.doctorId ?? body?.doctorId;
+        if (!doctorId) return jsonRes({ error: "doctorId é obrigatório" }, 400);
+        if (auth.doctorId && body?.doctorId && body.doctorId !== auth.doctorId) {
+          return jsonRes({ error: "forbidden: chave trancada a outro médico" }, 403);
         }
 
         try {
           const { createObstetricaBrainStore } =
             await import("@/lib/doctorthink/obstetrica-store.server");
-          const row = await createObstetricaBrainStore().addEntry(body.doctorId, question, answer);
+          const row = await createObstetricaBrainStore().addEntry(doctorId, question, answer);
           if (!row) return jsonRes({ error: "internal_error" }, 500);
-          return jsonRes({ ok: true, id: row.id }, 200);
+          // approved:false — entrou como rascunho; o médico aprova no painel.
+          return jsonRes({ ok: true, id: row.id, status: "pending_approval" }, 200);
         } catch {
           return jsonRes({ error: "internal_error" }, 500);
         }

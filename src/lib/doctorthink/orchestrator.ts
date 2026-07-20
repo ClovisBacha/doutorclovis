@@ -31,8 +31,9 @@ export async function runBrainQuery(
   const profile = await store.loadProfile(query.doctorId);
   const enabledChannels = profile.channels;
 
-  // Canal não habilitado (plano/toggle) → bloco vazio, nada do cérebro vaza.
-  const channelOn = enabledChannels[query.channel] ?? true;
+  // Default-DENY: só serve se o canal estiver EXPLICITAMENTE habilitado no mapa
+  // do profissional (plano + toggle). Canal desconhecido → nega (nada vaza).
+  const channelOn = enabledChannels[query.channel] === true;
   if (!channelOn) return { block: "", hadCoverage: false, enabledChannels };
 
   const entries = await store.loadApprovedEntries(query.doctorId, opts.maxEntriesLoaded);
