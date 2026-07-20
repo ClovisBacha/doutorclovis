@@ -322,6 +322,9 @@ function patientPremiumMonthlyCents(plan: string | null): number {
   return plan === "annual" ? 990 : 1990;
 }
 const ACCESS_STATUS = new Set(["active", "trialing"]);
+// Teto generoso para leituras que agregam totais em JS — evita o corte
+// silencioso do PostgREST (db-max-rows) num dashboard que é fonte de verdade.
+const MAX_ROWS = 100000;
 
 export type InsightDoctor = {
   doctorId: string;
@@ -347,7 +350,10 @@ export type InsightAffiliate = {
   active: boolean;
   signups: number;
   revenueCents: number;
-  commissionOwedCents: number;
+  /** Comissão acumulada na vida toda (não desconta repasses já feitos). */
+  commissionTotalCents: number;
+  /** Comissão gerada só neste mês — o valor típico do repasse do ciclo. */
+  commissionMonthCents: number;
 };
 export type InsightCoupon = {
   code: string;
@@ -406,16 +412,28 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
     );
 
     // Assinaturas (fonte de verdade da receita)
-    type SubRow = { user_id: string; product: string; plan: string | null; status: string | null };
+    type SubRow = {
+      user_id: string;
+      product: string;
+      plan: string | null;
+      status: string | null;
+      source: string | null;
+    };
     const subs = await safe<SubRow[]>(
       async () =>
-        ((await sb.from("subscriptions").select("user_id,product,plan,status")).data ??
-          []) as SubRow[],
+        ((
+          await sb
+            .from("subscriptions")
+            .select("user_id,product,plan,status,source")
+            .limit(MAX_ROWS)
+        ).data ?? []) as SubRow[],
       [],
     );
     // Melhor assinatura do médico: uma que dê acesso vence; guarda plano+status.
     const doctorSub = new Map<string, { plan: string; status: string; paying: boolean }>();
-    const patientPremium = new Map<string, string | null>(); // userId → plano (monthly/annual)
+    // Premium da paciente: guarda plano + fonte (só 'stripe' entra no MRR; cortesias
+    // de convite — source 'convite' — contam como volume, mas não como receita).
+    const patientPremium = new Map<string, { plan: string | null; source: string }>();
     for (const s of subs) {
       const status = s.status ?? "";
       const grants = ACCESS_STATUS.has(status);
@@ -425,7 +443,7 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
           doctorSub.set(s.user_id, { plan: s.plan ?? "", status, paying: grants });
         }
       } else if (s.product === "quiz_premium" && grants) {
-        patientPremium.set(s.user_id, s.plan ?? null);
+        patientPremium.set(s.user_id, { plan: s.plan ?? null, source: s.source ?? "stripe" });
       }
     }
 
@@ -433,7 +451,8 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
     type PatRow = { id: string; doctor_id: string | null };
     const patRows = await safe<PatRow[]>(
       async () =>
-        ((await sb.from("patient_profiles").select("id,doctor_id")).data ?? []) as PatRow[],
+        ((await sb.from("patient_profiles").select("id,doctor_id").limit(MAX_ROWS)).data ??
+          []) as PatRow[],
       [],
     );
     const patientsByDoctor = new Map<string, number>();
@@ -449,8 +468,12 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
     type ApptRow = { doctor_id: string | null; status: string | null; created_at: string | null };
     const apptRows = await safe<ApptRow[]>(
       async () =>
-        ((await sb.from("appointment_requests").select("doctor_id,status,created_at")).data ??
-          []) as ApptRow[],
+        ((
+          await sb
+            .from("appointment_requests")
+            .select("doctor_id,status,created_at")
+            .limit(MAX_ROWS)
+        ).data ?? []) as ApptRow[],
       [],
     );
     const apptByDoctor = new Map<string, number>();
@@ -476,8 +499,12 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
     };
     const consultRows = await safe<ConsultRow[]>(
       async () =>
-        ((await sb.from("private_consultations").select("doctor_id,status,amount_cents")).data ??
-          []) as ConsultRow[],
+        ((
+          await sb
+            .from("private_consultations")
+            .select("doctor_id,status,amount_cents")
+            .limit(MAX_ROWS)
+        ).data ?? []) as ConsultRow[],
       [],
     );
     const consultCountByDoctor = new Map<string, number>();
@@ -499,7 +526,7 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
 
     // Cérebro por médico
     const brainEntriesByDoctor = await safe<Map<string, number>>(async () => {
-      const { data: rows } = await sb.from("brain_entries").select("doctor_id");
+      const { data: rows } = await sb.from("brain_entries").select("doctor_id").limit(MAX_ROWS);
       const m = new Map<string, number>();
       for (const r of (rows ?? []) as { doctor_id: string | null }[])
         if (r.doctor_id) m.set(r.doctor_id, (m.get(r.doctor_id) ?? 0) + 1);
@@ -509,7 +536,8 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
       const { data: rows } = await sb
         .from("brain_hits")
         .select("doctor_id,channel,created_at")
-        .gte("created_at", monthStart);
+        .gte("created_at", monthStart)
+        .limit(MAX_ROWS);
       const m = new Map<string, number>();
       for (const r of (rows ?? []) as { doctor_id: string | null; channel: string | null }[])
         if (r.doctor_id && r.channel !== "teste") m.set(r.doctor_id, (m.get(r.doctor_id) ?? 0) + 1);
@@ -565,11 +593,13 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
     });
     perDoctor.sort((a, b) => b.mrrCents - a.mrrCents || b.patients - a.patients);
 
-    // Premium das pacientes (MRR)
+    // Premium das pacientes (MRR): só assinaturas pagas (source 'stripe').
+    // Cortesias (convite do médico) contam como volume, não como receita.
     let patientMrrCents = 0;
-    for (const plan of patientPremium.values()) patientMrrCents += patientPremiumMonthlyCents(plan);
+    for (const pp of patientPremium.values())
+      if (pp.source === "stripe") patientMrrCents += patientPremiumMonthlyCents(pp.plan);
 
-    // Afiliados / micro-influenciadores (comissão a pagar)
+    // Afiliados / micro-influenciadores (comissões: total acumulado + mês atual)
     const affiliates = await safe<InsightAffiliate[]>(async () => {
       const { data: rows } = await sb
         .from("affiliates")
@@ -578,26 +608,42 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
         .limit(300);
       const { data: earnings } = await sb
         .from("affiliate_earnings")
-        .select("affiliate_code,commission_cents,amount_paid_cents")
-        .limit(10000);
+        .select("affiliate_code,commission_cents,amount_paid_cents,created_at")
+        .limit(MAX_ROWS);
       const { data: signups } = await sb
         .from("patient_profiles")
         .select("ref_code")
         .not("ref_code", "is", null)
-        .limit(20000);
-      const byCode = new Map<string, { commission: number; revenue: number; signups: number }>();
+        .limit(MAX_ROWS);
+      const byCode = new Map<
+        string,
+        { commission: number; commissionMonth: number; revenue: number; signups: number }
+      >();
       for (const e of (earnings ?? []) as {
         affiliate_code: string;
         commission_cents: number;
         amount_paid_cents: number;
+        created_at: string | null;
       }[]) {
-        const c = byCode.get(e.affiliate_code) ?? { commission: 0, revenue: 0, signups: 0 };
+        const c = byCode.get(e.affiliate_code) ?? {
+          commission: 0,
+          commissionMonth: 0,
+          revenue: 0,
+          signups: 0,
+        };
         c.commission += e.commission_cents ?? 0;
+        if (e.created_at && e.created_at >= monthStart)
+          c.commissionMonth += e.commission_cents ?? 0;
         c.revenue += e.amount_paid_cents ?? 0;
         byCode.set(e.affiliate_code, c);
       }
       for (const s of (signups ?? []) as { ref_code: string }[]) {
-        const c = byCode.get(s.ref_code) ?? { commission: 0, revenue: 0, signups: 0 };
+        const c = byCode.get(s.ref_code) ?? {
+          commission: 0,
+          commissionMonth: 0,
+          revenue: 0,
+          signups: 0,
+        };
         c.signups += 1;
         byCode.set(s.ref_code, c);
       }
@@ -608,7 +654,8 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
         active: r.active,
         signups: byCode.get(r.code)?.signups ?? 0,
         revenueCents: byCode.get(r.code)?.revenue ?? 0,
-        commissionOwedCents: byCode.get(r.code)?.commission ?? 0,
+        commissionTotalCents: byCode.get(r.code)?.commission ?? 0,
+        commissionMonthCents: byCode.get(r.code)?.commissionMonth ?? 0,
       }));
     }, []);
     const affiliateInvoices = await safe(async () => {

@@ -543,12 +543,13 @@ function FinanceiroTab() {
         </div>
       )}
 
-      {/* Comissões a pagar (afiliados / micro-influenciadores) */}
+      {/* Comissões dos afiliados / micro-influenciadores */}
       <div className="rounded-3xl border border-border bg-card p-5">
-        <p className="font-serif text-lg">Comissões a pagar — micro-influenciadores</p>
+        <p className="font-serif text-lg">Comissões — micro-influenciadores</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Cada código de afiliado, quantas pacientes trouxe e quanto de comissão acumulou (sobre
-          faturas já pagas). É o que você repassa a cada influenciador.
+          Por código: quantas pacientes trouxe, o faturado, e a comissão. Pague pela coluna{" "}
+          <strong>este mês</strong> (comissão gerada no ciclo); o <strong>total</strong> é o
+          acumulado da vida toda (não desconta repasses já feitos).
         </p>
         {ins.affiliates.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
@@ -563,7 +564,8 @@ function FinanceiroTab() {
                   <th className="px-3 py-2 font-medium">Influenciador</th>
                   <th className="px-3 py-2 text-right font-medium">Cadastros</th>
                   <th className="px-3 py-2 text-right font-medium">Faturado</th>
-                  <th className="px-3 py-2 text-right font-medium">Comissão</th>
+                  <th className="px-3 py-2 text-right font-medium">Comissão (mês)</th>
+                  <th className="px-3 py-2 text-right font-medium">Total acumulado</th>
                 </tr>
               </thead>
               <tbody>
@@ -581,7 +583,10 @@ function FinanceiroTab() {
                       {brl(a.revenueCents)}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold tabular-nums text-emerald-600">
-                      {brl(a.commissionOwedCents)}
+                      {brl(a.commissionMonthCents)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                      {brl(a.commissionTotalCents)}
                     </td>
                   </tr>
                 ))}
