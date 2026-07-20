@@ -14,7 +14,9 @@ import { createFileRoute } from "@tanstack/react-router";
  *   URL: https://www.obstetrica.com.br/api/stripe-webhook
  *   Eventos: checkout.session.completed, customer.subscription.created,
  *            customer.subscription.updated, customer.subscription.deleted,
- *            invoice.paid  ← comissão de afiliado (50% de cada fatura paga)
+ *            invoice.paid  ← comissão de afiliado (50% de cada fatura paga),
+ *            charge.refunded, charge.dispute.created ← incidentes de pagamento
+ *            (reembolsos/disputas no /admin)
  */
 export const Route = createFileRoute("/api/stripe-webhook")({
   server: {
