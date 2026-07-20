@@ -12,7 +12,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
   ACCESS_STATUS,
-  CANCELLED_STATUS,
   MAX_ROWS,
   PAID_STATUS,
   PAYING_STATUS,
@@ -79,13 +78,14 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
             .from("doctors")
             .select("id,display_name,plan,active,verified,created_at")
             .order("created_at", { ascending: false })
+            .limit(MAX_ROWS)
         ).data ?? []) as DocRow[],
       [],
     );
 
     // Contagens auxiliares por médico (pacientes vinculadas e entradas de cérebro)
     const patientsByDoctor = await safe<Map<string, number>>(async () => {
-      const { data: rows } = await sb.from("patient_profiles").select("doctor_id");
+      const { data: rows } = await sb.from("patient_profiles").select("doctor_id").limit(MAX_ROWS);
       const m = new Map<string, number>();
       for (const r of (rows ?? []) as { doctor_id: string | null }[]) {
         if (r.doctor_id) m.set(r.doctor_id, (m.get(r.doctor_id) ?? 0) + 1);
@@ -94,7 +94,7 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
     }, new Map());
 
     const brainByDoctor = await safe<Map<string, number>>(async () => {
-      const { data: rows } = await sb.from("brain_entries").select("doctor_id");
+      const { data: rows } = await sb.from("brain_entries").select("doctor_id").limit(MAX_ROWS);
       const m = new Map<string, number>();
       for (const r of (rows ?? []) as { doctor_id: string | null }[]) {
         if (r.doctor_id) m.set(r.doctor_id, (m.get(r.doctor_id) ?? 0) + 1);
@@ -161,110 +161,6 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
       generatedAt: new Date().toISOString(),
     };
     return { ok: true as const, overview };
-  });
-
-export type FinanceByDoctor = {
-  doctorId: string | null;
-  doctorName: string;
-  requested: number;
-  paid: number;
-  pending: number;
-  cancelled: number;
-  revenueCents: number;
-};
-
-export type PlatformFinance = {
-  isSuperAdmin: true;
-  totals: {
-    requested: number;
-    paid: number;
-    pending: number;
-    cancelled: number;
-    revenueCents: number;
-  };
-  byDoctor: FinanceByDoctor[];
-  generatedAt: string;
-};
-
-/**
- * Financeiro da plataforma (super-admin): TODAS as consultas pagas do site,
- * agrupadas por médico. O dono enxerga quanto entrou por perfil de médico e
- * quantas consultas foram efetivamente pagas através da Obstétrica.
- */
-export const getPlatformFinance = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) => TokenSchema.parse(i))
-  .handler(async ({ data }) => {
-    const user = await requireSuperAdmin(data.accessToken);
-    if (!user) return { ok: false as const };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const sb = supabaseAdmin as any;
-
-    type ConsultRow = {
-      doctor_id: string | null;
-      status: string | null;
-      amount_cents: number | null;
-    };
-    const rows = await safe<ConsultRow[]>(
-      async () =>
-        ((await sb.from("private_consultations").select("doctor_id,status,amount_cents")).data ??
-          []) as ConsultRow[],
-      [],
-    );
-
-    const nameById = await safe<Map<string, string>>(async () => {
-      const { data: docs } = await sb.from("doctors").select("id,display_name");
-      const m = new Map<string, string>();
-      for (const d of (docs ?? []) as { id: string; display_name: string | null }[])
-        m.set(d.id, d.display_name || "(sem nome)");
-      return m;
-    }, new Map());
-
-    const NO_DOCTOR = "__none__";
-    const acc = new Map<string, FinanceByDoctor>();
-    const totals = { requested: 0, paid: 0, pending: 0, cancelled: 0, revenueCents: 0 };
-
-    for (const r of rows) {
-      const key = r.doctor_id ?? NO_DOCTOR;
-      const entry =
-        acc.get(key) ??
-        ({
-          doctorId: r.doctor_id ?? null,
-          doctorName: r.doctor_id
-            ? (nameById.get(r.doctor_id) ?? "(médico removido)")
-            : "Sem médico",
-          requested: 0,
-          paid: 0,
-          pending: 0,
-          cancelled: 0,
-          revenueCents: 0,
-        } satisfies FinanceByDoctor);
-
-      entry.requested += 1;
-      totals.requested += 1;
-      const status = r.status ?? "";
-      if (PAID_STATUS.has(status)) {
-        entry.paid += 1;
-        totals.paid += 1;
-        entry.revenueCents += r.amount_cents ?? 0;
-        totals.revenueCents += r.amount_cents ?? 0;
-      } else if (CANCELLED_STATUS.has(status)) {
-        entry.cancelled += 1;
-        totals.cancelled += 1;
-      } else {
-        entry.pending += 1;
-        totals.pending += 1;
-      }
-      acc.set(key, entry);
-    }
-
-    const byDoctor = [...acc.values()].sort((a, b) => b.revenueCents - a.revenueCents);
-    const finance: PlatformFinance = {
-      isSuperAdmin: true,
-      totals,
-      byDoctor,
-      generatedAt: new Date().toISOString(),
-    };
-    return { ok: true as const, finance };
   });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -356,7 +252,8 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
     };
     const docRows = await safe<DocRow[]>(
       async () =>
-        ((await sb.from("doctors").select("id,display_name,plan,active")).data ?? []) as DocRow[],
+        ((await sb.from("doctors").select("id,display_name,plan,active").limit(MAX_ROWS)).data ??
+          []) as DocRow[],
       [],
     );
 
@@ -637,7 +534,7 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
       const { data: reds } = await sb
         .from("platform_coupon_redemptions")
         .select("coupon_id")
-        .limit(20000);
+        .limit(MAX_ROWS);
       const redByCoupon = new Map<string, number>();
       for (const r of (reds ?? []) as { coupon_id: string }[])
         redByCoupon.set(r.coupon_id, (redByCoupon.get(r.coupon_id) ?? 0) + 1);
@@ -808,20 +705,20 @@ export const getRetentionMetrics = createServerFn({ method: "POST" })
 
     // Médicos: ativos, treinaram a IA, têm pacientes.
     const docRows = await safe<{ id: string; active: boolean | null }[]>(async () => {
-      return ((await sb.from("doctors").select("id,active")).data ?? []) as {
+      return ((await sb.from("doctors").select("id,active").limit(MAX_ROWS)).data ?? []) as {
         id: string;
         active: boolean | null;
       }[];
     }, []);
     const trainedSet = await safe<Set<string>>(async () => {
-      const { data: rows } = await sb.from("brain_entries").select("doctor_id");
+      const { data: rows } = await sb.from("brain_entries").select("doctor_id").limit(MAX_ROWS);
       const s = new Set<string>();
       for (const r of (rows ?? []) as { doctor_id: string | null }[])
         if (r.doctor_id) s.add(r.doctor_id);
       return s;
     }, new Set<string>());
     const withPatientsSet = await safe<Set<string>>(async () => {
-      const { data: rows } = await sb.from("patient_profiles").select("doctor_id");
+      const { data: rows } = await sb.from("patient_profiles").select("doctor_id").limit(MAX_ROWS);
       const s = new Set<string>();
       for (const r of (rows ?? []) as { doctor_id: string | null }[])
         if (r.doctor_id) s.add(r.doctor_id);
