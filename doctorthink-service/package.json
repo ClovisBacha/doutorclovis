@@ -1,0 +1,16 @@
+{
+  "name": "doctorthink-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DoctorThink — API standalone do Segundo Cérebro (cérebro de IA por profissional, treinado com respostas aprovadas).",
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "start:node": "node --experimental-strip-types src/server.ts",
+    "migrate": "bun run migrate-from-obstetrica.ts",
+    "gen-key": "bun run scripts/gen-key.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
