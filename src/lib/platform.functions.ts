@@ -10,43 +10,19 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
-/** E-mail do dono da plataforma. */
-function platformAdminEmail(): string {
-  const explicit = (process.env.PLATFORM_ADMIN_EMAIL || "").trim().toLowerCase();
-  if (explicit) return explicit;
-  return (process.env.ADMIN_EMAILS || "").split(",")[0]?.trim().toLowerCase() || "";
-}
-
-async function requireSuperAdmin(accessToken: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
-  const email = data.user?.email?.toLowerCase();
-  const owner = platformAdminEmail();
-  if (error || !email || !owner || email !== owner) return null;
-  return data.user;
-}
-
-// Preços de referência por plano (o que decidimos juntos — fácil de ajustar).
-// Usado só para a ESTIMATIVA de receita mensal (MRR) no console.
-// "trial" = avaliação de 14 dias (label do cadastro, sem expiração automática
-// ainda — roadmap de billing). "free" = plano permanente, sem custo variável:
-// sem Segundo Cérebro, até 5 pacientes. "clinica" = "Pro Equipe" na página de
-// vendas: preço POR MÉDICO (a partir de R$297) — como cada médico da equipe é
-// uma linha própria em `doctors`, a soma abaixo já reflete o preço por
-// assento automaticamente (não usa o desconto de 5+ médicos; é uma estimativa).
-// Tabela de preços vigente (jul/2026) — usada só para ESTIMAR o MRR no
-// console do dono. Clínica é sob consulta; 0 aqui = não entra na estimativa
-// (o valor real do contrato é somado à mão quando fechar).
-const PLAN_PRICE: Record<string, number> = {
-  trial: 0,
-  free: 0,
-  starter: 149,
-  pro: 297,
-  clinica: 0,
-  elite: 597,
-  black: 1499,
-};
+import {
+  ACCESS_STATUS,
+  CANCELLED_STATUS,
+  MAX_ROWS,
+  PAID_STATUS,
+  PLAN_PRICE,
+  TokenSchema,
+  doctorPlanMonthlyCents,
+  patientPremiumMonthlyCents,
+  platformAdminEmail,
+  requireSuperAdmin,
+  safe,
+} from "@/lib/platform-admin.server";
 
 export type PlatformDoctor = {
   id: string;
@@ -73,16 +49,6 @@ export type PlatformOverview = {
   doctors: PlatformDoctor[];
   generatedAt: string;
 };
-
-const TokenSchema = z.object({ accessToken: z.string().min(10) });
-
-async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await fn();
-  } catch {
-    return fallback;
-  }
-}
 
 /** Visão geral da plataforma (super-admin). */
 export const getPlatformOverview = createServerFn({ method: "POST" })
@@ -218,10 +184,6 @@ export type PlatformFinance = {
   generatedAt: string;
 };
 
-// "Pago" = pagamento confirmado pelo médico (ou consulta já realizada).
-const PAID_STATUS = new Set(["confirmado", "realizado"]);
-const CANCELLED_STATUS = new Set(["cancelado"]);
-
 /**
  * Financeiro da plataforma (super-admin): TODAS as consultas pagas do site,
  * agrupadas por médico. O dono enxerga quanto entrou por perfil de médico e
@@ -310,21 +272,6 @@ export const getPlatformFinance = createServerFn({ method: "POST" })
 // Fonte de verdade da receita: tabela `subscriptions` (estado do Stripe), não o
 // campo doctors.plan (que pode ser trial sem pagamento).
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Preço mensal do plano do médico (centavos). Planos anuais entram normalizados
-// ao mensal de lista (estimativa clara — o valor exato do anual vem do Stripe).
-function doctorPlanMonthlyCents(plan: string): number {
-  const base = plan.replace(/_annual$/, "");
-  return (PLAN_PRICE[base] ?? 0) * 100;
-}
-// Premium da paciente: R$19,90/mês; anual equivale a ~R$9,90/mês.
-function patientPremiumMonthlyCents(plan: string | null): number {
-  return plan === "annual" ? 990 : 1990;
-}
-const ACCESS_STATUS = new Set(["active", "trialing"]);
-// Teto generoso para leituras que agregam totais em JS — evita o corte
-// silencioso do PostgREST (db-max-rows) num dashboard que é fonte de verdade.
-const MAX_ROWS = 100000;
 
 export type InsightDoctor = {
   doctorId: string;
