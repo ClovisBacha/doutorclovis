@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
-import { getBrainContext, normalizeGapQuestion } from "@/lib/secondbrain.server";
+import { getBrainContextResolved, normalizeGapQuestion } from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
 
 // Rate limit simples por IP (janela fixa, em memória). Em ambiente serverless
@@ -225,7 +225,9 @@ export const Route = createFileRoute("/api/chat")({
           const userText = lastUserText(messages);
           const { getChatMemory, memoryBlock } = await import("@/lib/chat-memory.server");
           const [brain, memorySummary] = await Promise.all([
-            getBrainContext(userText, patient.doctorId, "app"),
+            // Fonte resolvida: local por padrão; DoctorThink remoto se ligado
+            // (env + flag doctorthink_remote). Fallback local em qualquer falha.
+            getBrainContextResolved(userText, patient.doctorId, "app"),
             getChatMemory(patient.patientId, patient.doctorId),
           ]);
           const memoria = memoryBlock(memorySummary);

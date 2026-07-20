@@ -321,6 +321,47 @@ export async function getBrainContext(
 }
 
 /**
+ * Resolve o contexto do cérebro escolhendo a FONTE: DoctorThink remoto (produto
+ * standalone) OU o cérebro local. Opt-in explícito por env
+ * (DOCTORTHINK_API_URL + DOCTORTHINK_API_KEY) + kill switch/rollout pela flag
+ * `doctorthink_remote`. Sem env (padrão) → SEMPRE local, comportamento provado.
+ * Qualquer falha do remoto (timeout/rede/erro) → cai no local. É o mesmo shape
+ * de retorno do getBrainContext, então os chamadores não mudam.
+ */
+export async function getBrainContextResolved(
+  userMessage: string,
+  doctorId?: string,
+  channel: BrainChannel = "app",
+): Promise<BrainContext> {
+  const url = process.env.DOCTORTHINK_API_URL;
+  const apiKey = process.env.DOCTORTHINK_API_KEY;
+  if (url && apiKey && doctorId) {
+    try {
+      const { isFlagEnabled } = await import("./platform-flags.server");
+      if (await isFlagEnabled("doctorthink_remote", doctorId)) {
+        const { askBrainRemote } = await import("./doctorthink/client");
+        const remote = await askBrainRemote(url, apiKey, {
+          doctorId,
+          message: userMessage,
+          channel,
+        });
+        if (remote) {
+          return {
+            block: remote.block,
+            enabledApp: remote.enabledChannels.app ?? true,
+            enabledWhatsapp: remote.enabledChannels.whatsapp ?? true,
+            hadCoverage: remote.hadCoverage,
+          };
+        }
+      }
+    } catch {
+      /* qualquer problema → cai no cérebro local */
+    }
+  }
+  return getBrainContext(userMessage, doctorId, channel);
+}
+
+/**
  * Placar de qualidade do cérebro de UM médico (mês corrente) — usado no card
  * do painel e no relatório por médico da aba Clínica. null = tabelas do
  * autoaprendizado ainda não migradas / erro (o chamador esconde o placar).

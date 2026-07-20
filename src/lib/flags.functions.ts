@@ -22,6 +22,11 @@ export const FLAG_CATALOG: { key: string; description: string }[] = [
   { key: "teleconsulta", description: "Teleconsulta por vídeo." },
   { key: "segundo_cerebro", description: "Respostas automáticas do Segundo Cérebro (IA)." },
   { key: "chat_ia", description: "Chatbot de IA no app da paciente." },
+  {
+    key: "doctorthink_remote",
+    description:
+      "Consumir o cérebro pela API DoctorThink remota (precisa de DOCTORTHINK_API_URL/KEY). Desligado ou sem env = cérebro local.",
+  },
 ];
 
 export type PlatformFlag = {
