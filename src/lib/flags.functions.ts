@@ -25,7 +25,7 @@ export const FLAG_CATALOG: { key: string; description: string }[] = [
   {
     key: "doctorthink_remote",
     description:
-      "Consumir o cérebro pela API DoctorThink remota (precisa de DOCTORTHINK_API_URL/KEY). Desligado ou sem env = cérebro local.",
+      "Consumir o cérebro pela API DoctorThink remota. Duplo opt-in: precisa de DOCTORTHINK_API_URL/KEY E esta flag LIGADA (ausente/desligada = cérebro local).",
   },
 ];
 

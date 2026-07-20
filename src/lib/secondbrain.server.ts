@@ -337,8 +337,11 @@ export async function getBrainContextResolved(
   const apiKey = process.env.DOCTORTHINK_API_KEY;
   if (url && apiKey && doctorId) {
     try {
-      const { isFlagEnabled } = await import("./platform-flags.server");
-      if (await isFlagEnabled("doctorthink_remote", doctorId)) {
+      // Duplo opt-in: além do env, a flag precisa estar EXPLICITAMENTE ligada
+      // (ausência = desligado) — evita ligar o remoto em 100% por acidente ao
+      // só setar as envs.
+      const { isFlagExplicitlyEnabled } = await import("./platform-flags.server");
+      if (await isFlagExplicitlyEnabled("doctorthink_remote", doctorId)) {
         const { askBrainRemote } = await import("./doctorthink/client");
         const remote = await askBrainRemote(url, apiKey, {
           doctorId,

@@ -16,7 +16,7 @@ import { createChatProvider, DEFAULT_CHAT_MODEL } from "./ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DOCTOR } from "./doctor.config";
 import { waSendText, waSendButtons } from "./whatsapp.server";
-import { getBrainContext } from "./secondbrain.server";
+import { getBrainContextResolved } from "./secondbrain.server";
 
 /* ------------------------------------------------------------------ */
 /* Tipos                                                                */
@@ -144,7 +144,7 @@ async function callAgent(
   // O block só influencia o TOM do campo "reply"; o formato JSON da resposta
   // e o fluxo de estados continuam regidos pelo prompt abaixo.
   const [brain, identity] = await Promise.all([
-    getBrainContext(userMessage, doctorId ?? undefined, "whatsapp"),
+    getBrainContextResolved(userMessage, doctorId ?? undefined, "whatsapp"),
     resolveDoctorIdentity(doctorId),
   ]);
   const baseSystem = buildSystem(identity);

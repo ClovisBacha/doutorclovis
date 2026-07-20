@@ -49,6 +49,21 @@ export async function isFlagEnabled(key: string, userId?: string): Promise<boole
   return bucket(key + userId) < pct;
 }
 
+/**
+ * Opt-in ESTRITO: ligado só se existir linha da flag com enabled=true (ausência
+ * = DESLIGADO). Para features novas que NÃO devem ligar sozinhas — o oposto do
+ * kill switch. O rollout_pct continua valendo.
+ */
+export async function isFlagExplicitlyEnabled(key: string, userId?: string): Promise<boolean> {
+  const row = await readFlag(key, Date.now());
+  if (!row || !row.enabled) return false; // ausência ou desligado → OFF
+  const pct = row.rollout_pct;
+  if (pct >= 100) return true;
+  if (pct <= 0) return false;
+  if (!userId) return false; // sem usuário não segmenta → não liga por acidente
+  return bucket(key + userId) < pct;
+}
+
 /** Limpa o cache (usado logo após o dono salvar uma flag). */
 export function clearFlagCache(): void {
   cache.clear();
