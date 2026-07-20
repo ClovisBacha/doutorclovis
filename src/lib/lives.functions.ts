@@ -110,6 +110,10 @@ export const saveLive = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await requireDoctor(data.accessToken);
     if (!user) return { ok: false as const, error: "Sem permissão." };
+    // Kill switch (feature flag): o dono pode desligar as lives dos médicos.
+    const { isFlagEnabled } = await import("@/lib/platform-flags.server");
+    if (!(await isFlagEnabled("lives", user.id)))
+      return { ok: false as const, error: "As lives estão temporariamente desativadas." };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const row = {
       title: data.title,

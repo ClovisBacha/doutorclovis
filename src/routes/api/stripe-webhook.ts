@@ -58,6 +58,32 @@ export const Route = createFileRoute("/api/stripe-webhook")({
             } catch (e) {
               console.error("[webhook] affiliate credit failed", e);
             }
+          } else if (type === "charge.refunded") {
+            // Reembolso: registra o incidente para o dono ver no /admin.
+            const charge = event.data?.object ?? {};
+            try {
+              await recordPaymentIncident("refund", {
+                chargeId: charge.id,
+                customerId: charge.customer,
+                amountCents: charge.amount_refunded ?? charge.amount ?? 0,
+                reason: charge.refunds?.data?.[0]?.reason ?? null,
+              });
+            } catch (e) {
+              console.error("[webhook] refund record failed", e);
+            }
+          } else if (type === "charge.dispute.created") {
+            // Disputa/chargeback: dinheiro sob contestação.
+            const dispute = event.data?.object ?? {};
+            try {
+              await recordPaymentIncident("dispute", {
+                chargeId: dispute.charge,
+                customerId: null,
+                amountCents: dispute.amount ?? 0,
+                reason: dispute.reason ?? null,
+              });
+            } catch (e) {
+              console.error("[webhook] dispute record failed", e);
+            }
           }
         } catch {
           // Erro ao aplicar → responde 500 para o Stripe re-tentar depois.
@@ -70,6 +96,41 @@ export const Route = createFileRoute("/api/stripe-webhook")({
     },
   },
 });
+
+/** Registra um reembolso/disputa em payment_incidents (idempotente por charge). */
+async function recordPaymentIncident(
+  kind: "refund" | "dispute",
+  data: {
+    chargeId?: string | null;
+    customerId?: string | null;
+    amountCents?: number;
+    reason?: string | null;
+  },
+): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  // Tenta ligar ao usuário pelo customer (via subscriptions).
+  let userId: string | null = null;
+  if (data.customerId) {
+    const { data: sub } = await (supabaseAdmin as any)
+      .from("subscriptions")
+      .select("user_id")
+      .eq("stripe_customer_id", data.customerId)
+      .limit(1)
+      .maybeSingle();
+    userId = sub?.user_id ?? null;
+  }
+  await (supabaseAdmin as any).from("payment_incidents").upsert(
+    {
+      kind,
+      stripe_charge_id: data.chargeId ? String(data.chargeId) : null,
+      stripe_customer_id: data.customerId ? String(data.customerId) : null,
+      user_id: userId,
+      amount_cents: data.amountCents ?? 0,
+      reason: data.reason ?? null,
+    },
+    { onConflict: "kind,stripe_charge_id" },
+  );
+}
 
 /** Lê a assinatura autoritativa no Stripe e sincroniza acesso + tabela. */
 async function applySubscription(subscriptionId: string): Promise<void> {

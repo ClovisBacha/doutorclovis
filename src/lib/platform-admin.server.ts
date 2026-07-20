@@ -26,6 +26,25 @@ export async function requireSuperAdmin(accessToken: string) {
 
 export const TokenSchema = z.object({ accessToken: z.string().min(10) });
 
+/** Resolve o usuário logado (qualquer papel) a partir do access token. */
+export async function getUser(accessToken: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
+  if (error || !data.user) return null;
+  return data.user;
+}
+
+/** true se o usuário é um médico (linha em `doctors`). */
+export async function userIsDoctor(userId: string): Promise<boolean> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await (supabaseAdmin as any)
+    .from("doctors")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle();
+  return !!data;
+}
+
 /** Executa um bloco de forma isolada: erro → valor default (resiliência). */
 export async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   try {

@@ -23,6 +23,7 @@ import {
   requireSuperAdmin,
   safe,
 } from "@/lib/platform-admin.server";
+import { writeAudit } from "@/lib/audit.server";
 
 export type PlatformDoctor = {
   id: string;
@@ -702,6 +703,12 @@ export const setDoctorStatus = createServerFn({ method: "POST" })
       .from("doctors")
       .update(patch)
       .eq("id", data.doctorId);
+    if (!error)
+      await writeAudit({ id: user.id, email: user.email }, "doctor.status", data.doctorId, {
+        active: data.active ?? null,
+        verified: data.verified ?? null,
+        plan: data.plan ?? null,
+      });
     return { ok: !error };
   });
 
@@ -928,12 +935,20 @@ export const createPlatformCoupon = createServerFn({ method: "POST" })
       if (error?.code === "23505") return { ok: false as const, reason: "duplicado" as const };
       if (error?.code === "42P01") return { ok: false as const, reason: "migracao" as const };
       if (error) return { ok: false as const };
+      await writeAudit({ id: user.id, email: user.email }, "coupon.create", custom, {
+        maxRedemptions: data.maxRedemptions ?? null,
+      });
       return { ok: true as const, code: custom };
     }
     for (let attempt = 0; attempt < 6; attempt++) {
       const code = randomCode();
       const { error } = await insert(code);
-      if (!error) return { ok: true as const, code };
+      if (!error) {
+        await writeAudit({ id: user.id, email: user.email }, "coupon.create", code, {
+          maxRedemptions: data.maxRedemptions ?? null,
+        });
+        return { ok: true as const, code };
+      }
       if (error.code === "42P01") return { ok: false as const, reason: "migracao" as const };
       if (error.code !== "23505") return { ok: false as const };
       // colisão improvável (32^8) → tenta outro código
@@ -956,5 +971,9 @@ export const togglePlatformCoupon = createServerFn({ method: "POST" })
       .from("platform_coupons")
       .update({ active: data.active })
       .eq("id", data.id);
+    if (!error)
+      await writeAudit({ id: user.id, email: user.email }, "coupon.toggle", data.id, {
+        active: data.active,
+      });
     return { ok: !error };
   });

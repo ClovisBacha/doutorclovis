@@ -11,6 +11,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { writeAudit } from "@/lib/audit.server";
 
 function adminEmails() {
   return (process.env.ADMIN_EMAILS || "")
@@ -120,13 +121,18 @@ export const createAffiliate = createServerFn({ method: "POST" })
     const user = await requireTeam(data.accessToken);
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const code = data.code.trim().toUpperCase();
     const { error } = await (supabaseAdmin as any).from("affiliates").insert({
-      code: data.code.trim().toUpperCase(),
+      code,
       name: data.name.trim(),
       commission_pct: data.commissionPct,
     });
     if (error?.code === "23505") return { ok: false as const, reason: "duplicado" as const };
     if (error?.code === "42P01") return { ok: false as const, reason: "migracao" as const };
+    if (!error)
+      await writeAudit({ id: user.id, email: user.email }, "affiliate.create", code, {
+        commissionPct: data.commissionPct,
+      });
     return { ok: !error };
   });
 
@@ -145,5 +151,14 @@ export const toggleAffiliate = createServerFn({ method: "POST" })
       .from("affiliates")
       .update({ active: data.active })
       .eq("code", data.code.toUpperCase());
+    if (!error)
+      await writeAudit(
+        { id: user.id, email: user.email },
+        "affiliate.toggle",
+        data.code.toUpperCase(),
+        {
+          active: data.active,
+        },
+      );
     return { ok: !error };
   });

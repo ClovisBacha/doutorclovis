@@ -84,6 +84,14 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
 
+    // Kill switch (feature flag): o dono pode desligar consultas particulares.
+    const { isFlagEnabled } = await import("@/lib/platform-flags.server");
+    if (!(await isFlagEnabled("consulta_particular", u.user.id)))
+      return {
+        ok: false as const,
+        error: "Consultas particulares estão temporariamente indisponíveis.",
+      };
+
     const consultType = CONSULT_TYPES.find((ct) => ct.key === data.consultType);
     const amount = consultType?.priceNumber ?? 0;
 
