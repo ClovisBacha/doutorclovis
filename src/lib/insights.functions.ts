@@ -64,6 +64,7 @@ async function loadSubs(sb: any): Promise<SubLite[]> {
         await sb
           .from("subscriptions")
           .select("user_id,product,plan,status,source,current_period_end,created_at")
+          .order("created_at", { ascending: false })
           .limit(MAX_ROWS)
       ).data ?? []) as SubLite[],
     [],
@@ -191,7 +192,8 @@ export const getGrowthMetrics = createServerFn({ method: "POST" })
       if (s.product === "doctor_plan") {
         if (status === "trialing") doctorTrialing.add(s.user_id);
         if (paysNow) {
-          doctorPaying.set(s.user_id, { plan: s.plan ?? "" });
+          // subs vem ordenado por created_at desc → a 1ª (mais recente) vence.
+          if (!doctorPaying.has(s.user_id)) doctorPaying.set(s.user_id, { plan: s.plan ?? "" });
           if (s.created_at && new Date(s.created_at).getTime() <= now - RETENTION_CYCLE_DAYS * DAY)
             doctorRetained.add(s.user_id);
         }

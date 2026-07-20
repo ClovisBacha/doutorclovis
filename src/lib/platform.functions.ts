@@ -264,13 +264,15 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
       plan: string | null;
       status: string | null;
       source: string | null;
+      created_at: string | null;
     };
     const subs = await safe<SubRow[]>(
       async () =>
         ((
           await sb
             .from("subscriptions")
-            .select("user_id,product,plan,status,source")
+            .select("user_id,product,plan,status,source,created_at")
+            .order("created_at", { ascending: false })
             .limit(MAX_ROWS)
         ).data ?? []) as SubRow[],
       [],
@@ -454,9 +456,12 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
     // Premium das pacientes (MRR): só assinaturas PAGAS (active) e via 'stripe'.
     // Cortesias (convite) e testes contam como volume, não como receita.
     let patientMrrCents = 0;
+    let payingPremiumCount = 0;
     for (const pp of patientPremium.values())
-      if (pp.paying && pp.source === "stripe")
+      if (pp.paying && pp.source === "stripe") {
         patientMrrCents += patientPremiumMonthlyCents(pp.plan);
+        payingPremiumCount += 1;
+      }
 
     // Afiliados / micro-influenciadores (comissões: total acumulado + mês atual)
     const affiliates = await safe<InsightAffiliate[]>(async () => {
@@ -571,7 +576,7 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
           .sort((a, b) => b.count - a.count),
       },
       transactions: {
-        activeSubscriptions: doctorsPaying + patientPremium.size,
+        activeSubscriptions: doctorsPaying + payingPremiumCount,
         paidConsultations: paidConsultationsTotal,
         affiliateInvoices,
       },
