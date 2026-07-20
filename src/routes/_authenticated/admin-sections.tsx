@@ -21,6 +21,7 @@ import { listFlags, setFlag, type PlatformFlag } from "@/lib/flags.functions";
 import { getNpsReport, type NpsReport } from "@/lib/nps.functions";
 import { getAuditLog, type AuditEntry } from "@/lib/audit.functions";
 import { getPaymentIncidents, type PaymentIncidentsReport } from "@/lib/payments.functions";
+import { getBusinessAdvice, type BusinessAdvice } from "@/lib/advisor.functions";
 import {
   adminToken,
   brl,
@@ -841,6 +842,171 @@ export function ReembolsosTab() {
               </tbody>
             </table>
           </div>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+// ═══════════════════════════ Consultor IA ═══════════════════════════
+
+const SAUDE_CLS: Record<string, { label: string; cls: string }> = {
+  forte: { label: "Forte", cls: "border-emerald-300 bg-emerald-50 text-emerald-700" },
+  estavel: { label: "Estável", cls: "border-sky-300 bg-sky-50 text-sky-700" },
+  atencao: { label: "Atenção", cls: "border-amber-300 bg-amber-50 text-amber-700" },
+  critico: { label: "Crítico", cls: "border-rose-300 bg-rose-50 text-rose-700" },
+};
+const IMPACTO_CLS: Record<string, string> = {
+  alto: "bg-emerald-100 text-emerald-700",
+  medio: "bg-sky-100 text-sky-700",
+  baixo: "bg-muted text-muted-foreground",
+};
+const ESFORCO_CLS: Record<string, string> = {
+  baixo: "bg-emerald-100 text-emerald-700",
+  medio: "bg-amber-100 text-amber-700",
+  alto: "bg-rose-100 text-rose-700",
+};
+
+export function ConsultorTab() {
+  const [advice, setAdvice] = useState<BusinessAdvice | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [at, setAt] = useState<string | null>(null);
+
+  async function run() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getBusinessAdvice({ data: { accessToken: await adminToken() } });
+      if (res.ok && res.advice) {
+        setAdvice(res.advice);
+        setAt(res.generatedAt);
+      } else {
+        setError(
+          res.reason === "sem_ia"
+            ? "A IA não está configurada (GOOGLE_GENERATIVE_AI_API_KEY)."
+            : res.reason === "falha_ia"
+              ? "A IA não conseguiu analisar agora. Tente de novo em instantes."
+              : "Não foi possível gerar a análise.",
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    run();
+  }, []);
+
+  return (
+    <div className="space-y-5">
+      <Panel
+        title="Consultor de negócio (IA)"
+        subtitle="A IA lê o retrato atual da plataforma (todos os médicos) e sugere o que fazer."
+        action={
+          <button
+            onClick={run}
+            disabled={loading}
+            className="rounded-full border border-border px-4 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary disabled:opacity-60"
+          >
+            {loading ? "Analisando…" : "↻ Nova análise"}
+          </button>
+        }
+      >
+        {loading && !advice ? (
+          <div className="space-y-3">
+            <div className="skeleton h-6 w-40 rounded-full" />
+            <div className="skeleton h-20 rounded-2xl" />
+            <div className="skeleton h-20 rounded-2xl" />
+          </div>
+        ) : error ? (
+          <EmptyHint>{error}</EmptyHint>
+        ) : advice ? (
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <span
+                className={`rounded-full border px-3 py-1 text-sm font-semibold ${
+                  (SAUDE_CLS[advice.saudeGeral] ?? SAUDE_CLS.estavel).cls
+                }`}
+              >
+                Saúde do negócio: {(SAUDE_CLS[advice.saudeGeral] ?? SAUDE_CLS.estavel).label}
+              </span>
+            </div>
+            <p className="text-[15px] leading-relaxed">{advice.diagnostico}</p>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {advice.pontosFortes.length > 0 && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    Pontos fortes
+                  </p>
+                  <ul className="mt-2 space-y-1.5 text-sm">
+                    {advice.pontosFortes.map((p, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-emerald-600">✓</span>
+                        <span>{p}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {advice.riscos.length > 0 && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                    Riscos
+                  </p>
+                  <ul className="mt-2 space-y-1.5 text-sm">
+                    {advice.riscos.map((r, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-amber-600">▲</span>
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Ações recomendadas (priorizadas)
+              </p>
+              <div className="space-y-2">
+                {advice.acoes.map((a, i) => (
+                  <div key={i} className="rounded-2xl border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium">
+                        <span className="mr-2 font-serif text-muted-foreground">{i + 1}.</span>
+                        {a.titulo}
+                      </p>
+                      <div className="flex gap-1.5">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${IMPACTO_CLS[a.impacto] ?? IMPACTO_CLS.medio}`}
+                        >
+                          impacto {a.impacto}
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${ESFORCO_CLS[a.esforco] ?? ESFORCO_CLS.medio}`}
+                        >
+                          esforço {a.esforco}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-sm text-muted-foreground">{a.porque}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground">
+              {at && <>Gerado {new Date(at).toLocaleString("pt-BR")}. </>}
+              Análise por IA a partir dos números atuais — um ponto de partida, não substitui seu
+              julgamento.
+            </p>
+          </div>
+        ) : (
+          <EmptyHint>Clique em "Nova análise" para gerar.</EmptyHint>
         )}
       </Panel>
     </div>

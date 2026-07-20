@@ -37,6 +37,7 @@ import {
   FlagsTab,
   AuditoriaTab,
   ReembolsosTab,
+  ConsultorTab,
 } from "./admin-sections";
 import { downloadCsv, CsvButton } from "@/components/admin-ui";
 
@@ -145,6 +146,7 @@ const PLANS = ["trial", "free", "starter", "pro", "clinica", "elite", "black"] a
 
 type AdminTab =
   | "visao"
+  | "consultor"
   | "crescimento"
   | "alertas"
   | "nps"
@@ -165,6 +167,7 @@ const NAV_GROUPS: { group: string; items: { key: AdminTab; label: string; icon: 
   {
     group: "Crescimento",
     items: [
+      { key: "consultor", label: "Consultor IA", icon: "🤖" },
       { key: "crescimento", label: "Crescimento", icon: "📈" },
       { key: "alertas", label: "Alertas", icon: "🚨" },
       { key: "nps", label: "NPS", icon: "⭐" },
@@ -310,6 +313,7 @@ function AdminConsole() {
         <div className="min-w-0 flex-1">
           <h2 className="mb-5 hidden font-serif text-2xl md:block">{activeLabel}</h2>
           {tab === "visao" && data && <OverviewTab data={data} />}
+          {tab === "consultor" && <ConsultorTab />}
           {tab === "crescimento" && <CrescimentoTab />}
           {tab === "alertas" && <AlertasTab />}
           {tab === "nps" && <NpsTab />}
