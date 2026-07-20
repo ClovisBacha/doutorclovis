@@ -1,6 +1,12 @@
 /**
  * Segundo Cérebro do médico — módulo server puro (sem createServerFn).
  *
+ * Este arquivo é o ADAPTADOR da Obstétrica para o núcleo portável DoctorThink
+ * (src/lib/doctorthink/). Toda a lógica de ranking e montagem do bloco vive no
+ * núcleo (portável, sem acoplamento); aqui fica só o I/O específico da
+ * Obstétrica (Supabase, entitlements do plano, e-mail de lacuna) + os rótulos
+ * de domínio (OBSTETRICA_LABELS). Trocar os rótulos = trocar o domínio.
+ *
  * Monta o bloco de contexto injetado no system prompt do chatbot do site
  * (api/chat.ts) e do agente WhatsApp (whatsapp-agent.server.ts), a partir de:
  *   - brain_settings (persona, frases típicas, regras, chaves liga/desliga)
@@ -14,6 +20,32 @@
  * Falha de banco NUNCA quebra o chat: qualquer erro resulta em block vazio
  * com os recursos habilitados (enabled true).
  */
+
+import {
+  assembleBrainBlock,
+  normalizeGapQuestion,
+  rankEntriesByKeywords,
+  type BrainBlockLabels,
+} from "./doctorthink/core";
+
+// Re-export para compatibilidade: chat.ts importa normalizeGapQuestion daqui.
+export { normalizeGapQuestion };
+
+/**
+ * Rótulos de domínio da Obstétrica para o bloco do cérebro. É o único ponto
+ * "médico/obstétrico" da montagem — outro app (DoctorThink para outra área)
+ * fornece os seus. As strings são idênticas às originais (saída byte-a-byte).
+ */
+const OBSTETRICA_LABELS: BrainBlockLabels = {
+  header: "## Segundo Cérebro do médico",
+  roleInstruction:
+    "Você responde COMO O PRÓPRIO médico responderia, seguindo o estilo, as frases e as condutas registradas abaixo.",
+  styleLabel: "### Estilo",
+  phrasesLabel: "### Frases típicas",
+  rulesLabel: "### Regras",
+  referenceLabel:
+    "### Respostas reais do médico (use como referência de conduta e tom; NUNCA invente conduta que não esteja aqui ou em conhecimento obstétrico consolidado; caso não coberto, oriente agendar consulta)",
+};
 
 export type BrainContext = {
   block: string;
@@ -48,18 +80,6 @@ function logBrainHit(doctorId: string, channel: BrainChannel): void {
       /* telemetria é best-effort — nunca afeta a resposta ao paciente */
     }
   })();
-}
-
-/** Normaliza a pergunta para deduplicar lacunas ("Posso tomar café?" ≈ "posso tomar cafe"). */
-export function normalizeGapQuestion(q: string): string {
-  return q
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 200);
 }
 
 /**
@@ -168,25 +188,6 @@ type BrainSettingsRow = {
 
 type BrainEntryRow = { question: string; answer: string };
 
-/** Normaliza texto para comparação: minúsculas e sem acentos. */
-function normalize(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-/** Palavras significativas (mais de 3 letras) da mensagem, normalizadas. */
-function significantWords(message: string): string[] {
-  return [
-    ...new Set(
-      normalize(message)
-        .split(/[^a-z0-9]+/)
-        .filter((w) => w.length > 3),
-    ),
-  ];
-}
-
 const MAX_ENTRIES_LOADED = 200;
 const MAX_ENTRIES_SCORED = 6;
 /** Corte de similaridade de cosseno da busca semântica (abaixo = irrelevante). */
@@ -282,47 +283,25 @@ export async function getBrainContext(
     }
 
     if (selected.length === 0) {
-      // Pontua cada entry pelas palavras da mensagem presentes em pergunta+resposta.
-      const words = significantWords(userMessage);
-      const scored = entries.map((entry) => {
-        const haystack = normalize(`${entry.question} ${entry.answer}`);
-        let score = 0;
-        for (const w of words) if (haystack.includes(w)) score += 1;
-        return { entry, score };
-      });
-
-      // Top 6 com score > 0. SEM fallback de "mais recentes": injetar entradas
-      // aleatórias quando nada casa é ruído no prompt — em vez disso o miss vira
-      // uma LACUNA registrada para o médico responder no painel (autoaprendizado
-      // com o médico no loop).
-      selected = scored
-        .filter((s) => s.score > 0)
-        .sort((a, b) => b.score - a.score) // sort estável: empates mantêm as mais recentes primeiro
-        .slice(0, MAX_ENTRIES_SCORED)
-        .map((s) => s.entry);
+      // Fallback por palavras (núcleo DoctorThink). SEM "mais recentes":
+      // injetar entradas aleatórias quando nada casa é ruído no prompt — em vez
+      // disso o miss vira uma LACUNA para o médico responder no painel.
+      selected = rankEntriesByKeywords(userMessage, entries, MAX_ENTRIES_SCORED);
     }
 
     if (selected.length === 0 && channel !== "teste") {
       logBrainGap(target, userMessage, channel);
     }
 
-    // Sem settings nem entries → sem bloco.
-    if (!persona && !samplePhrases && !rules && selected.length === 0) {
+    // Montagem do bloco pelo núcleo DoctorThink (rótulos de domínio da
+    // Obstétrica). Retorna "" quando não há persona/regras nem entries.
+    const block = assembleBrainBlock(
+      { persona, samplePhrases, rules },
+      selected,
+      OBSTETRICA_LABELS,
+    );
+    if (!block) {
       return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
-    }
-
-    const parts: string[] = [
-      "## Segundo Cérebro do médico",
-      "Você responde COMO O PRÓPRIO médico responderia, seguindo o estilo, as frases e as condutas registradas abaixo.",
-    ];
-    if (persona) parts.push("### Estilo", persona);
-    if (samplePhrases) parts.push("### Frases típicas", samplePhrases);
-    if (rules) parts.push("### Regras", rules);
-    if (selected.length > 0) {
-      parts.push(
-        "### Respostas reais do médico (use como referência de conduta e tom; NUNCA invente conduta que não esteja aqui ou em conhecimento obstétrico consolidado; caso não coberto, oriente agendar consulta)",
-        ...selected.map((e) => `P: ${e.question}\nR: ${e.answer}`),
-      );
     }
 
     // Bloco não-vazio realmente montado → o cérebro vai ser usado: registra o
@@ -330,7 +309,7 @@ export async function getBrainContext(
     logBrainHit(target, channel);
 
     return {
-      block: parts.join("\n") + "\n",
+      block,
       enabledApp,
       enabledWhatsapp,
       hadCoverage: selected.length > 0,
