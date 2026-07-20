@@ -29,6 +29,16 @@ import {
   type CorporateLead,
   type CorporateAccount,
 } from "@/lib/corporativo.functions";
+import {
+  CrescimentoTab,
+  AlertasTab,
+  NpsTab,
+  ComunicadosTab,
+  FlagsTab,
+  AuditoriaTab,
+  ReembolsosTab,
+} from "./admin-sections";
+import { downloadCsv, CsvButton } from "@/components/admin-ui";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ name: "robots", content: "noindex" }] }),
@@ -133,12 +143,69 @@ function LinkCard({ path, label }: { path: string; label: string }) {
 
 const PLANS = ["trial", "free", "starter", "pro", "clinica", "elite", "black"] as const;
 
+type AdminTab =
+  | "visao"
+  | "crescimento"
+  | "alertas"
+  | "nps"
+  | "financeiro"
+  | "reembolsos"
+  | "medicos"
+  | "empresas"
+  | "cupons"
+  | "afiliados"
+  | "comunicados"
+  | "flags"
+  | "auditoria"
+  | "varredura";
+
+// Navegação agrupada — cada grupo é uma família de telas, fácil de escanear.
+const NAV_GROUPS: { group: string; items: { key: AdminTab; label: string; icon: string }[] }[] = [
+  { group: "Início", items: [{ key: "visao", label: "Visão geral", icon: "🏠" }] },
+  {
+    group: "Crescimento",
+    items: [
+      { key: "crescimento", label: "Crescimento", icon: "📈" },
+      { key: "alertas", label: "Alertas", icon: "🚨" },
+      { key: "nps", label: "NPS", icon: "⭐" },
+    ],
+  },
+  {
+    group: "Financeiro",
+    items: [
+      { key: "financeiro", label: "Financeiro", icon: "💰" },
+      { key: "reembolsos", label: "Reembolsos", icon: "↩️" },
+    ],
+  },
+  {
+    group: "Pessoas",
+    items: [
+      { key: "medicos", label: "Médicos", icon: "🩺" },
+      { key: "empresas", label: "Empresas", icon: "🏢" },
+    ],
+  },
+  {
+    group: "Marketing",
+    items: [
+      { key: "cupons", label: "Cupons", icon: "🎟️" },
+      { key: "afiliados", label: "Afiliados", icon: "🤝" },
+      { key: "comunicados", label: "Comunicados", icon: "📣" },
+    ],
+  },
+  {
+    group: "Sistema",
+    items: [
+      { key: "flags", label: "Feature flags", icon: "🚦" },
+      { key: "auditoria", label: "Auditoria", icon: "🛡️" },
+      { key: "varredura", label: "Varredura", icon: "🔍" },
+    ],
+  },
+];
+
 function AdminConsole() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [data, setData] = useState<PlatformOverview | null>(null);
-  const [tab, setTab] = useState<
-    "visao" | "financeiro" | "medicos" | "cupons" | "afiliados" | "empresas" | "varredura"
-  >("visao");
+  const [tab, setTab] = useState<AdminTab>("visao");
 
   async function load() {
     const tk = await token();
@@ -173,8 +240,10 @@ function AdminConsole() {
       </section>
     );
 
+  const activeLabel = NAV_GROUPS.flatMap((g) => g.items).find((i) => i.key === tab)?.label ?? "";
+
   return (
-    <section className="mx-auto max-w-6xl px-5 py-12">
+    <section className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
@@ -191,41 +260,70 @@ function AdminConsole() {
         </button>
       </div>
 
-      {/* Abas */}
-      <div className="mt-6 flex gap-2 border-b border-border">
-        {(
-          [
-            ["visao", "Visão geral"],
-            ["financeiro", "Financeiro"],
-            ["medicos", "Médicos"],
-            ["cupons", "Cupons"],
-            ["afiliados", "Afiliados"],
-            ["empresas", "Empresas"],
-            ["varredura", "Varredura do site"],
-          ] as const
-        ).map(([k, label]) => (
+      {/* Navegação mobile: chips roláveis */}
+      <div className="mt-5 flex gap-2 overflow-x-auto pb-2 md:hidden">
+        {NAV_GROUPS.flatMap((g) => g.items).map((i) => (
           <button
-            key={k}
-            onClick={() => setTab(k)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === k
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-primary"
+            key={i.key}
+            onClick={() => setTab(i.key)}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              tab === i.key
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground"
             }`}
           >
-            {label}
+            <span className="mr-1">{i.icon}</span>
+            {i.label}
           </button>
         ))}
       </div>
 
-      <div className="mt-8">
-        {tab === "visao" && data && <OverviewTab data={data} />}
-        {tab === "financeiro" && <FinanceiroTab />}
-        {tab === "medicos" && data && <DoctorsTab data={data} onChanged={load} />}
-        {tab === "cupons" && <CuponsTab />}
-        {tab === "afiliados" && <AfiliadosTab />}
-        {tab === "empresas" && <EmpresasAdminTab />}
-        {tab === "varredura" && <VarreduraTab />}
+      <div className="mt-6 flex gap-8">
+        {/* Sidebar desktop: grupos */}
+        <nav className="hidden w-52 shrink-0 md:block">
+          {NAV_GROUPS.map((g) => (
+            <div key={g.group} className="mb-5">
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {g.group}
+              </p>
+              <div className="space-y-0.5">
+                {g.items.map((i) => (
+                  <button
+                    key={i.key}
+                    onClick={() => setTab(i.key)}
+                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+                      tab === i.key
+                        ? "bg-primary/10 font-medium text-primary"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    }`}
+                  >
+                    <span>{i.icon}</span>
+                    {i.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* Conteúdo */}
+        <div className="min-w-0 flex-1">
+          <h2 className="mb-5 hidden font-serif text-2xl md:block">{activeLabel}</h2>
+          {tab === "visao" && data && <OverviewTab data={data} />}
+          {tab === "crescimento" && <CrescimentoTab />}
+          {tab === "alertas" && <AlertasTab />}
+          {tab === "nps" && <NpsTab />}
+          {tab === "financeiro" && <FinanceiroTab />}
+          {tab === "reembolsos" && <ReembolsosTab />}
+          {tab === "medicos" && data && <DoctorsTab data={data} onChanged={load} />}
+          {tab === "empresas" && <EmpresasAdminTab />}
+          {tab === "cupons" && <CuponsTab />}
+          {tab === "afiliados" && <AfiliadosTab />}
+          {tab === "comunicados" && <ComunicadosTab />}
+          {tab === "flags" && <FlagsTab />}
+          {tab === "auditoria" && <AuditoriaTab />}
+          {tab === "varredura" && <VarreduraTab />}
+        </div>
       </div>
     </section>
   );
@@ -441,9 +539,49 @@ function FinanceiroTab() {
 
       {/* Tabela-mãe: tudo por médico */}
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Por médico — o controle inteiro
-        </p>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Por médico — o controle inteiro
+          </p>
+          {ins.perDoctor.length > 0 && (
+            <CsvButton
+              onClick={() =>
+                downloadCsv("financeiro-por-medico.csv", [
+                  [
+                    "medico",
+                    "email",
+                    "plano",
+                    "status",
+                    "mrr_reais",
+                    "pacientes",
+                    "premium",
+                    "agendamentos",
+                    "agendamentos_mes",
+                    "consultas_pagas",
+                    "faturamento_consultas_reais",
+                    "cerebro_entradas",
+                    "cerebro_respostas_mes",
+                  ],
+                  ...ins.perDoctor.map((d) => [
+                    d.name,
+                    d.email ?? "",
+                    d.plan,
+                    d.subStatus ?? "",
+                    (d.mrrCents / 100).toFixed(2),
+                    d.patients,
+                    d.patientsPremium,
+                    d.appointments,
+                    d.appointmentsThisMonth,
+                    d.paidConsults,
+                    (d.consultRevenueCents / 100).toFixed(2),
+                    d.brainEntries,
+                    d.brainHitsThisMonth,
+                  ]),
+                ])
+              }
+            />
+          )}
+        </div>
         <div className="overflow-x-auto rounded-3xl border border-border bg-card">
           <table className="w-full min-w-[820px] text-sm">
             <thead>
