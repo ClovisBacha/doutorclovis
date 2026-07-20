@@ -303,6 +303,380 @@ export const getPlatformFinance = createServerFn({ method: "POST" })
     return { ok: true as const, finance };
   });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Insights da plataforma (super-admin): o dashboard do DONO — tudo do site,
+// dividido por médico, com receita REAL (assinaturas ativas), planos mais
+// vendidos, agendamentos, consultas pagas e comissões a pagar (afiliados/cupons).
+// Fonte de verdade da receita: tabela `subscriptions` (estado do Stripe), não o
+// campo doctors.plan (que pode ser trial sem pagamento).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Preço mensal do plano do médico (centavos). Planos anuais entram normalizados
+// ao mensal de lista (estimativa clara — o valor exato do anual vem do Stripe).
+function doctorPlanMonthlyCents(plan: string): number {
+  const base = plan.replace(/_annual$/, "");
+  return (PLAN_PRICE[base] ?? 0) * 100;
+}
+// Premium da paciente: R$19,90/mês; anual equivale a ~R$9,90/mês.
+function patientPremiumMonthlyCents(plan: string | null): number {
+  return plan === "annual" ? 990 : 1990;
+}
+const ACCESS_STATUS = new Set(["active", "trialing"]);
+
+export type InsightDoctor = {
+  doctorId: string;
+  name: string;
+  email: string | null;
+  plan: string;
+  subStatus: string | null;
+  paying: boolean;
+  mrrCents: number;
+  patients: number;
+  patientsPremium: number;
+  appointments: number;
+  appointmentsThisMonth: number;
+  paidConsults: number;
+  consultRevenueCents: number;
+  brainEntries: number;
+  brainHitsThisMonth: number;
+};
+export type InsightAffiliate = {
+  code: string;
+  name: string;
+  commissionPct: number;
+  active: boolean;
+  signups: number;
+  revenueCents: number;
+  commissionOwedCents: number;
+};
+export type InsightCoupon = {
+  code: string;
+  kind: string;
+  active: boolean;
+  redemptions: number;
+  maxRedemptions: number | null;
+};
+export type PlatformInsights = {
+  isSuperAdmin: true;
+  revenue: {
+    doctorMrrCents: number;
+    patientMrrCents: number;
+    totalMrrCents: number;
+    consultRevenueCents: number;
+  };
+  subscriptions: {
+    doctorsPaying: number;
+    patientsPremium: number;
+    byPlan: { plan: string; count: number; monthly: number; annual: number }[];
+  };
+  appointments: { total: number; thisMonth: number; byStatus: { status: string; count: number }[] };
+  transactions: {
+    activeSubscriptions: number;
+    paidConsultations: number;
+    affiliateInvoices: number;
+  };
+  perDoctor: InsightDoctor[];
+  affiliates: InsightAffiliate[];
+  coupons: InsightCoupon[];
+  generatedAt: string;
+};
+
+/** Dashboard consolidado do dono (super-admin). Tudo do site, por médico. */
+export const getPlatformInsights = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    // Médicos
+    type DocRow = {
+      id: string;
+      display_name: string | null;
+      plan: string | null;
+      active: boolean | null;
+    };
+    const docRows = await safe<DocRow[]>(
+      async () =>
+        ((await sb.from("doctors").select("id,display_name,plan,active")).data ?? []) as DocRow[],
+      [],
+    );
+
+    // Assinaturas (fonte de verdade da receita)
+    type SubRow = { user_id: string; product: string; plan: string | null; status: string | null };
+    const subs = await safe<SubRow[]>(
+      async () =>
+        ((await sb.from("subscriptions").select("user_id,product,plan,status")).data ??
+          []) as SubRow[],
+      [],
+    );
+    // Melhor assinatura do médico: uma que dê acesso vence; guarda plano+status.
+    const doctorSub = new Map<string, { plan: string; status: string; paying: boolean }>();
+    const patientPremium = new Map<string, string | null>(); // userId → plano (monthly/annual)
+    for (const s of subs) {
+      const status = s.status ?? "";
+      const grants = ACCESS_STATUS.has(status);
+      if (s.product === "doctor_plan") {
+        const prev = doctorSub.get(s.user_id);
+        if (!prev || (grants && !prev.paying)) {
+          doctorSub.set(s.user_id, { plan: s.plan ?? "", status, paying: grants });
+        }
+      } else if (s.product === "quiz_premium" && grants) {
+        patientPremium.set(s.user_id, s.plan ?? null);
+      }
+    }
+
+    // Pacientes → médico (e quais são premium)
+    type PatRow = { id: string; doctor_id: string | null };
+    const patRows = await safe<PatRow[]>(
+      async () =>
+        ((await sb.from("patient_profiles").select("id,doctor_id")).data ?? []) as PatRow[],
+      [],
+    );
+    const patientsByDoctor = new Map<string, number>();
+    const premiumByDoctor = new Map<string, number>();
+    for (const p of patRows) {
+      if (!p.doctor_id) continue;
+      patientsByDoctor.set(p.doctor_id, (patientsByDoctor.get(p.doctor_id) ?? 0) + 1);
+      if (patientPremium.has(p.id))
+        premiumByDoctor.set(p.doctor_id, (premiumByDoctor.get(p.doctor_id) ?? 0) + 1);
+    }
+
+    // Agendamentos por médico (total + mês) e por status
+    type ApptRow = { doctor_id: string | null; status: string | null; created_at: string | null };
+    const apptRows = await safe<ApptRow[]>(
+      async () =>
+        ((await sb.from("appointment_requests").select("doctor_id,status,created_at")).data ??
+          []) as ApptRow[],
+      [],
+    );
+    const apptByDoctor = new Map<string, number>();
+    const apptMonthByDoctor = new Map<string, number>();
+    const apptByStatus = new Map<string, number>();
+    let apptThisMonth = 0;
+    for (const a of apptRows) {
+      apptByStatus.set(a.status ?? "—", (apptByStatus.get(a.status ?? "—") ?? 0) + 1);
+      const thisMonth = !!a.created_at && a.created_at >= monthStart;
+      if (thisMonth) apptThisMonth += 1;
+      if (a.doctor_id) {
+        apptByDoctor.set(a.doctor_id, (apptByDoctor.get(a.doctor_id) ?? 0) + 1);
+        if (thisMonth)
+          apptMonthByDoctor.set(a.doctor_id, (apptMonthByDoctor.get(a.doctor_id) ?? 0) + 1);
+      }
+    }
+
+    // Consultas pagas por médico
+    type ConsultRow = {
+      doctor_id: string | null;
+      status: string | null;
+      amount_cents: number | null;
+    };
+    const consultRows = await safe<ConsultRow[]>(
+      async () =>
+        ((await sb.from("private_consultations").select("doctor_id,status,amount_cents")).data ??
+          []) as ConsultRow[],
+      [],
+    );
+    const consultCountByDoctor = new Map<string, number>();
+    const consultRevByDoctor = new Map<string, number>();
+    let paidConsultationsTotal = 0;
+    let consultRevenueTotal = 0;
+    for (const c of consultRows) {
+      if (!PAID_STATUS.has(c.status ?? "")) continue;
+      paidConsultationsTotal += 1;
+      consultRevenueTotal += c.amount_cents ?? 0;
+      if (c.doctor_id) {
+        consultCountByDoctor.set(c.doctor_id, (consultCountByDoctor.get(c.doctor_id) ?? 0) + 1);
+        consultRevByDoctor.set(
+          c.doctor_id,
+          (consultRevByDoctor.get(c.doctor_id) ?? 0) + (c.amount_cents ?? 0),
+        );
+      }
+    }
+
+    // Cérebro por médico
+    const brainEntriesByDoctor = await safe<Map<string, number>>(async () => {
+      const { data: rows } = await sb.from("brain_entries").select("doctor_id");
+      const m = new Map<string, number>();
+      for (const r of (rows ?? []) as { doctor_id: string | null }[])
+        if (r.doctor_id) m.set(r.doctor_id, (m.get(r.doctor_id) ?? 0) + 1);
+      return m;
+    }, new Map());
+    const brainHitsByDoctor = await safe<Map<string, number>>(async () => {
+      const { data: rows } = await sb
+        .from("brain_hits")
+        .select("doctor_id,channel,created_at")
+        .gte("created_at", monthStart);
+      const m = new Map<string, number>();
+      for (const r of (rows ?? []) as { doctor_id: string | null; channel: string | null }[])
+        if (r.doctor_id && r.channel !== "teste") m.set(r.doctor_id, (m.get(r.doctor_id) ?? 0) + 1);
+      return m;
+    }, new Map());
+
+    // E-mails dos médicos (best effort)
+    const emailById = await safe<Map<string, string>>(async () => {
+      const m = new Map<string, string>();
+      for (let page = 1; page <= 5; page++) {
+        const { data: pg } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+        if (!pg?.users?.length) break;
+        for (const u of pg.users) if (u.email) m.set(u.id, u.email);
+        if (pg.users.length < 200) break;
+      }
+      return m;
+    }, new Map());
+
+    // Monta linhas por médico + agrega receita e planos
+    let doctorMrrCents = 0;
+    const byPlan = new Map<string, { count: number; monthly: number; annual: number }>();
+    const perDoctor: InsightDoctor[] = docRows.map((d) => {
+      const sub = doctorSub.get(d.id);
+      const paying = !!sub?.paying;
+      const mrrCents = paying ? doctorPlanMonthlyCents(sub!.plan || d.plan || "") : 0;
+      doctorMrrCents += mrrCents;
+      if (paying) {
+        const base = (sub!.plan || d.plan || "—").replace(/_annual$/, "");
+        const isAnnual = /_annual$/.test(sub!.plan || "");
+        const cur = byPlan.get(base) ?? { count: 0, monthly: 0, annual: 0 };
+        cur.count += 1;
+        if (isAnnual) cur.annual += 1;
+        else cur.monthly += 1;
+        byPlan.set(base, cur);
+      }
+      return {
+        doctorId: d.id,
+        name: d.display_name || "(sem nome)",
+        email: emailById.get(d.id) ?? null,
+        plan: d.plan || "trial",
+        subStatus: sub?.status ?? null,
+        paying,
+        mrrCents,
+        patients: patientsByDoctor.get(d.id) ?? 0,
+        patientsPremium: premiumByDoctor.get(d.id) ?? 0,
+        appointments: apptByDoctor.get(d.id) ?? 0,
+        appointmentsThisMonth: apptMonthByDoctor.get(d.id) ?? 0,
+        paidConsults: consultCountByDoctor.get(d.id) ?? 0,
+        consultRevenueCents: consultRevByDoctor.get(d.id) ?? 0,
+        brainEntries: brainEntriesByDoctor.get(d.id) ?? 0,
+        brainHitsThisMonth: brainHitsByDoctor.get(d.id) ?? 0,
+      };
+    });
+    perDoctor.sort((a, b) => b.mrrCents - a.mrrCents || b.patients - a.patients);
+
+    // Premium das pacientes (MRR)
+    let patientMrrCents = 0;
+    for (const plan of patientPremium.values()) patientMrrCents += patientPremiumMonthlyCents(plan);
+
+    // Afiliados / micro-influenciadores (comissão a pagar)
+    const affiliates = await safe<InsightAffiliate[]>(async () => {
+      const { data: rows } = await sb
+        .from("affiliates")
+        .select("code,name,commission_pct,active,created_at")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      const { data: earnings } = await sb
+        .from("affiliate_earnings")
+        .select("affiliate_code,commission_cents,amount_paid_cents")
+        .limit(10000);
+      const { data: signups } = await sb
+        .from("patient_profiles")
+        .select("ref_code")
+        .not("ref_code", "is", null)
+        .limit(20000);
+      const byCode = new Map<string, { commission: number; revenue: number; signups: number }>();
+      for (const e of (earnings ?? []) as {
+        affiliate_code: string;
+        commission_cents: number;
+        amount_paid_cents: number;
+      }[]) {
+        const c = byCode.get(e.affiliate_code) ?? { commission: 0, revenue: 0, signups: 0 };
+        c.commission += e.commission_cents ?? 0;
+        c.revenue += e.amount_paid_cents ?? 0;
+        byCode.set(e.affiliate_code, c);
+      }
+      for (const s of (signups ?? []) as { ref_code: string }[]) {
+        const c = byCode.get(s.ref_code) ?? { commission: 0, revenue: 0, signups: 0 };
+        c.signups += 1;
+        byCode.set(s.ref_code, c);
+      }
+      return ((rows ?? []) as any[]).map((r) => ({
+        code: r.code,
+        name: r.name,
+        commissionPct: r.commission_pct,
+        active: r.active,
+        signups: byCode.get(r.code)?.signups ?? 0,
+        revenueCents: byCode.get(r.code)?.revenue ?? 0,
+        commissionOwedCents: byCode.get(r.code)?.commission ?? 0,
+      }));
+    }, []);
+    const affiliateInvoices = await safe(async () => {
+      const { count } = await sb
+        .from("affiliate_earnings")
+        .select("*", { count: "exact", head: true });
+      return (count ?? 0) as number;
+    }, 0);
+
+    // Cupons de plataforma (usos)
+    const coupons = await safe<InsightCoupon[]>(async () => {
+      const { data: rows } = await sb
+        .from("platform_coupons")
+        .select("id,code,kind,active,max_redemptions")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      const { data: reds } = await sb
+        .from("platform_coupon_redemptions")
+        .select("coupon_id")
+        .limit(20000);
+      const redByCoupon = new Map<string, number>();
+      for (const r of (reds ?? []) as { coupon_id: string }[])
+        redByCoupon.set(r.coupon_id, (redByCoupon.get(r.coupon_id) ?? 0) + 1);
+      return ((rows ?? []) as any[]).map((c) => ({
+        code: c.code,
+        kind: c.kind,
+        active: c.active,
+        maxRedemptions: c.max_redemptions ?? null,
+        redemptions: redByCoupon.get(c.id) ?? 0,
+      }));
+    }, []);
+
+    const doctorsPaying = perDoctor.filter((d) => d.paying).length;
+    const insights: PlatformInsights = {
+      isSuperAdmin: true,
+      revenue: {
+        doctorMrrCents,
+        patientMrrCents,
+        totalMrrCents: doctorMrrCents + patientMrrCents,
+        consultRevenueCents: consultRevenueTotal,
+      },
+      subscriptions: {
+        doctorsPaying,
+        patientsPremium: patientPremium.size,
+        byPlan: [...byPlan.entries()]
+          .map(([plan, v]) => ({ plan, ...v }))
+          .sort((a, b) => b.count - a.count),
+      },
+      appointments: {
+        total: apptRows.length,
+        thisMonth: apptThisMonth,
+        byStatus: [...apptByStatus.entries()]
+          .map(([status, count]) => ({ status, count }))
+          .sort((a, b) => b.count - a.count),
+      },
+      transactions: {
+        activeSubscriptions: doctorsPaying + patientPremium.size,
+        paidConsultations: paidConsultationsTotal,
+        affiliateInvoices,
+      },
+      perDoctor,
+      affiliates,
+      coupons,
+      generatedAt: new Date().toISOString(),
+    };
+    return { ok: true as const, insights };
+  });
+
 /** Confere se o usuário logado é o super-admin (para gate de UI). */
 export const checkIsSuperAdmin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))

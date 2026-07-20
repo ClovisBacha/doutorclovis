@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getPlatformOverview,
-  getPlatformFinance,
+  getPlatformInsights,
   getRetentionMetrics,
   setDoctorStatus,
   listPlatformCoupons,
@@ -12,7 +12,7 @@ import {
   togglePlatformCoupon,
   type PlatformOverview,
   type PlatformDoctor,
-  type PlatformFinance,
+  type PlatformInsights,
   type RetentionMetrics,
   type PlatformCoupon,
 } from "@/lib/platform.functions";
@@ -303,11 +303,36 @@ function OverviewTab({ data }: { data: PlatformOverview }) {
  * médico. Dá ao dono o controle inteiro — quanto entrou por perfil de médico
  * e quantas consultas foram efetivamente pagas através da Obstétrica.
  */
+const brl = (cents: number) =>
+  `R$ ${(cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const brl0 = (cents: number) => `R$ ${Math.round(cents / 100).toLocaleString("pt-BR")}`;
+
+const PLAN_LABEL: Record<string, string> = {
+  starter: "Starter",
+  pro: "Pro",
+  elite: "Reconhecido",
+  black: "Black",
+  clinica: "Clínica",
+  trial: "Trial",
+  free: "Grátis",
+};
+
+const SUB_STATUS_LABEL: Record<string, { label: string; cls: string }> = {
+  active: { label: "Pagando", cls: "bg-emerald-50 text-emerald-600 border-emerald-200" },
+  trialing: { label: "Em teste", cls: "bg-sky-50 text-sky-600 border-sky-200" },
+  past_due: { label: "Em atraso", cls: "bg-amber-50 text-amber-600 border-amber-200" },
+  canceled: { label: "Cancelado", cls: "bg-rose-50 text-rose-600 border-rose-200" },
+};
+
+/**
+ * Financeiro & Negócio — o dashboard do DONO. Tudo do site em uma tela:
+ * receita real (assinaturas ativas), planos mais vendidos, e a tabela-mãe por
+ * médico (pacientes, premium, agendamentos, consultas pagas, cérebro). No fim,
+ * as comissões a pagar aos micro-influenciadores e o uso dos cupons.
+ */
 function FinanceiroTab() {
-  const [fin, setFin] = useState<PlatformFinance | null>(null);
+  const [ins, setIns] = useState<PlatformInsights | null>(null);
   const [loading, setLoading] = useState(true);
-  const brl = (cents: number) =>
-    `R$ ${(cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   useEffect(() => {
     (async () => {
@@ -315,8 +340,8 @@ function FinanceiroTab() {
         const { data: s } = await supabase.auth.getSession();
         const tk = s.session?.access_token;
         if (!tk) return;
-        const res = await getPlatformFinance({ data: { accessToken: tk } });
-        if (res.ok && res.finance) setFin(res.finance);
+        const res = await getPlatformInsights({ data: { accessToken: tk } });
+        if (res.ok && res.insights) setIns(res.insights);
       } finally {
         setLoading(false);
       }
@@ -324,79 +349,289 @@ function FinanceiroTab() {
   }, []);
 
   if (loading) return <div className="skeleton h-40 rounded-3xl" />;
-  if (!fin)
+  if (!ins)
     return (
       <p className="text-sm text-muted-foreground">
-        Não foi possível carregar o financeiro. Confira se a migração de <code>doctor_id</code> em
-        consultas foi aplicada.
+        Não foi possível carregar o financeiro. Confira se as migrações pendentes
+        (APLICAR_PENDENTES.sql) foram aplicadas no Supabase.
       </p>
     );
 
-  const t = fin.totals;
+  const rev = ins.revenue;
+  const maxPlan = Math.max(1, ...ins.subscriptions.byPlan.map((p) => p.count));
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard
-          label="Faturamento (consultas pagas)"
-          value={brl(t.revenueCents)}
-          tone="amber"
-          hint="pagamentos confirmados no site"
-        />
-        <KpiCard label="Consultas pagas" value={t.paid} tone="emerald" />
-        <KpiCard label="Aguardando pagamento" value={t.pending} tone="sky" />
-        <KpiCard label="Solicitadas (total)" value={t.requested} tone="primary" />
+    <div className="space-y-8">
+      {/* Receita recorrente real */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Receita recorrente (assinaturas ativas)
+        </p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <KpiCard
+            label="MRR total"
+            value={brl0(rev.totalMrrCents)}
+            tone="amber"
+            hint="médicos + pacientes premium"
+          />
+          <KpiCard label="MRR médicos" value={brl0(rev.doctorMrrCents)} tone="emerald" />
+          <KpiCard label="MRR pacientes premium" value={brl0(rev.patientMrrCents)} tone="sky" />
+          <KpiCard
+            label="Faturamento consultas"
+            value={brl0(rev.consultRevenueCents)}
+            tone="primary"
+            hint="consultas pagas no site"
+          />
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-3xl border border-border bg-card">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-4 py-3 font-medium">Médico</th>
-              <th className="px-4 py-3 text-right font-medium">Pagas</th>
-              <th className="px-4 py-3 text-right font-medium">Pendentes</th>
-              <th className="px-4 py-3 text-right font-medium">Solicitadas</th>
-              <th className="px-4 py-3 text-right font-medium">Faturamento</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fin.byDoctor.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                  Nenhuma consulta paga registrada ainda.
-                </td>
-              </tr>
-            )}
-            {fin.byDoctor.map((d) => (
-              <tr
-                key={d.doctorId ?? "__none__"}
-                className="border-b border-border/60 last:border-0"
-              >
-                <td className="px-4 py-3 font-medium">
-                  {d.doctorName}
-                  {!d.doctorId && (
-                    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      sem vínculo
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums text-emerald-600">{d.paid}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                  {d.pending}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">{d.requested}</td>
-                <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                  {brl(d.revenueCents)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Volume da plataforma */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Volume da plataforma
+        </p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <KpiCard label="Médicos pagando" value={ins.subscriptions.doctorsPaying} tone="emerald" />
+          <KpiCard label="Pacientes premium" value={ins.subscriptions.patientsPremium} tone="sky" />
+          <KpiCard
+            label="Agendamentos"
+            value={ins.appointments.total}
+            tone="primary"
+            hint={`${ins.appointments.thisMonth} neste mês`}
+          />
+          <KpiCard
+            label="Consultas pagas"
+            value={ins.transactions.paidConsultations}
+            tone="amber"
+          />
+        </div>
       </div>
+
+      {/* Planos mais vendidos */}
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <p className="font-serif text-lg">Planos mais vendidos</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Assinaturas de médico ativas, por plano (mensal vs anual).
+        </p>
+        {ins.subscriptions.byPlan.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">Nenhuma assinatura ativa ainda.</p>
+        ) : (
+          <div className="mt-4 space-y-2.5">
+            {ins.subscriptions.byPlan.map((p) => (
+              <div key={p.plan} className="flex items-center gap-3">
+                <span className="w-24 shrink-0 text-sm font-medium">
+                  {PLAN_LABEL[p.plan] ?? p.plan}
+                </span>
+                <div className="h-6 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="flex h-full items-center rounded-full bg-primary/80 px-2 text-[11px] font-semibold text-primary-foreground"
+                    style={{ width: `${Math.max(8, (p.count / maxPlan) * 100)}%` }}
+                  >
+                    {p.count}
+                  </div>
+                </div>
+                <span className="w-28 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {p.monthly} mensal · {p.annual} anual
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Tabela-mãe: tudo por médico */}
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Por médico — o controle inteiro
+        </p>
+        <div className="overflow-x-auto rounded-3xl border border-border bg-card">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Médico</th>
+                <th className="px-4 py-3 font-medium">Plano</th>
+                <th className="px-4 py-3 text-right font-medium">MRR</th>
+                <th className="px-4 py-3 text-right font-medium">Pacientes</th>
+                <th className="px-4 py-3 text-right font-medium">Premium</th>
+                <th className="px-4 py-3 text-right font-medium">Agend. (mês)</th>
+                <th className="px-4 py-3 text-right font-medium">Consultas $</th>
+                <th className="px-4 py-3 text-right font-medium">Cérebro</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ins.perDoctor.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                    Nenhum médico cadastrado ainda.
+                  </td>
+                </tr>
+              )}
+              {ins.perDoctor.map((d) => {
+                const st = d.subStatus ? SUB_STATUS_LABEL[d.subStatus] : null;
+                return (
+                  <tr key={d.doctorId} className="border-b border-border/60 last:border-0">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{d.name}</p>
+                      {d.email && <p className="text-xs text-muted-foreground">{d.email}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm">{PLAN_LABEL[d.plan] ?? d.plan}</span>
+                      {st && (
+                        <span
+                          className={`ml-1 inline-block rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${st.cls}`}
+                        >
+                          {st.label}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                      {d.mrrCents ? brl0(d.mrrCents) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{d.patients}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-sky-600">
+                      {d.patientsPremium}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {d.appointments}
+                      {d.appointmentsThisMonth > 0 && (
+                        <span className="text-emerald-600"> (+{d.appointmentsThisMonth})</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {d.paidConsults > 0 ? (
+                        <span>
+                          {d.paidConsults}
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {brl0(d.consultRevenueCents)}
+                          </span>
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                      {d.brainEntries} · {d.brainHitsThisMonth}/mês
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          MRR = mensalidade da assinatura ativa (anual normalizado ao mensal de lista). Premium =
+          pacientes do médico com assinatura Premium ativa. Cérebro = entradas treinadas · respostas
+          no mês.
+        </p>
+      </div>
+
+      {/* Agendamentos por status */}
+      {ins.appointments.byStatus.length > 0 && (
+        <div className="rounded-3xl border border-border bg-card p-5">
+          <p className="font-serif text-lg">Agendamentos por status</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {ins.appointments.byStatus.map((s) => (
+              <span
+                key={s.status}
+                className="rounded-full border border-border bg-muted/40 px-3 py-1 text-sm"
+              >
+                {s.status}: <span className="font-semibold tabular-nums">{s.count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Comissões a pagar (afiliados / micro-influenciadores) */}
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <p className="font-serif text-lg">Comissões a pagar — micro-influenciadores</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Cada código de afiliado, quantas pacientes trouxe e quanto de comissão acumulou (sobre
+          faturas já pagas). É o que você repassa a cada influenciador.
+        </p>
+        {ins.affiliates.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Nenhum afiliado cadastrado. Crie códigos na aba <strong>Afiliados</strong>.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Código</th>
+                  <th className="px-3 py-2 font-medium">Influenciador</th>
+                  <th className="px-3 py-2 text-right font-medium">Cadastros</th>
+                  <th className="px-3 py-2 text-right font-medium">Faturado</th>
+                  <th className="px-3 py-2 text-right font-medium">Comissão</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ins.affiliates.map((a) => (
+                  <tr key={a.code} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {a.code}
+                      {!a.active && (
+                        <span className="ml-1 text-[10px] text-muted-foreground">(off)</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">{a.name}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{a.signups}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                      {brl(a.revenueCents)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-emerald-600">
+                      {brl(a.commissionOwedCents)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Uso dos cupons de plataforma */}
+      {ins.coupons.length > 0 && (
+        <div className="rounded-3xl border border-border bg-card p-5">
+          <p className="font-serif text-lg">Cupons — uso</p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Código</th>
+                  <th className="px-3 py-2 font-medium">Tipo</th>
+                  <th className="px-3 py-2 text-right font-medium">Usos</th>
+                  <th className="px-3 py-2 text-right font-medium">Limite</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ins.coupons.map((c) => (
+                  <tr key={c.code} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {c.code}
+                      {!c.active && (
+                        <span className="ml-1 text-[10px] text-muted-foreground">(off)</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{c.kind}</td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums">
+                      {c.redemptions}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                      {c.maxRedemptions ?? "∞"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground">
-        Atualizado {new Date(fin.generatedAt).toLocaleString("pt-BR")}. "Pago" = pagamento
-        confirmado pelo médico ou consulta já realizada. Consultas antigas sem médico vinculado
-        aparecem em <em>Sem médico</em>.
+        Atualizado {new Date(ins.generatedAt).toLocaleString("pt-BR")}. Receita baseada na tabela de
+        assinaturas do Stripe (estado real), não no plano marcado no cadastro.
       </p>
     </div>
   );
