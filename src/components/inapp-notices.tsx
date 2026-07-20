@@ -6,6 +6,7 @@
  * Montado no layout autenticado; não aparece no console do dono (/admin).
  */
 import { useEffect, useState } from "react";
+import { useLocation } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getActiveAnnouncements,
@@ -28,7 +29,9 @@ const LEVEL_CLS: Record<string, string> = {
 export function InAppNotices() {
   const [anns, setAnns] = useState<Announcement[]>([]);
   const [askNps, setAskNps] = useState(false);
-  const onAdmin = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+  // Reativo à navegação client-side: o layout persiste, então não dá pra
+  // depender de um snapshot de window.location (some/aparece ao trocar de rota).
+  const onAdmin = useLocation({ select: (l) => l.pathname.startsWith("/admin") });
 
   useEffect(() => {
     if (onAdmin) return;

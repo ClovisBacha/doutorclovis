@@ -12,6 +12,7 @@ import { createServerFn } from "@tanstack/react-start";
 import {
   ACCESS_STATUS,
   MAX_ROWS,
+  PAYING_STATUS,
   TokenSchema,
   doctorPlanMonthlyCents,
   monthStartISO,
@@ -173,22 +174,35 @@ export const getGrowthMetrics = createServerFn({ method: "POST" })
       [],
     );
 
-    // ── Assinaturas: pagantes, em teste, premium pagas ──
+    // ── Assinaturas: PAGANTES (active) vs EM TESTE (trialing) — separados, senão
+    // o trial grátis contaria como receita e o forecast nunca somaria conversões.
     const doctorPaying = new Map<string, { plan: string }>();
     const doctorTrialing = new Set<string>();
     const doctorRetained = new Set<string>();
-    const patientPremium = new Map<string, { plan: string | null; source: string }>();
+    // Premium: volume = acesso (active|trialing); MRR = pago (active) via stripe.
+    const patientPremium = new Map<
+      string,
+      { plan: string | null; source: string; paying: boolean }
+    >();
     for (const s of subs) {
-      const grants = ACCESS_STATUS.has(s.status ?? "");
+      const status = s.status ?? "";
+      const grants = ACCESS_STATUS.has(status);
+      const paysNow = PAYING_STATUS.has(status);
       if (s.product === "doctor_plan") {
-        if (s.status === "trialing") doctorTrialing.add(s.user_id);
-        if (grants) {
+        if (status === "trialing") doctorTrialing.add(s.user_id);
+        if (paysNow) {
           doctorPaying.set(s.user_id, { plan: s.plan ?? "" });
           if (s.created_at && new Date(s.created_at).getTime() <= now - RETENTION_CYCLE_DAYS * DAY)
             doctorRetained.add(s.user_id);
         }
       } else if (s.product === "quiz_premium" && grants) {
-        patientPremium.set(s.user_id, { plan: s.plan ?? null, source: s.source ?? "stripe" });
+        const prev = patientPremium.get(s.user_id);
+        if (!prev || (paysNow && !prev.paying))
+          patientPremium.set(s.user_id, {
+            plan: s.plan ?? null,
+            source: s.source ?? "stripe",
+            paying: paysNow,
+          });
       }
     }
 
@@ -238,12 +252,15 @@ export const getGrowthMetrics = createServerFn({ method: "POST" })
     for (const { plan } of doctorPaying.values()) doctorMrrCents += doctorPlanMonthlyCents(plan);
     let patientMrrCents = 0;
     for (const pp of patientPremium.values())
-      if (pp.source === "stripe") patientMrrCents += patientPremiumMonthlyCents(pp.plan);
+      if (pp.paying && pp.source === "stripe")
+        patientMrrCents += patientPremiumMonthlyCents(pp.plan);
     const totalMrrCents = doctorMrrCents + patientMrrCents;
 
     // ── Unit economics ──
     const doctorArpuCents = doctorsPaying > 0 ? Math.round(doctorMrrCents / doctorsPaying) : 0;
-    const payingPremium = [...patientPremium.values()].filter((p) => p.source === "stripe").length;
+    const payingPremium = [...patientPremium.values()].filter(
+      (p) => p.paying && p.source === "stripe",
+    ).length;
     const patientArpuCents = payingPremium > 0 ? Math.round(patientMrrCents / payingPremium) : 0;
 
     const channels = await safe(

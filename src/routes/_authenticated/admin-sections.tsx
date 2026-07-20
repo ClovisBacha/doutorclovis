@@ -686,6 +686,7 @@ export function FlagsTab() {
                   }
                   onMouseUp={() => save(f, { rollout_pct: f.rollout_pct })}
                   onTouchEnd={() => save(f, { rollout_pct: f.rollout_pct })}
+                  onKeyUp={() => save(f, { rollout_pct: f.rollout_pct })}
                   className="flex-1"
                 />
                 <span className="w-10 text-right text-xs font-semibold tabular-nums">

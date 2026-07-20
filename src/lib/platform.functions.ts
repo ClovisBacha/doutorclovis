@@ -15,6 +15,7 @@ import {
   CANCELLED_STATUS,
   MAX_ROWS,
   PAID_STATUS,
+  PAYING_STATUS,
   PLAN_PRICE,
   TokenSchema,
   doctorPlanMonthlyCents,
@@ -377,21 +378,33 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
         ).data ?? []) as SubRow[],
       [],
     );
-    // Melhor assinatura do médico: uma que dê acesso vence; guarda plano+status.
+    // Melhor assinatura do médico (paga > teste > outra). `paying` = receita
+    // realizada (status active); `trialing` dá acesso mas NÃO entra no MRR.
+    const subRank = (st: string) => (PAYING_STATUS.has(st) ? 2 : ACCESS_STATUS.has(st) ? 1 : 0);
     const doctorSub = new Map<string, { plan: string; status: string; paying: boolean }>();
-    // Premium da paciente: guarda plano + fonte (só 'stripe' entra no MRR; cortesias
-    // de convite — source 'convite' — contam como volume, mas não como receita).
-    const patientPremium = new Map<string, { plan: string | null; source: string }>();
+    // Premium da paciente: só 'stripe' + paga entra no MRR; cortesias (convite)
+    // e testes contam como VOLUME, mas não como receita.
+    const patientPremium = new Map<
+      string,
+      { plan: string | null; source: string; paying: boolean }
+    >();
     for (const s of subs) {
       const status = s.status ?? "";
       const grants = ACCESS_STATUS.has(status);
+      const paysNow = PAYING_STATUS.has(status);
       if (s.product === "doctor_plan") {
         const prev = doctorSub.get(s.user_id);
-        if (!prev || (grants && !prev.paying)) {
-          doctorSub.set(s.user_id, { plan: s.plan ?? "", status, paying: grants });
+        if (!prev || subRank(status) > subRank(prev.status)) {
+          doctorSub.set(s.user_id, { plan: s.plan ?? "", status, paying: paysNow });
         }
       } else if (s.product === "quiz_premium" && grants) {
-        patientPremium.set(s.user_id, { plan: s.plan ?? null, source: s.source ?? "stripe" });
+        const prev = patientPremium.get(s.user_id);
+        if (!prev || (paysNow && !prev.paying))
+          patientPremium.set(s.user_id, {
+            plan: s.plan ?? null,
+            source: s.source ?? "stripe",
+            paying: paysNow,
+          });
       }
     }
 
@@ -541,11 +554,12 @@ export const getPlatformInsights = createServerFn({ method: "POST" })
     });
     perDoctor.sort((a, b) => b.mrrCents - a.mrrCents || b.patients - a.patients);
 
-    // Premium das pacientes (MRR): só assinaturas pagas (source 'stripe').
-    // Cortesias (convite do médico) contam como volume, não como receita.
+    // Premium das pacientes (MRR): só assinaturas PAGAS (active) e via 'stripe'.
+    // Cortesias (convite) e testes contam como volume, não como receita.
     let patientMrrCents = 0;
     for (const pp of patientPremium.values())
-      if (pp.source === "stripe") patientMrrCents += patientPremiumMonthlyCents(pp.plan);
+      if (pp.paying && pp.source === "stripe")
+        patientMrrCents += patientPremiumMonthlyCents(pp.plan);
 
     // Afiliados / micro-influenciadores (comissões: total acumulado + mês atual)
     const affiliates = await safe<InsightAffiliate[]>(async () => {

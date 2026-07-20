@@ -76,8 +76,14 @@ export function patientPremiumMonthlyCents(plan: string | null): number {
   return plan === "annual" ? 990 : 1990;
 }
 
-/** Status de assinatura que concede acesso (espelha statusGrantsAccess). */
+/** Status de assinatura que concede ACESSO (espelha statusGrantsAccess). */
 export const ACCESS_STATUS = new Set(["active", "trialing"]);
+/**
+ * Status que representa RECEITA realizada (assinatura paga de verdade). Teste
+ * (`trialing`) dá acesso mas NÃO entra no MRR — senão um trial grátis contaria
+ * como pagante e o forecast nunca somaria conversões. Separação essencial.
+ */
+export const PAYING_STATUS = new Set(["active"]);
 /** Consulta particular "paga" = confirmada pelo médico ou já realizada. */
 export const PAID_STATUS = new Set(["confirmado", "realizado"]);
 export const CANCELLED_STATUS = new Set(["cancelado"]);

@@ -121,17 +121,23 @@ async function recordPaymentIncident(
       .maybeSingle();
     userId = sub?.user_id ?? null;
   }
-  await (supabaseAdmin as any).from("payment_incidents").upsert(
-    {
-      kind,
-      stripe_charge_id: data.chargeId ? String(data.chargeId) : null,
-      stripe_customer_id: data.customerId ? String(data.customerId) : null,
-      user_id: userId,
-      amount_cents: data.amountCents ?? 0,
-      reason: data.reason ?? null,
-    },
-    { onConflict: "kind,stripe_charge_id" },
-  );
+  const row = {
+    kind,
+    stripe_charge_id: data.chargeId ? String(data.chargeId) : null,
+    stripe_customer_id: data.customerId ? String(data.customerId) : null,
+    user_id: userId,
+    amount_cents: data.amountCents ?? 0,
+    reason: data.reason ?? null,
+  };
+  const table = (supabaseAdmin as any).from("payment_incidents");
+  // Com charge id, upsert é idempotente (Stripe re-tenta sem duplicar). Sem
+  // charge id (raro), o Postgres trata NULLs como distintos → cai no insert
+  // simples para não confiar num onConflict que não dedupa NULL.
+  if (row.stripe_charge_id) {
+    await table.upsert(row, { onConflict: "kind,stripe_charge_id" });
+  } else {
+    await table.insert(row);
+  }
 }
 
 /** Lê a assinatura autoritativa no Stripe e sincroniza acesso + tabela. */

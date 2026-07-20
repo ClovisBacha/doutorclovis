@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS public.announcement_dismissals (
 -- ── Feature flags / kill switch ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.platform_flags (
   key         text PRIMARY KEY,
-  enabled     boolean NOT NULL DEFAULT false,
+  enabled     boolean NOT NULL DEFAULT true,
   rollout_pct int NOT NULL DEFAULT 100,  -- 0..100 (rollout gradual determinístico)
   description text,
   updated_at  timestamptz NOT NULL DEFAULT now()

@@ -50,8 +50,19 @@ export const submitNps = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const user = await getUser(data.accessToken);
     if (!user) return { ok: false as const };
-    const role = (await userIsDoctor(user.id)) ? "medico" : "paciente";
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Trava de escrita (anti-ballot-stuffing): 1 resposta por pessoa/90 dias.
+    // Não confia só no shouldAskNps do cliente — reconfirma no servidor.
+    const since = new Date(Date.now() - NINETY_DAYS_MS).toISOString();
+    const { data: recent } = await (supabaseAdmin as any)
+      .from("nps_responses")
+      .select("id")
+      .eq("user_id", user.id)
+      .gte("created_at", since)
+      .limit(1);
+    if ((recent ?? []).length > 0) return { ok: false as const, reason: "recente" as const };
+
+    const role = (await userIsDoctor(user.id)) ? "medico" : "paciente";
     const { error } = await (supabaseAdmin as any).from("nps_responses").insert({
       user_id: user.id,
       role,
@@ -128,7 +139,7 @@ export const getNpsReport = createServerFn({ method: "POST" })
     for (const r of rows) {
       add(overall, r.score);
       if (r.role === "medico") add(medico, r.score);
-      else add(paciente, r.score);
+      else if (r.role === "paciente") add(paciente, r.score);
       const month = (r.created_at ?? "").slice(0, 7);
       if (month) {
         const t = trendMap.get(month) ?? emptyBucket();
