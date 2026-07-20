@@ -1,0 +1,68 @@
+import { createFileRoute } from "@tanstack/react-router";
+
+/**
+ * DoctorThink API — POST /api/doctorthink/ask
+ *
+ * Produto do Segundo Cérebro para outros apps. Autentica por API key
+ * (Authorization: Bearer dtk_... ou header X-API-Key) e devolve o BLOCO de
+ * contexto do cérebro do médico para o app cliente injetar no próprio LLM.
+ *
+ * Body: { doctorId: string, message: string, channel?: "app"|"whatsapp"|"teste" }
+ * Resposta: { block: string, hadCoverage: boolean, enabledChannels: {...} }
+ *
+ * Hoje serve o inquilino Obstétrica (store sobre o Supabase da Obstétrica); na
+ * Fase 3, o tenant da chave seleciona o store do banco próprio do DoctorThink.
+ */
+function jsonRes(obj: unknown, status: number): Response {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+
+export const Route = createFileRoute("/api/doctorthink/ask")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const { authApiKey } = await import("@/lib/doctorthink/api-keys.server");
+        const auth = await authApiKey(
+          request.headers.get("authorization") || request.headers.get("x-api-key"),
+        );
+        if (!auth) return jsonRes({ error: "unauthorized" }, 401);
+
+        const body = (await request.json().catch(() => null)) as {
+          doctorId?: string;
+          message?: string;
+          channel?: string;
+        } | null;
+        if (!body?.doctorId || !body?.message) {
+          return jsonRes({ error: "doctorId e message são obrigatórios" }, 400);
+        }
+
+        const [{ createObstetricaBrainStore }, { runBrainQuery }, { OBSTETRICA_LABELS }] =
+          await Promise.all([
+            import("@/lib/doctorthink/obstetrica-store.server"),
+            import("@/lib/doctorthink/orchestrator"),
+            import("@/lib/secondbrain.server"),
+          ]);
+
+        try {
+          const result = await runBrainQuery(
+            {
+              tenantId: auth.tenantId,
+              doctorId: body.doctorId,
+              message: body.message,
+              channel: body.channel || "app",
+            },
+            createObstetricaBrainStore(),
+            OBSTETRICA_LABELS,
+            { maxEntriesLoaded: 200, maxEntriesScored: 6 },
+          );
+          return jsonRes(result, 200);
+        } catch {
+          return jsonRes({ error: "internal_error" }, 500);
+        }
+      },
+    },
+  },
+});

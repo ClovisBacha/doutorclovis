@@ -38,6 +38,7 @@ import {
   AuditoriaTab,
   ReembolsosTab,
   ConsultorTab,
+  DoctorThinkTab,
 } from "./admin-sections";
 import { downloadCsv, CsvButton } from "@/components/admin-ui";
 
@@ -159,6 +160,7 @@ type AdminTab =
   | "comunicados"
   | "flags"
   | "auditoria"
+  | "doctorthink"
   | "varredura";
 
 // Navegação agrupada — cada grupo é uma família de telas, fácil de escanear.
@@ -199,6 +201,7 @@ const NAV_GROUPS: { group: string; items: { key: AdminTab; label: string; icon: 
     group: "Sistema",
     items: [
       { key: "flags", label: "Feature flags", icon: "🚦" },
+      { key: "doctorthink", label: "DoctorThink", icon: "🧠" },
       { key: "auditoria", label: "Auditoria", icon: "🛡️" },
       { key: "varredura", label: "Varredura", icon: "🔍" },
     ],
@@ -325,6 +328,7 @@ function AdminConsole() {
           {tab === "afiliados" && <AfiliadosTab />}
           {tab === "comunicados" && <ComunicadosTab />}
           {tab === "flags" && <FlagsTab />}
+          {tab === "doctorthink" && <DoctorThinkTab />}
           {tab === "auditoria" && <AuditoriaTab />}
           {tab === "varredura" && <VarreduraTab />}
         </div>

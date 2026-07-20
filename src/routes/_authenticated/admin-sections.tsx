@@ -23,6 +23,12 @@ import { getAuditLog, type AuditEntry } from "@/lib/audit.functions";
 import { getPaymentIncidents, type PaymentIncidentsReport } from "@/lib/payments.functions";
 import { getBusinessAdvice, type BusinessAdvice } from "@/lib/advisor.functions";
 import {
+  createDoctorThinkKey,
+  listDoctorThinkKeys,
+  revokeDoctorThinkKey,
+  type DoctorThinkKey,
+} from "@/lib/doctorthink.functions";
+import {
   adminToken,
   brl,
   brl0,
@@ -1008,6 +1014,177 @@ export function ConsultorTab() {
         ) : (
           <EmptyHint>Clique em "Nova análise" para gerar.</EmptyHint>
         )}
+      </Panel>
+    </div>
+  );
+}
+
+// ═══════════════════════════ DoctorThink (API keys) ═══════════════════════════
+
+export function DoctorThinkTab() {
+  const [keys, setKeys] = useState<DoctorThinkKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tenantId, setTenantId] = useState("");
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [freshKey, setFreshKey] = useState<string | null>(null);
+
+  async function load() {
+    const res = await listDoctorThinkKeys({ data: { accessToken: await adminToken() } });
+    if (res.ok) setKeys(res.keys);
+    setLoading(false);
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function create() {
+    if (tenantId.trim().length < 2) return;
+    setSaving(true);
+    setFreshKey(null);
+    const res = await createDoctorThinkKey({
+      data: {
+        accessToken: await adminToken(),
+        tenantId: tenantId.trim(),
+        name: name.trim() || undefined,
+      },
+    });
+    setSaving(false);
+    if (res.ok && res.apiKey) {
+      setFreshKey(res.apiKey);
+      setTenantId("");
+      setName("");
+      load();
+    } else {
+      toast.error(
+        res.reason === "migracao"
+          ? "Aplique a migração (APLICAR_PENDENTES.sql) no Supabase."
+          : "Não foi possível criar a chave.",
+      );
+    }
+  }
+  async function revoke(id: string) {
+    await revokeDoctorThinkKey({ data: { accessToken: await adminToken(), id } });
+    load();
+  }
+
+  return (
+    <div className="space-y-5">
+      <Panel
+        title="DoctorThink — API do Segundo Cérebro"
+        subtitle="Crie uma chave por app cliente. O app chama /api/doctorthink/ask com a chave e recebe o bloco de contexto do cérebro do médico."
+      >
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground">Inquilino (app)</label>
+            <input
+              value={tenantId}
+              onChange={(e) => setTenantId(e.target.value)}
+              placeholder="ex.: obstetrica"
+              className="mt-1 block w-48 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Nome (opcional)</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="ex.: app da Obstétrica"
+              className="mt-1 block w-56 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            onClick={create}
+            disabled={saving}
+            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          >
+            {saving ? "Gerando…" : "Gerar chave"}
+          </button>
+        </div>
+
+        {freshKey && (
+          <div className="mt-4 rounded-2xl border border-emerald-300 bg-emerald-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+              Copie agora — a chave só aparece uma vez
+            </p>
+            <code className="mt-2 block break-all rounded-lg bg-white px-3 py-2 font-mono text-sm">
+              {freshKey}
+            </code>
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(freshKey);
+                toast.success("Chave copiada.");
+              }}
+              className="mt-2 rounded-full border border-emerald-300 px-3 py-1 text-xs text-emerald-700"
+            >
+              Copiar
+            </button>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Chaves">
+        {loading ? (
+          <div className="skeleton h-20 rounded-2xl" />
+        ) : keys.length === 0 ? (
+          <EmptyHint>Nenhuma chave ainda.</EmptyHint>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Inquilino</th>
+                  <th className="px-3 py-2 font-medium">Nome</th>
+                  <th className="px-3 py-2 font-medium">Último uso</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map((k) => (
+                  <tr key={k.id} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-2 font-mono text-xs">{k.tenant_id}</td>
+                    <td className="px-3 py-2">{k.name ?? "—"}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {k.last_used_at ? new Date(k.last_used_at).toLocaleString("pt-BR") : "nunca"}
+                    </td>
+                    <td className="px-3 py-2">
+                      {k.active ? (
+                        <span className="text-emerald-600">ativa</span>
+                      ) : (
+                        <span className="text-muted-foreground">revogada</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {k.active && (
+                        <button
+                          onClick={() => revoke(k.id)}
+                          className="rounded-full border border-border px-3 py-1 text-xs hover:text-rose-600"
+                        >
+                          Revogar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Como o app cliente usa">
+        <pre className="overflow-x-auto rounded-2xl bg-muted/50 p-4 text-xs leading-relaxed">
+          {`POST /api/doctorthink/ask
+Authorization: Bearer dtk_...
+{ "doctorId": "<uuid do médico>", "message": "tô enjoada", "channel": "app" }
+
+→ { "block": "...contexto do cérebro...", "hadCoverage": true, "enabledChannels": {...} }
+
+POST /api/doctorthink/train
+Authorization: Bearer dtk_...
+{ "doctorId": "<uuid>", "question": "...", "answer": "..." }`}
+        </pre>
       </Panel>
     </div>
   );

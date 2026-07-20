@@ -36,7 +36,7 @@ export { normalizeGapQuestion };
  * "médico/obstétrico" da montagem — outro app (DoctorThink para outra área)
  * fornece os seus. As strings são idênticas às originais (saída byte-a-byte).
  */
-const OBSTETRICA_LABELS: BrainBlockLabels = {
+export const OBSTETRICA_LABELS: BrainBlockLabels = {
   header: "## Segundo Cérebro do médico",
   roleInstruction:
     "Você responde COMO O PRÓPRIO médico responderia, seguindo o estilo, as frases e as condutas registradas abaixo.",

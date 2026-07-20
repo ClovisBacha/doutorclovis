@@ -53,6 +53,8 @@ import { Route as AcompanharTokenRouteImport } from './routes/acompanhar.$token'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiDoctorthinkTrainRouteImport } from './routes/api/doctorthink/train'
+import { Route as ApiDoctorthinkAskRouteImport } from './routes/api/doctorthink/ask'
 
 const TermosRoute = TermosRouteImport.update({
   id: '/termos',
@@ -273,6 +275,16 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiDoctorthinkTrainRoute = ApiDoctorthinkTrainRouteImport.update({
+  id: '/api/doctorthink/train',
+  path: '/api/doctorthink/train',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDoctorthinkAskRoute = ApiDoctorthinkAskRouteImport.update({
+  id: '/api/doctorthink/ask',
+  path: '/api/doctorthink/ask',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -318,6 +330,8 @@ export interface FileRoutesByFullPath {
   '/medicos/cadastro': typeof MedicosCadastroRoute
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
+  '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
+  '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -363,6 +377,8 @@ export interface FileRoutesByTo {
   '/medicos/cadastro': typeof MedicosCadastroRoute
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
+  '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
+  '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -410,6 +426,8 @@ export interface FileRoutesById {
   '/medicos_/cadastro': typeof MedicosCadastroRoute
   '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
+  '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
+  '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -457,6 +475,8 @@ export interface FileRouteTypes {
     | '/medicos/cadastro'
     | '/medicos/google-callback'
     | '/votar-nome/$token'
+    | '/api/doctorthink/ask'
+    | '/api/doctorthink/train'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -502,6 +522,8 @@ export interface FileRouteTypes {
     | '/medicos/cadastro'
     | '/medicos/google-callback'
     | '/votar-nome/$token'
+    | '/api/doctorthink/ask'
+    | '/api/doctorthink/train'
   id:
     | '__root__'
     | '/'
@@ -548,6 +570,8 @@ export interface FileRouteTypes {
     | '/medicos_/cadastro'
     | '/medicos_/google-callback'
     | '/votar-nome/$token'
+    | '/api/doctorthink/ask'
+    | '/api/doctorthink/train'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -592,6 +616,8 @@ export interface RootRouteChildren {
   MedicosCadastroRoute: typeof MedicosCadastroRoute
   MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
+  ApiDoctorthinkAskRoute: typeof ApiDoctorthinkAskRoute
+  ApiDoctorthinkTrainRoute: typeof ApiDoctorthinkTrainRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -904,6 +930,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/doctorthink/train': {
+      id: '/api/doctorthink/train'
+      path: '/api/doctorthink/train'
+      fullPath: '/api/doctorthink/train'
+      preLoaderRoute: typeof ApiDoctorthinkTrainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/doctorthink/ask': {
+      id: '/api/doctorthink/ask'
+      path: '/api/doctorthink/ask'
+      fullPath: '/api/doctorthink/ask'
+      preLoaderRoute: typeof ApiDoctorthinkAskRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -964,6 +1004,8 @@ const rootRouteChildren: RootRouteChildren = {
   MedicosCadastroRoute: MedicosCadastroRoute,
   MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
+  ApiDoctorthinkAskRoute: ApiDoctorthinkAskRoute,
+  ApiDoctorthinkTrainRoute: ApiDoctorthinkTrainRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
