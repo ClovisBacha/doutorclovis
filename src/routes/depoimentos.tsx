@@ -2,8 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Quote, Star } from "lucide-react";
 import { Reveal } from "@/components/reveal";
 import { SpotlightCard } from "@/components/motion-fx";
+import { getApprovedTestimonials } from "@/lib/testimonials.functions";
 
 export const Route = createFileRoute("/depoimentos")({
+  // Depoimentos aprovados pelo médico entram junto dos fixos (best-effort:
+  // se a tabela ainda não existe, segue só com os fixos).
+  loader: async () => {
+    try {
+      const res = await getApprovedTestimonials();
+      return { approved: res.ok ? res.items : [] };
+    } catch {
+      return { approved: [] as { name: string; body: string }[] };
+    }
+  },
   head: () => ({
     meta: [
       { title: "Depoimentos de pacientes — Obstétrica" },
@@ -55,6 +66,12 @@ const reviews = [
 ];
 
 function DepoimentosPage() {
+  const { approved } = Route.useLoaderData();
+  // Aprovados (de pacientes reais) primeiro; depois os fixos de referência.
+  const allReviews = [
+    ...approved.map((a) => ({ name: a.name, city: "Paciente Obstétrica", text: a.body })),
+    ...reviews,
+  ];
   return (
     <>
       {/* Hero */}
@@ -80,8 +97,8 @@ function DepoimentosPage() {
       {/* Cards */}
       <section className="mx-auto max-w-6xl px-5 pb-24">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {reviews.map((r, i) => (
-            <Reveal key={r.name} variant="up" delay={i * 80}>
+          {allReviews.map((r, i) => (
+            <Reveal key={`${r.name}-${i}`} variant="up" delay={i * 80}>
               <SpotlightCard className="relative flex h-full flex-col rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
                 <Quote className="h-7 w-7 text-primary/40" />
                 <p className="mt-3 flex-1 text-base leading-relaxed text-foreground">"{r.text}"</p>

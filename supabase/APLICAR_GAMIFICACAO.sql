@@ -134,3 +134,24 @@ ALTER TABLE public.patient_profiles
 CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_profiles_instagram_handle
   ON public.patient_profiles (instagram_handle)
   WHERE instagram_handle IS NOT NULL;
+
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Depoimentos → 100 Sementinhas ao ser aprovado pelo médico
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.testimonials (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE REFERENCES auth.users (id) ON DELETE CASCADE,
+  display_name text,
+  body text NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  reviewed_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_testimonials_status ON public.testimonials (status);
+
+ALTER TABLE public.testimonials ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON public.testimonials FROM anon, authenticated;
+GRANT ALL ON public.testimonials TO service_role;

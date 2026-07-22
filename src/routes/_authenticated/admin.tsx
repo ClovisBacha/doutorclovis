@@ -41,6 +41,7 @@ import {
   DoctorThinkTab,
 } from "./admin-sections";
 import { downloadCsv, CsvButton } from "@/components/admin-ui";
+import { adminListTestimonials, reviewTestimonial } from "@/lib/testimonials.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ name: "robots", content: "noindex" }] }),
@@ -157,6 +158,7 @@ type AdminTab =
   | "cupons"
   | "afiliados"
   | "comunicados"
+  | "depoimentos"
   | "flags"
   | "auditoria"
   | "doctorthink"
@@ -194,6 +196,7 @@ const NAV_GROUPS: { group: string; items: { key: AdminTab; label: string; icon: 
       { key: "cupons", label: "Cupons", icon: "🎟️" },
       { key: "afiliados", label: "Afiliados", icon: "🤝" },
       { key: "comunicados", label: "Comunicados", icon: "📣" },
+      { key: "depoimentos", label: "Depoimentos", icon: "💬" },
     ],
   },
   {
@@ -326,6 +329,7 @@ function AdminConsole() {
           {tab === "cupons" && <CuponsTab />}
           {tab === "afiliados" && <AfiliadosTab />}
           {tab === "comunicados" && <ComunicadosTab />}
+          {tab === "depoimentos" && <DepoimentosAdminTab />}
           {tab === "flags" && <FlagsTab />}
           {tab === "doctorthink" && <DoctorThinkTab />}
           {tab === "auditoria" && <AuditoriaTab />}
@@ -1139,6 +1143,133 @@ function CuponsTab() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Depoimentos das pacientes: revisão do médico. Aprovar publica o depoimento
+ * (página pública) e credita 100 🌱 à paciente (uma vez). Recusar não credita.
+ */
+type AdminTestimonial = {
+  id: string;
+  display_name: string | null;
+  body: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+};
+
+function DepoimentosAdminTab() {
+  const [rows, setRows] = useState<AdminTestimonial[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function load() {
+    try {
+      const res = await adminListTestimonials({ data: { accessToken: await token() } });
+      setRows(res.ok ? (res.items as AdminTestimonial[]) : []);
+    } catch {
+      setRows([]);
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function review(id: string, approve: boolean) {
+    if (busy) return;
+    setBusy(id);
+    try {
+      const res = await reviewTestimonial({ data: { accessToken: await token(), id, approve } });
+      if (res.ok) {
+        toast.success(
+          approve ? "Depoimento publicado — +100 🌱 pra paciente 💛" : "Depoimento recusado",
+        );
+        setRows((rs) =>
+          (rs ?? []).map((r) =>
+            r.id === id ? { ...r, status: approve ? "approved" : "rejected" } : r,
+          ),
+        );
+      } else {
+        toast.error("error" in res ? res.error : "Não foi possível revisar.");
+      }
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (rows === null) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+
+  const pending = rows.filter((r) => r.status === "pending");
+  const reviewed = rows.filter((r) => r.status !== "pending");
+  const badge = (s: AdminTestimonial["status"]) =>
+    s === "approved"
+      ? "bg-emerald-100 text-emerald-700"
+      : s === "rejected"
+        ? "bg-rose-100 text-rose-600"
+        : "bg-amber-100 text-amber-700";
+
+  const Card = ({ r }: { r: AdminTestimonial }) => (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-sm font-bold text-foreground">{r.display_name || "Paciente"}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge(r.status)}`}>
+          {r.status === "approved"
+            ? "Publicado"
+            : r.status === "rejected"
+              ? "Recusado"
+              : "Pendente"}
+        </span>
+      </div>
+      <p className="text-sm italic leading-relaxed text-foreground/80">“{r.body}”</p>
+      {r.status !== "approved" && (
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={() => review(r.id, true)}
+            disabled={busy === r.id}
+            className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+          >
+            Aprovar (+100 🌱)
+          </button>
+          {r.status !== "rejected" && (
+            <button
+              onClick={() => review(r.id, false)}
+              disabled={busy === r.id}
+              className="rounded-full border border-border px-4 py-1.5 text-xs font-bold text-muted-foreground disabled:opacity-40"
+            >
+              Recusar
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="mb-2 text-sm font-bold text-foreground">Pendentes ({pending.length})</h3>
+        {pending.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum depoimento aguardando revisão.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {pending.map((r) => (
+              <Card key={r.id} r={r} />
+            ))}
+          </div>
+        )}
+      </div>
+      {reviewed.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-sm font-bold text-foreground">Revisados</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {reviewed.map((r) => (
+              <Card key={r.id} r={r} />
+            ))}
+          </div>
         </div>
       )}
     </div>
