@@ -193,18 +193,24 @@ export const reviewTestimonial = createServerFn({ method: "POST" })
     const sb = supabaseAdmin as unknown as {
       from: (t: string) => {
         update: (v: Record<string, unknown>) => {
-          eq: (c: string, v: string) => { select: (c: string) => Promise<{ data: unknown }> };
+          eq: (
+            c: string,
+            v: string,
+          ) => { select: (c: string) => Promise<{ data: unknown; error: unknown }> };
         };
       };
     };
     const status: TestimonialStatus = data.approve ? "approved" : "rejected";
-    const { data: updated } = await sb
+    const { data: updated, error: upErr } = await sb
       .from("testimonials")
       .update({ status, reviewed_at: new Date().toISOString() })
       .eq("id", data.id)
       .select("user_id");
     const row = (Array.isArray(updated) ? updated[0] : null) as { user_id?: string } | null;
-    const uid = row?.user_id;
+    // Falha/ID inexistente: não finge sucesso (o painel não deve marcar
+    // "Publicado" sem nada ter mudado).
+    if (upErr || !row?.user_id) return { ok: false as const, error: "Depoimento não encontrado" };
+    const uid = row.user_id;
     // Recompensa só na APROVAÇÃO, uma vez por paciente (dedupe por user), fora
     // do Modo Cuidado. Best-effort: não derruba a revisão se falhar.
     if (data.approve && uid) {
