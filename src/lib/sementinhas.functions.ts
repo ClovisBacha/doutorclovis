@@ -180,12 +180,13 @@ export const grantLessonReward = createServerFn({ method: "POST" })
     const correct = Math.max(0, Math.min(data.correct, mod.quiz.length));
 
     const { cycle, gest } = await loadCycleAndGestation(supabaseAdmin, uid);
-    // ANTI-FRAUDE (cadência): não paga lição de semana no FUTURO — só até a
-    // semana gestacional real de hoje (+1 de folga p/ fuso/relógio). Revisar
-    // semanas passadas do curso é legítimo (e limitado a 12 módulos + dedupe).
-    // Sem idade gestacional confiável não há cadência a validar — não paga.
+    // ANTI-FRAUDE (cadência): a lição só paga a SEMANA gestacional atual (±1 de
+    // folga p/ fuso). Sem idade gestacional confiável não paga. Assim uma única
+    // edição do perfil não "varre" os 12 módulos de uma vez (antes bastava
+    // inflar reference_weeks). As lições do curso já saíram da UI (ensino só no
+    // desafio do dia), então travar na semana atual não bloqueia nada legítimo.
     if (!gest) return { ok: true as const, granted: 0 };
-    if (data.week > gest.weeks + 1) return { ok: true as const, granted: 0 };
+    if (Math.abs(data.week - gest.weeks) > 1) return { ok: true as const, granted: 0 };
     const dedupeKey = `lesson:${cycle}:${data.week}`;
 
     // Já ganhou por esta lição? (idempotência transparente p/ o "você ganhou X")
