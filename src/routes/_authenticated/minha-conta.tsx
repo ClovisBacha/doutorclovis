@@ -1056,14 +1056,18 @@ function BabyTab({
                 })
               : "—"}
           </p>
-          {daysToDue != null && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {daysToDue === 0
-                ? "É hoje! 🎉"
-                : daysToDue === 1
-                  ? "Amanhã!"
-                  : `Faltam ${daysToDue} dias`}
-            </p>
+          {reta ? (
+            <p className="mt-1 text-sm text-primary">Você está na janela do parto 💛</p>
+          ) : (
+            daysToDue != null && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {daysToDue === 0
+                  ? "É hoje! 🎉"
+                  : daysToDue === 1
+                    ? "Amanhã!"
+                    : `Faltam ${daysToDue} dias`}
+              </p>
+            )
           )}
         </div>
         <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
