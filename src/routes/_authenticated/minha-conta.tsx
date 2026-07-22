@@ -63,6 +63,8 @@ import {
   type AchievementDef,
 } from "@/lib/achievements.functions";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
+import { CANTINHO_ITEMS, CANTINHO_CATEGORIES, type CantinhoCategory } from "@/lib/cantinho";
+import { getCantinho, buyCantinhoItem } from "@/lib/cantinho.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
   searchDoctors,
@@ -246,6 +248,7 @@ const TABS = [
   "Carteirinha",
   "Pós-parto",
   "Conquistas",
+  "Cantinho",
   "Loja",
   "Consulta Particular",
   "Ciclo Menstrual",
@@ -316,7 +319,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Aprender",
-    tabs: ["Escola", "FAQ", "Pânico", "Conquistas", "Loja"],
+    tabs: ["Escola", "FAQ", "Pânico", "Conquistas", "Cantinho", "Loja"],
   },
   {
     label: "Médico",
@@ -886,6 +889,7 @@ function MinhaContaPage() {
               )}
               {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
               {tab === "Conquistas" && <ConquistasTab />}
+              {tab === "Cantinho" && <CantinhoTab />}
               {tab === "Loja" && <LojaTab gest={gest} />}
               {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
               {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
@@ -11591,6 +11595,150 @@ function ProductSheet({
         )}
       </div>
     </>
+  );
+}
+
+/* ---------- Meu Cantinho 🌱 (spend das Sementinhas) ---------- */
+function CantinhoTab() {
+  const [loading, setLoading] = useState(true);
+  const [saldo, setSaldo] = useState(0);
+  const [owned, setOwned] = useState<string[]>([]);
+  const [cat, setCat] = useState<CantinhoCategory | "all">("all");
+  const [buying, setBuying] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) {
+        setLoading(false);
+        return;
+      }
+      const res = await getCantinho({ data: { accessToken: s.session.access_token } });
+      if (res.ok) {
+        setSaldo(res.balance);
+        setOwned(res.owned);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) return <TabSkeleton />;
+
+  const ownedSet = new Set(owned);
+  const ownedItems = CANTINHO_ITEMS.filter((i) => ownedSet.has(i.id));
+  const shopItems = CANTINHO_ITEMS.filter((i) => cat === "all" || i.category === cat);
+
+  async function buy(itemId: string, price: number) {
+    if (buying) return;
+    if (saldo < price) {
+      toast("Sementinhas insuficientes 🌱");
+      return;
+    }
+    setBuying(itemId);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) {
+      setBuying(null);
+      return;
+    }
+    const res = await buyCantinhoItem({
+      data: { accessToken: s.session.access_token, itemId },
+    });
+    if (res.ok) {
+      setSaldo(res.balance);
+      setOwned((o) => [...o, itemId]);
+      toast("Adicionado ao seu cantinho! 💛");
+    } else {
+      toast(res.error ?? "Não foi possível comprar");
+      if (typeof res.balance === "number") setSaldo(res.balance);
+    }
+    setBuying(null);
+  }
+
+  const pill = (active: boolean) =>
+    `shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
+      active ? "bg-emerald-100 text-emerald-700" : "text-foreground/45 hover:text-foreground/70"
+    }`;
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho + saldo */}
+      <div className="flex items-center justify-between rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-5">
+        <div>
+          <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">Meu Cantinho</p>
+          <p className="mt-0.5 text-sm text-emerald-800/80">Um cantinho que cresce com você.</p>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5">
+          <span className="text-lg">🌱</span>
+          <span className="tabular-nums font-extrabold text-emerald-600">{saldo}</span>
+        </div>
+      </div>
+
+      {/* A cena do cantinho */}
+      <div className="min-h-[180px] rounded-3xl border border-emerald-100 bg-gradient-to-b from-sky-50 via-white to-emerald-50 p-6">
+        {ownedItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-4xl">🌱</p>
+            <p className="mt-2 font-serif text-lg text-foreground">Seu cantinho está começando</p>
+            <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+              Ganhe Sementinhas cuidando de você e traga vida pra ele — uma plantinha de cada vez.
+              💛
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-end justify-center gap-3">
+            {ownedItems.map((i) => (
+              <span key={i.id} className="text-5xl drop-shadow-sm" title={i.name}>
+                {i.emoji}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Loja de itens */}
+      <div>
+        <div className="scrollbar-hide mb-3 flex gap-2 overflow-x-auto">
+          <button onClick={() => setCat("all")} className={pill(cat === "all")}>
+            Tudo
+          </button>
+          {CANTINHO_CATEGORIES.map((c) => (
+            <button key={c.key} onClick={() => setCat(c.key)} className={pill(cat === c.key)}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {shopItems.map((i) => {
+            const has = ownedSet.has(i.id);
+            const cant = !has && saldo < i.price;
+            return (
+              <div
+                key={i.id}
+                className="flex flex-col items-center rounded-2xl border border-border bg-card p-4 text-center"
+              >
+                <span className="text-4xl">{i.emoji}</span>
+                <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
+                {has ? (
+                  <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                    No cantinho ✓
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => buy(i.id, i.price)}
+                    disabled={cant || buying === i.id}
+                    className={`press mt-2 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold ${
+                      cant ? "bg-slate-100 text-slate-400" : "bg-emerald-500 text-white"
+                    }`}
+                  >
+                    🌱 {i.price}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 

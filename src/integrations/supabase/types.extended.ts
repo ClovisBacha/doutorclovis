@@ -93,5 +93,6 @@ export function typedDb(client: SupabaseClient) {
     from(table: "corporate_leads"): ReturnType<SupabaseClient["from"]>;
     from(table: "corporate_accounts"): ReturnType<SupabaseClient["from"]>;
     from(table: "sementinhas_ledger"): ReturnType<SupabaseClient["from"]>;
+    from(table: "cantinho_items"): ReturnType<SupabaseClient["from"]>;
   };
 }
