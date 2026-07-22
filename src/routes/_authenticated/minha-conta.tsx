@@ -63,7 +63,14 @@ import {
   type AchievementDef,
 } from "@/lib/achievements.functions";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
-import { CANTINHO_ITEMS, CANTINHO_CATEGORIES, type CantinhoType } from "@/lib/cantinho";
+import {
+  CANTINHO_ITEMS,
+  CANTINHO_CATEGORIES,
+  CANTINHO_COMPLETIONIST_ID,
+  CANTINHO_COMPLETION_REQUIRED,
+  isCantinhoCollectionComplete,
+  type CantinhoType,
+} from "@/lib/cantinho";
 import { getCantinho, buyCantinhoItem, setCantinhoFundo } from "@/lib/cantinho.functions";
 import { getInstagramShare, setInstagramHandle } from "@/lib/instagram.functions";
 import { setCareMode } from "@/lib/care-mode.functions";
@@ -11880,6 +11887,7 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   const [equipped, setEquipped] = useState<string | null>(null);
   const [cat, setCat] = useState<CantinhoType | "all">("all");
   const [buying, setBuying] = useState<string | null>(null);
+  const [collection, setCollection] = useState({ owned: 0, total: 0, complete: false });
 
   useEffect(() => {
     (async () => {
@@ -11894,6 +11902,11 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
         setOwned(res.owned);
         setPremium(res.premium);
         setEquipped(res.equippedFundo);
+        setCollection({
+          owned: res.collectionOwned ?? 0,
+          total: res.collectionTotal ?? 0,
+          complete: res.collectionComplete ?? false,
+        });
       }
       setLoading(false);
     })();
@@ -11938,7 +11951,19 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
     });
     if (res.ok) {
       setSaldo(res.balance);
-      setOwned((o) => [...o, itemId]);
+      setOwned((o) => {
+        const next = o.includes(itemId) ? o : [...o, itemId];
+        // Trofeu da coleção: se esta compra fechou a coleção, desbloqueia na hora.
+        const nowComplete = isCantinhoCollectionComplete(next);
+        setCollection((c) => ({
+          owned: CANTINHO_COMPLETION_REQUIRED.filter((id) => next.includes(id)).length,
+          total: c.total || CANTINHO_COMPLETION_REQUIRED.length,
+          complete: nowComplete,
+        }));
+        return nowComplete && !next.includes(CANTINHO_COMPLETIONIST_ID)
+          ? [...next, CANTINHO_COMPLETIONIST_ID]
+          : next;
+      });
       toast("Adicionado ao seu cantinho! 💛");
     } else {
       toast(res.error ?? "Não foi possível comprar");
@@ -12009,19 +12034,32 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {shopItems.map((i) => {
             const has = ownedSet.has(i.id);
+            const isTrophy = i.id === CANTINHO_COMPLETIONIST_ID;
             const locked = i.premium && !premium; // exclusivo do Premium
+            const trophyLocked = isTrophy && !has; // troféu ainda não conquistado
             const cant = !has && !locked && saldo < i.price;
             return (
               <div
                 key={i.id}
-                className="relative flex flex-col items-center rounded-2xl border border-border bg-card p-4 text-center"
+                className={`relative flex flex-col items-center rounded-2xl border p-4 text-center ${
+                  isTrophy
+                    ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white"
+                    : "border-border bg-card"
+                }`}
               >
                 {i.premium && (
                   <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
                     {locked ? "🔒 Premium" : "Premium"}
                   </span>
                 )}
-                <span className={`text-4xl ${locked ? "opacity-40 grayscale" : ""}`}>
+                {isTrophy && (
+                  <span className="absolute right-2 top-2 rounded-full bg-amber-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800">
+                    Coleção
+                  </span>
+                )}
+                <span
+                  className={`text-4xl ${locked || trophyLocked ? "opacity-40 grayscale" : ""}`}
+                >
                   {i.emoji}
                 </span>
                 <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
@@ -12039,9 +12077,13 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
                     </button>
                   ) : (
                     <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
-                      No cantinho ✓
+                      {isTrophy ? "Conquistado! 👑" : "No cantinho ✓"}
                     </span>
                   )
+                ) : trophyLocked ? (
+                  <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
+                    🔒 {collection.owned}/{collection.total} da coleção
+                  </span>
                 ) : locked ? (
                   <span className="mt-2 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-600">
                     🌱 {i.price}

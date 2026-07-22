@@ -239,7 +239,36 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     premium: true,
   },
   { id: "especial-natal", name: "Natal", emoji: "🎄", price: 180, type: "especial", premium: true },
+
+  // ── Troféu de coleção — NÃO se compra; desbloqueia ao ter todos os itens
+  // normais (os 10 da loja comum). Recompensa da paciente mais dedicada. ─────
+  {
+    id: "especial-colecao",
+    name: "Coroa da Coleção",
+    emoji: "👑",
+    price: 0,
+    type: "especial",
+    premium: false,
+  },
 ];
+
+/** O troféu que coroa a coleção completa (concedido, nunca comprado). */
+export const CANTINHO_COMPLETIONIST_ID = "especial-colecao";
+
+/**
+ * Itens exigidos pra desbloquear o troféu: os da loja COMUM (preço > 0, não
+ * premium). Reachable por qualquer paciente dedicada — o troféu premia
+ * dedicação, não assinatura. Os premium seguem sendo extras opcionais.
+ */
+export const CANTINHO_COMPLETION_REQUIRED: string[] = CANTINHO_ITEMS.filter(
+  (i) => i.price > 0 && !i.premium && i.id !== CANTINHO_COMPLETIONIST_ID,
+).map((i) => i.id);
+
+/** True quando a paciente possui todos os itens exigidos pra coleção. */
+export function isCantinhoCollectionComplete(ownedIds: Iterable<string>): boolean {
+  const owned = ownedIds instanceof Set ? ownedIds : new Set(ownedIds);
+  return CANTINHO_COMPLETION_REQUIRED.every((id) => owned.has(id));
+}
 
 export const CANTINHO_BY_ID: Record<string, CantinhoItem> = Object.fromEntries(
   CANTINHO_ITEMS.map((i) => [i.id, i]),
