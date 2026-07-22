@@ -7,4 +7,4 @@ Disallow: /auth
 Disallow: /painel
 Disallow: /minha-conta
 
-Sitemap: https://obstetricia.drclovisbacha.com.br/sitemap.xml
+Sitemap: https://www.obstetrica.com.br/sitemap.xml

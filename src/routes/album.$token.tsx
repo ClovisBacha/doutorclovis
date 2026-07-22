@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { getAlbumByToken, addAlbumPostPublic, type AlbumPost } from "@/lib/family.functions";
 
 export const Route = createFileRoute("/album/$token")({
   head: () => ({
     meta: [
-      { title: "Álbum Familiar — Obstétrica by Dr. Clóvis" },
+      { title: "Álbum Familiar — Obstétrica" },
       { name: "description", content: "Álbum de memórias da gestação." },
     ],
   }),
@@ -32,14 +33,19 @@ function AlbumPage() {
 
   async function load() {
     setLoading(true);
-    const res = await getAlbumByToken({ data: { token } });
-    if (!res.ok) {
-      setError(res.error ?? "Erro desconhecido.");
+    try {
+      const res = await getAlbumByToken({ data: { token } });
+      if (!res.ok) {
+        setError(res.error ?? "Erro desconhecido.");
+        return;
+      }
+      setPosts(res.posts);
+    } catch {
+      // Falha de rede: sem isso a tela ficava em "Carregando álbum..." p/ sempre.
+      setError("Não foi possível carregar o álbum. Verifique a conexão e recarregue.");
+    } finally {
       setLoading(false);
-      return;
     }
-    setPosts(res.posts);
-    setLoading(false);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -67,25 +73,33 @@ function AlbumPage() {
   async function handleSubmit() {
     if (!authorName.trim()) return;
     setSubmitting(true);
-    const res = await addAlbumPostPublic({
-      data: {
-        token,
-        authorName: authorName.trim(),
-        caption: caption || null,
-        imageData,
-        emoji: emoji || null,
-      },
-    });
-    if (res.ok) {
-      setCaption("");
-      setEmoji("");
-      setImageData(null);
-      if (fileRef.current) fileRef.current.value = "";
-      setSubmitted(true);
-      await load();
-      setTimeout(() => setSubmitted(false), 3000);
+    try {
+      const res = await addAlbumPostPublic({
+        data: {
+          token,
+          authorName: authorName.trim(),
+          caption: caption || null,
+          imageData,
+          emoji: emoji || null,
+        },
+      });
+      if (res.ok) {
+        setCaption("");
+        setEmoji("");
+        setImageData(null);
+        if (fileRef.current) fileRef.current.value = "";
+        setSubmitted(true);
+        await load();
+        setTimeout(() => setSubmitted(false), 3000);
+      } else {
+        toast.error(res.error ?? "Não foi possível publicar. Tente de novo.");
+      }
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      // Antes, um throw deixava o botão preso em "Salvando..." para sempre.
+      setSubmitting(false);
     }
-    setSubmitting(false);
   }
 
   if (loading) {

@@ -70,7 +70,7 @@ export const LEVEL_FALLBACK: Record<RiskLevel, string> = {
   vermelho:
     "Os sinais que você marcou podem ser graves na gestação. Procure atendimento agora: ligue 192 (SAMU) ou vá ao pronto-socorro/maternidade mais próxima. Não espere.",
   amarelo:
-    "Os sinais que você marcou merecem atenção. Entre em contato com o consultório do Dr. Clóvis ainda hoje para avaliar. Se piorar, procure atendimento.",
+    "Os sinais que você marcou merecem atenção. Entre em contato com o consultório do seu médico ainda hoje para avaliar. Se piorar, procure atendimento.",
   verde:
     "Você não marcou sinais de alerta. Continue o acompanhamento pré-natal normalmente e registre como está se sentindo. Qualquer dúvida, fale com o consultório.",
 };

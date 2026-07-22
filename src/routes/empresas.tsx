@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { submitCorporateLead } from "@/lib/corporativo.functions";
 import { DOCTOR } from "@/lib/doctor.config";
+import { PricingGlass, type PricingGlassTier } from "@/components/ui/pricing-glass";
 
 export const Route = createFileRoute("/empresas")({
   head: () => ({
     meta: [
-      { title: "Benefício Corporativo — Obstétrica by Dr. Clóvis" },
+      { title: "Benefício Corporativo — Obstétrica" },
       {
         name: "description",
         content:
@@ -44,7 +45,7 @@ const PLANS = [
       "Escola do Bebê (12 módulos)",
       "Portal da família / álbum",
       "Pós-parto e marcos do bebê",
-      "Relatórios de engajamento",
+      "Relatórios de engajamento (em breve)",
       "Suporte prioritário",
     ],
   },
@@ -58,8 +59,8 @@ const PLANS = [
       "Tudo do Standard",
       "Consultas particulares com desconto",
       "Teleconsulta dedicada",
-      "Dashboard de saúde para RH",
-      "Relatório de Alta Pré-natal",
+      "Dashboard de saúde para RH (em breve)",
+      "Relatório de Alta Pré-natal (em breve)",
       "Gerente de conta dedicado",
     ],
   },
@@ -90,41 +91,31 @@ function EmpresasPage() {
     if (!form.companyName || !form.contactName || !form.contactEmail) return;
     setSubmitting(true);
     setError(null);
-    const res = await submitCorporateLead({
-      data: {
-        companyName: form.companyName,
-        contactName: form.contactName,
-        contactEmail: form.contactEmail,
-        contactPhone: form.contactPhone || null,
-        employeeCount: form.employeeCount || null,
-        message: form.message || null,
-      },
-    });
-    setSubmitting(false);
-    if (res.ok) {
-      setSubmitted(true);
-    } else {
-      setError(res.error ?? "Erro ao enviar. Tente novamente.");
+    try {
+      const res = await submitCorporateLead({
+        data: {
+          companyName: form.companyName,
+          contactName: form.contactName,
+          contactEmail: form.contactEmail,
+          contactPhone: form.contactPhone || null,
+          employeeCount: form.employeeCount || null,
+          message: form.message || null,
+        },
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        setError(res.error ?? "Erro ao enviar. Tente novamente.");
+      }
+    } catch {
+      setError("Erro de conexão. Tente novamente em instantes.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <div className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
-          <Link to="/" className="font-serif text-lg font-semibold text-primary">
-            Dr. Clóvis Bacha
-          </Link>
-          <a
-            href="#contato"
-            className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
-          >
-            Solicitar proposta
-          </a>
-        </div>
-      </div>
-
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-background to-background py-24 px-5">
         <div className="mx-auto max-w-3xl text-center">
@@ -136,13 +127,12 @@ function EmpresasPage() {
           </h1>
           <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
             Ofereça às suas funcionárias grávidas o acompanhamento pré-natal mais completo do
-            Brasil, com tecnologia e a expertise do Dr. Clóvis Bacha — especialista em gestação de
-            alto risco.
+            Brasil, com tecnologia e a expertise de especialistas em gestação de alto risco.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a
               href="#contato"
-              className="rounded-full bg-primary px-8 py-3 text-sm font-semibold text-white hover:opacity-90"
+              className="rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
               Solicitar demonstração grátis
             </a>
@@ -177,12 +167,12 @@ function EmpresasPage() {
               {
                 emoji: "📊",
                 title: "ROI mensurável",
-                desc: "Painel de engajamento para RH acompanhar uso, satisfação e wellbeing das funcionárias gestantes.",
+                desc: "Relatórios de engajamento e uso para o RH acompanhar o programa das funcionárias gestantes (em desenvolvimento).",
               },
               {
                 emoji: "⚕️",
                 title: "Médico especialista",
-                desc: "Dr. Clóvis Bacha é especialista em gestação de alto risco com mais de 20 anos de experiência.",
+                desc: "Cada gestante é acompanhada pelo próprio obstetra, com o suporte de especialistas em gestação de alto risco.",
               },
               {
                 emoji: "📱",
@@ -206,48 +196,35 @@ function EmpresasPage() {
       </section>
 
       {/* Plans */}
-      <section id="planos" className="py-20 px-5 bg-secondary/20">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="font-serif text-3xl text-center mb-3">Planos</h2>
-          <p className="text-center text-muted-foreground mb-12">
+      <section
+        id="planos"
+        className="relative overflow-hidden px-5 py-24 text-white"
+        style={{
+          background: "radial-gradient(120% 90% at 50% 0%, #2a151a 0%, #1a0e12 45%, #120a0d 100%)",
+        }}
+      >
+        <div className="relative z-10 mx-auto max-w-6xl">
+          <h2 className="mb-3 text-center font-serif text-3xl text-white">Planos</h2>
+          <p className="mb-4 text-center text-white/60">
             Preços mensais com faturamento anual. Todos os planos incluem onboarding gratuito.
           </p>
-          <div className="grid gap-6 md:grid-cols-3">
-            {PLANS.map((plan) => (
-              <div
-                key={plan.key}
-                className={`relative rounded-3xl border-2 bg-card p-8 ${plan.color} ${plan.highlight ? "shadow-lg shadow-primary/10" : ""}`}
-              >
-                {plan.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold text-white">
-                    Mais popular
-                  </div>
-                )}
-                <p className="font-serif text-xl mb-1">{plan.name}</p>
-                <p className="text-3xl font-bold text-primary mb-1">{plan.price}</p>
-                <p className="text-xs text-muted-foreground mb-6">{plan.seats}</p>
-                <ul className="space-y-2 mb-8">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm">
-                      <span className="text-primary mt-0.5">✓</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <a
-                  href="#contato"
-                  className={`block w-full rounded-full py-2.5 text-center text-sm font-semibold transition-all ${
-                    plan.highlight
-                      ? "bg-primary text-white hover:opacity-90"
-                      : "border border-border hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  Contratar
-                </a>
-              </div>
-            ))}
-          </div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
+          {(() => {
+            const glassTiers: PricingGlassTier[] = PLANS.map((plan) => {
+              const match = plan.price.match(/R\$\s*([\d.]+)/);
+              return {
+                name: plan.name,
+                tagline: plan.seats,
+                price: match ? match[1] : plan.price,
+                period: "/mês",
+                isPopular: !!plan.highlight,
+                features: plan.features,
+                ctaLabel: "Contratar",
+                ctaHref: "#contato",
+              };
+            });
+            return <PricingGlass tiers={glassTiers} />;
+          })()}
+          <p className="mt-8 text-center text-xs text-white/50">
             Precisa de mais vagas ou plano personalizado? Entre em contato — temos soluções sob
             medida.
           </p>
@@ -365,16 +342,6 @@ function EmpresasPage() {
           )}
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-8 px-5 text-center text-xs text-muted-foreground">
-        <p>
-          © {new Date().getFullYear()} {DOCTOR.name} · {DOCTOR.title} · {DOCTOR.crm}
-        </p>
-        <Link to="/" className="mt-2 block text-primary hover:underline">
-          Voltar ao site
-        </Link>
-      </footer>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { SpotlightCard } from "@/components/motion-fx";
 export const Route = createFileRoute("/mitos")({
   head: () => ({
     meta: [
-      { title: "Mitos x Verdades na gestação — Obstétrica by Dr. Clóvis" },
+      { title: "Mitos x Verdades na gestação — Obstétrica" },
       {
         name: "description",
         content: "Desfazendo crenças comuns sobre a gestação com base em evidências científicas.",
@@ -64,9 +64,28 @@ const cards = [
   },
 ];
 
+// FAQPage — faz o Google exibir estas perguntas já expandidas no resultado da
+// busca ("resultado rico"). Derivado do mesmo array acima para nunca divergir.
+const faqLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: cards.map((c) => ({
+    "@type": "Question",
+    name: `${c.afirma}: mito ou verdade?`,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: `${c.verdade ? "Verdade" : "Mito"}. ${c.exp}`,
+    },
+  })),
+};
+
 function MitosPage() {
   return (
     <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
+      />
       <Reveal variant="blur">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Educativo</p>
       </Reveal>

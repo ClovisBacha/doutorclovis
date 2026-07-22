@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { registerDoctor } from "@/lib/doctors.functions";
+import { registerDoctor, getMyDoctor } from "@/lib/doctors.functions";
+import { GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/medicos_/cadastro")({
   head: () => ({
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/medicos_/cadastro")({
   component: CadastroMedicoPage,
 });
 
-type Step = "auth" | "perfil";
+type Step = "auth" | "perfil" | "confirm-email" | "pronto";
 
 function CadastroMedicoPage() {
   const navigate = useNavigate();
@@ -28,6 +29,9 @@ function CadastroMedicoPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  // Sessão pré-existente (ex.: conta de paciente): confirmar a intenção antes
+  // de criar um perfil de médico por cima da mesma conta.
+  const [existingSession, setExistingSession] = useState<string | null>(null);
 
   const [profile, setProfile] = useState({
     display_name: "",
@@ -38,12 +42,38 @@ function CadastroMedicoPage() {
     pix_key: "",
   });
 
-  // Já logado? Pula direto para o perfil profissional
+  // Já logado? Médico ativo vai direto ao painel (ex.: login com Google);
+  // senão mostra o perfil profissional, avisando qual conta está em uso e
+  // oferecendo trocar — evita paciente virando "médico" sem perceber.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setStep("perfil");
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!data.session) return;
+      try {
+        const me = await getMyDoctor({ data: { accessToken: data.session.access_token } });
+        if (me.ok && me.doctor?.active) {
+          navigate({ to: "/painel" });
+          return;
+        }
+      } catch {
+        /* sem rede/perfil: segue para a etapa de perfil */
+      }
+      setExistingSession(data.session.user.email ?? "sua conta atual");
+      // Pré-preenche o nome com o do Google, se veio no cadastro social.
+      const gName =
+        (data.session.user.user_metadata?.full_name as string | undefined) ??
+        (data.session.user.user_metadata?.name as string | undefined) ??
+        "";
+      if (gName) setProfile((p) => (p.display_name ? p : { ...p, display_name: gName }));
+      setStep("perfil");
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function switchAccount() {
+    await supabase.auth.signOut();
+    setExistingSession(null);
+    setStep("auth");
+  }
 
   async function submitAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -90,7 +120,8 @@ function CadastroMedicoPage() {
       }
       const { data } = await supabase.auth.getSession();
       if (!data.session) {
-        toast.success("Confira seu e-mail para confirmar a conta e volte para continuar.");
+        // Confirmação de e-mail ativa: um toast some — a tela precisa ficar.
+        setStep("confirm-email");
         return;
       }
       setStep("perfil");
@@ -115,15 +146,41 @@ function CadastroMedicoPage() {
         setStep("auth");
         return;
       }
+      // Indicação: ?ref=<doctorId> na URL vira o médico que indicou.
+      const ref =
+        typeof window !== "undefined"
+          ? (new URLSearchParams(window.location.search).get("ref") ?? undefined)
+          : undefined;
+      // Convite de PACIENTE (obst_doc_invite): +15% no checkout p/ o médico
+      // e Premium para ela quando ele assinar — validado no servidor.
+      let patientInvite: string | undefined;
+      try {
+        const raw = localStorage.getItem("obst_doc_invite");
+        if (raw) {
+          const parsed = JSON.parse(raw) as { code?: string; at?: number };
+          if (parsed?.code && Date.now() - (parsed.at ?? 0) < 90 * 86400000)
+            patientInvite = parsed.code;
+        }
+      } catch {
+        /* sem storage, sem convite */
+      }
       const res = await registerDoctor({
-        data: { accessToken: s.session.access_token, profile },
+        data: {
+          accessToken: s.session.access_token,
+          profile,
+          ref: ref || undefined,
+          ...(patientInvite ? { patientInvite } : {}),
+        },
       });
       if (!res.ok) {
-        toast.error("Não foi possível criar seu perfil. Tente novamente.");
+        toast.error(
+          "error" in res && res.error
+            ? `Não foi possível criar seu perfil: ${res.error}`
+            : "Não foi possível criar seu perfil. Tente novamente.",
+        );
         return;
       }
-      toast.success("Bem-vindo(a)! Seu consultório digital está pronto. 🎉");
-      navigate({ to: "/painel" });
+      setStep("pronto");
     } catch {
       toast.error("Falha de conexão — tente novamente.");
     } finally {
@@ -150,26 +207,110 @@ function CadastroMedicoPage() {
             : "É com esses dados que suas pacientes vão te encontrar."}
         </p>
 
-        {/* Etapas */}
-        <div className="mt-6 flex items-center justify-center gap-2 text-xs font-semibold">
-          <span
-            className={`rounded-full px-3 py-1 ${step === "auth" ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary"}`}
-          >
-            1. Conta
-          </span>
-          <span className="h-px w-6 bg-border" />
-          <span
-            className={`rounded-full px-3 py-1 ${step === "perfil" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
-          >
-            2. Perfil médico
-          </span>
-        </div>
+        {/* Etapas (só nos passos de formulário) */}
+        {(step === "auth" || step === "perfil") && (
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs font-semibold">
+            <span
+              className={`rounded-full px-3 py-1 ${step === "auth" ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary"}`}
+            >
+              1. Conta
+            </span>
+            <span className="h-px w-6 bg-border" />
+            <span
+              className={`rounded-full px-3 py-1 ${step === "perfil" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
+            >
+              2. Perfil médico
+            </span>
+          </div>
+        )}
+
+        {step === "confirm-email" && (
+          <div className="mt-8 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-4xl">📬</p>
+            <h2 className="mt-3 font-serif text-xl">Confirme seu e-mail</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Enviamos um link de confirmação para <strong>{email}</strong>. Clique nele e volte a
+              esta página para continuar o cadastro do seu consultório.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="press mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground"
+            >
+              Já confirmei — continuar
+            </button>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Não chegou? Olhe o spam ou{" "}
+              <button
+                type="button"
+                onClick={() => setStep("auth")}
+                className="font-semibold text-primary hover:underline"
+              >
+                tente outro e-mail
+              </button>
+              .
+            </p>
+          </div>
+        )}
+
+        {step === "pronto" && (
+          <div className="mt-8 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-4xl">🎉</p>
+            <h2 className="mt-3 font-serif text-xl">Seu painel já está ativo!</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Seus <strong>14 dias grátis</strong> começaram agora. Você já pode entrar no painel,
+              treinar a sua IA (Segundo Cérebro), abrir a agenda e convidar suas pacientes — sem
+              esperar por ninguém.
+            </p>
+            <div className="mt-5 space-y-2 rounded-2xl bg-secondary/50 p-4 text-left text-xs text-muted-foreground">
+              <p>✅ Conta e perfil profissional criados</p>
+              <p>✅ Painel liberado — trial de 14 dias ativo</p>
+              <p>👉 Agora: treine sua IA e convide suas pacientes pelo painel</p>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/painel" })}
+                className="press glow-cta rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground"
+              >
+                Abrir meu painel →
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/" })}
+                className="press rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:border-primary hover:text-primary"
+              >
+                Conhecer o app da paciente
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === "perfil" && existingSession && (
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-xs text-amber-800">
+            Você está conectado como <strong>{existingSession}</strong>. O perfil de médico será
+            criado nesta conta.{" "}
+            <button
+              type="button"
+              onClick={switchAccount}
+              className="font-semibold text-amber-900 underline"
+            >
+              Usar outra conta
+            </button>
+          </div>
+        )}
 
         {step === "auth" ? (
           <form
             onSubmit={submitAuth}
             className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
           >
+            <GoogleButton role="medico" />
+            <p className="-mt-1 text-[11px] text-muted-foreground">
+              Com o Google seu e-mail já fica conectado — as teleconsultas caem na sua Agenda Google
+              automaticamente.
+            </p>
+            <OrDivider />
             <div>
               <label className={label}>E-mail profissional</label>
               <input
@@ -210,7 +351,7 @@ function CadastroMedicoPage() {
               </button>
             </p>
           </form>
-        ) : (
+        ) : step === "perfil" ? (
           <form
             onSubmit={submitPerfil}
             className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
@@ -282,7 +423,7 @@ function CadastroMedicoPage() {
               ficam protegidos por Row Level Security e LGPD.
             </p>
           </form>
-        )}
+        ) : null}
       </div>
     </main>
   );

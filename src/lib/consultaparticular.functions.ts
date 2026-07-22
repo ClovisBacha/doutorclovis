@@ -1,10 +1,37 @@
+import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
 
+/** Gate: médico assinante ativo — dono do próprio tenant de consultas pagas. */
+async function requireDoctor(accessToken: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: u, error } = await supabaseAdmin.auth.getUser(accessToken);
+  if (error || !u.user) return null;
+  const { data: doc } = await (supabaseAdmin as any)
+    .from("doctors")
+    .select("id,active")
+    .eq("id", u.user.id)
+    .maybeSingle();
+  if (!doc || doc.active === false) return null;
+  return u.user;
+}
+
+/** Resolve o médico da paciente logada (patient_profiles.doctor_id). */
+async function patientDoctorId(userId: string): Promise<string | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: p } = await (supabaseAdmin as any)
+    .from("patient_profiles")
+    .select("doctor_id")
+    .eq("id", userId)
+    .maybeSingle();
+  return p?.doctor_id ?? null;
+}
+
 export type PrivateConsultation = {
   id: string;
   patient_user_id: string;
+  doctor_id: string | null;
   consult_type: string;
   preferred_dates: string[];
   message: string | null;
@@ -57,6 +84,14 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
 
+    // Kill switch (feature flag): o dono pode desligar consultas particulares.
+    const { isFlagEnabled } = await import("@/lib/platform-flags.server");
+    if (!(await isFlagEnabled("consulta_particular", u.user.id)))
+      return {
+        ok: false as const,
+        error: "Consultas particulares estão temporariamente indisponíveis.",
+      };
+
     const consultType = CONSULT_TYPES.find((ct) => ct.key === data.consultType);
     const amount = consultType?.priceNumber ?? 0;
 
@@ -77,7 +112,7 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
           },
           body: JSON.stringify({
             transaction_amount: amount,
-            description: `${consultType?.label ?? data.consultType} — Dr. Clóvis Bacha`,
+            description: `${consultType?.label ?? data.consultType} — ${DOCTOR.name}`,
             payment_method_id: "pix",
             payer: { email: u.user.email },
           }),
@@ -98,22 +133,30 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
       }
     }
 
-    const { data: row, error } = await db
+    // Vincula a consulta ao médico da paciente (recorte multi-inquilino).
+    const doctorId = await patientDoctorId(u.user.id);
+    const baseRow = {
+      patient_user_id: u.user.id,
+      consult_type: data.consultType,
+      preferred_dates: data.preferredDates,
+      message: data.message,
+      mp_payment_id: mpPaymentId,
+      pix_qr_code: pixQrCode,
+      pix_qr_code_base64: pixQrCodeBase64,
+      amount_cents: Math.round(amount * 100),
+    };
+    let ins = await db
       .from("private_consultations")
-      .insert({
-        patient_user_id: u.user.id,
-        consult_type: data.consultType,
-        preferred_dates: data.preferredDates,
-        message: data.message,
-        mp_payment_id: mpPaymentId,
-        pix_qr_code: pixQrCode,
-        pix_qr_code_base64: pixQrCodeBase64,
-        amount_cents: Math.round(amount * 100),
-      })
+      .insert({ ...baseRow, doctor_id: doctorId })
       .select()
       .single();
-    if (error) return { ok: false as const, error: error.message };
-    return { ok: true as const, consultation: row as PrivateConsultation };
+    // Migração pendente (coluna doctor_id ainda não aplicada): não deixa a
+    // paciente na mão — insere sem o recorte e o backfill vincula depois.
+    if (ins.error && (ins.error.code === "42703" || ins.error.code === "PGRST204")) {
+      ins = await db.from("private_consultations").insert(baseRow).select().single();
+    }
+    if (ins.error) return { ok: false as const, error: ins.error.message };
+    return { ok: true as const, consultation: ins.data as PrivateConsultation };
   });
 
 export const getMyPrivateConsultations = createServerFn({ method: "POST" })
@@ -149,24 +192,29 @@ export const markPaymentSent = createServerFn({ method: "POST" })
     return { ok: !error };
   });
 
-export const getPrivateConsultationsAdmin = createServerFn({ method: "POST" })
+/**
+ * Painel do médico: as consultas pagas das SUAS pacientes (recorte por
+ * doctor_id). Cada médico administra o próprio fluxo de consultas particulares.
+ */
+export const getPrivateConsultationsForDoctor = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
+    const user = await requireDoctor(data.accessToken);
+    if (!user) return { ok: false as const, error: "Não autorizado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = typedDb(supabaseAdmin);
-    const adminEmails = (process.env.ADMIN_EMAILS || "")
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
-    if (!u.user?.email || !adminEmails.includes(u.user.email.toLowerCase()))
-      return { ok: false as const, error: "Não autorizado" };
     // Sem FK entre private_consultations e patient_profiles, o embed do
     // PostgREST falha (PGRST200) — buscamos os nomes em uma segunda query.
     const { data: rows, error } = await db
       .from("private_consultations")
       .select("*")
+      .eq("doctor_id", user.id)
       .order("created_at", { ascending: false });
+    if (error?.code === "42703" || error?.code === "42P01")
+      return {
+        ok: false as const,
+        error: "Aplique a migração de consultas (APLICAR_PENDENTES.sql) no Supabase.",
+      };
     if (error) return { ok: false as const, error: error.message };
     const userIds = [...new Set((rows ?? []).map((r: any) => r.patient_user_id))];
     const nameById = new Map<string, string | null>();
@@ -185,7 +233,8 @@ export const getPrivateConsultationsAdmin = createServerFn({ method: "POST" })
     return { ok: true as const, consultations: consultations as any[] };
   });
 
-export const confirmPaymentAdmin = createServerFn({ method: "POST" })
+/** Médico confirma/cancela o pagamento — só das SUAS consultas (doctor_id). */
+export const confirmPaymentForDoctor = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
       .object({
@@ -196,18 +245,14 @@ export const confirmPaymentAdmin = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data }) => {
+    const user = await requireDoctor(data.accessToken);
+    if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = typedDb(supabaseAdmin);
-    const adminEmails = (process.env.ADMIN_EMAILS || "")
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
-    if (!u.user?.email || !adminEmails.includes(u.user.email.toLowerCase()))
-      return { ok: false as const };
     const { error } = await db
       .from("private_consultations")
       .update({ status: data.status })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("doctor_id", user.id);
     return { ok: !error };
   });

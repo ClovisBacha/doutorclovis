@@ -1,12 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
+import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
+import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
+import { claimDailyAndGetWallet, grantLessonReward } from "@/lib/sementinhas.functions";
+import { getCantinho } from "@/lib/cantinho.functions";
+import { CANTINHO_BY_ID, CANTINHO_FUNDO_BG } from "@/lib/cantinho";
+
+/** Hash estável de string → número (posiciona decorações de forma determinística). */
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+import {
+  quizForDay,
+  quizEmojiForDay,
+  isAnswerCorrect,
+  isMultiQuestion,
+  type DailyQuiz,
+} from "@/lib/daily-quizzes";
+import { DOCTOR } from "@/lib/doctor.config";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
 interface GestacaoPathProps {
   profile: { baby_name: string | null } | null;
   gest: Gest;
+  /** Premium do quiz: revisão de qualquer aula liberada (grátis = só a de hoje). */
+  quizPremium?: boolean;
+  /** Modo Cuidado: silencia confete, comemorações, streak e a tela de nascimento. */
+  careMode?: boolean;
+  /** Abre o Cantinho (lojinha das Sementinhas). */
+  onOpenShop?: () => void;
 }
 
 /* ══════════════════════════ FASES (7 semanas cada) ══════════════════════════ */
@@ -212,13 +238,13 @@ function challengeForPosDay(D: number): Challenge {
 
 const POSDATA_GUIDANCE =
   "Pós-data: consultas 2x por semana com cardiotocografia e avaliação do líquido amniótico. " +
-  "Converse com o Dr. Clóvis sobre o planejamento da indução. Conte os movimentos do bebê " +
+  "Converse com o seu médico sobre o planejamento da indução. Conte os movimentos do bebê " +
   "todos os dias — se diminuírem, vá direto à maternidade.";
 
 const POS_GUIDANCE: Record<number, string> = {
   1: "Descanso e amamentação em livre demanda. Teste do pezinho entre o 3º e o 5º dia. Agende a revisão pós-parto (7–10 dias).",
   2: "Atenção aos sinais de alerta: febre, sangramento intenso, dor forte ou tristeza persistente. Se a amamentação doer, procure ajuda com a pega.",
-  3: "Baby blues costuma passar até aqui. Se a tristeza persistir ou piorar, faça o check-in emocional e fale com o Dr. Clóvis — você não está sozinha.",
+  3: "Baby blues costuma passar até aqui. Se a tristeza persistir ou piorar, faça o check-in emocional e fale com o seu médico — você não está sozinha.",
   4: "Agende a consulta puerperal completa (30–40 dias): revisão geral, contracepção e liberação de atividades.",
   5: "As vacinas de 2 meses do bebê estão chegando — deixe agendadas (penta, VIP, pneumo 10, rotavírus).",
   6: "Consulta puerperal em dia? É nela que se libera exercício físico e se define contracepção. Cuide também do seu sono.",
@@ -249,6 +275,7 @@ const LS = {
   posDoneDays: "dc-path-pos-done-days",
   dayTasks: (d: number) => `dc-path-day-${d}`,
   posDayTasks: (d: number) => `dc-path-pos-day-${d}`,
+  lessons: "dc-path-lessons",
   welcomed: "dc-path-welcomed",
   birth: "dc-path-birth",
   celebrated: "dc-path-birth-celebrated",
@@ -263,12 +290,21 @@ export function lsGet<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
+let warnedStorageBlocked = false;
+
 export function lsSet(key: string, value: unknown) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* quota/privado */
+    // Modo privado/cota cheia: o progresso local não está sendo salvo.
+    // Avisa UMA vez em vez de falhar em silêncio.
+    if (!warnedStorageBlocked) {
+      warnedStorageBlocked = true;
+      toast.error(
+        "Seu navegador está bloqueando o salvamento local — o progresso do dia pode se perder. Evite o modo anônimo.",
+      );
+    }
   }
   // A jornada pertence ao PERFIL da paciente, não ao aparelho: cada escrita
   // agenda uma sincronização do estado completo para journey_state no Supabase
@@ -349,33 +385,122 @@ function scheduleJourneySync() {
   }, 1500);
 }
 
+/* ── Merge granular na hidratação (evita reverter progresso não sincronizado) ──
+ *
+ * O blob inteiro é last-write-wins, mas os dados de PROGRESSO só crescem: dias
+ * feitos, figurinhas, notas de lição e os checks de cada dia nunca "desfazem".
+ * Se o aparelho fez um desafio offline e a nuvem (de outro aparelho) ficou mais
+ * recente, um overwrite cego apagaria esse desafio. Por isso, no pull, esses
+ * campos são UNIDOS (local ∪ nuvem); só o estado de fato mutável (nascimento,
+ * início da jornada, check-in do dia) segue LWW com a nuvem vencendo. */
+
+const UNION_ARRAY_KEYS = new Set([
+  "dc-path-done-days",
+  "dc-path-pos-done-days",
+  "dc-path-stickers",
+  "dc-path-pos-stickers",
+]);
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Combina o valor local com o da nuvem para uma chave da jornada. */
+export function mergeJourneyValue(key: string, local: unknown, cloud: unknown): unknown {
+  // Arrays append-only (dias feitos, figurinhas) → união ordenada.
+  if (UNION_ARRAY_KEYS.has(key)) {
+    if (Array.isArray(local) && Array.isArray(cloud)) {
+      return Array.from(new Set([...local, ...cloud])).sort((a, b) => a - b);
+    }
+    return cloud;
+  }
+  // Notas das lições (semana → nota 0–100) → maior nota vence.
+  if (key === "dc-path-lessons") {
+    if (isPlainObject(local) && isPlainObject(cloud)) {
+      const out: Record<string, unknown> = { ...cloud };
+      for (const [w, v] of Object.entries(local)) {
+        const cur = out[w];
+        if (typeof v === "number" && (typeof cur !== "number" || v > cur)) out[w] = v;
+      }
+      return out;
+    }
+    return cloud;
+  }
+  // Tarefas de cada dia (humor/desafio/leitura) → OR: uma vez feito, feito.
+  if (/^dc-path-(pos-)?day-\d+$/.test(key)) {
+    if (isPlainObject(local) && isPlainObject(cloud)) {
+      const out: Record<string, unknown> = { ...cloud };
+      for (const [t, v] of Object.entries(local)) if (v) out[t] = true;
+      return out;
+    }
+    return cloud;
+  }
+  // Demais chaves (nascimento, início, check-in, welcomed, premium-pending):
+  // mutáveis → a nuvem (mais recente) vence, como antes.
+  return cloud;
+}
+
 /**
  * Baixa a jornada do perfil e hidrata o localStorage quando a nuvem estiver
- * mais recente que a última sincronização deste aparelho (last-write-wins).
- * Retorna true quando hidratou algo (o chamador re-lê os estados).
+ * mais recente que a última sincronização deste aparelho. Faz merge granular
+ * (união do progresso; LWW no estado mutável) e tenta de novo se a rede falhar
+ * — num aparelho novo, o game não pode ficar "zerado" por uma falha de rede.
+ * Retorna true quando hidratou/mesclou algo (o chamador re-lê os estados).
  */
-async function pullJourneyFromProfile(): Promise<boolean> {
+async function pullJourneyFromProfile(retries = 2): Promise<boolean> {
   if (typeof window === "undefined") return false;
-  try {
-    const { supabase } = await import("@/integrations/supabase/client");
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return false;
-    const { data: row, error } = await (supabase as any)
-      .from("journey_state")
-      .select("data,updated_at")
-      .eq("user_id", u.user.id)
-      .maybeSingle();
-    if (error || !row?.data) return false;
-    const localMark = lsGet<string>(SYNC_MARKER, "");
-    if (localMark && localMark >= row.updated_at) return false; // aparelho já em dia
-    for (const [k, v] of Object.entries(row.data as Record<string, unknown>)) {
-      if (!k.startsWith(JOURNEY_PREFIX)) continue; // só chaves da jornada
-      localStorage.setItem(k, JSON.stringify(v));
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const { data: row, error } = await (supabase as any)
+        .from("journey_state")
+        .select("data,updated_at")
+        .eq("user_id", u.user.id)
+        .maybeSingle();
+      if (error) throw error; // rede/servidor: tenta de novo
+      if (!row?.data) return false; // sem jornada na nuvem (não é erro)
+      const localMark = lsGet<string>(SYNC_MARKER, "");
+      if (localMark && localMark >= row.updated_at) return false; // já em dia
+      const cloudData = row.data as Record<string, unknown>;
+      const keys = new Set<string>();
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(JOURNEY_PREFIX)) keys.add(k);
+      }
+      for (const k of Object.keys(cloudData)) if (k.startsWith(JOURNEY_PREFIX)) keys.add(k);
+      let localHadExtra = false; // o merge preservou algo que a nuvem não tinha?
+      for (const k of keys) {
+        const cloudHas = Object.prototype.hasOwnProperty.call(cloudData, k);
+        if (!cloudHas) {
+          localHadExtra = true; // chave só local: progresso não sincronizado
+          continue; // já está no localStorage — preserva
+        }
+        const localRaw = localStorage.getItem(k);
+        const localVal = localRaw != null ? safeParse(localRaw) : undefined;
+        const merged = mergeJourneyValue(k, localVal, cloudData[k]);
+        const mergedStr = JSON.stringify(merged);
+        if (mergedStr !== JSON.stringify(cloudData[k])) localHadExtra = true;
+        localStorage.setItem(k, mergedStr);
+      }
+      localStorage.setItem(SYNC_MARKER, JSON.stringify(row.updated_at));
+      // Se o merge manteve dados ausentes na nuvem, empurra de volta para ela
+      // convergir (senão o progresso ficaria só neste aparelho).
+      if (localHadExtra) scheduleJourneySync();
+      return true;
+    } catch {
+      if (attempt >= retries) return false;
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
     }
-    localStorage.setItem(SYNC_MARKER, JSON.stringify(row.updated_at));
-    return true;
+  }
+}
+
+function safeParse(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
   } catch {
-    return false;
+    return undefined;
   }
 }
 
@@ -510,11 +635,16 @@ const IDAY_ROW = 104;
 const IALBUM_ROW = 112;
 const IWEEK_HEADER = 72; // folga para o balão "Desafio de hoje" não cobrir o pill da semana
 const IBANNER_ROW = 120;
+const ILESSON_ROW = 116;
+
+/** Semana → lição da Escola do Bebê (o aprendizado agora vive DENTRO do caminho). */
+const LESSON_BY_WEEK = new Map<number, CourseModule>(COURSE_MODULES.map((m) => [m.week, m]));
 
 type JourneyNode =
   | PathNode
   | { kind: "phase-banner"; phase: Phase; y: number }
-  | { kind: "mascot"; emoji: string; y: number; x: number };
+  | { kind: "mascot"; emoji: string; y: number; x: number }
+  | { kind: "lesson"; week: number; y: number; x: number; row: number };
 
 const MASCOTS = ["🧸", "🦢", "🌷", "🍼", "🐘", "🌈", "🐥", "🧦"];
 
@@ -562,6 +692,14 @@ function buildFullJourney(
           y += IDAY_ROW;
           row++;
         }
+      }
+      // Lição da semana (Escola do Bebê) — uma moeda especial no próprio caminho,
+      // logo após os dias da semana: aprender faz parte da jornada.
+      if (LESSON_BY_WEEK.has(w)) {
+        const x = xOf(row);
+        nodes.push({ kind: "lesson", week: w, y: y + ILESSON_ROW / 2, x, row });
+        y += ILESSON_ROW;
+        row++;
       }
     }
   }
@@ -641,13 +779,19 @@ function BabyFootprint({ color }: { color: string }) {
 }
 
 /** Gera as pegadas entre pares consecutivos de nós já percorridos. */
-function buildFootsteps(nodes: JourneyNode[], doneDays: number[], pathWidthPx: number): Footstep[] {
+function buildFootsteps(
+  nodes: JourneyNode[],
+  doneDays: number[],
+  lessonsDoneWeeks: number[],
+  pathWidthPx: number,
+): Footstep[] {
   const walkable = nodes.filter(
-    (n): n is Extract<JourneyNode, { kind: "day" | "album-week" }> =>
-      n.kind === "day" || n.kind === "album-week",
+    (n): n is Extract<JourneyNode, { kind: "day" | "album-week" | "lesson" }> =>
+      n.kind === "day" || n.kind === "album-week" || n.kind === "lesson",
   );
   const walked = (n: (typeof walkable)[number]) =>
-    n.kind === "album-week" || doneDays.includes(n.D);
+    n.kind === "album-week" ||
+    (n.kind === "lesson" ? lessonsDoneWeeks.includes(n.week) : doneDays.includes(n.D));
 
   const steps: Footstep[] = [];
   for (let i = 0; i < walkable.length - 1; i++) {
@@ -665,7 +809,7 @@ function buildFootsteps(nodes: JourneyNode[], doneDays: number[], pathWidthPx: n
     // perpendicular unitária (para afastar pé esquerdo/direito da linha)
     const px = -dyPx / len;
     const py = dxPx / len;
-    const week = a.kind === "day" ? a.week : a.kind === "album-week" ? a.week : 20;
+    const week = a.week;
     const color = `color-mix(in oklab, ${trimMeta(week).main} 52%, white)`;
 
     // 4 passos entre as bordas das moedas (raio ~34px de folga)
@@ -674,7 +818,7 @@ function buildFootsteps(nodes: JourneyNode[], doneDays: number[], pathWidthPx: n
     const count = 4;
     // Identidade estável do segmento: completar um dia antigo não desloca
     // as keys das pegadas seguintes (evita saltos/re-animação indevida)
-    const segId = a.kind === "day" ? `d${a.D}` : `w${a.week}`;
+    const segId = a.kind === "day" ? `d${a.D}` : a.kind === "lesson" ? `l${a.week}` : `w${a.week}`;
     for (let s = 0; s < count; s++) {
       const t = t0 + ((t1 - t0) * s) / (count - 1);
       const side = s % 2 === 0 ? 1 : -1;
@@ -694,7 +838,13 @@ function buildFootsteps(nodes: JourneyNode[], doneDays: number[], pathWidthPx: n
 
 /* ══════════════════════════════ Componente ══════════════════════════════ */
 
-export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
+export function GestacaoPath({
+  profile,
+  gest,
+  quizPremium = false,
+  careMode = false,
+  onOpenShop,
+}: GestacaoPathProps) {
   const hasGest = !!gest;
   // Dia gestacional de hoje (0-based desde a DUM), até a semana 42 (D=300)
   const rawD = hasGest ? gest.totalDays : 0;
@@ -707,10 +857,18 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     { kind: "day"; D: number } | { kind: "album"; week: number } | null
   >(null);
   const [revealing, setRevealing] = useState(false);
+  // Lições da Escola do Bebê dentro do caminho: semana → nota do quiz (0–100).
+  // Cache local (entra no sync do journey_state); o servidor é a fonte da verdade.
+  const [lessonsDone, setLessonsDone] = useState<Record<number, number>>({});
+  const [lessonSheet, setLessonSheet] = useState<CourseModule | null>(null);
 
   const [journeyStart, setJourneyStart] = useState<JourneyStart | null>(null);
   const [stickers, setStickers] = useState<number[]>([]);
   const [doneDays, setDoneDays] = useState<number[]>([]);
+  const [saldo, setSaldo] = useState<number | null>(null);
+  // Itens do Cantinho que decoram o Caminho (não-fundo) + o fundo ativo.
+  const [decor, setDecor] = useState<string[]>([]);
+  const [fundoBg, setFundoBg] = useState<string | null>(null);
   const [checkin, setCheckin] = useState<Checkin>({ last: "", streak: 0 });
   const [dayTasks, setDayTasks] = useState<Record<string, boolean>>({});
   // Estado dedicado do dia de HOJE: alimenta o anel segmentado sem vazar o
@@ -720,6 +878,35 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   // Incrementa quando o pull da nuvem hidrata o localStorage — filhos que leem
   // no mount (PosPartoJourney) usam como key para remontar com dados frescos
   const [hydratedAt, setHydratedAt] = useState(0);
+  // Aparelho novo (sem nada local) esperando a jornada vir da nuvem: mostra um
+  // aviso sutil em vez de piscar "zerado" (e o pull tem retry se a rede falhar).
+  const [syncing, setSyncing] = useState(false);
+
+  // Sementinhas 🌱: concede o check-in do dia (idempotente) e lê o saldo p/ a
+  // barra do topo. Falha é silenciosa (moeda é secundária ao Caminho).
+  useEffect(() => {
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        const token = s.session?.access_token;
+        if (!token) return;
+        const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
+        // Modo Cuidado: esconde a barra de moeda e as decorações (não celebra).
+        if (w.ok) setSaldo(w.careMode ? null : w.balance);
+        if (w.ok && w.careMode) return;
+        // Itens comprados decoram o Caminho.
+        const c = await getCantinho({ data: { accessToken: token } });
+        if (c.ok) {
+          setDecor(c.owned.filter((id) => CANTINHO_BY_ID[id]?.type !== "fundo"));
+          // Cenário = o fundo EQUIPADO (escolhido na loja).
+          setFundoBg(c.equippedFundo ? (CANTINHO_FUNDO_BG[c.equippedFundo] ?? null) : null);
+        }
+      } catch {
+        /* saldo é secundário */
+      }
+    })();
+  }, []);
 
   // Lazy init: evita flash da tela errada no primeiro render (rota é ssr:false)
   const [birth, setBirth] = useState<Birth | null>(() => lsGet<Birth | null>(LS.birth, null));
@@ -727,6 +914,14 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   const [birthDateInput, setBirthDateInput] = useState(localDateStr());
   const [showBirthForm, setShowBirthForm] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
+
+  // Premium ativado: limpa o flag de "comprovante enviado" (o paywall some,
+  // mas o flag sincronizado não deve ficar para sempre no blob da jornada).
+  useEffect(() => {
+    if (quizPremium && lsGet<string>("dc-path-premium-pending", "")) {
+      lsSet("dc-path-premium-pending", "");
+    }
+  }, [quizPremium]);
 
   /* ── Fases visíveis: bônus pós-data só aparece para quem precisa ── */
   const phases = useMemo<Phase[]>(
@@ -743,6 +938,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     const hydrateFromLocal = () => {
       setStickers(lsGet<number[]>(LS.stickers, []));
       setDoneDays(lsGet<number[]>(LS.doneDays, []));
+      setLessonsDone(lsGet<Record<number, number>>(LS.lessons, {}));
       setCheckin(lsGet<Checkin>(LS.checkin, { last: "", streak: 0 }));
       setBirth(lsGet<Birth | null>(LS.birth, null));
       setCelebrated(lsGet<boolean>(LS.celebrated, false));
@@ -753,6 +949,12 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     // Render imediato com o que o aparelho tem
     hydrateFromLocal();
 
+    // Aparelho sem nenhum dado local + primeiro pull ainda em andamento: em vez
+    // de piscar a jornada "zerada", avisa que está sincronizando.
+    const localEmpty =
+      lsGet<number[]>(LS.doneDays, []).length === 0 && !lsGet<unknown>(LS.journeyStart, null);
+    setSyncing(localEmpty && !gatePrimed);
+
     (async () => {
       // Nuvem PRIMEIRO: num aparelho novo, a jornada real vem do perfil —
       // sem isso criaríamos uma jornada zerada por cima da verdadeira.
@@ -762,6 +964,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         ? await pullJourneyFromProfile()
         : await ensureInitialJourneyPull();
       if (cancelled) return;
+      setSyncing(false);
       if (changed) {
         hydrateFromLocal();
         // Filhos que leem o localStorage no próprio mount (PosPartoJourney)
@@ -771,6 +974,13 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
 
       // Só agora, se o perfil também não tem jornada, ela começa HOJE
       let js = lsGet<JourneyStart | null>(LS.journeyStart, null);
+      // DUM corrigida no Perfil pode jogar o início da jornada para o "futuro"
+      // (gestDay > hoje) — recalcula em vez de exibir dia negativo/travado.
+      if (js && js.gestDay > todayD) {
+        js = { date: localDateStr(), gestDay: todayD };
+        lsSet(LS.journeyStart, js);
+        toast("📅 Suas datas mudaram — a jornada foi recalculada a partir de hoje.");
+      }
       if (!js) {
         js = { date: localDateStr(), gestDay: todayD };
         lsSet(LS.journeyStart, js);
@@ -780,6 +990,26 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         }
       }
       if (!cancelled) setJourneyStart(js);
+
+      // Progresso das lições: o servidor (course_progress) é a fonte da verdade —
+      // mescla por cima do cache local e regrava para os próximos offline.
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        if (s.session && !cancelled) {
+          const res = await getCourseProgress({
+            data: { accessToken: s.session.access_token },
+          });
+          if (res.ok && !cancelled) {
+            const merged = { ...lsGet<Record<number, number>>(LS.lessons, {}) };
+            for (const row of res.progress) merged[row.module_week] = row.quiz_score;
+            setLessonsDone(merged);
+            lsSet(LS.lessons, merged);
+          }
+        }
+      } catch {
+        /* offline: o cache local segue valendo */
+      }
     })();
 
     return () => {
@@ -818,7 +1048,11 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  const footsteps = useMemo(() => buildFootsteps(nodes, doneDays, pathW), [nodes, doneDays, pathW]);
+  const lessonsDoneWeeks = useMemo(() => Object.keys(lessonsDone).map(Number), [lessonsDone]);
+  const footsteps = useMemo(
+    () => buildFootsteps(nodes, doneDays, lessonsDoneWeeks, pathW),
+    [nodes, doneDays, lessonsDoneWeeks, pathW],
+  );
 
   // Centraliza o nó de HOJE na tela ao abrir (scroll da própria página)
   useEffect(() => {
@@ -878,11 +1112,51 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
     toast.success(`${FRUIT_EMOJI[week] ?? "🍼"} Figurinha coletada: ${baby.fruit}!`);
   }
 
-  function openDay(D: number) {
+  // Intro imersiva (Duolingo) antes do sheet da aula
+  const [intro, setIntro] = useState<number | null>(null);
+
+  function reallyOpenDay(D: number) {
     setDayTasks(dayTaskState(D));
     setSheet({ kind: "day", D });
     if (D === todayD) {
       setTimeout(() => markDayTask(D, "leitura", true), 600);
+    }
+  }
+
+  function openDay(D: number) {
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // A intro só roda quando uma aula de verdade vem a seguir: hoje (grátis)
+    // ou revisão premium. Dia passado sem premium vai direto ao paywall —
+    // sem prometer 1,3s de aula que não vem.
+    const willHaveLesson = D === todayD || quizPremium;
+    if (quizForDay(D) && !reduced && willHaveLesson) {
+      setIntro(D);
+      return;
+    }
+    reallyOpenDay(D);
+  }
+
+  /** Salva a lição concluída: otimista no aparelho, canônico no servidor. */
+  async function completeLesson(week: number, score: number) {
+    if (lessonsDone[week] != null) return;
+    const next = { ...lessonsDone, [week]: score };
+    setLessonsDone(next);
+    lsSet(LS.lessons, next);
+    setRevealing(true);
+    setTimeout(() => setRevealing(false), 1800);
+    toast.success(`📚 Lição da semana ${week} completa!`);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      if (s.session) {
+        await markModuleComplete({
+          data: { accessToken: s.session.access_token, moduleWeek: week, quizScore: score },
+        });
+      }
+    } catch {
+      /* offline: fica no cache e o próximo sync resolve */
     }
   }
 
@@ -893,7 +1167,12 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
 
   // Piso de 300 dias: cobre qualquer parto real mesmo para quem só abre o app
   // meses depois do nascimento (a única saída da jornada não pode ficar travada).
-  const birthMinDate = localDateStr(new Date(Date.now() - 300 * 86400000));
+  // 420 dias (~14 meses) cobre até quem só volta ao app bem depois do parto.
+  const birthMinDate = localDateStr(new Date(Date.now() - 420 * 86400000));
+
+  // Declarar o nascimento muda o app inteiro para o modo pós-parto — por isso
+  // o fluxo tem DOIS passos: validar a data e depois confirmar de verdade.
+  const [birthConfirming, setBirthConfirming] = useState(false);
 
   function declareBirth() {
     const today = localDateStr();
@@ -909,18 +1188,39 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       toast.error("Data muito antiga — confira o dia do nascimento.");
       return;
     }
+    if (!birthConfirming) {
+      setBirthConfirming(true);
+      return;
+    }
     const b = { date: birthDateInput };
     setBirth(b);
     lsSet(LS.birth, b);
     setCelebrated(false);
     lsSet(LS.celebrated, false);
     setShowBirthForm(false);
+    setBirthConfirming(false);
+  }
+
+  /** Desfaz um nascimento declarado por engano (disponível na celebração). */
+  function undoBirth() {
+    setBirth(null);
+    lsSet(LS.birth, null);
+    setCelebrated(false);
+    lsSet(LS.celebrated, false);
+    setBirthConfirming(false);
+    // Se o check-in de humor de hoje aconteceu enquanto o app estava em modo
+    // pós-parto, ele não foi gravado na gestação (doCheckin pula com birth) —
+    // credita agora, senão o dia mostraria 3/3 sem nunca completar.
+    if (checkedToday && !dayTaskState(todayD).humor) {
+      markDayTask(todayD, "humor", true);
+    }
+    toast.success("Tudo certo — sua gestação continua aqui 💛");
   }
 
   async function share(week: number) {
     const baby = babyForWeek(week);
     const name = profile?.baby_name || "Meu bebê";
-    const text = `🤰 Semana ${week}: ${name} está do tamanho de ${baby.fruit.toLowerCase()}! ${FRUIT_EMOJI[week] ?? ""}\n📏 ${baby.size} · ⚖️ ${baby.weight}\n\nAcompanhamento pré-natal com Dr. Clóvis Bacha 🩺`;
+    const text = `🤰 Semana ${week}: ${name} está do tamanho de ${baby.fruit.toLowerCase()}! ${FRUIT_EMOJI[week] ?? ""}\n📏 ${baby.size} · ⚖️ ${baby.weight}\n\nAcompanhando cada semana no app Obstétrica 💜`;
     try {
       if (navigator.share) await navigator.share({ text });
       else {
@@ -969,6 +1269,36 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         100% { transform: scale(1) rotate(0); }
       }
       .dc-sticker-pop { animation: dcStickerPop 700ms cubic-bezier(0.34,1.56,0.64,1) both; }
+      /* Intro imersiva da aula (Duolingo): moeda salta, anéis pulsam, textos sobem */
+      @keyframes dcIntroCoin {
+        0% { transform: scale(0.2) rotate(-14deg); opacity: 0; }
+        60% { transform: scale(1.18) rotate(4deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      @keyframes dcIntroRing {
+        0% { transform: scale(0.5); opacity: 0.75; }
+        100% { transform: scale(2.1); opacity: 0; }
+      }
+      @keyframes dcIntroText {
+        0% { transform: translateY(18px); opacity: 0; }
+        100% { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes dcIntroOut {
+        to { opacity: 0; }
+      }
+      .dc-intro-coin { animation: dcIntroCoin 620ms cubic-bezier(0.34,1.56,0.64,1) both; }
+      .dc-intro-ring { animation: dcIntroRing 900ms ease-out both; }
+      .dc-intro-text { animation: dcIntroText 480ms 260ms var(--ease-out-expo, ease-out) both; }
+      .dc-intro-sub { animation: dcIntroText 480ms 420ms var(--ease-out-expo, ease-out) both; }
+      .dc-intro-leave { animation: dcIntroOut 260ms ease-in both; }
+
+      /* Brilho 3D estilo logo: reflexo superior + luz interna suave */
+      .dc-coin-shine {
+        position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+        background:
+          radial-gradient(62% 48% at 30% 20%, rgba(255,255,255,0.62), rgba(255,255,255,0.10) 55%, transparent 72%),
+          radial-gradient(80% 45% at 50% 108%, rgba(255,255,255,0.20), transparent 60%);
+      }
       @media (prefers-reduced-motion: reduce) {
         .dc-confetti, .dc-chest, .dc-sticker-pop, .dc-halo, .dc-step { animation: none; }
       }
@@ -976,7 +1306,8 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   );
 
   /* ══════════ PONTO 2 · Celebração do nascimento (uma vez) ══════════ */
-  if (birth && !celebrated) {
+  // Modo Cuidado: nunca dispara a celebração de nascimento (crítico em perda).
+  if (birth && !celebrated && !careMode) {
     const totalDone = doneDays.length;
     return (
       <div className="relative flex flex-col items-center gap-5 overflow-hidden rounded-3xl bg-white/80 p-8 text-center backdrop-blur-sm">
@@ -1014,6 +1345,12 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         >
           Começar o 4º trimestre 🍼
         </button>
+        <button
+          onClick={undoBirth}
+          className="text-xs font-medium text-muted-foreground underline underline-offset-2"
+        >
+          Declarei sem querer — voltar para a gestação
+        </button>
       </div>
     );
   }
@@ -1037,6 +1374,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         setRevealing={setRevealing}
         styleBlock={styleBlock}
         shareGest={share}
+        careMode={careMode}
       />
     );
   }
@@ -1052,7 +1390,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           </p>
           <p className="mt-2 text-lg font-bold text-amber-900">Sua gestação passou de 42 semanas</p>
           <p className="mt-2 text-sm leading-relaxed text-amber-800">
-            Entre em contato com o consultório do Dr. Clóvis <strong>hoje</strong> para avaliação do
+            Entre em contato com o consultório do seu médico <strong>hoje</strong> para avaliação do
             bem-estar do bebê e decisão sobre o parto. Se notar diminuição dos movimentos, perda de
             líquido ou sangramento, vá direto à maternidade.
           </p>
@@ -1076,23 +1414,50 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
         <div className="rounded-3xl bg-white/80 p-5 backdrop-blur-sm">
           <p className="text-sm font-bold">{babyLabel} já nasceu? 🎉</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Informe a data para celebrar e começar a jornada do 4º trimestre.
+            Informe a data para celebrar e começar a jornada do 4º trimestre. Seu caminho e as
+            figurinhas continuam guardados — eles voltam a aparecer no álbum. 💛
           </p>
-          <div className="mt-3 flex gap-2">
-            <input
-              type="date"
-              value={birthDateInput}
-              max={localDateStr()}
-              onChange={(e) => setBirthDateInput(e.target.value)}
-              className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
-            />
-            <button
-              onClick={declareBirth}
-              className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
-            >
-              Nasceu! 🎉
-            </button>
-          </div>
+          {birthConfirming ? (
+            <div className="mt-3 rounded-xl bg-pink-50 p-3">
+              <p className="text-sm font-bold text-pink-800">
+                Confirmar o nascimento em{" "}
+                {new Date(birthDateInput + "T00:00:00").toLocaleDateString("pt-BR")}?
+              </p>
+              <p className="mt-0.5 text-xs text-pink-700">
+                O app muda para o modo pós-parto (dá para desfazer logo em seguida).
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={declareBirth}
+                  className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                >
+                  Sim, nasceu! 🎉
+                </button>
+                <button
+                  onClick={() => setBirthConfirming(false)}
+                  className="press rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500"
+                >
+                  Ainda não
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 flex gap-2">
+              <input
+                type="date"
+                value={birthDateInput}
+                max={localDateStr()}
+                onChange={(e) => setBirthDateInput(e.target.value)}
+                className="rounded-xl border border-border bg-white px-3 py-2 text-sm"
+              />
+              <button
+                onClick={declareBirth}
+                className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+              >
+                Nasceu! 🎉
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1105,6 +1470,13 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
   return (
     <div className="flex flex-col gap-4">
       {styleBlock}
+
+      {syncing && (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-700">
+          <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-violet-300 border-t-violet-600" />
+          Sincronizando sua jornada…
+        </div>
+      )}
 
       {showWelcome && (
         <div className="glass-card glass-pink rounded-3xl p-5">
@@ -1134,7 +1506,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           <p className="mt-1 text-sm leading-relaxed text-amber-800">
             Isso é normal — acontece em 1 a cada 10 gestações. A partir de agora o acompanhamento
             fica mais próximo: consultas <strong>2x por semana</strong> com cardiotocografia, e a
-            conversa sobre indução acontece com o Dr. Clóvis.
+            conversa sobre indução acontece com o seu médico.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <a
@@ -1160,42 +1532,78 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           ) : (
             <div>
               <p className="text-sm font-bold">Que dia {babyLabel} chegou?</p>
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="date"
-                  value={birthDateInput}
-                  max={localDateStr()}
-                  onChange={(e) => setBirthDateInput(e.target.value)}
-                  className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm"
-                />
-                <button
-                  onClick={declareBirth}
-                  className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
-                >
-                  Confirmar 🎉
-                </button>
-                <button
-                  onClick={() => setShowBirthForm(false)}
-                  className="press rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-500"
-                >
-                  ✕
-                </button>
-              </div>
+              {birthConfirming ? (
+                <div className="mt-2 rounded-xl bg-pink-50 p-3">
+                  <p className="text-sm font-bold text-pink-800">
+                    Confirmar o nascimento em{" "}
+                    {new Date(birthDateInput + "T00:00:00").toLocaleDateString("pt-BR")}?
+                  </p>
+                  <p className="mt-0.5 text-xs text-pink-700">
+                    O app muda para o modo pós-parto (dá para desfazer logo em seguida).
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={declareBirth}
+                      className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                    >
+                      Sim, nasceu! 🎉
+                    </button>
+                    <button
+                      onClick={() => setBirthConfirming(false)}
+                      className="press rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-500"
+                    >
+                      Ainda não
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="date"
+                    value={birthDateInput}
+                    max={localDateStr()}
+                    onChange={(e) => setBirthDateInput(e.target.value)}
+                    className="flex-1 rounded-xl border border-border bg-white px-3 py-2 text-sm"
+                  />
+                  <button
+                    onClick={declareBirth}
+                    className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                  >
+                    Confirmar 🎉
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowBirthForm(false);
+                      setBirthConfirming(false);
+                    }}
+                    className="press rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-500"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
 
       {/* Stats — faixa sólida fixa no topo (Duolingo): conteúdo passa por baixo limpo */}
-      <div className="sticky top-0 z-30 -mx-5 flex items-center justify-around border-b border-border/60 bg-background/95 px-6 py-3 backdrop-blur-md md:mx-0 md:rounded-2xl md:border">
-        <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
-          <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
-          <span className="text-lg font-extrabold text-amber-500">{streak}</span>
-          <span className="text-xs font-medium text-muted-foreground">
-            {streak === 1 ? "dia" : "dias"}
-          </span>
-        </div>
-        <div className="h-6 w-px bg-slate-200" />
+      <div
+        style={{ top: "var(--safe-top)" }}
+        className="sticky z-30 -mx-5 flex items-center justify-around border-b border-border/60 bg-background/95 px-6 py-3 backdrop-blur-md md:mx-0 md:rounded-2xl md:border"
+      >
+        {!careMode && (
+          <>
+            <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
+              <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
+              <span className="text-lg font-extrabold text-amber-500">{streak}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {streak === 1 ? "dia" : "dias"}
+              </span>
+            </div>
+            <div className="h-6 w-px bg-slate-200" />
+          </>
+        )}
         <div className="flex items-center gap-1.5" title="Dia da sua jornada">
           <span className="text-xl">📅</span>
           <span className="text-lg font-extrabold text-sky-500">{journeyDayNum}º</span>
@@ -1206,7 +1614,43 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           <span className="text-xl">🏆</span>
           <span className="text-lg font-extrabold text-violet-500">{stickers.length}</span>
         </div>
+        {saldo != null && (
+          <>
+            <div className="h-6 w-px bg-slate-200" />
+            <div className="flex items-center gap-1.5" title="Suas Sementinhas">
+              <span className="text-xl">🌱</span>
+              <span className="text-lg font-extrabold text-emerald-500">{saldo}</span>
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Botão flutuante da lojinha (Cantinho) — silenciado no Modo Cuidado */}
+      {!careMode && onOpenShop && (
+        <>
+          <style>{`
+            @keyframes dc-shop-glow {
+              0%, 100% { box-shadow: 0 8px 22px rgba(16,185,129,0.42); }
+              50% { box-shadow: 0 10px 34px rgba(16,185,129,0.78), 0 0 0 5px rgba(163,230,53,0.30); }
+            }
+            @media (prefers-reduced-motion: reduce) { .dc-shop-fab { animation: none !important; } }
+          `}</style>
+          <button
+            onClick={onOpenShop}
+            aria-label="Abrir o Cantinho"
+            className="dc-shop-fab press fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-full bg-gradient-to-br from-emerald-400 via-lime-400 to-emerald-500 px-4 py-3 text-white ring-2 ring-white/70 md:bottom-8"
+            style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
+          >
+            <span className="text-xl leading-none">🛍️</span>
+            <span className="text-sm font-extrabold leading-none">Cantinho</span>
+            {saldo != null && (
+              <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold leading-none">
+                🌱 {saldo}
+              </span>
+            )}
+          </button>
+        </>
+      )}
 
       {!checkedToday && (
         <div className="rounded-2xl bg-white/80 p-4 shadow-[0_2px_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
@@ -1230,6 +1674,34 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       {/* ── Caminho contínuo em tela cheia (Duolingo-style) ──
           Sem caixa nem scroll interno: a página inteira É o caminho. */}
       <div ref={pathRef} className="relative -mx-5 md:mx-0" style={{ height: `${height}px` }}>
+        {/* Cenário (papel de parede) equipado — atrás de tudo */}
+        {fundoBg && (
+          <div
+            className="pointer-events-none absolute inset-0 select-none rounded-2xl opacity-55"
+            style={{ background: fundoBg }}
+            aria-hidden
+          />
+        )}
+        {/* Itens do Cantinho decoram as margens da trilha (não cobrem as lições) */}
+        {decor.map((id, k) => {
+          const item = CANTINHO_BY_ID[id];
+          if (!item) return null;
+          const h = hashStr(id);
+          const side = k % 2;
+          const left = side === 0 ? 3 + (h % 9) : 88 + (h % 9);
+          const top = 6 + ((h >> 4) % 88);
+          return (
+            <span
+              key={id}
+              className="pointer-events-none absolute select-none text-3xl opacity-90 drop-shadow-sm"
+              style={{ left: `${left}%`, top: `${top}%`, transform: "translate(-50%,-50%)" }}
+              aria-hidden
+              title={item.name}
+            >
+              {item.emoji}
+            </span>
+          );
+        })}
         {/* Pegadas do bebê no trecho já percorrido (atrás das moedas) */}
         {footsteps.map((f) => (
           <div
@@ -1313,6 +1785,63 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
             );
           }
 
+          if (node.kind === "lesson") {
+            const m = LESSON_BY_WEEK.get(node.week)!;
+            const done = lessonsDone[node.week] != null;
+            const unlocked = node.week <= currentWeek;
+            const tm = trimMeta(node.week);
+            return (
+              <button
+                key={`l${node.week}`}
+                onClick={() => unlocked && setLessonSheet(m)}
+                disabled={!unlocked}
+                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none disabled:cursor-not-allowed"
+                style={{ left: `${node.x}%`, top: `${node.y}px` }}
+                aria-label={`Lição da semana ${node.week}: ${m.title}`}
+              >
+                <div className="relative">
+                  {/* Lição disponível e não feita: halo dourado convida o toque */}
+                  {unlocked && !done && (
+                    <span
+                      className="dc-halo pointer-events-none absolute inset-0 rounded-2xl"
+                      style={{ boxShadow: "0 0 26px 5px rgba(245,158,11,0.4)" }}
+                    />
+                  )}
+                  <div
+                    className="duo3d relative flex h-[68px] w-[68px] items-center justify-center rounded-2xl"
+                    style={
+                      {
+                        background: !unlocked
+                          ? `linear-gradient(180deg, color-mix(in oklab, ${LOCKED.main} 88%, white) 0%, ${LOCKED.main} 60%)`
+                          : done
+                            ? "linear-gradient(180deg, #fcd34d 0%, #f59e0b 60%)"
+                            : `linear-gradient(180deg, color-mix(in oklab, ${tm.main} 78%, white) 0%, ${tm.main} 55%)`,
+                        "--lip": !unlocked ? LOCKED.lip : done ? "#b45309" : tm.lip,
+                        boxShadow: "0 6px 0 var(--lip)",
+                      } as React.CSSProperties
+                    }
+                  >
+                    <span className="relative z-10 text-3xl">
+                      {!unlocked ? "🔒" : done ? "⭐" : "📚"}
+                    </span>
+                    <span className="dc-coin-shine" aria-hidden />
+                  </div>
+                </div>
+                <span
+                  className={`mt-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide shadow-sm ${
+                    !unlocked
+                      ? "bg-white/80 text-slate-400"
+                      : done
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-white/90 " + tm.softText
+                  }`}
+                >
+                  {done ? "Lição completa" : "Lição"}
+                </span>
+              </button>
+            );
+          }
+
           if (node.kind === "album-week") {
             const collected = stickers.includes(node.week);
             const tm = trimMeta(node.week);
@@ -1338,8 +1867,12 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                     } as React.CSSProperties
                   }
                 >
-                  <span className="text-2xl">{FRUIT_EMOJI[node.week] ?? "🍼"}</span>
+                  <span className="relative z-10 text-2xl">{FRUIT_EMOJI[node.week] ?? "🍼"}</span>
+                  <span className="dc-coin-shine" aria-hidden />
                 </div>
+                <span className="mt-1 rounded-full bg-white/85 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400 shadow-sm">
+                  memória
+                </span>
               </button>
             );
           }
@@ -1363,9 +1896,18 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
             <div key={`d${D}`}>
               <button
                 id={isToday ? "dc-today-node" : undefined}
-                onClick={() => openDay(D)}
-                disabled={isFuture}
-                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none disabled:cursor-not-allowed"
+                onClick={() => {
+                  if (isFuture) {
+                    const em = D - todayD;
+                    toast(
+                      `🔒 Esse dia abre ${em === 1 ? "amanhã" : `em ${em} dias`} — um passo de cada vez 💛`,
+                    );
+                    return;
+                  }
+                  openDay(D);
+                }}
+                aria-disabled={isFuture}
+                className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none ${isFuture ? "cursor-not-allowed" : ""}`}
                 style={{ left: `${node.x}%`, top: `${node.y}px` }}
                 aria-label={`Dia ${dayOfWeek} da semana ${week}`}
               >
@@ -1395,29 +1937,23 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                       {
                         width: `${dia}px`,
                         height: `${dia}px`,
-                        background: `linear-gradient(180deg, color-mix(in oklab, ${palette.main} 82%, white) 0%, ${palette.main} 55%)`,
+                        background: `radial-gradient(120% 120% at 32% 24%, color-mix(in oklab, ${palette.main} 55%, white) 0%, ${palette.main} 58%, color-mix(in oklab, ${palette.main} 82%, black) 100%)`,
                         "--lip": palette.lip,
-                        boxShadow: `0 ${isToday ? 8 : 6}px 0 ${palette.lip}`,
+                        boxShadow: `0 ${isToday ? 8 : 6}px 0 ${palette.lip}, 0 12px 24px -10px ${palette.main}99`,
                       } as React.CSSProperties
                     }
                   >
+                    {/* Sem números: as bolinhas falam pela cor e pelo brilho (estilo da logo) */}
                     {isToday && !done ? (
-                      <span className="text-3xl">🎁</span>
+                      <span className="relative z-10 text-3xl">🎁</span>
                     ) : done ? (
                       <span
-                        className={`font-black text-white ${isToday ? "text-3xl" : "text-2xl"}`}
+                        className={`relative z-10 font-black text-white ${isToday ? "text-3xl" : "text-2xl"}`}
                       >
                         ✓
                       </span>
-                    ) : (
-                      <span
-                        className={`text-base font-black tabular-nums ${
-                          isFuture ? "text-slate-400" : "text-pink-300"
-                        }`}
-                      >
-                        {dayOfWeek}
-                      </span>
-                    )}
+                    ) : null}
+                    <span className="dc-coin-shine" aria-hidden />
                   </div>
                 </div>
               </button>
@@ -1429,6 +1965,20 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
       {/* Folga para a barra de navegação inferior do app */}
       <div className="h-16" />
 
+      {/* Intro imersiva da aula (Duolingo): moeda salta, depois o sheet abre */}
+      {intro !== null && (
+        <QuizIntro
+          D={intro}
+          isToday={intro === todayD}
+          babyLabel={babyLabel}
+          onDone={() => {
+            const D = intro;
+            setIntro(null);
+            reallyOpenDay(D);
+          }}
+        />
+      )}
+
       {/* Sheet de DIA */}
       {sheet?.kind === "day" &&
         (() => {
@@ -1436,10 +1986,20 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           const week = Math.max(1, Math.min(42, Math.floor(D / 7)));
           const baby = babyForWeek(week);
           const ch = challengeForDay(D);
+          const quiz = quizForDay(D);
+          const quizEmoji = quizEmojiForDay(D);
           const isToday = D === todayD;
           const state = isToday ? dayTasks : dayTaskState(D);
           const done = doneDays.includes(D);
           const tm = trimMeta(week);
+          // Progresso explícito das 3 tarefas — evita o "respondi o quiz e o
+          // dia não completou" (faltava o check-in de humor).
+          const humorOk = isToday ? checkedToday || !!state.humor : !!state.humor;
+          const tasksChecked = [humorOk, !!state.desafio, !!state.leitura].filter(Boolean).length;
+          const missingHumorHint =
+            isToday && !humorOk
+              ? "Quase lá! Falta o check-in de humor — feche esta aula e toque em como você está 💛"
+              : null;
           return (
             <div
               className="fixed inset-0 z-50 flex items-end"
@@ -1451,7 +2011,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                 style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {revealing && <ConfettiBurst />}
+                {revealing && !careMode && <ConfettiBurst />}
                 <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
 
                 <div className="mb-4 flex items-center gap-3">
@@ -1484,16 +2044,23 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
 
                 <div className="mb-4 rounded-2xl bg-emerald-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                    ✅ Complete as 3 para ganhar o dia
+                    ✅ Complete as 3 para ganhar o dia · {tasksChecked}/3
                   </p>
                   <div className="mt-2 flex flex-col gap-2">
                     {[
                       { id: "humor", label: "Check-in: como você está?", emoji: "🙂" },
-                      { id: "desafio", label: ch.label, emoji: ch.emoji },
+                      quiz
+                        ? {
+                            id: "desafio",
+                            label: "Aula da professora de hoje (abaixo)",
+                            emoji: quizEmoji,
+                          }
+                        : { id: "desafio", label: ch.label, emoji: ch.emoji },
                       { id: "leitura", label: `Ler sobre ${babyLabel} hoje (abaixo)`, emoji: "📖" },
                     ].map((t) => {
                       const checked = t.id === "humor" && isToday ? checkedToday : !!state[t.id];
-                      const canToggle = isToday && t.id === "desafio";
+                      // Com quiz, a tarefa "desafio" completa ao responder o quiz.
+                      const canToggle = isToday && t.id === "desafio" && !quiz;
                       return (
                         <div key={t.id} className="flex items-center gap-2">
                           <button
@@ -1542,7 +2109,7 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                 {/* PONTO 1 · Orientação pós-data mais séria nas semanas 41–42 */}
                 <div className="mb-4 rounded-2xl border border-sky-100 bg-sky-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-sky-600">
-                    🩺 Orientação do Dr. Clóvis
+                    🩺 Orientação médica
                   </p>
                   <p className="mt-1.5 text-sm leading-relaxed text-sky-900">
                     {week >= 41 ? POSDATA_GUIDANCE : consultaForWeek(week)}
@@ -1557,13 +2124,33 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
                   )}
                 </div>
 
+                {quiz &&
+                  (isToday || quizPremium ? (
+                    <DailyQuizBlock
+                      key={`quiz-${D}`}
+                      quiz={quiz}
+                      emoji={quizEmoji}
+                      week={week}
+                      alreadyDone={!!state.desafio || done}
+                      canEarn={isToday}
+                      missingHint={missingHumorHint}
+                      showPremiumAd={isToday && !quizPremium}
+                      onEarn={() => markDayTask(D, "desafio", true)}
+                    />
+                  ) : (
+                    <QuizPaywall week={week} />
+                  ))}
+
                 {isToday && (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                  <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      🔒 Amanhã: novo desafio
+                      🔒 Amanhã: {quizForDay(D + 1) ? "nova aula da professora" : "novo desafio"}
                     </p>
                     <p className="mt-1 text-sm text-slate-500">
-                      {challengeForDay(D + 1).emoji} Volte amanhã para manter a chama 🔥
+                      {quizForDay(D + 1)
+                        ? `${quizEmojiForDay(D + 1)} `
+                        : `${challengeForDay(D + 1).emoji} `}
+                      Volte amanhã para manter a chama 🔥
                       {streak > 0 ? ` (${streak} ${streak === 1 ? "dia" : "dias"})` : ""}
                     </p>
                   </div>
@@ -1581,6 +2168,19 @@ export function GestacaoPath({ profile, gest }: GestacaoPathProps) {
           revealing={revealing}
           onClose={() => setSheet(null)}
           onShare={share}
+          careMode={careMode}
+        />
+      )}
+
+      {/* Sheet de LIÇÃO (Escola do Bebê dentro do caminho) */}
+      {lessonSheet && (
+        <LessonSheet
+          module={lessonSheet}
+          savedScore={lessonsDone[lessonSheet.week] ?? null}
+          revealing={revealing}
+          onComplete={(score) => completeLesson(lessonSheet.week, score)}
+          onClose={() => setLessonSheet(null)}
+          careMode={careMode}
         />
       )}
     </div>
@@ -1595,12 +2195,14 @@ function AlbumSheet({
   revealing,
   onClose,
   onShare,
+  careMode = false,
 }: {
   week: number;
   babyLabel: string;
   revealing: boolean;
   onClose: () => void;
   onShare: (week: number) => void;
+  careMode?: boolean;
 }) {
   const baby = babyForWeek(week);
   const tm = trimMeta(week);
@@ -1615,7 +2217,7 @@ function AlbumSheet({
         style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {revealing && <ConfettiBurst />}
+        {revealing && !careMode && <ConfettiBurst />}
         <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
 
         <div className="mb-4 flex items-center gap-3">
@@ -1666,6 +2268,779 @@ function AlbumSheet({
   );
 }
 
+/* ══════════════════ Sheet de lição (Escola do Bebê no caminho) ══════════════════ */
+
+function LessonSheet({
+  module: m,
+  savedScore,
+  revealing,
+  onComplete,
+  onClose,
+  careMode = false,
+}: {
+  module: CourseModule;
+  savedScore: number | null;
+  revealing: boolean;
+  onComplete: (score: number) => void;
+  onClose: () => void;
+  careMode?: boolean;
+}) {
+  const alreadyDone = savedScore != null;
+  const total = m.quiz.length;
+  const tm = trimMeta(m.week);
+  const [phase, setPhase] = useState<"intro" | "quiz" | "done">("intro");
+  const [qIndex, setQIndex] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [reward, setReward] = useState<number | null>(null);
+  const finishedRef = useRef(false);
+
+  const q = m.quiz[qIndex];
+  const score = alreadyDone ? (savedScore ?? 0) : Math.round((correctCount / total) * 100);
+  const progressPct =
+    phase === "done" ? 100 : phase === "intro" ? 4 : Math.round((qIndex / total) * 100);
+
+  function startQuiz() {
+    setPhase("quiz");
+    setQIndex(0);
+    setSelected(alreadyDone ? m.quiz[0].correct : null);
+    setChecked(alreadyDone);
+  }
+
+  function check() {
+    if (selected == null) return;
+    setChecked(true);
+    if (selected === q.correct) setCorrectCount((c) => c + 1);
+  }
+
+  async function finish(finalCorrect: number) {
+    setPhase("done");
+    if (alreadyDone || finishedRef.current) return;
+    finishedRef.current = true;
+    onComplete(Math.round((finalCorrect / total) * 100));
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (token) {
+        const r = await grantLessonReward({
+          data: { accessToken: token, week: m.week, correct: finalCorrect },
+        });
+        if (r.ok) setReward(r.granted);
+      }
+    } catch {
+      /* recompensa é secundária */
+    }
+  }
+
+  function next() {
+    // correctCount já foi incrementado em check(); no último passo reflete tudo.
+    if (qIndex + 1 >= total) {
+      finish(correctCount);
+      return;
+    }
+    const ni = qIndex + 1;
+    setQIndex(ni);
+    setSelected(alreadyDone ? m.quiz[ni].correct : null);
+    setChecked(alreadyDone);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-white"
+      style={{ paddingTop: "var(--safe-top)" }}
+    >
+      {revealing && !careMode && <ConfettiBurst />}
+
+      {/* Topo: fechar + progresso */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button
+          onClick={onClose}
+          aria-label="Fechar"
+          className="press text-2xl leading-none text-slate-400"
+        >
+          ✕
+        </button>
+        <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 pb-4">
+        {phase === "intro" && (
+          <div>
+            <div className="mt-4 flex flex-col items-center text-center">
+              <div
+                className="duo3d flex h-20 w-20 items-center justify-center rounded-3xl text-4xl"
+                style={{ background: tm.main, "--lip": tm.lip } as React.CSSProperties}
+              >
+                📚
+              </div>
+              <p className="mt-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Lição · Semana {m.week}
+                {alreadyDone && <span className="ml-1 text-amber-500">· ⭐ {savedScore}%</span>}
+              </p>
+              <h3 className="mt-1 text-2xl font-extrabold leading-tight">{m.title}</h3>
+              <p className="text-sm text-muted-foreground">{m.theme}</p>
+            </div>
+            <div className="mt-5 rounded-2xl bg-violet-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
+                📖 Para aprender hoje
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-violet-950">{m.content}</p>
+            </div>
+          </div>
+        )}
+
+        {phase === "quiz" && q && (
+          <div>
+            <p className="mt-4 text-xs font-bold uppercase tracking-wider text-emerald-600">
+              Pergunta {qIndex + 1} de {total}
+            </p>
+            <h3 className="mt-2 text-2xl font-extrabold leading-tight text-foreground">
+              {q.question}
+            </h3>
+            <div className="mt-5 flex flex-col gap-3">
+              {q.options.map((opt, oi) => {
+                let cls = "border-slate-200 bg-white text-foreground";
+                if (checked) {
+                  if (oi === q.correct) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
+                  else if (oi === selected) cls = "border-rose-400 bg-rose-50 text-rose-700";
+                  else cls = "border-slate-100 text-slate-400";
+                } else if (selected === oi) {
+                  cls = "border-emerald-500 bg-emerald-50 text-emerald-900";
+                }
+                return (
+                  <button
+                    key={oi}
+                    disabled={checked}
+                    onClick={() => setSelected(oi)}
+                    className={`press rounded-2xl border-2 px-4 py-4 text-left text-base font-semibold transition-colors ${cls}`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+            {checked && (
+              <div
+                className={`mt-4 rounded-2xl p-3 text-sm font-bold ${
+                  alreadyDone || selected === q.correct
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-rose-100 text-rose-700"
+                }`}
+              >
+                {alreadyDone
+                  ? "Resposta correta destacada em verde."
+                  : selected === q.correct
+                    ? "Certíssimo! 🎉"
+                    : "Quase! A resposta certa está em verde. 💛"}
+              </div>
+            )}
+          </div>
+        )}
+
+        {phase === "done" && (
+          <div className="mt-10 flex flex-col items-center text-center">
+            <p className="text-6xl">{score === 100 ? "🏆" : score >= 67 ? "🎉" : "💪"}</p>
+            <h3 className="mt-3 text-2xl font-extrabold">
+              {score === 100 ? "Perfeito!" : score >= 67 ? "Muito bem!" : "Lição completa!"}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {alreadyDone
+                ? `${score}% na sua última tentativa`
+                : `${correctCount} de ${total} acertos · ${score}%`}
+            </p>
+            {!careMode && reward != null && reward > 0 && (
+              <div className="mt-5 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
+                +{reward} 🌱 Sementinhas!
+              </div>
+            )}
+            {!alreadyDone && score < 67 && (
+              <p className="mt-3 max-w-xs text-xs text-muted-foreground">
+                Toda tentativa vale — releia o conteúdo quando quiser pra fixar. 💛
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Barra de ação inferior */}
+      <div
+        className="border-t border-slate-100 p-4"
+        style={{ paddingBottom: "calc(1rem + var(--safe-bottom))" }}
+      >
+        {phase === "intro" && (
+          <button
+            onClick={startQuiz}
+            className="press w-full rounded-full bg-emerald-500 py-3.5 text-sm font-extrabold text-white"
+          >
+            {alreadyDone ? "Revisar as respostas" : "Começar o quiz"}
+          </button>
+        )}
+        {phase === "quiz" && !checked && (
+          <button
+            onClick={check}
+            disabled={selected == null}
+            className="press w-full rounded-full bg-emerald-500 py-3.5 text-sm font-extrabold text-white disabled:opacity-40"
+          >
+            Verificar
+          </button>
+        )}
+        {phase === "quiz" && checked && (
+          <button
+            onClick={next}
+            className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+          >
+            {qIndex + 1 >= total ? "Ver resultado" : "Continuar"}
+          </button>
+        )}
+        {phase === "done" && (
+          <button
+            onClick={onClose}
+            className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+          >
+            Voltar ao caminho
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ Paywall das aulas premium ══════════════════
+   Grátis: só a aula do dia de HOJE. Premium: revisitar/fazer qualquer aula
+   já liberada. Pagamento assistido: PIX + comprovante no WhatsApp e o
+   consultório ativa o acesso (toggle no painel do médico). */
+
+const QUIZ_PRICE_MONTHLY = 19.9;
+const QUIZ_PRICE_ANNUAL_MONTH = 9.9; // 12x — cobrado anualmente (R$ 118,80/ano)
+
+function QuizPaywall({ week, context = "past" }: { week: number; context?: "past" | "ad" }) {
+  const [plan, setPlan] = useState<"monthly" | "annual">("annual");
+  const [loading, setLoading] = useState(false);
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
+
+  // Código do médico Elite: a paciente digita e ganha o premium na hora.
+  async function redeem() {
+    if (code.trim().length < 4) {
+      toast.error("Digite o código do seu médico.");
+      return;
+    }
+    setRedeeming(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) {
+        toast.error("Entre na sua conta para usar o código.");
+        setRedeeming(false);
+        return;
+      }
+      const { redeemInviteCode } = await import("@/lib/invites.functions");
+      const res = await redeemInviteCode({
+        data: { accessToken: s.session.access_token, code: code.trim() },
+      });
+      if (res.ok) {
+        toast.success("Premium liberado pelo seu médico! 💛");
+        setTimeout(() => window.location.reload(), 1200);
+        return;
+      }
+      const msg: Record<string, string> = {
+        codigo_invalido: "Código não encontrado. Confira com o seu médico.",
+        codigo_usado: "Este código já foi usado. Peça um novo ao seu médico.",
+        codigo_inativo: "Este código não está mais ativo.",
+        cota_esgotada: "O seu médico já usou todos os convites deste mês.",
+        nao_autenticado: "Entre na sua conta para usar o código.",
+        falha_resgate: "Não foi possível resgatar. Tente novamente.",
+      };
+      toast.error(msg[res.error ?? ""] ?? "Não foi possível resgatar o código.");
+    } catch {
+      toast.error("Não foi possível resgatar o código.");
+    }
+    setRedeeming(false);
+  }
+
+  // Assinatura recorrente por cartão (Stripe): paga → o webhook libera o
+  // acesso na hora. A UI só leva ao checkout seguro, nunca concede nada.
+  async function subscribe() {
+    setLoading(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) {
+        toast.error("Entre na sua conta para assinar.");
+        setLoading(false);
+        return;
+      }
+      const { createSubscriptionCheckout } = await import("@/lib/billing.functions");
+      // Afiliado (influenciador): código guardado do link ?ref= vira
+      // atribuição/comissão — validado no servidor.
+      const { storedAffiliateCode } = await import("@/routes/__root");
+      const refCode = storedAffiliateCode();
+      const res = await createSubscriptionCheckout({
+        data: {
+          accessToken: s.session.access_token,
+          product: "quiz_premium",
+          plan,
+          returnPath: "/minha-conta",
+          ...(refCode ? { refCode } : {}),
+        },
+      });
+      if (res.ok && res.url) {
+        window.location.href = res.url;
+        return;
+      }
+      toast.error(
+        res.error === "pagamento_indisponivel"
+          ? "O pagamento está sendo configurado. Tente em instantes."
+          : "Não foi possível abrir o pagamento. Tente novamente.",
+      );
+    } catch {
+      toast.error("Não foi possível abrir o pagamento. Tente novamente.");
+    }
+    setLoading(false);
+  }
+
+  const PlanCard = ({
+    id,
+    label,
+    price,
+    sub,
+    badge,
+  }: {
+    id: "monthly" | "annual";
+    label: string;
+    price: string;
+    sub: string;
+    badge?: string;
+  }) => {
+    const active = plan === id;
+    return (
+      <button
+        type="button"
+        onClick={() => setPlan(id)}
+        aria-pressed={active}
+        className={`relative rounded-xl border-2 p-2.5 text-center transition-colors ${
+          active ? "border-amber-500 bg-white" : "border-amber-200 bg-white/70"
+        }`}
+      >
+        {badge && (
+          <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black text-white">
+            {badge}
+          </span>
+        )}
+        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">{label}</p>
+        <p className="text-lg font-extrabold text-amber-900">{price}</p>
+        <p className="text-[10px] text-amber-700">{sub}</p>
+      </button>
+    );
+  };
+
+  return (
+    <div className="mb-4 overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-orange-50 p-4">
+      <div className="flex items-start gap-3">
+        <div
+          className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full"
+          style={{
+            background: `radial-gradient(120% 120% at 32% 24%, #fde68a 0%, #f59e0b 60%, #b45309 100%)`,
+            boxShadow: "0 5px 0 #b45309",
+          }}
+        >
+          <span className="relative z-10 text-2xl">👑</span>
+          <span className="dc-coin-shine" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          {context === "ad" ? (
+            <>
+              <p className="text-sm font-extrabold text-amber-900">Gostou de aprender hoje? 🌟</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
+                No plano grátis você faz <strong>só a aula de hoje</strong>. Com o{" "}
+                <strong>Obstétrica Premium</strong> você libera{" "}
+                <strong>todas as aulas já disponíveis</strong> — faça e revise as de qualquer dia
+                que já passou, quando quiser. 💛
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-extrabold text-amber-900">Aula premium 🔒</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
+                Essa aula é de um dia que já passou. No plano grátis você faz{" "}
+                <strong>a aula de cada dia</strong> no próprio dia. Com o premium, você desbloqueia{" "}
+                <strong>todas as aulas já liberadas</strong> para fazer e revisar quando quiser.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <PlanCard
+          id="monthly"
+          label="Mensal"
+          price={`R$ ${QUIZ_PRICE_MONTHLY.toFixed(2).replace(".", ",")}`}
+          sub="por mês"
+        />
+        <PlanCard
+          id="annual"
+          label="Anual"
+          price={`R$ ${QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}`}
+          sub="por mês · no anual"
+          badge="ECONOMIZE 50%"
+        />
+      </div>
+
+      <button
+        onClick={subscribe}
+        disabled={loading}
+        className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-60"
+        style={{ boxShadow: "0 4px 0 #b45309" }}
+      >
+        {loading ? "Abrindo pagamento seguro…" : "✨ Assinar e liberar as aulas"}
+      </button>
+
+      <p className="mt-2 text-center text-[10px] leading-relaxed text-amber-700/80">
+        Pagamento seguro por cartão · acesso na hora · cancele quando quiser.
+        <br />A aula de hoje continua grátis, todos os dias 💛
+      </p>
+
+      {/* Código do médico Elite — libera o premium sem pagar */}
+      <div className="mt-3 border-t border-amber-200/70 pt-3">
+        {!codeOpen ? (
+          <button
+            onClick={() => setCodeOpen(true)}
+            className="w-full text-center text-xs font-semibold text-amber-800 underline decoration-amber-300 underline-offset-2"
+          >
+            Tenho um cupom
+          </button>
+        ) : (
+          <div>
+            <p className="text-xs font-semibold text-amber-900">
+              Digite o código que seu médico te passou:
+            </p>
+            <div className="mt-1.5 flex gap-2">
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                maxLength={16}
+                placeholder="EX: ABCD2345"
+                className="min-w-0 flex-1 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-mono tracking-widest text-amber-900 outline-none"
+              />
+              <button
+                onClick={redeem}
+                disabled={redeeming}
+                className="press shrink-0 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-60"
+              >
+                {redeeming ? "…" : "Resgatar"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ Intro imersiva da aula (estilo Duolingo) ══════════════════
+   Tela cheia por ~1,3s: fundo no tom do trimestre, moeda saltando com anéis,
+   "Semana N · Aula de hoje". Toque pula. Reduced-motion nem chega aqui. */
+
+function QuizIntro({
+  D,
+  isToday,
+  babyLabel,
+  onDone,
+}: {
+  D: number;
+  isToday: boolean;
+  babyLabel: string;
+  onDone: () => void;
+}) {
+  const [leaving, setLeaving] = useState(false);
+  const week = Math.max(1, Math.min(42, Math.floor(D / 7)));
+  const tm = trimMeta(week);
+  const emoji = quizEmojiForDay(D);
+  const skipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doneRef = useRef(false);
+
+  // onDone dispara exatamente UMA vez (timer natural ou toque para pular)
+  const finish = () => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    onDone();
+  };
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setLeaving(true), 1250);
+    const t2 = setTimeout(finish, 1500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (skipTimer.current) clearTimeout(skipTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div
+      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden ${
+        leaving ? "dc-intro-leave" : ""
+      }`}
+      style={{
+        background: `radial-gradient(120% 100% at 50% 20%, color-mix(in oklab, ${tm.main} 30%, white) 0%, color-mix(in oklab, ${tm.main} 72%, white) 45%, ${tm.main} 100%)`,
+        paddingTop: "var(--safe-top)",
+      }}
+      onClick={() => {
+        if (doneRef.current || skipTimer.current) return;
+        setLeaving(true);
+        skipTimer.current = setTimeout(finish, 180);
+      }}
+      role="status"
+      aria-label="Abrindo a aula de hoje"
+    >
+      <div className="relative flex items-center justify-center">
+        {/* Anéis pulsando para fora */}
+        <span
+          className="dc-intro-ring absolute h-32 w-32 rounded-full border-4 border-white/50"
+          aria-hidden
+        />
+        <span
+          className="dc-intro-ring absolute h-32 w-32 rounded-full border-4 border-white/30"
+          style={{ animationDelay: "220ms" }}
+          aria-hidden
+        />
+        {/* Moeda saltando, no mesmo estilo glossy da logo */}
+        <div
+          className="dc-intro-coin relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-full"
+          style={{
+            background: `radial-gradient(120% 120% at 32% 24%, color-mix(in oklab, ${tm.main} 45%, white) 0%, ${tm.main} 60%, color-mix(in oklab, ${tm.main} 80%, black) 100%)`,
+            boxShadow: `0 10px 0 ${tm.lip}, 0 22px 40px -12px rgba(0,0,0,0.35)`,
+          }}
+        >
+          <span className="relative z-10 text-5xl">{emoji}</span>
+          <span className="dc-coin-shine" aria-hidden />
+        </div>
+      </div>
+
+      <p className="dc-intro-text mt-8 text-xs font-black uppercase tracking-[0.3em] text-white/85">
+        Semana {week} · {isToday ? "Aula de hoje" : "Revisão"}
+      </p>
+      <p className="dc-intro-sub mt-2 max-w-[240px] text-center font-serif text-2xl font-extrabold leading-snug text-white drop-shadow-sm">
+        {isToday ? `2 minutinhos por ${babyLabel} 💛` : `Relembre pelo ${babyLabel} 💛`}
+      </p>
+      <p className="dc-intro-sub mt-3 text-[11px] font-semibold text-white/75">
+        toque para começar
+      </p>
+    </div>
+  );
+}
+
+/* ══════════════════ Quiz diário da professora (dentro do sheet do dia) ══════════════════
+   Um exercício por dia (semanas 1-40): mini-lição rica + curiosidade + 4-5
+   perguntas variadas (escolha única ou "marque todas"), estilo Duolingo.
+   Responder no dia de HOJE completa a tarefa "desafio"; dias passados ficam
+   jogáveis em modo revisão (aprender vale sempre; a chama vale no dia).
+   Ao terminar, quem é do plano grátis recebe um convite para o Premium. */
+
+type QuizAnswer = number | number[] | null;
+
+function DailyQuizBlock({
+  quiz,
+  emoji,
+  week,
+  alreadyDone,
+  canEarn,
+  missingHint,
+  showPremiumAd = false,
+  onEarn,
+}: {
+  quiz: DailyQuiz;
+  emoji: string;
+  week: number;
+  alreadyDone: boolean;
+  canEarn: boolean;
+  /** Dica do que ainda falta para fechar o dia (ex.: check-in de humor). */
+  missingHint?: string | null;
+  /** Mostra o convite ao Premium ao terminar (só para quem é do plano grátis). */
+  showPremiumAd?: boolean;
+  onEarn: () => void;
+}) {
+  const questions = quiz.questions;
+  const [answers, setAnswers] = useState<QuizAnswer[]>(() => questions.map(() => null));
+  const [checked, setChecked] = useState(false);
+  // Congela "essa resposta valeu o desafio de hoje" no momento do Responder:
+  // onEarn marca a tarefa e flipa alreadyDone no MESMO render, então o rodapé
+  // não pode depender do prop ao vivo (viraria "modo revisão" na hora).
+  const [earnedNow, setEarnedNow] = useState(false);
+  const tm = trimMeta(week);
+  const total = questions.length;
+  const score = checked ? questions.filter((q, i) => isAnswerCorrect(q, answers[i])).length : 0;
+
+  // "Marque todas": alterna o índice dentro do array de respostas.
+  function toggleMulti(qi: number, oi: number) {
+    setAnswers((prev) => {
+      const next = [...prev];
+      const cur = Array.isArray(next[qi]) ? [...(next[qi] as number[])] : [];
+      const at = cur.indexOf(oi);
+      if (at >= 0) cur.splice(at, 1);
+      else cur.push(oi);
+      next[qi] = cur;
+      return next;
+    });
+  }
+
+  const allAnswered = answers.every((a, i) =>
+    isMultiQuestion(questions[i]) ? Array.isArray(a) && a.length > 0 : a != null,
+  );
+
+  function verify() {
+    setChecked(true);
+    if (canEarn && !alreadyDone) {
+      setEarnedNow(true);
+      onEarn();
+    }
+  }
+
+  const selected = (qi: number, oi: number) => {
+    const a = answers[qi];
+    return Array.isArray(a) ? a.includes(oi) : a === oi;
+  };
+
+  return (
+    <div className="mb-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
+          {emoji} Aula de hoje · Semana {week}
+        </p>
+        {alreadyDone && !checked && (
+          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-500">
+            revisão
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-violet-950">{quiz.teach}</p>
+
+      {quiz.funFact && (
+        <div className="mt-2.5 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+          <span className="font-bold">💡 Você sabia?</span> {quiz.funFact}
+        </div>
+      )}
+
+      {questions.map((q, qi) => {
+        const isMulti = isMultiQuestion(q);
+        const correct = isAnswerCorrect(q, answers[qi]);
+        return (
+          <div key={qi} className="mt-3">
+            <p className="text-sm font-bold text-violet-950">
+              {qi + 1}. {q.q}
+            </p>
+            {isMulti && (
+              <p className="mt-0.5 text-[11px] font-semibold text-violet-500">
+                Marque todas as corretas
+              </p>
+            )}
+            <div className="mt-1.5 flex flex-col gap-1.5">
+              {q.o.map((opt, oi) => {
+                const isCorrectOpt = Array.isArray(q.a) ? q.a.includes(oi) : q.a === oi;
+                const isPicked = selected(qi, oi);
+                let cls = "border-violet-200 bg-white text-violet-950";
+                if (checked) {
+                  if (isCorrectOpt) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
+                  else if (isPicked) cls = "border-rose-300 bg-rose-50 text-rose-700";
+                  else cls = "border-violet-100 bg-white text-slate-400";
+                } else if (isPicked) {
+                  cls = "border-violet-500 bg-violet-100 text-violet-900";
+                }
+                return (
+                  <button
+                    key={oi}
+                    disabled={checked}
+                    onClick={() => (isMulti ? toggleMulti(qi, oi) : setAnswerAt(qi, oi))}
+                    className={`press flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-left text-sm font-medium transition-colors ${cls}`}
+                  >
+                    {isMulti && (
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 text-[10px] ${
+                          isPicked
+                            ? "border-violet-500 bg-violet-500 text-white"
+                            : "border-violet-300 bg-white"
+                        }`}
+                      >
+                        {isPicked ? "✓" : ""}
+                      </span>
+                    )}
+                    <span>{opt}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {checked && (
+              <p
+                className={`mt-1.5 rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                  correct ? "bg-emerald-100/70 text-emerald-800" : "bg-amber-100/70 text-amber-800"
+                }`}
+              >
+                {correct ? "✓ Isso! " : "💡 "}
+                {q.why}
+              </p>
+            )}
+          </div>
+        );
+      })}
+
+      {!checked ? (
+        <button
+          onClick={verify}
+          disabled={!allAnswered}
+          className="press mt-4 w-full rounded-full py-3 text-sm font-extrabold text-white disabled:opacity-40"
+          style={{ background: tm.main, boxShadow: `0 4px 0 ${tm.lip}` }}
+        >
+          Responder
+        </button>
+      ) : (
+        <>
+          <div className="mt-3 rounded-2xl bg-white p-3 text-center">
+            <p className="text-sm font-extrabold">
+              {score === total
+                ? "🏆 Acertou tudo!"
+                : score >= total - 1
+                  ? "🎉 Quase perfeito!"
+                  : score > 0
+                    ? "👏 Muito bem!"
+                    : "💪 Anotado!"}{" "}
+              {score}/{total}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {earnedNow
+                ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
+                : "Modo revisão — o desafio vale no próprio dia, mas aprender vale sempre 💜"}
+            </p>
+          </div>
+          {showPremiumAd && (
+            <div className="mt-3">
+              <QuizPaywall week={week} context="ad" />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  // Escolha única: define a resposta do quiz qi.
+  function setAnswerAt(qi: number, oi: number) {
+    setAnswers((prev) => {
+      const next = [...prev];
+      next[qi] = oi;
+      return next;
+    });
+  }
+}
+
 /* ══════════════════ PONTO 2 · Jornada do 4º trimestre ══════════════════ */
 
 function PosPartoJourney({
@@ -1683,6 +3058,7 @@ function PosPartoJourney({
   setRevealing,
   styleBlock,
   shareGest,
+  careMode = false,
 }: {
   babyLabel: string;
   birth: Birth;
@@ -1698,6 +3074,7 @@ function PosPartoJourney({
   setRevealing: (v: boolean) => void;
   styleBlock: React.ReactNode;
   shareGest: (week: number) => void;
+  careMode?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [posDone, setPosDone] = useState<number[]>([]);
@@ -1834,14 +3211,18 @@ function PosPartoJourney({
 
       {/* Stats */}
       <div className="flex items-center justify-around rounded-2xl bg-white/70 px-3 py-2.5 backdrop-blur-sm shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
-        <div className="flex items-center gap-1.5">
-          <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
-          <span className="text-lg font-extrabold text-amber-500">{streak}</span>
-          <span className="text-xs font-medium text-muted-foreground">
-            {streak === 1 ? "dia" : "dias"}
-          </span>
-        </div>
-        <div className="h-6 w-px bg-slate-200" />
+        {!careMode && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
+              <span className="text-lg font-extrabold text-amber-500">{streak}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {streak === 1 ? "dia" : "dias"}
+              </span>
+            </div>
+            <div className="h-6 w-px bg-slate-200" />
+          </>
+        )}
         <div className="flex items-center gap-1.5">
           <span className="text-xl">👶</span>
           <span className="text-lg font-extrabold text-sky-500">S{currentWeek}</span>
@@ -1967,9 +3348,18 @@ function PosPartoJourney({
             return (
               <button
                 key={`d${D}`}
-                onClick={() => openDay(D)}
-                disabled={isFuture}
-                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none disabled:cursor-not-allowed"
+                onClick={() => {
+                  if (isFuture) {
+                    const em = D - todayD;
+                    toast(
+                      `🔒 Esse dia abre ${em === 1 ? "amanhã" : `em ${em} dias`} — um passo de cada vez 💛`,
+                    );
+                    return;
+                  }
+                  openDay(D);
+                }}
+                aria-disabled={isFuture}
+                className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none ${isFuture ? "cursor-not-allowed" : ""}`}
                 style={{ left: `${node.x}%`, top: `${node.y}px` }}
                 aria-label={`Dia ${(D % 7) + 1} da semana ${week} de vida`}
               >
@@ -1986,7 +3376,7 @@ function PosPartoJourney({
                   </div>
                 )}
                 <div
-                  className={`duo3d flex items-center justify-center rounded-full ${
+                  className={`duo3d relative flex items-center justify-center overflow-hidden rounded-full ${
                     isToday ? "ring-4 ring-white/70" : ""
                   } ${isToday && !done ? "dc-chest" : ""}`}
                   style={
@@ -1999,20 +3389,15 @@ function PosPartoJourney({
                   }
                 >
                   {isToday && !done ? (
-                    <span className="text-2xl">🎁</span>
+                    <span className="relative z-10 text-2xl">🎁</span>
                   ) : done ? (
-                    <span className={`font-black text-white ${isToday ? "text-2xl" : "text-lg"}`}>
+                    <span
+                      className={`relative z-10 font-black text-white ${isToday ? "text-2xl" : "text-lg"}`}
+                    >
                       ✓
                     </span>
-                  ) : (
-                    <span
-                      className={`font-black tabular-nums ${
-                        isFuture ? "text-slate-400" : "text-sky-300"
-                      } text-sm`}
-                    >
-                      {(D % 7) + 1}
-                    </span>
-                  )}
+                  ) : null}
+                  <span className="dc-coin-shine" aria-hidden />
                 </div>
               </button>
             );
@@ -2041,7 +3426,7 @@ function PosPartoJourney({
                 style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {revealing && <ConfettiBurst />}
+                {revealing && !careMode && <ConfettiBurst />}
                 <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
 
                 <div className="mb-4 flex items-center gap-3">
@@ -2106,7 +3491,7 @@ function PosPartoJourney({
 
                 <div className="mb-4 rounded-2xl border border-sky-100 bg-sky-50 p-4">
                   <p className="text-xs font-bold uppercase tracking-wider text-sky-600">
-                    🩺 Orientação do Dr. Clóvis
+                    🩺 Orientação médica
                   </p>
                   <p className="mt-1.5 text-sm leading-relaxed text-sky-900">
                     {POS_GUIDANCE[week] ?? POS_GUIDANCE[12]}
@@ -2136,6 +3521,7 @@ function PosPartoJourney({
           revealing={revealing}
           onClose={() => setSheet(null)}
           onShare={shareGest}
+          careMode={careMode}
         />
       )}
     </div>

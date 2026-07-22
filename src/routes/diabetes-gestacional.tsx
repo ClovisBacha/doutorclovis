@@ -5,7 +5,7 @@ import { AppCtaBanner } from "@/components/app-cta-banner";
 export const Route = createFileRoute("/diabetes-gestacional")({
   head: () => ({
     meta: [
-      { title: "Diabetes Gestacional — Protocolo e Calculadoras — Obstétrica by Dr. Clóvis" },
+      { title: "Diabetes Gestacional — Protocolo e Calculadoras — Obstétrica" },
       {
         name: "description",
         content:

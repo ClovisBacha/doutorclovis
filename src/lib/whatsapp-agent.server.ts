@@ -1,5 +1,5 @@
 /**
- * Agente de IA para WhatsApp — Dr. Clóvis Bacha.
+ * Agente de IA para WhatsApp — consultório do médico associado.
  *
  * Fluxo de agendamento por mensagem:
  *   start → collecting_name → collecting_reason → collecting_date → confirming → done
@@ -16,7 +16,7 @@ import { createChatProvider, DEFAULT_CHAT_MODEL } from "./ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DOCTOR } from "./doctor.config";
 import { waSendText, waSendButtons } from "./whatsapp.server";
-import { getBrainContext } from "./secondbrain.server";
+import { getBrainContextResolved } from "./secondbrain.server";
 
 /* ------------------------------------------------------------------ */
 /* Tipos                                                                */
@@ -49,6 +49,10 @@ interface ConvContext {
   email?: string;
   history?: { role: "user" | "assistant"; content: string }[];
   appointment_id?: string;
+  // Médico da conversa (null = dono da instalação). A tabela é chaveada só
+  // por telefone; se a MESMA paciente escrever para o número de OUTRO médico,
+  // a conversa anterior não pode vazar — detectamos a troca e recomeçamos.
+  doctor_id?: string | null;
 }
 
 interface AgentDecision {
@@ -62,29 +66,73 @@ interface AgentDecision {
 /* Prompt do sistema                                                    */
 /* ------------------------------------------------------------------ */
 
-const SYSTEM = `Você é a assistente virtual do consultório do ${DOCTOR.name}, ${DOCTOR.title} especialista em gestação de alto risco.
+/**
+ * Identidade do médico dono do número que recebeu a mensagem. Cada número de
+ * WhatsApp mapeado (doctor_whatsapp_numbers) fala em nome do SEU médico —
+ * nome, título e PIX próprios. DOCTOR.* só como fallback do dono da
+ * instalação (número sem mapeamento).
+ */
+interface DoctorIdentity {
+  name: string;
+  title: string;
+  pixKey: string;
+}
+
+async function resolveDoctorIdentity(doctorId?: string | null): Promise<DoctorIdentity> {
+  const fallback: DoctorIdentity = {
+    name: DOCTOR.name,
+    title: DOCTOR.title,
+    pixKey: DOCTOR.pixKey,
+  };
+  if (!doctorId) return fallback;
+  try {
+    const { data: doc } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("display_name,title,pix_key")
+      .eq("id", doctorId)
+      .maybeSingle();
+    if (!doc) return fallback;
+    return {
+      name: (doc.display_name as string)?.trim() || fallback.name,
+      title: (doc.title as string)?.trim() || "ginecologista e obstetra",
+      // PIX de OUTRO médico nunca cai no fallback do dono: sem pix_key, omite.
+      pixKey: (doc.pix_key as string)?.trim() || "",
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function buildSystem(identity: DoctorIdentity): string {
+  return `Você é a assistente virtual do consultório do ${identity.name}, ${identity.title} especialista em gestação de alto risco.
 
 PERSONALIDADE: Acolhedora, empática, clara e profissional. Tom conversacional, sem jargões.
 LÍNGUA: Português brasileiro coloquial mas educado.
 REGRAS:
-- NUNCA dê diagnóstico, prescrição ou conduta clínica.
-- Para sintomas preocupantes → oriente urgência: SAMU 192 ou UPA.
-- Para perguntas clínicas → responda com informação geral e sugira consulta.
+- Você é uma INTELIGÊNCIA ARTIFICIAL de apoio — NÃO é o médico e NÃO substitui a consulta. Se a paciente tratar você como médica, esclareça com gentileza.
+- NUNCA dê diagnóstico, prescrição, dose de medicamento ou conduta clínica.
+- Responda SOMENTE dentro do que o médico já validou (bloco de estilo/conduta, se houver). Fora disso, NÃO improvise: diga que vai encaminhar ao médico e sugira consulta.
+- Para sintomas preocupantes → oriente urgência: SAMU 192 ou UPA/pronto-socorro AGORA.
+- Para perguntas clínicas → informação geral acolhedora e sugira consulta com o médico.
 - Seja CONCISA: máx 3 frases por mensagem no fluxo de agendamento.
 - Não invente horários disponíveis: diga que a equipe confirmará em até 2h.
 
 CONSULTÓRIO:
 - Especialidade: Gestação de alto risco, pré-natal, hipertensão gestacional, diabetes gestacional, medicina fetal
 - Agendamento: confirmado pela equipe após receber solicitação
-- Horários: consulte a disponibilidade ao confirmar com a equipe
-- PIX: ${DOCTOR.pixKey}
+- Horários: consulte a disponibilidade ao confirmar com a equipe${identity.pixKey ? `\n- PIX: ${identity.pixKey}` : ""}
 - Site: ${DOCTOR.siteUrl}`;
+}
 
 /* ------------------------------------------------------------------ */
 /* Núcleo do agente                                                     */
 /* ------------------------------------------------------------------ */
 
-async function callAgent(conv: WaConversation, userMessage: string): Promise<AgentDecision> {
+async function callAgent(
+  conv: WaConversation,
+  userMessage: string,
+  doctorId?: string | null,
+): Promise<AgentDecision> {
   const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY não configurado");
 
@@ -95,11 +143,15 @@ async function callAgent(conv: WaConversation, userMessage: string): Promise<Age
   // getBrainContext é safe (falha vira block vazio) — nunca derruba o agente.
   // O block só influencia o TOM do campo "reply"; o formato JSON da resposta
   // e o fluxo de estados continuam regidos pelo prompt abaixo.
-  const brain = await getBrainContext(userMessage, undefined, "whatsapp");
+  const [brain, identity] = await Promise.all([
+    getBrainContextResolved(userMessage, doctorId ?? undefined, "whatsapp"),
+    resolveDoctorIdentity(doctorId),
+  ]);
+  const baseSystem = buildSystem(identity);
   const system =
     brain.enabledWhatsapp && brain.block
-      ? `${SYSTEM}\n\n${brain.block}\nO bloco acima orienta apenas o estilo e a conduta do texto enviado ao paciente. Continue seguindo o fluxo de estados e o formato de resposta em JSON exigidos na mensagem do usuário.`
-      : SYSTEM;
+      ? `${baseSystem}\n\n${brain.block}\nO bloco acima orienta apenas o estilo e a conduta do texto enviado ao paciente. Continue seguindo o fluxo de estados e o formato de resposta em JSON exigidos na mensagem do usuário.`
+      : baseSystem;
 
   const stateInstructions: Record<ConvState, string> = {
     start: `O paciente acabou de mandar a primeira mensagem. Cumprimenta-o pelo nome se disponível, apresente-se brevemente e pergunte como pode ajudar. Se a intenção for agendamento, mova para collecting_name.`,
@@ -178,32 +230,64 @@ Responda OBRIGATORIAMENTE em JSON válido com este formato exato:
 /* Persistência (Supabase service_role)                                 */
 /* ------------------------------------------------------------------ */
 
-async function getOrCreateConversation(phone: string): Promise<WaConversation> {
-  const sb = supabaseAdmin;
-  const { data } = await (sb as any)
-    .from("whatsapp_conversations")
-    .select("*")
-    .eq("phone", phone)
-    .maybeSingle();
-
+/**
+ * Conversa por (telefone, médico): a MESMA paciente falando com números de
+ * médicos diferentes tem conversas separadas no banco. Banco sem a coluna
+ * doctor_id (migração pendente) → comportamento antigo por telefone (o reset
+ * por contexto em handleWhatsAppMessage segue garantindo o isolamento).
+ */
+async function getOrCreateConversation(
+  phone: string,
+  doctorId?: string | null,
+): Promise<WaConversation> {
+  const sb = supabaseAdmin as any;
+  let query = sb.from("whatsapp_conversations").select("*").eq("phone", phone);
+  query = doctorId ? query.eq("doctor_id", doctorId) : query.is("doctor_id", null);
+  const first = await query.maybeSingle();
+  let data = first.data;
+  if (first.error?.code === "42703") {
+    ({ data } = await sb
+      .from("whatsapp_conversations")
+      .select("*")
+      .eq("phone", phone)
+      .maybeSingle());
+  }
   if (data) return data as WaConversation;
 
-  const { data: created } = await (sb as any)
+  const { data: created, error: insErr } = await sb
     .from("whatsapp_conversations")
-    .insert({ phone, state: "start", context: {} })
+    .insert({ phone, state: "start", context: {}, doctor_id: doctorId ?? null })
     .select()
     .single();
-
+  if (created) return created as WaConversation;
+  if (insErr) {
+    // 42703 (coluna ausente) ou 23505 (UNIQUE(phone) legado com outra conversa
+    // do mesmo telefone): reaproveita/cria a linha por telefone — o reset por
+    // contexto impede vazamento entre médicos.
+    const { data: legacy } = await sb
+      .from("whatsapp_conversations")
+      .select("*")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (legacy) return legacy as WaConversation;
+    const { data: legacyCreated } = await sb
+      .from("whatsapp_conversations")
+      .insert({ phone, state: "start", context: {} })
+      .select()
+      .single();
+    return legacyCreated as WaConversation;
+  }
   return created as WaConversation;
 }
 
 async function saveConversation(
-  phone: string,
+  conv: WaConversation,
   state: ConvState,
   context: ConvContext,
   patientName?: string | null,
 ): Promise<void> {
   const sb = supabaseAdmin;
+  // Por id: nunca atualiza a conversa do mesmo telefone com OUTRO médico.
   await (sb as any)
     .from("whatsapp_conversations")
     .update({
@@ -212,12 +296,20 @@ async function saveConversation(
       patient_name: patientName ?? undefined,
       last_message_at: new Date().toISOString(),
     })
-    .eq("phone", phone);
+    .eq("id", conv.id);
 }
 
-async function createAppointmentRequest(phone: string, context: ConvContext): Promise<void> {
+async function createAppointmentRequest(
+  phone: string,
+  context: ConvContext,
+  doctorId?: string | null,
+): Promise<void> {
   const sb = supabaseAdmin;
-  await (sb as any).from("appointment_requests").insert({
+  // Atribuição por médico: o número que recebeu → doctor_id. Número sem
+  // mapeamento fica sem médico (doctor_id null) — não existe mais "dono da
+  // instalação" para onde cair.
+  const targetDoctor = doctorId ?? null;
+  const row = {
     patient_name: context.name ?? "Paciente WhatsApp",
     patient_phone: phone,
     patient_email: context.email ?? "",
@@ -226,7 +318,14 @@ async function createAppointmentRequest(phone: string, context: ConvContext): Pr
     reason: context.reason ?? "Consulta (agendado via WhatsApp)",
     notes: `Preferência informada: ${context.preferred_date ?? "a definir"}. Agendado via agente WhatsApp.`,
     status: "pending",
-  });
+  };
+  const { error } = await (sb as any)
+    .from("appointment_requests")
+    .insert(targetDoctor ? { ...row, doctor_id: targetDoctor } : row);
+  if (error?.code === "42703" && targetDoctor) {
+    // Coluna doctor_id ainda não migrada: registra sem atribuição.
+    await (sb as any).from("appointment_requests").insert(row);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -237,11 +336,24 @@ export async function handleWhatsAppMessage(
   phone: string,
   messageText: string,
   messageId: string,
+  phoneNumberId?: string | null,
 ): Promise<void> {
   // Normaliza o telefone (remove + e espaços)
   const cleanPhone = phone.replace(/\D/g, "");
 
-  const conv = await getOrCreateConversation(cleanPhone);
+  // WhatsApp por médico: o número que recebeu → doctor_id (null = cérebro do dono).
+  const { resolveDoctorIdByWhatsappNumber } = await import("./whatsapp.server");
+  const doctorId = await resolveDoctorIdByWhatsappNumber(phoneNumberId);
+
+  let conv = await getOrCreateConversation(cleanPhone, doctorId);
+
+  // Isolamento por médico (defesa em profundidade p/ banco sem doctor_id):
+  // se a conversa existente pertence a OUTRO médico, recomeça do zero —
+  // histórico, nome e motivo de um consultório nunca vazam para outro.
+  const targetDoctor = doctorId ?? null;
+  if (conv.context.doctor_id !== undefined && conv.context.doctor_id !== targetDoctor) {
+    conv = { ...conv, state: "start", context: {} };
+  }
 
   // Detecta urgência por palavras-chave antes do agente para segurança
   const urgentWords =
@@ -249,12 +361,17 @@ export async function handleWhatsAppMessage(
   const forceUrgent = urgentWords.test(messageText);
 
   // Chama o agente
-  const decision = await callAgent(forceUrgent ? { ...conv, state: "urgent" } : conv, messageText);
+  const decision = await callAgent(
+    forceUrgent ? { ...conv, state: "urgent" } : conv,
+    messageText,
+    doctorId,
+  );
 
   // Merge dos dados extraídos
   const newContext: ConvContext = {
     ...conv.context,
     ...Object.fromEntries(Object.entries(decision.extracted ?? {}).filter(([, v]) => v != null)),
+    doctor_id: targetDoctor,
     history: [
       ...(conv.context.history ?? []).slice(-10),
       { role: "user", content: messageText },
@@ -264,13 +381,13 @@ export async function handleWhatsAppMessage(
 
   // Cria o agendamento se o agente decidiu
   if (decision.create_appointment) {
-    await createAppointmentRequest(cleanPhone, newContext);
+    await createAppointmentRequest(cleanPhone, newContext, doctorId);
     newContext.appointment_id = "pending";
   }
 
   // Salva o estado atualizado
   await saveConversation(
-    cleanPhone,
+    conv,
     forceUrgent ? "urgent" : decision.next_state,
     newContext,
     newContext.name,

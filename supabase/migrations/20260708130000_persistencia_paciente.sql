@@ -26,9 +26,11 @@ CREATE TABLE IF NOT EXISTS public.triage_logs (
 CREATE INDEX IF NOT EXISTS idx_triage_logs_user_created
   ON public.triage_logs(user_id, created_at DESC);
 ALTER TABLE public.triage_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own triage logs" ON public.triage_logs;
 CREATE POLICY "Patient manages own triage logs"
   ON public.triage_logs FOR ALL TO authenticated
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages triage logs" ON public.triage_logs;
 CREATE POLICY "Service manages triage logs"
   ON public.triage_logs FOR ALL TO service_role
   USING (true) WITH CHECK (true);

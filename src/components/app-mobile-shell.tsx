@@ -17,7 +17,7 @@ import {
   CreditCard,
   FileText,
   Footprints,
-  GraduationCap,
+  Map,
   Heart,
   Home,
   MessageCircle,
@@ -31,7 +31,7 @@ import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
-import { babyForWeek } from "@/lib/gestacao";
+import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
 
 /* ================================================================
    Tipos
@@ -39,6 +39,7 @@ import { babyForWeek } from "@/lib/gestacao";
 
 export type AppTab =
   | "Bebê"
+  | "Caminho"
   | "Carta do Bebê"
   | "Calendário"
   | "Linha do Tempo"
@@ -69,6 +70,7 @@ export type AppTab =
   | "Carteirinha"
   | "Pós-parto"
   | "Conquistas"
+  | "Cantinho"
   | "Loja"
   | "Consulta Particular"
   | "Ciclo Menstrual"
@@ -86,6 +88,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
   gestacao: [
     "Bebê",
+    "Caminho",
     "Carta do Bebê",
     "Calendário",
     "Linha do Tempo",
@@ -128,6 +131,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
     "FAQ",
     "Pânico",
     "Conquistas",
+    "Cantinho",
     "Loja",
     "Médico",
     "Chat IA",
@@ -233,34 +237,48 @@ function weatherTip(code: number, temp: number): { tip: string; tipEmoji: string
 function useWeather(): WeatherState | null {
   const [weather, setWeather] = useState<WeatherState | null>(null);
   useEffect(() => {
-    if (typeof window === "undefined" || !("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        try {
-          const res = await fetch(
-            `https://api.open-meteo.com/v1/forecast` +
-              `?latitude=${coords.latitude.toFixed(4)}` +
-              `&longitude=${coords.longitude.toFixed(4)}` +
-              `&current=temperature_2m,weather_code` +
-              `&timezone=auto&forecast_days=1`,
-          );
-          if (!res.ok) return;
-          const data = (await res.json()) as {
-            current: { temperature_2m: number; weather_code: number };
-          };
-          const temp = Math.round(data.current.temperature_2m);
-          const code = data.current.weather_code;
-          const { condition, emoji } = wmoToInfo(code);
-          const overlay = weatherOverlay(code, temp);
-          const { tip, tipEmoji } = weatherTip(code, temp);
-          setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji });
-        } catch {
-          /* clima é enhancement — falha silenciosa */
-        }
-      },
-      () => {},
-      { timeout: 8000, maximumAge: 300_000 },
-    );
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+
+    async function load(lat: number, lon: number) {
+      try {
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast` +
+            `?latitude=${lat.toFixed(4)}` +
+            `&longitude=${lon.toFixed(4)}` +
+            `&current=temperature_2m,weather_code` +
+            `&timezone=auto&forecast_days=1`,
+        );
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          current: { temperature_2m: number; weather_code: number };
+        };
+        const temp = Math.round(data.current.temperature_2m);
+        const code = data.current.weather_code;
+        const { condition, emoji } = wmoToInfo(code);
+        const overlay = weatherOverlay(code, temp);
+        const { tip, tipEmoji } = weatherTip(code, temp);
+        if (!cancelled) setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji });
+      } catch {
+        /* clima é enhancement — falha silenciosa */
+      }
+    }
+
+    // Fallback: Belo Horizonte. Sem ele, quem nega a localização perdia o
+    // strip de clima inteiro (dado "sumido" relatado na auditoria de design).
+    const FALLBACK = { lat: -19.9167, lon: -43.9345 };
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => load(coords.latitude, coords.longitude),
+        () => load(FALLBACK.lat, FALLBACK.lon),
+        { timeout: 8000, maximumAge: 300_000 },
+      );
+    } else {
+      load(FALLBACK.lat, FALLBACK.lon);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
   return weather;
 }
@@ -284,45 +302,79 @@ export function AppBottomNav({
   activeSection: BottomSection;
   onSelect: (s: BottomSection) => void;
 }) {
+  // Estilo Instagram: rolando para BAIXO (lendo conteúdo) a barra encolhe e
+  // some com os rótulos; rolando para CIMA (procurando navegação) ela volta ao
+  // tamanho cheio. Perto do topo fica sempre expandida.
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let lastY = window.scrollY;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - lastY;
+        if (y < 48) setCompact(false);
+        else if (delta > 6) setCompact(true);
+        else if (delta < -6) setCompact(false);
+        lastY = y;
+        raf = 0;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   return (
     <nav
       aria-label="Navegação do app"
-      className="fixed inset-x-0 bottom-0 z-40 flex md:hidden items-center justify-around border-t border-border/70 bg-background/90 backdrop-blur-xl backdrop-saturate-150 print:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      className="pointer-events-none fixed inset-x-0 z-40 flex justify-center md:hidden print:hidden"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
     >
-      {NAV_ITEMS.map(({ id, Icon, label }) => {
-        const active = activeSection === id;
-        return (
-          <button
-            key={id}
-            onClick={() => onSelect(id)}
-            aria-current={active ? "page" : undefined}
-            className="flex flex-1 flex-col items-center gap-0.5 py-2 transition-colors duration-200"
-          >
-            {/* Pill de fundo — expande com mola quando ativa (key retrigger do pop-in) */}
-            <div
-              key={active ? "on" : "off"}
-              className={`flex h-8 w-14 items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-                active ? "pop-in bg-primary/12 scale-105" : "scale-100"
-              }`}
+      <div
+        className={`pointer-events-auto flex items-center justify-around rounded-full border border-border/60 bg-background/85 shadow-[0_10px_36px_rgba(0,0,0,0.14)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+          compact ? "w-[64%] px-1.5 py-1" : "w-[92%] max-w-md px-2 py-1.5"
+        }`}
+      >
+        {NAV_ITEMS.map(({ id, Icon, label }) => {
+          const active = activeSection === id;
+          return (
+            <button
+              key={id}
+              onClick={() => onSelect(id)}
+              aria-current={active ? "page" : undefined}
+              aria-label={label}
+              className="flex min-w-0 flex-1 flex-col items-center py-1 transition-colors duration-200"
             >
-              <Icon
-                className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-                  active ? "text-primary scale-110" : "text-muted-foreground scale-100"
-                }`}
-                strokeWidth={active ? 2.5 : 1.8}
-              />
-            </div>
-            <span
-              className={`text-[9px] font-medium transition-colors duration-200 ${
-                active ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              {label}
-            </span>
-          </button>
-        );
-      })}
+              {/* Pill de fundo — expande com mola quando ativa (key retrigger do pop-in) */}
+              <div
+                key={active ? "on" : "off"}
+                className={`flex items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                  compact ? "h-9 w-9" : "h-9 w-12"
+                } ${active ? "pop-in bg-primary/12 scale-105" : "scale-100"}`}
+              >
+                <Icon
+                  className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                    active ? "text-primary scale-110" : "text-muted-foreground scale-100"
+                  }`}
+                  strokeWidth={active ? 2.5 : 1.8}
+                />
+              </div>
+              <span
+                className={`overflow-hidden text-[10px] font-medium transition-all duration-300 ${
+                  compact ? "max-h-0 opacity-0" : "mt-0.5 max-h-4 opacity-100"
+                } ${active ? "text-primary" : "text-muted-foreground"}`}
+              >
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 }
@@ -332,6 +384,97 @@ export function AppBottomNav({
    ================================================================ */
 
 type GestInfo = { weeks: number; days: number; totalDays: number } | null;
+
+/**
+ * Marcos proativos por semana: o app INICIA o cuidado ("você entrou na semana
+ * 28 — hora de contar os movimentos") em vez de esperar a paciente procurar.
+ * Faixas em ordem; a primeira que contém a semana atual vence.
+ */
+const WEEK_MILESTONES: {
+  min: number;
+  max: number;
+  icon: string;
+  title: string;
+  text: string;
+  tab: AppTab;
+}[] = [
+  {
+    min: 6,
+    max: 10,
+    icon: "🩺",
+    title: "Hora do primeiro ultrassom",
+    text: "O exame inicial (6–9 semanas) data a gestação. Já agendou a primeira consulta?",
+    tab: "Consultas",
+  },
+  {
+    min: 11,
+    max: 13,
+    icon: "🔬",
+    title: "Janela do morfológico do 1º trimestre",
+    text: "Entre 11 e 14 semanas — guarde o resultado na aba Exames.",
+    tab: "Exames",
+  },
+  {
+    min: 16,
+    max: 19,
+    icon: "🦶",
+    title: "Os primeiros chutes estão chegando",
+    text: "Entre 18 e 22 semanas você deve começar a sentir — registre os movimentos.",
+    tab: "Chutes",
+  },
+  {
+    min: 20,
+    max: 23,
+    icon: "🔬",
+    title: "Janela do morfológico do 2º trimestre",
+    text: "Entre 20 e 24 semanas — o ultrassom mais detalhado do bebê.",
+    tab: "Exames",
+  },
+  {
+    min: 24,
+    max: 27,
+    icon: "🍬",
+    title: "Época do teste de glicose (TOTG)",
+    text: "Entre 24 e 28 semanas — rastreio de diabetes gestacional. Combine com seu médico.",
+    tab: "Exames",
+  },
+  {
+    min: 28,
+    max: 30,
+    icon: "👶",
+    title: "Comece a contagem de movimentos",
+    text: "No 3º trimestre, o padrão diário dos chutes é o melhor sinal de bem-estar do bebê.",
+    tab: "Chutes",
+  },
+  {
+    min: 31,
+    max: 33,
+    icon: "📋",
+    title: "Hora de montar o plano de parto",
+    text: "Registre suas preferências e converse com seu médico na próxima consulta.",
+    tab: "Plano de Parto",
+  },
+  {
+    min: 34,
+    max: 36,
+    icon: "🧳",
+    title: "Prepare a mala da maternidade",
+    text: "O checklist completo te guia peça por peça — deixe pronta até a semana 36.",
+    tab: "Checklist",
+  },
+  {
+    min: 37,
+    max: 42,
+    icon: "⏱️",
+    title: "Reta final: conheça os sinais do trabalho de parto",
+    text: "Registre as contrações — padrão 5-1-1 é hora de ir para a maternidade.",
+    tab: "Contrações",
+  },
+];
+
+function milestoneForWeek(weeks: number) {
+  return WEEK_MILESTONES.find((m) => weeks >= m.min && weeks <= m.max) ?? null;
+}
 
 export type NextAppointment = { dateLabel: string; typeLabel: string };
 
@@ -380,10 +523,10 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     color: "bg-orange-50 text-orange-600 ring-orange-200",
   },
   {
-    Icon: GraduationCap,
-    label: "Escola",
-    tab: "Escola",
-    color: "bg-teal-50 text-teal-600 ring-teal-200",
+    Icon: Map,
+    label: "Jornada",
+    tab: "Caminho",
+    color: "bg-fuchsia-50 text-fuchsia-600 ring-fuchsia-200",
   },
   {
     Icon: Stethoscope,
@@ -405,28 +548,72 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
   },
 ];
 
+/**
+ * Lê do cache local da jornada (dc-path-*) a chama e o estado do desafio de
+ * hoje. Leitura duplicada de propósito: não puxa o módulo pesado do jogo.
+ */
+function readJourneyStats(totalDays: number | null): { streak: number; todayDone: boolean } {
+  if (typeof window === "undefined" || totalDays == null) return { streak: 0, todayDone: false };
+  try {
+    const doneDays: number[] = JSON.parse(localStorage.getItem("dc-path-done-days") ?? "[]");
+    const todayD = Math.max(7, Math.min(300, totalDays));
+    const set = new Set(doneDays);
+    let s = 0;
+    let d = set.has(todayD) ? todayD : todayD - 1;
+    while (set.has(d)) {
+      s++;
+      d--;
+    }
+    return { streak: s, todayDone: set.has(todayD) };
+  } catch {
+    return { streak: 0, todayDone: false };
+  }
+}
+
 export function AppHomeScreen({
   firstName,
   babyName,
   gest,
   onNavigate,
   nextAppointment,
+  babyTone = 0,
+  onBabyTap,
+  careMode = false,
 }: {
   firstName: string;
   babyName: string | null;
   gest: GestInfo;
   onNavigate: (tab: AppTab) => void;
   nextAppointment?: NextAppointment | null;
+  /** Tom de pele do bebê (índice na paleta BABY_TONES). */
+  babyTone?: number;
+  /** Toque na foto do bebê → abre a Jornada do Bebê (gatilho Premium). */
+  onBabyTap?: () => void;
+  /** Modo Cuidado: silencia contagem, tamanho do bebê, streak e desafio. */
+  careMode?: boolean;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
+  const daysLeft = gest ? Math.max(0, 280 - gest.totalDays) : null;
+  // Reta final (40s+): substitui "É hoje!/Parto em 0 dias" perpétuo por acolhimento.
+  const reta = gest ? retaFinalMensagem(gest.weeks) : null;
+  const trimestre = gest
+    ? gest.weeks < 14
+      ? "1º trimestre"
+      : gest.weeks < 28
+        ? "2º trimestre"
+        : "3º trimestre"
+    : null;
   const weather = useWeather();
+  const [journey] = useState(() => readJourneyStats(gest?.totalDays ?? null));
 
   const h = new Date().getHours();
   const isMadrugada = h < 5;
   const period = periodFor(h);
-  // Céu escuro (noite/madrugada) ou de transição (entardecer) pede texto claro
-  const darkSky = period === "madrugada" || period === "noite" || period === "entardecer";
+  // Céu escuro (noite/madrugada) pede texto claro. O entardecer TERMINA claro
+  // na base do card (oklch ~0.8) — texto branco ali ficava ilegível, então ele
+  // conta como céu claro para o texto (auditoria de contraste).
+  const darkSky = period === "madrugada" || period === "noite";
 
   // Cores de texto adaptadas ao céu do momento
   const heroText = darkSky ? "text-white/95" : "text-foreground";
@@ -436,9 +623,12 @@ export function AppHomeScreen({
 
   return (
     <div className="space-y-4 pb-2">
-      {/* ── Hero card: céu real do momento + bebê + clima ──────────── */}
+      {/* ── Hero imersivo: céu real do momento + bebê + clima ────────
+          Full-bleed nas laterais (-mx-5 cancela o px-5 da página) e puxado
+          para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
+          encosta nas quatro bordas para máxima imersão no celular. */}
       <div
-        className="shine rounded-3xl relative overflow-hidden p-5 transition-[background] duration-1000"
+        className="shine relative -mx-5 -mt-2 flex min-h-[88svh] flex-col overflow-hidden px-5 pb-7 pt-6 transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Céu vivo: sol/lua, estrelas à noite, nuvens à deriva, chuva */}
@@ -449,22 +639,66 @@ export function AppHomeScreen({
           period={period}
         />
 
-        <div className="relative">
+        <div className="relative flex flex-1 flex-col">
           {isMadrugada && (
-            <p className="text-[11px] text-white/40">🌙 Madrugada — tente descansar um pouco</p>
+            <p className="text-[11px] text-white/65">🌙 Madrugada — tente descansar um pouco</p>
           )}
 
           {gest && baby ? (
             <>
-              {/* Bebê protagonista — flutua devagar, como se boiasse */}
-              <div className="float-slow mt-1 flex justify-center">
+              {/* Nome do bebê no TOPO — protagonista da tela imersiva */}
+              {babyName && (
+                <div className="mb-3 text-center">
+                  <p
+                    className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${heroLabel}`}
+                  >
+                    Acompanhando
+                  </p>
+                  <p className={`mt-0.5 font-serif text-[1.75rem] leading-tight ${heroText}`}>
+                    {babyName}
+                  </p>
+                </div>
+              )}
+
+              {/* Dados de topo: trimestre + contagem regressiva p/ o parto */}
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                >
+                  {trimestre}
+                </span>
+                {careMode ? null : reta ? (
+                  <span
+                    className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                  >
+                    {reta.eyebrow} 💛
+                  </span>
+                ) : (
+                  daysLeft != null && (
+                    <span
+                      className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                    >
+                      {daysLeft === 0 ? "É hoje! 🎉" : `Parto em ${daysLeft} dias 💛`}
+                    </span>
+                  )
+                )}
+              </div>
+
+              {/* Bebê protagonista — GRANDE, flutuando, dono da tela.
+                  Toque abre a Jornada do Bebê (estágios + gatilho Premium). */}
+              <button
+                onClick={onBabyTap}
+                aria-label="Ver a jornada do bebê"
+                className="float-slow flex flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
+              >
                 <BabyIllustration
                   week={gest.weeks}
+                  tone={babyTone}
                   showSac={false}
                   showInfo={false}
-                  className="h-40 w-40 drop-shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+                  className="h-56 w-56 drop-shadow-[0_14px_36px_rgba(0,0,0,0.16)]"
                 />
-              </div>
+              </button>
 
               {/* Número de semana — lente de vidro líquido translúcida */}
               <div className="mt-1 flex flex-col items-center">
@@ -476,18 +710,24 @@ export function AppHomeScreen({
                     fontWeight: 700,
                     letterSpacing: "-0.02em",
                     fontVariantNumeric: "tabular-nums lining-nums",
-                    backgroundImage:
-                      "linear-gradient(180deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.15) 100%)",
+                    // Vidro líquido legível nos DOIS céus: claro no escuro,
+                    // escuro-quente no claro (contraste auditado).
+                    backgroundImage: darkSky
+                      ? "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.45) 100%)"
+                      : "linear-gradient(180deg, rgba(62,38,28,0.9) 0%, rgba(62,38,28,0.55) 100%)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     color: "transparent",
-                    textShadow: [
-                      "0 -1px 1px rgba(255,255,255,0.55)", // reflexo de luz no topo
-                      "0 1px 1px rgba(255,255,255,0.25)", // segundo realce de refração
-                      "0 4px 10px rgba(0,0,0,0.06)", // profundidade esfumada
-                      "0 1px 3px rgba(0,0,0,0.05)", // volume sutil junto ao corpo
-                    ].join(", "),
+                    textShadow: darkSky
+                      ? [
+                          "0 -1px 1px rgba(255,255,255,0.55)",
+                          "0 1px 1px rgba(255,255,255,0.25)",
+                          "0 4px 10px rgba(0,0,0,0.18)",
+                        ].join(", ")
+                      : ["0 -1px 1px rgba(255,255,255,0.6)", "0 4px 10px rgba(0,0,0,0.08)"].join(
+                          ", ",
+                        ),
                   }}
                 >
                   {gest.weeks}
@@ -500,30 +740,28 @@ export function AppHomeScreen({
                 </p>
               </div>
 
-              {babyName && (
-                <p className={`mt-1 text-center text-xs ${heroMuted}`}>Acompanhando {babyName}</p>
+              {/* Badges liquid glass (silenciados no Modo Cuidado) */}
+              {!careMode && (
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {[baby.size, baby.weight, `🍓 ${baby.fruit}`].map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide"
+                      style={{
+                        background: "rgba(255,255,255,0.18)",
+                        backdropFilter: "blur(20px)",
+                        WebkitBackdropFilter: "blur(20px)",
+                        border: "1px solid rgba(255,255,255,0.35)",
+                        boxShadow:
+                          "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.20)",
+                        color: darkSky ? "rgba(255,255,255,0.93)" : "rgba(30,20,14,0.82)",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
               )}
-
-              {/* Badges liquid glass */}
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                {[baby.size, baby.weight, `🍓 ${baby.fruit}`].map((label) => (
-                  <span
-                    key={label}
-                    className="rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide"
-                    style={{
-                      background: "rgba(255,255,255,0.18)",
-                      backdropFilter: "blur(20px)",
-                      WebkitBackdropFilter: "blur(20px)",
-                      border: "1px solid rgba(255,255,255,0.35)",
-                      boxShadow:
-                        "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.20)",
-                      color: darkSky ? "rgba(255,255,255,0.93)" : "rgba(30,20,14,0.82)",
-                    }}
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
 
               {/* Barra de progresso */}
               <div className="mt-4">
@@ -542,8 +780,8 @@ export function AppHomeScreen({
                 </div>
               </div>
 
-              {/* Strip de clima — só aparece quando dados chegam */}
-              {!isMadrugada && weather && (
+              {/* Strip de clima — com fallback de cidade, sempre chega */}
+              {weather && (
                 <div
                   className={`mt-3 rounded-2xl backdrop-blur-sm px-3 py-2 flex items-start gap-2.5 ${
                     darkSky ? "bg-white/15" : "bg-white/40"
@@ -566,7 +804,9 @@ export function AppHomeScreen({
               )}
             </>
           ) : (
-            <div className="mt-3">
+            /* flex-1 centrado: sem isso o texto ficava colado no topo com
+               ~380px de gradiente vazio abaixo (hero tem min-h de 66svh). */
+            <div className="mt-3 flex flex-1 flex-col items-center justify-center text-center">
               <p className={`text-sm ${heroMuted}`}>
                 Configure sua data de gestação em <strong>Perfil</strong> para ver o
                 desenvolvimento.
@@ -581,6 +821,67 @@ export function AppHomeScreen({
           )}
         </div>
       </div>
+
+      {/* ── Jornada do dia: o game em destaque (silenciado no Modo Cuidado) ── */}
+      {gest && !careMode && (
+        <button
+          onClick={() => onNavigate("Caminho")}
+          className="group w-full overflow-hidden rounded-3xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-violet-500 p-[2px] text-left shadow-[var(--shadow-card)] transition-all duration-300 active:scale-[0.98]"
+        >
+          <div className="flex items-center gap-3.5 rounded-[calc(1.5rem-2px)] bg-gradient-to-r from-pink-500/95 to-violet-500/95 px-4 py-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl shadow-inner">
+              {journey.todayDone ? "✅" : "🎁"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">
+                Jornada diária · Jogo
+              </p>
+              <p className="mt-0.5 text-[15px] font-extrabold leading-tight text-white">
+                {journey.todayDone
+                  ? "Desafio de hoje completo! 🎉"
+                  : "Seu desafio de hoje te espera!"}
+              </p>
+              <p className="mt-0.5 text-[11px] font-medium text-white/85">
+                🔥 {journey.streak} {journey.streak === 1 ? "dia seguido" : "dias seguidos"} · 📚
+                lições e figurinhas no caminho
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-fuchsia-600 shadow-md transition-transform duration-300 group-hover:scale-105">
+              Jogar
+            </span>
+          </div>
+        </button>
+      )}
+
+      {/* ── Marco da semana (silenciado no Modo Cuidado) ──── */}
+      {gest &&
+        !careMode &&
+        (() => {
+          const m = milestoneForWeek(gest.weeks);
+          if (!m) return null;
+          return (
+            <button
+              onClick={() => onNavigate(m.tab)}
+              className="shine group w-full rounded-3xl border border-primary/25 bg-primary/6 text-left shadow-[var(--shadow-card)] transition-all duration-300 active:scale-[0.98] hover:border-primary/40 hover:bg-primary/10"
+            >
+              <div className="flex items-center gap-3.5 px-4 py-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-2xl ring-1 ring-primary/20">
+                  {m.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+                    Marco da semana {gest.weeks}
+                  </p>
+                  <p className="mt-0.5 text-[14px] font-bold leading-tight text-foreground">
+                    {m.title}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{m.text}</p>
+                </div>
+                <ChevronRight className="h-5 w-5 shrink-0 text-primary transition-transform duration-300 group-hover:translate-x-0.5" />
+              </div>
+            </button>
+          );
+        })()}
 
       {/* ── Próxima consulta (#10) ──────────────────────────────────── */}
       {nextAppointment ? (
@@ -662,7 +963,7 @@ export function AppHomeScreen({
         <div className="flex items-center gap-4 p-4">
           <img
             src={portrait}
-            alt="Dr. Clóvis Bacha"
+            alt={DOCTOR.name}
             className="h-16 w-16 shrink-0 rounded-2xl object-cover"
           />
           <div className="min-w-0 flex-1">
@@ -714,7 +1015,7 @@ export function SectionHeader({
     <div className="mb-5 flex items-center gap-3 md:hidden">
       <button
         onClick={onHome}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-all duration-200 hover:bg-primary/15 active:scale-95"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-all duration-200 hover:bg-primary/15 active:scale-95"
         aria-label="Voltar ao início"
       >
         <ChevronLeft className="h-4 w-4" />

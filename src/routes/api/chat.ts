@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
-import { getBrainContext } from "@/lib/secondbrain.server";
+import { getBrainContextResolved, normalizeGapQuestion } from "@/lib/secondbrain.server";
+import { computeGestation } from "@/lib/gestacao";
 
 // Rate limit simples por IP (janela fixa, em memória). Em ambiente serverless
 // a memória não é compartilhada entre instâncias nem persiste entre cold starts,
@@ -21,38 +22,168 @@ function rateLimited(ip: string) {
   return entry.count > RATE_LIMIT;
 }
 
-const SYSTEM_PROMPT = `Você é o assistente virtual do consultório do Dr. Clóvis Bacha, ginecologista e obstetra brasileiro especialista em gestação de alto risco.
+// Chat do SITE PÚBLICO: assistente geral da plataforma (dúvidas do app e do
+// site, suporte). NÃO fala como um médico específico e NÃO dá conduta clínica.
+const SUPPORT_SYSTEM_PROMPT = `Você é o assistente da plataforma Obstétrica — um app de acompanhamento de gestação para pacientes e um painel para obstetras.
 
-Sobre o Dr. Clóvis:
-- Formado em Medicina, com residência em Ginecologia e Obstetrícia.
-- Especialista em medicina fetal e gestação de alto risco (hipertensão gestacional, diabetes gestacional, gemelaridade, malformações fetais, prematuridade, etc).
-- Atendimento humanizado, acolhedor e baseado em evidências.
+O que você faz:
+- Explica como usar o app (perfil, cálculo de idade gestacional, contrações, exames, chat com o obstetra, teleconsulta, etc).
+- Orienta a paciente a se vincular ao próprio obstetra: ela busca o médico no app e envia uma solicitação; ao ser aceita, passa a conversar com a IA do consultório dela.
+- Tira dúvidas gerais sobre a plataforma e encaminha para o suporte quando necessário.
 
-Sobre o atendimento:
-- Consultas presenciais e online (telemedicina).
-- Exames e ultrassonografia obstétrica acompanhados pelo doutor.
-- Acompanhamento pré-natal completo e pós-parto.
+Regras de resposta:
+- Responda em português brasileiro, com tom acolhedor, claro e conciso (3 a 6 frases).
+- NÃO dê diagnóstico, prescrição ou conduta médica. Para dúvidas clínicas, oriente falar com o obstetra pelo app; em urgência, ligar 192 (SAMU) ou ir ao pronto-socorro.
+- Não invente dados (telefone, endereço, valores). Se não souber, encaminhe para o suporte.`;
 
-Agendamento:
-- O paciente pode solicitar consulta pela página /agendamento do site.
-- O consultório confirma horário por telefone/e-mail.
+/** Assistente médico do consultório de UM médico (usado no app da paciente). */
+function medicalSystemPrompt(doctorName?: string | null): string {
+  const consultorio = doctorName ? `do consultório do(a) ${doctorName}` : "do seu obstetra";
+  return `Você é o assistente virtual ${consultorio}, no app de acompanhamento de gestação da paciente.
 
 Regras de resposta:
 - Responda em português brasileiro, com tom acolhedor, claro e profissional.
+- Você é uma INTELIGÊNCIA ARTIFICIAL de apoio — não é o médico e NÃO substitui a consulta. Se a paciente tratar você como médica, esclareça isso com gentileza.
 - Seja conciso (3 a 6 frases) salvo se a paciente pedir mais detalhe.
-- NUNCA dê diagnóstico, prescrição ou conduta médica. Para sintomas, oriente buscar avaliação presencial e, em urgência, ligar 192 (SAMU) ou ir ao pronto-socorro.
-- Se a pessoa quiser marcar consulta, direcione para a página /agendamento.
-- Não invente dados (telefone, endereço, valores). Se não souber, peça para a paciente entrar em contato pelo site.`;
+- NUNCA dê diagnóstico, prescrição, dose de medicamento ou conduta médica. Para qualquer sintoma ou decisão clínica, oriente falar com o obstetra pelo app; em urgência (sangramento, dor intensa, redução dos movimentos do bebê, pressão muito alta), ligar 192 (SAMU) ou ir ao pronto-socorro AGORA.
+- Responda SOMENTE seguindo o estilo e as condutas já validadas pelo médico (bloco abaixo, se houver). Se a dúvida estiver fora do que o médico validou, NÃO improvise conduta: diga que vai encaminhar para o médico e oriente marcar/consultar.
+- Não invente dados (telefone, endereço, valores, resultados de exame).`;
+}
+
+/**
+ * Resolve o médico da PACIENTE logada a partir do token do Supabase enviado no
+ * header Authorization. Sem token (site público) → null. Devolve o doctor_id
+ * (para injetar o cérebro DAQUELE médico) e o nome dele (para a persona).
+ */
+async function resolvePatientDoctor(request: Request): Promise<{
+  patientId: string;
+  doctorId: string | null;
+  doctorName: string | null;
+  clinicalBlock: string;
+} | null> {
+  const auth = request.headers.get("authorization") || request.headers.get("Authorization");
+  const token = auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : null;
+  if (!token) return null; // site público (anônimo)
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !data.user) return null;
+    // Prontuário resumido DIRETO do banco (fonte confiável — nunca do texto
+    // que o cliente envia): é o que permite personalizar a resposta ("dor de
+    // cabeça" numa paciente com histórico de pressão alta NÃO é a mesma
+    // resposta de uma sem histórico).
+    const first = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select(
+        "doctor_id,lmp_date,reference_date,reference_weeks,reference_days,pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm,prior_cesarean",
+      )
+      .eq("id", data.user.id)
+      .maybeSingle();
+    let prof = first.data;
+    if (first.error) {
+      // QUALQUER falha nas colunas clínicas (42703, transitória) NUNCA pode
+      // derrubar o vínculo com o médico — o cérebro do chat depende dele.
+      // Re-consulta só o essencial; personalização é enriquecimento.
+      console.error("[chat] clinical select failed, fallback to essentials", first.error);
+      const fb = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("doctor_id,lmp_date,reference_date,reference_weeks,reference_days")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      prof = fb.data;
+    }
+    const clinicalBlock = buildClinicalBlock(prof ?? null);
+    const doctorId = (prof?.doctor_id ?? null) as string | null;
+    if (!doctorId)
+      return { patientId: data.user.id, doctorId: null, doctorName: null, clinicalBlock };
+    const { data: doc } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("display_name")
+      .eq("id", doctorId)
+      .maybeSingle();
+    return {
+      patientId: data.user.id,
+      doctorId,
+      doctorName: (doc?.display_name || null) as string | null,
+      clinicalBlock,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Monta o bloco de contexto clínico para o system prompt. Só entra o que
+ * existe no perfil; sem nome (privacidade no prompt) e com instrução de uso.
+ */
+function buildClinicalBlock(
+  prof: {
+    lmp_date?: string | null;
+    reference_date?: string | null;
+    reference_weeks?: number | null;
+    reference_days?: number | null;
+    pregnancy_number?: number | null;
+    prior_bp_elevated?: boolean | null;
+    prior_bp_week?: number | null;
+    prior_gestational_diabetes?: boolean | null;
+    prior_preterm?: boolean | null;
+    prior_cesarean?: boolean | null;
+  } | null,
+): string {
+  if (!prof) return "";
+  const lines: string[] = [];
+  try {
+    // Semana calculada NO SERVIDOR a partir do perfil (não confia no cliente).
+    // computeGestation é pura (sem browser APIs) — segura no server.
+    const gest = computeGestation({
+      lmp: prof.lmp_date,
+      referenceDate: prof.reference_date,
+      referenceWeeks: prof.reference_weeks,
+      referenceDays: prof.reference_days,
+    });
+    if (gest && gest.weeks >= 1 && gest.weeks <= 44) {
+      const tri = gest.weeks < 14 ? "1º" : gest.weeks < 28 ? "2º" : "3º";
+      lines.push(`- Semana gestacional: ${gest.weeks} (${tri} trimestre)`);
+    }
+  } catch {
+    /* sem semana calculável */
+  }
+  if ((prof.pregnancy_number ?? 1) >= 2) {
+    const prior: string[] = [];
+    if (prof.prior_bp_elevated)
+      prior.push(
+        `pressão elevada na gestação anterior${prof.prior_bp_week ? ` (a partir da semana ${prof.prior_bp_week})` : ""}`,
+      );
+    if (prof.prior_gestational_diabetes) prior.push("diabetes gestacional anterior");
+    if (prof.prior_preterm) prior.push("parto prematuro anterior");
+    if (prof.prior_cesarean) prior.push("cesariana anterior");
+    lines.push(
+      `- ${prof.pregnancy_number}ª gestação${prior.length ? `; histórico: ${prior.join(", ")}` : ""}`,
+    );
+  }
+  if (lines.length === 0) return "";
+  return [
+    "## Contexto clínico da paciente (fonte: sistema — confiável)",
+    ...lines,
+    "Use este contexto para calibrar a resposta (ex.: histórico de pressão alta muda a orientação sobre dor de cabeça/inchaço — reforce sinais de alerta e contato precoce). Não recite estes dados de volta sem necessidade.",
+  ].join("\n");
+}
 
 /** Extrai o texto da última mensagem de usuário (formato UIMessage com parts). */
 function lastUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg?.role !== "user") continue;
-    return (msg.parts ?? [])
+    const raw = (msg.parts ?? [])
       .map((p) => (p.type === "text" ? p.text : ""))
       .join(" ")
       .trim();
+    // A 1ª mensagem do app vem prefixada com "[Contexto: Meu nome é X...
+    // semana N...]" (buildPatientContext no cliente). Esse prefixo NÃO pode
+    // entrar no cérebro: contamina o ranking (palavras como "semana" casam
+    // com qualquer entrada e engolem lacunas legítimas), vaza o nome da
+    // paciente para brain_gaps/painel e quebra a dedup por pergunta.
+    return raw.replace(/^\s*\[contexto:[\s\S]*?\]\s*/i, "").trim();
   }
   return "";
 }
@@ -78,19 +209,98 @@ export const Route = createFileRoute("/api/chat")({
         const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         if (!key) return new Response("Missing GOOGLE_GENERATIVE_AI_API_KEY", { status: 500 });
 
-        // Segundo Cérebro: contexto de estilo/conduta do médico injetado no
-        // system prompt. getBrainContext é safe (falha vira block vazio),
-        // então nunca derruba o chat.
         const messages = body.messages as UIMessage[];
-        const brain = await getBrainContext(lastUserText(messages), undefined, "app");
-        const system =
-          brain.enabledApp && brain.block ? `${SYSTEM_PROMPT}\n\n${brain.block}` : SYSTEM_PROMPT;
+
+        // Quem está falando? Paciente logada (token no Authorization) fala com a
+        // IA do PRÓPRIO médico; site público (anônimo) fala com o assistente
+        // geral da plataforma. Assim cada conta é individual.
+        const patient = await resolvePatientDoctor(request);
+
+        let system: string;
+        if (patient && patient.doctorId) {
+          // App: injeta o Segundo Cérebro DAQUELE médico (respeitando o plano)
+          // + o contexto clínico DELA (semana/histórico, direto do banco)
+          // + a MEMÓRIA dela (o que já contou/perguntou em conversas passadas).
+          // getBrainContext/getChatMemory são safe (falha vira bloco vazio).
+          const userText = lastUserText(messages);
+          const { getChatMemory, memoryBlock } = await import("@/lib/chat-memory.server");
+          const [brain, memorySummary] = await Promise.all([
+            // Fonte resolvida: local por padrão; DoctorThink remoto se ligado
+            // (env + flag doctorthink_remote). Fallback local em qualquer falha.
+            getBrainContextResolved(userText, patient.doctorId, "app"),
+            getChatMemory(patient.patientId, patient.doctorId),
+          ]);
+          const memoria = memoryBlock(memorySummary);
+          const base = medicalSystemPrompt(patient.doctorName);
+          const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
+          // Confiança visível: com cobertura, cite a fonte; sem cobertura,
+          // escale. O claim "já registrei" só entra quando a lacuna FOI de
+          // fato elegível a registro (mesma regra do logBrainGap: norm >= 8
+          // chars) — a IA nunca afirma um registro que não aconteceu.
+          const gapWasLogged = normalizeGapQuestion(userText).length >= 8;
+          const confianca =
+            brain.enabledApp && brain.hadCoverage
+              ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
+              : brain.enabledApp
+                ? gapWasLogged
+                  ? `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. O sistema registrou a pergunta para ele responder no painel — diga isso com acolhimento (ex.: "essa é uma dúvida que ${medico} prefere responder pessoalmente; registrei aqui para ele ver"). Limite-se a informações gerais seguras e sinais de alerta, sem improvisar conduta específica.`
+                  : `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. Peça com gentileza que ela detalhe a pergunta (assim você pode encaminhar ao médico) e limite-se a informações gerais seguras, sem improvisar conduta específica.`
+                : "";
+          system = [
+            base,
+            patient.clinicalBlock,
+            memoria,
+            brain.enabledApp && brain.block ? brain.block : "",
+            confianca,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
+        } else if (patient) {
+          // App, mas a paciente ainda não se vinculou a um médico → sem cérebro.
+          system =
+            medicalSystemPrompt() +
+            "\n\nA paciente ainda não está vinculada a um obstetra. Se fizer sentido, convide-a a buscar o médico dela no app e enviar uma solicitação de vínculo.";
+        } else {
+          // Site público (anônimo): assistente geral / suporte da plataforma.
+          system = SUPPORT_SYSTEM_PROMPT;
+        }
+
+        // Conversa individual por paciente: grava a pergunta agora e a resposta
+        // no onFinish; depois atualiza a memória dela (tudo fire-and-forget —
+        // tabela ausente ou falha nunca afeta a resposta).
+        const persistFor = patient
+          ? { patientId: patient.patientId, doctorId: patient.doctorId ?? null }
+          : null;
+
+        if (persistFor) {
+          const { saveChatMessage } = await import("@/lib/chat-memory.server");
+          saveChatMessage(
+            persistFor.patientId,
+            persistFor.doctorId,
+            "user",
+            lastUserText(messages),
+          );
+        }
 
         const google = createChatProvider(key);
         const result = streamText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           system,
           messages: await convertToModelMessages(messages),
+          onFinish: persistFor
+            ? ({ text }) => {
+                void (async () => {
+                  try {
+                    const { saveChatMessage, maybeUpdateChatMemory } =
+                      await import("@/lib/chat-memory.server");
+                    saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text);
+                    maybeUpdateChatMemory(persistFor.patientId, persistFor.doctorId);
+                  } catch {
+                    /* best-effort */
+                  }
+                })();
+              }
+            : undefined,
         });
 
         return result.toUIMessageStreamResponse({

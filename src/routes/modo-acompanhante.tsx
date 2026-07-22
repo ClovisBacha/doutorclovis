@@ -4,7 +4,7 @@ import { Heart, ListChecks, MessageSquare, Backpack } from "lucide-react";
 export const Route = createFileRoute("/modo-acompanhante")({
   head: () => ({
     meta: [
-      { title: "Modo Acompanhante — Guia para parceiros | Dr. Clóvis Bacha" },
+      { title: "Modo Acompanhante — Guia para parceiros | Obstétrica" },
       {
         name: "description",
         content:

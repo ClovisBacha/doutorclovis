@@ -27,7 +27,9 @@ export function AppCtaBanner() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-primary/20 bg-background/95 backdrop-blur shadow-[0_-4px_24px_rgba(0,0,0,0.08)] safe-area-bottom">
+    // No mobile a PublicBottomNav ocupa o rodapé (h≈64px) — o banner sobe para
+    // não cobrir a navegação; no md+ a bottom-nav some e o banner volta ao chão.
+    <div className="fixed bottom-[64px] left-0 right-0 z-50 border-t border-primary/20 bg-background/95 backdrop-blur shadow-[0_-4px_24px_rgba(0,0,0,0.08)] safe-area-bottom md:bottom-0">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">

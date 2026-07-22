@@ -28,6 +28,7 @@ GRANT ALL ON public.appointment_requests TO service_role;
 
 ALTER TABLE public.appointment_requests ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can request an appointment" ON public.appointment_requests;
 CREATE POLICY "Anyone can request an appointment"
   ON public.appointment_requests
   FOR INSERT
@@ -45,9 +46,11 @@ UPDATE auth.users
 
 GRANT SELECT, UPDATE ON public.appointment_requests TO authenticated;
 DROP POLICY IF EXISTS "admin read appointments" ON public.appointment_requests;
+DROP POLICY IF EXISTS "admin read appointments" ON public.appointment_requests;
 CREATE POLICY "admin read appointments" ON public.appointment_requests
   FOR SELECT TO authenticated
   USING (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false));
+DROP POLICY IF EXISTS "admin update appointments" ON public.appointment_requests;
 DROP POLICY IF EXISTS "admin update appointments" ON public.appointment_requests;
 CREATE POLICY "admin update appointments" ON public.appointment_requests
   FOR UPDATE TO authenticated
@@ -77,9 +80,13 @@ CREATE TABLE IF NOT EXISTS public.patient_profiles (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.patient_profiles TO authenticated;
 GRANT ALL ON public.patient_profiles TO service_role;
 ALTER TABLE public.patient_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own profile select" ON public.patient_profiles;
 CREATE POLICY "own profile select" ON public.patient_profiles FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "own profile insert" ON public.patient_profiles;
 CREATE POLICY "own profile insert" ON public.patient_profiles FOR INSERT WITH CHECK (auth.uid() = id);
+DROP POLICY IF EXISTS "own profile update" ON public.patient_profiles;
 CREATE POLICY "own profile update" ON public.patient_profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+DROP POLICY IF EXISTS "own profile delete" ON public.patient_profiles;
 CREATE POLICY "own profile delete" ON public.patient_profiles FOR DELETE USING (auth.uid() = id);
 
 -- Journal entries (diário gestacional)
@@ -94,6 +101,7 @@ CREATE TABLE IF NOT EXISTS public.journal_entries (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.journal_entries TO authenticated;
 GRANT ALL ON public.journal_entries TO service_role;
 ALTER TABLE public.journal_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own journal all" ON public.journal_entries;
 CREATE POLICY "own journal all" ON public.journal_entries FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- Kick counter sessions
@@ -108,6 +116,7 @@ CREATE TABLE IF NOT EXISTS public.kick_sessions (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.kick_sessions TO authenticated;
 GRANT ALL ON public.kick_sessions TO service_role;
 ALTER TABLE public.kick_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own kicks all" ON public.kick_sessions;
 CREATE POLICY "own kicks all" ON public.kick_sessions FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- Maternity bag checklist
@@ -122,6 +131,7 @@ CREATE TABLE IF NOT EXISTS public.checklist_items (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.checklist_items TO authenticated;
 GRANT ALL ON public.checklist_items TO service_role;
 ALTER TABLE public.checklist_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own checklist all" ON public.checklist_items;
 CREATE POLICY "own checklist all" ON public.checklist_items FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- Auto-create profile on signup
@@ -133,6 +143,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+DROP TRIGGER IF EXISTS on_auth_user_created_patient ON auth.users;
 CREATE TRIGGER on_auth_user_created_patient
   AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_patient();
 
@@ -169,6 +180,7 @@ CREATE TABLE IF NOT EXISTS public.health_logs (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.health_logs TO authenticated;
 GRANT ALL ON public.health_logs TO service_role;
 ALTER TABLE public.health_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own health logs" ON public.health_logs;
 CREATE POLICY "own health logs" ON public.health_logs FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE TABLE IF NOT EXISTS public.doctor_questions (
@@ -181,6 +193,7 @@ CREATE TABLE IF NOT EXISTS public.doctor_questions (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.doctor_questions TO authenticated;
 GRANT ALL ON public.doctor_questions TO service_role;
 ALTER TABLE public.doctor_questions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own questions" ON public.doctor_questions;
 CREATE POLICY "own questions" ON public.doctor_questions FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 CREATE TABLE IF NOT EXISTS public.companion_invites (
@@ -195,7 +208,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.companion_invites TO authenticate
 GRANT SELECT ON public.companion_invites TO anon;
 GRANT ALL ON public.companion_invites TO service_role;
 ALTER TABLE public.companion_invites ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own invites manage" ON public.companion_invites;
 CREATE POLICY "own invites manage" ON public.companion_invites FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "public read by token" ON public.companion_invites;
 CREATE POLICY "public read by token" ON public.companion_invites FOR SELECT TO anon USING (true);
 
 
@@ -242,6 +257,7 @@ CREATE TABLE IF NOT EXISTS public.contraction_logs (
 
 ALTER TABLE public.contraction_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users manage own contraction_logs" ON public.contraction_logs;
 CREATE POLICY "Users manage own contraction_logs"
   ON public.contraction_logs FOR ALL
   USING  (auth.uid() = user_id)
@@ -270,6 +286,7 @@ CREATE TABLE IF NOT EXISTS public.preconsulta_forms (
 
 ALTER TABLE public.preconsulta_forms ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users manage own preconsulta_forms" ON public.preconsulta_forms;
 CREATE POLICY "Users manage own preconsulta_forms"
   ON public.preconsulta_forms FOR ALL
   USING  (auth.uid() = user_id)
@@ -316,6 +333,7 @@ CREATE TABLE IF NOT EXISTS public.consultation_notes (
 
 ALTER TABLE public.consultation_notes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users manage own consultation_notes" ON public.consultation_notes;
 CREATE POLICY "Users manage own consultation_notes"
   ON public.consultation_notes FOR ALL
   USING  (auth.uid() = user_id)
@@ -346,11 +364,13 @@ CREATE TABLE IF NOT EXISTS public.teleconsulta_sessions (
 ALTER TABLE public.teleconsulta_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Patients can read their own sessions
+DROP POLICY IF EXISTS "Patients read own teleconsultas" ON public.teleconsulta_sessions;
 CREATE POLICY "Patients read own teleconsultas"
   ON public.teleconsulta_sessions FOR SELECT
   USING (auth.uid() = patient_user_id);
 
 -- Patients can update only patient_notes on their own sessions
+DROP POLICY IF EXISTS "Patients update own notes" ON public.teleconsulta_sessions;
 CREATE POLICY "Patients update own notes"
   ON public.teleconsulta_sessions FOR UPDATE
   USING (auth.uid() = patient_user_id)
@@ -377,6 +397,7 @@ CREATE TABLE IF NOT EXISTS public.baby_letters (
 
 ALTER TABLE public.baby_letters ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users manage own baby_letters" ON public.baby_letters;
 CREATE POLICY "Users manage own baby_letters"
   ON public.baby_letters FOR ALL
   USING  (auth.uid() = user_id)
@@ -402,6 +423,7 @@ CREATE TABLE IF NOT EXISTS public.family_album_posts (
 
 ALTER TABLE public.family_album_posts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Patient manages own album" ON public.family_album_posts;
 CREATE POLICY "Patient manages own album"
   ON public.family_album_posts FOR ALL
   USING  (auth.uid() = patient_user_id)
@@ -441,6 +463,7 @@ ALTER TABLE public.baby_name_sessions  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.baby_name_entries   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.baby_name_votes     ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Patient manages own name session" ON public.baby_name_sessions;
 CREATE POLICY "Patient manages own name session"
   ON public.baby_name_sessions FOR ALL
   USING (auth.uid() = patient_user_id)
@@ -468,6 +491,7 @@ CREATE TABLE IF NOT EXISTS public.course_progress (
 
 ALTER TABLE public.course_progress ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Patient manages own progress" ON public.course_progress;
 CREATE POLICY "Patient manages own progress"
   ON public.course_progress FOR ALL
   USING  (auth.uid() = user_id)
@@ -488,6 +512,7 @@ CREATE TABLE IF NOT EXISTS public.panic_events (
 
 ALTER TABLE public.panic_events ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Patient manages own panic events" ON public.panic_events;
 CREATE POLICY "Patient manages own panic events"
   ON public.panic_events FOR ALL
   USING  (auth.uid() = user_id)
@@ -564,10 +589,15 @@ ALTER TABLE public.baby_milestones    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.baby_weights       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.baby_vaccines      ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Patient manages own ppd" ON public.ppd_screenings;
 CREATE POLICY "Patient manages own ppd"       ON public.ppd_screenings     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Patient manages own bf logs" ON public.breastfeeding_logs;
 CREATE POLICY "Patient manages own bf logs"   ON public.breastfeeding_logs FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Patient manages own milestones" ON public.baby_milestones;
 CREATE POLICY "Patient manages own milestones" ON public.baby_milestones   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Patient manages own weights" ON public.baby_weights;
 CREATE POLICY "Patient manages own weights"   ON public.baby_weights       FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Patient manages own vaccines" ON public.baby_vaccines;
 CREATE POLICY "Patient manages own vaccines"  ON public.baby_vaccines      FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 GRANT ALL ON public.ppd_screenings     TO authenticated, service_role;
@@ -586,12 +616,14 @@ GRANT ALL ON public.baby_vaccines      TO authenticated, service_role;
 
 -- Allow service_role to manage entries and votes (for server functions)
 -- Public can insert entries/votes if they know a valid session (controlled at app layer)
+DROP POLICY IF EXISTS "Service manages name entries" ON public.baby_name_entries;
 CREATE POLICY "Service manages name entries"
   ON public.baby_name_entries FOR ALL
   TO service_role
   USING (true)
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Service manages name votes" ON public.baby_name_votes;
 CREATE POLICY "Service manages name votes"
   ON public.baby_name_votes FOR ALL
   TO service_role
@@ -618,11 +650,13 @@ CREATE TABLE IF NOT EXISTS public.private_consultations (
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.private_consultations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own private consultations" ON public.private_consultations;
 CREATE POLICY "Patient manages own private consultations"
   ON public.private_consultations FOR ALL
   TO authenticated
   USING (patient_user_id = auth.uid())
   WITH CHECK (patient_user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages private consultations" ON public.private_consultations;
 CREATE POLICY "Service manages private consultations"
   ON public.private_consultations FOR ALL
   TO service_role
@@ -639,11 +673,13 @@ CREATE TABLE IF NOT EXISTS public.patient_achievements (
   UNIQUE(user_id, achievement_key)
 );
 ALTER TABLE public.patient_achievements ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own achievements" ON public.patient_achievements;
 CREATE POLICY "Patient manages own achievements"
   ON public.patient_achievements FOR ALL
   TO authenticated
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages achievements" ON public.patient_achievements;
 CREATE POLICY "Service manages achievements"
   ON public.patient_achievements FOR ALL
   TO service_role
@@ -662,11 +698,13 @@ CREATE TABLE IF NOT EXISTS public.push_subscriptions (
   UNIQUE(user_id, endpoint)
 );
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own subscriptions" ON public.push_subscriptions;
 CREATE POLICY "Patient manages own subscriptions"
   ON public.push_subscriptions FOR ALL
   TO authenticated
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages subscriptions" ON public.push_subscriptions;
 CREATE POLICY "Service manages subscriptions"
   ON public.push_subscriptions FOR ALL
   TO service_role
@@ -701,9 +739,11 @@ CREATE TABLE IF NOT EXISTS public.menstrual_cycles (
   UNIQUE(user_id, start_date)
 );
 ALTER TABLE public.menstrual_cycles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own cycles" ON public.menstrual_cycles;
 CREATE POLICY "Patient manages own cycles"
   ON public.menstrual_cycles FOR ALL TO authenticated
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages cycles" ON public.menstrual_cycles;
 CREATE POLICY "Service manages cycles"
   ON public.menstrual_cycles FOR ALL TO service_role
   USING (true) WITH CHECK (true);
@@ -719,9 +759,11 @@ CREATE TABLE IF NOT EXISTS public.preventive_reminders (
   UNIQUE(user_id, exam_key)
 );
 ALTER TABLE public.preventive_reminders ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Patient manages own reminders" ON public.preventive_reminders;
 CREATE POLICY "Patient manages own reminders"
   ON public.preventive_reminders FOR ALL TO authenticated
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages reminders" ON public.preventive_reminders;
 CREATE POLICY "Service manages reminders"
   ON public.preventive_reminders FOR ALL TO service_role
   USING (true) WITH CHECK (true);
@@ -740,10 +782,12 @@ CREATE TABLE IF NOT EXISTS public.corporate_leads (
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.corporate_leads ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Anyone can submit corporate lead" ON public.corporate_leads;
 CREATE POLICY "Anyone can submit corporate lead"
   ON public.corporate_leads FOR INSERT
   TO anon, authenticated
   WITH CHECK (true);
+DROP POLICY IF EXISTS "Service manages corporate leads" ON public.corporate_leads;
 CREATE POLICY "Service manages corporate leads"
   ON public.corporate_leads FOR ALL TO service_role
   USING (true) WITH CHECK (true);
@@ -768,6 +812,7 @@ ALTER TABLE public.corporate_accounts ENABLE ROW LEVEL SECURITY;
 -- tabela — a policy antiga expunha o access_code de todas as empresas a
 -- qualquer usuária logada.
 DROP POLICY IF EXISTS "Authenticated can read active accounts for validation" ON public.corporate_accounts;
+DROP POLICY IF EXISTS "Service manages corporate accounts" ON public.corporate_accounts;
 CREATE POLICY "Service manages corporate accounts"
   ON public.corporate_accounts FOR ALL TO service_role
   USING (true) WITH CHECK (true);
@@ -844,6 +889,7 @@ CREATE TABLE IF NOT EXISTS public.exam_files (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE public.exam_files ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own exam_files" ON public.exam_files;
 CREATE POLICY "own exam_files" ON public.exam_files
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 GRANT SELECT, INSERT, DELETE ON public.exam_files TO authenticated;
@@ -865,6 +911,7 @@ CREATE TABLE IF NOT EXISTS public.birth_plans (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE public.birth_plans ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own birth_plans" ON public.birth_plans;
 CREATE POLICY "own birth_plans" ON public.birth_plans
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.birth_plans TO authenticated;
@@ -900,12 +947,14 @@ ON CONFLICT (day_of_week) DO NOTHING;
 ALTER TABLE public.doctor_availability ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.doctor_availability TO anon, authenticated;
 GRANT ALL ON public.doctor_availability TO service_role;
+DROP POLICY IF EXISTS "public_read_availability" ON public.doctor_availability;
 CREATE POLICY "public_read_availability"  ON public.doctor_availability FOR SELECT USING (true);
 -- Escrita restrita ao médico (admin = app_metadata.is_admin = true).
 -- A policy antiga "auth_write_availability" deixava QUALQUER usuária logada
 -- editar a agenda do médico.
 DROP POLICY IF EXISTS "auth_write_availability" ON public.doctor_availability;
 GRANT INSERT, UPDATE, DELETE ON public.doctor_availability TO authenticated;
+DROP POLICY IF EXISTS "admin_write_availability" ON public.doctor_availability;
 DROP POLICY IF EXISTS "admin_write_availability" ON public.doctor_availability;
 CREATE POLICY "admin_write_availability" ON public.doctor_availability FOR ALL TO authenticated
   USING (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false))
@@ -921,10 +970,12 @@ CREATE TABLE IF NOT EXISTS public.blocked_dates (
 ALTER TABLE public.blocked_dates ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.blocked_dates TO anon, authenticated;
 GRANT ALL ON public.blocked_dates TO service_role;
+DROP POLICY IF EXISTS "public_read_blocked" ON public.blocked_dates;
 CREATE POLICY "public_read_blocked"   ON public.blocked_dates FOR SELECT USING (true);
 -- Escrita restrita ao médico (admin) — mesma regra da disponibilidade acima.
 DROP POLICY IF EXISTS "auth_write_blocked" ON public.blocked_dates;
 GRANT INSERT, UPDATE, DELETE ON public.blocked_dates TO authenticated;
+DROP POLICY IF EXISTS "admin_write_blocked" ON public.blocked_dates;
 DROP POLICY IF EXISTS "admin_write_blocked" ON public.blocked_dates;
 CREATE POLICY "admin_write_blocked" ON public.blocked_dates FOR ALL TO authenticated
   USING (coalesce((auth.jwt() -> 'app_metadata' ->> 'is_admin')::boolean, false))
@@ -986,6 +1037,7 @@ CREATE TABLE IF NOT EXISTS public.doctor_accounts (
 ALTER TABLE public.doctor_accounts ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.doctor_accounts TO service_role;
 GRANT SELECT ON public.doctor_accounts TO authenticated;
+DROP POLICY IF EXISTS "own_doctor_account" ON public.doctor_accounts;
 CREATE POLICY "own_doctor_account" ON public.doctor_accounts
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
@@ -1005,6 +1057,7 @@ CREATE TABLE IF NOT EXISTS public.doctor_leads (
 ALTER TABLE public.doctor_leads ENABLE ROW LEVEL SECURITY;
 GRANT INSERT ON public.doctor_leads TO anon, authenticated;
 GRANT ALL ON public.doctor_leads TO service_role;
+DROP POLICY IF EXISTS "insert_lead" ON public.doctor_leads;
 CREATE POLICY "insert_lead" ON public.doctor_leads FOR INSERT WITH CHECK (true);
 
 
@@ -1028,9 +1081,11 @@ CREATE TABLE IF NOT EXISTS epds_screenings (
 );
 
 ALTER TABLE epds_screenings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users own epds" ON epds_screenings;
 CREATE POLICY "users own epds" ON epds_screenings
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 -- Doctors (admin) can read all
+DROP POLICY IF EXISTS "admin read epds" ON epds_screenings;
 CREATE POLICY "admin read epds" ON epds_screenings
   FOR SELECT USING (
     EXISTS (
@@ -1052,6 +1107,7 @@ CREATE TABLE IF NOT EXISTS glucose_diary (
 );
 
 ALTER TABLE glucose_diary ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users own glucose_diary" ON glucose_diary;
 CREATE POLICY "users own glucose_diary" ON glucose_diary
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
@@ -1073,6 +1129,7 @@ CREATE TABLE IF NOT EXISTS biometry_logs (
 );
 
 ALTER TABLE biometry_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "users own biometry_logs" ON biometry_logs;
 CREATE POLICY "users own biometry_logs" ON biometry_logs
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
@@ -1212,9 +1269,11 @@ CREATE INDEX IF NOT EXISTS idx_triage_logs_user_created
   ON public.triage_logs(user_id, created_at DESC);
 ALTER TABLE public.triage_logs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Patient manages own triage logs" ON public.triage_logs;
+DROP POLICY IF EXISTS "Patient manages own triage logs" ON public.triage_logs;
 CREATE POLICY "Patient manages own triage logs"
   ON public.triage_logs FOR ALL TO authenticated
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Service manages triage logs" ON public.triage_logs;
 DROP POLICY IF EXISTS "Service manages triage logs" ON public.triage_logs;
 CREATE POLICY "Service manages triage logs"
   ON public.triage_logs FOR ALL TO service_role
@@ -1254,8 +1313,10 @@ CREATE TABLE IF NOT EXISTS public.doctors (
 ALTER TABLE public.doctors ENABLE ROW LEVEL SECURITY;
 -- O médico lê/edita o próprio perfil; escrita administrativa via service_role
 DROP POLICY IF EXISTS "doctor reads own profile" ON public.doctors;
+DROP POLICY IF EXISTS "doctor reads own profile" ON public.doctors;
 CREATE POLICY "doctor reads own profile" ON public.doctors
   FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
 DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
 CREATE POLICY "doctor updates own profile" ON public.doctors
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
@@ -1279,6 +1340,7 @@ CREATE TABLE IF NOT EXISTS public.journey_state (
 
 ALTER TABLE public.journey_state ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "own journey" ON public.journey_state;
+DROP POLICY IF EXISTS "own journey" ON public.journey_state;
 CREATE POLICY "own journey" ON public.journey_state
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.journey_state TO authenticated;
@@ -1295,6 +1357,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+DROP TRIGGER IF EXISTS trg_journey_touch ON public.journey_state;
 DROP TRIGGER IF EXISTS trg_journey_touch ON public.journey_state;
 CREATE TRIGGER trg_journey_touch
   BEFORE INSERT OR UPDATE ON public.journey_state
@@ -1313,3 +1376,124 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.get_user_id_by_email(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_id_by_email(text) TO service_role;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MIGRATION: 20260709000000_patient_doctor_link.sql (vínculo paciente↔médico)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ─────────────────────────────────────────────────────────────────────────────
+-- VÍNCULO PACIENTE ↔ MÉDICO (individual por conta)
+--
+-- Modelo: a paciente BUSCA o médico e ENVIA uma solicitação; o médico ACEITA,
+-- e só então a paciente passa a pertencer a ele (patient_profiles.doctor_id).
+-- Assim cada conta é individual: o chat/cérebro que a paciente usa no app é o
+-- do SEU médico, e o médico só enxerga as pacientes que ele aceitou.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- O médico pode se ocultar da busca (ex.: agenda cheia) sem ficar inativo.
+ALTER TABLE public.doctors
+  ADD COLUMN IF NOT EXISTS accepting_patients boolean NOT NULL DEFAULT true;
+
+CREATE TABLE IF NOT EXISTS public.patient_link_requests (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id  uuid        NOT NULL REFERENCES auth.users(id)     ON DELETE CASCADE,
+  doctor_id   uuid        NOT NULL REFERENCES public.doctors(id) ON DELETE CASCADE,
+  status      text        NOT NULL DEFAULT 'pending',  -- pending | accepted | declined | cancelled
+  message     text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  decided_at  timestamptz
+);
+
+-- No máximo UMA solicitação pendente por (paciente, médico).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_link_pending
+  ON public.patient_link_requests(patient_id, doctor_id)
+  WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_link_doctor_pending
+  ON public.patient_link_requests(doctor_id)
+  WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_link_patient
+  ON public.patient_link_requests(patient_id);
+
+ALTER TABLE public.patient_link_requests ENABLE ROW LEVEL SECURITY;
+
+-- A paciente gerencia as próprias solicitações (criar, ver, cancelar).
+DROP POLICY IF EXISTS "patient manages own requests" ON public.patient_link_requests;
+DROP POLICY IF EXISTS "patient manages own requests" ON public.patient_link_requests;
+CREATE POLICY "patient manages own requests" ON public.patient_link_requests
+  FOR ALL USING (auth.uid() = patient_id) WITH CHECK (auth.uid() = patient_id);
+
+-- O médico vê e responde as solicitações destinadas a ele.
+DROP POLICY IF EXISTS "doctor reads incoming requests" ON public.patient_link_requests;
+DROP POLICY IF EXISTS "doctor reads incoming requests" ON public.patient_link_requests;
+CREATE POLICY "doctor reads incoming requests" ON public.patient_link_requests
+  FOR SELECT USING (auth.uid() = doctor_id);
+DROP POLICY IF EXISTS "doctor updates incoming requests" ON public.patient_link_requests;
+DROP POLICY IF EXISTS "doctor updates incoming requests" ON public.patient_link_requests;
+CREATE POLICY "doctor updates incoming requests" ON public.patient_link_requests
+  FOR UPDATE USING (auth.uid() = doctor_id) WITH CHECK (auth.uid() = doctor_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.patient_link_requests TO authenticated;
+GRANT ALL ON public.patient_link_requests TO service_role;
+
+-- Busca de médicos pela paciente (nome/especialidade), sem expor toda a tabela
+-- via RLS. SECURITY DEFINER, só campos públicos, só médicos ativos e visíveis.
+CREATE OR REPLACE FUNCTION public.search_doctors(p_query text)
+RETURNS TABLE (
+  id           uuid,
+  display_name text,
+  title        text,
+  specialty    text,
+  slug         text
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT d.id, d.display_name, d.title, d.specialty, d.slug
+  FROM public.doctors d
+  WHERE d.active = true
+    AND d.accepting_patients = true
+    AND d.display_name <> ''
+    AND (
+      p_query = ''
+      OR d.display_name ILIKE '%' || p_query || '%'
+      OR d.specialty   ILIKE '%' || p_query || '%'
+      OR d.title       ILIKE '%' || p_query || '%'
+    )
+  ORDER BY d.display_name
+  LIMIT 20;
+$$;
+REVOKE ALL ON FUNCTION public.search_doctors(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.search_doctors(text) TO authenticated, service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- BLINDAGEM DO VÍNCULO: só o service_role (as server functions, após o médico
+-- ACEITAR) pode gravar patient_profiles.doctor_id. A paciente edita o próprio
+-- perfil pelo navegador (role `authenticated`, RLS "own profile update"), então
+-- sem esta trava ela poderia se autovincular a QUALQUER médico via update direto
+-- no Supabase — furando o fluxo de aprovação e puxando o cérebro pago dele.
+--
+-- IMPORTANTE: SECURITY INVOKER (padrão) — o gatilho precisa enxergar o papel
+-- REAL de quem escreve (current_user). SECURITY DEFINER quebraria a checagem.
+CREATE OR REPLACE FUNCTION public.protect_patient_doctor_id()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF current_user <> 'service_role' THEN
+    IF TG_OP = 'INSERT' THEN
+      -- A paciente nunca se vincula sozinha ao criar o perfil.
+      NEW.doctor_id := NULL;
+    ELSIF NEW.doctor_id IS DISTINCT FROM OLD.doctor_id THEN
+      -- Nem troca/define o médico depois: mantém o valor definido pelo servidor.
+      NEW.doctor_id := OLD.doctor_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_doctor_id ON public.patient_profiles;
+DROP TRIGGER IF EXISTS trg_protect_doctor_id ON public.patient_profiles;
+CREATE TRIGGER trg_protect_doctor_id
+  BEFORE INSERT OR UPDATE ON public.patient_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.protect_patient_doctor_id();

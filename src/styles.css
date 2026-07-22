@@ -111,7 +111,9 @@
   --shadow-float:
     0 20px 60px -20px oklch(0.3 0.02 35 / 0.14), 0 8px 24px -8px oklch(0.3 0.02 35 / 0.08);
 
-  --font-serif: "DM Sans", system-ui, sans-serif;
+  /* Headlines na mesma família arredondada da logo (Nunito) — o corpo segue
+     em DM Sans. Isso amarra a tipografia do site à identidade da marca. */
+  --font-serif: "Nunito", "DM Sans", system-ui, sans-serif;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -207,7 +209,7 @@
   h2,
   h3,
   .font-serif {
-    font-family: "DM Sans", system-ui, sans-serif;
+    font-family: var(--font-serif);
     font-weight: 700;
     letter-spacing: -0.022em;
     line-height: 1.15;
@@ -490,6 +492,50 @@
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   border: 1px solid color-mix(in oklab, var(--primary) 12%, transparent);
+}
+
+/* ── Liquid Glass — vidro "líquido" com brilho especular (estilo Apple) ──
+   Painel translúcido que refrata o fundo (blur alto + saturação), com uma
+   borda-luz no topo (specular) e um glow interno suave. Usado atrás de
+   blocos de TEXTO sobre fundos vivos (hero) e nos chips de seção. */
+.liquid-glass {
+  position: relative;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.1) 45%),
+    color-mix(in oklab, var(--card) 26%, transparent);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -12px 32px -18px rgba(255, 255, 255, 0.35),
+    0 12px 40px -16px rgba(0, 0, 0, 0.18);
+}
+/* reflexo especular que atravessa o topo do vidro */
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent);
+  pointer-events: none;
+}
+
+/* Chip de vidro para eyebrows/labels de seção */
+.glass-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.3rem 0.85rem;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.18));
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 2px 12px -4px rgba(0, 0, 0, 0.1);
 }
 
 /* Batimento cardíaco — 72bpm (0.83s por ciclo), duplo pulso como coração real (#6) */
@@ -897,6 +943,108 @@ button:active > .duo3d {
      alcançados pelo seletor universal acima */
   ::view-transition-old(root),
   ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* ── Safe areas do iPhone (notch/Dynamic Island) ─────────────────────────────
+   Com viewport-fit=cover (PWA standalone), a página desenha SOB a barra de
+   status. Elementos fixos/sticky no topo compensam com --safe-top. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Segundo Cérebro: visual tecnológico do card de score ─────────────── */
+@keyframes brainPulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.55));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.85));
+  }
+}
+@keyframes brainDot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.brain-tech {
+  background:
+    radial-gradient(ellipse 90% 70% at 18% 0%, rgba(88, 28, 135, 0.55), transparent 60%),
+    radial-gradient(ellipse 80% 60% at 92% 100%, rgba(8, 145, 178, 0.35), transparent 60%),
+    linear-gradient(160deg, #0b1024 0%, #131a36 55%, #0b1024 100%);
+}
+.brain-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 90% 85% at 50% 40%, black 30%, transparent 78%);
+}
+.brain-ring {
+  animation: brainPulse 3.2s ease-in-out infinite;
+}
+.brain-node {
+  animation: brainDot 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-ring,
+  .brain-node {
+    animation: none;
+  }
+}
+
+/* ── Segundo Cérebro na home: sinapses, órbita e halo ─────────────────── */
+@keyframes synapseTravel {
+  to {
+    stroke-dashoffset: -84;
+  }
+}
+.synapse {
+  stroke-dasharray: 4 10;
+  animation: synapseTravel 2.8s linear infinite;
+}
+@keyframes orbitSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.brain-orbit {
+  animation: orbitSpin 18s linear infinite;
+  transform-origin: 110px 95px;
+}
+@keyframes haloBreathe {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+.brain-halo {
+  animation: haloBreathe 4.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .synapse,
+  .brain-orbit,
+  .brain-halo {
+    animation: none;
+  }
+}
+
+.brain-bubble {
+  animation: floatY 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-bubble {
     animation: none;
   }
 }

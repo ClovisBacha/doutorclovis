@@ -2,20 +2,22 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Heart, Pause, Play } from "lucide-react";
 import { AppCtaBanner } from "@/components/app-cta-banner";
+import { HeartbeatFeel } from "@/components/heartbeat-feel";
+import { Reveal } from "@/components/reveal";
 
 export const Route = createFileRoute("/batimentos")({
   head: () => ({
     meta: [
-      { title: "Som do coração do bebê — Obstétrica by Dr. Clóvis" },
+      { title: "Sinta e ouça o coração do bebê — Obstétrica" },
       {
         name: "description",
         content:
-          "Ouça uma simulação dos batimentos cardíacos do bebê em cada trimestre da gestação.",
+          "Sinta os batimentos do bebê na palma da mão: o celular vibra no ritmo do coração fetal. E ouça a simulação em cada trimestre da gestação.",
       },
-      { property: "og:title", content: "Som do coração do bebê" },
+      { property: "og:title", content: "Sinta o coração do bebê na palma da mão" },
       {
         property: "og:description",
-        content: "Simulação dos batimentos cardíacos fetais por trimestre.",
+        content: "O celular vibra no ritmo do batimento fetal, batida por batida.",
       },
     ],
   }),
@@ -92,15 +94,28 @@ function BatimentosPage() {
 
   return (
     <section className="mx-auto max-w-4xl px-5 py-16">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-        Som do coração
+      <Reveal variant="up">
+        <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
+          Som do coração
+        </p>
+        <h1 className="mt-3 font-serif text-4xl">Sinta e ouça os batimentos do bebê</h1>
+        <p className="mt-4 max-w-2xl text-muted-foreground">
+          Anote o valor do BPM na próxima consulta ou ultrassom, ajuste abaixo e{" "}
+          <strong>segure o celular</strong>: ele vibra no ritmo exato do coraçãozinho — para você,
+          para o papai e para os avós, mesmo à distância.
+        </p>
+      </Reveal>
+
+      <div className="mx-auto mt-10 max-w-lg">
+        <HeartbeatFeel defaultBpm={140} />
+      </div>
+
+      <h2 className="mt-14 font-serif text-2xl">O ritmo em cada trimestre</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+        Uma simulação suave do ritmo cardíaco fetal. O som real é ouvido no Doppler a partir da
+        10ª-12ª semana.
       </p>
-      <h1 className="mt-3 font-serif text-4xl">Ouça os batimentos do bebê</h1>
-      <p className="mt-4 max-w-2xl text-muted-foreground">
-        Uma simulação suave do ritmo cardíaco fetal em cada trimestre. O som real é ouvido no
-        Doppler a partir da 10ª-12ª semana.
-      </p>
-      <div className="mt-10 grid gap-5 md:grid-cols-3">
+      <div className="mt-6 grid gap-5 md:grid-cols-3">
         {trimestres.map((t, i) => (
           <div
             key={t.label}

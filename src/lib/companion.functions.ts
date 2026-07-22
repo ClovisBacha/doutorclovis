@@ -11,6 +11,9 @@ export type CompanionView = {
   reference_date: string | null;
   reference_weeks: number | null;
   reference_days: number | null;
+  /** BPM fetal medido pelo médico na consulta ("Sentir o coração" v2). */
+  fetal_bpm?: number | null;
+  fetal_bpm_at?: string | null;
 };
 
 /**
@@ -37,13 +40,23 @@ export const getCompanionView = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "expired" as const };
     }
 
-    const { data: profile } = await supabaseAdmin
+    const base =
+      "display_name,baby_name,lmp_date,due_date,reference_date,reference_weeks,reference_days";
+    const first = await (supabaseAdmin as any)
       .from("patient_profiles")
-      .select(
-        "display_name,baby_name,lmp_date,due_date,reference_date,reference_weeks,reference_days",
-      )
+      .select(`${base},fetal_bpm,fetal_bpm_at`)
       .eq("id", invite.user_id)
       .maybeSingle();
+    let profile = first.data;
+    if (first.error?.code === "42703") {
+      // Colunas fetal_bpm ainda não aplicadas no banco: segue sem elas.
+      const fallback = await supabaseAdmin
+        .from("patient_profiles")
+        .select(base)
+        .eq("id", invite.user_id)
+        .maybeSingle();
+      profile = fallback.data;
+    }
 
     if (!profile) return { ok: false as const, reason: "invalid" as const };
     return { ok: true as const, profile: profile as CompanionView };

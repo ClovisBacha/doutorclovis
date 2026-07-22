@@ -50,7 +50,9 @@ export const submitCorporateLead = createServerFn({ method: "POST" })
       employee_count: data.employeeCount,
       message: data.message,
     });
-    return { ok: !error, error: error?.message };
+    // Mensagem crua do banco fica no log do servidor, nunca no cliente.
+    if (error) console.error("submitCorporateLead failed", error);
+    return { ok: !error, error: error ? "Não foi possível enviar. Tente novamente." : undefined };
   });
 
 export const joinCorporate = createServerFn({ method: "POST" })
@@ -82,7 +84,10 @@ export const joinCorporate = createServerFn({ method: "POST" })
       .from("patient_profiles")
       .update({ corporate_account_id: account.id })
       .eq("id", u.user.id);
-    if (error) return { ok: false as const, error: error.message };
+    if (error) {
+      console.error("joinCorporate failed", error);
+      return { ok: false as const, error: "Não foi possível entrar agora. Tente novamente." };
+    }
     return { ok: true as const, companyName: account.company_name as string };
   });
 

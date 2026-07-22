@@ -68,11 +68,13 @@ export const addAlbumPostPublic = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
       .object({
-        token: z.string(),
-        authorName: z.string().min(1),
-        caption: z.string().nullable(),
-        imageData: z.string().nullable(),
-        emoji: z.string().nullable(),
+        token: z.string().max(64),
+        authorName: z.string().min(1).max(80),
+        caption: z.string().max(500).nullable(),
+        // Foto vem em base64 (canvas 800px jpeg ≈ 200KB). O teto de 1,5M chars
+        // impede payloads gigantes de inflarem o banco via endpoint público.
+        imageData: z.string().max(1_500_000).nullable(),
+        emoji: z.string().max(8).nullable(),
       })
       .parse(i),
   )

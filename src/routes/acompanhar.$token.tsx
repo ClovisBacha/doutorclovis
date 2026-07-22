@@ -1,11 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getCompanionView, type CompanionView as Profile } from "@/lib/companion.functions";
-import { babyForWeek, computeGestation, dueDateFromLmp, trimesterForWeek } from "@/lib/gestacao";
+import {
+  babyForWeek,
+  computeGestation,
+  dueDateFromLmp,
+  retaFinalMensagemFor,
+  trimesterForWeek,
+} from "@/lib/gestacao";
 import { getRecentPanicByToken } from "@/lib/escola.functions";
+import { HeartbeatFeel } from "@/components/heartbeat-feel";
 
 export const Route = createFileRoute("/acompanhar/$token")({
-  head: () => ({ meta: [{ title: "Painel do Papai — Obstétrica by Dr. Clóvis" }] }),
+  head: () => ({ meta: [{ title: "Painel do Papai — Obstétrica" }] }),
   component: CompanionView,
 });
 
@@ -104,21 +111,31 @@ function CompanionView() {
 
   useEffect(() => {
     (async () => {
-      const res = await getCompanionView({ data: { token } });
-      if (!res.ok) {
-        setErr(
-          res.reason === "expired"
-            ? "Este convite expirou. Peça um novo link à gestante."
-            : "Convite inválido.",
-        );
-        setLoading(false);
+      try {
+        const res = await getCompanionView({ data: { token } });
+        if (!res.ok) {
+          setErr(
+            res.reason === "expired"
+              ? "Este convite expirou. Peça um novo link à gestante."
+              : "Convite inválido.",
+          );
+          return;
+        }
+        setProfile(res.profile);
+      } catch {
+        // Falha de rede: sem isso a tela ficava em "Carregando..." p/ sempre.
+        setErr("Não foi possível carregar. Verifique a conexão e recarregue.");
         return;
+      } finally {
+        setLoading(false);
       }
-      setProfile(res.profile);
-      setLoading(false);
-      // Check for recent panic events
-      const panicRes = await getRecentPanicByToken({ data: { token } });
-      if (panicRes.ok && panicRes.event) setPanicEvent(panicRes.event as any);
+      // Alerta de pânico é secundário: falha dele não derruba o painel.
+      try {
+        const panicRes = await getRecentPanicByToken({ data: { token } });
+        if (panicRes.ok && panicRes.event) setPanicEvent(panicRes.event as any);
+      } catch {
+        /* sem alerta */
+      }
     })();
   }, [token]);
 
@@ -151,6 +168,8 @@ function CompanionView() {
   const daysLeft = dueDate
     ? Math.max(0, Math.ceil((dueDate.getTime() - today.getTime()) / 86_400_000))
     : null;
+  // Reta final (40s+): evita "0 dias para a DPP" perpétuo também pro acompanhante.
+  const reta = gest ? retaFinalMensagemFor({ weeks: gest.weeks, dueDate: due }) : null;
 
   const TABS: { id: PapaiTab; label: string }[] = [
     { id: "bebe", label: "Bebê" },
@@ -212,11 +231,18 @@ function CompanionView() {
         <p className="mt-1 text-muted-foreground">
           Semana <strong className="text-foreground">{gest.weeks}</strong>
           {gest.days > 0 && ` e ${gest.days} dias`}
-          {daysLeft !== null && (
+          {reta ? (
             <>
               {" "}
-              · <strong className="text-foreground">{daysLeft} dias</strong> para a DPP
+              · <strong className="text-foreground">{reta.eyebrow}</strong>
             </>
+          ) : (
+            daysLeft !== null && (
+              <>
+                {" "}
+                · <strong className="text-foreground">{daysLeft} dias</strong> para a DPP
+              </>
+            )
           )}
         </p>
       )}
@@ -265,6 +291,27 @@ function CompanionView() {
               </div>
               <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{baby.desc}</p>
             </div>
+
+            {/* Sentir o coração: se o médico registrou o BPM real da consulta,
+                vibra no ritmo EXATO do bebê; senão, usa o típico da semana
+                gestacional (1º tri ~160, 2º ~145, 3º ~135). */}
+            <HeartbeatFeel
+              defaultBpm={
+                profile.fetal_bpm ?? (trimester === 1 ? 160 : trimester === 2 ? 145 : 135)
+              }
+              babyName={profile.baby_name}
+              sourceNote={
+                profile.fetal_bpm
+                  ? `Ritmo real medido pelo médico${
+                      profile.fetal_bpm_at
+                        ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
+                        : ""
+                    } 💗`
+                  : undefined
+              }
+              compact
+            />
+
             {due && (
               <div className="rounded-2xl border border-border bg-card p-4 text-sm">
                 <p className="text-muted-foreground">Data Provável do Parto</p>
@@ -276,8 +323,14 @@ function CompanionView() {
                     year: "numeric",
                   })}
                 </p>
-                {daysLeft !== null && (
-                  <p className="mt-1 text-xs text-primary font-medium">Faltam {daysLeft} dias 🎉</p>
+                {reta ? (
+                  <p className="mt-1 text-xs text-primary font-medium">{reta.titulo}</p>
+                ) : (
+                  daysLeft !== null && (
+                    <p className="mt-1 text-xs text-primary font-medium">
+                      Faltam {daysLeft} dias 🎉
+                    </p>
+                  )
                 )}
               </div>
             )}
@@ -356,7 +409,7 @@ function CompanionView() {
       </div>
 
       <p className="mt-10 text-center text-xs text-muted-foreground">
-        Acompanhamento médico com Dr. Clóvis Bacha · Obstetrícia e Alto Risco
+        Acompanhamento médico · Obstetrícia e Alto Risco
       </p>
     </section>
   );

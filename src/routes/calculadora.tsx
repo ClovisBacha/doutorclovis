@@ -5,7 +5,7 @@ import { AppCtaBanner } from "@/components/app-cta-banner";
 export const Route = createFileRoute("/calculadora")({
   head: () => ({
     meta: [
-      { title: "Calculadoras obstétricas — Obstétrica by Dr. Clóvis" },
+      { title: "Calculadoras obstétricas — Obstétrica" },
       {
         name: "description",
         content:

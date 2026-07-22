@@ -1,5 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppBottomNav,
@@ -8,11 +7,19 @@ import {
   tabToSection,
   type AppTab,
   type BottomSection,
+  type NextAppointment,
 } from "@/components/app-mobile-shell";
 import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
+import { InviteDoctorCTA } from "@/components/invite-doctor-cta";
+import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
+import { ymdLocal } from "@/lib/utils";
+import { getMyDoctor } from "@/lib/doctors.functions";
+import { getMyAppointments, type MyAppointment } from "@/lib/appointments.functions";
+import { HeartbeatFeel } from "@/components/heartbeat-feel";
+import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
@@ -20,9 +27,10 @@ import {
   computeGestation,
   consultaForWeek,
   dueDateFromLmp,
+  retaFinalMensagemFor,
   trimesterForWeek,
 } from "@/lib/gestacao";
-import { BabyIllustration } from "@/components/baby-illustration";
+import { BabyIllustration, BABY_TONES } from "@/components/baby-illustration";
 import { assessSymptoms, saveTriageLog } from "@/lib/triage.functions";
 import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
 import {
@@ -47,18 +55,27 @@ import {
   type NameEntry,
   type NameSession,
 } from "@/lib/family.functions";
-import {
-  getCourseProgress,
-  markModuleComplete,
-  savePanicEvent,
-  type CourseProgress,
-} from "@/lib/escola.functions";
+import { getCourseProgress, savePanicEvent, type CourseProgress } from "@/lib/escola.functions";
+import { COURSE_MODULES } from "@/lib/course-modules";
 import {
   checkAndAwardAchievements,
   ACHIEVEMENT_DEFS,
   type AchievementDef,
 } from "@/lib/achievements.functions";
+import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
+import { CANTINHO_ITEMS, CANTINHO_CATEGORIES, type CantinhoType } from "@/lib/cantinho";
+import { getCantinho, buyCantinhoItem, setCantinhoFundo } from "@/lib/cantinho.functions";
+import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
+import {
+  searchDoctors,
+  requestDoctor,
+  getMyDoctorLink,
+  cancelDoctorRequest,
+  getMyDoctorPix,
+  type DoctorPublic,
+  type MyDoctorLink,
+} from "@/lib/patientlink.functions";
 import {
   requestPrivateConsultation,
   getMyPrivateConsultations,
@@ -101,7 +118,7 @@ import {
 export const Route = createFileRoute("/_authenticated/minha-conta")({
   head: () => ({
     meta: [
-      { title: "Minha Conta — Obstétrica by Dr. Clóvis" },
+      { title: "Minha Conta — Obstétrica" },
       { name: "description", content: "Acompanhe semana a semana o desenvolvimento do seu bebê." },
     ],
   }),
@@ -133,6 +150,13 @@ type Profile = {
   prior_cesarean?: boolean | null;
   prior_notes?: string | null;
   corporate_account_id?: string | null;
+  quiz_premium?: boolean | null;
+  doctor_id?: string | null;
+  /** Tom de pele do bebê nas ilustrações (0–4, paleta BABY_TONES). */
+  baby_skin_tone?: number | null;
+  /** BPM fetal medido pelo médico na consulta ("Sentir o coração"). */
+  fetal_bpm?: number | null;
+  fetal_bpm_at?: string | null;
 };
 
 type JournalEntry = {
@@ -179,7 +203,15 @@ type BirthPlan = {
   music: string;
   notes: string;
 };
-type DoctorQ = { id: string; question: string; answered: boolean; created_at: string };
+type DoctorQ = {
+  id: string;
+  question: string;
+  answered: boolean;
+  created_at: string;
+  /** Resposta escrita pelo médico (volta para a paciente na aba Perguntas). */
+  answer?: string | null;
+  answered_at?: string | null;
+};
 type Invite = { id: string; token: string; companion_name: string | null; created_at: string };
 
 type Gest = ReturnType<typeof computeGestation>;
@@ -217,6 +249,7 @@ const TABS = [
   "Carteirinha",
   "Pós-parto",
   "Conquistas",
+  "Cantinho",
   "Loja",
   "Consulta Particular",
   "Ciclo Menstrual",
@@ -287,7 +320,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Aprender",
-    tabs: ["Escola", "FAQ", "Pânico", "Conquistas", "Loja"],
+    tabs: ["Escola", "FAQ", "Pânico", "Conquistas", "Cantinho", "Loja"],
   },
   {
     label: "Médico",
@@ -362,6 +395,7 @@ function triggerAchievementsCheck() {
     )
     .then((res) => {
       if (!res || !res.ok) return;
+      if (res.careMode) return; // Modo Cuidado: sem comemorações.
       for (const key of res.newlyAwarded ?? []) {
         const def = ACHIEVEMENT_DEFS.find((d) => d.key === key);
         if (def) toast(`${def.emoji} Nova conquista desbloqueada: ${def.title}!`);
@@ -382,8 +416,57 @@ function MinhaContaPage() {
   })();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isDoctor, setIsDoctor] = useState(false);
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
+  // Jornada do Bebê (toque na foto do bebê) + popup do Premium (gatilho)
+  const [journeyOpen, setJourneyOpen] = useState(false);
+  const [premiumOpen, setPremiumOpen] = useState(false);
+  // Navegação disparada de DENTRO de uma aba (ex.: "Configure em Perfil") —
+  // troca a aba e sai da home mobile, senão o destino fica escondido no celular.
+  const goToTab = (t: string) => {
+    setTab(t as Tab);
+    setMobileHome(false);
+  };
+
+  // Modo Cuidado 🤍 — lido do perfil; pausa a gamificação globalmente.
+  const careMode = Boolean((profile as { care_mode?: boolean } | null)?.care_mode);
+  async function toggleCareMode(on: boolean) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) return;
+    const res = await setCareMode({ data: { accessToken: s.session.access_token, on } });
+    if (res.ok) setProfile((p) => (p ? ({ ...p, care_mode: on } as Profile) : p));
+  }
+
+  // Próxima consulta confirmada → card na home mobile (fecha o ciclo
+  // médico→paciente também na primeira tela do app).
+  const [nextAppt, setNextAppt] = useState<NextAppointment | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return;
+        const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
+        if (!res.ok) return;
+        const today = ymdLocal();
+        const next = res.appointments
+          .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
+          .sort((a, b) =>
+            (a.confirmed_date! + (a.confirmed_time ?? "")).localeCompare(
+              b.confirmed_date! + (b.confirmed_time ?? ""),
+            ),
+          )[0];
+        if (next) {
+          setNextAppt({
+            dateLabel: `${formatApptDate(next.confirmed_date!)} · ${next.confirmed_time ?? ""}`,
+            typeLabel: next.reason,
+          });
+        }
+      } catch {
+        /* card é enhancement — sem consulta, sem card */
+      }
+    })();
+  }, []);
 
   // Baixa a jornada da nuvem e arma a barreira anti-push logo no mount da
   // página, independente da aba ativa: abas como Sons/Quartinho gravam chaves
@@ -391,6 +474,40 @@ function MinhaContaPage() {
   // antes de qualquer push para não sobrescrever a jornada real na conta (P1).
   useEffect(() => {
     ensureInitialJourneyPull();
+  }, []);
+
+  // Retorno do checkout do Stripe: o webhook libera o acesso em segundos.
+  // Reconsulta o perfil até o premium refletir e avisa a paciente.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const st = new URLSearchParams(window.location.search).get("assinatura");
+    if (!st) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    if (st === "cancelada") {
+      toast("Pagamento não concluído. Você pode tentar de novo quando quiser.");
+      return;
+    }
+    if (st !== "sucesso") return;
+    toast.success("Pagamento recebido! Ativando seu acesso…");
+    let tries = 0;
+    const tick = async () => {
+      tries++;
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const { data } = await (supabase as any)
+        .from("patient_profiles")
+        .select("*")
+        .eq("id", u.user.id)
+        .maybeSingle();
+      if (data?.quiz_premium) {
+        setProfile(data);
+        toast.success("Premium ativado! Aproveite 💛");
+        return;
+      }
+      if (tries < 6) setTimeout(tick, 2000);
+      else if (data) setProfile(data);
+    };
+    setTimeout(tick, 1500);
   }, []);
 
   useEffect(() => {
@@ -403,18 +520,47 @@ function MinhaContaPage() {
         .eq("id", u.user.id)
         .maybeSingle();
       setProfile(data);
-      setLoading(false);
 
-      const { data: s } = await supabase.auth.getSession();
-      if (s.session?.access_token) {
-        const r = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
-        setIsAdmin(r.isAdmin);
+      // Papel ANTES de liberar o render: sem isso o médico via o app da
+      // gestante piscar por 2-3 round-trips até o bloqueio assumir.
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (s.session?.access_token) {
+          const r = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
+          setIsAdmin(r.isAdmin);
+          // Médico cadastrado (ativo OU não) é médico — não usa o app da
+          // gestante (o render abaixo troca o app pela tela de redirecionamento
+          // ao /painel). Admin nunca entra aqui: continua vendo tudo p/ testar.
+          if (!r.isAdmin) {
+            try {
+              const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
+              if (me.ok && me.doctor) setIsDoctor(true);
+            } catch {
+              /* sem perfil de médico → é gestante, segue no app */
+            }
+          }
+        }
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
 
   async function signOut() {
     await supabase.auth.signOut();
+    // Limpa a jornada local (dc-path-*) e o marcador de sync: num aparelho
+    // compartilhado, a próxima conta NÃO pode ver nem re-subir os dados de
+    // saúde da conta anterior (vazamento entre contas).
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith("dc-path-") || k === "dc-journey-synced-at")) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch {
+      /* modo privado/quota: sem cache local a limpar */
+    }
     navigate({ to: "/" });
   }
 
@@ -474,12 +620,69 @@ function MinhaContaPage() {
     eu: "Eu",
   };
 
+  // Médico (não-admin) NÃO usa o app da gestante: bebê, diário, jogo e afins
+  // são exclusivos das pacientes. O espaço dele é o /painel. A conta admin
+  // (ADMIN_EMAILS) segue vendo tudo para testar — isDoctor só é setado quando
+  // o usuário não é admin (ver efeito de carga acima).
+  if (isDoctor) {
+    return (
+      <section className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-5 text-center">
+        <p className="text-5xl">🩺</p>
+        <h1 className="mt-4 font-serif text-2xl">Esta área é da gestante</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Sua conta é de médico — o bebê, o diário e a jornada são exclusivos das pacientes. O seu
+          espaço de trabalho é o painel do consultório.
+        </p>
+        <Link
+          to="/painel"
+          className="mt-6 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Ir para o meu painel →
+        </Link>
+        <button
+          onClick={signOut}
+          className="mt-3 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >
+          Sair da conta
+        </button>
+      </section>
+    );
+  }
+
   return (
     <>
       {/* ── App bottom nav (mobile only) ─────────────────────── */}
       <AppBottomNav activeSection={activeSection} onSelect={handleBottomNav} />
 
-      <section className="mx-auto max-w-5xl px-5 py-6 md:py-12">
+      {/* ── Jornada do Bebê (toque na foto) + popup Premium ─────── */}
+      {journeyOpen && gest && (
+        <BabyJourneyModal
+          currentWeek={gest.weeks}
+          tone={profile?.baby_skin_tone ?? 0}
+          premium={!!profile?.quiz_premium}
+          onClose={() => setJourneyOpen(false)}
+          onWantPremium={() => setPremiumOpen(true)}
+        />
+      )}
+      {premiumOpen && (
+        <PremiumUpsellModal
+          onClose={() => setPremiumOpen(false)}
+          onUnlocked={async () => {
+            // Cupom aplicado: recarrega o perfil para o premium refletir já.
+            const { data: u } = await supabase.auth.getUser();
+            if (!u.user) return;
+            const { data } = await (supabase as any)
+              .from("patient_profiles")
+              .select("*")
+              .eq("id", u.user.id)
+              .maybeSingle();
+            if (data) setProfile(data);
+          }}
+        />
+      )}
+
+      {/* pb-28 no mobile: folga para a barra flutuante não cobrir o fim da página */}
+      <section className="mx-auto max-w-5xl px-5 py-6 pb-28 md:py-12">
         {/* ── Desktop header ───────────────────────────────────── */}
         <div className="hidden md:flex flex-wrap items-end justify-between gap-3 mb-2">
           <div>
@@ -500,7 +703,7 @@ function MinhaContaPage() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            {isAdmin && (
+            {(isAdmin || isDoctor) && (
               <Link
                 to="/painel"
                 className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
@@ -523,7 +726,7 @@ function MinhaContaPage() {
             {mobileHome ? `Olá, ${firstName} 💛` : SECTION_TITLES[activeSection]}
           </p>
           <div className="flex items-center gap-2">
-            {isAdmin && (
+            {(isAdmin || isDoctor) && (
               <Link
                 to="/painel"
                 className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
@@ -540,14 +743,52 @@ function MinhaContaPage() {
           </div>
         </div>
 
+        {/* ── Sem médico vinculado? Convida a encontrar um ──
+            Some quando a paciente já escolheu um médico (doctor_id) e nunca
+            aparece para contas de médico/admin — elas são o próprio médico. */}
+        {!loading && profile && !profile.doctor_id && !isDoctor && !isAdmin && (
+          <Link
+            to="/encontrar-medico"
+            className="mb-4 flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 transition-colors hover:border-primary/60"
+          >
+            <span className="text-2xl">👩‍⚕️</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">
+                Você ainda não tem um médico no app
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Encontre um obstetra por experiência, formação e cidade — ele passa a te acompanhar
+                por aqui.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+              Encontrar
+            </span>
+          </Link>
+        )}
+
+        {/* ── Convide o SEU médico: ele ganha +15% e você ganha o Premium ── */}
+        {!loading && profile && !profile.doctor_id && !isDoctor && !isAdmin && (
+          <InviteDoctorCTA variant="card" />
+        )}
+
         {/* ── Mobile: home screen ──────────────────────────────── */}
         {mobileHome && (
           <div className="md:hidden">
+            {careMode && (
+              <div className="mb-4">
+                <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />
+              </div>
+            )}
             <AppHomeScreen
               firstName={firstName}
               babyName={profile?.baby_name ?? null}
               gest={gest}
               onNavigate={mobileNavigate}
+              nextAppointment={nextAppt}
+              babyTone={profile?.baby_skin_tone ?? 0}
+              onBabyTap={() => setJourneyOpen(true)}
+              careMode={careMode}
             />
           </div>
         )}
@@ -599,7 +840,7 @@ function MinhaContaPage() {
                       setTab(t);
                       setMobileHome(false);
                     }}
-                    className={`press flex-shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+                    className={`press flex-shrink-0 rounded-full px-3.5 py-2 text-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
                       tab === t
                         ? `${cs.pill} font-semibold`
                         : "text-foreground/60 hover:text-foreground/80"
@@ -612,12 +853,33 @@ function MinhaContaPage() {
             </div>
           </div>
 
+          {careMode && <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />}
           <div key={tab} className="mt-6 tab-enter">
             <TabErrorBoundary tabName={tab}>
-              {tab === "Bebê" && <BabyTab profile={profile} gest={gest} />}
-              {tab === "Caminho" && <GestacaoPath profile={profile} gest={gest} />}
-              {tab === "Carta do Bebê" && <CartaBebêTab profile={profile} gest={gest} />}
-              {tab === "Calendário" && <PrenatalCalendarTab profile={profile} gest={gest} />}
+              {tab === "Bebê" && (
+                <BabyTab
+                  profile={profile}
+                  gest={gest}
+                  onNavigate={goToTab}
+                  onBabyTap={() => setJourneyOpen(true)}
+                  careMode={careMode}
+                />
+              )}
+              {tab === "Caminho" && (
+                <GestacaoPath
+                  profile={profile}
+                  gest={gest}
+                  quizPremium={!!profile?.quiz_premium}
+                  careMode={careMode}
+                  onOpenShop={() => goToTab("Cantinho")}
+                />
+              )}
+              {tab === "Carta do Bebê" && (
+                <CartaBebêTab profile={profile} gest={gest} onNavigate={goToTab} />
+              )}
+              {tab === "Calendário" && (
+                <PrenatalCalendarTab profile={profile} gest={gest} onNavigate={goToTab} />
+              )}
               {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
               {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
               {tab === "Humor" && <HumorTab />}
@@ -625,7 +887,7 @@ function MinhaContaPage() {
                 <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
               )}
               {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
-              {tab === "Saúde" && <HealthTab gest={gest} profile={profile} />}
+              {tab === "Saúde" && <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />}
               {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
               {tab === "Meditações" && <MeditacoesTab gest={gest} />}
               {tab === "Sons" && <SonsBebêTab gest={gest} />}
@@ -639,15 +901,25 @@ function MinhaContaPage() {
               {tab === "Consultas" && <ConsultasTab />}
               {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
               {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
-              {tab === "Conta Regressiva" && <CountdownTab profile={profile} gest={gest} />}
+              {tab === "Conta Regressiva" && (
+                <CountdownTab
+                  profile={profile}
+                  gest={gest}
+                  onNavigate={goToTab}
+                  careMode={careMode}
+                />
+              )}
               {tab === "Álbum" && <AlbumTab profile={profile} />}
               {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
-              {tab === "Escola" && <EscolaBebêTab gest={gest} />}
-              {tab === "FAQ" && <FAQTab gest={gest} onNavigate={(t) => setTab(t as Tab)} />}
-              {tab === "Pânico" && <PânicoTab profile={profile} />}
-              {tab === "Carteirinha" && <CardTab profile={profile} gest={gest} />}
-              {tab === "Pós-parto" && <PosPartoTab profile={profile} />}
+              {tab === "Escola" && <EscolaBebêTab gest={gest} onNavigate={goToTab} />}
+              {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
+              {tab === "Pânico" && <PânicoTab profile={profile} onNavigate={goToTab} />}
+              {tab === "Carteirinha" && (
+                <CardTab profile={profile} gest={gest} onNavigate={goToTab} />
+              )}
+              {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
               {tab === "Conquistas" && <ConquistasTab />}
+              {tab === "Cantinho" && <CantinhoTab />}
               {tab === "Loja" && <LojaTab gest={gest} />}
               {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
               {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
@@ -655,11 +927,16 @@ function MinhaContaPage() {
               {tab === "Médico" && <MédicoTab />}
               {tab === "Exames" && <ExamesTab gest={gest} />}
               {tab === "Plano de Parto" && <PlanoPártoTab profile={profile} />}
-              {tab === "Apoio Emocional" && (
-                <ApoioEmocionalTab onNavigate={(t) => setTab(t as Tab)} />
-              )}
+              {tab === "Apoio Emocional" && <ApoioEmocionalTab onNavigate={goToTab} />}
               {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
-              {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
+              {tab === "Perfil" && (
+                <ProfileTab
+                  profile={profile}
+                  onSaved={setProfile}
+                  careMode={careMode}
+                  onToggleCare={toggleCareMode}
+                />
+              )}
             </TabErrorBoundary>
           </div>
         </div>
@@ -669,7 +946,20 @@ function MinhaContaPage() {
 }
 
 /* ---------- Bebê ---------- */
-function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function BabyTab({
+  profile,
+  gest,
+  onNavigate,
+  onBabyTap,
+  careMode = false,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+  /** Toque na foto do bebê → Jornada do Bebê (gatilho Premium). */
+  onBabyTap?: () => void;
+  careMode?: boolean;
+}) {
   if (!profile || !gest) {
     return (
       <div className="glass-card glass-pink rounded-3xl p-10 text-center">
@@ -677,7 +967,14 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         <p className="font-serif text-xl text-pink-700">Configure seu perfil</p>
         <p className="mt-2 text-sm text-muted-foreground">
           Configure a data da sua última menstruação ou os dados do ultrassom em{" "}
-          <strong>Perfil</strong> para começar o acompanhamento.
+          <button
+            type="button"
+            onClick={() => onNavigate("Perfil")}
+            className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+          >
+            Perfil
+          </button>{" "}
+          para começar o acompanhamento.
         </p>
       </div>
     );
@@ -692,45 +989,112 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
     : null;
   const exam = consultaForWeek(gest.weeks);
   const babyLabel = profile.baby_name ? profile.baby_name : "seu bebê";
+  // Reta final (semanas 40-42+): substitui a contagem regressiva por acolhimento.
+  // Usa âncora unificada (idade gestacional + DPP) para nunca sobrar estado sem mensagem.
+  const reta = retaFinalMensagemFor({ weeks: gest.weeks, dueDate: due });
+
+  const bpmDefault = profile.fetal_bpm ?? (gest.weeks < 14 ? 160 : gest.weeks < 28 ? 145 : 135);
 
   return (
-    <div className="grid gap-6 md:grid-cols-[1.2fr_1fr]">
-      <div className="rounded-3xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">{trimestre}</p>
-        <h2 className="mt-2 font-serif text-4xl">
-          {gest.weeks} <span className="text-2xl text-muted-foreground">semanas</span>
-          {gest.days > 0 && (
-            <span className="ml-2 text-xl text-muted-foreground">e {gest.days}d</span>
-          )}
-        </h2>
-        <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-secondary">
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {progress.toFixed(0)}% da jornada {daysToDue != null && `· faltam ${daysToDue} dias`}
-        </p>
+    <div className="space-y-6">
+      {/* ── Hero imersivo: o bebê é o protagonista ─────────────────────── */}
+      <div className="relative overflow-hidden rounded-3xl border border-border bg-[image:var(--gradient-warm)] p-6 shadow-[var(--shadow-card)] md:p-10">
+        {/* brilhos suaves ao fundo */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-primary/10 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 -left-14 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
+        />
 
-        <div className="mt-6 rounded-2xl bg-[image:var(--gradient-warm)] p-6">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">
-            {babyLabel} esta semana
-          </p>
-          {/* Baby illustration — grows week-by-week */}
-          <div className="my-3 flex justify-center">
-            <BabyIllustration week={gest.weeks} />
+        <div className="relative grid items-center gap-6 md:grid-cols-[auto_1fr] md:gap-12">
+          {/* Bebê grande, flutuando devagar — toque abre a Jornada */}
+          <button
+            onClick={onBabyTap}
+            aria-label="Ver a jornada do bebê"
+            className="float-slow mx-auto transition-transform active:scale-[0.97]"
+          >
+            <BabyIllustration
+              week={gest.weeks}
+              tone={profile.baby_skin_tone ?? 0}
+              showInfo={false}
+              className="h-60 w-60 drop-shadow-[0_18px_44px_rgba(168,90,68,0.22)] md:h-80 md:w-80"
+            />
+          </button>
+
+          <div className="text-center md:text-left">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+              {trimestre} · {babyLabel} esta semana
+            </p>
+            <h2 className="mt-2 font-serif leading-none">
+              <span className="text-6xl md:text-7xl">{gest.weeks}</span>
+              <span className="ml-2 text-xl text-muted-foreground md:text-2xl">
+                semanas{gest.days > 0 ? ` e ${gest.days}d` : ""}
+              </span>
+            </h2>
+
+            {/* Chips: tamanho · peso · comparação (silenciados no Modo Cuidado) */}
+            {!careMode && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2 md:justify-start">
+                {[
+                  { icon: "📏", label: baby.size },
+                  ...(baby.weight !== "—" ? [{ icon: "⚖️", label: baby.weight }] : []),
+                  { icon: "🍓", label: baby.fruit },
+                ].map((c) => (
+                  <span
+                    key={c.label}
+                    className="rounded-full border border-primary/15 bg-card/70 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur"
+                  >
+                    {c.icon} {c.label}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {!careMode && (
+              <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-foreground md:mx-0 md:text-base">
+                {baby.desc}
+              </p>
+            )}
+
+            {/* Progresso da jornada (silenciado no Modo Cuidado) */}
+            {!careMode && (
+              <div className="mt-5">
+                <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
+                  <span>Início</span>
+                  <span className="text-primary">{progress.toFixed(0)}% da jornada</span>
+                  <span>Parto</span>
+                </div>
+                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-card/70">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                {reta ? (
+                  <p className="mt-1.5 text-xs font-medium text-primary">{reta.titulo}</p>
+                ) : (
+                  daysToDue != null && (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      {daysToDue === 0
+                        ? "É hoje! 🎉"
+                        : daysToDue === 1
+                          ? "Amanhã! 🎉"
+                          : `Faltam ${daysToDue} dias para conhecer ${babyLabel} 💛`}
+                    </p>
+                  )
+                )}
+              </div>
+            )}
           </div>
-          <p className="mt-1 font-serif text-xl text-primary">{baby.size}</p>
-          <p className="text-sm text-muted-foreground">
-            Peso: {baby.weight} · {baby.fruit}
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-foreground">{baby.desc}</p>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="rounded-3xl border border-border bg-card p-6">
+      {/* ── Linha de cards: DPP · próxima consulta · exame ─────────────── */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">
             DPP — Data provável do parto
           </p>
@@ -743,17 +1107,21 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
                 })
               : "—"}
           </p>
-          {daysToDue != null && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {daysToDue === 0
-                ? "É hoje! 🎉"
-                : daysToDue === 1
-                  ? "Amanhã!"
-                  : `Faltam ${daysToDue} dias`}
-            </p>
+          {careMode ? null : reta ? (
+            <p className="mt-1 text-sm text-primary">Você está na janela do parto 💛</p>
+          ) : (
+            daysToDue != null && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {daysToDue === 0
+                  ? "É hoje! 🎉"
+                  : daysToDue === 1
+                    ? "Amanhã!"
+                    : `Faltam ${daysToDue} dias`}
+              </p>
+            )
           )}
         </div>
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Próxima consulta</p>
           <p className="mt-2 text-sm text-muted-foreground">
             {gest.weeks < 28
@@ -770,6 +1138,23 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           <p className="mt-2 text-sm leading-relaxed text-foreground">{exam}</p>
         </div>
       </div>
+
+      {/* ── Sentir o coração: vibra no ritmo do bebê (BPM real se o médico
+             registrou na consulta; senão, o típico do trimestre) ─────────── */}
+      <HeartbeatFeel
+        defaultBpm={bpmDefault}
+        babyName={profile.baby_name}
+        sourceNote={
+          profile.fetal_bpm
+            ? `Ritmo real medido pelo seu médico${
+                profile.fetal_bpm_at
+                  ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
+                  : ""
+              } 💗`
+            : undefined
+        }
+        compact
+      />
       {/* Segunda gestação: historical alerts */}
       {(profile.pregnancy_number ?? 1) >= 2 && (
         <div className="col-span-full rounded-3xl border border-primary/25 bg-primary/8 p-6">
@@ -778,7 +1163,7 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           </p>
           <div className="space-y-2 text-sm">
             {profile.prior_bp_elevated && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-red-500 text-base">⚠️</span>
                 <p>
                   Na gestação anterior, você teve <strong>pressão elevada</strong>
@@ -790,30 +1175,30 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               </div>
             )}
             {profile.prior_gestational_diabetes && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-primary text-base">🍬</span>
                 <p>
                   Você teve <strong>diabetes gestacional</strong> anteriormente. O risco de
-                  recorrência é maior — converse com Dr. Clóvis sobre o teste de glicemia antecipado
+                  recorrência é maior — converse com seu médico sobre o teste de glicemia antecipado
                   (semanas 20–24).
                 </p>
               </div>
             )}
             {profile.prior_preterm && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-primary text-base">👶</span>
                 <p>
-                  Histórico de <strong>parto prematuro</strong>. Dr. Clóvis acompanhará o
+                  Histórico de <strong>parto prematuro</strong>. Seu médico acompanhará o
                   comprimento cervical com mais frequência nesta gestação.
                 </p>
               </div>
             )}
             {profile.prior_cesarean && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-primary text-base">🏥</span>
                 <p>
                   Cesariana anterior registrada. A via de parto desta gestação será planejada em
-                  conjunto com Dr. Clóvis.
+                  conjunto com o seu médico.
                 </p>
               </div>
             )}
@@ -823,11 +1208,19 @@ function BabyTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
               !profile.prior_cesarean && (
                 <p className="text-primary">
                   Nenhuma complicação registrada na gestação anterior. Continue preenchendo seu
-                  histórico em <strong>Perfil → 2ª Gestação</strong>.
+                  histórico em{" "}
+                  <button
+                    type="button"
+                    onClick={() => onNavigate("Perfil")}
+                    className="font-semibold underline underline-offset-2 hover:opacity-80"
+                  >
+                    Perfil → 2ª Gestação
+                  </button>
+                  .
                 </p>
               )}
             {profile.prior_notes && (
-              <div className="flex items-start gap-2 rounded-xl bg-white/70 p-3">
+              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
                 <span className="text-base">📋</span>
                 <p>
                   <strong>Observações:</strong> {profile.prior_notes}
@@ -1461,17 +1854,104 @@ function ChecklistTab({ gest }: { gest: Gest }) {
   );
 }
 
+/* ---------- Modo Cuidado 🤍 ---------- */
+function CareModeBanner({
+  onExit,
+  onNavigate,
+}: {
+  onExit: () => void;
+  onNavigate: (t: string) => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
+      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Modo Cuidado 🤍</p>
+      <p className="mt-2 font-serif text-lg text-foreground">Estamos aqui com você.</p>
+      <p className="mt-1 max-w-md text-sm text-muted-foreground">
+        Pausamos as comemorações, contagens e a pontuação. Tudo o que você construiu está guardado —
+        nada se perdeu. No seu tempo. 💛
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          onClick={() => onNavigate("Apoio Emocional")}
+          className="press rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+        >
+          Apoio emocional
+        </button>
+        <button
+          onClick={() => onNavigate("Médico")}
+          className="press rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+        >
+          Falar com o consultório
+        </button>
+        <button
+          onClick={onExit}
+          className="press rounded-full px-4 py-2 text-sm font-medium text-slate-500 underline"
+        >
+          Sair do Modo Cuidado
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CareModeToggle({
+  careMode,
+  onToggle,
+}: {
+  careMode: boolean;
+  onToggle: (on: boolean) => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-card p-6">
+      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Modo Cuidado 🤍</p>
+      {careMode ? (
+        <>
+          <p className="mt-2 text-sm text-muted-foreground">
+            O Modo Cuidado está ativo. Comemorações, contagens e pontos estão pausados, e tudo o que
+            você construiu segue guardado.
+          </p>
+          <button
+            onClick={() => onToggle(false)}
+            className="press mt-4 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+          >
+            Desativar quando estiver pronta
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            Passando por um momento difícil — uma perda, uma complicação, ou só precisa de uma
+            pausa? O Modo Cuidado silencia as comemorações, contagens e pontos, e mantém com carinho
+            tudo o que você já construiu.
+          </p>
+          <button
+            onClick={() => onToggle(true)}
+            className="press mt-4 rounded-full bg-slate-700 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Ativar Modo Cuidado
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Perfil ---------- */
 function ProfileTab({
   profile,
   onSaved,
+  careMode,
+  onToggleCare,
 }: {
   profile: Profile | null;
   onSaved: (p: Profile) => void;
+  careMode: boolean;
+  onToggleCare: (on: boolean) => void;
 }) {
   const [form, setForm] = useState({
     display_name: profile?.display_name ?? "",
     baby_name: profile?.baby_name ?? "",
+    baby_skin_tone: profile?.baby_skin_tone ?? 0,
     lmp_date: profile?.lmp_date ?? "",
     reference_date: profile?.reference_date ?? "",
     reference_weeks: profile?.reference_weeks?.toString() ?? "",
@@ -1530,6 +2010,7 @@ function ProfileTab({
         id: u.user.id,
         display_name: form.display_name || null,
         baby_name: form.baby_name || null,
+        baby_skin_tone: form.baby_skin_tone,
         lmp_date: form.lmp_date || null,
         due_date: form.lmp_date ? dueDateFromLmp(form.lmp_date) : null,
         reference_date: form.reference_date || null,
@@ -1554,11 +2035,20 @@ function ProfileTab({
         prior_notes: form.prior_notes || null,
         updated_at: new Date().toISOString(),
       };
-      const { data, error } = await (supabase as any)
+      let { data, error } = await (supabase as any)
         .from("patient_profiles")
         .upsert(payload)
         .select()
         .single();
+      if (error && String(error.message || "").includes("baby_skin_tone")) {
+        // Coluna do tom ainda não migrada no banco: salva o resto mesmo assim.
+        delete payload.baby_skin_tone;
+        ({ data, error } = await (supabase as any)
+          .from("patient_profiles")
+          .upsert(payload)
+          .select()
+          .single());
+      }
       if (error) {
         setMsg(error.message);
       } else {
@@ -1573,6 +2063,8 @@ function ProfileTab({
 
   return (
     <div className="space-y-6">
+      <CareModeToggle careMode={careMode} onToggle={onToggleCare} />
+
       {/* Completion card */}
       <div className="glass-card glass-indigo rounded-3xl p-6">
         <div className="flex items-center justify-between">
@@ -1611,6 +2103,42 @@ function ProfileTab({
             value={form.baby_name}
             onChange={(v) => setForm({ ...form, baby_name: v })}
           />
+        </div>
+
+        {/* Tom de pele do bebê nas ilustrações — toda família se vê no app */}
+        <div className="mt-4">
+          <p className="mb-2 block text-sm font-medium">Tom de pele do bebê nas ilustrações</p>
+          <div className="flex flex-wrap items-center gap-3">
+            {BABY_TONES.map((t, i) => (
+              <button
+                key={t.label}
+                type="button"
+                onClick={() => setForm({ ...form, baby_skin_tone: i })}
+                title={t.label}
+                aria-label={`Tom ${t.label}`}
+                aria-pressed={form.baby_skin_tone === i}
+                className={`h-9 w-9 rounded-full border-2 transition-transform ${
+                  form.baby_skin_tone === i
+                    ? "scale-110 border-primary ring-2 ring-primary/30"
+                    : "border-border hover:scale-105"
+                }`}
+                style={{ backgroundColor: t.swatch }}
+              />
+            ))}
+            <div className="ml-1">
+              <BabyIllustration
+                week={30}
+                tone={form.baby_skin_tone}
+                showSac={false}
+                showInfo={false}
+                className="h-14 w-14"
+              />
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {BABY_TONES[form.baby_skin_tone]?.label ?? "Claro"} — muda o bebê em todas as telas. Dá
+            para trocar quando quiser.
+          </p>
         </div>
       </div>
 
@@ -1698,6 +2226,9 @@ function ProfileTab({
             value={form.birth_date}
             onChange={(v) => setForm({ ...form, birth_date: v })}
           />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Deixe em branco enquanto a gestação está em curso — preencha só quando o bebê nascer.
+          </p>
         </div>
       </div>
 
@@ -1898,7 +2429,10 @@ function ProfileTab({
                     setCorporateMsg(
                       `✅ Vinculado a ${res.companyName}! Salve o perfil para confirmar.`,
                     );
-                    onSaved({ ...profile!, corporate_account_id: "pending" } as typeof profile);
+                    onSaved({
+                      ...profile!,
+                      corporate_account_id: "pending",
+                    } as NonNullable<typeof profile>);
                   } else {
                     setCorporateMsg(res.error ?? "Código inválido.");
                   }
@@ -1987,7 +2521,15 @@ function iomGain(week: number, bmi: number): { min: number; max: number } {
   return { min: 0.5 + (week - 12) * rMin, max: 2.0 + (week - 12) * rMax };
 }
 
-function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
+function HealthTab({
+  gest,
+  profile,
+  onNavigate,
+}: {
+  gest: Gest;
+  profile: Profile | null;
+  onNavigate: (tab: string) => void;
+}) {
   const [logs, setLogs] = useState<HealthLog[]>([]);
   const [form, setForm] = useState({
     weight_kg: "",
@@ -2317,14 +2859,29 @@ function HealthTab({ gest, profile }: { gest: Gest; profile: Profile | null }) {
           </svg>
           <p className="mt-1 text-xs text-muted-foreground">
             Linha sólida = seu peso · Faixa = zona saudável para seu IMC. Configure altura e peso
-            pré-gestacional em <strong>Perfil</strong>.
+            pré-gestacional em{" "}
+            <button
+              type="button"
+              onClick={() => onNavigate("Perfil")}
+              className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+            >
+              Perfil
+            </button>
+            .
           </p>
         </div>
       ) : (
         prePregW == null && (
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
             Configure sua <strong>altura</strong> e <strong>peso pré-gestacional</strong> em{" "}
-            <strong>Perfil</strong> para ver a curva de ganho de peso recomendada pelo IOM.
+            <button
+              type="button"
+              onClick={() => onNavigate("Perfil")}
+              className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+            >
+              Perfil
+            </button>{" "}
+            para ver a curva de ganho de peso recomendada pelo IOM.
           </div>
         )
       )}
@@ -2715,9 +3272,15 @@ function QuestionsTab({ gest }: { gest: Gest }) {
       toast.error("Sua sessão expirou. Faça login novamente.");
       return;
     }
+    // Carimba o médico vinculado para o assinante ver a pergunta da SUA paciente.
+    const { data: prof } = await (supabase as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", u.user.id)
+      .maybeSingle();
     const { error } = await (supabase as any)
       .from("doctor_questions")
-      .insert({ user_id: u.user.id, question: q });
+      .insert({ user_id: u.user.id, question: q, doctor_id: prof?.doctor_id ?? null });
     if (error) {
       toast.error("Não foi possível salvar a pergunta. Tente novamente.");
       return;
@@ -2836,25 +3399,36 @@ function QuestionsTab({ gest }: { gest: Gest }) {
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
             Respondidas ({answered.length})
           </p>
-          <div className="space-y-2 opacity-60">
+          <div className="space-y-2">
             {answered.map((q) => (
-              <div
-                key={q.id}
-                className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4"
-              >
-                <input
-                  type="checkbox"
-                  checked
-                  onChange={() => toggle(q)}
-                  className="mt-1 h-4 w-4"
-                />
-                <p className="flex-1 text-sm line-through">{q.question}</p>
-                <button
-                  onClick={() => remove(q.id)}
-                  className="text-xs text-muted-foreground hover:text-destructive"
-                >
-                  ×
-                </button>
+              <div key={q.id} className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked
+                    onChange={() => toggle(q)}
+                    className="mt-1 h-4 w-4"
+                  />
+                  <p className={`flex-1 text-sm ${q.answer ? "" : "line-through"}`}>{q.question}</p>
+                  <button
+                    onClick={() => remove(q.id)}
+                    className="text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    ×
+                  </button>
+                </div>
+                {/* Resposta do médico — volta para a paciente aqui */}
+                {q.answer && (
+                  <div className="ml-7 mt-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                      💬 Resposta do seu médico
+                      {q.answered_at
+                        ? ` · ${new Date(q.answered_at).toLocaleDateString("pt-BR")}`
+                        : ""}
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-foreground">{q.answer}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -2883,11 +3457,17 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
   async function create() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const token = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+    // Token criptográfico (não-enumerável) — dá acesso ao painel do papai,
+    // álbum e alerta de pânico. Validade de 1 ano cobre gestação + pós-parto;
+    // o backend já rejeita convites vencidos (expires_at) e o "Revogar" segue
+    // sendo o controle imediato.
+    const token = crypto.randomUUID().replace(/-/g, "");
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
     await (supabase as any).from("companion_invites").insert({
       user_id: u.user.id,
       token,
       companion_name: name || null,
+      expires_at: expiresAt,
     });
     setName("");
     load();
@@ -3136,7 +3716,15 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
 }
 
 /* ---------- Carteirinha digital (feat 43 — evoluída) ---------- */
-function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function CardTab({
+  profile,
+  gest,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+}) {
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
@@ -3156,7 +3744,7 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
         `Alergias: ${profile.allergies ?? "Nenhuma"}`,
         `Medicamentos: ${profile.medications ?? "Nenhum"}`,
         `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
-        `Médico: Dr. Clóvis Bacha | CRM-MG`,
+        `Médico: ${DOCTOR.name} | ${DOCTOR.crm}`,
         `Atualizado: ${updatedAt}`,
       ].join("\n")
     : "";
@@ -3219,7 +3807,7 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           {profile.emergency_phone && (
             <Info label="Tel. emergência" value={profile.emergency_phone} />
           )}
-          <Info label="Médico" value="Dr. Clóvis Bacha" />
+          <Info label="Médico" value={DOCTOR.name} />
         </div>
 
         <div className="mt-5 rounded-xl bg-card/60 p-3 text-xs text-muted-foreground">
@@ -3240,7 +3828,7 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             Escaneie para ver todos os dados em caso de emergência
           </p>
           <p className="mt-2 text-xs font-medium text-primary">
-            Dr. Clóvis Bacha — Ginecologia & Obstetrícia
+            {DOCTOR.name} — Ginecologia & Obstetrícia
           </p>
         </div>
       </div>
@@ -3288,8 +3876,15 @@ function CardTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
       </button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Mantenha seus dados atualizados em <strong>Perfil</strong> — o QR Code atualiza
-        automaticamente.
+        Mantenha seus dados atualizados em{" "}
+        <button
+          type="button"
+          onClick={() => onNavigate("Perfil")}
+          className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+        >
+          Perfil
+        </button>{" "}
+        — o QR Code atualiza automaticamente.
       </p>
     </div>
   );
@@ -3329,9 +3924,21 @@ type WAMsg = {
   audioDuration?: string;
   fileName?: string;
   fileSize?: string;
+  /** Mensagem de erro transitório — não votável. */
+  error?: boolean;
 };
 
-function WABubble({ msg }: { msg: WAMsg }) {
+function WABubble({
+  msg,
+  feedback,
+  onFeedback,
+}: {
+  msg: WAMsg;
+  /** Voto já dado nesta resposta (persistido no estado do chat). */
+  feedback?: "up" | "down";
+  /** Presente só em respostas da IA elegíveis a avaliação. */
+  onFeedback?: (helpful: boolean) => void;
+}) {
   const isUser = msg.role === "user";
   const timeStr = msg.ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const [playing, setPlaying] = useState(false);
@@ -3341,7 +3948,7 @@ function WABubble({ msg }: { msg: WAMsg }) {
     <div className={`flex items-end gap-1.5 mb-0.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
       {!isUser && (
         <div
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white self-end mb-0.5"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white self-end mb-0.5"
           style={{
             background: "rgba(255,255,255,0.18)",
             backdropFilter: "blur(12px)",
@@ -3437,7 +4044,7 @@ function WABubble({ msg }: { msg: WAMsg }) {
                 {msg.fileName}
               </p>
               {msg.fileSize && (
-                <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+                <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.7)" }}>
                   {msg.fileSize}
                 </p>
               )}
@@ -3455,9 +4062,35 @@ function WABubble({ msg }: { msg: WAMsg }) {
           </p>
         )}
 
-        {/* Timestamp */}
+        {/* Timestamp + feedback 👍👎 (só em respostas da IA) */}
         <div className="flex items-center justify-end gap-1 px-2.5 pb-1.5 pt-0.5">
-          <span className="text-[10px] leading-none" style={{ color: "rgba(255,255,255,0.45)" }}>
+          {!isUser && onFeedback && (
+            <span className="mr-auto flex items-center gap-1.5 pl-0.5">
+              {feedback ? (
+                <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.7)" }}>
+                  {feedback === "up" ? "Obrigado! 💛" : "Anotado — seu médico vai ver 💛"}
+                </span>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onFeedback(true)}
+                    aria-label="Resposta útil"
+                    className="rounded-full px-1.5 py-0.5 text-[13px] leading-none opacity-60 transition-opacity hover:opacity-100"
+                  >
+                    👍
+                  </button>
+                  <button
+                    onClick={() => onFeedback(false)}
+                    aria-label="Resposta não ajudou"
+                    className="rounded-full px-1.5 py-0.5 text-[13px] leading-none opacity-60 transition-opacity hover:opacity-100"
+                  >
+                    👎
+                  </button>
+                </>
+              )}
+            </span>
+          )}
+          <span className="text-[10px] leading-none" style={{ color: "rgba(255,255,255,0.7)" }}>
             {timeStr}
           </span>
           {isUser && (
@@ -3478,7 +4111,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const greeting = [
     firstName ? `Olá, ${firstName}!` : "Olá!",
     gest ? `Você está na semana ${gest.weeks} — vou responder levando em conta sua gestação.` : "",
-    "Sou o assistente virtual do consultório do Dr. Clóvis Bacha. Como posso ajudar?",
+    "Sou o assistente virtual do consultório do seu obstetra. Como posso ajudar?",
   ]
     .filter(Boolean)
     .join(" ");
@@ -3489,6 +4122,28 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
+  // Feedback 👍👎 por índice de mensagem — o 👎 vira lacuna na fila do médico.
+  const [votes, setVotes] = useState<Record<number, "up" | "down">>({});
+
+  function voteMessage(i: number, helpful: boolean) {
+    setVotes((v) => ({ ...v, [i]: helpful ? "up" : "down" }));
+    void (async () => {
+      try {
+        const q = messages
+          .slice(0, i)
+          .reverse()
+          .find((x) => x.role === "user")?.content;
+        if (!q) return;
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session?.access_token) return;
+        await submitBrainFeedback({
+          data: { accessToken: s.session.access_token, question: q, helpful },
+        });
+      } catch {
+        /* telemetria é best-effort */
+      }
+    })();
+  }
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -3535,9 +4190,16 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           };
         },
       );
+      // Envia o token da paciente para o /api/chat resolver o médico dela e
+      // usar a IA do consultório correto (cada conta é individual).
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ messages: uiMessages }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -3573,6 +4235,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
           role: "assistant",
           content: "Desculpe, ocorreu um erro. Tente novamente.",
           ts: new Date(),
+          error: true, // falha transitória não é votável (senão 👎 vira lacuna falsa)
         },
       ]);
     } finally {
@@ -3640,7 +4303,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             className="text-[15px] font-semibold leading-tight"
             style={{ color: "rgba(255,255,255,0.95)" }}
           >
-            Assistente Dr. Clóvis
+            Assistente do seu médico
           </p>
           <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
             Dúvidas gerais sobre gestação
@@ -3650,15 +4313,28 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
 
       {/* Área de mensagens */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-0.5 px-3 py-3">
-        {messages.map((m, i) => (
-          <WABubble key={i} msg={m} />
-        ))}
+        {messages.map((m, i) => {
+          // Avaliável: resposta da IA com pergunta anterior, fora do streaming.
+          const canVote =
+            m.role === "assistant" &&
+            !m.error &&
+            messages.slice(0, i).some((x) => x.role === "user") &&
+            !(loading && i === messages.length - 1);
+          return (
+            <WABubble
+              key={i}
+              msg={m}
+              feedback={votes[i]}
+              onFeedback={canVote ? (helpful) => voteMessage(i, helpful) : undefined}
+            />
+          );
+        })}
 
         {/* Indicador digitando */}
         {loading && (
           <div className="flex items-end gap-1.5">
             <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
               style={{
                 background: "rgba(255,255,255,0.18)",
                 backdropFilter: "blur(12px)",
@@ -3822,7 +4498,7 @@ function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
             <button
               onClick={() => fileImageRef.current?.click()}
               className="ml-1 shrink-0 self-end text-xl"
-              style={{ color: "rgba(255,255,255,0.45)" }}
+              style={{ color: "rgba(255,255,255,0.7)" }}
             >
               📷
             </button>
@@ -4002,23 +4678,38 @@ function weekToDate(targetWeek: number, profile: Profile): Date | null {
 }
 
 function toGoogleCalUrl(label: string, date: Date) {
-  const ymd = date.toISOString().slice(0, 10).replace(/-/g, "");
+  const ymd = ymdLocal(date).replace(/-/g, "");
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: `Pré-natal: ${label}`,
     dates: `${ymd}/${ymd}`,
-    details: "Acompanhamento pré-natal — Obstétrica by Dr. Clóvis",
+    details: "Acompanhamento pré-natal — Obstétrica",
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function PrenatalCalendarTab({
+  profile,
+  gest,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+}) {
   if (!profile || (!profile.lmp_date && !profile.reference_date)) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Configure a DUM ou os dados do ultrassom em <strong>Perfil</strong> para gerar o
-          calendário personalizado.
+          Configure a DUM ou os dados do ultrassom em{" "}
+          <button
+            type="button"
+            onClick={() => onNavigate("Perfil")}
+            className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+          >
+            Perfil
+          </button>{" "}
+          para gerar o calendário personalizado.
         </p>
       </div>
     );
@@ -4029,15 +4720,23 @@ function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest:
 
   function downloadAllIcs() {
     const events: string[] = [];
+    // DTSTAMP é obrigatório no VEVENT (RFC 5545); DTEND de evento all-day é
+    // EXCLUSIVO — precisa ser o dia seguinte, senão o evento tem duração zero
+    // e alguns clientes o descartam.
+    const dtstamp = `${ymdLocal().replace(/-/g, "")}T000000Z`;
     PRENATAL_MILESTONES.forEach((m) => {
       const d = weekToDate(m.week, profile!);
       if (!d) return;
-      const ymd = d.toISOString().slice(0, 10).replace(/-/g, "");
+      const ymd = ymdLocal(d).replace(/-/g, "");
+      const next = new Date(d);
+      next.setDate(next.getDate() + 1);
+      const ymdEnd = ymdLocal(next).replace(/-/g, "");
       const lines = [
         "BEGIN:VEVENT",
         `UID:prenatal-${m.week}-${m.label.slice(0, 10).replace(/\s/g, "")}@doutorclovis`,
+        `DTSTAMP:${dtstamp}`,
         `DTSTART;VALUE=DATE:${ymd}`,
-        `DTEND;VALUE=DATE:${ymd}`,
+        `DTEND;VALUE=DATE:${ymdEnd}`,
         `SUMMARY:Pré-natal S${m.week}: ${m.label}`,
         m.detail ? `DESCRIPTION:${m.detail}` : "",
         "END:VEVENT",
@@ -4047,14 +4746,14 @@ function PrenatalCalendarTab({ profile, gest }: { profile: Profile | null; gest:
     const ics = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Dr Clovis Bacha//Prenatal Calendar//PT-BR",
+      "PRODID:-//Obstetrica//Prenatal Calendar//PT-BR",
       ...events,
       "END:VCALENDAR",
     ].join("\r\n");
     const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = "prenatal-dr-clovis.ics";
+    a.download = "prenatal-obstetrica.ics";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -4578,7 +5277,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         <p className="text-4xl">✓</p>
         <h2 className="mt-3 font-serif text-2xl text-emerald-800">Formulário enviado!</h2>
         <p className="mt-2 text-sm text-emerald-700">
-          O Dr. Clóvis receberá seu resumo antes da consulta. Pode chegar com tranquilidade!
+          Seu médico receberá seu resumo antes da consulta. Pode chegar com tranquilidade!
         </p>
         <button
           onClick={() => {
@@ -4605,7 +5304,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
-        <strong>Para o Dr. Clóvis Bacha:</strong> preencha antes de cada consulta. Seu resumo chega
+        <strong>Para o seu médico:</strong> preencha antes de cada consulta. Seu resumo chega
         formatado para o médico — sem precisar lembrar de tudo na hora!
         {gest && (
           <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
@@ -4702,7 +5401,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
             value={form.questions}
             onChange={(e) => setForm((f) => ({ ...f, questions: e.target.value }))}
             rows={3}
-            placeholder="Anote suas dúvidas aqui — elas chegam direto para o Dr. Clóvis antes da consulta."
+            placeholder="Anote suas dúvidas aqui — elas chegam direto para o seu médico antes da consulta."
             className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
@@ -5023,7 +5722,31 @@ type TranscribeResult = {
   error?: string;
 };
 
+/* Rótulo/estilo por status da consulta — o mesmo vocabulário do painel. */
+const APPT_STATUS_UI: Record<
+  MyAppointment["status"],
+  { label: string; cls: string; emoji: string }
+> = {
+  confirmed: { label: "Confirmada", cls: "bg-emerald-100 text-emerald-700", emoji: "✅" },
+  pending: { label: "Aguardando confirmação", cls: "bg-amber-100 text-amber-700", emoji: "⏳" },
+  done: { label: "Realizada", cls: "bg-slate-100 text-slate-500", emoji: "✔️" },
+  cancelled: { label: "Não confirmada", cls: "bg-rose-100 text-rose-600", emoji: "✖️" },
+};
+
+function formatApptDate(ymd: string): string {
+  const s = new Date(ymd + "T00:00:00").toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+  });
+  // Só a primeira letra maiúscula ("Sexta-feira, 17 de julho") — a classe
+  // capitalize deixaria cada palavra maiúscula ("17 De Julho").
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function ConsultasTab() {
+  const [appts, setAppts] = useState<MyAppointment[]>([]);
+  const [loadingAppts, setLoadingAppts] = useState(true);
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -5042,6 +5765,16 @@ function ConsultasTab() {
 
   useEffect(() => {
     loadNotes();
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return;
+        const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
+        if (res.ok) setAppts(res.appointments);
+      } finally {
+        setLoadingAppts(false);
+      }
+    })();
   }, []);
 
   async function loadNotes() {
@@ -5159,8 +5892,139 @@ function ConsultasTab() {
     }
   }
 
+  // Ordenação: confirmadas futuras primeiro (mais próxima no topo), depois
+  // pendentes, depois histórico (realizadas/não confirmadas) mais recente antes.
+  const today = ymdLocal();
+  const upcoming = appts
+    .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
+    .sort((a, b) =>
+      (a.confirmed_date! + (a.confirmed_time ?? "")).localeCompare(
+        b.confirmed_date! + (b.confirmed_time ?? ""),
+      ),
+    );
+  const pending = appts
+    .filter((a) => a.status === "pending")
+    .sort((a, b) => a.preferred_date.localeCompare(b.preferred_date));
+  const history = appts
+    .filter(
+      (a) =>
+        a.status === "done" ||
+        a.status === "cancelled" ||
+        (a.status === "confirmed" && (a.confirmed_date ?? "") < today),
+    )
+    .slice(0, 6);
+
   return (
     <div className="space-y-6">
+      {/* ── Minhas consultas: o ciclo médico→paciente fecha AQUI ────── */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-serif text-lg">Minhas consultas</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Acompanhe o status dos seus agendamentos.
+            </p>
+          </div>
+          <a
+            href="/agendamento"
+            className="press rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+          >
+            Agendar nova consulta
+          </a>
+        </div>
+
+        {loadingAppts ? (
+          <div className="mt-4 space-y-2">
+            <div className="skeleton h-16 rounded-2xl" />
+            <div className="skeleton h-16 rounded-2xl" />
+          </div>
+        ) : appts.length === 0 ? (
+          <div className="mt-4 rounded-2xl bg-secondary/50 p-5 text-center">
+            <p className="text-2xl">🗓️</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Você ainda não tem consultas por aqui. Agende a primeira — leva 1 minuto.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Use o mesmo e-mail da sua conta para o agendamento aparecer aqui.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-2.5">
+            {upcoming.map((a, i) => (
+              <div
+                key={a.id}
+                className={`rounded-2xl border p-4 ${
+                  i === 0 ? "border-emerald-300 bg-emerald-50/60" : "border-border bg-background"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.confirmed.cls}`}
+                  >
+                    {APPT_STATUS_UI.confirmed.emoji} {i === 0 ? "Próxima consulta" : "Confirmada"}
+                  </span>
+                  {a.price_brl != null && (
+                    <span className="text-xs text-muted-foreground">
+                      R$ {(a.price_brl / 100).toFixed(2)}
+                      {a.payment_status === "pago" ? " · pago ✓" : ""}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-sm font-semibold">
+                  {formatApptDate(a.confirmed_date!)} · {a.confirmed_time}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{a.reason}</p>
+              </div>
+            ))}
+            {pending.map((a) => (
+              <div key={a.id} className="rounded-2xl border border-border bg-background p-4">
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.pending.cls}`}
+                >
+                  {APPT_STATUS_UI.pending.emoji} {APPT_STATUS_UI.pending.label}
+                </span>
+                <p className="mt-2 text-sm">
+                  Você pediu {formatApptDate(a.preferred_date)} · {a.preferred_time}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {a.reason} — o consultório confirma em até 1 dia útil.
+                </p>
+              </div>
+            ))}
+            {history.length > 0 && (
+              <details className="pt-1">
+                <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary">
+                  Histórico ({history.length})
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {history.map((a) => {
+                    const ui = APPT_STATUS_UI[a.status === "confirmed" ? "done" : a.status];
+                    return (
+                      <div
+                        key={a.id}
+                        className="rounded-2xl border border-border/60 bg-background/60 p-3 opacity-80"
+                      >
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ui.cls}`}
+                        >
+                          {ui.emoji} {ui.label}
+                        </span>
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          {new Date(
+                            (a.confirmed_date ?? a.preferred_date) + "T00:00:00",
+                          ).toLocaleDateString("pt-BR")}{" "}
+                          · {a.confirmed_time ?? a.preferred_time} — {a.reason}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Recording card */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Gravar consulta</p>
@@ -5520,7 +6384,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         if (!d) continue;
         all.push({
           id: `milestone-${m.week}-${m.label}`,
-          date: d.toISOString().slice(0, 10),
+          date: ymdLocal(d),
           type: "consulta",
           title: `📌 ${m.label} (semana ${m.week})`,
           detail: m.detail,
@@ -5664,7 +6528,7 @@ const MOOD_SUGGESTIONS: Record<number, string[]> = {
     "Gengibre, torradas secas e pequenas refeições frequentes podem ajudar no mal-estar.",
   ],
   1: [
-    "Seus sentimentos são válidos. Se a tristeza ou ansiedade persistir, conversar com o Dr. Clóvis pode ajudar.",
+    "Seus sentimentos são válidos. Se a tristeza ou ansiedade persistir, conversar com o seu médico pode ajudar.",
     "Técnicas de respiração profunda e meditação guiada (aba Meditações) podem aliviar a ansiedade.",
   ],
 };
@@ -5735,11 +6599,11 @@ function HumorTab() {
     : 3;
   const suggestions = MOOD_SUGGESTIONS[Math.min(5, Math.max(1, overallAvg))] ?? MOOD_SUGGESTIONS[3];
 
-  const bestDay = dayAvg.reduce(
+  const bestDay = dayAvg.reduce<number>(
     (best, v, i) => (v !== null && (best === -1 || v > (dayAvg[best] ?? 0)) ? i : best),
     -1,
   );
-  const hardDay = dayAvg.reduce(
+  const hardDay = dayAvg.reduce<number>(
     (hard, v, i) => (v !== null && (hard === -1 || v < (dayAvg[hard] ?? 6)) ? i : hard),
     -1,
   );
@@ -6287,7 +7151,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Teleconsulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Quando o Dr. Clóvis abrir a sala, você receberá um e-mail com o link do Google Meet e
+          Quando o seu médico abrir a sala, você receberá um e-mail com o link do Google Meet e
           poderá entrar também por aqui com um clique.
         </p>
         <p className="mt-3 text-xs text-muted-foreground">
@@ -6386,7 +7250,15 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
 
 /* ---------- Carta Semanal do Bebê (Feature #21) ---------- */
 
-function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function CartaBebêTab({
+  profile,
+  gest,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+}) {
   const [letter, setLetter] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [cachedWeek, setCachedWeek] = useState<number | null>(null);
@@ -6454,8 +7326,15 @@ function CartaBebêTab({ profile, gest }: { profile: Profile | null; gest: Gest 
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center">
         <p className="text-muted-foreground">
-          Configure sua gestação em <strong>Perfil</strong> para receber a carta semanal do seu
-          bebê.
+          Configure sua gestação em{" "}
+          <button
+            type="button"
+            onClick={() => onNavigate("Perfil")}
+            className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+          >
+            Perfil
+          </button>{" "}
+          para receber a carta semanal do seu bebê.
         </p>
       </div>
     );
@@ -7707,7 +8586,17 @@ const MILESTONES = [
   { week: 40, label: "Data provável do parto", emoji: "🍼" },
 ];
 
-function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function CountdownTab({
+  profile,
+  gest,
+  onNavigate,
+  careMode = false,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+  careMode?: boolean;
+}) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -7727,7 +8616,15 @@ function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }
   if (!due) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground">
-        Adicione a data provável do parto em <strong>Perfil</strong>.
+        Adicione a data provável do parto em{" "}
+        <button
+          type="button"
+          onClick={() => onNavigate("Perfil")}
+          className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+        >
+          Perfil
+        </button>
+        .
       </div>
     );
   }
@@ -7735,62 +8632,95 @@ function CountdownTab({ profile, gest }: { profile: Profile | null; gest: Gest }
   const dueMs = new Date(due + "T00:00:00").getTime();
   const diffMs = Math.max(0, dueMs - now);
   const isDueToday = now >= dueMs && now < dueMs + 86400000;
-  const overdueDays = Math.floor((now - dueMs) / 86400000);
   const totalSec = Math.floor(diffMs / 1000);
   const days = Math.floor(totalSec / 86400);
   const hours = Math.floor((totalSec % 86400) / 3600);
   const mins = Math.floor((totalSec % 3600) / 60);
   const secs = totalSec % 60;
   const progress = Math.min(100, (gest.totalDays / 280) * 100);
+  // Reta final: âncora unificada (idade gestacional + DPP). Havendo mensagem de
+  // reta e não sendo o dia da DPP, troca a contagem regressiva por acolhimento —
+  // nunca deixa a contagem congelada em 00:00:00:00.
+  const reta = retaFinalMensagemFor({ weeks: gest.weeks, dueDate: due });
 
   const lmpMs = profile.lmp_date
     ? new Date(profile.lmp_date + "T00:00:00").getTime()
     : dueMs - 280 * 86400000;
 
+  // Modo Cuidado: sem contagem regressiva nem comemoração — só acolhimento.
+  if (careMode) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-8 text-center">
+        <p className="text-3xl">🤍</p>
+        <p className="mt-3 font-serif text-xl text-foreground">Estamos aqui com você</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          A contagem está pausada. No seu tempo. Se precisar, fale com o consultório ou acesse o
+          apoio emocional.
+        </p>
+        <button
+          onClick={() => onNavigate("Apoio Emocional")}
+          className="press mt-5 rounded-full bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white"
+        >
+          Apoio emocional
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-          Faltam para a DPP
-        </p>
-        <div className="mt-6 flex justify-center gap-4 sm:gap-8">
-          {[
-            { value: days, label: "dias" },
-            { value: hours, label: "horas" },
-            { value: mins, label: "min" },
-            { value: secs, label: "seg" },
-          ].map(({ value, label }) => (
-            <div key={label} className="flex flex-col items-center">
-              <span className="tabular-nums text-4xl font-bold text-primary sm:text-5xl">
-                {String(value).padStart(2, "0")}
-              </span>
-              <span className="mt-1 text-xs text-muted-foreground">{label}</span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6">
-          <div className="mx-auto h-3 max-w-sm overflow-hidden rounded-full bg-secondary">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {progress.toFixed(1)}% da gestação completa
+      {!isDueToday && reta ? (
+        <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            {reta.eyebrow}
           </p>
+          <p className="mt-3 font-serif text-2xl text-foreground">{reta.titulo}</p>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-foreground/80">
+            {reta.corpo}
+          </p>
+          <div className="mx-auto mt-5 max-w-md rounded-2xl border border-primary/15 bg-white/60 p-4 text-left text-sm leading-relaxed text-foreground/75">
+            <span className="mr-1">🤍</span>
+            {reta.dica}
+          </div>
         </div>
-        {diffMs === 0 &&
-          (isDueToday ? (
+      ) : (
+        <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Faltam para a DPP
+          </p>
+          <div className="mt-6 flex justify-center gap-4 sm:gap-8">
+            {[
+              { value: days, label: "dias" },
+              { value: hours, label: "horas" },
+              { value: mins, label: "min" },
+              { value: secs, label: "seg" },
+            ].map(({ value, label }) => (
+              <div key={label} className="flex flex-col items-center">
+                <span className="tabular-nums text-4xl font-bold text-primary sm:text-5xl">
+                  {String(value).padStart(2, "0")}
+                </span>
+                <span className="mt-1 text-xs text-muted-foreground">{label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6">
+            <div className="mx-auto h-3 max-w-sm overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {progress.toFixed(1)}% da gestação completa
+            </p>
+          </div>
+          {isDueToday && (
             <p className="mt-4 text-lg font-semibold text-primary">
               🎊 Hoje é a data provável do parto! Parabéns, mamãe!
             </p>
-          ) : (
-            <p className="mt-4 text-lg font-semibold text-primary">
-              A DPP passou há {overdueDays} {overdueDays === 1 ? "dia" : "dias"} — mantenha contato
-              próximo com o consultório.
-            </p>
-          ))}
-      </div>
+          )}
+        </div>
+      )}
 
       <div>
         <h3 className="mb-4 font-semibold">Marcos da gestação</h3>
@@ -8292,386 +9222,9 @@ function NomeTab({ profile }: { profile: Profile | null }) {
    Feature 36 — Escola do Bebê
 ───────────────────────────────────────────────────────────────────────────── */
 
-type CourseModule = {
-  week: number;
-  title: string;
-  theme: string;
-  content: string;
-  videoSearch: string;
-  quiz: { question: string; options: [string, string, string, string]; correct: number }[];
-};
-
-const COURSE_MODULES: CourseModule[] = [
-  {
-    week: 6,
-    title: "O coração começa a bater",
-    theme: "Sistema cardiovascular",
-    content:
-      "Na semana 6, o coração do seu bebê já bate cerca de 100-160 vezes por minuto — é o som mais emocionante da gestação! O embrião mede cerca de 5mm e está se formando rapidamente. O tubo neural, que dará origem ao cérebro e medula espinhal, está se fechando. Os brotos dos braços e pernas também começam a aparecer. Nessa fase é fundamental a suplementação de ácido fólico para prevenir defeitos do tubo neural.",
-    videoSearch: "Dr Clóvis Bacha semana 6 gestação desenvolvimento embrião",
-    quiz: [
-      {
-        question: "Quantas vezes por minuto bate o coração fetal na semana 6?",
-        options: ["40-60 bpm", "100-160 bpm", "200-240 bpm", "60-80 bpm"],
-        correct: 1,
-      },
-      {
-        question: "Qual suplemento é essencial para fechar o tubo neural?",
-        options: ["Vitamina C", "Ferro", "Ácido fólico", "Cálcio"],
-        correct: 2,
-      },
-      {
-        question: "O que está se formando na semana 6?",
-        options: [
-          "Dentes e cabelos",
-          "Brotos de braços e pernas",
-          "Pulmões completos",
-          "Sistema imune",
-        ],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 8,
-    title: "De embrião a feto",
-    theme: "Transição embrião→feto",
-    content:
-      "A semana 8 marca uma virada: seu bebê passa a ser chamado de feto! Mede cerca de 1,6cm e todos os órgãos vitais estão formados — agora vêm amadurecer. Os dedos das mãos começam a se separar, os olhos migram para a frente do rosto, e o rabo embrionário desaparece. O cérebro está se desenvolvendo rapidamente com divisões específicas. Você provavelmente já está sentindo as náuseas do 1º trimestre, causadas pelo hormônio hCG.",
-    videoSearch: "Dr Clóvis Bacha semana 8 feto náuseas primeiro trimestre",
-    quiz: [
-      {
-        question: "Como o bebê é chamado a partir da semana 8?",
-        options: ["Zigoto", "Embrião", "Feto", "Neonato"],
-        correct: 2,
-      },
-      {
-        question: "O que causa as náuseas do 1º trimestre?",
-        options: ["Progesterona", "hCG", "Estrogênio", "Oxitocina"],
-        correct: 1,
-      },
-      {
-        question: "Quanto mede o feto na semana 8?",
-        options: ["0,5 cm", "1,6 cm", "5 cm", "10 cm"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 10,
-    title: "Movimentos e reflexos",
-    theme: "Sistema nervoso",
-    content:
-      "Na semana 10, o feto já faz movimentos espontâneos — mas você ainda não os sente! Mede cerca de 3cm. Os dedos dos pés e das mãos estão completamente separados. O cérebro está produzindo neurônios a uma velocidade incrível: 250.000 por minuto! Os testículos ou ovários já estão se formando. A placenta está assumindo a produção de hormônios, o que geralmente marca o fim das náuseas mais intensas para muitas gestantes.",
-    videoSearch: "Dr Clóvis Bacha semana 10 movimentos feto placenta",
-    quiz: [
-      {
-        question: "Quantos neurônios por minuto são produzidos na semana 10?",
-        options: ["10.000", "100.000", "250.000", "1.000.000"],
-        correct: 2,
-      },
-      {
-        question: "Quando a placenta assume a produção hormonal?",
-        options: ["Semana 4", "Semana 10", "Semana 20", "Semana 30"],
-        correct: 1,
-      },
-      {
-        question: "O feto já se movimenta na semana 10?",
-        options: [
-          "Não, só na semana 20",
-          "Sim, mas a mãe ainda não sente",
-          "Sim, e a mãe já sente",
-          "Não, só após o nascimento",
-        ],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 12,
-    title: "Fim do 1º trimestre — Grande conquista!",
-    theme: "Marco gestacional",
-    content:
-      "Parabéns! O 1º trimestre é considerado o mais crítico e você chegou ao final dele. O risco de abortamento espontâneo cai significativamente. O bebê mede cerca de 5,5cm e pesa 14g. Todos os órgãos estão formados e agora crescem e amadurecem. O bebê já pode chupar o dedo, abrir a boca e fazer movimentos de respiração. A morfológica do 1º trimestre avalia a translucência nucal (risco de síndrome de Down) e é realizada entre as semanas 11 e 14.",
-    videoSearch: "Dr Clóvis Bacha semana 12 morfológica primeiro trimestre translucência nucal",
-    quiz: [
-      {
-        question: "O que avalia a translucência nucal?",
-        options: [
-          "Posição do bebê",
-          "Risco de síndrome de Down",
-          "Peso fetal",
-          "Batimentos cardíacos",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Quanto mede o bebê na semana 12?",
-        options: ["1 cm", "3 cm", "5,5 cm", "12 cm"],
-        correct: 2,
-      },
-      {
-        question: "Quando é feita a morfológica do 1º trimestre?",
-        options: ["Semanas 6-8", "Semanas 11-14", "Semanas 18-22", "Semanas 28-32"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 16,
-    title: "Primeiros movimentos sentidos",
-    theme: "Movimentos fetais",
-    content:
-      "Por volta da semana 16-18, a maioria das mães primíparas começa a sentir os primeiros movimentos do bebê — chamados de 'perceptio'. Parece um borbulhar ou borboleta no abdômen. O bebê mede cerca de 11,6cm e pesa 100g. O sistema auditivo está bem desenvolvido: o bebê pode ouvir sua voz! Sua pele ainda é transparente. É a época ideal para a amniocentese, se indicada. O bebê tem padrões de sono e vigília.",
-    videoSearch: "Dr Clóvis Bacha semana 16 primeiros movimentos bebê percepção",
-    quiz: [
-      {
-        question: "Como se chama a primeira percepção dos movimentos fetais?",
-        options: ["Quickening/Perceptio", "Braxton Hicks", "Expulsão", "Versão"],
-        correct: 0,
-      },
-      {
-        question: "O bebê consegue ouvir na semana 16?",
-        options: [
-          "Não, só na semana 30",
-          "Sim, o sistema auditivo já está desenvolvido",
-          "Só após o nascimento",
-          "Apenas sons muito altos",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Qual exame pode ser feito com segurança entre as semanas 15-18?",
-        options: ["Ecocardiograma", "Amniocentese", "Cordocentese", "Biópsia de vilo corial"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 20,
-    title: "Metade da jornada — Morfológica do 2º tri",
-    theme: "Anatomia fetal",
-    content:
-      "Metade da gestação! O bebê mede cerca de 25cm e pesa 300g. A morfológica do 2º trimestre (semanas 20-24) é o exame mais completo: avalia todos os órgãos, face, coluna, coração em detalhes. Você já deve estar sentindo os chutes claramente. O bebê cobre-se de vernix caseosa (substância branca protetora). Os neurônios continuam se multiplicando. É nessa época que muitas famílias descobrem o sexo do bebê.",
-    videoSearch: "Dr Clóvis Bacha semana 20 morfológica segundo trimestre anatomia fetal",
-    quiz: [
-      {
-        question: "O que é vernix caseosa?",
-        options: [
-          "Líquido amniótico",
-          "Substância branca que protege a pele fetal",
-          "Placenta prévia",
-          "Tampão mucoso",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Quando é feita a morfológica do 2º trimestre?",
-        options: ["Semanas 10-12", "Semanas 16-18", "Semanas 20-24", "Semanas 32-36"],
-        correct: 2,
-      },
-      {
-        question: "Quanto pesa o bebê na semana 20?",
-        options: ["100g", "300g", "800g", "1.500g"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 24,
-    title: "Viabilidade fetal",
-    theme: "Desenvolvimento pulmonar",
-    content:
-      "A semana 24 é um marco: o bebê atinge a chamada viabilidade fetal — com cuidados intensivos neonatais, tem chances de sobreviver fora do útero. Os pulmões começam a produzir surfactante, essencial para a respiração após o nascimento. O bebê abre e fecha os olhos. Pesa cerca de 600g e mede 30cm. O exame de glicemia (TOTG) para detectar diabetes gestacional é realizado entre 24-28 semanas.",
-    videoSearch: "Dr Clóvis Bacha semana 24 viabilidade fetal pulmões surfactante",
-    quiz: [
-      {
-        question: "O que é surfactante?",
-        options: [
-          "Hormônio da gravidez",
-          "Substância que amadurece os pulmões fetais",
-          "Tipo de antibiótico",
-          "Proteína do cordão umbilical",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Quando é feito o exame de diabetes gestacional (TOTG)?",
-        options: ["8-10 semanas", "14-16 semanas", "24-28 semanas", "36-38 semanas"],
-        correct: 2,
-      },
-      {
-        question: "A partir de qual semana o bebê tem chance de sobreviver com suporte intensivo?",
-        options: ["Semana 18", "Semana 24", "Semana 30", "Semana 36"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 28,
-    title: "Início do 3º trimestre",
-    theme: "Crescimento cerebral",
-    content:
-      "Bem-vinda ao 3º trimestre! O bebê pesa cerca de 1kg e mede 37cm. O cérebro está se desenvolvendo intensamente — as dobras e sulcos do córtex estão se formando. Os olhos respondem à luz. O bebê pode ter soluços que você sente. É hora de começar a contar os chutes (10 movimentos em 2 horas). O exame de streptococo B (GBS) será feito mais adiante. As consultas pré-natais ficam mais frequentes.",
-    videoSearch: "Dr Clóvis Bacha semana 28 terceiro trimestre crescimento cerebral",
-    quiz: [
-      {
-        question: "Quanto pesa o bebê na semana 28?",
-        options: ["300g", "600g", "1kg", "2kg"],
-        correct: 2,
-      },
-      {
-        question: "Quantos movimentos fetais em 2 horas são considerados normais?",
-        options: ["2 movimentos", "5 movimentos", "10 movimentos", "20 movimentos"],
-        correct: 2,
-      },
-      {
-        question: "O que está se formando intensamente no cérebro fetal no 3º trimestre?",
-        options: ["Neurônios", "Sulcos e dobras do córtex", "Nervos ópticos", "Hipófise"],
-        correct: 1,
-      },
-    ],
-  },
-  {
-    week: 32,
-    title: "Posicionamento e preparação",
-    theme: "Posição fetal",
-    content:
-      "Na semana 32, o bebê pesa cerca de 1,7kg. A maioria já se vira para a posição cefálica (cabeça para baixo). As contrações de Braxton-Hicks ficam mais frequentes — são ensaios do útero para o parto. O bebê dorme 90% do tempo, com ciclos de sono REM. A gordura subcutânea está se depositando — o bebê está ficando menos enrugado. O ecocardiograma fetal avalia o coração com detalhes e geralmente é feito nessa época.",
-    videoSearch: "Dr Clóvis Bacha semana 32 posição fetal Braxton Hicks ecocardiograma",
-    quiz: [
-      {
-        question: "O que são contrações de Braxton-Hicks?",
-        options: [
-          "Contrações de trabalho de parto",
-          "Ensaios do útero, sem dor intensa regular",
-          "Sinal de pré-eclâmpsia",
-          "Contrações do diafragma",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Qual é a posição ideal do bebê para o parto vaginal?",
-        options: [
-          "Pélvica (nádegas para baixo)",
-          "Transversa",
-          "Cefálica (cabeça para baixo)",
-          "Oblíqua",
-        ],
-        correct: 2,
-      },
-      {
-        question: "Quando é realizado o ecocardiograma fetal?",
-        options: ["Semana 6", "Semana 14", "Semanas 28-32", "Semana 38"],
-        correct: 2,
-      },
-    ],
-  },
-  {
-    week: 36,
-    title: "Pré-termo tardio — Preparação final",
-    theme: "Maturidade fetal",
-    content:
-      "Na semana 36, o bebê pesa cerca de 2,6kg e está quase pronto. Os pulmões estão maduros na maioria dos casos. A cabeça geralmente encaixa na pelve materna (insinuação). O teste de estreptococo B (GBS) é feito entre as semanas 35-37 — se positivo, você receberá antibióticos durante o parto. O médico avaliará o colo do útero. Bebês nascidos entre 34-36 semanas são chamados de pré-termos tardios e podem precisar de cuidados especiais.",
-    videoSearch: "Dr Clóvis Bacha semana 36 pré-termo tardio estreptococo B parto",
-    quiz: [
-      {
-        question: "Quando é feito o exame de estreptococo B (GBS)?",
-        options: ["Semanas 12-14", "Semanas 20-22", "Semanas 35-37", "No dia do parto"],
-        correct: 2,
-      },
-      {
-        question: "O que é insinuação fetal?",
-        options: [
-          "Bebê virado de ponta-cabeça",
-          "Encaixamento da cabeça na pelve materna",
-          "Posição transversa",
-          "Bebê com soluço",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Bebês de que semanas são chamados pré-termos tardios?",
-        options: ["20-28 semanas", "28-32 semanas", "34-36 semanas", "37-39 semanas"],
-        correct: 2,
-      },
-    ],
-  },
-  {
-    week: 38,
-    title: "Gestação a termo — Sinais do parto",
-    theme: "Sinais de trabalho de parto",
-    content:
-      "A partir de 37 semanas, a gestação é considerada a termo. Agora é esperar os sinais do parto! Perda do tampão mucoso (rolha de muco com sangue — pode sair dias antes). Contrações regulares e progressivas (regra 5-1-1: a cada 5 min, duração de 1 min, por 1 hora). Ruptura da bolsa (líquido claro, inodoro — vá para o hospital). O bebê pesa em média 3,1kg. Fique atenta a movimentos reduzidos — relate ao médico imediatamente.",
-    videoSearch: "Dr Clóvis Bacha semana 38 sinais trabalho de parto tampão mucoso contrações",
-    quiz: [
-      {
-        question: "O que é a regra 5-1-1 das contrações?",
-        options: [
-          "5 respirações, 1 push, 1 hora",
-          "Contrações a cada 5 min, com 1 min de duração, por 1 hora",
-          "5 horas de trabalho, 1 médico, 1 hospital",
-          "Nenhuma das anteriores",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Se a bolsa rompeu, o líquido deve ser:",
-        options: [
-          "Verde ou com sangue",
-          "Claro e inodoro",
-          "Espesso e rosado",
-          "Amarelo e com odor",
-        ],
-        correct: 1,
-      },
-      {
-        question: "Movimentos fetais reduzidos exigem:",
-        options: [
-          "Esperar 24 horas",
-          "Tomar líquidos e descansar",
-          "Contato imediato com o médico",
-          "Fazer exercícios",
-        ],
-        correct: 2,
-      },
-    ],
-  },
-  {
-    week: 40,
-    title: "Pré-natal completo — Você chegou!",
-    theme: "Pós-parto e amamentação",
-    content:
-      "Parabéns! Você completou as semanas essenciais do pré-natal. Esteja preparada: o parto pode acontecer em qualquer momento. O bebê pesa em média 3,4kg e mede 51cm. Nas semanas após o parto, você passará pelos lóquios (sangramento pós-parto normal), cuidados com a cicatriz (cesárea ou episiotomia), e início da amamentação. O leite materno exclusivo pelos primeiros 6 meses é a melhor nutrição para o bebê. Cuide de você também — o puerpério pode trazer desafios emocionais.",
-    videoSearch: "Dr Clóvis Bacha semana 40 parto pós-parto amamentação puerpério",
-    quiz: [
-      {
-        question: "Como se chama o sangramento normal após o parto?",
-        options: ["Menstruação", "Lóquios", "Epistaxis", "Metrorragia"],
-        correct: 1,
-      },
-      {
-        question: "Até quando é recomendado o aleitamento materno exclusivo?",
-        options: ["2 meses", "4 meses", "6 meses", "12 meses"],
-        correct: 2,
-      },
-      {
-        question: "Quanto pesa o bebê na semana 40?",
-        options: ["2,2kg", "2,8kg", "3,4kg", "4,2kg"],
-        correct: 2,
-      },
-    ],
-  },
-];
-
-type QuizState = { answered: boolean; answers: (number | null)[]; score: number };
-
-function EscolaBebêTab({ gest }: { gest: Gest }) {
+function EscolaBebêTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) => void }) {
   const [progress, setProgress] = useState<CourseProgress[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeModule, setActiveModule] = useState<CourseModule | null>(null);
-  const [quizState, setQuizState] = useState<QuizState>({ answered: false, answers: [], score: 0 });
-  const [saving, setSaving] = useState(false);
   const currentWeek = gest?.weeks ?? 0;
 
   useEffect(() => {
@@ -8683,181 +9236,55 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
       }
       const res = await getCourseProgress({ data: { accessToken: s.session.access_token } });
       if (res.ok) setProgress(res.progress);
-      else toast.error("Não foi possível carregar seu progresso do curso. Tente novamente.");
       setLoading(false);
     })();
   }, []);
 
-  function isDone(week: number) {
-    return progress.some((p) => p.module_week === week);
-  }
-
-  function isUnlocked(week: number) {
-    return currentWeek >= week;
-  }
-
-  const completedCount = COURSE_MODULES.filter((m) => isDone(m.week)).length;
+  const completedCount = COURSE_MODULES.filter((m) =>
+    progress.some((p) => p.module_week === m.week),
+  ).length;
   const hasCertificate = COURSE_MODULES.length > 0 && completedCount >= COURSE_MODULES.length;
-
-  async function finishQuiz(score: number) {
-    if (!activeModule) return;
-    setSaving(true);
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session) {
-        toast.error("Não foi possível salvar seu progresso — faça login novamente.");
-        return;
-      }
-      const res = await markModuleComplete({
-        data: {
-          accessToken: s.session.access_token,
-          moduleWeek: activeModule.week,
-          quizScore: score,
-        },
-      });
-      if (!res.ok) {
-        toast.error("Não foi possível salvar seu progresso. Tente novamente.");
-        return;
-      }
-      setProgress((p) => [
-        ...p.filter((x) => x.module_week !== activeModule.week),
-        {
-          module_week: activeModule.week,
-          quiz_score: score,
-          completed_at: new Date().toISOString(),
-        },
-      ]);
-      triggerAchievementsCheck();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function openModule(m: CourseModule) {
-    setActiveModule(m);
-    setQuizState({ answered: false, answers: Array(m.quiz.length).fill(null), score: 0 });
-  }
-
-  if (activeModule) {
-    const done = isDone(activeModule.week);
-    return (
-      <div className="max-w-2xl space-y-6">
-        <button
-          onClick={() => setActiveModule(null)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
-        >
-          ← Voltar ao curso
-        </button>
-
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Semana {activeModule.week}
-          </p>
-          <h2 className="mt-1 font-serif text-2xl">{activeModule.title}</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">{activeModule.theme}</p>
-          <p className="mt-4 leading-relaxed text-sm">{activeModule.content}</p>
-
-          <a
-            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(activeModule.videoSearch)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-100"
-          >
-            ▶ Assistir vídeo do Dr. Clóvis — Semana {activeModule.week}
-          </a>
-        </div>
-
-        {/* Quiz */}
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <h3 className="font-semibold mb-4">Quiz — Semana {activeModule.week}</h3>
-          {activeModule.quiz.map((q, qi) => (
-            <div key={qi} className="mb-5">
-              <p className="text-sm font-medium mb-2">
-                {qi + 1}. {q.question}
-              </p>
-              <div className="space-y-2">
-                {q.options.map((opt, oi) => {
-                  let style = "border-border bg-background text-foreground";
-                  if (quizState.answered) {
-                    if (oi === q.correct) style = "border-green-400 bg-green-50 text-green-800";
-                    else if (oi === quizState.answers[qi] && oi !== q.correct)
-                      style = "border-red-300 bg-red-50 text-red-700";
-                    else style = "border-border bg-background text-muted-foreground";
-                  } else if (quizState.answers[qi] === oi) {
-                    style = "border-primary bg-primary/5 text-primary";
-                  }
-                  return (
-                    <button
-                      key={oi}
-                      disabled={quizState.answered}
-                      onClick={() => {
-                        if (quizState.answered) return;
-                        setQuizState((prev) => {
-                          const newAnswers = [...prev.answers];
-                          newAnswers[qi] = oi;
-                          return { ...prev, answers: newAnswers };
-                        });
-                      }}
-                      className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${style}`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-          {!quizState.answered ? (
-            <button
-              onClick={async () => {
-                const score = Math.round(
-                  (activeModule.quiz.filter((q, i) => quizState.answers[i] === q.correct).length /
-                    activeModule.quiz.length) *
-                    100,
-                );
-                setQuizState((prev) => ({ ...prev, answered: true, score }));
-                if (!done) await finishQuiz(score);
-              }}
-              disabled={quizState.answers.some((a) => a === null)}
-              className="mt-2 rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
-            >
-              Verificar respostas
-            </button>
-          ) : (
-            <div className="mt-4 rounded-2xl bg-secondary p-4 text-center">
-              <p className="text-lg font-bold">
-                {quizState.score >= 67 ? "🎉 Muito bem!" : "📚 Continue estudando!"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Módulo {done ? "já" : ""} concluído — semana {activeModule.week}
-              </p>
-              <button
-                onClick={() => setActiveModule(null)}
-                className="mt-3 rounded-full bg-primary px-6 py-2 text-sm font-medium text-white"
-              >
-                {saving ? "Salvando..." : "Próximo módulo"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const unlockedCount = COURSE_MODULES.filter((m) => currentWeek >= m.week).length;
+  const nextLesson = COURSE_MODULES.find(
+    (m) => currentWeek >= m.week && !progress.some((p) => p.module_week === m.week),
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Progress header */}
+    <div className="mx-auto max-w-2xl space-y-5">
+      {/* As lições agora moram DENTRO do caminho — esta aba vira a porta de entrada */}
+      <div className="glass-card glass-pink rounded-3xl p-8 text-center">
+        <p className="text-5xl">📚</p>
+        <h2 className="mt-3 font-serif text-2xl">As lições agora fazem parte da sua jornada!</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          Cada semana-chave da gestação tem uma <strong>moeda de lição</strong> no seu caminho:
+          aprenda o conteúdo, responda o quiz e ganhe a estrela — tudo dentro do jogo.
+        </p>
+        <button
+          onClick={() => onNavigate("Caminho")}
+          className="press mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3.5 text-sm font-extrabold text-primary-foreground shadow-[var(--shadow-float)]"
+        >
+          🗺️ Ir para o Caminho
+        </button>
+        {nextLesson && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Próxima lição disponível: <strong>semana {nextLesson.week}</strong> — {nextLesson.title}
+          </p>
+        )}
+      </div>
+
+      {/* Progresso resumido */}
       <div className="rounded-3xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="font-serif text-xl">Escola do Bebê</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {completedCount} de {COURSE_MODULES.length} módulos concluídos
+            <h3 className="font-serif text-lg">Seu progresso</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {loading
+                ? "Carregando..."
+                : `${completedCount} de ${COURSE_MODULES.length} lições · ${unlockedCount} já liberadas`}
             </p>
           </div>
           {hasCertificate && (
-            <div className="rounded-2xl bg-primary/6 border border-primary/30 px-4 py-2 text-center">
+            <div className="rounded-2xl border border-primary/30 bg-primary/6 px-4 py-2 text-center">
               <p className="text-lg">🎓</p>
               <p className="text-xs font-semibold text-primary">Certificado</p>
             </div>
@@ -8871,58 +9298,41 @@ function EscolaBebêTab({ gest }: { gest: Gest }) {
             }}
           />
         </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {COURSE_MODULES.map((m) => {
+            const done = progress.some((p) => p.module_week === m.week);
+            const unlocked = currentWeek >= m.week;
+            return (
+              <button
+                key={m.week}
+                onClick={() => onNavigate("Caminho")}
+                title={`Semana ${m.week}: ${m.title}`}
+                className={`press flex h-11 w-11 items-center justify-center rounded-xl text-lg ${
+                  done
+                    ? "bg-amber-100"
+                    : unlocked
+                      ? "bg-violet-50"
+                      : "bg-slate-50 opacity-40 grayscale"
+                }`}
+              >
+                {done ? "⭐" : unlocked ? "📚" : "🔒"}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {hasCertificate && (
         <div className="rounded-3xl border-2 border-primary/30 bg-gradient-to-br from-primary/6 to-primary/12 p-8 text-center">
-          <p className="text-4xl mb-2">🎓</p>
+          <p className="mb-2 text-4xl">🎓</p>
           <h3 className="font-serif text-2xl font-bold text-foreground">
             Certificado de Pré-natal
           </h3>
           <p className="mt-2 text-primary">
-            Parabéns! Você concluiu o curso de pré-natal da Escola do Bebê.
+            Parabéns! Você concluiu todas as lições do curso de pré-natal.
           </p>
-          <p className="mt-1 text-sm text-primary">Dr. Clóvis Bacha — Ginecologia & Obstetrícia</p>
         </div>
       )}
-
-      {/* Module grid */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {COURSE_MODULES.map((m) => {
-          const unlocked = isUnlocked(m.week);
-          const done = isDone(m.week);
-          const prog = progress.find((p) => p.module_week === m.week);
-          return (
-            <button
-              key={m.week}
-              onClick={() => unlocked && openModule(m)}
-              disabled={!unlocked}
-              className={`rounded-2xl border p-5 text-left transition-all ${
-                done
-                  ? "border-green-300 bg-green-50"
-                  : unlocked
-                    ? "border-border bg-card hover:border-primary/50 hover:bg-primary/5"
-                    : "border-border bg-secondary/30 opacity-50 cursor-not-allowed"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                  Semana {m.week}
-                </span>
-                <span className="text-lg">{done ? "✅" : unlocked ? "▶" : "🔒"}</span>
-              </div>
-              <p className="mt-2 font-medium text-sm">{m.title}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{m.theme}</p>
-              {done && prog && (
-                <p className="mt-1.5 text-xs text-green-600">Quiz: {prog.quiz_score}% de acerto</p>
-              )}
-              {!unlocked && (
-                <p className="mt-1.5 text-xs text-muted-foreground">Libera na semana {m.week}</p>
-              )}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -8965,7 +9375,7 @@ const FAQ_ITEMS: FAQItem[] = [
     tags: ["medicamentos"],
   },
   {
-    q: "Com que frequência preciso consultar o Dr. Clóvis?",
+    q: "Com que frequência preciso ir às consultas do pré-natal?",
     a: "O calendário mínimo do pré-natal: mensal até 32 semanas, quinzenal até 36, e semanal a partir daí. Gestações de alto risco têm consultas mais frequentes. Não pule nenhuma — cada consulta tem um objetivo específico.",
     weeks: [4, 40],
     tags: ["consultas", "pré-natal"],
@@ -9060,7 +9470,7 @@ const FAQ_ITEMS: FAQItem[] = [
   },
   {
     q: "Posso ter epidural?",
-    a: "A anestesia peridural (epidural) é segura e muito usada no parto. Reduz a dor sem impedir os movimentos. Pode ser administrada em qualquer fase do trabalho de parto ativo. Converse com Dr. Clóvis sobre seu plano de parto.",
+    a: "A anestesia peridural (epidural) é segura e muito usada no parto. Reduz a dor sem impedir os movimentos. Pode ser administrada em qualquer fase do trabalho de parto ativo. Converse com o seu médico sobre seu plano de parto.",
     weeks: [34, 42],
     tags: ["parto", "epidural", "dor"],
   },
@@ -9093,6 +9503,49 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
 
   return (
     <div className="max-w-2xl space-y-5">
+      {/* ── Suporte em 2 passos: chat primeiro, e-mail se precisar ── */}
+      <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5">
+        <h2 className="font-serif text-xl">Precisa de ajuda? 💬</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Nosso suporte funciona em 2 passos — comece sempre pelo chat.
+        </p>
+        <div className="mt-4 space-y-2.5">
+          <button
+            onClick={() => onNavigate("Chat IA")}
+            className="press flex w-full items-center gap-3 rounded-2xl bg-primary p-4 text-left text-primary-foreground shadow-[var(--shadow-soft)]"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-lg">
+              1️⃣
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold">Fale com o chat</span>
+              <span className="block text-xs opacity-85">
+                Resposta na hora, 24h — resolve a maioria das dúvidas
+              </span>
+            </span>
+          </button>
+          <a
+            href={`mailto:${DOCTOR.supportEmail}?subject=${encodeURIComponent("Preciso de ajuda — app Obstétrica")}&body=${encodeURIComponent("Olá! Já tentei pelo chat e ainda preciso de ajuda com: ")}`}
+            className="press flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-lg">
+              2️⃣
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-foreground">
+                Não resolveu? Mande um e-mail
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {DOCTOR.supportEmail} — resposta em até 1 dia útil
+              </span>
+            </span>
+          </a>
+        </div>
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          🚨 Emergência médica não é suporte: ligue 192 (SAMU) ou vá à maternidade.
+        </p>
+      </div>
+
       <div className="rounded-3xl border border-border bg-card p-5">
         <h2 className="font-serif text-xl mb-1">Perguntas frequentes</h2>
         {currentWeek > 0 && (
@@ -9176,7 +9629,13 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
    Feature 41 — Botão do Pânico
 ───────────────────────────────────────────────────────────────────────────── */
 
-function PânicoTab({ profile }: { profile: Profile | null }) {
+function PânicoTab({
+  profile,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  onNavigate: (tab: string) => void;
+}) {
   const [status, setStatus] = useState<"idle" | "locating" | "sent" | "error" | "save_error">(
     "idle",
   );
@@ -9411,7 +9870,14 @@ function PânicoTab({ profile }: { profile: Profile | null }) {
       <p className="text-center text-xs text-muted-foreground px-4">
         O botão registra sua localização GPS; seu acompanhante designado poderá vê-la na página de
         acompanhamento (últimos 30 minutos). Configure o contato de emergência em{" "}
-        <strong>Perfil</strong>.
+        <button
+          type="button"
+          onClick={() => onNavigate("Perfil")}
+          className="font-semibold underline underline-offset-2 hover:opacity-80"
+        >
+          Perfil
+        </button>
+        .
       </p>
     </div>
   );
@@ -9823,7 +10289,13 @@ const MILESTONES_DEF = [
   { key: "primeira_palavra", label: "Primeira palavra", emoji: "💬", weekApprox: 52 },
 ];
 
-function PosPartoTab({ profile }: { profile: Profile | null }) {
+function PosPartoTab({
+  profile,
+  onNavigate,
+}: {
+  profile: Profile | null;
+  onNavigate: (tab: string) => void;
+}) {
   const [subTab, setSubTab] = useState<"saúde" | "amamentação" | "marcos" | "vacinas" | "retorno">(
     "saúde",
   );
@@ -9835,7 +10307,14 @@ function PosPartoTab({ profile }: { profile: Profile | null }) {
         <h2 className="font-serif text-xl">Portal Pós-parto</h2>
         <p className="text-sm text-muted-foreground">
           Ative o portal após o nascimento do bebê preenchendo a data de nascimento em{" "}
-          <strong>Perfil → Pós-parto</strong>.
+          <button
+            type="button"
+            onClick={() => onNavigate("Perfil")}
+            className="font-semibold underline underline-offset-2 hover:opacity-80"
+          >
+            Perfil → Pós-parto
+          </button>
+          .
         </p>
         <div className="rounded-xl bg-secondary/50 p-4 text-left text-sm space-y-1">
           <p className="font-medium">Recursos disponíveis:</p>
@@ -10029,7 +10508,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
                   </a>
                 </div>
                 <p className="mt-2 text-xs text-red-700">
-                  Informe o Dr. Clóvis sobre seu resultado na próxima consulta.
+                  Informe o seu médico sobre seu resultado na próxima consulta.
                 </p>
               </div>
             )}
@@ -10082,7 +10561,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
 
       <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-xs text-muted-foreground">
         A EPDS é um rastreio, não um diagnóstico. Apenas um profissional de saúde pode diagnosticar
-        depressão pós-parto. O resultado deve ser compartilhado com o Dr. Clóvis.
+        depressão pós-parto. O resultado deve ser compartilhado com o seu médico.
         {babyAgeDays < 42 && (
           <span> Recomenda-se repetir o rastreio com 6 semanas após o parto.</span>
         )}
@@ -10299,7 +10778,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
   const [milestones, setMilestones] = useState<BabyMilestone[]>([]);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState<string | null>(null);
-  const [dateInput, setDateInput] = useState(new Date().toISOString().slice(0, 10));
+  const [dateInput, setDateInput] = useState(ymdLocal());
 
   useEffect(() => {
     (async () => {
@@ -10443,7 +10922,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
 function VaccinesSection({ birthDate }: { birthDate: Date }) {
   const [vaccines, setVaccines] = useState<BabyVaccine[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateInput, setDateInput] = useState(new Date().toISOString().slice(0, 10));
+  const [dateInput, setDateInput] = useState(ymdLocal());
 
   useEffect(() => {
     (async () => {
@@ -10562,7 +11041,7 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
 
 function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Profile }) {
   const [babyWeight, setBabyWeight] = useState("");
-  const [weightDate, setWeightDate] = useState(new Date().toISOString().slice(0, 10));
+  const [weightDate, setWeightDate] = useState(ymdLocal());
   const [weights, setWeights] = useState<BabyWeight[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -10700,6 +11179,7 @@ function ConquistasTab() {
   const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [newBadges, setNewBadges] = useState<string[]>([]);
+  const [saldo, setSaldo] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -10708,15 +11188,25 @@ function ConquistasTab() {
         setLoading(false);
         return;
       }
-      const res = await checkAndAwardAchievements({
-        data: { accessToken: s.session.access_token },
-      });
+      const token = s.session.access_token;
+      const res = await checkAndAwardAchievements({ data: { accessToken: token } });
       if (res.ok) {
         setUnlocked(res.unlocked);
-        const recent = res.unlocked
-          .filter((a) => Date.now() - new Date(a.unlocked_at).getTime() < 30000)
-          .map((a) => a.achievement_key);
+        // Modo Cuidado: não acende o banner "🎉 Nova conquista".
+        const recent = res.careMode
+          ? []
+          : res.unlocked
+              .filter((a) => Date.now() - new Date(a.unlocked_at).getTime() < 30000)
+              .map((a) => a.achievement_key);
         setNewBadges(recent);
+      }
+      // Concede o check-in do dia (idempotente) e lê o saldo já com conquistas
+      // e marcos contabilizados acima.
+      try {
+        const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
+        if (w.ok) setSaldo(w.careMode ? null : w.balance);
+      } catch {
+        /* saldo é secundário: falha não quebra a aba */
       }
       setLoading(false);
     })();
@@ -10739,6 +11229,29 @@ function ConquistasTab() {
 
   return (
     <div className="space-y-8">
+      {saldo != null && (
+        <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">
+                Suas Sementinhas
+              </p>
+              <p className="mt-1 flex items-baseline gap-1.5 font-serif text-3xl text-emerald-900">
+                <span className="tabular-nums">{saldo}</span>
+                <span className="text-2xl">🌱</span>
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-700/80">
+                Você ganha cuidando de você, aprendendo e avançando na jornada.
+              </p>
+            </div>
+            <div className="text-4xl">🌱</div>
+          </div>
+          <p className="mt-3 rounded-2xl bg-white/60 px-3 py-2 text-[11px] text-emerald-800/80">
+            Em breve você vai poder usar suas Sementinhas para montar o seu Cantinho. 💛
+          </p>
+        </div>
+      )}
+
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -11145,7 +11658,7 @@ function ProductSheet({
               {/* Recomendação médica */}
               <div className="rounded-xl bg-primary/[0.06] border border-primary/15 p-3">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-primary mb-1.5">
-                  👨‍⚕️ Por que Dr. Clóvis recomenda
+                  👨‍⚕️ Por que seu médico recomenda
                 </p>
                 <p className="text-[13px] text-gray-700 leading-relaxed">{product.description}</p>
               </div>
@@ -11166,8 +11679,8 @@ function ProductSheet({
 
               {/* Selo de confiança */}
               <p className="text-[10px] text-gray-400">
-                ✓ Curado e recomendado por Dr. Clóvis Bacha — Ginecologista e Obstetra especialista
-                em gestação de alto risco
+                ✓ Curado e recomendado pelo seu médico — Ginecologia e Obstetrícia, especialista em
+                gestação de alto risco
               </p>
 
               {/* CTA Amazon */}
@@ -11221,7 +11734,7 @@ function ProductSheet({
                               {r.name}
                             </p>
                             <div className="flex items-baseline gap-1 mt-1.5">
-                              <span className="text-[9px] text-gray-400 line-through">
+                              <span className="text-[10px] text-gray-400 line-through">
                                 {r.originalPrice}
                               </span>
                               <span className="text-[13px] font-bold text-gray-900 leading-none">
@@ -11240,6 +11753,198 @@ function ProductSheet({
         )}
       </div>
     </>
+  );
+}
+
+/* ---------- Meu Cantinho 🌱 (spend das Sementinhas) ---------- */
+function CantinhoTab() {
+  const [loading, setLoading] = useState(true);
+  const [saldo, setSaldo] = useState(0);
+  const [owned, setOwned] = useState<string[]>([]);
+  const [premium, setPremium] = useState(false);
+  const [equipped, setEquipped] = useState<string | null>(null);
+  const [cat, setCat] = useState<CantinhoType | "all">("all");
+  const [buying, setBuying] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) {
+        setLoading(false);
+        return;
+      }
+      const res = await getCantinho({ data: { accessToken: s.session.access_token } });
+      if (res.ok) {
+        setSaldo(res.balance);
+        setOwned(res.owned);
+        setPremium(res.premium);
+        setEquipped(res.equippedFundo);
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  async function equipFundo(id: string | null) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) return;
+    const prev = equipped;
+    setEquipped(id); // otimista
+    const res = await setCantinhoFundo({
+      data: { accessToken: s.session.access_token, fundoId: id },
+    });
+    if (!res.ok) {
+      setEquipped(prev);
+      toast(res.error ?? "Não foi possível trocar o cenário");
+    } else {
+      toast(id ? "Cenário aplicado! 🌄" : "Cenário removido");
+    }
+  }
+
+  if (loading) return <TabSkeleton />;
+
+  const ownedSet = new Set(owned);
+  const ownedItems = CANTINHO_ITEMS.filter((i) => ownedSet.has(i.id));
+  const shopItems = CANTINHO_ITEMS.filter((i) => cat === "all" || i.type === cat);
+
+  async function buy(itemId: string, price: number) {
+    if (buying) return;
+    if (saldo < price) {
+      toast("Sementinhas insuficientes 🌱");
+      return;
+    }
+    setBuying(itemId);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) {
+      setBuying(null);
+      return;
+    }
+    const res = await buyCantinhoItem({
+      data: { accessToken: s.session.access_token, itemId },
+    });
+    if (res.ok) {
+      setSaldo(res.balance);
+      setOwned((o) => [...o, itemId]);
+      toast("Adicionado ao seu cantinho! 💛");
+    } else {
+      toast(res.error ?? "Não foi possível comprar");
+      if (typeof res.balance === "number") setSaldo(res.balance);
+      // Já possuído (ex.: comprado em outro aparelho): reflete na hora.
+      if (res.error === "Você já tem este item")
+        setOwned((o) => (o.includes(itemId) ? o : [...o, itemId]));
+    }
+    setBuying(null);
+  }
+
+  const pill = (active: boolean) =>
+    `shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
+      active ? "bg-emerald-100 text-emerald-700" : "text-foreground/45 hover:text-foreground/70"
+    }`;
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho + saldo */}
+      <div className="flex items-center justify-between rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-5">
+        <div>
+          <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">Meu Cantinho</p>
+          <p className="mt-0.5 text-sm text-emerald-800/80">Um cantinho que cresce com você.</p>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5">
+          <span className="text-lg">🌱</span>
+          <span className="tabular-nums font-extrabold text-emerald-600">{saldo}</span>
+        </div>
+      </div>
+
+      {/* A cena do cantinho */}
+      <div className="min-h-[180px] rounded-3xl border border-emerald-100 bg-gradient-to-b from-sky-50 via-white to-emerald-50 p-6">
+        {ownedItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-4xl">🌱</p>
+            <p className="mt-2 font-serif text-lg text-foreground">Seu cantinho está começando</p>
+            <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+              Ganhe Sementinhas cuidando de você e traga vida pra ele — uma plantinha de cada vez.
+              💛
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-end justify-center gap-3">
+            {ownedItems.map((i) => (
+              <span key={i.id} className="text-5xl drop-shadow-sm" title={i.name}>
+                {i.emoji}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Loja de itens */}
+      <div>
+        <div className="scrollbar-hide mb-3 flex gap-2 overflow-x-auto">
+          <button onClick={() => setCat("all")} className={pill(cat === "all")}>
+            Tudo
+          </button>
+          {CANTINHO_CATEGORIES.map((c) => (
+            <button key={c.key} onClick={() => setCat(c.key)} className={pill(cat === c.key)}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {shopItems.map((i) => {
+            const has = ownedSet.has(i.id);
+            const locked = i.premium && !premium; // exclusivo do Premium
+            const cant = !has && !locked && saldo < i.price;
+            return (
+              <div
+                key={i.id}
+                className="relative flex flex-col items-center rounded-2xl border border-border bg-card p-4 text-center"
+              >
+                {i.premium && (
+                  <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                    {locked ? "🔒 Premium" : "Premium"}
+                  </span>
+                )}
+                <span className={`text-4xl ${locked ? "opacity-40 grayscale" : ""}`}>
+                  {i.emoji}
+                </span>
+                <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
+                {has ? (
+                  i.type === "fundo" ? (
+                    <button
+                      onClick={() => equipFundo(equipped === i.id ? null : i.id)}
+                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
+                        equipped === i.id
+                          ? "bg-emerald-500 text-white"
+                          : "border border-emerald-300 text-emerald-700"
+                      }`}
+                    >
+                      {equipped === i.id ? "Em uso ✓" : "Usar"}
+                    </button>
+                  ) : (
+                    <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                      No cantinho ✓
+                    </span>
+                  )
+                ) : locked ? (
+                  <span className="mt-2 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-600">
+                    🌱 {i.price}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => buy(i.id, i.price)}
+                    disabled={cant || buying === i.id}
+                    className={`press mt-2 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold ${
+                      cant ? "bg-slate-100 text-slate-400" : "bg-emerald-500 text-white"
+                    }`}
+                  >
+                    🌱 {i.price}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -11290,8 +11995,8 @@ function LojaTab({ gest }: { gest: Gest }) {
       {/* ── Header ──────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-primary/70">
-            Curado por Dr. Clóvis
+          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-primary/70">
+            Curadoria do seu médico
           </p>
           <h2 className="font-serif text-[22px] font-medium leading-tight text-gray-900 mt-0.5">
             Seleção da semana
@@ -11328,7 +12033,7 @@ function LojaTab({ gest }: { gest: Gest }) {
                   <span className="text-[36px]">{vis.emoji}</span>
                 </div>
                 <div className="flex flex-col justify-center bg-white px-3 py-3 flex-1 min-w-0">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">
                     {vis.label}
                   </span>
                   <p className="text-[11px] font-medium leading-tight line-clamp-2 text-gray-800">
@@ -11349,7 +12054,8 @@ function LojaTab({ gest }: { gest: Gest }) {
 
       {/* ── Filtros — sticky, some on scroll down ── */}
       <div
-        className={`sticky top-0 z-20 -mx-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm border-b border-gray-100 transition-transform duration-200 ease-in-out ${
+        style={{ top: "var(--safe-top)" }}
+        className={`sticky z-20 -mx-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm border-b border-gray-100 transition-transform duration-200 ease-in-out ${
           filtersHidden ? "-translate-y-[130%]" : "translate-y-0"
         }`}
       >
@@ -11405,13 +12111,13 @@ function LojaTab({ gest }: { gest: Gest }) {
                   </span>
 
                   {/* Label categoria — canto superior direito */}
-                  <span className="absolute top-2 right-2 text-[9px] font-semibold uppercase tracking-widest text-white/50">
+                  <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-white/50">
                     {vis.label}
                   </span>
 
                   {/* Badge destaque — canto superior esquerdo */}
                   {product.badge && (
-                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[8px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
+                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
                       {product.badge}
                     </span>
                   )}
@@ -11437,8 +12143,8 @@ function LojaTab({ gest }: { gest: Gest }) {
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[10px] font-medium text-[#00a650]">Envio grátis</span>
-                    <span className="text-[9px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
-                      ✓ Dr. Clóvis
+                    <span className="text-[10px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
+                      ✓ Recomendado
                     </span>
                   </div>
                 </div>
@@ -11475,8 +12181,14 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   const [newId, setNewId] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
 
-  const PIX_KEY = DOCTOR.pixKey;
-  const PIX_NAME = DOCTOR.pixName;
+  // PIX do PRÓPRIO médico da paciente (não uma chave central). Começa no
+  // fallback central e, se a paciente tiver médico com chave PIX, atualiza.
+  const [pix, setPix] = useState<{ key: string; name: string }>({
+    key: DOCTOR.pixKey,
+    name: DOCTOR.pixName,
+  });
+  const PIX_KEY = pix.key;
+  const PIX_NAME = pix.name;
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
@@ -11486,6 +12198,11 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
     }
     const res = await getMyPrivateConsultations({ data: { accessToken: s.session.access_token } });
     if (res.ok) setConsultations(res.consultations);
+    // PIX do médico da paciente (fallback central se não houver)
+    const pixRes = await getMyDoctorPix({ data: { accessToken: s.session.access_token } });
+    if (pixRes.ok && pixRes.pix?.key) {
+      setPix({ key: pixRes.pix.key, name: pixRes.pix.name || DOCTOR.pixName });
+    }
     setLoading(false);
   }
 
@@ -11625,7 +12342,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                 ))}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Informe até 3 opções — Dr. Clóvis confirmará a disponibilidade.
+                Informe até 3 opções — o seu médico confirmará a disponibilidade.
               </p>
             </div>
 
@@ -11645,7 +12362,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
           <p className="font-semibold mb-3">💳 Pagamento via PIX</p>
           <p className="text-sm text-muted-foreground mb-3">
-            Após solicitar, efetue o pagamento via PIX e marque como pago. Dr. Clóvis confirmará e
+            Após solicitar, efetue o pagamento via PIX e marque como pago. Seu médico confirmará e
             entrará em contato.
           </p>
           <div className="space-y-2">
@@ -11683,7 +12400,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
           Consultas particulares
         </p>
-        <h2 className="font-serif text-2xl">Consulta com Dr. Clóvis</h2>
+        <h2 className="font-serif text-2xl">Consulta com {DOCTOR.name}</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Videochamadas particulares sem intermediário. Pagamento via PIX direto ao médico.
         </p>
@@ -11710,7 +12427,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
           <p className="text-sm text-green-600 mt-1">
             {consultations.find((c) => c.id === newId)?.pix_qr_code_base64
               ? "Escaneie o QR Code PIX abaixo ou copie o código para pagar. A confirmação é automática."
-              : "Use a chave PIX abaixo para pagar e depois toque em “Marquei o pagamento” — o Dr. Clóvis confirmará manualmente."}
+              : "Use a chave PIX abaixo para pagar e depois toque em “Marquei o pagamento” — seu médico confirmará manualmente."}
           </p>
         </div>
       )}
@@ -11812,7 +12529,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
       )}
 
       <p className="text-xs text-center text-muted-foreground">
-        Após confirmar o pagamento, Dr. Clóvis entrará em contato para confirmar o horário.
+        Após confirmar o pagamento, seu médico entrará em contato para confirmar o horário.
       </p>
     </div>
   );
@@ -12497,281 +13214,203 @@ function PreventivosTab() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MÉDICO TAB — perfil completo do Dr. Clóvis Bacha
+// MÉDICO TAB — perfil completo do médico associado (DOCTOR config)
 // ─────────────────────────────────────────────────────────────────────────────
 function MédicoTab() {
-  const SPECIALTIES = [
-    "Gestação de alto risco",
-    "Hipertensão na gravidez (pré-eclâmpsia)",
-    "Diabetes gestacional",
-    "Gestação gemelar e múltipla",
-    "Malformações fetais",
-    "Prematuridade",
-    "Medicina fetal",
-    "Ultrassonografia obstétrica",
-    "Dopplervelocimetria",
-    "Cardiotocografia computadorizada",
-  ];
+  const [token, setToken] = useState<string | null>(null);
+  const [link, setLink] = useState<MyDoctorLink | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<DoctorPublic[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
 
-  const TIMELINE = [
-    { ano: "1998", t: "Graduação em Medicina", d: "Universidade Federal" },
-    { ano: "2001", t: "Residência em GO", d: "Hospital Universitário" },
-    { ano: "2003", t: "Especialização em Medicina Fetal", d: "" },
-    { ano: "2006", t: "Fellowship — Ultrassonografia Obstétrica", d: "" },
-    { ano: "2008", t: "Título de Especialista", d: "FEBRASGO" },
-    { ano: "2015", t: "Pós-graduação em Alto Risco", d: "" },
-    { ano: "2019", t: "Dopplervelocimetria avançada", d: "ISUOG" },
-    { ano: "2022", t: "Cardiotocografia computadorizada", d: "" },
-  ];
+  async function getToken(): Promise<string | null> {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  }
 
-  const HOSPITALS = [
-    {
-      name: "Hospital Vila da Serra",
-      address: "Nova Lima — MG",
-      specialty: "UTI neonatal de alta complexidade",
-      detail: "Referência regional em gestações de alto risco com suporte intensivo.",
-    },
-    {
-      name: "Hospital Mater Dei Santo Agostinho",
-      address: "Belo Horizonte — MG",
-      specialty: "Referência em obstetrícia",
-      detail: "Centro de excelência em medicina materno-fetal e neonatologia.",
-    },
-    {
-      name: "Hospital Sofia Feldman",
-      address: "Belo Horizonte — MG",
-      specialty: "Parto humanizado",
-      detail: "Reconhecido pela OMS por suas práticas humanizadas de atenção ao parto.",
-    },
-    {
-      name: "Maternidade Octaviano Neves",
-      address: "Belo Horizonte — MG",
-      specialty: "Tradição em GO",
-      detail: "Décadas de excelência no atendimento obstétrico em Minas Gerais.",
-    },
-  ];
+  async function loadLink() {
+    const tk = await getToken();
+    setToken(tk);
+    if (!tk) {
+      setLoading(false);
+      return;
+    }
+    const res = await getMyDoctorLink({ data: { accessToken: tk } });
+    if (res.ok) setLink(res.link);
+    setLoading(false);
+  }
 
-  const LIVES_PAST = [
-    { titulo: "Diabetes gestacional: controle e cuidados", data: "Abril 2026" },
-    { titulo: "Pré-eclâmpsia: reconheça os sinais", data: "Março 2026" },
-    { titulo: "Vacinas na gestação: quais são obrigatórias?", data: "Fevereiro 2026" },
-  ];
+  useEffect(() => {
+    void loadLink();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const SOCIETIES = [
-    "FEBRASGO — Federação Brasileira de Ginecologia e Obstetrícia",
-    "ISUOG — International Society of Ultrasound in Obstetrics and Gynecology",
-    "SOGIMIG — Sociedade de Ginecologia e Obstetrícia de Minas Gerais",
-    "CFM — Conselho Federal de Medicina",
-  ];
+  async function doSearch(e?: React.FormEvent) {
+    e?.preventDefault();
+    const tk = token ?? (await getToken());
+    if (!tk) return;
+    setSearching(true);
+    const res = await searchDoctors({ data: { accessToken: tk, query: query.trim() } });
+    setResults(res.ok ? res.doctors : []);
+    setSearched(true);
+    setSearching(false);
+  }
+
+  async function sendRequest(d: DoctorPublic) {
+    const tk = token ?? (await getToken());
+    if (!tk) return;
+    setBusyId(d.id);
+    const res = await requestDoctor({ data: { accessToken: tk, doctorId: d.id } });
+    setBusyId(null);
+    if (res.ok) {
+      toast.success(
+        res.status === "accepted"
+          ? "Você já está vinculada a esse médico."
+          : "Solicitação enviada! Aguarde o médico aceitar.",
+      );
+      setShowSearch(false);
+      await loadLink();
+    } else {
+      toast.error("Não foi possível enviar a solicitação.");
+    }
+  }
+
+  async function cancelPending() {
+    const tk = token ?? (await getToken());
+    if (!tk || !link?.pending) return;
+    setBusyId("cancel");
+    await cancelDoctorRequest({ data: { accessToken: tk, requestId: link.pending.id } });
+    setBusyId(null);
+    await loadLink();
+  }
+
+  if (loading)
+    return <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>;
+
+  const doctor = link?.doctor ?? null;
+  const pending = link?.pending ?? null;
 
   return (
-    <div className="space-y-8 pb-8">
-      {/* Cabeçalho do médico */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="grid md:grid-cols-[200px_1fr]">
-          <img
-            src={portrait}
-            alt="Dr. Clóvis Bacha"
-            className="w-full aspect-square object-cover md:h-full"
-          />
-          <div className="p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              Médico responsável
-            </p>
-            <h2 className="mt-1 font-serif text-2xl text-foreground">Dr. Clóvis Bacha</h2>
+    <div className="space-y-6 pb-8">
+      {doctor ? (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            Meu obstetra
+          </p>
+          <h2 className="mt-1 font-serif text-2xl text-foreground">
+            {doctor.display_name || "Obstetra"}
+          </h2>
+          {(doctor.title || doctor.specialty) && (
             <p className="text-sm text-muted-foreground">
-              Ginecologista e Obstetra · Especialista em Gestação de Alto Risco
+              {[doctor.title, doctor.specialty].filter(Boolean).join(" · ")}
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["CRM-MG", "FEBRASGO", "ISUOG", "SOGIMIG"].map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Mais de duas décadas dedicadas ao acompanhamento de gestações complexas — unindo
-              medicina baseada em evidências ao cuidado profundamente humano. Especializado em
-              Medicina Fetal, Ultrassonografia Obstétrica e Dopplervelocimetria.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link
-                to="/sobre"
-                className="text-xs font-medium text-primary underline underline-offset-4"
-              >
-                Currículo completo →
-              </Link>
-              <Link
-                to="/agendamento"
-                className="text-xs font-medium text-primary underline underline-offset-4"
-              >
-                Agendar consulta →
-              </Link>
-            </div>
+          )}
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Você está vinculada a este obstetra. No <strong>Chat IA</strong>, o assistente responde
+            com o estilo e as condutas que o seu médico validou.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              to="/agendamento"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Agendar consulta
+            </Link>
+            <button
+              onClick={() => setShowSearch((s) => !s)}
+              className="rounded-full border border-primary/40 px-4 py-2 text-sm font-medium text-primary"
+            >
+              Trocar de médico
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Áreas de atuação */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h3 className="font-serif text-lg text-foreground mb-4">Áreas de atuação</h3>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {SPECIALTIES.map((s) => (
-            <div key={s} className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-              {s}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Formação */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h3 className="font-serif text-lg text-foreground mb-4">Formação e trajetória</h3>
-        <ol className="relative border-l-2 border-primary/30 pl-5 space-y-5">
-          {TIMELINE.map((e) => (
-            <li key={e.ano} className="relative">
-              <span className="absolute -left-[25px] flex h-4 w-4 items-center justify-center rounded-full bg-primary ring-4 ring-card" />
-              <p className="font-serif text-xl text-primary">{e.ano}</p>
-              <p className="text-sm font-medium text-foreground">{e.t}</p>
-              {e.d && <p className="text-xs text-muted-foreground">{e.d}</p>}
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      {/* Hospitais */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-serif text-lg text-foreground">Onde o Dr. Clóvis atende</h3>
-          <Link
-            to="/hospitais"
-            className="text-xs font-medium text-primary underline underline-offset-4"
+      ) : pending ? (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+            Solicitação enviada
+          </p>
+          <h2 className="mt-1 font-serif text-xl text-foreground">
+            Aguardando {pending.doctor.display_name || "o médico"} aceitar
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Assim que o médico aceitar, você poderá conversar com a IA do consultório dele aqui no
+            app.
+          </p>
+          <button
+            onClick={cancelPending}
+            disabled={busyId === "cancel"}
+            className="mt-4 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground disabled:opacity-40"
           >
-            Ver rotas →
-          </Link>
+            Cancelar solicitação
+          </button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {HOSPITALS.map((h) => (
-            <div key={h.name} className="rounded-xl border border-border bg-secondary/30 p-4">
-              <p className="font-medium text-sm text-foreground">{h.name}</p>
-              <p className="text-xs text-primary mt-0.5">{h.address}</p>
-              <p className="text-xs text-muted-foreground mt-1">{h.specialty}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{h.detail}</p>
-            </div>
-          ))}
+      ) : (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            Meu obstetra
+          </p>
+          <h2 className="mt-1 font-serif text-xl text-foreground">Encontre o seu obstetra</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Busque pelo nome do seu médico e envie uma solicitação. Quando ele aceitar, seu
+            acompanhamento fica conectado — e o Chat IA passa a responder como o consultório dele.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          A escolha do hospital depende do plano de saúde e da complexidade da gestação. Confirme
-          com a equipe.
-        </p>
-      </div>
+      )}
 
-      {/* Lives */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-serif text-lg text-foreground">Lives e conteúdo</h3>
-          <Link
-            to="/lives"
-            className="text-xs font-medium text-primary underline underline-offset-4"
-          >
-            Ver todas →
-          </Link>
-        </div>
-        <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 mb-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">
-            Lives no Instagram
-          </p>
-          <p className="text-sm font-medium text-foreground">
-            O Dr. Clóvis faz lives regulares sobre gestação e saúde da mulher
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Siga @drclovisbacha e ative as notificações para não perder
-          </p>
-          <a
-            href="https://www.instagram.com/drclovisbacha/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-block text-xs font-medium text-primary underline underline-offset-4"
-          >
-            Seguir no Instagram →
-          </a>
-        </div>
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-            Lives anteriores
-          </p>
-          {LIVES_PAST.map((l) => (
-            <div
-              key={l.titulo}
-              className="flex items-center justify-between rounded-lg border border-border bg-secondary/20 px-3 py-2"
+      {(!doctor || showSearch) && !pending && (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <form onSubmit={doSearch} className="flex gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Nome do médico ou especialidade…"
+              className="flex-1 rounded-full border border-input bg-card px-4 py-2 text-sm outline-none focus:border-primary"
+            />
+            <button
+              type="submit"
+              disabled={searching}
+              className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
             >
-              <p className="text-sm text-foreground">{l.titulo}</p>
-              <p className="text-xs text-muted-foreground ml-4 flex-shrink-0">{l.data}</p>
-            </div>
-          ))}
+              {searching ? "Buscando…" : "Buscar"}
+            </button>
+          </form>
+          <div className="mt-4 space-y-2">
+            {searched && results.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhum médico encontrado. Confira o nome ou peça o convite ao seu obstetra.
+              </p>
+            )}
+            {results.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {d.display_name || "Obstetra"}
+                  </p>
+                  {(d.title || d.specialty) && (
+                    <p className="text-xs text-muted-foreground">
+                      {[d.title, d.specialty].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => sendRequest(d)}
+                  disabled={busyId === d.id}
+                  className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
+                >
+                  {busyId === d.id ? "Enviando…" : "Solicitar"}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* Bastidores / Alto Risco */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-serif text-lg text-foreground">Gestação de alto risco</h3>
-          <Link
-            to="/bastidores"
-            className="text-xs font-medium text-primary underline underline-offset-4"
-          >
-            Saiba mais →
-          </Link>
-        </div>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-          Considera-se gestação de alto risco quando existem condições que aumentam as chances de
-          complicações para a mãe e/ou o bebê. O acompanhamento especializado faz toda a diferença
-          no desfecho.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[
-            {
-              titulo: "Hipertensão",
-              texto:
-                "Pré-eclâmpsia, eclâmpsia e hipertensão crônica requerem monitoramento intensivo.",
-            },
-            {
-              titulo: "Diabetes gestacional",
-              texto: "Controle glicêmico rigoroso e ajuste de dieta durante toda a gestação.",
-            },
-            {
-              titulo: "Malformações fetais",
-              texto: "Diagnóstico precoce com ecocardiografia e ultrassonografia morfológica.",
-            },
-            {
-              titulo: "Gestação múltipla",
-              texto: "Gemelar e múltipla exigem protocolos específicos de vigilância fetal.",
-            },
-          ].map((c) => (
-            <div key={c.titulo} className="rounded-xl border border-border bg-secondary/30 p-3">
-              <p className="text-sm font-medium text-foreground">{c.titulo}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{c.texto}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Sociedades */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h3 className="font-serif text-lg text-foreground mb-4">Sociedades e filiações</h3>
-        <div className="space-y-2">
-          {SOCIETIES.map((s) => (
-            <div key={s} className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
-              {s}
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -13097,7 +13736,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-2xl">Plano de parto</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Registre suas preferências para compartilhar com o Dr. Clóvis e a equipe da maternidade. O
+          Registre suas preferências para compartilhar com o seu médico e a equipe da maternidade. O
           plano é um ponto de partida — decisões clínicas sempre prevalecem.
         </p>
       </div>
@@ -13220,7 +13859,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
 
       <p className="text-xs text-muted-foreground">
         Imprima ou tire um print para levar à maternidade. Leve também uma cópia para a consulta com
-        o Dr. Clóvis.
+        o seu médico.
       </p>
     </div>
   );
@@ -13264,7 +13903,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
         </p>
         <p className="mt-3 text-sm italic text-muted-foreground">
           "Cada gestação tem sua própria história. Cuidar de você é tão importante quanto cuidar do
-          bebê." — Dr. Clóvis Bacha
+          bebê." — {DOCTOR.name}
         </p>
       </div>
 
@@ -13304,7 +13943,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
           ))}
         </ul>
         <p className="mt-3 text-xs text-primary">
-          Converse com o Dr. Clóvis na sua próxima consulta. Ele pode indicar acompanhamento
+          Converse com o seu médico na sua próxima consulta. Ele pode indicar acompanhamento
           psicológico especializado em gestação.
         </p>
       </div>

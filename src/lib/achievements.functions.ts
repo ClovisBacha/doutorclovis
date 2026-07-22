@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
+import { computeGestation } from "@/lib/gestacao";
+import { grantSementinhas, SEMENTINHAS, BIG_ACHIEVEMENTS } from "@/lib/sementinhas.functions";
+import { isCareModeActive } from "@/lib/care-mode.functions";
 
 export type AchievementDef = {
   key: string;
@@ -109,6 +112,35 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     emoji: "🥇",
     category: "bebe",
   },
+  // ── Pós-parto ──────────────────────────────────────────────
+  {
+    key: "first_breastfeeding",
+    title: "Primeira Mamada",
+    description: "Registrou a primeira amamentação",
+    emoji: "🤱",
+    category: "bebe",
+  },
+  {
+    key: "first_baby_weight",
+    title: "Crescendo!",
+    description: "Registrou o primeiro peso do bebê",
+    emoji: "⚖️",
+    category: "saude",
+  },
+  {
+    key: "first_vaccine",
+    title: "Protegido",
+    description: "Primeira vacina do bebê registrada",
+    emoji: "💉",
+    category: "saude",
+  },
+  {
+    key: "first_baby_milestone",
+    title: "Primeiro Marco",
+    description: "Registrou o primeiro marco do bebê",
+    emoji: "🌟",
+    category: "bebe",
+  },
 ];
 
 export const getMyAchievements = createServerFn({ method: "POST" })
@@ -148,7 +180,7 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     const { data: profile } = await db
       .from("patient_profiles")
       .select(
-        "display_name, lmp_date, reference_date, blood_type, emergency_contact, emergency_phone, height_cm, pre_pregnancy_weight_kg",
+        "display_name, lmp_date, reference_date, reference_weeks, reference_days, birth_date, blood_type, emergency_contact, emergency_phone, height_cm, pre_pregnancy_weight_kg",
       )
       .eq("id", uid)
       .single();
@@ -210,6 +242,31 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     if (checkItems && checkItems.length > 0 && checkItems.every((c: any) => c.done))
       toAward.push("prenatal_done");
 
+    // ── Conquistas pós-parto (registrar o ato, nunca o resultado clínico) ──
+    const { count: bfCount } = await db
+      .from("breastfeeding_logs")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", uid);
+    if ((bfCount ?? 0) >= 1) toAward.push("first_breastfeeding");
+
+    const { count: weightCount } = await db
+      .from("baby_weights")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", uid);
+    if ((weightCount ?? 0) >= 1) toAward.push("first_baby_weight");
+
+    const { count: vaccineCount } = await db
+      .from("baby_vaccines")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", uid);
+    if ((vaccineCount ?? 0) >= 1) toAward.push("first_vaccine");
+
+    const { count: milestoneCount } = await db
+      .from("baby_milestones")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", uid);
+    if ((milestoneCount ?? 0) >= 1) toAward.push("first_baby_milestone");
+
     // Chaves já desbloqueadas antes desta checagem, para detectar as novas
     // (permite que os pontos de ação exibam um toast de "nova conquista").
     const { data: existingRows } = await db
@@ -228,6 +285,71 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
       );
     }
 
+    // 🌱 Sementinhas: recompensa por conquistas + marcos de semana/trimestre.
+    // Tudo idempotente (dedupe_key), então rodar a cada checagem se auto-corrige
+    // sem conceder em dobro. Ganho só por ação/educação/marco — nunca por
+    // resultado clínico.
+    const titleByKey = new Map(ACHIEVEMENT_DEFS.map((d) => [d.key, d.title]));
+    const grants: { amount: number; reason: string; dedupeKey: string }[] = toAward.map((key) => ({
+      amount: BIG_ACHIEVEMENTS.has(key)
+        ? SEMENTINHAS.achievementBig
+        : SEMENTINHAS.achievementDefault,
+      reason: `Conquista: ${titleByKey.get(key) ?? key}`,
+      dedupeKey: `achievement:${key}`,
+    }));
+    // Marcos escopados à GESTAÇÃO/bebê atual (LMP/referência/nascimento) — senão,
+    // numa 2ª gravidez os marcos já teriam sido "consumidos" na 1ª.
+    const cycle = profile?.lmp_date ?? profile?.reference_date ?? profile?.birth_date ?? "x";
+    if (profile?.birth_date) {
+      // ── Pós-nascimento: para o ganho gestacional (que cresceria pra sempre)
+      // e passa a recompensar a jornada do bebê. ──
+      grants.push({
+        amount: SEMENTINHAS.trimesterMilestone,
+        reason: "Bem-vindo ao mundo 🍼",
+        dedupeKey: `born:${cycle}`,
+      });
+      const ageDays = Math.floor(
+        (Date.now() - new Date(profile.birth_date + "T00:00:00").getTime()) / 86400000,
+      );
+      const months = Math.floor(ageDays / 30);
+      if (months >= 1)
+        grants.push({
+          amount: SEMENTINHAS.weekMilestone,
+          reason: `Bebê com ${months} ${months === 1 ? "mês" : "meses"} 🎉`,
+          dedupeKey: `babymonth:${cycle}:${months}`,
+        });
+    } else {
+      const gest = computeGestation({
+        lmp: profile?.lmp_date ?? null,
+        referenceDate: profile?.reference_date ?? null,
+        referenceWeeks: profile?.reference_weeks ?? null,
+        referenceDays: profile?.reference_days ?? null,
+      });
+      if (gest) {
+        // Marco da semana atual: presente por avançar, não por performance.
+        grants.push({
+          amount: SEMENTINHAS.weekMilestone,
+          reason: `Semana ${gest.weeks} 🎉`,
+          dedupeKey: `week:${cycle}:${gest.weeks}`,
+        });
+        if (gest.weeks >= 13)
+          grants.push({
+            amount: SEMENTINHAS.trimesterMilestone,
+            reason: "Fim do 1º trimestre 🎊",
+            dedupeKey: `trimester:${cycle}:1`,
+          });
+        if (gest.weeks >= 27)
+          grants.push({
+            amount: SEMENTINHAS.trimesterMilestone,
+            reason: "Fim do 2º trimestre 🎊",
+            dedupeKey: `trimester:${cycle}:2`,
+          });
+      }
+    }
+    // Modo Cuidado: não concede Sementinhas nem sinaliza comemoração ao cliente.
+    const careMode = await isCareModeActive(supabaseAdmin, uid);
+    if (!careMode) await grantSementinhas(db, uid, grants);
+
     const { data: rows } = await db
       .from("patient_achievements")
       .select("achievement_key, unlocked_at")
@@ -236,5 +358,6 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
       ok: true as const,
       unlocked: (rows ?? []) as { achievement_key: string; unlocked_at: string }[],
       newlyAwarded,
+      careMode,
     };
   });
