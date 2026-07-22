@@ -225,3 +225,49 @@ export function dueDateFromLmp(lmp: string) {
   d.setDate(d.getDate() + 280);
   return d.toISOString().slice(0, 10);
 }
+
+export type RetaFinalMensagem = {
+  eyebrow: string;
+  titulo: string;
+  corpo: string;
+  dica: string;
+};
+
+/**
+ * Mensagem acolhedora para a reta final (semanas 40 a 42+).
+ *
+ * Baseada em orientação obstétrica (ACOG/FEBRASGO/MSD): a DPP é apenas uma
+ * estimativa, a janela normal e segura do parto vai até 42 semanas, e passar
+ * das 40 é o cenário mais comum na 1ª gestação. O tom NUNCA culpabiliza o
+ * corpo nem usa "atraso/vencido/passou do prazo" — normaliza, reforça a
+ * segurança pela vigilância e blinda da pressão social. Retorna `null` antes
+ * da semana 40 (nenhuma mensagem de reta final).
+ */
+export function retaFinalMensagem(weeks: number): RetaFinalMensagem | null {
+  if (weeks < 40) return null;
+  if (weeks < 41) {
+    return {
+      eyebrow: "Reta final",
+      titulo: "Você chegou às 40 semanas 💛",
+      corpo:
+        "A data provável do parto é só uma estimativa — apenas cerca de 1 em cada 20 bebês nasce no dia dela. 40 semanas não é um prazo final: é o meio de uma janela normal e segura que vai até 42. Seu corpo não está atrasado, está no tempo dele.",
+      dica: "Se as mensagens de “ainda não nasceu?” começaram a chegar, respire: você não deve satisfação a ninguém. Quem escolhe a hora é o seu bebê.",
+    };
+  }
+  if (weeks < 42) {
+    return {
+      eyebrow: "Termo tardio",
+      titulo: "Passou da DPP? Você está em ótima companhia 💛",
+      corpo:
+        "É super comum, principalmente na primeira gestação, o bebê chegar depois das 40 semanas — nada de errado com você. A partir de agora seu acompanhamento fica mais de pertinho (cardiotoco e avaliação do líquido), só pra confirmar que está tudo bem aí dentro. Você e seu bebê estão sendo bem cuidados.",
+      dica: "Um banho morno, uma respiração lenta (inspire em 4, segure em 7, solte em 8) e menos telefone ajudam a acalmar a ansiedade da espera.",
+    };
+  }
+  return {
+    eyebrow: "Reta final",
+    titulo: "Falta pouquíssimo 💛",
+    corpo:
+      "Chegar às 42 semanas pede um acompanhamento mais próximo, e a sua equipe já está com um plano — isso não é sinal de problema, é cuidado extra para a reta final. Seu médico vai conversar com você sobre os próximos passos, como a indução. Faça todas as perguntas: essa decisão é sua, junto com quem cuida de você.",
+    dica: "Cada dia de acompanhamento é um dia a mais garantindo que o encontro com seu bebê seja seguro e no tempo certo.",
+  };
+}

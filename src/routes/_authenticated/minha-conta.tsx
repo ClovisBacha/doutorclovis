@@ -27,6 +27,7 @@ import {
   computeGestation,
   consultaForWeek,
   dueDateFromLmp,
+  retaFinalMensagem,
   trimesterForWeek,
 } from "@/lib/gestacao";
 import { BabyIllustration, BABY_TONES } from "@/components/baby-illustration";
@@ -944,6 +945,8 @@ function BabyTab({
     : null;
   const exam = consultaForWeek(gest.weeks);
   const babyLabel = profile.baby_name ? profile.baby_name : "seu bebê";
+  // Reta final (semanas 40-42+): substitui a contagem regressiva por acolhimento.
+  const reta = retaFinalMensagem(gest.weeks);
 
   const bpmDefault = profile.fetal_bpm ?? (gest.weeks < 14 ? 160 : gest.weeks < 28 ? 145 : 135);
 
@@ -1020,14 +1023,18 @@ function BabyTab({
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              {daysToDue != null && (
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  {daysToDue === 0
-                    ? "É hoje! 🎉"
-                    : daysToDue === 1
-                      ? "Amanhã! 🎉"
-                      : `Faltam ${daysToDue} dias para conhecer ${babyLabel} 💛`}
-                </p>
+              {reta ? (
+                <p className="mt-1.5 text-xs font-medium text-primary">{reta.titulo}</p>
+              ) : (
+                daysToDue != null && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {daysToDue === 0
+                      ? "É hoje! 🎉"
+                      : daysToDue === 1
+                        ? "Amanhã! 🎉"
+                        : `Faltam ${daysToDue} dias para conhecer ${babyLabel} 💛`}
+                  </p>
+                )
               )}
             </div>
           </div>
@@ -8480,13 +8487,16 @@ function CountdownTab({
   const dueMs = new Date(due + "T00:00:00").getTime();
   const diffMs = Math.max(0, dueMs - now);
   const isDueToday = now >= dueMs && now < dueMs + 86400000;
-  const overdueDays = Math.floor((now - dueMs) / 86400000);
   const totalSec = Math.floor(diffMs / 1000);
   const days = Math.floor(totalSec / 86400);
   const hours = Math.floor((totalSec % 86400) / 3600);
   const mins = Math.floor((totalSec % 3600) / 60);
   const secs = totalSec % 60;
   const progress = Math.min(100, (gest.totalDays / 280) * 100);
+  // Passou da DPP: troca a contagem regressiva (que ficaria em 00:00:00:00)
+  // por acolhimento embasado (semanas 40-42+), sem tom de "atraso".
+  const overdue = now >= dueMs && !isDueToday;
+  const reta = retaFinalMensagem(gest.weeks);
 
   const lmpMs = profile.lmp_date
     ? new Date(profile.lmp_date + "T00:00:00").getTime()
@@ -8494,48 +8504,58 @@ function CountdownTab({
 
   return (
     <div className="space-y-8">
-      <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-          Faltam para a DPP
-        </p>
-        <div className="mt-6 flex justify-center gap-4 sm:gap-8">
-          {[
-            { value: days, label: "dias" },
-            { value: hours, label: "horas" },
-            { value: mins, label: "min" },
-            { value: secs, label: "seg" },
-          ].map(({ value, label }) => (
-            <div key={label} className="flex flex-col items-center">
-              <span className="tabular-nums text-4xl font-bold text-primary sm:text-5xl">
-                {String(value).padStart(2, "0")}
-              </span>
-              <span className="mt-1 text-xs text-muted-foreground">{label}</span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6">
-          <div className="mx-auto h-3 max-w-sm overflow-hidden rounded-full bg-secondary">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {progress.toFixed(1)}% da gestação completa
+      {overdue && reta ? (
+        <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            {reta.eyebrow}
           </p>
+          <p className="mt-3 font-serif text-2xl text-foreground">{reta.titulo}</p>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-foreground/80">
+            {reta.corpo}
+          </p>
+          <div className="mx-auto mt-5 max-w-md rounded-2xl border border-primary/15 bg-white/60 p-4 text-left text-sm leading-relaxed text-foreground/75">
+            <span className="mr-1">🤍</span>
+            {reta.dica}
+          </div>
         </div>
-        {diffMs === 0 &&
-          (isDueToday ? (
+      ) : (
+        <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Faltam para a DPP
+          </p>
+          <div className="mt-6 flex justify-center gap-4 sm:gap-8">
+            {[
+              { value: days, label: "dias" },
+              { value: hours, label: "horas" },
+              { value: mins, label: "min" },
+              { value: secs, label: "seg" },
+            ].map(({ value, label }) => (
+              <div key={label} className="flex flex-col items-center">
+                <span className="tabular-nums text-4xl font-bold text-primary sm:text-5xl">
+                  {String(value).padStart(2, "0")}
+                </span>
+                <span className="mt-1 text-xs text-muted-foreground">{label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6">
+            <div className="mx-auto h-3 max-w-sm overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {progress.toFixed(1)}% da gestação completa
+            </p>
+          </div>
+          {isDueToday && (
             <p className="mt-4 text-lg font-semibold text-primary">
               🎊 Hoje é a data provável do parto! Parabéns, mamãe!
             </p>
-          ) : (
-            <p className="mt-4 text-lg font-semibold text-primary">
-              A DPP passou há {overdueDays} {overdueDays === 1 ? "dia" : "dias"} — mantenha contato
-              próximo com o consultório.
-            </p>
-          ))}
-      </div>
+          )}
+        </div>
+      )}
 
       <div>
         <h3 className="mb-4 font-semibold">Marcos da gestação</h3>
