@@ -64,7 +64,6 @@ export type AppTab =
   | "Conta Regressiva"
   | "Álbum"
   | "Nome do Bebê"
-  | "Escola"
   | "FAQ"
   | "Pânico"
   | "Carteirinha"
@@ -127,7 +126,6 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
     "Nome do Bebê",
     "Pós-parto",
     "Apoio Emocional",
-    "Escola",
     "FAQ",
     "Pânico",
     "Conquistas",
