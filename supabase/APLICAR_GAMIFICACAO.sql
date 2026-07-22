@@ -155,3 +155,23 @@ ALTER TABLE public.testimonials ENABLE ROW LEVEL SECURITY;
 
 REVOKE ALL ON public.testimonials FROM anon, authenticated;
 GRANT ALL ON public.testimonials TO service_role;
+
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Indicar amiga → 100 Sementinhas quando ela cria a conta
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS referral_code text;
+
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS referred_by uuid;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_profiles_referral_code
+  ON public.patient_profiles (referral_code)
+  WHERE referral_code IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_patient_profiles_referred_by
+  ON public.patient_profiles (referred_by);
+
+-- Anti-fraude: só a service role grava indicação (RLS é por linha, não coluna).
+REVOKE UPDATE (referred_by, referral_code) ON public.patient_profiles FROM authenticated;

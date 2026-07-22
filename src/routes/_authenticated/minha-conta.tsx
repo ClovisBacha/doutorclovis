@@ -79,6 +79,8 @@ import {
   submitTestimonial,
   type TestimonialStatus,
 } from "@/lib/testimonials.functions";
+import { getReferral, attributeReferral } from "@/lib/referral.functions";
+import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
@@ -487,6 +489,29 @@ function MinhaContaPage() {
   // antes de qualquer push para não sobrescrever a jornada real na conta (P1).
   useEffect(() => {
     ensureInitialJourneyPull();
+  }, []);
+
+  // Indicação de amiga: se veio por um link ?amiga=CODE, atribui na 1ª visita
+  // logada (idempotente) e credita 100 🌱 à indicadora. Limpa o código quando
+  // resolve (só mantém enquanto o perfil da amiga ainda não existe).
+  useEffect(() => {
+    (async () => {
+      const code = storedReferralCode();
+      if (!code) return;
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      try {
+        const res = await attributeReferral({
+          data: { accessToken: s.session.access_token, code },
+        });
+        if (res.ok && !("retry" in res && res.retry)) clearStoredReferralCode();
+        if (res.ok && "attributed" in res && res.attributed) {
+          toast.success("Você entrou pela indicação de uma amiga 💛");
+        }
+      } catch {
+        /* tenta de novo na próxima visita */
+      }
+    })();
   }, []);
 
   // Retorno do checkout do Stripe: o webhook libera o acesso em segundos.
@@ -12119,6 +12144,80 @@ function TestimonialCard() {
   );
 }
 
+/**
+ * Card "Indique uma amiga". Mostra o link pessoal da paciente; quando a amiga
+ * entra pelo link e cria a conta, a indicadora ganha 100 🌱 (uma vez por amiga).
+ */
+function ReferralCard() {
+  const [code, setCode] = useState<string | null>(null);
+  const [count, setCount] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const res = await getReferral({ data: { accessToken: s.session.access_token } });
+      if (res.ok) {
+        setCode(res.code);
+        setCount(res.count);
+      }
+      setLoaded(true);
+    })();
+  }, []);
+
+  if (!loaded || !code) return null;
+
+  const link =
+    (typeof window !== "undefined" ? window.location.origin : "https://www.obstetrica.com.br") +
+    `/?amiga=${code}`;
+  const msg = `Estou usando o Obstétrica na minha gestação e amei 💛 Entra pelo meu link: ${link}`;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Link copiado! Manda pra sua amiga 💌");
+    } catch {
+      toast("Copie o link: " + link);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-pink-200 bg-gradient-to-br from-pink-50 via-white to-rose-50 p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">👭</span>
+          <p className="text-sm font-extrabold text-pink-700">Indique uma amiga → 100 🌱</p>
+        </div>
+        {count > 0 && (
+          <span className="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-bold text-pink-700">
+            {count} {count === 1 ? "amiga" : "amigas"} 💞
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+        Cada amiga que criar a conta pelo seu link te dá{" "}
+        <span className="font-bold">100 Sementinhas</span>. Sem limite de amigas 💜
+      </p>
+
+      <div className="mt-3 flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2">
+        <span className="flex-1 truncate text-xs text-muted-foreground">{link}</span>
+        <button onClick={copy} className="press shrink-0 text-xs font-bold text-pink-600">
+          Copiar
+        </button>
+      </div>
+      <a
+        href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="press mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 py-2.5 text-sm font-extrabold text-white"
+      >
+        Convidar pelo WhatsApp
+      </a>
+    </div>
+  );
+}
+
 function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
@@ -12264,6 +12363,9 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
 
       {/* Deixe seu depoimento (100 🌱 quando o médico aprova) */}
       {!careMode && <TestimonialCard />}
+
+      {/* Indique uma amiga (100 🌱 quando ela cria a conta) */}
+      {!careMode && <ReferralCard />}
 
       {/* Loja de itens */}
       <div>
