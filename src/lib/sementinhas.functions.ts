@@ -181,10 +181,11 @@ export const grantLessonReward = createServerFn({ method: "POST" })
 
     const { cycle, gest } = await loadCycleAndGestation(supabaseAdmin, uid);
     // ANTI-FRAUDE (cadência): não paga lição de semana no FUTURO — só até a
-    // semana gestacional real de hoje (+1 de folga p/ fuso/relógio). Impede
-    // reivindicar a jornada inteira de uma vez. Sem dado gestacional, só o
-    // conteúdo finito + dedupe limitam.
-    if (gest && data.week > gest.weeks + 1) return { ok: true as const, granted: 0 };
+    // semana gestacional real de hoje (+1 de folga p/ fuso/relógio). Revisar
+    // semanas passadas do curso é legítimo (e limitado a 12 módulos + dedupe).
+    // Sem idade gestacional confiável não há cadência a validar — não paga.
+    if (!gest) return { ok: true as const, granted: 0 };
+    if (data.week > gest.weeks + 1) return { ok: true as const, granted: 0 };
     const dedupeKey = `lesson:${cycle}:${data.week}`;
 
     // Já ganhou por esta lição? (idempotência transparente p/ o "você ganhou X")
@@ -232,12 +233,15 @@ export const grantDailyQuizReward = createServerFn({ method: "POST" })
     const correct = Math.max(0, Math.min(data.correct, quiz.questions.length));
 
     const { cycle, gest } = await loadCycleAndGestation(supabaseAdmin, uid);
-    // ANTI-FRAUDE (cadência): o desafio é DIÁRIO. Não paga um dia no FUTURO —
-    // só até o dia gestacional real de hoje (+1 de folga p/ fuso/relógio).
-    // Sem isso, dava pra reivindicar todos os ~280 dias de uma vez. Sem dado
-    // gestacional (pós-parto/perfil incompleto), só o conteúdo finito + dedupe
-    // limitam.
-    if (gest && data.day > gest.totalDays + 1) return { ok: true as const, granted: 0 };
+    // ANTI-FRAUDE (cadência diária): o "desafio do dia" só paga o dia de HOJE.
+    // Espelha o cliente (canEarn={isToday}). Isto barra as DUAS fraudes: minerar
+    // o FUTURO (reivindicar a jornada inteira) e reprocessar TODOS os dias
+    // passados de uma vez. `todayDay` usa a mesma janela do cliente (7..300).
+    // Sem idade gestacional confiável (perfil incompleto/pós-parto) não há
+    // cadência a validar — não paga (o quiz é conteúdo de gravidez).
+    if (!gest) return { ok: true as const, granted: 0 };
+    const todayDay = Math.max(7, Math.min(300, gest.totalDays));
+    if (Math.abs(data.day - todayDay) > 1) return { ok: true as const, granted: 0 };
     const dedupeKey = `dailyquiz:${cycle}:${data.day}`;
 
     const { data: existing } = await db
