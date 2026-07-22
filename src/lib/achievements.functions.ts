@@ -3,6 +3,7 @@ import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
 import { computeGestation } from "@/lib/gestacao";
 import { grantSementinhas, SEMENTINHAS, BIG_ACHIEVEMENTS } from "@/lib/sementinhas.functions";
+import { isCareModeActive } from "@/lib/care-mode.functions";
 
 export type AchievementDef = {
   key: string;
@@ -271,7 +272,9 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
           dedupeKey: `trimester:${cycle}:2`,
         });
     }
-    await grantSementinhas(db, uid, grants);
+    // Modo Cuidado: não concede Sementinhas nem sinaliza comemoração ao cliente.
+    const careMode = await isCareModeActive(supabaseAdmin, uid);
+    if (!careMode) await grantSementinhas(db, uid, grants);
 
     const { data: rows } = await db
       .from("patient_achievements")
@@ -281,5 +284,6 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
       ok: true as const,
       unlocked: (rows ?? []) as { achievement_key: string; unlocked_at: string }[],
       newlyAwarded,
+      careMode,
     };
   });

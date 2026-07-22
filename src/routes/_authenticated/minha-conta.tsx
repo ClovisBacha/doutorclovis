@@ -65,6 +65,7 @@ import {
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import { CANTINHO_ITEMS, CANTINHO_CATEGORIES, type CantinhoCategory } from "@/lib/cantinho";
 import { getCantinho, buyCantinhoItem } from "@/lib/cantinho.functions";
+import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
   searchDoctors,
@@ -394,6 +395,7 @@ function triggerAchievementsCheck() {
     )
     .then((res) => {
       if (!res || !res.ok) return;
+      if (res.careMode) return; // Modo Cuidado: sem comemorações.
       for (const key of res.newlyAwarded ?? []) {
         const def = ACHIEVEMENT_DEFS.find((d) => d.key === key);
         if (def) toast(`${def.emoji} Nova conquista desbloqueada: ${def.title}!`);
@@ -426,6 +428,15 @@ function MinhaContaPage() {
     setTab(t as Tab);
     setMobileHome(false);
   };
+
+  // Modo Cuidado 🤍 — lido do perfil; pausa a gamificação globalmente.
+  const careMode = Boolean((profile as { care_mode?: boolean } | null)?.care_mode);
+  async function toggleCareMode(on: boolean) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) return;
+    const res = await setCareMode({ data: { accessToken: s.session.access_token, on } });
+    if (res.ok) setProfile((p) => (p ? ({ ...p, care_mode: on } as Profile) : p));
+  }
 
   // Próxima consulta confirmada → card na home mobile (fecha o ciclo
   // médico→paciente também na primeira tela do app).
@@ -836,6 +847,7 @@ function MinhaContaPage() {
             </div>
           </div>
 
+          {careMode && <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />}
           <div key={tab} className="mt-6 tab-enter">
             <TabErrorBoundary tabName={tab}>
               {tab === "Bebê" && (
@@ -899,7 +911,14 @@ function MinhaContaPage() {
               {tab === "Plano de Parto" && <PlanoPártoTab profile={profile} />}
               {tab === "Apoio Emocional" && <ApoioEmocionalTab onNavigate={goToTab} />}
               {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
-              {tab === "Perfil" && <ProfileTab profile={profile} onSaved={setProfile} />}
+              {tab === "Perfil" && (
+                <ProfileTab
+                  profile={profile}
+                  onSaved={setProfile}
+                  careMode={careMode}
+                  onToggleCare={toggleCareMode}
+                />
+              )}
             </TabErrorBoundary>
           </div>
         </div>
@@ -1809,13 +1828,99 @@ function ChecklistTab({ gest }: { gest: Gest }) {
   );
 }
 
+/* ---------- Modo Cuidado 🤍 ---------- */
+function CareModeBanner({
+  onExit,
+  onNavigate,
+}: {
+  onExit: () => void;
+  onNavigate: (t: string) => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
+      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Modo Cuidado 🤍</p>
+      <p className="mt-2 font-serif text-lg text-foreground">Estamos aqui com você.</p>
+      <p className="mt-1 max-w-md text-sm text-muted-foreground">
+        Pausamos as comemorações, contagens e a pontuação. Tudo o que você construiu está guardado —
+        nada se perdeu. No seu tempo. 💛
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          onClick={() => onNavigate("Apoio Emocional")}
+          className="press rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+        >
+          Apoio emocional
+        </button>
+        <button
+          onClick={() => onNavigate("Médico")}
+          className="press rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+        >
+          Falar com o consultório
+        </button>
+        <button
+          onClick={onExit}
+          className="press rounded-full px-4 py-2 text-sm font-medium text-slate-500 underline"
+        >
+          Sair do Modo Cuidado
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CareModeToggle({
+  careMode,
+  onToggle,
+}: {
+  careMode: boolean;
+  onToggle: (on: boolean) => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-card p-6">
+      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Modo Cuidado 🤍</p>
+      {careMode ? (
+        <>
+          <p className="mt-2 text-sm text-muted-foreground">
+            O Modo Cuidado está ativo. Comemorações, contagens e pontos estão pausados, e tudo o que
+            você construiu segue guardado.
+          </p>
+          <button
+            onClick={() => onToggle(false)}
+            className="press mt-4 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+          >
+            Desativar quando estiver pronta
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            Passando por um momento difícil — uma perda, uma complicação, ou só precisa de uma
+            pausa? O Modo Cuidado silencia as comemorações, contagens e pontos, e mantém com carinho
+            tudo o que você já construiu.
+          </p>
+          <button
+            onClick={() => onToggle(true)}
+            className="press mt-4 rounded-full bg-slate-700 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Ativar Modo Cuidado
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Perfil ---------- */
 function ProfileTab({
   profile,
   onSaved,
+  careMode,
+  onToggleCare,
 }: {
   profile: Profile | null;
   onSaved: (p: Profile) => void;
+  careMode: boolean;
+  onToggleCare: (on: boolean) => void;
 }) {
   const [form, setForm] = useState({
     display_name: profile?.display_name ?? "",
@@ -1932,6 +2037,8 @@ function ProfileTab({
 
   return (
     <div className="space-y-6">
+      <CareModeToggle careMode={careMode} onToggle={onToggleCare} />
+
       {/* Completion card */}
       <div className="glass-card glass-indigo rounded-3xl p-6">
         <div className="flex items-center justify-between">
@@ -11046,7 +11153,7 @@ function ConquistasTab() {
       // e marcos contabilizados acima.
       try {
         const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
-        if (w.ok) setSaldo(w.balance);
+        if (w.ok) setSaldo(w.careMode ? null : w.balance);
       } catch {
         /* saldo é secundário: falha não quebra a aba */
       }

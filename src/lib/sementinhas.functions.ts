@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb, type SementinhasLedgerRow } from "@/integrations/supabase/types.extended";
+import { isCareModeActive } from "@/lib/care-mode.functions";
 
 /**
  * Sementinhas 🌱 — moeda de recompensa da paciente.
@@ -86,14 +87,18 @@ export const claimDailyAndGetWallet = createServerFn({ method: "POST" })
     const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (error || !u.user) return { ok: false as const, error: "Não autenticado" };
     const uid = u.user.id;
-    await grantSementinhas(db, uid, [
-      {
-        amount: SEMENTINHAS.dailyCheckin,
-        reason: "Check-in de hoje",
-        dedupeKey: `checkin:${todayKeySaoPaulo()}`,
-      },
-    ]);
-    return { ok: true as const, ...(await walletPayload(db, uid)) };
+    // Modo Cuidado: não concede nem comemora; só devolve o saldo que já existe.
+    const careMode = await isCareModeActive(supabaseAdmin, uid);
+    if (!careMode) {
+      await grantSementinhas(db, uid, [
+        {
+          amount: SEMENTINHAS.dailyCheckin,
+          reason: "Check-in de hoje",
+          dedupeKey: `checkin:${todayKeySaoPaulo()}`,
+        },
+      ]);
+    }
+    return { ok: true as const, careMode, ...(await walletPayload(db, uid)) };
   });
 
 /** Só lê a carteira (sem conceder nada). */

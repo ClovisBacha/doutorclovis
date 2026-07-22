@@ -870,7 +870,8 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
         const token = s.session?.access_token;
         if (!token) return;
         const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
-        if (w.ok) setSaldo(w.balance);
+        // Modo Cuidado: esconde a barra de moeda (não celebra).
+        if (w.ok) setSaldo(w.careMode ? null : w.balance);
       } catch {
         /* saldo é secundário */
       }
