@@ -72,6 +72,15 @@ export type CorporateAccountRow = {
   created_at: string;
 };
 
+export type SementinhasLedgerRow = {
+  id: string;
+  user_id: string;
+  amount: number;
+  reason: string;
+  dedupe_key: string | null;
+  created_at: string;
+};
+
 // Typed helper that casts the Supabase admin client to support new tables.
 // Usage: `const db = typedDb(supabaseAdmin);`
 export function typedDb(client: SupabaseClient) {
@@ -83,5 +92,6 @@ export function typedDb(client: SupabaseClient) {
     from(table: "preventive_reminders"): ReturnType<SupabaseClient["from"]>;
     from(table: "corporate_leads"): ReturnType<SupabaseClient["from"]>;
     from(table: "corporate_accounts"): ReturnType<SupabaseClient["from"]>;
+    from(table: "sementinhas_ledger"): ReturnType<SupabaseClient["from"]>;
   };
 }

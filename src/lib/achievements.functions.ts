@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
+import { computeGestation } from "@/lib/gestacao";
+import { grantSementinhas, SEMENTINHAS, BIG_ACHIEVEMENTS } from "@/lib/sementinhas.functions";
 
 export type AchievementDef = {
   key: string;
@@ -148,7 +150,7 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     const { data: profile } = await db
       .from("patient_profiles")
       .select(
-        "display_name, lmp_date, reference_date, blood_type, emergency_contact, emergency_phone, height_cm, pre_pregnancy_weight_kg",
+        "display_name, lmp_date, reference_date, reference_weeks, reference_days, blood_type, emergency_contact, emergency_phone, height_cm, pre_pregnancy_weight_kg",
       )
       .eq("id", uid)
       .single();
@@ -227,6 +229,48 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
         { onConflict: "user_id,achievement_key", ignoreDuplicates: true },
       );
     }
+
+    // 🌱 Sementinhas: recompensa por conquistas + marcos de semana/trimestre.
+    // Tudo idempotente (dedupe_key), então rodar a cada checagem se auto-corrige
+    // sem conceder em dobro. Ganho só por ação/educação/marco — nunca por
+    // resultado clínico.
+    const titleByKey = new Map(ACHIEVEMENT_DEFS.map((d) => [d.key, d.title]));
+    const grants: { amount: number; reason: string; dedupeKey: string | null }[] = toAward.map(
+      (key) => ({
+        amount: BIG_ACHIEVEMENTS.has(key)
+          ? SEMENTINHAS.achievementBig
+          : SEMENTINHAS.achievementDefault,
+        reason: `Conquista: ${titleByKey.get(key) ?? key}`,
+        dedupeKey: `achievement:${key}`,
+      }),
+    );
+    const gest = computeGestation({
+      lmp: profile?.lmp_date ?? null,
+      referenceDate: profile?.reference_date ?? null,
+      referenceWeeks: profile?.reference_weeks ?? null,
+      referenceDays: profile?.reference_days ?? null,
+    });
+    if (gest) {
+      // Marco da semana atual: presente por avançar, não por performance.
+      grants.push({
+        amount: SEMENTINHAS.weekMilestone,
+        reason: `Semana ${gest.weeks} 🎉`,
+        dedupeKey: `week:${gest.weeks}`,
+      });
+      if (gest.weeks >= 13)
+        grants.push({
+          amount: SEMENTINHAS.trimesterMilestone,
+          reason: "Fim do 1º trimestre 🎊",
+          dedupeKey: "trimester:1",
+        });
+      if (gest.weeks >= 27)
+        grants.push({
+          amount: SEMENTINHAS.trimesterMilestone,
+          reason: "Fim do 2º trimestre 🎊",
+          dedupeKey: "trimester:2",
+        });
+    }
+    await grantSementinhas(db, uid, grants);
 
     const { data: rows } = await db
       .from("patient_achievements")

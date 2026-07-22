@@ -62,6 +62,7 @@ import {
   ACHIEVEMENT_DEFS,
   type AchievementDef,
 } from "@/lib/achievements.functions";
+import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
   searchDoctors,
@@ -11019,6 +11020,7 @@ function ConquistasTab() {
   const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [newBadges, setNewBadges] = useState<string[]>([]);
+  const [saldo, setSaldo] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -11027,15 +11029,22 @@ function ConquistasTab() {
         setLoading(false);
         return;
       }
-      const res = await checkAndAwardAchievements({
-        data: { accessToken: s.session.access_token },
-      });
+      const token = s.session.access_token;
+      const res = await checkAndAwardAchievements({ data: { accessToken: token } });
       if (res.ok) {
         setUnlocked(res.unlocked);
         const recent = res.unlocked
           .filter((a) => Date.now() - new Date(a.unlocked_at).getTime() < 30000)
           .map((a) => a.achievement_key);
         setNewBadges(recent);
+      }
+      // Concede o check-in do dia (idempotente) e lê o saldo já com conquistas
+      // e marcos contabilizados acima.
+      try {
+        const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
+        if (w.ok) setSaldo(w.balance);
+      } catch {
+        /* saldo é secundário: falha não quebra a aba */
       }
       setLoading(false);
     })();
@@ -11058,6 +11067,29 @@ function ConquistasTab() {
 
   return (
     <div className="space-y-8">
+      {saldo != null && (
+        <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">
+                Suas Sementinhas
+              </p>
+              <p className="mt-1 flex items-baseline gap-1.5 font-serif text-3xl text-emerald-900">
+                <span className="tabular-nums">{saldo}</span>
+                <span className="text-2xl">🌱</span>
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-700/80">
+                Você ganha cuidando de você, aprendendo e avançando na jornada.
+              </p>
+            </div>
+            <div className="text-4xl">🌱</div>
+          </div>
+          <p className="mt-3 rounded-2xl bg-white/60 px-3 py-2 text-[11px] text-emerald-800/80">
+            Em breve você vai poder usar suas Sementinhas para montar o seu Cantinho. 💛
+          </p>
+        </div>
+      )}
+
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center justify-between">
           <div>
