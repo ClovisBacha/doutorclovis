@@ -12270,7 +12270,9 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   if (loading) return <TabSkeleton />;
 
   const ownedSet = new Set(owned);
-  const ownedItems = CANTINHO_ITEMS.filter((i) => ownedSet.has(i.id));
+  // A cena mostra só decorações que a paciente REALMENTE possui — cenários
+  // (fundo) são papel de parede, não entram como emoji na cena.
+  const ownedItems = CANTINHO_ITEMS.filter((i) => ownedSet.has(i.id) && i.type !== "fundo");
   const shopItems = CANTINHO_ITEMS.filter((i) => cat === "all" || i.type === cat);
 
   async function buy(itemId: string, price: number) {

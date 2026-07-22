@@ -743,97 +743,6 @@ function TaskRing({ done, color }: { done: number; color: string }) {
   );
 }
 
-/* ── Pezinhos de bebê no trecho já percorrido ──
-   Entre duas moedas consecutivas COMPLETADAS, uma trilha de pegadas
-   minúsculas alternando pé esquerdo/direito, rotacionadas na direção
-   da caminhada — como se o bebê tivesse passado ali. */
-
-type Footstep = {
-  x: number; // left em %
-  y: number; // top em px
-  angle: number; // direção da caminhada em graus
-  left: boolean; // pé esquerdo (espelhado)
-  delay: number; // ms — os passos "acontecem" em sequência
-  color: string;
-  id: string;
-};
-
-function BabyFootprint({ color }: { color: string }) {
-  // Pezinho como a referência: planta em gota + dedão interno + 4 dedinhos.
-  // Sombra é uma elipse no próprio SVG (bem mais barata que filter:drop-shadow
-  // em ~1000 pegadas no pior caso de jornada completa).
-  return (
-    <svg viewBox="0 0 20 28" className="h-[13px] w-auto" aria-hidden>
-      <ellipse cx="11" cy="19" rx="6.8" ry="8.8" fill="rgba(0,0,0,0.14)" />
-      <ellipse cx="10.5" cy="18" rx="6.5" ry="8.6" fill={color} />
-      <ellipse cx="9" cy="15" rx="4" ry="5" fill="rgba(255,255,255,0.28)" />
-      <circle cx="16" cy="7.6" r="3" fill={color} />
-      <circle cx="10.6" cy="5.4" r="2.2" fill={color} />
-      <circle cx="6.2" cy="6" r="1.9" fill={color} />
-      <circle cx="2.6" cy="7.8" r="1.6" fill={color} />
-      <circle cx="1.4" cy="10.2" r="1.3" fill={color} />
-    </svg>
-  );
-}
-
-/** Gera as pegadas entre pares consecutivos de nós já percorridos. */
-function buildFootsteps(
-  nodes: JourneyNode[],
-  doneDays: number[],
-  lessonsDoneWeeks: number[],
-  pathWidthPx: number,
-): Footstep[] {
-  const walkable = nodes.filter(
-    (n): n is Extract<JourneyNode, { kind: "day" | "album-week" | "lesson" }> =>
-      n.kind === "day" || n.kind === "album-week" || n.kind === "lesson",
-  );
-  const walked = (n: (typeof walkable)[number]) =>
-    n.kind === "album-week" ||
-    (n.kind === "lesson" ? lessonsDoneWeeks.includes(n.week) : doneDays.includes(n.D));
-
-  const steps: Footstep[] = [];
-  for (let i = 0; i < walkable.length - 1; i++) {
-    const a = walkable[i];
-    const b = walkable[i + 1];
-    // Só linhas adjacentes (sem cruzar pill de semana ou banner de fase)
-    if (b.y - a.y > 118) continue;
-    if (!walked(a) || !walked(b)) continue;
-
-    const dxPx = ((b.x - a.x) / 100) * pathWidthPx;
-    const dyPx = b.y - a.y;
-    const len = Math.hypot(dxPx, dyPx);
-    if (len < 60) continue;
-    const angle = (Math.atan2(dyPx, dxPx) * 180) / Math.PI + 90;
-    // perpendicular unitária (para afastar pé esquerdo/direito da linha)
-    const px = -dyPx / len;
-    const py = dxPx / len;
-    const week = a.week;
-    const color = `color-mix(in oklab, ${trimMeta(week).main} 52%, white)`;
-
-    // 4 passos entre as bordas das moedas (raio ~34px de folga)
-    const t0 = Math.min(0.42, 40 / len);
-    const t1 = 1 - t0;
-    const count = 4;
-    // Identidade estável do segmento: completar um dia antigo não desloca
-    // as keys das pegadas seguintes (evita saltos/re-animação indevida)
-    const segId = a.kind === "day" ? `d${a.D}` : a.kind === "lesson" ? `l${a.week}` : `w${a.week}`;
-    for (let s = 0; s < count; s++) {
-      const t = t0 + ((t1 - t0) * s) / (count - 1);
-      const side = s % 2 === 0 ? 1 : -1;
-      steps.push({
-        x: a.x + (b.x - a.x) * t + ((px * side * 7) / pathWidthPx) * 100,
-        y: a.y + dyPx * t + py * side * 7,
-        angle,
-        left: side === 1,
-        delay: s * 140,
-        color,
-        id: `${segId}-${s}`,
-      });
-    }
-  }
-  return steps;
-}
-
 /* ══════════════════════════════ Componente ══════════════════════════════ */
 
 export function GestacaoPath({
@@ -1036,22 +945,7 @@ export function GestacaoPath({
     [phases, journeyStartD],
   );
 
-  // Largura real do caminho (px) — necessária para ângulo/afastamento das pegadas,
-  // já que os nós posicionam left em % e top em px
   const pathRef = useRef<HTMLDivElement>(null);
-  const [pathW, setPathW] = useState(390);
-  useEffect(() => {
-    const measure = () => setPathW(pathRef.current?.clientWidth || 390);
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  const lessonsDoneWeeks = useMemo(() => Object.keys(lessonsDone).map(Number), [lessonsDone]);
-  const footsteps = useMemo(
-    () => buildFootsteps(nodes, doneDays, lessonsDoneWeeks, pathW),
-    [nodes, doneDays, lessonsDoneWeeks, pathW],
-  );
 
   // Centraliza o nó de HOJE na tela ao abrir (scroll da própria página)
   useEffect(() => {
@@ -1706,24 +1600,6 @@ export function GestacaoPath({
             </span>
           );
         })}
-        {/* Pegadas do bebê no trecho já percorrido (atrás das moedas) */}
-        {footsteps.map((f) => (
-          <div
-            key={f.id}
-            className="pointer-events-none absolute select-none"
-            style={{
-              left: `${f.x}%`,
-              top: `${f.y}px`,
-              transform: `translate(-50%,-50%) rotate(${f.angle}deg)${f.left ? " scaleX(-1)" : ""}`,
-            }}
-            aria-hidden
-          >
-            <span className="dc-step inline-block" style={{ animationDelay: `${f.delay}ms` }}>
-              <BabyFootprint color={f.color} />
-            </span>
-          </div>
-        ))}
-
         {nodes.map((node) => {
           if (node.kind === "phase-banner") {
             const p = node.phase;
