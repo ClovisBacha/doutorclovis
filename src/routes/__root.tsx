@@ -243,6 +243,51 @@ export function storedAffiliateCode(): string | null {
   }
 }
 
+/**
+ * Indicação entre pacientes: qualquer página aberta com ?amiga=CODIGO guarda o
+ * código por 60 dias — na 1ª visita logada vira a atribuição da indicação.
+ * Primeiro código vence (não deixa um link posterior roubar a indicação).
+ */
+function useReferralCapture() {
+  useEffect(() => {
+    try {
+      const code = new URLSearchParams(window.location.search).get("amiga");
+      if (!code || !/^[a-zA-Z0-9]{3,12}$/.test(code)) return;
+      const KEY = "obst_amiga";
+      const existing = localStorage.getItem(KEY);
+      if (existing) {
+        const parsed = JSON.parse(existing) as { code?: string; at?: number };
+        if (parsed?.code && Date.now() - (parsed.at ?? 0) < 60 * 86400000) return;
+      }
+      localStorage.setItem(KEY, JSON.stringify({ code: code.toUpperCase(), at: Date.now() }));
+    } catch {
+      /* storage indisponível — sem atribuição */
+    }
+  }, []);
+}
+
+/** Lê o código de indicação de amiga (≤60 dias) guardado no navegador. */
+export function storedReferralCode(): string | null {
+  try {
+    const raw = localStorage.getItem("obst_amiga");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { code?: string; at?: number };
+    if (!parsed?.code || Date.now() - (parsed.at ?? 0) > 60 * 86400000) return null;
+    return parsed.code;
+  } catch {
+    return null;
+  }
+}
+
+/** Limpa o código de indicação após a atribuição (evita re-tentar sempre). */
+export function clearStoredReferralCode(): void {
+  try {
+    localStorage.removeItem("obst_amiga");
+  } catch {
+    /* ignore */
+  }
+}
+
 // Captura o evento beforeinstallprompt para mostrar banner customizado depois
 let deferredInstallPrompt: Event | null = null;
 if (typeof window !== "undefined") {
@@ -274,6 +319,7 @@ function useScrollToTop() {
 function SiteShell() {
   useSWRegistration();
   useAffiliateCapture();
+  useReferralCapture();
   useScrollToTop();
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
