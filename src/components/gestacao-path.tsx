@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
+import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import {
   quizForDay,
   quizEmojiForDay,
@@ -845,6 +846,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
   const [journeyStart, setJourneyStart] = useState<JourneyStart | null>(null);
   const [stickers, setStickers] = useState<number[]>([]);
   const [doneDays, setDoneDays] = useState<number[]>([]);
+  const [saldo, setSaldo] = useState<number | null>(null);
   const [checkin, setCheckin] = useState<Checkin>({ last: "", streak: 0 });
   const [dayTasks, setDayTasks] = useState<Record<string, boolean>>({});
   // Estado dedicado do dia de HOJE: alimenta o anel segmentado sem vazar o
@@ -857,6 +859,23 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
   // Aparelho novo (sem nada local) esperando a jornada vir da nuvem: mostra um
   // aviso sutil em vez de piscar "zerado" (e o pull tem retry se a rede falhar).
   const [syncing, setSyncing] = useState(false);
+
+  // Sementinhas 🌱: concede o check-in do dia (idempotente) e lê o saldo p/ a
+  // barra do topo. Falha é silenciosa (moeda é secundária ao Caminho).
+  useEffect(() => {
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        const token = s.session?.access_token;
+        if (!token) return;
+        const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
+        if (w.ok) setSaldo(w.balance);
+      } catch {
+        /* saldo é secundário */
+      }
+    })();
+  }, []);
 
   // Lazy init: evita flash da tela errada no primeiro render (rota é ssr:false)
   const [birth, setBirth] = useState<Birth | null>(() => lsGet<Birth | null>(LS.birth, null));
@@ -1558,6 +1577,15 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
           <span className="text-xl">🏆</span>
           <span className="text-lg font-extrabold text-violet-500">{stickers.length}</span>
         </div>
+        {saldo != null && (
+          <>
+            <div className="h-6 w-px bg-slate-200" />
+            <div className="flex items-center gap-1.5" title="Suas Sementinhas">
+              <span className="text-xl">🌱</span>
+              <span className="text-lg font-extrabold text-emerald-500">{saldo}</span>
+            </div>
+          </>
+        )}
       </div>
 
       {!checkedToday && (
