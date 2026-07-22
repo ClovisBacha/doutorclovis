@@ -74,6 +74,11 @@ import {
 import { getCantinho, buyCantinhoItem, setCantinhoFundo } from "@/lib/cantinho.functions";
 import { getInstagramShare, setInstagramHandle } from "@/lib/instagram.functions";
 import { getRatingReward, claimRatingReward } from "@/lib/rating.functions";
+import {
+  getMyTestimonial,
+  submitTestimonial,
+  type TestimonialStatus,
+} from "@/lib/testimonials.functions";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
@@ -11989,6 +11994,131 @@ function RatingRewardCard({ onEarned }: { onEarned: (n: number) => void }) {
   );
 }
 
+/**
+ * Card "Deixe seu depoimento". A paciente escreve; o Dr. Clóvis aprova no
+ * painel → ela ganha 100 🌱 (uma vez) e o texto pode ir pra página pública.
+ * Mostra o status (em análise / publicado / recusado) e permite editar.
+ */
+function TestimonialCard() {
+  const [status, setStatus] = useState<TestimonialStatus | null>(null);
+  const [body, setBody] = useState("");
+  const [name, setName] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const res = await getMyTestimonial({ data: { accessToken: s.session.access_token } });
+      if (res.ok) {
+        if (res.testimonial) {
+          setStatus(res.testimonial.status);
+          setBody(res.testimonial.body);
+          setName(res.testimonial.displayName ?? "");
+        }
+        setLoaded(true);
+      }
+    })();
+  }, []);
+
+  async function send() {
+    if (saving || body.trim().length < 10) return;
+    setSaving(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) {
+      setSaving(false);
+      return;
+    }
+    const res = await submitTestimonial({
+      data: { accessToken: s.session.access_token, body: body.trim(), displayName: name.trim() },
+    });
+    if (res.ok) {
+      setStatus("pending");
+      setEditing(false);
+      toast("Depoimento enviado! O Dr. Clóvis vai revisar 💛");
+    } else {
+      toast(res.error ?? "Não foi possível enviar");
+    }
+    setSaving(false);
+  }
+
+  if (!loaded) return null;
+
+  const statusBadge =
+    status === "approved" ? (
+      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
+        Publicado ✓ +100 🌱
+      </span>
+    ) : status === "pending" ? (
+      <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
+        Em análise pelo médico ⏳
+      </span>
+    ) : status === "rejected" ? (
+      <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
+        Não publicado — pode reescrever
+      </span>
+    ) : null;
+
+  // Já enviou e não está editando: mostra status + preview + botão editar.
+  const showForm = editing || !status;
+
+  return (
+    <div className="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">💬</span>
+          <p className="text-sm font-extrabold text-violet-700">Deixe seu depoimento</p>
+        </div>
+        {statusBadge}
+      </div>
+
+      {showForm ? (
+        <>
+          <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+            Conte como está sendo sua experiência 💜 Se o Dr. Clóvis aprovar, você ganha{" "}
+            <span className="font-bold">100 Sementinhas</span> e seu depoimento pode aparecer no
+            site.
+          </p>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value.slice(0, 600))}
+            rows={4}
+            placeholder="Escreva aqui seu depoimento..."
+            className="mt-3 w-full resize-none rounded-2xl border border-border bg-white p-3 text-sm outline-none focus:border-violet-400"
+          />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value.slice(0, 60))}
+            placeholder="Como quer aparecer (ex.: Mariana, mamãe da Alice)"
+            className="mt-2 w-full rounded-full border border-border bg-white px-4 py-2 text-sm outline-none focus:border-violet-400"
+          />
+          <button
+            onClick={send}
+            disabled={saving || body.trim().length < 10}
+            className="press mt-2 w-full rounded-full bg-violet-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
+          >
+            {status ? "Reenviar para análise" : "Enviar depoimento"}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="mt-3 rounded-2xl bg-white/70 p-3 text-sm italic leading-relaxed text-foreground/80">
+            “{body}”
+          </p>
+          <button
+            onClick={() => setEditing(true)}
+            className="press mt-2 text-xs font-bold text-violet-600"
+          >
+            Editar depoimento
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
@@ -12131,6 +12261,9 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
 
       {/* Ganhe avaliando o app (aparece só quando há loja publicada) */}
       {!careMode && <RatingRewardCard onEarned={(n) => setSaldo((s) => s + n)} />}
+
+      {/* Deixe seu depoimento (100 🌱 quando o médico aprova) */}
+      {!careMode && <TestimonialCard />}
 
       {/* Loja de itens */}
       <div>
