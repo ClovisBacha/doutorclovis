@@ -39,6 +39,19 @@ export const CANTINHO_CATEGORIES: { key: CantinhoType; label: string }[] = [
 ];
 
 export const CANTINHO_ITEMS: CantinhoItem[] = [
+  // ── Grátis (1) — cenário inicial, já vem com a paciente ─────────────
+  // "Sem graça de propósito": um fundo liso que só troca de cor com as
+  // semanas. Serve de ponto de partida pra dar gostinho de personalizar antes
+  // do 1º item comprado (a Suculenta, 30). Preço 0 => sempre possuído.
+  {
+    id: "fundo-simples",
+    name: "Fundo Suave",
+    emoji: "🎨",
+    price: 0,
+    type: "fundo",
+    premium: false,
+  },
+
   // ── Loja normal (10) — só Sementinhas ──────────────────────────────
   {
     id: "planta-suculenta",
@@ -240,3 +253,30 @@ export const CANTINHO_FUNDO_BG: Record<string, string> = {
   "fundo-estrelas": "linear-gradient(180deg,#1e2a5a 0%,#39306b 55%,#5b4b8a 100%)",
   "fundo-aurora": "linear-gradient(180deg,#0b2f3a 0%,#12664f 45%,#1f8a6b 80%,#0b2f3a 100%)",
 };
+
+/**
+ * Tons "sem graça" do Fundo Suave (grátis). Trocam com a semana pra dar a
+ * sensação de que "às vezes muda de cor", sem competir com os cenários pagos.
+ */
+const FUNDO_SIMPLES_TONS = [
+  "linear-gradient(180deg,#f6f7fb 0%,#eef1f7 100%)",
+  "linear-gradient(180deg,#f4f8f5 0%,#e8f1ec 100%)",
+  "linear-gradient(180deg,#fbf6f4 0%,#f3e9e5 100%)",
+  "linear-gradient(180deg,#f5f4fb 0%,#ebe9f5 100%)",
+  "linear-gradient(180deg,#f8f6f1 0%,#efeadf 100%)",
+  "linear-gradient(180deg,#f2f8fb 0%,#e4eff5 100%)",
+];
+
+/**
+ * Fundo aplicado no Caminho para um item `fundo`. O Fundo Suave (grátis) troca
+ * de tom pela semana; os demais usam o gradiente fixo do catálogo. `week` é a
+ * semana gestacional (opcional). Devolve null quando não há cenário.
+ */
+export function fundoBgFor(id: string | null | undefined, week?: number | null): string | null {
+  if (!id) return null;
+  if (id === "fundo-simples") {
+    const w = Number.isFinite(week) ? Math.max(0, Math.floor(week as number)) : 0;
+    return FUNDO_SIMPLES_TONS[w % FUNDO_SIMPLES_TONS.length];
+  }
+  return CANTINHO_FUNDO_BG[id] ?? null;
+}
