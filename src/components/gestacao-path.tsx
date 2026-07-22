@@ -899,8 +899,8 @@ export function GestacaoPath({
         const c = await getCantinho({ data: { accessToken: token } });
         if (c.ok) {
           setDecor(c.owned.filter((id) => CANTINHO_BY_ID[id]?.type !== "fundo"));
-          const fundo = c.owned.filter((id) => CANTINHO_FUNDO_BG[id]).at(-1);
-          setFundoBg(fundo ? CANTINHO_FUNDO_BG[fundo] : null);
+          // Cenário = o fundo EQUIPADO (escolhido na loja).
+          setFundoBg(c.equippedFundo ? (CANTINHO_FUNDO_BG[c.equippedFundo] ?? null) : null);
         }
       } catch {
         /* saldo é secundário */

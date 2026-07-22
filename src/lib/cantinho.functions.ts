@@ -34,14 +34,16 @@ export const getCantinho = createServerFn({ method: "POST" })
     const { data: owned } = await db.from("cantinho_items").select("item_id").eq("user_id", uid);
     const { data: prof } = await supabaseAdmin
       .from("patient_profiles")
-      .select("quiz_premium")
+      .select("quiz_premium, cantinho_fundo")
       .eq("id", uid)
       .single();
+    const p = prof as { quiz_premium?: boolean; cantinho_fundo?: string | null } | null;
     return {
       ok: true as const,
       balance,
       owned: ((owned ?? []) as { item_id: string }[]).map((r) => r.item_id),
-      premium: Boolean((prof as { quiz_premium?: boolean } | null)?.quiz_premium),
+      premium: Boolean(p?.quiz_premium),
+      equippedFundo: p?.cantinho_fundo ?? null,
     };
   });
 
@@ -89,4 +91,39 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
       return { ok: false as const, error: msg, balance: r.balance ?? 0 };
     }
     return { ok: true as const, balance: r.balance ?? 0, itemId: item.id };
+  });
+
+/** Equipa (ou limpa, com null) o cenário ativo do Cantinho. Só 1 por vez. */
+export const setCantinhoFundo = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), fundoId: z.string().max(80).nullable() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const uid = await authUid(data.accessToken);
+    if (!uid) return { ok: false as const, error: "Não autenticado" };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.fundoId) {
+      const item = CANTINHO_BY_ID[data.fundoId];
+      if (!item || item.type !== "fundo") return { ok: false as const, error: "Cenário inválido" };
+      // Precisa possuir o item pra equipar.
+      const db = typedDb(supabaseAdmin);
+      const { data: owned } = await db
+        .from("cantinho_items")
+        .select("item_id")
+        .eq("user_id", uid)
+        .eq("item_id", data.fundoId)
+        .maybeSingle();
+      if (!owned) return { ok: false as const, error: "Você ainda não tem este cenário" };
+    }
+    const { error: upErr } = await (
+      supabaseAdmin.from("patient_profiles") as unknown as {
+        update: (v: { cantinho_fundo: string | null }) => {
+          eq: (c: string, val: string) => Promise<{ error: unknown }>;
+        };
+      }
+    )
+      .update({ cantinho_fundo: data.fundoId })
+      .eq("id", uid);
+    if (upErr) return { ok: false as const, error: "Falha ao salvar" };
+    return { ok: true as const, equippedFundo: data.fundoId };
   });

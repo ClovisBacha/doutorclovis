@@ -64,7 +64,7 @@ import {
 } from "@/lib/achievements.functions";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import { CANTINHO_ITEMS, CANTINHO_CATEGORIES, type CantinhoType } from "@/lib/cantinho";
-import { getCantinho, buyCantinhoItem } from "@/lib/cantinho.functions";
+import { getCantinho, buyCantinhoItem, setCantinhoFundo } from "@/lib/cantinho.functions";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
@@ -11762,6 +11762,7 @@ function CantinhoTab() {
   const [saldo, setSaldo] = useState(0);
   const [owned, setOwned] = useState<string[]>([]);
   const [premium, setPremium] = useState(false);
+  const [equipped, setEquipped] = useState<string | null>(null);
   const [cat, setCat] = useState<CantinhoType | "all">("all");
   const [buying, setBuying] = useState<string | null>(null);
 
@@ -11777,10 +11778,27 @@ function CantinhoTab() {
         setSaldo(res.balance);
         setOwned(res.owned);
         setPremium(res.premium);
+        setEquipped(res.equippedFundo);
       }
       setLoading(false);
     })();
   }, []);
+
+  async function equipFundo(id: string | null) {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) return;
+    const prev = equipped;
+    setEquipped(id); // otimista
+    const res = await setCantinhoFundo({
+      data: { accessToken: s.session.access_token, fundoId: id },
+    });
+    if (!res.ok) {
+      setEquipped(prev);
+      toast(res.error ?? "Não foi possível trocar o cenário");
+    } else {
+      toast(id ? "Cenário aplicado! 🌄" : "Cenário removido");
+    }
+  }
 
   if (loading) return <TabSkeleton />;
 
@@ -11890,9 +11908,22 @@ function CantinhoTab() {
                 </span>
                 <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
                 {has ? (
-                  <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
-                    No cantinho ✓
-                  </span>
+                  i.type === "fundo" ? (
+                    <button
+                      onClick={() => equipFundo(equipped === i.id ? null : i.id)}
+                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
+                        equipped === i.id
+                          ? "bg-emerald-500 text-white"
+                          : "border border-emerald-300 text-emerald-700"
+                      }`}
+                    >
+                      {equipped === i.id ? "Em uso ✓" : "Usar"}
+                    </button>
+                  ) : (
+                    <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                      No cantinho ✓
+                    </span>
+                  )
                 ) : locked ? (
                   <span className="mt-2 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-600">
                     🌱 {i.price}
