@@ -2871,174 +2871,294 @@ function DailyQuizBlock({
   onEarn: () => void;
 }) {
   const questions = quiz.questions;
-  const [answers, setAnswers] = useState<QuizAnswer[]>(() => questions.map(() => null));
-  const [checked, setChecked] = useState(false);
-  // Congela "essa resposta valeu o desafio de hoje" no momento do Responder:
-  // onEarn marca a tarefa e flipa alreadyDone no MESMO render, então o rodapé
-  // não pode depender do prop ao vivo (viraria "modo revisão" na hora).
-  const [earnedNow, setEarnedNow] = useState(false);
   const tm = trimMeta(week);
   const total = questions.length;
-  const score = checked ? questions.filter((q, i) => isAnswerCorrect(q, answers[i])).length : 0;
 
-  // "Marque todas": alterna o índice dentro do array de respostas.
-  function toggleMulti(qi: number, oi: number) {
-    setAnswers((prev) => {
-      const next = [...prev];
-      const cur = Array.isArray(next[qi]) ? [...(next[qi] as number[])] : [];
-      const at = cur.indexOf(oi);
-      if (at >= 0) cur.splice(at, 1);
-      else cur.push(oi);
-      next[qi] = cur;
-      return next;
-    });
+  const [open, setOpen] = useState(false);
+  const [phase, setPhase] = useState<"intro" | "quiz" | "done">("intro");
+  const [qIndex, setQIndex] = useState(0);
+  const [answers, setAnswers] = useState<QuizAnswer[]>(() => questions.map(() => null));
+  const [checked, setChecked] = useState(false);
+  const [earnedNow, setEarnedNow] = useState(false);
+  const earnedRef = useRef(false);
+
+  const q = questions[qIndex];
+  const isMulti = q ? isMultiQuestion(q) : false;
+  const cur = answers[qIndex];
+  const score = questions.filter((qq, i) => isAnswerCorrect(qq, answers[i])).length;
+  const progressPct =
+    phase === "done" ? 100 : phase === "intro" ? 4 : Math.round((qIndex / total) * 100);
+  const isSel = (oi: number) => (Array.isArray(cur) ? cur.includes(oi) : cur === oi);
+  const canVerify = isMulti ? Array.isArray(cur) && cur.length > 0 : cur != null;
+
+  function begin() {
+    setOpen(true);
+    setPhase("intro");
+    setQIndex(0);
+    setAnswers(questions.map(() => null));
+    setChecked(false);
   }
 
-  const allAnswered = answers.every((a, i) =>
-    isMultiQuestion(questions[i]) ? Array.isArray(a) && a.length > 0 : a != null,
-  );
-
-  function verify() {
-    setChecked(true);
-    if (canEarn && !alreadyDone) {
-      setEarnedNow(true);
-      onEarn();
+  function startQuiz() {
+    setPhase("quiz");
+    setQIndex(0);
+    if (alreadyDone) {
+      setAnswers(questions.map((qq) => qq.a)); // revisão: pré-preenche o gabarito
+      setChecked(true);
+    } else {
+      setChecked(false);
     }
   }
 
-  const selected = (qi: number, oi: number) => {
-    const a = answers[qi];
-    return Array.isArray(a) ? a.includes(oi) : a === oi;
-  };
-
-  return (
-    <div className="mb-4 rounded-2xl border border-violet-100 bg-violet-50 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
-          {emoji} Aula de hoje · Semana {week}
-        </p>
-        {alreadyDone && !checked && (
-          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-500">
-            revisão
-          </span>
-        )}
-      </div>
-      <p className="mt-2 text-sm leading-relaxed text-violet-950">{quiz.teach}</p>
-
-      {quiz.funFact && (
-        <div className="mt-2.5 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
-          <span className="font-bold">💡 Você sabia?</span> {quiz.funFact}
-        </div>
-      )}
-
-      {questions.map((q, qi) => {
-        const isMulti = isMultiQuestion(q);
-        const correct = isAnswerCorrect(q, answers[qi]);
-        return (
-          <div key={qi} className="mt-3">
-            <p className="text-sm font-bold text-violet-950">
-              {qi + 1}. {q.q}
-            </p>
-            {isMulti && (
-              <p className="mt-0.5 text-[11px] font-semibold text-violet-500">
-                Marque todas as corretas
-              </p>
-            )}
-            <div className="mt-1.5 flex flex-col gap-1.5">
-              {q.o.map((opt, oi) => {
-                const isCorrectOpt = Array.isArray(q.a) ? q.a.includes(oi) : q.a === oi;
-                const isPicked = selected(qi, oi);
-                let cls = "border-violet-200 bg-white text-violet-950";
-                if (checked) {
-                  if (isCorrectOpt) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
-                  else if (isPicked) cls = "border-rose-300 bg-rose-50 text-rose-700";
-                  else cls = "border-violet-100 bg-white text-slate-400";
-                } else if (isPicked) {
-                  cls = "border-violet-500 bg-violet-100 text-violet-900";
-                }
-                return (
-                  <button
-                    key={oi}
-                    disabled={checked}
-                    onClick={() => (isMulti ? toggleMulti(qi, oi) : setAnswerAt(qi, oi))}
-                    className={`press flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-left text-sm font-medium transition-colors ${cls}`}
-                  >
-                    {isMulti && (
-                      <span
-                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 text-[10px] ${
-                          isPicked
-                            ? "border-violet-500 bg-violet-500 text-white"
-                            : "border-violet-300 bg-white"
-                        }`}
-                      >
-                        {isPicked ? "✓" : ""}
-                      </span>
-                    )}
-                    <span>{opt}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {checked && (
-              <p
-                className={`mt-1.5 rounded-xl px-3 py-2 text-xs leading-relaxed ${
-                  correct ? "bg-emerald-100/70 text-emerald-800" : "bg-amber-100/70 text-amber-800"
-                }`}
-              >
-                {correct ? "✓ Isso! " : "💡 "}
-                {q.why}
-              </p>
-            )}
-          </div>
-        );
-      })}
-
-      {!checked ? (
-        <button
-          onClick={verify}
-          disabled={!allAnswered}
-          className="press mt-4 w-full rounded-full py-3 text-sm font-extrabold text-white disabled:opacity-40"
-          style={{ background: tm.main, boxShadow: `0 4px 0 ${tm.lip}` }}
-        >
-          Responder
-        </button>
-      ) : (
-        <>
-          <div className="mt-3 rounded-2xl bg-white p-3 text-center">
-            <p className="text-sm font-extrabold">
-              {score === total
-                ? "🏆 Acertou tudo!"
-                : score >= total - 1
-                  ? "🎉 Quase perfeito!"
-                  : score > 0
-                    ? "👏 Muito bem!"
-                    : "💪 Anotado!"}{" "}
-              {score}/{total}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {earnedNow
-                ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
-                : "Modo revisão — o desafio vale no próprio dia, mas aprender vale sempre 💜"}
-            </p>
-          </div>
-          {showPremiumAd && (
-            <div className="mt-3">
-              <QuizPaywall week={week} context="ad" />
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-
-  // Escolha única: define a resposta do quiz qi.
-  function setAnswerAt(qi: number, oi: number) {
+  function pick(oi: number) {
+    if (checked) return;
     setAnswers((prev) => {
       const next = [...prev];
-      next[qi] = oi;
+      if (isMulti) {
+        const arr = Array.isArray(next[qIndex]) ? [...(next[qIndex] as number[])] : [];
+        const at = arr.indexOf(oi);
+        if (at >= 0) arr.splice(at, 1);
+        else arr.push(oi);
+        next[qIndex] = arr;
+      } else {
+        next[qIndex] = oi;
+      }
       return next;
     });
   }
+
+  function next() {
+    if (qIndex + 1 >= total) {
+      setPhase("done");
+      if (canEarn && !alreadyDone && !earnedRef.current) {
+        earnedRef.current = true;
+        setEarnedNow(true);
+        onEarn();
+      }
+      return;
+    }
+    setQIndex((i) => i + 1);
+    setChecked(alreadyDone);
+  }
+
+  return (
+    <>
+      {/* Card de entrada (abre a experiência em tela cheia) */}
+      <div className="mb-4 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="duo3d flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl"
+            style={{ background: tm.main, "--lip": tm.lip } as React.CSSProperties}
+          >
+            {alreadyDone ? "⭐" : emoji}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
+              Aula de hoje · Semana {week}
+            </p>
+            <p className="line-clamp-1 text-sm font-bold text-violet-950">
+              {quiz.teach.split(". ")[0]}.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={begin}
+          className="press mt-3 w-full rounded-full py-3 text-sm font-extrabold text-white"
+          style={{ background: tm.main, boxShadow: `0 4px 0 ${tm.lip}` }}
+        >
+          {alreadyDone ? "Revisar a aula ⭐" : "Fazer a aula de hoje 📚"}
+        </button>
+        {missingHint && !alreadyDone && (
+          <p className="mt-2 text-center text-[11px] text-violet-500">{missingHint}</p>
+        )}
+      </div>
+
+      {/* Experiência em tela cheia (Duolingo) */}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-white"
+          style={{ paddingTop: "var(--safe-top)" }}
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Fechar"
+              className="press text-2xl leading-none text-slate-400"
+            >
+              ✕
+            </button>
+            <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-violet-500 transition-all duration-300"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 pb-4">
+            {phase === "intro" && (
+              <div>
+                <div className="mt-2 flex flex-col items-center text-center">
+                  <div
+                    className="duo3d flex h-20 w-20 items-center justify-center rounded-3xl text-4xl"
+                    style={{ background: tm.main, "--lip": tm.lip } as React.CSSProperties}
+                  >
+                    {emoji}
+                  </div>
+                  <p className="mt-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Aula de hoje · Semana {week}
+                    {alreadyDone && <span className="ml-1 text-amber-500">· revisão</span>}
+                  </p>
+                </div>
+                <div className="mt-4 rounded-2xl bg-violet-50 p-4">
+                  <p className="text-sm leading-relaxed text-violet-950">{quiz.teach}</p>
+                </div>
+                {quiz.funFact && (
+                  <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-800">
+                    <span className="font-bold">💡 Você sabia?</span> {quiz.funFact}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {phase === "quiz" && q && (
+              <div>
+                <p className="mt-4 text-xs font-bold uppercase tracking-wider text-violet-600">
+                  Pergunta {qIndex + 1} de {total}
+                </p>
+                <h3 className="mt-2 text-2xl font-extrabold leading-tight text-foreground">
+                  {q.q}
+                </h3>
+                {isMulti && (
+                  <p className="mt-1 text-[13px] font-semibold text-violet-500">
+                    Marque todas as corretas
+                  </p>
+                )}
+                <div className="mt-5 flex flex-col gap-3">
+                  {q.o.map((opt, oi) => {
+                    const isCorrectOpt = Array.isArray(q.a) ? q.a.includes(oi) : q.a === oi;
+                    const picked = isSel(oi);
+                    let cls = "border-slate-200 bg-white text-foreground";
+                    if (checked) {
+                      if (isCorrectOpt) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
+                      else if (picked) cls = "border-rose-400 bg-rose-50 text-rose-700";
+                      else cls = "border-slate-100 text-slate-400";
+                    } else if (picked) {
+                      cls = "border-violet-500 bg-violet-50 text-violet-900";
+                    }
+                    return (
+                      <button
+                        key={oi}
+                        disabled={checked}
+                        onClick={() => pick(oi)}
+                        className={`press flex items-center gap-3 rounded-2xl border-2 px-4 py-4 text-left text-base font-semibold transition-colors ${cls}`}
+                      >
+                        {isMulti && (
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-xs ${
+                              picked
+                                ? "border-violet-500 bg-violet-500 text-white"
+                                : "border-slate-300"
+                            }`}
+                          >
+                            {picked ? "✓" : ""}
+                          </span>
+                        )}
+                        <span>{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {checked && (
+                  <div
+                    className={`mt-4 rounded-2xl p-3 text-sm leading-relaxed ${
+                      isAnswerCorrect(q, cur)
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    <span className="font-bold">
+                      {isAnswerCorrect(q, cur) ? "✓ Isso! " : "💡 "}
+                    </span>
+                    {q.why}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {phase === "done" && (
+              <div className="mt-8 flex flex-col items-center text-center">
+                <p className="text-6xl">
+                  {score === total ? "🏆" : score >= total - 1 ? "🎉" : score > 0 ? "👏" : "💪"}
+                </p>
+                <h3 className="mt-3 text-2xl font-extrabold">
+                  {score === total
+                    ? "Acertou tudo!"
+                    : score >= total - 1
+                      ? "Quase perfeito!"
+                      : score > 0
+                        ? "Muito bem!"
+                        : "Anotado!"}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {score} de {total} acertos
+                </p>
+                <p className="mt-3 max-w-xs text-xs text-muted-foreground">
+                  {earnedNow
+                    ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
+                    : "Aprender vale sempre 💜"}
+                </p>
+                {showPremiumAd && (
+                  <div className="mt-4 w-full">
+                    <QuizPaywall week={week} context="ad" />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div
+            className="border-t border-slate-100 p-4"
+            style={{ paddingBottom: "calc(1rem + var(--safe-bottom))" }}
+          >
+            {phase === "intro" && (
+              <button
+                onClick={startQuiz}
+                className="press w-full rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white"
+              >
+                {alreadyDone ? "Revisar as respostas" : "Começar o quiz"}
+              </button>
+            )}
+            {phase === "quiz" && !checked && (
+              <button
+                onClick={() => setChecked(true)}
+                disabled={!canVerify}
+                className="press w-full rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white disabled:opacity-40"
+              >
+                Verificar
+              </button>
+            )}
+            {phase === "quiz" && checked && (
+              <button
+                onClick={next}
+                className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+              >
+                {qIndex + 1 >= total ? "Ver resultado" : "Continuar"}
+              </button>
+            )}
+            {phase === "done" && (
+              <button
+                onClick={() => setOpen(false)}
+                className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+              >
+                Voltar ao caminho
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 /* ══════════════════ PONTO 2 · Jornada do 4º trimestre ══════════════════ */
