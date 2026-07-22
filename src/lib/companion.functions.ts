@@ -59,5 +59,32 @@ export const getCompanionView = createServerFn({ method: "POST" })
     }
 
     if (!profile) return { ok: false as const, reason: "invalid" as const };
+
+    // Recompensa: a gestante ganha 100 🌱 quando o convite dela é REALMENTE
+    // usado (alguém abriu o link do acompanhante). Uma única vez por gestante
+    // (dedupe fixo), nunca em Modo Cuidado. Best-effort — nunca quebra a
+    // visualização do acompanhante se falhar.
+    try {
+      await rewardCompanionShare(invite.user_id);
+    } catch (e) {
+      console.error("[companion] reward failed", e);
+    }
+
     return { ok: true as const, profile: profile as CompanionView };
   });
+
+/** Concede 100 🌱 à gestante quando o link do acompanhante é aberto (1x). */
+async function rewardCompanionShare(uid: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { typedDb } = await import("@/integrations/supabase/types.extended");
+  const { grantSementinhas, SEMENTINHAS } = await import("@/lib/sementinhas.functions");
+  const { isCareModeActive } = await import("@/lib/care-mode.functions");
+  if (await isCareModeActive(supabaseAdmin, uid)) return;
+  await grantSementinhas(typedDb(supabaseAdmin), uid, [
+    {
+      amount: SEMENTINHAS.trimesterMilestone, // 100
+      reason: "Acompanhante convidado 💞",
+      dedupeKey: "companion_reward", // fixo → no máx. 1 por gestante
+    },
+  ]);
+}

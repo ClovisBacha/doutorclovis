@@ -1,10 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
-import { CANTINHO_BY_ID, CANTINHO_ITEMS } from "@/lib/cantinho";
+import {
+  CANTINHO_BY_ID,
+  CANTINHO_ITEMS,
+  CANTINHO_COMPLETIONIST_ID,
+  CANTINHO_COMPLETION_REQUIRED,
+  isCantinhoCollectionComplete,
+} from "@/lib/cantinho";
 
-/** Itens grátis (preço 0) — sempre possuídos, não precisam de compra. */
-const FREE_ITEM_IDS = CANTINHO_ITEMS.filter((i) => i.price <= 0).map((i) => i.id);
+/**
+ * Itens grátis (preço 0) — sempre possuídos, não precisam de compra. O troféu
+ * da coleção (também preço 0) é EXCLUÍDO: ele não é grátis, é desbloqueado ao
+ * completar a coleção.
+ */
+const FREE_ITEM_IDS = CANTINHO_ITEMS.filter(
+  (i) => i.price <= 0 && i.id !== CANTINHO_COMPLETIONIST_ID,
+).map((i) => i.id);
 /** Cenário grátis padrão, equipado quando a paciente ainda não escolheu nenhum. */
 const DEFAULT_FUNDO = "fundo-simples";
 
@@ -46,6 +58,10 @@ export const getCantinho = createServerFn({ method: "POST" })
     // Itens grátis entram como possuídos sempre (sem linha na tabela de compras).
     const ownedIds = new Set(((owned ?? []) as { item_id: string }[]).map((r) => r.item_id));
     for (const id of FREE_ITEM_IDS) ownedIds.add(id);
+    // Troféu da coleção: concedido (virtual) assim que tem todos os itens comuns.
+    const collectionComplete = isCantinhoCollectionComplete(ownedIds);
+    if (collectionComplete) ownedIds.add(CANTINHO_COMPLETIONIST_ID);
+    const collectionOwned = CANTINHO_COMPLETION_REQUIRED.filter((id) => ownedIds.has(id)).length;
     return {
       ok: true as const,
       balance,
@@ -53,6 +69,9 @@ export const getCantinho = createServerFn({ method: "POST" })
       premium: Boolean(p?.quiz_premium),
       // Sem escolha própria, começa com o cenário grátis (Caminho nunca fica em branco).
       equippedFundo: p?.cantinho_fundo ?? DEFAULT_FUNDO,
+      collectionComplete,
+      collectionOwned,
+      collectionTotal: CANTINHO_COMPLETION_REQUIRED.length,
     };
   });
 
@@ -66,6 +85,10 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
     if (!uid) return { ok: false as const, error: "Não autenticado" };
     const item = CANTINHO_BY_ID[data.itemId];
     if (!item) return { ok: false as const, error: "Item inexistente" };
+    // Troféu da coleção não se compra — desbloqueia ao completar a coleção.
+    if (item.id === CANTINHO_COMPLETIONIST_ID) {
+      return { ok: false as const, error: "Desbloqueia ao completar a coleção 👑" };
+    }
     // Item grátis não passa pela compra — já é da paciente desde o início.
     if (item.price <= 0) return { ok: false as const, error: "Este item já é seu 💛" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
