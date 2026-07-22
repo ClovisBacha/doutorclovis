@@ -172,3 +172,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_profiles_referral_code
 
 CREATE INDEX IF NOT EXISTS idx_patient_profiles_referred_by
   ON public.patient_profiles (referred_by);
+
+-- Anti-fraude: só a service role grava indicação (RLS é por linha, não coluna).
+REVOKE UPDATE (referred_by, referral_code) ON public.patient_profiles FROM authenticated;
