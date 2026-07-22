@@ -138,18 +138,23 @@ export const BABY_BY_WEEK: Record<
     desc: "Encaixe pélvico em muitos casos.",
   },
   39: { size: "50,7 cm", weight: "3,3 kg", fruit: "Melancia pequena", desc: "Termo completo!" },
-  40: { size: "51,2 cm", weight: "3,4 kg", fruit: "Abóbora moranga", desc: "Pronto para nascer." },
+  40: {
+    size: "51,2 cm",
+    weight: "3,4 kg",
+    fruit: "Abóbora moranga",
+    desc: "Pronto para chegar a qualquer momento — no tempo dele.",
+  },
   41: {
     size: "51,7 cm",
     weight: "3,6 kg",
     fruit: "Jaca pequena",
-    desc: "Pós-termo — acompanhamento próximo.",
+    desc: "Termo tardio — acompanhamento mais de pertinho, tudo sob cuidado.",
   },
   42: {
     size: "52,2 cm",
     weight: "3,7 kg",
     fruit: "Abóbora grande",
-    desc: "Pós-termo — avaliação frequente do bem-estar fetal e decisão sobre indução.",
+    desc: "Reta final — o bem-estar do bebê é acompanhado de perto pela sua equipe.",
   },
 };
 
@@ -270,4 +275,29 @@ export function retaFinalMensagem(weeks: number): RetaFinalMensagem | null {
       "Chegar às 42 semanas pede um acompanhamento mais próximo, e a sua equipe já está com um plano — isso não é sinal de problema, é cuidado extra para a reta final. Seu médico vai conversar com você sobre os próximos passos, como a indução. Faça todas as perguntas: essa decisão é sua, junto com quem cuida de você.",
     dica: "Cada dia de acompanhamento é um dia a mais garantindo que o encontro com seu bebê seja seguro e no tempo certo.",
   };
+}
+
+/**
+ * Versão robusta de {@link retaFinalMensagem}: unifica as duas "âncoras"
+ * temporais (idade gestacional por USG/DUM **e** a DPP salva) para evitar
+ * divergência. Se a DPP já passou, considera pelo menos a semana 40 e estima a
+ * faixa (41/42) pelos dias além da data — assim nunca sobra um estado sem
+ * mensagem (que mostraria a contagem congelada). Retorna `null` só quando
+ * ambos os relógios indicam antes da semana 40.
+ */
+export function retaFinalMensagemFor(opts: {
+  weeks: number;
+  dueDate: string | null;
+  now?: number;
+}): RetaFinalMensagem | null {
+  const now = opts.now ?? Date.now();
+  let eff = opts.weeks;
+  if (opts.dueDate) {
+    const dueMs = new Date(opts.dueDate + "T00:00:00").getTime();
+    if (now >= dueMs) {
+      const daysPast = Math.floor((now - dueMs) / 86400000);
+      eff = Math.max(eff, 40 + Math.floor(daysPast / 7));
+    }
+  }
+  return retaFinalMensagem(eff);
 }

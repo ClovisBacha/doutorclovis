@@ -31,7 +31,7 @@ import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
-import { babyForWeek } from "@/lib/gestacao";
+import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
 
 /* ================================================================
    Tipos
@@ -590,6 +590,8 @@ export function AppHomeScreen({
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
   const daysLeft = gest ? Math.max(0, 280 - gest.totalDays) : null;
+  // Reta final (40s+): substitui "É hoje!/Parto em 0 dias" perpétuo por acolhimento.
+  const reta = gest ? retaFinalMensagem(gest.weeks) : null;
   const trimestre = gest
     ? gest.weeks < 14
       ? "1º trimestre"
@@ -660,12 +662,20 @@ export function AppHomeScreen({
                 >
                   {trimestre}
                 </span>
-                {daysLeft != null && (
+                {reta ? (
                   <span
                     className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
                   >
-                    {daysLeft === 0 ? "É hoje! 🎉" : `Parto em ${daysLeft} dias 💛`}
+                    {reta.eyebrow} 💛
                   </span>
+                ) : (
+                  daysLeft != null && (
+                    <span
+                      className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                    >
+                      {daysLeft === 0 ? "É hoje! 🎉" : `Parto em ${daysLeft} dias 💛`}
+                    </span>
+                  )
                 )}
               </div>
 

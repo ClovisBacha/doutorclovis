@@ -1,7 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getCompanionView, type CompanionView as Profile } from "@/lib/companion.functions";
-import { babyForWeek, computeGestation, dueDateFromLmp, trimesterForWeek } from "@/lib/gestacao";
+import {
+  babyForWeek,
+  computeGestation,
+  dueDateFromLmp,
+  retaFinalMensagemFor,
+  trimesterForWeek,
+} from "@/lib/gestacao";
 import { getRecentPanicByToken } from "@/lib/escola.functions";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 
@@ -162,6 +168,8 @@ function CompanionView() {
   const daysLeft = dueDate
     ? Math.max(0, Math.ceil((dueDate.getTime() - today.getTime()) / 86_400_000))
     : null;
+  // Reta final (40s+): evita "0 dias para a DPP" perpétuo também pro acompanhante.
+  const reta = gest ? retaFinalMensagemFor({ weeks: gest.weeks, dueDate: due }) : null;
 
   const TABS: { id: PapaiTab; label: string }[] = [
     { id: "bebe", label: "Bebê" },
@@ -223,11 +231,18 @@ function CompanionView() {
         <p className="mt-1 text-muted-foreground">
           Semana <strong className="text-foreground">{gest.weeks}</strong>
           {gest.days > 0 && ` e ${gest.days} dias`}
-          {daysLeft !== null && (
+          {reta ? (
             <>
               {" "}
-              · <strong className="text-foreground">{daysLeft} dias</strong> para a DPP
+              · <strong className="text-foreground">{reta.eyebrow}</strong>
             </>
+          ) : (
+            daysLeft !== null && (
+              <>
+                {" "}
+                · <strong className="text-foreground">{daysLeft} dias</strong> para a DPP
+              </>
+            )
           )}
         </p>
       )}
@@ -308,8 +323,14 @@ function CompanionView() {
                     year: "numeric",
                   })}
                 </p>
-                {daysLeft !== null && (
-                  <p className="mt-1 text-xs text-primary font-medium">Faltam {daysLeft} dias 🎉</p>
+                {reta ? (
+                  <p className="mt-1 text-xs text-primary font-medium">{reta.titulo}</p>
+                ) : (
+                  daysLeft !== null && (
+                    <p className="mt-1 text-xs text-primary font-medium">
+                      Faltam {daysLeft} dias 🎉
+                    </p>
+                  )
                 )}
               </div>
             )}

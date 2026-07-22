@@ -27,7 +27,7 @@ import {
   computeGestation,
   consultaForWeek,
   dueDateFromLmp,
-  retaFinalMensagem,
+  retaFinalMensagemFor,
   trimesterForWeek,
 } from "@/lib/gestacao";
 import { BabyIllustration, BABY_TONES } from "@/components/baby-illustration";
@@ -946,7 +946,8 @@ function BabyTab({
   const exam = consultaForWeek(gest.weeks);
   const babyLabel = profile.baby_name ? profile.baby_name : "seu bebê";
   // Reta final (semanas 40-42+): substitui a contagem regressiva por acolhimento.
-  const reta = retaFinalMensagem(gest.weeks);
+  // Usa âncora unificada (idade gestacional + DPP) para nunca sobrar estado sem mensagem.
+  const reta = retaFinalMensagemFor({ weeks: gest.weeks, dueDate: due });
 
   const bpmDefault = profile.fetal_bpm ?? (gest.weeks < 14 ? 160 : gest.weeks < 28 ? 145 : 135);
 
@@ -8497,10 +8498,10 @@ function CountdownTab({
   const mins = Math.floor((totalSec % 3600) / 60);
   const secs = totalSec % 60;
   const progress = Math.min(100, (gest.totalDays / 280) * 100);
-  // Passou da DPP: troca a contagem regressiva (que ficaria em 00:00:00:00)
-  // por acolhimento embasado (semanas 40-42+), sem tom de "atraso".
-  const overdue = now >= dueMs && !isDueToday;
-  const reta = retaFinalMensagem(gest.weeks);
+  // Reta final: âncora unificada (idade gestacional + DPP). Havendo mensagem de
+  // reta e não sendo o dia da DPP, troca a contagem regressiva por acolhimento —
+  // nunca deixa a contagem congelada em 00:00:00:00.
+  const reta = retaFinalMensagemFor({ weeks: gest.weeks, dueDate: due });
 
   const lmpMs = profile.lmp_date
     ? new Date(profile.lmp_date + "T00:00:00").getTime()
@@ -8508,7 +8509,7 @@ function CountdownTab({
 
   return (
     <div className="space-y-8">
-      {overdue && reta ? (
+      {!isDueToday && reta ? (
         <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
             {reta.eyebrow}
