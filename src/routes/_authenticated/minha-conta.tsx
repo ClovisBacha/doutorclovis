@@ -871,6 +871,7 @@ function MinhaContaPage() {
                   gest={gest}
                   quizPremium={!!profile?.quiz_premium}
                   careMode={careMode}
+                  onOpenShop={() => goToTab("Cantinho")}
                 />
               )}
               {tab === "Carta do Bebê" && (

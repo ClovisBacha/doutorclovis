@@ -22,6 +22,8 @@ interface GestacaoPathProps {
   quizPremium?: boolean;
   /** Modo Cuidado: silencia confete, comemorações, streak e a tela de nascimento. */
   careMode?: boolean;
+  /** Abre o Cantinho (lojinha das Sementinhas). */
+  onOpenShop?: () => void;
 }
 
 /* ══════════════════════════ FASES (7 semanas cada) ══════════════════════════ */
@@ -832,6 +834,7 @@ export function GestacaoPath({
   gest,
   quizPremium = false,
   careMode = false,
+  onOpenShop,
 }: GestacaoPathProps) {
   const hasGest = !!gest;
   // Dia gestacional de hoje (0-based desde a DUM), até a semana 42 (D=300)
@@ -1601,6 +1604,33 @@ export function GestacaoPath({
           </>
         )}
       </div>
+
+      {/* Botão flutuante da lojinha (Cantinho) — silenciado no Modo Cuidado */}
+      {!careMode && onOpenShop && (
+        <>
+          <style>{`
+            @keyframes dc-shop-glow {
+              0%, 100% { box-shadow: 0 8px 22px rgba(16,185,129,0.42); }
+              50% { box-shadow: 0 10px 34px rgba(16,185,129,0.78), 0 0 0 5px rgba(163,230,53,0.30); }
+            }
+            @media (prefers-reduced-motion: reduce) { .dc-shop-fab { animation: none !important; } }
+          `}</style>
+          <button
+            onClick={onOpenShop}
+            aria-label="Abrir o Cantinho"
+            className="dc-shop-fab press fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-full bg-gradient-to-br from-emerald-400 via-lime-400 to-emerald-500 px-4 py-3 text-white ring-2 ring-white/70 md:bottom-8"
+            style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
+          >
+            <span className="text-xl leading-none">🛍️</span>
+            <span className="text-sm font-extrabold leading-none">Cantinho</span>
+            {saldo != null && (
+              <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold leading-none">
+                🌱 {saldo}
+              </span>
+            )}
+          </button>
+        </>
+      )}
 
       {!checkedToday && (
         <div className="rounded-2xl bg-white/80 p-4 shadow-[0_2px_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
