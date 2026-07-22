@@ -80,7 +80,6 @@ const PATIENT_TABS = [
   "Conta Regressiva",
   "Álbum",
   "Nome do Bebê",
-  "Escola",
   "FAQ",
   "Pânico",
   "Carteirinha",

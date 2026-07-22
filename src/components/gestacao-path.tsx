@@ -693,14 +693,8 @@ function buildFullJourney(
           row++;
         }
       }
-      // Lição da semana (Escola do Bebê) — uma moeda especial no próprio caminho,
-      // logo após os dias da semana: aprender faz parte da jornada.
-      if (LESSON_BY_WEEK.has(w)) {
-        const x = xOf(row);
-        nodes.push({ kind: "lesson", week: w, y: y + ILESSON_ROW / 2, x, row });
-        y += ILESSON_ROW;
-        row++;
-      }
+      // (Opção A) As lições do curso saíram do Caminho — o ensino é só o
+      // "desafio do dia" (aula por semana). Sem nós de LIÇÃO na trilha.
     }
   }
   return { nodes, height: y + 40 };

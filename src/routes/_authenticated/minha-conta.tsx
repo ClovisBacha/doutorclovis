@@ -243,7 +243,6 @@ const TABS = [
   "Conta Regressiva",
   "Álbum",
   "Nome do Bebê",
-  "Escola",
   "FAQ",
   "Pânico",
   "Carteirinha",
@@ -320,7 +319,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Aprender",
-    tabs: ["Escola", "FAQ", "Pânico", "Conquistas", "Cantinho", "Loja"],
+    tabs: ["FAQ", "Pânico", "Conquistas", "Cantinho", "Loja"],
   },
   {
     label: "Médico",
@@ -911,7 +910,6 @@ function MinhaContaPage() {
               )}
               {tab === "Álbum" && <AlbumTab profile={profile} />}
               {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
-              {tab === "Escola" && <EscolaBebêTab gest={gest} onNavigate={goToTab} />}
               {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
               {tab === "Pânico" && <PânicoTab profile={profile} onNavigate={goToTab} />}
               {tab === "Carteirinha" && (
