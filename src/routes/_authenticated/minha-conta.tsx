@@ -73,6 +73,7 @@ import {
 } from "@/lib/cantinho";
 import { getCantinho, buyCantinhoItem, setCantinhoFundo } from "@/lib/cantinho.functions";
 import { getInstagramShare, setInstagramHandle } from "@/lib/instagram.functions";
+import { getRatingReward, claimRatingReward } from "@/lib/rating.functions";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
@@ -11879,6 +11880,115 @@ function InstagramShareCard() {
   );
 }
 
+/**
+ * Card "Avalie o app e ganhe 100 🌱". Só aparece quando há loja publicada
+ * (Play/App Store configurada). A paciente abre a loja, avalia e toca "já
+ * avaliei" → ganha 100 uma vez (por confiança; a loja não diz quem avaliou).
+ */
+function RatingRewardCard({ onEarned }: { onEarned: (n: number) => void }) {
+  const [state, setState] = useState<{
+    enabled: boolean;
+    reward: number;
+    playUrl: string | null;
+    appleUrl: string | null;
+    claimed: boolean;
+  } | null>(null);
+  const [claiming, setClaiming] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const res = await getRatingReward({ data: { accessToken: s.session.access_token } });
+      if (res.ok) {
+        setState({
+          enabled: res.enabled,
+          reward: res.reward,
+          playUrl: res.playUrl,
+          appleUrl: res.appleUrl,
+          claimed: res.claimed,
+        });
+      }
+    })();
+  }, []);
+
+  async function claim() {
+    if (claiming) return;
+    setClaiming(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) {
+      setClaiming(false);
+      return;
+    }
+    const res = await claimRatingReward({ data: { accessToken: s.session.access_token } });
+    if (res.ok && res.granted > 0) {
+      onEarned(res.granted);
+      setState((st) => (st ? { ...st, claimed: true } : st));
+      toast(`+${res.granted} 🌱 Obrigado por avaliar! ⭐`);
+    } else if (res.ok) {
+      setState((st) => (st ? { ...st, claimed: true } : st));
+    } else {
+      toast(res.error ?? "Não foi possível resgatar");
+    }
+    setClaiming(false);
+  }
+
+  if (!state || !state.enabled) return null;
+
+  return (
+    <div className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-yellow-50 p-5">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">⭐</span>
+        <p className="text-sm font-extrabold text-amber-700">
+          Avalie o app e ganhe {state.reward} 🌱
+        </p>
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+        Sua avaliação ajuda outras gestantes a encontrarem o app 💛 Avalie na loja e ganhe{" "}
+        <span className="font-bold">{state.reward} Sementinhas</span>.
+      </p>
+
+      {state.claimed ? (
+        <p className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
+          Recompensa resgatada ✓ Obrigado! ⭐
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {state.appleUrl && (
+              <a
+                href={state.appleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="press flex-1 rounded-full border border-amber-300 bg-white py-2 text-center text-xs font-bold text-amber-700"
+              >
+                App Store
+              </a>
+            )}
+            {state.playUrl && (
+              <a
+                href={state.playUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="press flex-1 rounded-full border border-amber-300 bg-white py-2 text-center text-xs font-bold text-amber-700"
+              >
+                ▶ Play Store
+              </a>
+            )}
+          </div>
+          <button
+            onClick={claim}
+            disabled={claiming}
+            className="press mt-2 w-full rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
+          >
+            Já avaliei — resgatar {state.reward} 🌱
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
@@ -12018,6 +12128,9 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
 
       {/* Ganhe compartilhando no Instagram (aparece só quando a Meta está ligada) */}
       {!careMode && <InstagramShareCard />}
+
+      {/* Ganhe avaliando o app (aparece só quando há loja publicada) */}
+      {!careMode && <RatingRewardCard onEarned={(n) => setSaldo((s) => s + n)} />}
 
       {/* Loja de itens */}
       <div>
