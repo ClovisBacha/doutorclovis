@@ -26,7 +26,9 @@ export const SEMENTINHAS = {
 export const BIG_ACHIEVEMENTS = new Set(["course_complete", "prenatal_done"]);
 
 type Db = ReturnType<typeof typedDb>;
-type Grant = { amount: number; reason: string; dedupeKey: string | null };
+// dedupeKey é obrigatório: ganho sem chave duplicaria (NULL não conflita no
+// índice único). Gastos NÃO passam por aqui — usam insert direto (dedupe_key NULL).
+type Grant = { amount: number; reason: string; dedupeKey: string };
 
 /** Concede Sementinhas de forma idempotente (dedupe_key). Server-only. */
 export async function grantSementinhas(db: Db, userId: string, grants: Grant[]): Promise<void> {

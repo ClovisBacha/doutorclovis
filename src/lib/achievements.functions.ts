@@ -235,15 +235,13 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     // sem conceder em dobro. Ganho só por ação/educação/marco — nunca por
     // resultado clínico.
     const titleByKey = new Map(ACHIEVEMENT_DEFS.map((d) => [d.key, d.title]));
-    const grants: { amount: number; reason: string; dedupeKey: string | null }[] = toAward.map(
-      (key) => ({
-        amount: BIG_ACHIEVEMENTS.has(key)
-          ? SEMENTINHAS.achievementBig
-          : SEMENTINHAS.achievementDefault,
-        reason: `Conquista: ${titleByKey.get(key) ?? key}`,
-        dedupeKey: `achievement:${key}`,
-      }),
-    );
+    const grants: { amount: number; reason: string; dedupeKey: string }[] = toAward.map((key) => ({
+      amount: BIG_ACHIEVEMENTS.has(key)
+        ? SEMENTINHAS.achievementBig
+        : SEMENTINHAS.achievementDefault,
+      reason: `Conquista: ${titleByKey.get(key) ?? key}`,
+      dedupeKey: `achievement:${key}`,
+    }));
     const gest = computeGestation({
       lmp: profile?.lmp_date ?? null,
       referenceDate: profile?.reference_date ?? null,
@@ -251,23 +249,26 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
       referenceDays: profile?.reference_days ?? null,
     });
     if (gest) {
+      // Marcos escopados à GESTAÇÃO atual (LMP/referência) — senão, numa 2ª
+      // gravidez os marcos já teriam sido "consumidos" na 1ª e ela não ganharia.
+      const cycle = profile?.lmp_date ?? profile?.reference_date ?? "x";
       // Marco da semana atual: presente por avançar, não por performance.
       grants.push({
         amount: SEMENTINHAS.weekMilestone,
         reason: `Semana ${gest.weeks} 🎉`,
-        dedupeKey: `week:${gest.weeks}`,
+        dedupeKey: `week:${cycle}:${gest.weeks}`,
       });
       if (gest.weeks >= 13)
         grants.push({
           amount: SEMENTINHAS.trimesterMilestone,
           reason: "Fim do 1º trimestre 🎊",
-          dedupeKey: "trimester:1",
+          dedupeKey: `trimester:${cycle}:1`,
         });
       if (gest.weeks >= 27)
         grants.push({
           amount: SEMENTINHAS.trimesterMilestone,
           reason: "Fim do 2º trimestre 🎊",
-          dedupeKey: "trimester:2",
+          dedupeKey: `trimester:${cycle}:2`,
         });
     }
     await grantSementinhas(db, uid, grants);
