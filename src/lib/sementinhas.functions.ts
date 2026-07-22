@@ -3,6 +3,7 @@ import { z } from "zod";
 import { typedDb, type SementinhasLedgerRow } from "@/integrations/supabase/types.extended";
 import { isCareModeActive } from "@/lib/care-mode.functions";
 import { COURSE_MODULES } from "@/lib/course-modules";
+import { quizForDay } from "@/lib/daily-quizzes";
 
 /**
  * Sementinhas 🌱 — moeda de recompensa da paciente.
@@ -169,6 +170,60 @@ export const grantLessonReward = createServerFn({ method: "POST" })
     await grantSementinhas(db, uid, [
       { amount, reason: `Lição da semana ${data.week} 📚`, dedupeKey },
     ]);
+    return { ok: true as const, granted: amount };
+  });
+
+/**
+ * Recompensa por concluir o DESAFIO DO DIA (quiz da aula de hoje). Base por
+ * concluir + bônus por acerto (nunca punitivo). Validado no servidor contra o
+ * quiz real do dia (anti-fraude: dia inexistente não paga; `correct` limitado
+ * ao nº de perguntas). Idempotente por dia/ciclo; suprimido em Modo Cuidado.
+ */
+export const grantDailyQuizReward = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        day: z.number().int().min(1).max(400),
+        correct: z.number().int().min(0).max(20),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = typedDb(supabaseAdmin);
+    const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (error || !u.user) return { ok: false as const, error: "Não autenticado" };
+    const uid = u.user.id;
+    if (await isCareModeActive(supabaseAdmin, uid)) return { ok: true as const, granted: 0 };
+
+    const quiz = quizForDay(data.day);
+    if (!quiz || quiz.questions.length === 0) return { ok: true as const, granted: 0 };
+    const correct = Math.max(0, Math.min(data.correct, quiz.questions.length));
+
+    const { data: prof } = await supabaseAdmin
+      .from("patient_profiles")
+      .select("lmp_date, reference_date, birth_date")
+      .eq("id", uid)
+      .single();
+    const p = prof as {
+      lmp_date?: string | null;
+      reference_date?: string | null;
+      birth_date?: string | null;
+    } | null;
+    const cycle = p?.lmp_date ?? p?.reference_date ?? p?.birth_date ?? "x";
+    const dedupeKey = `dailyquiz:${cycle}:${data.day}`;
+
+    const { data: existing } = await db
+      .from("sementinhas_ledger")
+      .select("amount")
+      .eq("user_id", uid)
+      .eq("dedupe_key", dedupeKey)
+      .maybeSingle();
+    if (existing) return { ok: true as const, granted: 0 };
+
+    const amount = 5 + 3 * correct; // base 5 + 3 por acerto
+    await grantSementinhas(db, uid, [{ amount, reason: "Desafio do dia 🎯", dedupeKey }]);
     return { ok: true as const, granted: amount };
   });
 

@@ -3,7 +3,11 @@ import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
-import { claimDailyAndGetWallet, grantLessonReward } from "@/lib/sementinhas.functions";
+import {
+  claimDailyAndGetWallet,
+  grantLessonReward,
+  grantDailyQuizReward,
+} from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, CANTINHO_FUNDO_BG } from "@/lib/cantinho";
 
@@ -2125,8 +2129,10 @@ export function GestacaoPath({
                       quiz={quiz}
                       emoji={quizEmoji}
                       week={week}
+                      day={D}
                       alreadyDone={!!state.desafio || done}
                       canEarn={isToday}
+                      careMode={careMode}
                       missingHint={missingHumorHint}
                       showPremiumAd={isToday && !quizPremium}
                       onEarn={() => markDayTask(D, "desafio", true)}
@@ -2847,8 +2853,10 @@ function DailyQuizBlock({
   quiz,
   emoji,
   week,
+  day,
   alreadyDone,
   canEarn,
+  careMode = false,
   missingHint,
   showPremiumAd = false,
   onEarn,
@@ -2856,8 +2864,11 @@ function DailyQuizBlock({
   quiz: DailyQuiz;
   emoji: string;
   week: number;
+  /** Dia da jornada (D) — usado no ganho de Sementinhas (dedupe + validação). */
+  day: number;
   alreadyDone: boolean;
   canEarn: boolean;
+  careMode?: boolean;
   /** Dica do que ainda falta para fechar o dia (ex.: check-in de humor). */
   missingHint?: string | null;
   /** Mostra o convite ao Premium ao terminar (só para quem é do plano grátis). */
@@ -2874,6 +2885,7 @@ function DailyQuizBlock({
   const [answers, setAnswers] = useState<QuizAnswer[]>(() => questions.map(() => null));
   const [checked, setChecked] = useState(false);
   const [earnedNow, setEarnedNow] = useState(false);
+  const [reward, setReward] = useState<number | null>(null);
   const earnedRef = useRef(false);
 
   const q = questions[qIndex];
@@ -2921,6 +2933,19 @@ function DailyQuizBlock({
     });
   }
 
+  async function grantReward(correct: number) {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) return;
+      const r = await grantDailyQuizReward({ data: { accessToken: token, day, correct } });
+      if (r.ok) setReward(r.granted);
+    } catch {
+      /* recompensa é secundária */
+    }
+  }
+
   function next() {
     if (qIndex + 1 >= total) {
       setPhase("done");
@@ -2928,6 +2953,7 @@ function DailyQuizBlock({
         earnedRef.current = true;
         setEarnedNow(true);
         onEarn();
+        grantReward(score);
       }
       return;
     }
@@ -3097,6 +3123,11 @@ function DailyQuizBlock({
                 <p className="mt-1 text-sm text-muted-foreground">
                   {score} de {total} acertos
                 </p>
+                {!careMode && reward != null && reward > 0 && (
+                  <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
+                    +{reward} 🌱 Sementinhas!
+                  </div>
+                )}
                 <p className="mt-3 max-w-xs text-xs text-muted-foreground">
                   {earnedNow
                     ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
