@@ -4,6 +4,7 @@ import { typedDb, type SementinhasLedgerRow } from "@/integrations/supabase/type
 import { isCareModeActive } from "@/lib/care-mode.functions";
 import { COURSE_MODULES } from "@/lib/course-modules";
 import { quizForDay } from "@/lib/daily-quizzes";
+import { computeGestation } from "@/lib/gestacao";
 
 /**
  * Sementinhas 🌱 — moeda de recompensa da paciente.
@@ -61,6 +62,40 @@ async function computeBalance(db: Db, userId: string): Promise<number> {
 /** Data de hoje (America/Sao_Paulo) como YYYY-MM-DD, para dedupe do check-in. */
 function todayKeySaoPaulo(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+/**
+ * Lê o perfil e devolve o "ciclo" (chave de dedupe por gestação) + a idade
+ * gestacional REAL de hoje calculada no servidor. É a fonte de verdade
+ * anti-fraude: o cliente não pode reivindicar recompensa de um dia/semana no
+ * FUTURO (isso "imprimiria" a jornada inteira de uma vez). `gest` é null quando
+ * não há dado gestacional (pós-parto ou perfil incompleto) — aí não dá pra
+ * validar por data e caímos no limite do conteúdo finito + dedupe.
+ */
+async function loadCycleAndGestation(
+  admin: typeof import("@/integrations/supabase/client.server").supabaseAdmin,
+  uid: string,
+) {
+  const { data: prof } = await admin
+    .from("patient_profiles")
+    .select("lmp_date, reference_date, reference_weeks, reference_days, birth_date")
+    .eq("id", uid)
+    .single();
+  const p = prof as {
+    lmp_date?: string | null;
+    reference_date?: string | null;
+    reference_weeks?: number | null;
+    reference_days?: number | null;
+    birth_date?: string | null;
+  } | null;
+  const cycle = p?.lmp_date ?? p?.reference_date ?? p?.birth_date ?? "x";
+  const gest = computeGestation({
+    lmp: p?.lmp_date ?? null,
+    referenceDate: p?.reference_date ?? null,
+    referenceWeeks: p?.reference_weeks ?? null,
+    referenceDays: p?.reference_days ?? null,
+  });
+  return { cycle, gest };
 }
 
 async function walletPayload(db: Db, userId: string) {
@@ -144,17 +179,12 @@ export const grantLessonReward = createServerFn({ method: "POST" })
     if (!mod) return { ok: true as const, granted: 0 };
     const correct = Math.max(0, Math.min(data.correct, mod.quiz.length));
 
-    const { data: prof } = await supabaseAdmin
-      .from("patient_profiles")
-      .select("lmp_date, reference_date, birth_date")
-      .eq("id", uid)
-      .single();
-    const p = prof as {
-      lmp_date?: string | null;
-      reference_date?: string | null;
-      birth_date?: string | null;
-    } | null;
-    const cycle = p?.lmp_date ?? p?.reference_date ?? p?.birth_date ?? "x";
+    const { cycle, gest } = await loadCycleAndGestation(supabaseAdmin, uid);
+    // ANTI-FRAUDE (cadência): não paga lição de semana no FUTURO — só até a
+    // semana gestacional real de hoje (+1 de folga p/ fuso/relógio). Impede
+    // reivindicar a jornada inteira de uma vez. Sem dado gestacional, só o
+    // conteúdo finito + dedupe limitam.
+    if (gest && data.week > gest.weeks + 1) return { ok: true as const, granted: 0 };
     const dedupeKey = `lesson:${cycle}:${data.week}`;
 
     // Já ganhou por esta lição? (idempotência transparente p/ o "você ganhou X")
@@ -201,17 +231,13 @@ export const grantDailyQuizReward = createServerFn({ method: "POST" })
     if (!quiz || quiz.questions.length === 0) return { ok: true as const, granted: 0 };
     const correct = Math.max(0, Math.min(data.correct, quiz.questions.length));
 
-    const { data: prof } = await supabaseAdmin
-      .from("patient_profiles")
-      .select("lmp_date, reference_date, birth_date")
-      .eq("id", uid)
-      .single();
-    const p = prof as {
-      lmp_date?: string | null;
-      reference_date?: string | null;
-      birth_date?: string | null;
-    } | null;
-    const cycle = p?.lmp_date ?? p?.reference_date ?? p?.birth_date ?? "x";
+    const { cycle, gest } = await loadCycleAndGestation(supabaseAdmin, uid);
+    // ANTI-FRAUDE (cadência): o desafio é DIÁRIO. Não paga um dia no FUTURO —
+    // só até o dia gestacional real de hoje (+1 de folga p/ fuso/relógio).
+    // Sem isso, dava pra reivindicar todos os ~280 dias de uma vez. Sem dado
+    // gestacional (pós-parto/perfil incompleto), só o conteúdo finito + dedupe
+    // limitam.
+    if (gest && data.day > gest.totalDays + 1) return { ok: true as const, granted: 0 };
     const dedupeKey = `dailyquiz:${cycle}:${data.day}`;
 
     const { data: existing } = await db
