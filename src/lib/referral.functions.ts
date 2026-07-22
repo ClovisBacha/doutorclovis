@@ -96,12 +96,23 @@ export const attributeReferral = createServerFn({ method: "POST" })
     z.object({ accessToken: z.string().min(10), code: z.string().min(3).max(20) }).parse(i),
   )
   .handler(async ({ data }) => {
-    const uid = await authUid(data.accessToken);
-    if (!uid) return { ok: false as const, error: "Não autenticado" };
     const code = normalizeCode(data.code);
     if (code.length < 3) return { ok: true as const, attributed: false };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
+
+    // A indicação SÓ conta se a amiga REALMENTE fez login no site: precisa de um
+    // token válido E de e-mail confirmado (o app exige confirmar o e-mail antes
+    // de logar — ver src/routes/auth.tsx). Uma conta apenas criada, sem login/
+    // confirmação, NÃO credita a indicadora. `retry` mantém o código guardado
+    // até a amiga confirmar e logar.
+    const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
+    const confirmed = Boolean(
+      u.user.email_confirmed_at ?? (u.user as { confirmed_at?: string | null }).confirmed_at,
+    );
+    if (!confirmed) return { ok: true as const, attributed: false, retry: true };
+    const uid = u.user.id;
 
     // Já indicada? (fixado uma vez) — nada a fazer.
     const { data: me } = await sb
