@@ -20,6 +20,8 @@ interface GestacaoPathProps {
   gest: Gest;
   /** Premium do quiz: revisão de qualquer aula liberada (grátis = só a de hoje). */
   quizPremium?: boolean;
+  /** Modo Cuidado: silencia confete, comemorações, streak e a tela de nascimento. */
+  careMode?: boolean;
 }
 
 /* ══════════════════════════ FASES (7 semanas cada) ══════════════════════════ */
@@ -825,7 +827,12 @@ function buildFootsteps(
 
 /* ══════════════════════════════ Componente ══════════════════════════════ */
 
-export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPathProps) {
+export function GestacaoPath({
+  profile,
+  gest,
+  quizPremium = false,
+  careMode = false,
+}: GestacaoPathProps) {
   const hasGest = !!gest;
   // Dia gestacional de hoje (0-based desde a DUM), até a semana 42 (D=300)
   const rawD = hasGest ? gest.totalDays : 0;
@@ -1276,7 +1283,8 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
   );
 
   /* ══════════ PONTO 2 · Celebração do nascimento (uma vez) ══════════ */
-  if (birth && !celebrated) {
+  // Modo Cuidado: nunca dispara a celebração de nascimento (crítico em perda).
+  if (birth && !celebrated && !careMode) {
     const totalDone = doneDays.length;
     return (
       <div className="relative flex flex-col items-center gap-5 overflow-hidden rounded-3xl bg-white/80 p-8 text-center backdrop-blur-sm">
@@ -1343,6 +1351,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
         setRevealing={setRevealing}
         styleBlock={styleBlock}
         shareGest={share}
+        careMode={careMode}
       />
     );
   }
@@ -1560,14 +1569,18 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
         style={{ top: "var(--safe-top)" }}
         className="sticky z-30 -mx-5 flex items-center justify-around border-b border-border/60 bg-background/95 px-6 py-3 backdrop-blur-md md:mx-0 md:rounded-2xl md:border"
       >
-        <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
-          <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
-          <span className="text-lg font-extrabold text-amber-500">{streak}</span>
-          <span className="text-xs font-medium text-muted-foreground">
-            {streak === 1 ? "dia" : "dias"}
-          </span>
-        </div>
-        <div className="h-6 w-px bg-slate-200" />
+        {!careMode && (
+          <>
+            <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
+              <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
+              <span className="text-lg font-extrabold text-amber-500">{streak}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {streak === 1 ? "dia" : "dias"}
+              </span>
+            </div>
+            <div className="h-6 w-px bg-slate-200" />
+          </>
+        )}
         <div className="flex items-center gap-1.5" title="Dia da sua jornada">
           <span className="text-xl">📅</span>
           <span className="text-lg font-extrabold text-sky-500">{journeyDayNum}º</span>
@@ -1920,7 +1933,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
                 style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {revealing && <ConfettiBurst />}
+                {revealing && !careMode && <ConfettiBurst />}
                 <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
 
                 <div className="mb-4 flex items-center gap-3">
@@ -2077,6 +2090,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
           revealing={revealing}
           onClose={() => setSheet(null)}
           onShare={share}
+          careMode={careMode}
         />
       )}
 
@@ -2088,6 +2102,7 @@ export function GestacaoPath({ profile, gest, quizPremium = false }: GestacaoPat
           revealing={revealing}
           onComplete={(score) => completeLesson(lessonSheet.week, score)}
           onClose={() => setLessonSheet(null)}
+          careMode={careMode}
         />
       )}
     </div>
@@ -2102,12 +2117,14 @@ function AlbumSheet({
   revealing,
   onClose,
   onShare,
+  careMode = false,
 }: {
   week: number;
   babyLabel: string;
   revealing: boolean;
   onClose: () => void;
   onShare: (week: number) => void;
+  careMode?: boolean;
 }) {
   const baby = babyForWeek(week);
   const tm = trimMeta(week);
@@ -2122,7 +2139,7 @@ function AlbumSheet({
         style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {revealing && <ConfettiBurst />}
+        {revealing && !careMode && <ConfettiBurst />}
         <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
 
         <div className="mb-4 flex items-center gap-3">
@@ -2181,12 +2198,14 @@ function LessonSheet({
   revealing,
   onComplete,
   onClose,
+  careMode = false,
 }: {
   module: CourseModule;
   savedScore: number | null;
   revealing: boolean;
   onComplete: (score: number) => void;
   onClose: () => void;
+  careMode?: boolean;
 }) {
   const alreadyDone = savedScore != null;
   // Lição já concluída reabre em modo REVISÃO: respostas corretas destacadas
@@ -2221,7 +2240,7 @@ function LessonSheet({
         style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {revealing && <ConfettiBurst />}
+        {revealing && !careMode && <ConfettiBurst />}
         <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
 
         <div className="mb-4 flex items-center gap-3">
@@ -2879,6 +2898,7 @@ function PosPartoJourney({
   setRevealing,
   styleBlock,
   shareGest,
+  careMode = false,
 }: {
   babyLabel: string;
   birth: Birth;
@@ -2894,6 +2914,7 @@ function PosPartoJourney({
   setRevealing: (v: boolean) => void;
   styleBlock: React.ReactNode;
   shareGest: (week: number) => void;
+  careMode?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [posDone, setPosDone] = useState<number[]>([]);
@@ -3030,14 +3051,18 @@ function PosPartoJourney({
 
       {/* Stats */}
       <div className="flex items-center justify-around rounded-2xl bg-white/70 px-3 py-2.5 backdrop-blur-sm shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
-        <div className="flex items-center gap-1.5">
-          <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
-          <span className="text-lg font-extrabold text-amber-500">{streak}</span>
-          <span className="text-xs font-medium text-muted-foreground">
-            {streak === 1 ? "dia" : "dias"}
-          </span>
-        </div>
-        <div className="h-6 w-px bg-slate-200" />
+        {!careMode && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
+              <span className="text-lg font-extrabold text-amber-500">{streak}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                {streak === 1 ? "dia" : "dias"}
+              </span>
+            </div>
+            <div className="h-6 w-px bg-slate-200" />
+          </>
+        )}
         <div className="flex items-center gap-1.5">
           <span className="text-xl">👶</span>
           <span className="text-lg font-extrabold text-sky-500">S{currentWeek}</span>
@@ -3241,7 +3266,7 @@ function PosPartoJourney({
                 style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {revealing && <ConfettiBurst />}
+                {revealing && !careMode && <ConfettiBurst />}
                 <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
 
                 <div className="mb-4 flex items-center gap-3">
@@ -3336,6 +3361,7 @@ function PosPartoJourney({
           revealing={revealing}
           onClose={() => setSheet(null)}
           onShare={shareGest}
+          careMode={careMode}
         />
       )}
     </div>

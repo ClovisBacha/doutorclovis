@@ -775,6 +775,11 @@ function MinhaContaPage() {
         {/* ── Mobile: home screen ──────────────────────────────── */}
         {mobileHome && (
           <div className="md:hidden">
+            {careMode && (
+              <div className="mb-4">
+                <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />
+              </div>
+            )}
             <AppHomeScreen
               firstName={firstName}
               babyName={profile?.baby_name ?? null}
@@ -783,6 +788,7 @@ function MinhaContaPage() {
               nextAppointment={nextAppt}
               babyTone={profile?.baby_skin_tone ?? 0}
               onBabyTap={() => setJourneyOpen(true)}
+              careMode={careMode}
             />
           </div>
         )}
@@ -856,10 +862,16 @@ function MinhaContaPage() {
                   gest={gest}
                   onNavigate={goToTab}
                   onBabyTap={() => setJourneyOpen(true)}
+                  careMode={careMode}
                 />
               )}
               {tab === "Caminho" && (
-                <GestacaoPath profile={profile} gest={gest} quizPremium={!!profile?.quiz_premium} />
+                <GestacaoPath
+                  profile={profile}
+                  gest={gest}
+                  quizPremium={!!profile?.quiz_premium}
+                  careMode={careMode}
+                />
               )}
               {tab === "Carta do Bebê" && (
                 <CartaBebêTab profile={profile} gest={gest} onNavigate={goToTab} />
@@ -889,7 +901,12 @@ function MinhaContaPage() {
               {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
               {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
               {tab === "Conta Regressiva" && (
-                <CountdownTab profile={profile} gest={gest} onNavigate={goToTab} />
+                <CountdownTab
+                  profile={profile}
+                  gest={gest}
+                  onNavigate={goToTab}
+                  careMode={careMode}
+                />
               )}
               {tab === "Álbum" && <AlbumTab profile={profile} />}
               {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
@@ -933,12 +950,14 @@ function BabyTab({
   gest,
   onNavigate,
   onBabyTap,
+  careMode = false,
 }: {
   profile: Profile | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
   /** Toque na foto do bebê → Jornada do Bebê (gatilho Premium). */
   onBabyTap?: () => void;
+  careMode?: boolean;
 }) {
   if (!profile || !gest) {
     return (
@@ -1015,53 +1034,59 @@ function BabyTab({
               </span>
             </h2>
 
-            {/* Chips: tamanho · peso · comparação */}
-            <div className="mt-4 flex flex-wrap justify-center gap-2 md:justify-start">
-              {[
-                { icon: "📏", label: baby.size },
-                ...(baby.weight !== "—" ? [{ icon: "⚖️", label: baby.weight }] : []),
-                { icon: "🍓", label: baby.fruit },
-              ].map((c) => (
-                <span
-                  key={c.label}
-                  className="rounded-full border border-primary/15 bg-card/70 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur"
-                >
-                  {c.icon} {c.label}
-                </span>
-              ))}
-            </div>
-
-            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-foreground md:mx-0 md:text-base">
-              {baby.desc}
-            </p>
-
-            {/* Progresso da jornada */}
-            <div className="mt-5">
-              <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
-                <span>Início</span>
-                <span className="text-primary">{progress.toFixed(0)}% da jornada</span>
-                <span>Parto</span>
+            {/* Chips: tamanho · peso · comparação (silenciados no Modo Cuidado) */}
+            {!careMode && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2 md:justify-start">
+                {[
+                  { icon: "📏", label: baby.size },
+                  ...(baby.weight !== "—" ? [{ icon: "⚖️", label: baby.weight }] : []),
+                  { icon: "🍓", label: baby.fruit },
+                ].map((c) => (
+                  <span
+                    key={c.label}
+                    className="rounded-full border border-primary/15 bg-card/70 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur"
+                  >
+                    {c.icon} {c.label}
+                  </span>
+                ))}
               </div>
-              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-card/70">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all"
-                  style={{ width: `${progress}%` }}
-                />
+            )}
+
+            {!careMode && (
+              <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-foreground md:mx-0 md:text-base">
+                {baby.desc}
+              </p>
+            )}
+
+            {/* Progresso da jornada (silenciado no Modo Cuidado) */}
+            {!careMode && (
+              <div className="mt-5">
+                <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
+                  <span>Início</span>
+                  <span className="text-primary">{progress.toFixed(0)}% da jornada</span>
+                  <span>Parto</span>
+                </div>
+                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-card/70">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                {reta ? (
+                  <p className="mt-1.5 text-xs font-medium text-primary">{reta.titulo}</p>
+                ) : (
+                  daysToDue != null && (
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      {daysToDue === 0
+                        ? "É hoje! 🎉"
+                        : daysToDue === 1
+                          ? "Amanhã! 🎉"
+                          : `Faltam ${daysToDue} dias para conhecer ${babyLabel} 💛`}
+                    </p>
+                  )
+                )}
               </div>
-              {reta ? (
-                <p className="mt-1.5 text-xs font-medium text-primary">{reta.titulo}</p>
-              ) : (
-                daysToDue != null && (
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    {daysToDue === 0
-                      ? "É hoje! 🎉"
-                      : daysToDue === 1
-                        ? "Amanhã! 🎉"
-                        : `Faltam ${daysToDue} dias para conhecer ${babyLabel} 💛`}
-                  </p>
-                )
-              )}
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -1081,7 +1106,7 @@ function BabyTab({
                 })
               : "—"}
           </p>
-          {reta ? (
+          {careMode ? null : reta ? (
             <p className="mt-1 text-sm text-primary">Você está na janela do parto 💛</p>
           ) : (
             daysToDue != null && (
@@ -8564,10 +8589,12 @@ function CountdownTab({
   profile,
   gest,
   onNavigate,
+  careMode = false,
 }: {
   profile: Profile | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
+  careMode?: boolean;
 }) {
   const [now, setNow] = useState(Date.now());
 
@@ -8618,6 +8645,26 @@ function CountdownTab({
   const lmpMs = profile.lmp_date
     ? new Date(profile.lmp_date + "T00:00:00").getTime()
     : dueMs - 280 * 86400000;
+
+  // Modo Cuidado: sem contagem regressiva nem comemoração — só acolhimento.
+  if (careMode) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-8 text-center">
+        <p className="text-3xl">🤍</p>
+        <p className="mt-3 font-serif text-xl text-foreground">Estamos aqui com você</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          A contagem está pausada. No seu tempo. Se precisar, fale com o consultório ou acesse o
+          apoio emocional.
+        </p>
+        <button
+          onClick={() => onNavigate("Apoio Emocional")}
+          className="press mt-5 rounded-full bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white"
+        >
+          Apoio emocional
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -11144,9 +11191,12 @@ function ConquistasTab() {
       const res = await checkAndAwardAchievements({ data: { accessToken: token } });
       if (res.ok) {
         setUnlocked(res.unlocked);
-        const recent = res.unlocked
-          .filter((a) => Date.now() - new Date(a.unlocked_at).getTime() < 30000)
-          .map((a) => a.achievement_key);
+        // Modo Cuidado: não acende o banner "🎉 Nova conquista".
+        const recent = res.careMode
+          ? []
+          : res.unlocked
+              .filter((a) => Date.now() - new Date(a.unlocked_at).getTime() < 30000)
+              .map((a) => a.achievement_key);
         setNewBadges(recent);
       }
       // Concede o check-in do dia (idempotente) e lê o saldo já com conquistas

@@ -578,6 +578,7 @@ export function AppHomeScreen({
   nextAppointment,
   babyTone = 0,
   onBabyTap,
+  careMode = false,
 }: {
   firstName: string;
   babyName: string | null;
@@ -588,6 +589,8 @@ export function AppHomeScreen({
   babyTone?: number;
   /** Toque na foto do bebê → abre a Jornada do Bebê (gatilho Premium). */
   onBabyTap?: () => void;
+  /** Modo Cuidado: silencia contagem, tamanho do bebê, streak e desafio. */
+  careMode?: boolean;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
@@ -664,7 +667,7 @@ export function AppHomeScreen({
                 >
                   {trimestre}
                 </span>
-                {reta ? (
+                {careMode ? null : reta ? (
                   <span
                     className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
                   >
@@ -737,26 +740,28 @@ export function AppHomeScreen({
                 </p>
               </div>
 
-              {/* Badges liquid glass */}
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                {[baby.size, baby.weight, `🍓 ${baby.fruit}`].map((label) => (
-                  <span
-                    key={label}
-                    className="rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide"
-                    style={{
-                      background: "rgba(255,255,255,0.18)",
-                      backdropFilter: "blur(20px)",
-                      WebkitBackdropFilter: "blur(20px)",
-                      border: "1px solid rgba(255,255,255,0.35)",
-                      boxShadow:
-                        "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.20)",
-                      color: darkSky ? "rgba(255,255,255,0.93)" : "rgba(30,20,14,0.82)",
-                    }}
-                  >
-                    {label}
-                  </span>
-                ))}
-              </div>
+              {/* Badges liquid glass (silenciados no Modo Cuidado) */}
+              {!careMode && (
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {[baby.size, baby.weight, `🍓 ${baby.fruit}`].map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide"
+                      style={{
+                        background: "rgba(255,255,255,0.18)",
+                        backdropFilter: "blur(20px)",
+                        WebkitBackdropFilter: "blur(20px)",
+                        border: "1px solid rgba(255,255,255,0.35)",
+                        boxShadow:
+                          "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.20)",
+                        color: darkSky ? "rgba(255,255,255,0.93)" : "rgba(30,20,14,0.82)",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Barra de progresso */}
               <div className="mt-4">
@@ -817,8 +822,8 @@ export function AppHomeScreen({
         </div>
       </div>
 
-      {/* ── Jornada do dia: o game em destaque (acesso principal) ───── */}
-      {gest && (
+      {/* ── Jornada do dia: o game em destaque (silenciado no Modo Cuidado) ── */}
+      {gest && !careMode && (
         <button
           onClick={() => onNavigate("Caminho")}
           className="group w-full overflow-hidden rounded-3xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-violet-500 p-[2px] text-left shadow-[var(--shadow-card)] transition-all duration-300 active:scale-[0.98]"
@@ -848,8 +853,9 @@ export function AppHomeScreen({
         </button>
       )}
 
-      {/* ── Marco da semana: o app INICIA o cuidado (proatividade) ──── */}
+      {/* ── Marco da semana (silenciado no Modo Cuidado) ──── */}
       {gest &&
+        !careMode &&
         (() => {
           const m = milestoneForWeek(gest.weeks);
           if (!m) return null;
