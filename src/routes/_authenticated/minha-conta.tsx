@@ -63,7 +63,7 @@ import {
   type AchievementDef,
 } from "@/lib/achievements.functions";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
-import { CANTINHO_ITEMS, CANTINHO_CATEGORIES, type CantinhoCategory } from "@/lib/cantinho";
+import { CANTINHO_ITEMS, CANTINHO_CATEGORIES, type CantinhoType } from "@/lib/cantinho";
 import { getCantinho, buyCantinhoItem } from "@/lib/cantinho.functions";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
@@ -11761,7 +11761,8 @@ function CantinhoTab() {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
   const [owned, setOwned] = useState<string[]>([]);
-  const [cat, setCat] = useState<CantinhoCategory | "all">("all");
+  const [premium, setPremium] = useState(false);
+  const [cat, setCat] = useState<CantinhoType | "all">("all");
   const [buying, setBuying] = useState<string | null>(null);
 
   useEffect(() => {
@@ -11775,6 +11776,7 @@ function CantinhoTab() {
       if (res.ok) {
         setSaldo(res.balance);
         setOwned(res.owned);
+        setPremium(res.premium);
       }
       setLoading(false);
     })();
@@ -11784,7 +11786,7 @@ function CantinhoTab() {
 
   const ownedSet = new Set(owned);
   const ownedItems = CANTINHO_ITEMS.filter((i) => ownedSet.has(i.id));
-  const shopItems = CANTINHO_ITEMS.filter((i) => cat === "all" || i.category === cat);
+  const shopItems = CANTINHO_ITEMS.filter((i) => cat === "all" || i.type === cat);
 
   async function buy(itemId: string, price: number) {
     if (buying) return;
@@ -11871,17 +11873,29 @@ function CantinhoTab() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {shopItems.map((i) => {
             const has = ownedSet.has(i.id);
-            const cant = !has && saldo < i.price;
+            const locked = i.premium && !premium; // exclusivo do Premium
+            const cant = !has && !locked && saldo < i.price;
             return (
               <div
                 key={i.id}
-                className="flex flex-col items-center rounded-2xl border border-border bg-card p-4 text-center"
+                className="relative flex flex-col items-center rounded-2xl border border-border bg-card p-4 text-center"
               >
-                <span className="text-4xl">{i.emoji}</span>
+                {i.premium && (
+                  <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                    {locked ? "🔒 Premium" : "Premium"}
+                  </span>
+                )}
+                <span className={`text-4xl ${locked ? "opacity-40 grayscale" : ""}`}>
+                  {i.emoji}
+                </span>
                 <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
                 {has ? (
                   <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
                     No cantinho ✓
+                  </span>
+                ) : locked ? (
+                  <span className="mt-2 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-600">
+                    🌱 {i.price}
                   </span>
                 ) : (
                   <button

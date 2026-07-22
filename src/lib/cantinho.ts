@@ -1,72 +1,242 @@
 /**
- * Meu Cantinho 🌱 — o "spend sink" das Sementinhas.
+ * Meu Cantinho 🌱 — catálogo do "spend sink" das Sementinhas.
  *
- * Metáfora de um cantinho aconchegante que CRESCE (jardim/ninho), escolhida por
- * ser emocionalmente segura (ver pesquisa): em caso de perda gestacional, um
- * cantinho/jardim é muito menos doloroso que um "quarto do bebê" montado peça a
- * peça. O berço é apenas UM item opcional dentro do cantinho, não o centro.
+ * Metáfora "cantinho que cresce" (jardim/ninho) — emocionalmente segura (ver
+ * pesquisa): o berço é apenas UM item opcional, nunca o centro.
  *
- * O catálogo é compartilhado (cliente + servidor). O PREÇO é a fonte da verdade
- * no servidor: a compra valida o preço daqui, nunca confia no valor do cliente.
+ * Cada item tem um `type` que define ONDE aparece no Caminho:
+ *  - fundo   → papel de parede (equipa 1)
+ *  - ceu     → faixa do topo (sol/lua/estrelas...) — decoração acumulável
+ *  - planta  → laterais da trilha
+ *  - objeto  → objetos aconchegantes ao longo do caminho
+ *  - bicho   → criaturas que passeiam
+ *  - especial→ peça central animada (premium)
+ *
+ * `premium: true` → só quem assina o Premium compra (ainda paga com Sementinhas;
+ * nunca dinheiro real por item = sem pay-to-win). Item comprado fica pra sempre.
+ *
+ * O PREÇO é a fonte da verdade no servidor: a compra valida o preço daqui.
  */
 
-export type CantinhoCategory = "plantas" | "conforto" | "luz" | "decoracao" | "bebe";
+export type CantinhoType = "fundo" | "ceu" | "planta" | "objeto" | "bicho" | "especial";
 
 export type CantinhoItem = {
   id: string;
   name: string;
   emoji: string;
   price: number; // em Sementinhas
-  category: CantinhoCategory;
+  type: CantinhoType;
+  premium: boolean;
 };
 
-export const CANTINHO_CATEGORIES: { key: CantinhoCategory; label: string }[] = [
-  { key: "plantas", label: "Plantas" },
-  { key: "conforto", label: "Conforto" },
-  { key: "luz", label: "Luz" },
-  { key: "decoracao", label: "Decoração" },
-  { key: "bebe", label: "Bebê" },
+export const CANTINHO_CATEGORIES: { key: CantinhoType; label: string }[] = [
+  { key: "fundo", label: "Cenários" },
+  { key: "ceu", label: "Céu" },
+  { key: "planta", label: "Plantas" },
+  { key: "objeto", label: "Objetos" },
+  { key: "bicho", label: "Bichinhos" },
+  { key: "especial", label: "Especiais" },
 ];
 
 export const CANTINHO_ITEMS: CantinhoItem[] = [
-  // Plantas — o coração da metáfora "que cresce"
-  { id: "planta-suculenta", name: "Suculenta", emoji: "🌱", price: 30, category: "plantas" },
-  { id: "planta-vaso", name: "Vaso de flores", emoji: "🪴", price: 45, category: "plantas" },
-  { id: "planta-samambaia", name: "Samambaia", emoji: "🌿", price: 55, category: "plantas" },
-  { id: "planta-girassol", name: "Girassol", emoji: "🌻", price: 60, category: "plantas" },
-  // Conforto
+  // ── Loja normal (10) — só Sementinhas ──────────────────────────────
   {
-    id: "conforto-poltrona",
+    id: "planta-suculenta",
+    name: "Suculenta",
+    emoji: "🌱",
+    price: 30,
+    type: "planta",
+    premium: false,
+  },
+  {
+    id: "objeto-cestinho",
+    name: "Cestinho",
+    emoji: "🧺",
+    price: 35,
+    type: "objeto",
+    premium: false,
+  },
+  {
+    id: "ceu-estrelinhas",
+    name: "Estrelinhas",
+    emoji: "✨",
+    price: 40,
+    type: "ceu",
+    premium: false,
+  },
+  { id: "ceu-nuvem", name: "Nuvem fofa", emoji: "☁️", price: 40, type: "ceu", premium: false },
+  {
+    id: "planta-vaso",
+    name: "Vaso de flores",
+    emoji: "🪴",
+    price: 45,
+    type: "planta",
+    premium: false,
+  },
+  {
+    id: "bicho-borboleta",
+    name: "Borboleta",
+    emoji: "🦋",
+    price: 50,
+    type: "bicho",
+    premium: false,
+  },
+  {
+    id: "objeto-tapete",
+    name: "Tapetinho fofo",
+    emoji: "🧶",
+    price: 50,
+    type: "objeto",
+    premium: false,
+  },
+  {
+    id: "planta-girassol",
+    name: "Girassol",
+    emoji: "🌻",
+    price: 60,
+    type: "planta",
+    premium: false,
+  },
+  {
+    id: "objeto-luminaria",
+    name: "Luminária",
+    emoji: "🪔",
+    price: 60,
+    type: "objeto",
+    premium: false,
+  },
+  {
+    id: "fundo-amanhecer",
+    name: "Campo ao amanhecer",
+    emoji: "🌅",
+    price: 120,
+    type: "fundo",
+    premium: false,
+  },
+
+  // ── Premium (20) — exige assinatura ────────────────────────────────
+  { id: "bicho-coelho", name: "Coelhinho", emoji: "🐰", price: 160, type: "bicho", premium: true },
+  { id: "bicho-gato", name: "Gatinho", emoji: "🐈", price: 180, type: "bicho", premium: true },
+  {
+    id: "bicho-passaro",
+    name: "Passarinho cantante",
+    emoji: "🐦",
+    price: 180,
+    type: "bicho",
+    premium: true,
+  },
+  {
+    id: "especial-balao",
+    name: "Balão de ar",
+    emoji: "🎈",
+    price: 200,
+    type: "especial",
+    premium: true,
+  },
+  {
+    id: "especial-vagalume",
+    name: "Vaga-lumes",
+    emoji: "🪄",
+    price: 220,
+    type: "especial",
+    premium: true,
+  },
+  {
+    id: "objeto-mobile",
+    name: "Móbile de estrelas",
+    emoji: "🎐",
+    price: 150,
+    type: "objeto",
+    premium: true,
+  },
+  {
+    id: "objeto-poltrona",
     name: "Poltrona de amamentação",
     emoji: "🪑",
-    price: 120,
-    category: "conforto",
+    price: 200,
+    type: "objeto",
+    premium: true,
   },
-  { id: "conforto-tapete", name: "Tapetinho fofo", emoji: "🧶", price: 50, category: "conforto" },
-  { id: "conforto-almofada", name: "Almofada", emoji: "🛋️", price: 45, category: "conforto" },
-  { id: "conforto-cestinho", name: "Cestinho", emoji: "🧺", price: 35, category: "conforto" },
-  // Luz
-  { id: "luz-luminaria", name: "Luminária aconchegante", emoji: "🪔", price: 60, category: "luz" },
-  { id: "luz-lua", name: "Luz noturna lua", emoji: "🌙", price: 55, category: "luz" },
-  { id: "luz-velinha", name: "Velinha aromática", emoji: "🕯️", price: 40, category: "luz" },
-  // Decoração
-  { id: "deco-movel", name: "Móbile", emoji: "🎐", price: 70, category: "decoracao" },
-  { id: "deco-quadro", name: "Quadrinho", emoji: "🖼️", price: 40, category: "decoracao" },
-  { id: "deco-nuvem", name: "Nuvem fofa", emoji: "☁️", price: 45, category: "decoracao" },
   {
-    id: "deco-arcoiris",
-    name: "Arco-íris de parede",
-    emoji: "🌈",
-    price: 50,
-    category: "decoracao",
+    id: "objeto-berco",
+    name: "Berço (opcional)",
+    emoji: "🛏️",
+    price: 250,
+    type: "objeto",
+    premium: true,
   },
-  { id: "deco-estrelas", name: "Estrelinhas", emoji: "✨", price: 40, category: "decoracao" },
-  // Bebê — opcionais, nunca o centro da metáfora
-  { id: "bebe-ursinho", name: "Ursinho de pelúcia", emoji: "🧸", price: 55, category: "bebe" },
-  { id: "bebe-coelho", name: "Coelhinho", emoji: "🐰", price: 55, category: "bebe" },
-  { id: "bebe-berco", name: "Berço (opcional)", emoji: "🛏️", price: 150, category: "bebe" },
+  { id: "ceu-sol", name: "Sol radiante", emoji: "☀️", price: 120, type: "ceu", premium: true },
+  { id: "ceu-arcoiris", name: "Arco-íris", emoji: "🌈", price: 150, type: "ceu", premium: true },
+  { id: "ceu-lua", name: "Lua e estrelas", emoji: "🌙", price: 140, type: "ceu", premium: true },
+  {
+    id: "fundo-quartinho",
+    name: "Quartinho aconchegante",
+    emoji: "🧸",
+    price: 220,
+    type: "fundo",
+    premium: true,
+  },
+  { id: "fundo-mar", name: "Ondas do mar", emoji: "🌊", price: 280, type: "fundo", premium: true },
+  {
+    id: "fundo-estrelas",
+    name: "Chuva de estrelas",
+    emoji: "🌠",
+    price: 250,
+    type: "fundo",
+    premium: true,
+  },
+  {
+    id: "fundo-aurora",
+    name: "Aurora boreal",
+    emoji: "🌌",
+    price: 300,
+    type: "fundo",
+    premium: true,
+  },
+  {
+    id: "especial-cascata",
+    name: "Cascata",
+    emoji: "💧",
+    price: 300,
+    type: "especial",
+    premium: true,
+  },
+  {
+    id: "especial-arvore",
+    name: "Árvore que cresce",
+    emoji: "🌳",
+    price: 350,
+    type: "especial",
+    premium: true,
+  },
+  {
+    id: "especial-dianoite",
+    name: "Ciclo dia/noite",
+    emoji: "🌗",
+    price: 400,
+    type: "especial",
+    premium: true,
+  },
+  {
+    id: "especial-outono",
+    name: "Outono",
+    emoji: "🍂",
+    price: 160,
+    type: "especial",
+    premium: true,
+  },
+  { id: "especial-natal", name: "Natal", emoji: "🎄", price: 180, type: "especial", premium: true },
 ];
 
 export const CANTINHO_BY_ID: Record<string, CantinhoItem> = Object.fromEntries(
   CANTINHO_ITEMS.map((i) => [i.id, i]),
 );
+
+/** Gradiente de fundo (papel de parede) por item `fundo`, aplicado no Caminho. */
+export const CANTINHO_FUNDO_BG: Record<string, string> = {
+  "fundo-amanhecer": "linear-gradient(180deg,#fde7c8 0%,#fbcfa0 40%,#f6e6cf 100%)",
+  "fundo-quartinho": "linear-gradient(180deg,#f3e8ff 0%,#fde2e4 55%,#fff 100%)",
+  "fundo-mar": "linear-gradient(180deg,#cdeffd 0%,#8fd3f4 55%,#e6f7ff 100%)",
+  "fundo-estrelas": "linear-gradient(180deg,#1e2a5a 0%,#39306b 55%,#5b4b8a 100%)",
+  "fundo-aurora": "linear-gradient(180deg,#0b2f3a 0%,#12664f 45%,#1f8a6b 80%,#0b2f3a 100%)",
+};

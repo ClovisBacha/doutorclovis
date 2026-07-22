@@ -32,10 +32,16 @@ export const getCantinho = createServerFn({ method: "POST" })
       0,
     );
     const { data: owned } = await db.from("cantinho_items").select("item_id").eq("user_id", uid);
+    const { data: prof } = await supabaseAdmin
+      .from("patient_profiles")
+      .select("quiz_premium")
+      .eq("id", uid)
+      .single();
     return {
       ok: true as const,
       balance,
       owned: ((owned ?? []) as { item_id: string }[]).map((r) => r.item_id),
+      premium: Boolean((prof as { quiz_premium?: boolean } | null)?.quiz_premium),
     };
   });
 
@@ -50,6 +56,17 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
     const item = CANTINHO_BY_ID[data.itemId];
     if (!item) return { ok: false as const, error: "Item inexistente" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Gate de Premium no servidor: item premium só p/ assinante (nunca confia no cliente).
+    if (item.premium) {
+      const { data: prof } = await supabaseAdmin
+        .from("patient_profiles")
+        .select("quiz_premium")
+        .eq("id", uid)
+        .single();
+      if (!(prof as { quiz_premium?: boolean } | null)?.quiz_premium) {
+        return { ok: false as const, error: "Item exclusivo do Premium" };
+      }
+    }
     // A função buy_cantinho_item não está nos tipos gerados; cast tipado.
     const rpc = supabaseAdmin.rpc as unknown as (
       fn: string,
