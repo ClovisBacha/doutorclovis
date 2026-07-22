@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb, type SementinhasLedgerRow } from "@/integrations/supabase/types.extended";
 import { isCareModeActive } from "@/lib/care-mode.functions";
+import { COURSE_MODULES } from "@/lib/course-modules";
 
 /**
  * Sementinhas 🌱 — moeda de recompensa da paciente.
@@ -122,8 +123,8 @@ export const grantLessonReward = createServerFn({ method: "POST" })
     z
       .object({
         accessToken: z.string().min(10),
-        week: z.number().int(),
-        correct: z.number().int().min(0),
+        week: z.number().int().min(1).max(45),
+        correct: z.number().int().min(0).max(20),
       })
       .parse(i),
   )
@@ -134,6 +135,13 @@ export const grantLessonReward = createServerFn({ method: "POST" })
     if (error || !u.user) return { ok: false as const, error: "Não autenticado" };
     const uid = u.user.id;
     if (await isCareModeActive(supabaseAdmin, uid)) return { ok: true as const, granted: 0 };
+
+    // ANTI-FRAUDE: a semana e o nº de acertos são validados contra o CURSO real
+    // no servidor — o cliente não define o valor creditado. Semana inexistente
+    // não paga; `correct` é limitado ao nº de perguntas daquela lição.
+    const mod = COURSE_MODULES.find((mm) => mm.week === data.week);
+    if (!mod) return { ok: true as const, granted: 0 };
+    const correct = Math.max(0, Math.min(data.correct, mod.quiz.length));
 
     const { data: prof } = await supabaseAdmin
       .from("patient_profiles")
@@ -157,7 +165,7 @@ export const grantLessonReward = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) return { ok: true as const, granted: 0 };
 
-    const amount = 10 + 3 * data.correct; // base + bônus por acerto
+    const amount = 10 + 3 * correct; // base + bônus por acerto (limitado)
     await grantSementinhas(db, uid, [
       { amount, reason: `Lição da semana ${data.week} 📚`, dedupeKey },
     ]);
