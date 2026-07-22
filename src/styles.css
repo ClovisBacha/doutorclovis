@@ -1048,3 +1048,82 @@ button:active > .duo3d {
     animation: none;
   }
 }
+
+/* ══════════ Imersão do quiz (Duolingo) + itens animados no Caminho ══════════ */
+@keyframes dc-quiz-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes dc-q-slide {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes dc-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes dc-result-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-8deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.18) rotate(3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes dc-float {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-7px) rotate(3deg);
+  }
+}
+.dc-quiz-in {
+  animation: dc-quiz-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.dc-q-slide {
+  animation: dc-q-slide 240ms ease-out both;
+}
+.dc-pop {
+  animation: dc-pop 420ms ease both;
+}
+.dc-result-in {
+  animation: dc-result-in 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.dc-float {
+  animation: dc-float 3.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-quiz-in,
+  .dc-q-slide,
+  .dc-pop,
+  .dc-result-in,
+  .dc-float {
+    animation: none !important;
+  }
+}

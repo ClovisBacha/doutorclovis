@@ -1691,8 +1691,13 @@ export function GestacaoPath({
           return (
             <span
               key={id}
-              className="pointer-events-none absolute select-none text-3xl opacity-90 drop-shadow-sm"
-              style={{ left: `${left}%`, top: `${top}%`, transform: "translate(-50%,-50%)" }}
+              className="dc-float pointer-events-none absolute select-none text-3xl opacity-90 drop-shadow-sm"
+              style={{
+                left: `${left}%`,
+                top: `${top}%`,
+                transform: "translate(-50%,-50%)",
+                animationDelay: `${(h % 20) * 0.16}s`,
+              }}
               aria-hidden
               title={item.name}
             >
@@ -2996,7 +3001,7 @@ function DailyQuizBlock({
       {/* Experiência em tela cheia (Duolingo) */}
       {open && (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-white"
+          className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-violet-50 via-white to-fuchsia-50"
           style={{ paddingTop: "var(--safe-top)" }}
         >
           <div className="flex items-center gap-3 px-4 py-3">
@@ -3042,7 +3047,7 @@ function DailyQuizBlock({
             )}
 
             {phase === "quiz" && q && (
-              <div>
+              <div key={qIndex} className="dc-q-slide">
                 <p className="mt-4 text-xs font-bold uppercase tracking-wider text-violet-600">
                   Pergunta {qIndex + 1} de {total}
                 </p>
@@ -3059,9 +3064,12 @@ function DailyQuizBlock({
                     const isCorrectOpt = Array.isArray(q.a) ? q.a.includes(oi) : q.a === oi;
                     const picked = isSel(oi);
                     let cls = "border-slate-200 bg-white text-foreground";
+                    let pop = "";
                     if (checked) {
-                      if (isCorrectOpt) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
-                      else if (picked) cls = "border-rose-400 bg-rose-50 text-rose-700";
+                      if (isCorrectOpt) {
+                        cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
+                        pop = "dc-pop";
+                      } else if (picked) cls = "border-rose-400 bg-rose-50 text-rose-700";
                       else cls = "border-slate-100 text-slate-400";
                     } else if (picked) {
                       cls = "border-violet-500 bg-violet-50 text-violet-900";
@@ -3071,7 +3079,7 @@ function DailyQuizBlock({
                         key={oi}
                         disabled={checked}
                         onClick={() => pick(oi)}
-                        className={`press flex items-center gap-3 rounded-2xl border-2 px-4 py-4 text-left text-base font-semibold transition-colors ${cls}`}
+                        className={`press flex items-center gap-3 rounded-2xl border-2 px-4 py-4 text-left text-base font-semibold transition-colors ${cls} ${pop}`}
                       >
                         {isMulti && (
                           <span
@@ -3108,7 +3116,8 @@ function DailyQuizBlock({
 
             {phase === "done" && (
               <div className="mt-8 flex flex-col items-center text-center">
-                <p className="text-6xl">
+                {!careMode && score > 0 && <ConfettiBurst big={score === total} />}
+                <p className="dc-result-in text-6xl">
                   {score === total ? "🏆" : score >= total - 1 ? "🎉" : score > 0 ? "👏" : "💪"}
                 </p>
                 <h3 className="mt-3 text-2xl font-extrabold">
