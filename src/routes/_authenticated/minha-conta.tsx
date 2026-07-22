@@ -11650,6 +11650,9 @@ function CantinhoTab() {
     } else {
       toast(res.error ?? "Não foi possível comprar");
       if (typeof res.balance === "number") setSaldo(res.balance);
+      // Já possuído (ex.: comprado em outro aparelho): reflete na hora.
+      if (res.error === "Você já tem este item")
+        setOwned((o) => (o.includes(itemId) ? o : [...o, itemId]));
     }
     setBuying(null);
   }

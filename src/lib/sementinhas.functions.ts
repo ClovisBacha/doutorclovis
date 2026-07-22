@@ -107,36 +107,7 @@ export const getWallet = createServerFn({ method: "POST" })
     return { ok: true as const, ...(await walletPayload(db, u.user.id)) };
   });
 
-/**
- * Gasta Sementinhas (ex.: comprar item do Cantinho). Recusa se saldo < custo.
- * Baixa concorrência esperada: verifica-e-insere (nada é deletado do ledger).
- */
-export const spendSementinhas = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) =>
-    z
-      .object({
-        accessToken: z.string().min(10),
-        cost: z.number().int().positive(),
-        reason: z.string().min(1).max(200),
-      })
-      .parse(i),
-  )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const db = typedDb(supabaseAdmin);
-    const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
-    if (error || !u.user) return { ok: false as const, error: "Não autenticado" };
-    const uid = u.user.id;
-    const balance = await computeBalance(db, uid);
-    if (balance < data.cost) {
-      return { ok: false as const, error: "Sementinhas insuficientes", balance };
-    }
-    const { error: insErr } = await db.from("sementinhas_ledger").insert({
-      user_id: uid,
-      amount: -data.cost,
-      reason: data.reason,
-      dedupe_key: null,
-    });
-    if (insErr) return { ok: false as const, error: "Falha ao registrar o gasto", balance };
-    return { ok: true as const, balance: balance - data.cost };
-  });
+// Nota: o GASTO de Sementinhas é feito pela RPC atômica buy_cantinho_item
+// (ver cantinho.functions.ts) — com advisory lock por usuário, sem risco de
+// saldo negativo. Não há função genérica de gasto de propósito, pra evitar um
+// caminho não-atômico que furasse essa garantia.
