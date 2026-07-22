@@ -4,6 +4,15 @@ import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
+import { getCantinho } from "@/lib/cantinho.functions";
+import { CANTINHO_BY_ID, CANTINHO_FUNDO_BG } from "@/lib/cantinho";
+
+/** Hash estável de string → número (posiciona decorações de forma determinística). */
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
 import {
   quizForDay,
   quizEmojiForDay,
@@ -857,6 +866,9 @@ export function GestacaoPath({
   const [stickers, setStickers] = useState<number[]>([]);
   const [doneDays, setDoneDays] = useState<number[]>([]);
   const [saldo, setSaldo] = useState<number | null>(null);
+  // Itens do Cantinho que decoram o Caminho (não-fundo) + o fundo ativo.
+  const [decor, setDecor] = useState<string[]>([]);
+  const [fundoBg, setFundoBg] = useState<string | null>(null);
   const [checkin, setCheckin] = useState<Checkin>({ last: "", streak: 0 });
   const [dayTasks, setDayTasks] = useState<Record<string, boolean>>({});
   // Estado dedicado do dia de HOJE: alimenta o anel segmentado sem vazar o
@@ -880,8 +892,16 @@ export function GestacaoPath({
         const token = s.session?.access_token;
         if (!token) return;
         const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
-        // Modo Cuidado: esconde a barra de moeda (não celebra).
+        // Modo Cuidado: esconde a barra de moeda e as decorações (não celebra).
         if (w.ok) setSaldo(w.careMode ? null : w.balance);
+        if (w.ok && w.careMode) return;
+        // Itens comprados decoram o Caminho.
+        const c = await getCantinho({ data: { accessToken: token } });
+        if (c.ok) {
+          setDecor(c.owned.filter((id) => CANTINHO_BY_ID[id]?.type !== "fundo"));
+          const fundo = c.owned.filter((id) => CANTINHO_FUNDO_BG[id]).at(-1);
+          setFundoBg(fundo ? CANTINHO_FUNDO_BG[fundo] : null);
+        }
       } catch {
         /* saldo é secundário */
       }
@@ -1654,6 +1674,34 @@ export function GestacaoPath({
       {/* ── Caminho contínuo em tela cheia (Duolingo-style) ──
           Sem caixa nem scroll interno: a página inteira É o caminho. */}
       <div ref={pathRef} className="relative -mx-5 md:mx-0" style={{ height: `${height}px` }}>
+        {/* Cenário (papel de parede) equipado — atrás de tudo */}
+        {fundoBg && (
+          <div
+            className="pointer-events-none absolute inset-0 select-none rounded-2xl opacity-55"
+            style={{ background: fundoBg }}
+            aria-hidden
+          />
+        )}
+        {/* Itens do Cantinho decoram as margens da trilha (não cobrem as lições) */}
+        {decor.map((id, k) => {
+          const item = CANTINHO_BY_ID[id];
+          if (!item) return null;
+          const h = hashStr(id);
+          const side = k % 2;
+          const left = side === 0 ? 3 + (h % 9) : 88 + (h % 9);
+          const top = 6 + ((h >> 4) % 88);
+          return (
+            <span
+              key={id}
+              className="pointer-events-none absolute select-none text-3xl opacity-90 drop-shadow-sm"
+              style={{ left: `${left}%`, top: `${top}%`, transform: "translate(-50%,-50%)" }}
+              aria-hidden
+              title={item.name}
+            >
+              {item.emoji}
+            </span>
+          );
+        })}
         {/* Pegadas do bebê no trecho já percorrido (atrás das moedas) */}
         {footsteps.map((f) => (
           <div
