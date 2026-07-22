@@ -112,6 +112,58 @@ export const getWallet = createServerFn({ method: "POST" })
     return { ok: true as const, ...(await walletPayload(db, u.user.id)) };
   });
 
+/**
+ * Recompensa por concluir a lição do quiz. NUNCA punitivo: base por concluir +
+ * bônus por acerto. Idempotente por lição (dedupe), escopado ao ciclo. Devolve
+ * quanto foi concedido AGORA (0 se já havia ganhado ou em Modo Cuidado).
+ */
+export const grantLessonReward = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        week: z.number().int(),
+        correct: z.number().int().min(0),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = typedDb(supabaseAdmin);
+    const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (error || !u.user) return { ok: false as const, error: "Não autenticado" };
+    const uid = u.user.id;
+    if (await isCareModeActive(supabaseAdmin, uid)) return { ok: true as const, granted: 0 };
+
+    const { data: prof } = await supabaseAdmin
+      .from("patient_profiles")
+      .select("lmp_date, reference_date, birth_date")
+      .eq("id", uid)
+      .single();
+    const p = prof as {
+      lmp_date?: string | null;
+      reference_date?: string | null;
+      birth_date?: string | null;
+    } | null;
+    const cycle = p?.lmp_date ?? p?.reference_date ?? p?.birth_date ?? "x";
+    const dedupeKey = `lesson:${cycle}:${data.week}`;
+
+    // Já ganhou por esta lição? (idempotência transparente p/ o "você ganhou X")
+    const { data: existing } = await db
+      .from("sementinhas_ledger")
+      .select("amount")
+      .eq("user_id", uid)
+      .eq("dedupe_key", dedupeKey)
+      .maybeSingle();
+    if (existing) return { ok: true as const, granted: 0 };
+
+    const amount = 10 + 3 * data.correct; // base + bônus por acerto
+    await grantSementinhas(db, uid, [
+      { amount, reason: `Lição da semana ${data.week} 📚`, dedupeKey },
+    ]);
+    return { ok: true as const, granted: amount };
+  });
+
 // Nota: o GASTO de Sementinhas é feito pela RPC atômica buy_cantinho_item
 // (ver cantinho.functions.ts) — com advisory lock por usuário, sem risco de
 // saldo negativo. Não há função genérica de gasto de propósito, pra evitar um

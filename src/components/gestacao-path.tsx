@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
-import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
+import { claimDailyAndGetWallet, grantLessonReward } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, CANTINHO_FUNDO_BG } from "@/lib/cantinho";
 
@@ -2286,145 +2286,227 @@ function LessonSheet({
   careMode?: boolean;
 }) {
   const alreadyDone = savedScore != null;
-  // Lição já concluída reabre em modo REVISÃO: respostas corretas destacadas
-  // e resultado com a nota salva — sem quiz em branco reeditável.
-  const [answers, setAnswers] = useState<(number | null)[]>(() =>
-    alreadyDone ? m.quiz.map((q) => q.correct) : Array(m.quiz.length).fill(null),
-  );
-  const [checked, setChecked] = useState(alreadyDone);
+  const total = m.quiz.length;
   const tm = trimMeta(m.week);
-  const score = alreadyDone
-    ? savedScore
-    : checked
-      ? Math.round((m.quiz.filter((q, i) => answers[i] === q.correct).length / m.quiz.length) * 100)
-      : 0;
+  const [phase, setPhase] = useState<"intro" | "quiz" | "done">("intro");
+  const [qIndex, setQIndex] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [reward, setReward] = useState<number | null>(null);
+  const finishedRef = useRef(false);
 
-  function verify() {
-    const s = Math.round(
-      (m.quiz.filter((q, i) => answers[i] === q.correct).length / m.quiz.length) * 100,
-    );
+  const q = m.quiz[qIndex];
+  const score = alreadyDone ? (savedScore ?? 0) : Math.round((correctCount / total) * 100);
+  const progressPct =
+    phase === "done" ? 100 : phase === "intro" ? 4 : Math.round((qIndex / total) * 100);
+
+  function startQuiz() {
+    setPhase("quiz");
+    setQIndex(0);
+    setSelected(alreadyDone ? m.quiz[0].correct : null);
+    setChecked(alreadyDone);
+  }
+
+  function check() {
+    if (selected == null) return;
     setChecked(true);
-    if (!alreadyDone) onComplete(s);
+    if (selected === q.correct) setCorrectCount((c) => c + 1);
+  }
+
+  async function finish(finalCorrect: number) {
+    setPhase("done");
+    if (alreadyDone || finishedRef.current) return;
+    finishedRef.current = true;
+    onComplete(Math.round((finalCorrect / total) * 100));
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (token) {
+        const r = await grantLessonReward({
+          data: { accessToken: token, week: m.week, correct: finalCorrect },
+        });
+        if (r.ok) setReward(r.granted);
+      }
+    } catch {
+      /* recompensa é secundária */
+    }
+  }
+
+  function next() {
+    // correctCount já foi incrementado em check(); no último passo reflete tudo.
+    if (qIndex + 1 >= total) {
+      finish(correctCount);
+      return;
+    }
+    const ni = qIndex + 1;
+    setQIndex(ni);
+    setSelected(alreadyDone ? m.quiz[ni].correct : null);
+    setChecked(alreadyDone);
   }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end"
-      style={{ background: "rgba(0,0,0,0.2)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex flex-col bg-white"
+      style={{ paddingTop: "var(--safe-top)" }}
     >
-      <div
-        className="relative max-h-[88vh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 pb-10 shadow-2xl"
-        style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {revealing && !careMode && <ConfettiBurst />}
-        <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
+      {revealing && !careMode && <ConfettiBurst />}
 
-        <div className="mb-4 flex items-center gap-3">
+      {/* Topo: fechar + progresso */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button
+          onClick={onClose}
+          aria-label="Fechar"
+          className="press text-2xl leading-none text-slate-400"
+        >
+          ✕
+        </button>
+        <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200">
           <div
-            className="duo3d flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-3xl"
-            style={
-              {
-                background: alreadyDone ? "#f59e0b" : tm.main,
-                "--lip": alreadyDone ? "#b45309" : tm.lip,
-              } as React.CSSProperties
-            }
-          >
-            {alreadyDone ? "⭐" : "📚"}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Lição · Semana {m.week}
-              {alreadyDone && (
-                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-600">
-                  completa · {savedScore}%
-                </span>
-              )}
-            </p>
-            <h3 className="mt-0.5 text-xl font-extrabold">{m.title}</h3>
-            <p className="text-xs text-muted-foreground">{m.theme}</p>
-          </div>
+            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
         </div>
+      </div>
 
-        {/* Conteúdo da lição */}
-        <div className="mb-4 rounded-2xl bg-violet-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
-            📖 Para aprender hoje
-          </p>
-          <p className="mt-1.5 text-sm leading-relaxed text-violet-950">{m.content}</p>
-        </div>
-
-        {/* Quiz — responda as 3 para ganhar a estrela */}
-        <div className="mb-2 rounded-2xl bg-emerald-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-            ✏️ Quiz — responda para ganhar a estrela
-          </p>
-          {m.quiz.map((q, qi) => (
-            <div key={qi} className="mt-3">
-              <p className="text-sm font-bold text-emerald-950">
-                {qi + 1}. {q.question}
-              </p>
-              <div className="mt-1.5 flex flex-col gap-1.5">
-                {q.options.map((opt, oi) => {
-                  let cls = "border-emerald-200 bg-white text-emerald-950";
-                  if (checked) {
-                    if (oi === q.correct)
-                      cls = "border-emerald-500 bg-emerald-100 text-emerald-800";
-                    else if (oi === answers[qi]) cls = "border-rose-300 bg-rose-50 text-rose-700";
-                    else cls = "border-emerald-100 bg-white text-slate-400";
-                  } else if (answers[qi] === oi) {
-                    cls = "border-emerald-500 bg-emerald-100 text-emerald-900";
-                  }
-                  return (
-                    <button
-                      key={oi}
-                      disabled={checked}
-                      onClick={() =>
-                        setAnswers((prev) => {
-                          const next = [...prev];
-                          next[qi] = oi;
-                          return next;
-                        })
-                      }
-                      className={`press rounded-xl border-2 px-3 py-2 text-left text-sm font-medium transition-colors ${cls}`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-          {!checked ? (
-            <button
-              onClick={verify}
-              disabled={answers.some((a) => a === null)}
-              className="press mt-4 w-full rounded-full bg-emerald-500 py-3 text-sm font-extrabold text-white disabled:opacity-40"
-            >
-              Verificar respostas
-            </button>
-          ) : (
-            <div className="mt-4 rounded-2xl bg-white p-4 text-center">
-              <p className="text-2xl">{score === 100 ? "🏆" : score >= 67 ? "🎉" : "💪"}</p>
-              <p className="mt-1 text-sm font-extrabold">
-                {score === 100
-                  ? "Perfeito! Você acertou tudo!"
-                  : score >= 67
-                    ? "Muito bem! Lição completa."
-                    : "Lição completa — releia o conteúdo para fixar!"}
-              </p>
-              <p className="text-xs text-muted-foreground">{score}% de acerto</p>
-              <button
-                onClick={onClose}
-                className="press mt-3 rounded-full bg-pink-500 px-6 py-2.5 text-sm font-extrabold text-white"
+      <div className="flex-1 overflow-y-auto px-5 pb-4">
+        {phase === "intro" && (
+          <div>
+            <div className="mt-4 flex flex-col items-center text-center">
+              <div
+                className="duo3d flex h-20 w-20 items-center justify-center rounded-3xl text-4xl"
+                style={{ background: tm.main, "--lip": tm.lip } as React.CSSProperties}
               >
-                Voltar ao caminho
-              </button>
+                📚
+              </div>
+              <p className="mt-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Lição · Semana {m.week}
+                {alreadyDone && <span className="ml-1 text-amber-500">· ⭐ {savedScore}%</span>}
+              </p>
+              <h3 className="mt-1 text-2xl font-extrabold leading-tight">{m.title}</h3>
+              <p className="text-sm text-muted-foreground">{m.theme}</p>
             </div>
-          )}
-        </div>
+            <div className="mt-5 rounded-2xl bg-violet-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-violet-600">
+                📖 Para aprender hoje
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-violet-950">{m.content}</p>
+            </div>
+          </div>
+        )}
+
+        {phase === "quiz" && q && (
+          <div>
+            <p className="mt-4 text-xs font-bold uppercase tracking-wider text-emerald-600">
+              Pergunta {qIndex + 1} de {total}
+            </p>
+            <h3 className="mt-2 text-2xl font-extrabold leading-tight text-foreground">
+              {q.question}
+            </h3>
+            <div className="mt-5 flex flex-col gap-3">
+              {q.options.map((opt, oi) => {
+                let cls = "border-slate-200 bg-white text-foreground";
+                if (checked) {
+                  if (oi === q.correct) cls = "border-emerald-500 bg-emerald-50 text-emerald-800";
+                  else if (oi === selected) cls = "border-rose-400 bg-rose-50 text-rose-700";
+                  else cls = "border-slate-100 text-slate-400";
+                } else if (selected === oi) {
+                  cls = "border-emerald-500 bg-emerald-50 text-emerald-900";
+                }
+                return (
+                  <button
+                    key={oi}
+                    disabled={checked}
+                    onClick={() => setSelected(oi)}
+                    className={`press rounded-2xl border-2 px-4 py-4 text-left text-base font-semibold transition-colors ${cls}`}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+            {checked && (
+              <div
+                className={`mt-4 rounded-2xl p-3 text-sm font-bold ${
+                  alreadyDone || selected === q.correct
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-rose-100 text-rose-700"
+                }`}
+              >
+                {alreadyDone
+                  ? "Resposta correta destacada em verde."
+                  : selected === q.correct
+                    ? "Certíssimo! 🎉"
+                    : "Quase! A resposta certa está em verde. 💛"}
+              </div>
+            )}
+          </div>
+        )}
+
+        {phase === "done" && (
+          <div className="mt-10 flex flex-col items-center text-center">
+            <p className="text-6xl">{score === 100 ? "🏆" : score >= 67 ? "🎉" : "💪"}</p>
+            <h3 className="mt-3 text-2xl font-extrabold">
+              {score === 100 ? "Perfeito!" : score >= 67 ? "Muito bem!" : "Lição completa!"}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {alreadyDone
+                ? `${score}% na sua última tentativa`
+                : `${correctCount} de ${total} acertos · ${score}%`}
+            </p>
+            {!careMode && reward != null && reward > 0 && (
+              <div className="mt-5 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
+                +{reward} 🌱 Sementinhas!
+              </div>
+            )}
+            {!alreadyDone && score < 67 && (
+              <p className="mt-3 max-w-xs text-xs text-muted-foreground">
+                Toda tentativa vale — releia o conteúdo quando quiser pra fixar. 💛
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Barra de ação inferior */}
+      <div
+        className="border-t border-slate-100 p-4"
+        style={{ paddingBottom: "calc(1rem + var(--safe-bottom))" }}
+      >
+        {phase === "intro" && (
+          <button
+            onClick={startQuiz}
+            className="press w-full rounded-full bg-emerald-500 py-3.5 text-sm font-extrabold text-white"
+          >
+            {alreadyDone ? "Revisar as respostas" : "Começar o quiz"}
+          </button>
+        )}
+        {phase === "quiz" && !checked && (
+          <button
+            onClick={check}
+            disabled={selected == null}
+            className="press w-full rounded-full bg-emerald-500 py-3.5 text-sm font-extrabold text-white disabled:opacity-40"
+          >
+            Verificar
+          </button>
+        )}
+        {phase === "quiz" && checked && (
+          <button
+            onClick={next}
+            className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+          >
+            {qIndex + 1 >= total ? "Ver resultado" : "Continuar"}
+          </button>
+        )}
+        {phase === "done" && (
+          <button
+            onClick={onClose}
+            className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+          >
+            Voltar ao caminho
+          </button>
+        )}
       </div>
     </div>
   );
