@@ -123,3 +123,14 @@ ALTER TABLE public.patient_profiles
 -- ════════════════════════════════════════════════════════════════════════
 ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS cantinho_fundo text;
+
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Instagram → 100 Sementinhas: @ da paciente p/ casar com o Story marcado
+-- ════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS instagram_handle text;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_profiles_instagram_handle
+  ON public.patient_profiles (instagram_handle)
+  WHERE instagram_handle IS NOT NULL;

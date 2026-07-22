@@ -9,7 +9,7 @@ import {
   grantDailyQuizReward,
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
-import { CANTINHO_BY_ID, CANTINHO_FUNDO_BG } from "@/lib/cantinho";
+import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
 
 /** Hash estável de string → número (posiciona decorações de forma determinística). */
 function hashStr(s: string): number {
@@ -897,8 +897,9 @@ export function GestacaoPath({
         const c = await getCantinho({ data: { accessToken: token } });
         if (c.ok) {
           setDecor(c.owned.filter((id) => CANTINHO_BY_ID[id]?.type !== "fundo"));
-          // Cenário = o fundo EQUIPADO (escolhido na loja).
-          setFundoBg(c.equippedFundo ? (CANTINHO_FUNDO_BG[c.equippedFundo] ?? null) : null);
+          // Cenário = o fundo EQUIPADO (escolhido na loja). O Fundo Suave grátis
+          // troca de tom pela semana gestacional.
+          setFundoBg(fundoBgFor(c.equippedFundo, currentWeek));
         }
       } catch {
         /* saldo é secundário */

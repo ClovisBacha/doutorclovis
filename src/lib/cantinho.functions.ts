@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
-import { CANTINHO_BY_ID } from "@/lib/cantinho";
+import { CANTINHO_BY_ID, CANTINHO_ITEMS } from "@/lib/cantinho";
+
+/** Itens grátis (preço 0) — sempre possuídos, não precisam de compra. */
+const FREE_ITEM_IDS = CANTINHO_ITEMS.filter((i) => i.price <= 0).map((i) => i.id);
+/** Cenário grátis padrão, equipado quando a paciente ainda não escolheu nenhum. */
+const DEFAULT_FUNDO = "fundo-simples";
 
 /**
  * Backend do Meu Cantinho. Toda compra valida o PREÇO pelo catálogo do servidor
@@ -38,12 +43,16 @@ export const getCantinho = createServerFn({ method: "POST" })
       .eq("id", uid)
       .single();
     const p = prof as { quiz_premium?: boolean; cantinho_fundo?: string | null } | null;
+    // Itens grátis entram como possuídos sempre (sem linha na tabela de compras).
+    const ownedIds = new Set(((owned ?? []) as { item_id: string }[]).map((r) => r.item_id));
+    for (const id of FREE_ITEM_IDS) ownedIds.add(id);
     return {
       ok: true as const,
       balance,
-      owned: ((owned ?? []) as { item_id: string }[]).map((r) => r.item_id),
+      owned: [...ownedIds],
       premium: Boolean(p?.quiz_premium),
-      equippedFundo: p?.cantinho_fundo ?? null,
+      // Sem escolha própria, começa com o cenário grátis (Caminho nunca fica em branco).
+      equippedFundo: p?.cantinho_fundo ?? DEFAULT_FUNDO,
     };
   });
 
@@ -57,6 +66,8 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
     if (!uid) return { ok: false as const, error: "Não autenticado" };
     const item = CANTINHO_BY_ID[data.itemId];
     if (!item) return { ok: false as const, error: "Item inexistente" };
+    // Item grátis não passa pela compra — já é da paciente desde o início.
+    if (item.price <= 0) return { ok: false as const, error: "Este item já é seu 💛" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Gate de Premium no servidor: item premium só p/ assinante (nunca confia no cliente).
     if (item.premium) {
@@ -105,15 +116,18 @@ export const setCantinhoFundo = createServerFn({ method: "POST" })
     if (data.fundoId) {
       const item = CANTINHO_BY_ID[data.fundoId];
       if (!item || item.type !== "fundo") return { ok: false as const, error: "Cenário inválido" };
-      // Precisa possuir o item pra equipar.
-      const db = typedDb(supabaseAdmin);
-      const { data: owned } = await db
-        .from("cantinho_items")
-        .select("item_id")
-        .eq("user_id", uid)
-        .eq("item_id", data.fundoId)
-        .maybeSingle();
-      if (!owned) return { ok: false as const, error: "Você ainda não tem este cenário" };
+      // Item grátis dispensa a checagem de posse (sempre é da paciente).
+      if (item.price > 0) {
+        // Precisa possuir o item pra equipar.
+        const db = typedDb(supabaseAdmin);
+        const { data: owned } = await db
+          .from("cantinho_items")
+          .select("item_id")
+          .eq("user_id", uid)
+          .eq("item_id", data.fundoId)
+          .maybeSingle();
+        if (!owned) return { ok: false as const, error: "Você ainda não tem este cenário" };
+      }
     }
     const { error: upErr } = await (
       supabaseAdmin.from("patient_profiles") as unknown as {

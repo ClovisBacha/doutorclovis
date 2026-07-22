@@ -65,6 +65,7 @@ import {
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import { CANTINHO_ITEMS, CANTINHO_CATEGORIES, type CantinhoType } from "@/lib/cantinho";
 import { getCantinho, buyCantinhoItem, setCantinhoFundo } from "@/lib/cantinho.functions";
+import { getInstagramShare, setInstagramHandle } from "@/lib/instagram.functions";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
@@ -917,7 +918,7 @@ function MinhaContaPage() {
               )}
               {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
               {tab === "Conquistas" && <ConquistasTab />}
-              {tab === "Cantinho" && <CantinhoTab />}
+              {tab === "Cantinho" && <CantinhoTab careMode={careMode} />}
               {tab === "Loja" && <LojaTab gest={gest} />}
               {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
               {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
@@ -11755,7 +11756,123 @@ function ProductSheet({
 }
 
 /* ---------- Meu Cantinho 🌱 (spend das Sementinhas) ---------- */
-function CantinhoTab() {
+/**
+ * Card "Compartilhe no Instagram e ganhe 100 🌱". Só aparece quando a integração
+ * está configurada na Meta (enabled) — assim nunca prometemos algo que ainda não
+ * credita. A paciente registra o @ dela; ao marcar @obstetrica.app num Story, o
+ * webhook casa e credita automático (no máx. 1x/semana). Sem aprovação manual.
+ */
+function InstagramShareCard() {
+  const [state, setState] = useState<{
+    enabled: boolean;
+    handle: string | null;
+    reward: number;
+    tag: string;
+    rewardedThisWeek: boolean;
+  } | null>(null);
+  const [input, setInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const res = await getInstagramShare({ data: { accessToken: s.session.access_token } });
+      if (res.ok) {
+        setState({
+          enabled: res.enabled,
+          handle: res.handle,
+          reward: res.reward,
+          tag: res.tag,
+          rewardedThisWeek: res.rewardedThisWeek,
+        });
+        setInput(res.handle ?? "");
+      }
+    })();
+  }, []);
+
+  async function save() {
+    if (saving) return;
+    setSaving(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) {
+      setSaving(false);
+      return;
+    }
+    const res = await setInstagramHandle({
+      data: { accessToken: s.session.access_token, handle: input },
+    });
+    if (res.ok) {
+      setState((st) => (st ? { ...st, handle: res.handle } : st));
+      toast(res.handle ? "Instagram salvo! 📸" : "Instagram removido");
+    } else {
+      toast(res.error ?? "Não foi possível salvar");
+    }
+    setSaving(false);
+  }
+
+  // Integração desligada (Meta ainda não configurada) → não mostra nada.
+  if (!state || !state.enabled) return null;
+
+  return (
+    <div className="rounded-3xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 via-white to-rose-50 p-5">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">📸</span>
+        <p className="text-sm font-extrabold text-fuchsia-700">
+          Compartilhe e ganhe {state.reward} 🌱
+        </p>
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+        Poste um Story marcando <span className="font-bold">@{state.tag}</span> mostrando seu
+        progresso e ganhe <span className="font-bold">{state.reward} Sementinhas</span> —
+        automático, até 1x por semana. 💜
+      </p>
+
+      {state.rewardedThisWeek && (
+        <p className="mt-2 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
+          Você já ganhou esta semana ✓ Obrigado por compartilhar!
+        </p>
+      )}
+
+      <label className="mt-3 block text-xs font-semibold text-muted-foreground">
+        Seu @ do Instagram (pra gente reconhecer você)
+      </label>
+      <div className="mt-1 flex gap-2">
+        <div className="flex flex-1 items-center rounded-full border border-border bg-white px-3">
+          <span className="text-sm text-muted-foreground">@</span>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value.replace(/^@+/, ""))}
+            placeholder="seu.usuario"
+            className="w-full bg-transparent px-1 py-2 text-sm outline-none"
+            autoCapitalize="none"
+            autoCorrect="off"
+          />
+        </div>
+        <button
+          onClick={save}
+          disabled={saving || input.trim() === (state.handle ?? "")}
+          className="press shrink-0 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+        >
+          Salvar
+        </button>
+      </div>
+
+      {state.handle && (
+        <a
+          href="https://instagram.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="press mt-3 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-rose-500 py-2.5 text-sm font-extrabold text-white"
+        >
+          Abrir o Instagram e postar
+        </a>
+      )}
+    </div>
+  );
+}
+
+function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
   const [owned, setOwned] = useState<string[]>([]);
@@ -11873,6 +11990,9 @@ function CantinhoTab() {
           </div>
         )}
       </div>
+
+      {/* Ganhe compartilhando no Instagram (aparece só quando a Meta está ligada) */}
+      {!careMode && <InstagramShareCard />}
 
       {/* Loja de itens */}
       <div>

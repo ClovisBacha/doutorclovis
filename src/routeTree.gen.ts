@@ -46,6 +46,7 @@ import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
+import { Route as ApiInstagramWebhookRouteImport } from './routes/api/instagram-webhook'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
 import { Route as AlbumTokenRouteImport } from './routes/album.$token'
@@ -240,6 +241,11 @@ const ApiMpWebhookRoute = ApiMpWebhookRouteImport.update({
   path: '/api/mp-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInstagramWebhookRoute = ApiInstagramWebhookRouteImport.update({
+  id: '/api/instagram-webhook',
+  path: '/api/instagram-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -322,6 +328,7 @@ export interface FileRoutesByFullPath {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
@@ -369,6 +376,7 @@ export interface FileRoutesByTo {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
@@ -418,6 +426,7 @@ export interface FileRoutesById {
   '/album/$token': typeof AlbumTokenRoute
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
@@ -467,6 +476,7 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/instagram-webhook'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/stripe-webhook'
@@ -514,6 +524,7 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/instagram-webhook'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/stripe-webhook'
@@ -562,6 +573,7 @@ export interface FileRouteTypes {
     | '/album/$token'
     | '/api/carta-semanal'
     | '/api/chat'
+    | '/api/instagram-webhook'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/stripe-webhook'
@@ -608,6 +620,7 @@ export interface RootRouteChildren {
   AlbumTokenRoute: typeof AlbumTokenRoute
   ApiCartaSemanalRoute: typeof ApiCartaSemanalRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiInstagramWebhookRoute: typeof ApiInstagramWebhookRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
@@ -881,6 +894,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMpWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/instagram-webhook': {
+      id: '/api/instagram-webhook'
+      path: '/api/instagram-webhook'
+      fullPath: '/api/instagram-webhook'
+      preLoaderRoute: typeof ApiInstagramWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -996,6 +1016,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlbumTokenRoute: AlbumTokenRoute,
   ApiCartaSemanalRoute: ApiCartaSemanalRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiInstagramWebhookRoute: ApiInstagramWebhookRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
