@@ -17,8 +17,6 @@ import {
 const FREE_ITEM_IDS = CANTINHO_ITEMS.filter(
   (i) => i.price <= 0 && i.id !== CANTINHO_COMPLETIONIST_ID,
 ).map((i) => i.id);
-/** Cenário grátis padrão, equipado quando a paciente ainda não escolheu nenhum. */
-const DEFAULT_FUNDO = "fundo-simples";
 
 /**
  * Backend do Meu Cantinho. Toda compra valida o PREÇO pelo catálogo do servidor
@@ -67,8 +65,9 @@ export const getCantinho = createServerFn({ method: "POST" })
       balance,
       owned: [...ownedIds],
       premium: Boolean(p?.quiz_premium),
-      // Sem escolha própria, começa com o cenário grátis (Caminho nunca fica em branco).
-      equippedFundo: p?.cantinho_fundo ?? DEFAULT_FUNDO,
+      // Nada por padrão: o Caminho só ganha cenário quando a paciente ESCOLHE
+      // um fundo que possui (nada aparece sem ela querer).
+      equippedFundo: p?.cantinho_fundo ?? null,
       collectionComplete,
       collectionOwned,
       collectionTotal: CANTINHO_COMPLETION_REQUIRED.length,
