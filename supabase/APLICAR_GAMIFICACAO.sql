@@ -131,5 +131,6 @@ ALTER TABLE public.patient_profiles
 ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS instagram_handle text;
 
-CREATE INDEX IF NOT EXISTS idx_patient_profiles_instagram_handle
-  ON public.patient_profiles (instagram_handle);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_profiles_instagram_handle
+  ON public.patient_profiles (instagram_handle)
+  WHERE instagram_handle IS NOT NULL;

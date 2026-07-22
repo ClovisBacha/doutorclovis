@@ -46,9 +46,18 @@ function dedupeKeyThisWeek(): string {
   return `instagram_share:${weekBucketSaoPaulo()}`;
 }
 
-/** A integração só "existe" pra paciente quando a Meta está configurada. */
+/**
+ * A integração só "existe" pra paciente quando a Meta está TOTALMENTE
+ * configurada. Inclui o PAGE_TOKEN de propósito: sem ele, o webhook não
+ * resolve o @ de quem marcou no Story e as 100 🌱 nunca cairiam — então o card
+ * não deve aparecer prometendo algo que não credita.
+ */
 export function instagramConfigured(): boolean {
-  return Boolean(process.env.INSTAGRAM_APP_SECRET && process.env.INSTAGRAM_VERIFY_TOKEN);
+  return Boolean(
+    process.env.INSTAGRAM_APP_SECRET &&
+    process.env.INSTAGRAM_VERIFY_TOKEN &&
+    process.env.INSTAGRAM_PAGE_TOKEN,
+  );
 }
 
 async function authUid(accessToken: string): Promise<string | null> {
@@ -159,6 +168,15 @@ export const setInstagramHandle = createServerFn({ method: "POST" })
     }
     const value = norm || null;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Anti-roubo de crédito: um @ pertence a UMA conta. Se outra paciente já
+    // registrou este @, recusa (senão o webhook creditaria a conta errada num
+    // empate). O índice único no banco é a garantia final; isto dá a mensagem.
+    if (value) {
+      const existingOwner = await findUidByInstagramHandle(value);
+      if (existingOwner && existingOwner !== uid) {
+        return { ok: false as const, error: "Esse @ já está vinculado a outra conta" };
+      }
+    }
     const { error } = await (
       supabaseAdmin.from("patient_profiles") as unknown as {
         update: (v: { instagram_handle: string | null }) => {

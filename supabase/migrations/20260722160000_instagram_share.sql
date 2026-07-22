@@ -9,6 +9,8 @@
 ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS instagram_handle text;
 
--- Busca por @ no webhook (case-insensitive; já gravamos normalizado em minúsculo).
-CREATE INDEX IF NOT EXISTS idx_patient_profiles_instagram_handle
-  ON public.patient_profiles (instagram_handle);
+-- Busca por @ no webhook + garante que um @ pertence a UMA conta (anti-roubo de
+-- crédito num empate). Parcial: permite vários NULL (quem não registrou).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_profiles_instagram_handle
+  ON public.patient_profiles (instagram_handle)
+  WHERE instagram_handle IS NOT NULL;
