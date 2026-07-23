@@ -267,7 +267,6 @@ const TABS = [
   "Saúde",
   "Nutrição",
   "Bem-estar",
-  "Clima",
   "Alertas",
   "Consultas",
   "Acompanhante",
@@ -275,8 +274,7 @@ const TABS = [
   "Carteirinha",
   "Pós-parto",
   "Recompensas",
-  "Ciclo Menstrual",
-  "Preventivos",
+  "Saúde da mulher",
   "Médico",
   "Chat IA",
   "Perfil",
@@ -291,16 +289,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Saúde",
-    tabs: [
-      "Saúde",
-      "Exames",
-      "Nutrição",
-      "Bem-estar",
-      "Clima",
-      "Alertas",
-      "Ciclo Menstrual",
-      "Preventivos",
-    ],
+    tabs: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
   },
   {
     label: "Família",
@@ -1039,7 +1028,6 @@ function MinhaContaPage() {
                 )}
                 {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
                 {tab === "Bem-estar" && <BemEstarHub gest={gest} onNavigate={goToTab} />}
-                {tab === "Clima" && <ClimaTab gest={gest} />}
                 {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
                 {tab === "Consultas" && <ConsultasHub profile={profile} gest={gest} />}
                 {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
@@ -1049,8 +1037,7 @@ function MinhaContaPage() {
                 )}
                 {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
                 {tab === "Recompensas" && <RecompensasHub careMode={careMode} gest={gest} />}
-                {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
-                {tab === "Preventivos" && <PreventivosTab />}
+                {tab === "Saúde da mulher" && <SaudeMulherHub />}
                 {tab === "Médico" && <MédicoTab />}
                 {tab === "Exames" && <ExamesTab gest={gest} />}
                 {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
@@ -1559,6 +1546,7 @@ const BEMESTAR_SUBTABS = [
   { key: "exercicios", label: "Exercícios" },
   { key: "humor", label: "Humor" },
   { key: "apoio", label: "Apoio emocional" },
+  { key: "clima", label: "Clima" },
 ] as const;
 
 function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) => void }) {
@@ -1586,6 +1574,7 @@ function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: strin
         {sub === "exercicios" && <ExerciciosTab gest={gest} />}
         {sub === "humor" && <HumorTab />}
         {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
+        {sub === "clima" && <ClimaTab gest={gest} />}
       </Fade>
     </div>
   );
@@ -14671,6 +14660,39 @@ function CicloCalendario({ model }: { model: CycleModel }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+const SAUDE_MULHER_SUBTABS = [
+  { key: "ciclo", label: "Ciclo menstrual" },
+  { key: "preventivos", label: "Preventivos" },
+] as const;
+
+/** Hub "Saúde da mulher": Ciclo Menstrual + Preventivos numa tela só. */
+function SaudeMulherHub() {
+  const [sub, setSub] = useState<(typeof SAUDE_MULHER_SUBTABS)[number]["key"]>("ciclo");
+  return (
+    <div className="space-y-5">
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+        {SAUDE_MULHER_SUBTABS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSub(s.key)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+              sub === s.key
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-foreground/55 hover:text-foreground/80"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <Fade key={sub}>
+        {sub === "ciclo" && <CicloMenstrualTab />}
+        {sub === "preventivos" && <PreventivosTab />}
+      </Fade>
     </div>
   );
 }
