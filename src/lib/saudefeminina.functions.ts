@@ -26,10 +26,12 @@ export const logCycleStart = createServerFn({ method: "POST" })
     z
       .object({
         accessToken: z.string().min(10),
-        startDate: z.string(),
-        flowIntensity: z.string().nullable(),
-        symptoms: z.array(z.string()),
-        notes: z.string().nullable(),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        flowIntensity: z.string().max(30).nullable(),
+        // Sintomas entram no contexto da IA — limita tamanho/quantidade (defesa
+        // em profundidade contra injeção/inchaço; a UI usa uma lista fixa curta).
+        symptoms: z.array(z.string().max(60)).max(20),
+        notes: z.string().max(1000).nullable(),
       })
       .parse(i),
   )
