@@ -53,11 +53,7 @@ export type AppTab =
   | "Exercícios"
   | "Clima"
   | "Alertas"
-  | "Pré-consulta"
-  | "Perguntas"
-  | "Checklist"
   | "Consultas"
-  | "Teleconsulta"
   | "Acompanhante"
   | "FAQ"
   | "Pânico"
@@ -73,7 +69,6 @@ export type AppTab =
   | "Chat IA"
   | "Perfil"
   | "Exames"
-  | "Plano de Parto"
   | "Apoio Emocional";
 
 export type BottomSection = "home" | "gestacao" | "saude" | "consultas" | "eu";
@@ -101,15 +96,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
     "Ciclo Menstrual",
     "Preventivos",
   ],
-  consultas: [
-    "Pré-consulta",
-    "Plano de Parto",
-    "Perguntas",
-    "Checklist",
-    "Consultas",
-    "Teleconsulta",
-    "Consulta Particular",
-  ],
+  consultas: ["Consultas", "Consulta Particular"],
   eu: [
     "Diário",
     "Humor",
@@ -440,7 +427,7 @@ const WEEK_MILESTONES: {
     icon: "📋",
     title: "Hora de montar o plano de parto",
     text: "Registre suas preferências e converse com seu médico na próxima consulta.",
-    tab: "Plano de Parto",
+    tab: "Consultas",
   },
   {
     min: 34,
@@ -448,7 +435,7 @@ const WEEK_MILESTONES: {
     icon: "🧳",
     title: "Prepare a mala da maternidade",
     text: "O checklist completo te guia peça por peça — deixe pronta até a semana 36.",
-    tab: "Checklist",
+    tab: "Consultas",
   },
   {
     min: 37,
@@ -500,8 +487,8 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
   },
   {
     Icon: FileText,
-    label: "Pré-consulta",
-    tab: "Pré-consulta",
+    label: "Consultas",
+    tab: "Consultas",
     color: "bg-sky-50 text-sky-600 ring-sky-200",
   },
   {

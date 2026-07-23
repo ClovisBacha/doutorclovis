@@ -263,11 +263,7 @@ const TABS = [
   "Exercícios",
   "Clima",
   "Alertas",
-  "Pré-consulta",
-  "Perguntas",
-  "Checklist",
   "Consultas",
-  "Teleconsulta",
   "Acompanhante",
   "FAQ",
   "Pânico",
@@ -283,7 +279,6 @@ const TABS = [
   "Chat IA",
   "Perfil",
   "Exames",
-  "Plano de Parto",
   "Apoio Emocional",
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -322,15 +317,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Consultas",
-    tabs: [
-      "Pré-consulta",
-      "Plano de Parto",
-      "Perguntas",
-      "Checklist",
-      "Consultas",
-      "Teleconsulta",
-      "Consulta Particular",
-    ],
+    tabs: ["Consultas", "Consulta Particular"],
   },
   {
     label: "Aprender",
@@ -928,11 +915,7 @@ function MinhaContaPage() {
               {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
               {tab === "Clima" && <ClimaTab gest={gest} />}
               {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
-              {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
-              {tab === "Perguntas" && <QuestionsTab gest={gest} />}
-              {tab === "Checklist" && <ChecklistTab gest={gest} />}
-              {tab === "Consultas" && <ConsultasTab />}
-              {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
+              {tab === "Consultas" && <ConsultasHub profile={profile} gest={gest} />}
               {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
               {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
               {tab === "Pânico" && <PânicoTab profile={profile} onNavigate={goToTab} />}
@@ -948,7 +931,6 @@ function MinhaContaPage() {
               {tab === "Preventivos" && <PreventivosTab />}
               {tab === "Médico" && <MédicoTab />}
               {tab === "Exames" && <ExamesTab gest={gest} />}
-              {tab === "Plano de Parto" && <PlanoPártoTab profile={profile} />}
               {tab === "Apoio Emocional" && <ApoioEmocionalTab onNavigate={goToTab} />}
               {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
               {tab === "Perfil" && (
@@ -5974,6 +5956,49 @@ function formatApptDate(ymd: string): string {
  * Se abrir vaga (alguém cancela), ela recebe uma OFERTA com prazo de resposta —
  * aceita ou recusa aqui. Se não responder no prazo, passa pra próxima.
  */
+/**
+ * Hub "Consultas": junta agenda + preparo + teleconsulta numa tela só, com
+ * sub-abas. Antes: Consultas, Pré-consulta, Perguntas, Checklist, Plano de
+ * Parto, Teleconsulta (6 abas). Agora: 1.
+ */
+const CONSULTAS_SUBTABS = [
+  { key: "agenda", label: "Agenda" },
+  { key: "preparo", label: "Preparar" },
+  { key: "perguntas", label: "Perguntas" },
+  { key: "checklist", label: "Checklist" },
+  { key: "parto", label: "Plano de parto" },
+  { key: "tele", label: "Teleconsulta" },
+] as const;
+
+function ConsultasHub({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  const [sub, setSub] = useState<(typeof CONSULTAS_SUBTABS)[number]["key"]>("agenda");
+  return (
+    <div className="space-y-5">
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+        {CONSULTAS_SUBTABS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSub(s.key)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+              sub === s.key
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-foreground/55 hover:text-foreground/80"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {sub === "agenda" && <ConsultasTab />}
+      {sub === "preparo" && <PreConsultaTab profile={profile} gest={gest} />}
+      {sub === "perguntas" && <QuestionsTab gest={gest} />}
+      {sub === "checklist" && <ChecklistTab gest={gest} />}
+      {sub === "parto" && <PlanoPártoTab profile={profile} />}
+      {sub === "tele" && <TeleconsultaTab profile={profile} />}
+    </div>
+  );
+}
+
 function WaitlistCard() {
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
