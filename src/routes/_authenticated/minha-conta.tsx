@@ -1691,6 +1691,95 @@ function BebeHub({
   );
 }
 
+/**
+ * Resumo da semana — uma retrospectiva acolhedora que a paciente espera:
+ * o humor da semana, o que está acontecendo com o bebê agora e o que vem na
+ * próxima semana. Retenção: dá um motivo pra voltar. Lê o humor do próprio
+ * diário (LGPD). Suprimido no Modo Cuidado por quem chama.
+ */
+function WeeklyRecapCard({ profile, gest }: { profile: Profile; gest: NonNullable<Gest> }) {
+  const [moods, setMoods] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const since = new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA");
+      const { data } = await (supabase as any)
+        .from("journal_entries")
+        .select("mood, entry_date")
+        .gte("entry_date", since)
+        .order("entry_date", { ascending: true });
+      setMoods(
+        ((data ?? []) as { mood: string | null }[]).map((d) => d.mood ?? "").filter(Boolean),
+      );
+      setLoaded(true);
+    })();
+  }, []);
+
+  const week = gest.weeks;
+  const baby = babyForWeek(week);
+  const nextBaby = babyForWeek(week + 1);
+
+  // Humor predominante da semana
+  const counts: Record<string, number> = {};
+  moods.forEach((m) => (counts[m] = (counts[m] ?? 0) + 1));
+  const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+        Sua semana em resumo
+      </p>
+
+      {/* Humor da semana */}
+      <div className="mt-4">
+        <p className="text-sm font-semibold text-foreground">Como foi seu humor</p>
+        {!loaded ? (
+          <div className="skeleton mt-2 h-6 w-40 rounded-full" />
+        ) : moods.length === 0 ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Você ainda não registrou seu humor esta semana — o check-in no topo leva 1 toque. 💛
+          </p>
+        ) : (
+          <>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {moods.map((m, i) => (
+                <span key={i} className="text-xl">
+                  {m}
+                </span>
+              ))}
+            </div>
+            {dominant && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                No geral, você se sentiu{" "}
+                <strong>{(MOOD_LABEL[dominant] ?? "bem").toLowerCase()}</strong> nesta semana.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Bebê agora */}
+      <div className="mt-5 rounded-2xl bg-secondary/50 p-4">
+        <p className="text-sm font-semibold text-foreground">
+          {profile.baby_name ? profile.baby_name : "Seu bebê"} nesta semana
+        </p>
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{baby.desc}</p>
+      </div>
+
+      {/* Próxima semana */}
+      <div className="mt-3 flex items-center gap-2 text-sm">
+        <span className="text-lg">🔜</span>
+        <span className="text-muted-foreground">
+          Semana <strong className="text-foreground">{week + 1}</strong> chegando —{" "}
+          {profile.baby_name ? "ele" : "seu bebê"} vai ter o tamanho de{" "}
+          <strong className="text-foreground">{nextBaby.fruit.toLowerCase()}</strong>.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /** Saudação pela hora do dia — deixa a home viva e pessoal. */
 function dayGreeting(): string {
   const h = new Date().getHours();
@@ -2094,6 +2183,13 @@ function BabyTab({
           compact
         />
       </StaggerItem>
+
+      {!careMode && (
+        <StaggerItem>
+          <WeeklyRecapCard profile={profile} gest={gest} />
+        </StaggerItem>
+      )}
+
       {/* Segunda gestação: historical alerts */}
       {(profile.pregnancy_number ?? 1) >= 2 && (
         <StaggerItem className="col-span-full rounded-3xl border border-primary/25 bg-primary/8 p-6">
