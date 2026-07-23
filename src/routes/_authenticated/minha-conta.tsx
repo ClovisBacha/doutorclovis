@@ -186,6 +186,8 @@ type Profile = {
   /** BPM fetal medido pelo médico na consulta ("Sentir o coração"). */
   fetal_bpm?: number | null;
   fetal_bpm_at?: string | null;
+  /** Foto da paciente (data URL comprimida). */
+  avatar_url?: string | null;
 };
 
 type JournalEntry = {
@@ -985,6 +987,7 @@ function MinhaContaPage() {
                   onSaved={setProfile}
                   careMode={careMode}
                   onToggleCare={toggleCareMode}
+                  onNavigate={goToTab}
                 />
               )}
             </TabErrorBoundary>
@@ -1987,19 +1990,97 @@ function CareModeToggle({
 }
 
 /* ---------- Perfil ---------- */
+/** Resumo da agenda dentro do Perfil: próxima consulta + avisos + atalhos. */
+function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
+  const [appts, setAppts] = useState<MyAppointment[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) {
+        setLoaded(true);
+        return;
+      }
+      const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setAppts(res.appointments);
+      setLoaded(true);
+    })();
+  }, []);
+
+  if (!loaded) return null;
+  const today = ymdLocal();
+  const next = appts
+    .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
+    .sort((a, b) =>
+      (a.confirmed_date! + (a.confirmed_time ?? "")).localeCompare(
+        b.confirmed_date! + (b.confirmed_time ?? ""),
+      ),
+    )[0];
+  const needsResponse = appts.some((a) => a.status === "counter_proposed");
+  const pendingCount = appts.filter((a) => a.status === "pending").length;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-serif text-lg">Minha agenda</p>
+        <a href="/agendamento" className="press text-xs font-bold text-primary">
+          Agendar +
+        </a>
+      </div>
+      {needsResponse && (
+        <button
+          onClick={() => onNavigate("Consultas")}
+          className="press mt-3 w-full rounded-2xl border-2 border-violet-300 bg-violet-50/70 p-3 text-left"
+        >
+          <span className="text-sm font-bold text-violet-700">
+            🗓️ O médico sugeriu um horário — toque para responder
+          </span>
+        </button>
+      )}
+      {next ? (
+        <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+            Próxima consulta
+          </p>
+          <p className="mt-0.5 text-sm font-semibold">
+            {formatApptDate(next.confirmed_date!)} · {next.confirmed_time}
+          </p>
+        </div>
+      ) : (
+        !needsResponse && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            {pendingCount > 0
+              ? `Você tem ${pendingCount} pedido(s) aguardando confirmação do médico.`
+              : "Nenhuma consulta marcada ainda."}
+          </p>
+        )
+      )}
+      <button
+        onClick={() => onNavigate("Consultas")}
+        className="press mt-3 w-full rounded-full border border-border py-2 text-xs font-bold text-muted-foreground"
+      >
+        Abrir Consultas (agenda, fila de espera, gravações)
+      </button>
+    </div>
+  );
+}
+
 function ProfileTab({
   profile,
   onSaved,
   careMode,
   onToggleCare,
+  onNavigate,
 }: {
   profile: Profile | null;
   onSaved: (p: Profile) => void;
   careMode: boolean;
   onToggleCare: (on: boolean) => void;
+  onNavigate: (tab: string) => void;
 }) {
   const [form, setForm] = useState({
     display_name: profile?.display_name ?? "",
+    avatar_url: profile?.avatar_url ?? "",
     baby_name: profile?.baby_name ?? "",
     baby_skin_tone: profile?.baby_skin_tone ?? 0,
     lmp_date: profile?.lmp_date ?? "",
@@ -2059,6 +2140,7 @@ function ProfileTab({
       const payload: any = {
         id: u.user.id,
         display_name: form.display_name || null,
+        avatar_url: form.avatar_url || null,
         baby_name: form.baby_name || null,
         baby_skin_tone: form.baby_skin_tone,
         lmp_date: form.lmp_date || null,
@@ -2111,9 +2193,61 @@ function ProfileTab({
     }
   }
 
+  // Foto da paciente: comprime pra ~256px (data URL leve) e guarda no form.
+  function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxSize = 256;
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setForm((f) => ({ ...f, avatar_url: canvas.toDataURL("image/jpeg", 0.8) }));
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
   return (
     <div className="space-y-6">
       <CareModeToggle careMode={careMode} onToggle={onToggleCare} />
+
+      {/* Foto + nome da paciente */}
+      <div className="flex items-center gap-4 rounded-3xl border border-border bg-card p-5">
+        <label className="press relative shrink-0 cursor-pointer">
+          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-secondary ring-2 ring-primary/20">
+            {form.avatar_url ? (
+              <img src={form.avatar_url} alt="Sua foto" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-3xl">🙂</span>
+            )}
+          </div>
+          <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-sm text-primary-foreground shadow">
+            📷
+          </span>
+          <input type="file" accept="image/*" onChange={handleAvatar} className="hidden" />
+        </label>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-serif text-lg">
+            {form.display_name || "Sua foto e seus dados"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Toque na foto para {form.avatar_url ? "trocar" : "adicionar"}. Não esqueça de{" "}
+            <strong>salvar</strong> no fim.
+          </p>
+        </div>
+      </div>
+
+      {/* Minha agenda (próximas consultas) — junto do perfil */}
+      <ProfileAgendaCard onNavigate={onNavigate} />
 
       {/* Completion card */}
       <div className="glass-card glass-indigo rounded-3xl p-6">
