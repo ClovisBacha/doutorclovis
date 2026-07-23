@@ -252,16 +252,10 @@ const TABS = [
   "Bebê",
   "Caminho",
   "Calendário",
-  "Linha do Tempo",
-  "Diário",
-  "Humor",
-  "Chutes",
-  "Contrações",
+  "Registros",
   "Saúde",
   "Nutrição",
-  "Meditações",
-  "Sons",
-  "Exercícios",
+  "Bem-estar",
   "Clima",
   "Alertas",
   "Consultas",
@@ -280,22 +274,13 @@ const TABS = [
   "Chat IA",
   "Perfil",
   "Exames",
-  "Apoio Emocional",
 ] as const;
 type Tab = (typeof TABS)[number];
 
 const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   {
     label: "Gestação",
-    tabs: [
-      "Bebê",
-      "Caminho",
-      "Calendário",
-      "Linha do Tempo",
-      "Chutes",
-      "Contrações",
-      "Carteirinha",
-    ],
+    tabs: ["Bebê", "Caminho", "Calendário", "Registros", "Carteirinha"],
   },
   {
     label: "Saúde",
@@ -303,9 +288,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
       "Saúde",
       "Exames",
       "Nutrição",
-      "Meditações",
-      "Sons",
-      "Exercícios",
+      "Bem-estar",
       "Clima",
       "Alertas",
       "Ciclo Menstrual",
@@ -314,7 +297,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Família",
-    tabs: ["Diário", "Humor", "Acompanhante", "Pós-parto", "Apoio Emocional"],
+    tabs: ["Acompanhante", "Pós-parto"],
   },
   {
     label: "Consultas",
@@ -923,18 +906,10 @@ function MinhaContaPage() {
               {tab === "Calendário" && (
                 <PrenatalCalendarTab profile={profile} gest={gest} onNavigate={goToTab} />
               )}
-              {tab === "Linha do Tempo" && <TimelineTab profile={profile} gest={gest} />}
-              {tab === "Diário" && <JournalTab profile={profile} gest={gest} />}
-              {tab === "Humor" && <HumorTab />}
-              {tab === "Chutes" && (
-                <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
-              )}
-              {tab === "Contrações" && <ContracoesTab weeks={gest?.weeks ?? null} />}
+              {tab === "Registros" && <RegistrosHub profile={profile} gest={gest} />}
               {tab === "Saúde" && <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />}
               {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
-              {tab === "Meditações" && <MeditacoesTab gest={gest} />}
-              {tab === "Sons" && <SonsBebêTab gest={gest} />}
-              {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
+              {tab === "Bem-estar" && <BemEstarHub gest={gest} onNavigate={goToTab} />}
               {tab === "Clima" && <ClimaTab gest={gest} />}
               {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
               {tab === "Consultas" && <ConsultasHub profile={profile} gest={gest} />}
@@ -953,7 +928,6 @@ function MinhaContaPage() {
               {tab === "Preventivos" && <PreventivosTab />}
               {tab === "Médico" && <MédicoTab />}
               {tab === "Exames" && <ExamesTab gest={gest} />}
-              {tab === "Apoio Emocional" && <ApoioEmocionalTab onNavigate={goToTab} />}
               {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
               {tab === "Perfil" && (
                 <ProfileTab
@@ -973,6 +947,86 @@ function MinhaContaPage() {
 }
 
 /* ---------- Bebê ---------- */
+/**
+ * Hub "Bem-estar": autocuidado numa tela só (sub-abas) — Meditações, Sons,
+ * Exercícios, Humor e Apoio Emocional. Antes eram 5 abas.
+ */
+const BEMESTAR_SUBTABS = [
+  { key: "meditacoes", label: "Meditações" },
+  { key: "sons", label: "Sons" },
+  { key: "exercicios", label: "Exercícios" },
+  { key: "humor", label: "Humor" },
+  { key: "apoio", label: "Apoio emocional" },
+] as const;
+
+function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) => void }) {
+  const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"]>("meditacoes");
+  return (
+    <div className="space-y-5">
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+        {BEMESTAR_SUBTABS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSub(s.key)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+              sub === s.key
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-foreground/55 hover:text-foreground/80"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {sub === "meditacoes" && <MeditacoesTab gest={gest} />}
+      {sub === "sons" && <SonsBebêTab gest={gest} />}
+      {sub === "exercicios" && <ExerciciosTab gest={gest} />}
+      {sub === "humor" && <HumorTab />}
+      {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
+    </div>
+  );
+}
+
+/**
+ * Hub "Registros": tudo que a paciente registra numa tela só (sub-abas) —
+ * Diário, Chutes, Contrações e Linha do Tempo. Antes eram 4 abas.
+ */
+const REGISTROS_SUBTABS = [
+  { key: "diario", label: "Diário" },
+  { key: "chutes", label: "Chutes" },
+  { key: "contracoes", label: "Contrações" },
+  { key: "timeline", label: "Linha do tempo" },
+] as const;
+
+function RegistrosHub({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+  const [sub, setSub] = useState<(typeof REGISTROS_SUBTABS)[number]["key"]>("diario");
+  return (
+    <div className="space-y-5">
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+        {REGISTROS_SUBTABS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSub(s.key)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+              sub === s.key
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-foreground/55 hover:text-foreground/80"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {sub === "diario" && <JournalTab profile={profile} gest={gest} />}
+      {sub === "chutes" && (
+        <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
+      )}
+      {sub === "contracoes" && <ContracoesTab weeks={gest?.weeks ?? null} />}
+      {sub === "timeline" && <TimelineTab profile={profile} gest={gest} />}
+    </div>
+  );
+}
+
 /**
  * Hub "Bebê": junta numa tela só (com sub-abas) tudo que é sobre o bebê —
  * a semana, a contagem regressiva, o álbum, os nomes, a carta e o enxoval.
@@ -1964,7 +2018,7 @@ function CareModeBanner({
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          onClick={() => onNavigate("Apoio Emocional")}
+          onClick={() => onNavigate("Bem-estar")}
           className="press rounded-full bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
         >
           Apoio emocional
@@ -9158,7 +9212,7 @@ function CountdownTab({
           apoio emocional.
         </p>
         <button
-          onClick={() => onNavigate("Apoio Emocional")}
+          onClick={() => onNavigate("Bem-estar")}
           className="press mt-5 rounded-full bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white"
         >
           Apoio emocional
@@ -14963,7 +15017,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
           O diário é um espaço só seu — sem julgamentos, sem respostas certas.
         </p>
         <button
-          onClick={() => onNavigate("Diário")}
+          onClick={() => onNavigate("Registros")}
           className="mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground"
         >
           Abrir meu diário

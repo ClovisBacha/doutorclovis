@@ -41,16 +41,10 @@ export type AppTab =
   | "Bebê"
   | "Caminho"
   | "Calendário"
-  | "Linha do Tempo"
-  | "Diário"
-  | "Humor"
-  | "Chutes"
-  | "Contrações"
+  | "Registros"
   | "Saúde"
   | "Nutrição"
-  | "Meditações"
-  | "Sons"
-  | "Exercícios"
+  | "Bem-estar"
   | "Clima"
   | "Alertas"
   | "Consultas"
@@ -68,29 +62,18 @@ export type AppTab =
   | "Médico"
   | "Chat IA"
   | "Perfil"
-  | "Exames"
-  | "Apoio Emocional";
+  | "Exames";
 
 export type BottomSection = "home" | "gestacao" | "saude" | "consultas" | "eu";
 
 const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
-  gestacao: [
-    "Bebê",
-    "Caminho",
-    "Calendário",
-    "Linha do Tempo",
-    "Chutes",
-    "Contrações",
-    "Carteirinha",
-  ],
+  gestacao: ["Bebê", "Caminho", "Calendário", "Registros", "Carteirinha"],
   saude: [
     "Saúde",
     "Exames",
     "Nutrição",
-    "Meditações",
-    "Sons",
-    "Exercícios",
+    "Bem-estar",
     "Clima",
     "Alertas",
     "Ciclo Menstrual",
@@ -98,11 +81,8 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   ],
   consultas: ["Consultas", "Consulta Particular"],
   eu: [
-    "Diário",
-    "Humor",
     "Acompanhante",
     "Pós-parto",
-    "Apoio Emocional",
     "FAQ",
     "Pânico",
     "Conquistas",
@@ -400,7 +380,7 @@ const WEEK_MILESTONES: {
     icon: "🦶",
     title: "Os primeiros chutes estão chegando",
     text: "Entre 18 e 22 semanas você deve começar a sentir — registre os movimentos.",
-    tab: "Chutes",
+    tab: "Registros",
   },
   {
     min: 20,
@@ -424,7 +404,7 @@ const WEEK_MILESTONES: {
     icon: "👶",
     title: "Comece a contagem de movimentos",
     text: "No 3º trimestre, o padrão diário dos chutes é o melhor sinal de bem-estar do bebê.",
-    tab: "Chutes",
+    tab: "Registros",
   },
   {
     min: 31,
@@ -448,7 +428,7 @@ const WEEK_MILESTONES: {
     icon: "⏱️",
     title: "Reta final: conheça os sinais do trabalho de parto",
     text: "Registre as contrações — padrão 5-1-1 é hora de ir para a maternidade.",
-    tab: "Contrações",
+    tab: "Registros",
   },
 ];
 
@@ -463,7 +443,7 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
   {
     Icon: Footprints,
     label: "Chutes",
-    tab: "Chutes",
+    tab: "Registros",
     color: "bg-violet-50 text-violet-600 ring-violet-200",
   },
   {
@@ -499,7 +479,7 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
   {
     Icon: NotebookPen,
     label: "Diário",
-    tab: "Diário",
+    tab: "Registros",
     color: "bg-orange-50 text-orange-600 ring-orange-200",
   },
   {
