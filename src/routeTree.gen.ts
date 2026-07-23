@@ -45,6 +45,7 @@ import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 import { Route as ApiWaitlistTickRouteImport } from './routes/api/waitlist-tick'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
+import { Route as ApiPushWeeklyTickRouteImport } from './routes/api/push-weekly-tick'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
 import { Route as ApiInstagramWebhookRouteImport } from './routes/api/instagram-webhook'
@@ -237,6 +238,11 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   path: '/api/stripe-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPushWeeklyTickRoute = ApiPushWeeklyTickRouteImport.update({
+  id: '/api/push-weekly-tick',
+  path: '/api/push-weekly-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNutritionRoute = ApiNutritionRouteImport.update({
   id: '/api/nutrition',
   path: '/api/nutrition',
@@ -337,6 +343,7 @@ export interface FileRoutesByFullPath {
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/waitlist-tick': typeof ApiWaitlistTickRoute
@@ -386,6 +393,7 @@ export interface FileRoutesByTo {
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/waitlist-tick': typeof ApiWaitlistTickRoute
@@ -437,6 +445,7 @@ export interface FileRoutesById {
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/waitlist-tick': typeof ApiWaitlistTickRoute
@@ -488,6 +497,7 @@ export interface FileRouteTypes {
     | '/api/instagram-webhook'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/waitlist-tick'
@@ -537,6 +547,7 @@ export interface FileRouteTypes {
     | '/api/instagram-webhook'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/waitlist-tick'
@@ -587,6 +598,7 @@ export interface FileRouteTypes {
     | '/api/instagram-webhook'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcribe'
     | '/api/waitlist-tick'
@@ -635,6 +647,7 @@ export interface RootRouteChildren {
   ApiInstagramWebhookRoute: typeof ApiInstagramWebhookRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
+  ApiPushWeeklyTickRoute: typeof ApiPushWeeklyTickRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiWaitlistTickRoute: typeof ApiWaitlistTickRoute
@@ -900,6 +913,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/push-weekly-tick': {
+      id: '/api/push-weekly-tick'
+      path: '/api/push-weekly-tick'
+      fullPath: '/api/push-weekly-tick'
+      preLoaderRoute: typeof ApiPushWeeklyTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/nutrition': {
       id: '/api/nutrition'
       path: '/api/nutrition'
@@ -1039,6 +1059,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInstagramWebhookRoute: ApiInstagramWebhookRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
+  ApiPushWeeklyTickRoute: ApiPushWeeklyTickRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiWaitlistTickRoute: ApiWaitlistTickRoute,
