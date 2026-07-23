@@ -36,6 +36,7 @@ import {
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { AlertFab } from "@/components/alert-fab";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
 import { shareMilestoneCard } from "@/lib/share-card";
@@ -765,6 +766,9 @@ function MinhaContaPage() {
           onClose={() => setMilestoneWeek(null)}
         />
       )}
+
+      {/* ── Sinais de alerta sempre à mão (some no Modo Cuidado) ── */}
+      {!careMode && <AlertFab />}
 
       {/* ── App bottom nav (mobile only) ─────────────────────── */}
       <AppBottomNav activeSection={activeSection} onSelect={handleBottomNav} />
