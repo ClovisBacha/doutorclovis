@@ -13630,6 +13630,337 @@ function avgCycleLength(cycles: MenstrualCycle[]): number {
   return Math.round(gaps.reduce((s, v) => s + v, 0) / gaps.length);
 }
 
+/* ─────────────────────────────────────────────────────────
+   Ciclo visual — estilo Apple Health (anel de fases + calendário)
+───────────────────────────────────────────────────────── */
+
+type CyclePhase = "menstruacao" | "folicular" | "fertil" | "ovulacao" | "lutea";
+
+const PHASE_META: Record<
+  CyclePhase,
+  { label: string; emoji: string; dot: string; chip: string; desc: string }
+> = {
+  menstruacao: {
+    label: "Menstruação",
+    emoji: "🩸",
+    dot: "text-rose-500",
+    chip: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
+    desc: "Fase de descanso. Escute seu corpo.",
+  },
+  folicular: {
+    label: "Fase folicular",
+    emoji: "🌱",
+    dot: "text-amber-400",
+    chip: "bg-amber-400/15 text-amber-600 dark:text-amber-300",
+    desc: "A energia vai voltando aos poucos.",
+  },
+  fertil: {
+    label: "Janela fértil",
+    emoji: "🌿",
+    dot: "text-emerald-400",
+    chip: "bg-emerald-400/15 text-emerald-600 dark:text-emerald-300",
+    desc: "Maior chance de concepção estimada.",
+  },
+  ovulacao: {
+    label: "Ovulação",
+    emoji: "✨",
+    dot: "text-emerald-600",
+    chip: "bg-emerald-600/15 text-emerald-700 dark:text-emerald-300",
+    desc: "Pico de fertilidade estimado.",
+  },
+  lutea: {
+    label: "Fase lútea",
+    emoji: "🌙",
+    dot: "text-violet-400",
+    chip: "bg-violet-400/15 text-violet-600 dark:text-violet-300",
+    desc: "A TPM pode aparecer nos últimos dias.",
+  },
+};
+
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+function fromYmd(s: string): Date {
+  return new Date(s + "T00:00:00");
+}
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+function startOfDay(d: Date): Date {
+  const r = new Date(d);
+  r.setHours(0, 0, 0, 0);
+  return r;
+}
+function diffDays(a: Date, b: Date): number {
+  return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / 86400000);
+}
+
+function avgPeriodLength(cycles: MenstrualCycle[]): number {
+  const durs = cycles
+    .map(cycleLengthDays)
+    .filter((n): n is number => n !== null && n >= 2 && n <= 12);
+  if (!durs.length) return 5;
+  return Math.round(durs.reduce((s, v) => s + v, 0) / durs.length);
+}
+
+// Ovulação ~14 dias antes do próximo período. Em base 1 (dia 1 = início do
+// período), isso cai no dia `cycleLen - 13`.
+function phaseForCycleDay(day: number, cycleLen: number, periodLen: number): CyclePhase {
+  const ov = cycleLen - 13;
+  if (day <= periodLen) return "menstruacao";
+  if (day === ov) return "ovulacao";
+  if (day >= ov - 5 && day <= ov + 1) return "fertil";
+  if (day < ov) return "folicular";
+  return "lutea";
+}
+
+type CycleModel = {
+  cycleLen: number;
+  periodLen: number;
+  lastStart: Date;
+  actualPeriod: Set<string>;
+};
+
+function buildCycleModel(cycles: MenstrualCycle[]): CycleModel | null {
+  if (!cycles.length) return null;
+  const cycleLen = Math.max(18, Math.min(45, avgCycleLength(cycles)));
+  const periodLen = avgPeriodLength(cycles);
+  const lastStart = fromYmd(cycles[0].start_date);
+  const actualPeriod = new Set<string>();
+  for (const c of cycles) {
+    const s = fromYmd(c.start_date);
+    const e = c.end_date ? fromYmd(c.end_date) : addDays(s, periodLen - 1);
+    for (let d = new Date(s); d <= e; d = addDays(d, 1)) actualPeriod.add(ymd(d));
+  }
+  return { cycleLen, periodLen, lastStart, actualPeriod };
+}
+
+// Dia do ciclo (base 1) para uma data qualquer, projetando o ciclo médio pra
+// frente e pra trás a partir do último período registrado.
+function cycleDayFor(date: Date, model: CycleModel): number {
+  const off = diffDays(model.lastStart, date);
+  return (((off % model.cycleLen) + model.cycleLen) % model.cycleLen) + 1;
+}
+
+function classifyDay(date: Date, model: CycleModel): { phase: CyclePhase; actual: boolean } {
+  if (model.actualPeriod.has(ymd(date))) return { phase: "menstruacao", actual: true };
+  const phase = phaseForCycleDay(cycleDayFor(date, model), model.cycleLen, model.periodLen);
+  return { phase, actual: false };
+}
+
+// Próximos marcos (a partir de hoje): período, ovulação, janela fértil.
+function upcomingMarks(model: CycleModel, today: Date) {
+  let nextPeriod: Date | null = null;
+  let ovulation: Date | null = null;
+  const horizon = model.cycleLen * 2 + 2;
+  for (let i = 1; i <= horizon; i++) {
+    const d = addDays(today, i);
+    const c = classifyDay(d, model);
+    const prev = classifyDay(addDays(d, -1), model);
+    if (!nextPeriod && c.phase === "menstruacao" && prev.phase !== "menstruacao") nextPeriod = d;
+    if (!ovulation && c.phase === "ovulacao") ovulation = d;
+    if (nextPeriod && ovulation) break;
+  }
+  const fertileStart = ovulation ? addDays(ovulation, -5) : null;
+  const fertileEnd = ovulation ? addDays(ovulation, 1) : null;
+  return { nextPeriod, ovulation, fertileStart, fertileEnd };
+}
+
+function CicloHero({ model }: { model: CycleModel }) {
+  const today = startOfDay(new Date());
+  const dayInCycle = cycleDayFor(today, model);
+  const { phase } = classifyDay(today, model);
+  const meta = PHASE_META[phase];
+  const marks = upcomingMarks(model, today);
+  const daysToNext = marks.nextPeriod ? diffDays(today, marks.nextPeriod) : null;
+
+  // Anel de fases: um ponto por dia do ciclo.
+  const cx = 110;
+  const cy = 110;
+  const radius = 90;
+  const dots = Array.from({ length: model.cycleLen }, (_, i) => {
+    const angle = (i / model.cycleLen) * 2 * Math.PI - Math.PI / 2;
+    const x = cx + radius * Math.cos(angle);
+    const y = cy + radius * Math.sin(angle);
+    const p = phaseForCycleDay(i + 1, model.cycleLen, model.periodLen);
+    const isToday = i + 1 === dayInCycle;
+    return { x, y, dot: PHASE_META[p].dot, isToday };
+  });
+
+  const fmt = (d: Date | null, opts?: Intl.DateTimeFormatOptions) =>
+    d ? d.toLocaleDateString("pt-BR", opts ?? { day: "2-digit", month: "short" }) : "—";
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-8">
+        {/* Anel */}
+        <div className="relative shrink-0" style={{ width: 220, height: 220 }}>
+          <svg viewBox="0 0 220 220" className="h-full w-full" aria-hidden="true">
+            {dots.map((d, i) => (
+              <g key={i}>
+                {d.isToday && (
+                  <circle
+                    cx={d.x}
+                    cy={d.y}
+                    r={8.5}
+                    className="fill-background stroke-foreground"
+                    strokeWidth={1.5}
+                  />
+                )}
+                <circle
+                  cx={d.x}
+                  cy={d.y}
+                  r={d.isToday ? 5 : 4.2}
+                  className={`fill-current ${d.dot}`}
+                />
+              </g>
+            ))}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="text-3xl leading-none">{meta.emoji}</span>
+            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              Dia do ciclo
+            </p>
+            <p className="font-serif text-4xl leading-none">{dayInCycle}</p>
+          </div>
+        </div>
+
+        {/* Resumo */}
+        <div className="min-w-0 flex-1 space-y-4 text-center md:text-left">
+          <div>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${meta.chip}`}
+            >
+              {meta.emoji} {meta.label}
+            </span>
+            <p className="mt-2 text-sm text-muted-foreground">{meta.desc}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-secondary/60 px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Próximo período
+              </p>
+              <p className="font-serif text-lg">{fmt(marks.nextPeriod)}</p>
+              {daysToNext !== null && (
+                <p className="text-[11px] text-muted-foreground">
+                  {daysToNext === 0
+                    ? "pode ser hoje"
+                    : daysToNext === 1
+                      ? "em 1 dia"
+                      : `em ${daysToNext} dias`}
+                </p>
+              )}
+            </div>
+            <div className="rounded-2xl bg-secondary/60 px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ovulação</p>
+              <p className="font-serif text-lg">{fmt(marks.ovulation)}</p>
+              <p className="text-[11px] text-muted-foreground">estimada</p>
+            </div>
+            <div className="col-span-2 rounded-2xl bg-secondary/60 px-3 py-2.5 sm:col-span-1">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Janela fértil
+              </p>
+              <p className="font-serif text-base">
+                {fmt(marks.fertileStart)} – {fmt(marks.fertileEnd)}
+              </p>
+              <p className="text-[11px] text-muted-foreground">ciclo de {model.cycleLen} dias</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p className="mt-4 text-center text-[11px] text-muted-foreground md:text-left">
+        Estimativas com base no seu histórico. Não substituem métodos contraceptivos nem
+        acompanhamento médico.
+      </p>
+    </div>
+  );
+}
+
+const WEEKDAYS_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+function CicloCalendario({ model }: { model: CycleModel }) {
+  const [monthOffset, setMonthOffset] = useState(0);
+  const today = startOfDay(new Date());
+  const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  const monthLabel = base.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const gridStart = addDays(base, -base.getDay());
+  const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+
+  function cellClass(d: Date): string {
+    const inMonth = d.getMonth() === base.getMonth();
+    const isToday = ymd(d) === ymd(today);
+    const { phase, actual } = classifyDay(d, model);
+    let tone = "text-foreground/70";
+    if (actual) tone = "bg-rose-500 text-white font-semibold";
+    else if (phase === "menstruacao")
+      tone = "border border-dashed border-rose-400 text-rose-500 dark:text-rose-300";
+    else if (phase === "ovulacao") tone = "bg-emerald-600 text-white font-semibold";
+    else if (phase === "fertil") tone = "bg-emerald-400/25 text-emerald-700 dark:text-emerald-300";
+    const ring = isToday ? " ring-2 ring-foreground ring-offset-2 ring-offset-card" : "";
+    const dim = inMonth ? "" : " opacity-35";
+    return `flex aspect-square items-center justify-center rounded-full text-xs ${tone}${ring}${dim}`;
+  }
+
+  const legend: { label: string; swatch: string }[] = [
+    { label: "Período", swatch: "bg-rose-500" },
+    { label: "Previsão", swatch: "border border-dashed border-rose-400" },
+    { label: "Fértil", swatch: "bg-emerald-400/40" },
+    { label: "Ovulação", swatch: "bg-emerald-600" },
+  ];
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          onClick={() => setMonthOffset((m) => m - 1)}
+          aria-label="Mês anterior"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
+        >
+          ‹
+        </button>
+        <p className="font-serif text-lg capitalize">{monthLabel}</p>
+        <button
+          onClick={() => setMonthOffset((m) => m + 1)}
+          aria-label="Próximo mês"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
+        >
+          ›
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {WEEKDAYS_PT.map((w, i) => (
+          <div
+            key={i}
+            className="pb-1 text-center text-[11px] font-medium uppercase text-muted-foreground"
+          >
+            {w}
+          </div>
+        ))}
+        {days.map((d, i) => (
+          <div key={i} className={cellClass(d)}>
+            {d.getDate()}
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+        {legend.map((l) => (
+          <span
+            key={l.label}
+            className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+          >
+            <span className={`h-3 w-3 shrink-0 rounded-full ${l.swatch}`} />
+            {l.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CicloMenstrualTab() {
   const [cycles, setCycles] = useState<MenstrualCycle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13709,64 +14040,28 @@ function CicloMenstrualTab() {
     await load();
   }
 
-  const avgLen = avgCycleLength(cycles);
-  const lastCycle = cycles[0] ?? null;
-  const nextPeriod = lastCycle
-    ? new Date(new Date(lastCycle.start_date + "T00:00:00").getTime() + avgLen * 86400000)
-    : null;
-  const fertileWindowStart = nextPeriod ? new Date(nextPeriod.getTime() - 16 * 86400000) : null;
-  const fertileWindowEnd = nextPeriod ? new Date(nextPeriod.getTime() - 10 * 86400000) : null;
-  const daysToNext = nextPeriod ? Math.round((nextPeriod.getTime() - Date.now()) / 86400000) : null;
+  const model = useMemo(() => buildCycleModel(cycles), [cycles]);
 
   if (loading) return <TabSkeleton />;
 
   return (
     <div className="space-y-6">
-      {/* Header + predictions */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">Próximo período</p>
-          {nextPeriod ? (
-            <>
-              <p className="font-serif text-2xl mt-1">
-                {nextPeriod.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {daysToNext !== null && daysToNext > 0
-                  ? `em ${daysToNext} dias`
-                  : daysToNext === 0
-                    ? "pode ser hoje"
-                    : `${Math.abs(daysToNext ?? 0)} dias atrás`}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">Ciclo médio: {avgLen} dias</p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground mt-2">
-              Registre pelo menos 2 ciclos para calcular.
-            </p>
-          )}
+      {/* Ciclo visual — estilo Apple Health */}
+      {model ? (
+        <div className="space-y-4">
+          <CicloHero model={model} />
+          <CicloCalendario model={model} />
         </div>
-        <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
-            Janela fértil estimada
+      ) : (
+        <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center">
+          <p className="mb-2 text-4xl">🌸</p>
+          <p className="font-serif text-lg">Seu ciclo, visual e previsível</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            Registre seu período abaixo para ver o anel de fases, a janela fértil e a previsão do
+            próximo ciclo — como no app de saúde do celular.
           </p>
-          {fertileWindowStart && fertileWindowEnd ? (
-            <>
-              <p className="font-serif text-lg mt-1">
-                {fertileWindowStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}{" "}
-                — {fertileWindowEnd.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Baseado no ciclo médio. Para concepção, use métodos mais precisos.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground mt-2">
-              Disponível após 2 ciclos registrados.
-            </p>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Log button */}
       {!showForm ? (
