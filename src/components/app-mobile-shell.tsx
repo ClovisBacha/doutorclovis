@@ -40,7 +40,6 @@ import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
 export type AppTab =
   | "Bebê"
   | "Caminho"
-  | "Carta do Bebê"
   | "Calendário"
   | "Linha do Tempo"
   | "Diário"
@@ -52,7 +51,6 @@ export type AppTab =
   | "Meditações"
   | "Sons"
   | "Exercícios"
-  | "Quartinho"
   | "Clima"
   | "Alertas"
   | "Pré-consulta"
@@ -61,9 +59,6 @@ export type AppTab =
   | "Consultas"
   | "Teleconsulta"
   | "Acompanhante"
-  | "Conta Regressiva"
-  | "Álbum"
-  | "Nome do Bebê"
   | "FAQ"
   | "Pânico"
   | "Carteirinha"
@@ -88,12 +83,10 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   gestacao: [
     "Bebê",
     "Caminho",
-    "Carta do Bebê",
     "Calendário",
     "Linha do Tempo",
     "Chutes",
     "Contrações",
-    "Conta Regressiva",
     "Carteirinha",
   ],
   saude: [
@@ -121,9 +114,6 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
     "Diário",
     "Humor",
     "Acompanhante",
-    "Quartinho",
-    "Álbum",
-    "Nome do Bebê",
     "Pós-parto",
     "Apoio Emocional",
     "FAQ",
