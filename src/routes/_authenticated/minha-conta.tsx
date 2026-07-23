@@ -16,6 +16,7 @@ import { InviteDoctorCTA } from "@/components/invite-doctor-cta";
 import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
+import drPortrait from "@/assets/dr-clovis-portrait.jpg";
 import { ymdLocal } from "@/lib/utils";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import {
@@ -1616,6 +1617,80 @@ function BebeHub({
   );
 }
 
+/**
+ * Presença do médico — a "integração real" sentida. Um selo vivo de que o
+ * médico acompanha a gestação e, quando ele registrou o batimento do bebê
+ * recentemente, uma "novidade" acolhedora com o coração pulsando.
+ *
+ * Identidade vem do doctor.config (a instalação do Dr. Clóvis). O sinal do
+ * batimento é real (profile.fetal_bpm_at, gravado pelo médico) — nada é
+ * inventado: sem batimento recente, mostra só o selo de acompanhamento.
+ */
+function DoctorPresenceCard({
+  profile,
+  onNavigate,
+  careMode = false,
+}: {
+  profile: Profile | null;
+  onNavigate: (tab: string) => void;
+  careMode?: boolean;
+}) {
+  const bpm = profile?.fetal_bpm ?? null;
+  const at = profile?.fetal_bpm_at ?? null;
+  const baby = profile?.baby_name ? profile.baby_name : "seu bebê";
+
+  let whenLabel: string | null = null;
+  let recent = false;
+  if (at) {
+    const days = Math.floor((Date.now() - new Date(at + "T00:00:00").getTime()) / 86400000);
+    recent = days >= 0 && days <= 30;
+    whenLabel = days <= 0 ? "hoje" : days === 1 ? "ontem" : `há ${days} dias`;
+  }
+  // Em Modo Cuidado nunca mostra a novidade do batimento do bebê (pode ser
+  // doloroso); fica só o selo de acompanhamento, que é acolhedor.
+  const showBpm = bpm != null && at != null && recent && !careMode;
+
+  return (
+    <button
+      onClick={() => onNavigate("Consultas")}
+      className="flex w-full items-center gap-4 rounded-3xl border border-primary/20 bg-primary/5 p-4 text-left transition-colors hover:border-primary/40"
+    >
+      <span className="relative shrink-0">
+        <img
+          src={drPortrait}
+          alt={DOCTOR.name}
+          className="h-14 w-14 rounded-full object-cover ring-2 ring-primary/20"
+        />
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground ring-2 ring-card">
+          ✓
+        </span>
+      </span>
+      <span className="min-w-0 flex-1">
+        {showBpm ? (
+          <>
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+              <span className="heartbeat-icon text-rose-500">💓</span>
+              {DOCTOR.name.split(" ").slice(0, 2).join(" ")} ouviu o coração de {baby}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {bpm} bpm · {whenLabel} · toque para sentir o batimento
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="block text-sm font-semibold text-foreground">
+              {DOCTOR.name} está acompanhando sua gestação
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Você não está sozinha — seu médico acompanha cada semana por aqui. 💛
+            </span>
+          </>
+        )}
+      </span>
+    </button>
+  );
+}
+
 function BabyTab({
   profile,
   gest,
@@ -1760,6 +1835,11 @@ function BabyTab({
             )}
           </div>
         </div>
+      </StaggerItem>
+
+      {/* ── Presença do médico (integração real sentida) ─────────────── */}
+      <StaggerItem>
+        <DoctorPresenceCard profile={profile} onNavigate={onNavigate} careMode={careMode} />
       </StaggerItem>
 
       {/* ── Linha de cards: DPP · próxima consulta · exame ─────────────── */}
