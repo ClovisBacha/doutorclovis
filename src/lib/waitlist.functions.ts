@@ -97,6 +97,9 @@ async function offerNextForWeek(
   offerDate: string,
   offerTime: string,
 ): Promise<boolean> {
+  // Nunca oferta um horário que já passou (cascata lenta / cancelamento tardio):
+  // sem isto, dava pra "confirmar" consulta numa data no passado.
+  if (new Date(`${offerDate}T${offerTime}`).getTime() <= Date.now()) return false;
   // O slot ainda está livre? (ninguém confirmou nesse horário)
   const { data: taken } = await scopeDoctor(
     (admin as any)
@@ -206,11 +209,11 @@ export const joinWaitlist = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data }) => {
-    const email = await authEmail(data.accessToken);
-    if (!email) return { ok: false as const, error: "Não autenticado" };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
-    const uid = u.user!.id;
+    const { data: u, error: uerr } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (uerr || !u.user?.email) return { ok: false as const, error: "Não autenticado" };
+    const email = u.user.email.toLowerCase();
+    const uid = u.user.id;
     const { data: prof } = await (supabaseAdmin as any)
       .from("patient_profiles")
       .select("display_name, doctor_id, phone")

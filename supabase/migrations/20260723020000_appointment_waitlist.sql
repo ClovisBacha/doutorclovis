@@ -31,8 +31,12 @@ CREATE INDEX IF NOT EXISTS idx_waitlist_deadline
   ON public.appointment_waitlist (status, offer_deadline);
 
 -- Uma paciente não entra duas vezes na MESMA semana enquanto está ativa.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_waitlist_unique_active
+-- NULLS NOT DISTINCT (PG15+) é ESSENCIAL: na instalação única o doctor_id é
+-- NULL em todas as linhas; sem isto o índice não deduplicaria nada.
+DROP INDEX IF EXISTS public.idx_waitlist_unique_active;
+CREATE UNIQUE INDEX idx_waitlist_unique_active
   ON public.appointment_waitlist (doctor_id, week_start, lower(patient_email))
+  NULLS NOT DISTINCT
   WHERE status IN ('waiting', 'offered');
 
 ALTER TABLE public.appointment_waitlist ENABLE ROW LEVEL SECURITY;

@@ -1,4 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import crypto from "node:crypto";
+
+/** Compara dois segredos em tempo constante (evita timing attack). */
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
+}
 
 /**
  * Cascata da fila de espera: expira ofertas vencidas (sem resposta em 4h) e
@@ -22,7 +30,7 @@ import { createFileRoute } from "@tanstack/react-router";
 async function handle(request: Request): Promise<Response> {
   const secret = process.env.CRON_SECRET || "";
   const auth = request.headers.get("authorization") || "";
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!secret || !safeEqual(auth, `Bearer ${secret}`)) {
     return new Response("forbidden", { status: 401 });
   }
   try {
