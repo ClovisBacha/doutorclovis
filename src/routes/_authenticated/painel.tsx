@@ -13,10 +13,12 @@ import {
   confirmAppointment,
   proposeAppointmentTime,
   markAppointmentPaid,
+  getDoctorWaitlist,
   type AdminAppointment,
   type AdminPreConsulta,
   type AdminQuestion,
   type PatientEngagement,
+  type AdminWaitlistEntry,
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
 import { BabyIllustration } from "@/components/baby-illustration";
@@ -411,11 +413,14 @@ function PainelPage() {
           <CalendárioSection appointments={appointments} onNavigate={setTab} />
         )}
         {tab === "Agendamentos" && (
-          <AppointmentsSection
-            appointments={appointments}
-            onChangeStatus={changeStatus}
-            onRefresh={load}
-          />
+          <div className="space-y-6">
+            <AppointmentsSection
+              appointments={appointments}
+              onChangeStatus={changeStatus}
+              onRefresh={load}
+            />
+            <WaitlistSection />
+          </div>
         )}
         {tab === "Agenda" && <AgendaSection />}
         {tab === "Perguntas" && (
@@ -1126,6 +1131,95 @@ function DashboardSkeleton() {
 }
 
 /* ---------- Agendamentos ---------- */
+/* ---------- Fila de espera (visão do médico) ---------- */
+function WaitlistSection() {
+  const [entries, setEntries] = useState<AdminWaitlistEntry[] | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getDoctorWaitlist({ data: { accessToken: await token() } });
+        setEntries(res.ok ? res.entries : []);
+      } catch {
+        setEntries([]);
+      }
+    })();
+  }, []);
+
+  if (entries === null) return <div className="h-24 animate-pulse rounded-3xl bg-secondary" />;
+
+  // Agrupa por semana (segunda-feira).
+  const byWeek = new Map<string, AdminWaitlistEntry[]>();
+  for (const e of entries) {
+    const arr = byWeek.get(e.week_start) ?? [];
+    arr.push(e);
+    byWeek.set(e.week_start, arr);
+  }
+  const weeks = [...byWeek.keys()].sort();
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="font-serif text-lg">Fila de espera</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Quem está esperando vaga, por semana. Ao cancelar uma consulta, a 1ª da fila é avisada
+            automaticamente.
+          </p>
+        </div>
+        <span className="rounded-full bg-secondary px-3 py-1 text-xs font-bold">
+          {entries.length}
+        </span>
+      </div>
+
+      {entries.length === 0 ? (
+        <p className="mt-4 rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground">
+          Ninguém na fila de espera no momento.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-4">
+          {weeks.map((wk) => (
+            <div key={wk}>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Semana de {new Date(wk + "T00:00:00").toLocaleDateString("pt-BR")}
+              </p>
+              <div className="space-y-2">
+                {byWeek.get(wk)!.map((e, i) => (
+                  <div
+                    key={e.id}
+                    className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-background p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">
+                        {i + 1}º · {e.patient_name}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {e.patient_phone || e.patient_email}
+                      </p>
+                    </div>
+                    {e.status === "offered" ? (
+                      <span className="shrink-0 rounded-full bg-violet-100 px-2.5 py-0.5 text-[11px] font-bold text-violet-700">
+                        🗓️ vaga oferecida
+                        {e.offer_deadline
+                          ? ` · até ${new Date(e.offer_deadline).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                          : ""}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                        ⏳ aguardando
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AppointmentsSection({
   appointments,
   onChangeStatus,

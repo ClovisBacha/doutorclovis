@@ -454,6 +454,44 @@ export const markAppointmentPaid = createServerFn({ method: "POST" })
       : { ok: true as const, error: null };
   });
 
+export type AdminWaitlistEntry = {
+  id: string;
+  patient_name: string;
+  patient_email: string;
+  patient_phone: string | null;
+  week_start: string;
+  status: string;
+  offer_date: string | null;
+  offer_time: string | null;
+  offer_deadline: string | null;
+  created_at: string;
+};
+
+/**
+ * [Painel] Fila de espera ATIVA do médico (waiting + offered), agrupável por
+ * semana. Só leitura, escopada ao doctor_id do assinante (equipe vê tudo).
+ */
+export const getDoctorWaitlist = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, entries: [] as AdminWaitlistEntry[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows } = await scopedBy(
+      (supabaseAdmin as any)
+        .from("appointment_waitlist")
+        .select(
+          "id, patient_name, patient_email, patient_phone, week_start, status, offer_date, offer_time, offer_deadline, created_at",
+        )
+        .in("status", ["waiting", "offered"]),
+      scope,
+    )
+      .order("week_start", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(200);
+    return { ok: true as const, entries: (rows ?? []) as AdminWaitlistEntry[] };
+  });
+
 const AnswerSchema = z.object({
   accessToken: z.string().min(10),
   id: z.string().uuid(),
