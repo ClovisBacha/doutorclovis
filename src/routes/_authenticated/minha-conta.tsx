@@ -801,7 +801,9 @@ function MinhaContaPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
                 Minha conta
               </p>
-              <h1 className="mt-2 font-serif text-3xl md:text-4xl">Olá, {firstName} 💛</h1>
+              <h1 className="mt-2 font-serif text-3xl md:text-4xl">
+                {dayGreeting()}, {firstName} 💛
+              </h1>
               {(profile?.baby_name || gest) && (
                 <p className="mt-1.5 text-sm text-muted-foreground">
                   {profile?.baby_name && <>Acompanhando {profile.baby_name}</>}
@@ -835,7 +837,7 @@ function MinhaContaPage() {
           {/* ── Mobile top bar ───────────────────────────────────── */}
           <div className="flex md:hidden items-center justify-between mb-4">
             <p className="font-serif text-xl leading-tight text-foreground">
-              {mobileHome ? `Olá, ${firstName} 💛` : SECTION_TITLES[activeSection]}
+              {mobileHome ? `${dayGreeting()}, ${firstName} 💛` : SECTION_TITLES[activeSection]}
             </p>
             <div className="flex items-center gap-2">
               {(isAdmin || isDoctor) && (
@@ -1618,6 +1620,92 @@ function BebeHub({
   );
 }
 
+/** Saudação pela hora do dia — deixa a home viva e pessoal. */
+function dayGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return "Boa madrugada";
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+const MOOD_CHOICES = [
+  { emoji: "😊", label: "Bem", phrase: "Hoje me sinto bem." },
+  { emoji: "😌", label: "Tranquila", phrase: "Hoje me sinto tranquila." },
+  { emoji: "😴", label: "Cansada", phrase: "Hoje estou cansada." },
+  { emoji: "😟", label: "Ansiosa", phrase: "Hoje estou um pouco ansiosa." },
+  { emoji: "😢", label: "Pra baixo", phrase: "Hoje não está sendo um bom dia." },
+] as const;
+
+/**
+ * Check-in de humor de 1 toque na home. Registra o humor do dia no diário
+ * (alimenta o cérebro do paciente, que lê só o rótulo do humor). Uma vez por
+ * dia (marcador no localStorage) — some depois de responder.
+ */
+function HomeMoodCheckin({ name }: { name: string }) {
+  const today = new Date().toLocaleDateString("en-CA");
+  const key = `mood-checkin:${today}`;
+  const [done, setDone] = useState(() => {
+    try {
+      return !!localStorage.getItem(key);
+    } catch {
+      return false;
+    }
+  });
+  const [saving, setSaving] = useState(false);
+
+  if (done) return null;
+
+  async function pick(m: (typeof MOOD_CHOICES)[number]) {
+    hapticTap();
+    setSaving(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (u.user) {
+        await (supabase as any).from("journal_entries").insert({
+          user_id: u.user.id,
+          mood: m.emoji,
+          content: m.phrase,
+          entry_date: today,
+        });
+      }
+      try {
+        localStorage.setItem(key, "1");
+      } catch {
+        /* modo privado */
+      }
+      setDone(true);
+      toast("Obrigado por compartilhar como você está 💛");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <p className="text-sm font-semibold text-foreground">
+        Como você está se sentindo agora{name ? `, ${name}` : ""}?
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {MOOD_CHOICES.map((m) => (
+          <button
+            key={m.label}
+            disabled={saving}
+            onClick={() => pick(m)}
+            className="press flex min-w-[64px] flex-col items-center gap-1 rounded-2xl border border-border px-3 py-2 transition-colors hover:border-primary disabled:opacity-50"
+          >
+            <span className="text-2xl">{m.emoji}</span>
+            <span className="text-[11px] text-muted-foreground">{m.label}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Fica só no seu diário e ajuda seu médico a te entender melhor.
+      </p>
+    </div>
+  );
+}
+
 /**
  * Presença do médico — a "integração real" sentida. Um selo vivo de que o
  * médico acompanha a gestação e, quando ele registrou o batimento do bebê
@@ -1743,6 +1831,11 @@ function BabyTab({
 
   return (
     <Stagger className="space-y-6">
+      {/* ── Check-in de humor de 1 toque (home viva) ─────────────────── */}
+      <StaggerItem>
+        <HomeMoodCheckin name={profile.display_name?.split(" ")[0] ?? ""} />
+      </StaggerItem>
+
       {/* ── Hero imersivo: o bebê é o protagonista ─────────────────────── */}
       <StaggerItem className="relative overflow-hidden rounded-3xl border border-border bg-[image:var(--gradient-warm)] p-6 shadow-[var(--shadow-card)] md:p-10">
         {/* brilhos suaves ao fundo */}
