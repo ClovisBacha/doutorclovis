@@ -258,6 +258,57 @@ export const grantDailyQuizReward = createServerFn({ method: "POST" })
     return { ok: true as const, granted: amount };
   });
 
+/**
+ * Recompensa por concluir a ATIVIDADE DE BEM-ESTAR do dia (respiração,
+ * movimento ou meditação). Recompensa fixa por concluir (nunca punitivo, sem
+ * "acerto"). Só paga o dia de HOJE (mesma cadência do desafio), idempotente por
+ * dia/ciclo (uma por dia, independente do tipo), suprimido em Modo Cuidado.
+ */
+export const grantWellnessReward = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        day: z.number().int().min(1).max(400),
+        activity: z.enum(["breathing", "movement", "meditation"]),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = typedDb(supabaseAdmin);
+    const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (error || !u.user) return { ok: false as const, error: "Não autenticado" };
+    const uid = u.user.id;
+    if (await isCareModeActive(supabaseAdmin, uid)) return { ok: true as const, granted: 0 };
+
+    const { cycle, gest } = await loadCycleAndGestation(supabaseAdmin, uid);
+    // Mesma cadência do desafio: só paga o dia de HOJE (anti-fraude).
+    if (!gest) return { ok: true as const, granted: 0 };
+    const todayDay = Math.max(7, Math.min(300, gest.totalDays));
+    if (Math.abs(data.day - todayDay) > 1) return { ok: true as const, granted: 0 };
+    // Uma recompensa de bem-estar por dia (independe do tipo de atividade).
+    const dedupeKey = `wellness:${cycle}:${data.day}`;
+
+    const { data: existing } = await db
+      .from("sementinhas_ledger")
+      .select("amount")
+      .eq("user_id", uid)
+      .eq("dedupe_key", dedupeKey)
+      .maybeSingle();
+    if (existing) return { ok: true as const, granted: 0 };
+
+    const reason =
+      data.activity === "breathing"
+        ? "Respiração do dia 🌬️"
+        : data.activity === "movement"
+          ? "Movimento do dia 🤸"
+          : "Meditação do dia 🧘";
+    const amount = 5; // base fixa por concluir (nunca punitivo)
+    await grantSementinhas(db, uid, [{ amount, reason, dedupeKey }]);
+    return { ok: true as const, granted: amount };
+  });
+
 // Nota: o GASTO de Sementinhas é feito pela RPC atômica buy_cantinho_item
 // (ver cantinho.functions.ts) — com advisory lock por usuário, sem risco de
 // saldo negativo. Não há função genérica de gasto de propósito, pra evitar um

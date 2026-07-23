@@ -7,6 +7,7 @@ import {
   claimDailyAndGetWallet,
   grantLessonReward,
   grantDailyQuizReward,
+  grantWellnessReward,
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
@@ -2023,6 +2024,16 @@ export function GestacaoPath({
                     <QuizPaywall week={week} />
                   ))}
 
+                {/* Atividade de bem-estar do dia (respiração guiada) */}
+                <BreathingBlock
+                  key={`breath-${D}`}
+                  day={D}
+                  canEarn={isToday}
+                  careMode={careMode}
+                  alreadyDone={!!state.bemestar}
+                  onEarn={() => markDayTask(D, "bemestar", true)}
+                />
+
                 {isToday && (
                   <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -2719,6 +2730,240 @@ function QuizIntro({
         toque para começar
       </p>
     </div>
+  );
+}
+
+/* ══════════════════ Respiração guiada (atividade de bem-estar do dia) ══════════════════
+   Estilo iPhone/Apple Watch: um círculo que abre (inspire), segura e fecha
+   (expire), com vibração suave a cada fase. Padrão calmo 4-4-6. Ao concluir,
+   recompensa fixa (nunca punitiva), suprimida em Modo Cuidado. */
+
+const BREATH_PATTERN = { in: 4000, hold: 4000, out: 6000 } as const;
+const BREATH_CYCLES = 5;
+
+function buzz(ms = 28) {
+  try {
+    navigator.vibrate?.(ms);
+  } catch {
+    /* sem haptics */
+  }
+}
+
+function BreathingBlock({
+  day,
+  canEarn,
+  careMode = false,
+  alreadyDone,
+  onEarn,
+}: {
+  day: number;
+  canEarn: boolean;
+  careMode?: boolean;
+  alreadyDone: boolean;
+  onEarn: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [phase, setPhase] = useState<"intro" | "in" | "hold" | "out" | "done">("intro");
+  const [cycle, setCycle] = useState(0);
+  const [reward, setReward] = useState<number | null>(null);
+  const grantedRef = useRef(false);
+
+  // Loop das respirações: inspire → segure → expire, BREATH_CYCLES vezes.
+  useEffect(() => {
+    if (phase !== "in" && phase !== "hold" && phase !== "out") return;
+    if (cycle === 0 && phase === "in") buzz();
+    let cancelled = false;
+    const dur =
+      phase === "in"
+        ? BREATH_PATTERN.in
+        : phase === "hold"
+          ? BREATH_PATTERN.hold
+          : BREATH_PATTERN.out;
+    const t = setTimeout(() => {
+      if (cancelled) return;
+      buzz();
+      if (phase === "in") setPhase("hold");
+      else if (phase === "hold") setPhase("out");
+      else {
+        const next = cycle + 1;
+        if (next >= BREATH_CYCLES) {
+          setPhase("done");
+          finish();
+        } else {
+          setCycle(next);
+          setPhase("in");
+        }
+      }
+    }, dur);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, cycle]);
+
+  async function finish() {
+    if (grantedRef.current || !canEarn || careMode) return;
+    grantedRef.current = true;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) return;
+      const r = await grantWellnessReward({
+        data: { accessToken: token, day, activity: "breathing" },
+      });
+      if (r.ok && r.granted > 0) {
+        setReward(r.granted);
+        onEarn();
+      }
+    } catch {
+      /* recompensa é secundária */
+    }
+  }
+
+  function begin() {
+    setCycle(0);
+    setReward(null);
+    grantedRef.current = false;
+    setPhase("in");
+  }
+
+  function close() {
+    setOpen(false);
+    setPhase("intro");
+  }
+
+  const label =
+    phase === "in" ? "Inspire" : phase === "hold" ? "Segure" : phase === "out" ? "Expire" : "";
+  // Escala do círculo: cresce ao inspirar, mantém ao segurar, encolhe ao expirar.
+  const scale = phase === "in" || phase === "hold" ? 1 : phase === "out" ? 0.55 : 0.7;
+  const scaleDur = phase === "in" ? BREATH_PATTERN.in : phase === "out" ? BREATH_PATTERN.out : 0;
+
+  return (
+    <>
+      <div className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 to-cyan-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🌬️</span>
+          <div className="flex-1">
+            <p className="text-sm font-extrabold text-sky-800">Respiração do dia</p>
+            <p className="text-xs text-sky-700/80">
+              Um minutinho de calma pra você e o bebê {alreadyDone ? "· feito hoje ✓" : ""}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setOpen(true);
+            setPhase("intro");
+          }}
+          className="press mt-3 w-full rounded-full bg-sky-500 py-2.5 text-sm font-extrabold text-white"
+        >
+          {alreadyDone ? "Respirar de novo" : "Começar a respirar"}
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-sky-100 via-cyan-50 to-white"
+          style={{ paddingTop: "var(--safe-top)" }}
+        >
+          <div className="flex items-center px-4 py-3">
+            <button
+              onClick={close}
+              aria-label="Fechar"
+              className="press text-2xl leading-none text-slate-400"
+            >
+              ✕
+            </button>
+            {(phase === "in" || phase === "hold" || phase === "out") && (
+              <p className="flex-1 text-center text-xs font-bold uppercase tracking-wider text-sky-500">
+                Ciclo {Math.min(cycle + 1, BREATH_CYCLES)} de {BREATH_CYCLES}
+              </p>
+            )}
+            <span className="w-6" />
+          </div>
+
+          {phase === "intro" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <span className="text-6xl">🌸</span>
+              <h3 className="mt-4 text-2xl font-extrabold text-sky-900">Respire com seu bebê</h3>
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-sky-800/80">
+                Vamos fazer {BREATH_CYCLES} respirações lentas: inspire em 4s, segure 4s e solte em
+                6s. Deixe os ombros caírem. 💙
+              </p>
+              <button
+                onClick={begin}
+                className="press mt-8 rounded-full bg-sky-500 px-8 py-3 text-sm font-extrabold text-white"
+              >
+                Começar
+              </button>
+            </div>
+          )}
+
+          {(phase === "in" || phase === "hold" || phase === "out") && (
+            <div className="flex flex-1 flex-col items-center justify-center">
+              <div className="relative flex h-72 w-72 items-center justify-center">
+                <div
+                  className="absolute inset-0 rounded-full bg-sky-300/30"
+                  style={{
+                    transform: `scale(${scale})`,
+                    transitionProperty: "transform",
+                    transitionDuration: `${scaleDur}ms`,
+                    transitionTimingFunction: "cubic-bezier(0.4,0,0.4,1)",
+                  }}
+                  aria-hidden
+                />
+                <div
+                  className="absolute inset-6 rounded-full bg-sky-400/40"
+                  style={{
+                    transform: `scale(${scale})`,
+                    transitionProperty: "transform",
+                    transitionDuration: `${scaleDur}ms`,
+                    transitionTimingFunction: "cubic-bezier(0.4,0,0.4,1)",
+                  }}
+                  aria-hidden
+                />
+                <div
+                  className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 text-white shadow-lg"
+                  style={{
+                    transform: `scale(${scale})`,
+                    transitionProperty: "transform",
+                    transitionDuration: `${scaleDur}ms`,
+                    transitionTimingFunction: "cubic-bezier(0.4,0,0.4,1)",
+                  }}
+                >
+                  <span className="text-base font-extrabold">{label}</span>
+                </div>
+              </div>
+              <p className="mt-10 text-lg font-bold text-sky-800">{label}…</p>
+            </div>
+          )}
+
+          {phase === "done" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              {!careMode && <ConfettiBurst />}
+              <span className="dc-result-in text-6xl">🌸</span>
+              <h3 className="mt-3 text-2xl font-extrabold text-sky-900">Que calma boa 💙</h3>
+              <p className="mt-1 text-sm text-sky-800/80">
+                Você respirou com seu bebê. Guarde essa sensação.
+              </p>
+              {!careMode && reward != null && reward > 0 && (
+                <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
+                  +{reward} 🌱 Sementinhas!
+                </div>
+              )}
+              <button
+                onClick={close}
+                className="press mt-8 w-full max-w-xs rounded-full bg-sky-500 py-3 text-sm font-extrabold text-white"
+              >
+                Voltar ao caminho
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
