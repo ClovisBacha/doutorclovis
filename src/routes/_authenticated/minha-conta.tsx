@@ -13590,38 +13590,46 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
       return;
     }
     setBuying(itemId);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setBuying(null);
-      return;
-    }
-    const res = await buyCantinhoItem({
-      data: { accessToken: s.session.access_token, itemId },
-    });
-    if (res.ok) {
-      setSaldo(res.balance);
-      setOwned((o) => {
-        const next = o.includes(itemId) ? o : [...o, itemId];
-        // Trofeu da coleção: se esta compra fechou a coleção, desbloqueia na hora.
-        const nowComplete = isCantinhoCollectionComplete(next);
-        setCollection((c) => ({
-          owned: CANTINHO_COMPLETION_REQUIRED.filter((id) => next.includes(id)).length,
-          total: c.total || CANTINHO_COMPLETION_REQUIRED.length,
-          complete: nowComplete,
-        }));
-        return nowComplete && !next.includes(CANTINHO_COMPLETIONIST_ID)
-          ? [...next, CANTINHO_COMPLETIONIST_ID]
-          : next;
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) {
+        toast("Sua sessão expirou — entre novamente.");
+        return;
+      }
+      const res = await buyCantinhoItem({
+        data: { accessToken: s.session.access_token, itemId },
       });
-      toast("Adicionado ao seu cantinho! 💛");
-    } else {
-      toast(res.error ?? "Não foi possível comprar");
-      if (typeof res.balance === "number") setSaldo(res.balance);
-      // Já possuído (ex.: comprado em outro aparelho): reflete na hora.
-      if (res.error === "Você já tem este item")
-        setOwned((o) => (o.includes(itemId) ? o : [...o, itemId]));
+      if (res.ok) {
+        setSaldo(res.balance);
+        setOwned((o) => {
+          const next = o.includes(itemId) ? o : [...o, itemId];
+          // Trofeu da coleção: se esta compra fechou a coleção, desbloqueia na hora.
+          const nowComplete = isCantinhoCollectionComplete(next);
+          setCollection((c) => ({
+            owned: CANTINHO_COMPLETION_REQUIRED.filter((id) => next.includes(id)).length,
+            total: c.total || CANTINHO_COMPLETION_REQUIRED.length,
+            complete: nowComplete,
+          }));
+          return nowComplete && !next.includes(CANTINHO_COMPLETIONIST_ID)
+            ? [...next, CANTINHO_COMPLETIONIST_ID]
+            : next;
+        });
+        toast("Adicionado ao seu cantinho! 💛");
+      } else {
+        toast(res.error ?? "Não foi possível comprar");
+        if (typeof res.balance === "number") setSaldo(res.balance);
+        // Já possuído (ex.: comprado em outro aparelho): reflete na hora.
+        if (res.error === "Você já tem este item")
+          setOwned((o) => (o.includes(itemId) ? o : [...o, itemId]));
+      }
+    } catch (e) {
+      // SEM try/catch, um erro aqui deixava `buying` travado pra sempre e todos
+      // os cliques seguintes viravam no-op silencioso. Agora sempre libera.
+      console.error("[cantinho buy] erro:", e);
+      toast("Não consegui comprar agora — tente de novo em instantes.");
+    } finally {
+      setBuying(null);
     }
-    setBuying(null);
   }
 
   const pill = (active: boolean) =>
