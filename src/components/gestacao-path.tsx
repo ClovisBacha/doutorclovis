@@ -1049,6 +1049,8 @@ export function GestacaoPath({
 
   // Intro imersiva (Duolingo) antes do sheet da aula
   const [intro, setIntro] = useState<number | null>(null);
+  // Tela cheia de bem-estar (aberta pelo card do dia). Guarda o dia (D).
+  const [wellnessDay, setWellnessDay] = useState<number | null>(null);
 
   function reallyOpenDay(D: number) {
     setDayTasks(dayTaskState(D));
@@ -1883,6 +1885,16 @@ export function GestacaoPath({
       <div className="h-16" />
 
       {/* Intro imersiva da aula (Duolingo): moeda salta, depois o sheet abre */}
+      {wellnessDay !== null && (
+        <WellnessScreen
+          day={wellnessDay}
+          canEarn={wellnessDay === todayD}
+          careMode={careMode}
+          onEarn={() => markDayTask(wellnessDay as number, "bemestar", true)}
+          onClose={() => setWellnessDay(null)}
+        />
+      )}
+
       {intro !== null && (
         <QuizIntro
           D={intro}
@@ -1987,7 +1999,7 @@ export function GestacaoPath({
                         : { id: "desafio", label: ch.label, emoji: ch.emoji },
                       {
                         id: "bemestar",
-                        label: "Fazer 1 atividade de bem-estar (abaixo)",
+                        label: "Fazer 1 atividade de bem-estar",
                         emoji: "🌿",
                       },
                     ].map((t) => {
@@ -2076,15 +2088,26 @@ export function GestacaoPath({
                     <QuizPaywall week={week} />
                   ))}
 
-                {/* Atividade de bem-estar do dia (alterna respiração / movimento) */}
-                <WellnessBlock
-                  key={`wellness-${D}`}
-                  day={D}
-                  canEarn={isToday}
-                  careMode={careMode}
-                  alreadyDone={!!state.bemestar}
-                  onEarn={() => markDayTask(D, "bemestar", true)}
-                />
+                {/* Bem-estar do dia: abre a TELA CHEIA de atividades (cards). */}
+                <button
+                  onClick={() => setWellnessDay(D)}
+                  className="press mt-4 flex w-full items-center justify-between gap-3 rounded-3xl bg-gradient-to-br from-emerald-400 to-green-500 p-4 text-left text-white shadow-[0_10px_26px_-10px_rgba(0,0,0,0.35)]"
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="text-3xl drop-shadow-sm">🌿</span>
+                    <span>
+                      <span className="block text-base font-extrabold">
+                        Atividades de bem-estar
+                      </span>
+                      <span className="block text-xs text-white/90">
+                        {state.bemestar
+                          ? "Estrela de bem-estar conquistada ⭐"
+                          : "Respirar · meditar · momento com o bebê…"}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="text-2xl leading-none">›</span>
+                </button>
 
                 {isToday && (
                   <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
@@ -3995,19 +4018,53 @@ const WELLNESS_TYPES = [
   { key: "gratitude", emoji: "✨", label: "Gratidão", Comp: GratitudeBlock },
 ] as const;
 
+/** Cor + descrição de cada atividade (cards bonitos da tela de bem-estar). */
+const WELLNESS_META: Record<string, { title: string; grad: string; desc: string }> = {
+  breathing: {
+    title: "Respirar",
+    grad: "from-sky-400 to-cyan-500",
+    desc: "Respiração guiada de 1 minuto pra acalmar.",
+  },
+  movement: {
+    title: "Movimento",
+    grad: "from-amber-400 to-orange-500",
+    desc: "Movimentos leves e seguros pra soltar o corpo.",
+  },
+  meditation: {
+    title: "Meditar",
+    grad: "from-violet-400 to-purple-500",
+    desc: "Uma meditação curtinha pra relaxar.",
+  },
+  bonding: {
+    title: "Momento com o bebê",
+    grad: "from-rose-400 to-pink-500",
+    desc: "Um instante só de conexão com o bebê.",
+  },
+  gratitude: {
+    title: "Gratidão",
+    grad: "from-emerald-400 to-green-500",
+    desc: "Escreva uma coisa boa do seu dia.",
+  },
+};
+
 /**
- * Desafio de bem-estar do dia: a paciente faz TODAS as atividades (respirar,
- * mexer, meditar, momento com o bebê, gratidão) — cada uma acende uma estrela e
- * rende Sementinhas; completar todas fecha o dia com um bônus (celebração vem do
- * bônus da recompensa). Nunca punitivo: fazer só uma já ganha. No Modo Cuidado,
- * some o placar/estrelas (as atividades continuam disponíveis, sem gamificação).
+ * Tela CHEIA de bem-estar: cards coloridos com as atividades. Abre instantâneo
+ * (cards são estáticos; o ✓ de progresso carrega em segundo plano). Faça 1 pra
+ * ganhar a estrela; cada uma rende Sementinhas. No Modo Cuidado some o placar.
+ * X no canto fecha (ou volta, se estiver dentro de uma atividade).
  */
-function WellnessBlock(props: {
+function WellnessScreen({
+  day,
+  canEarn,
+  careMode,
+  onEarn,
+  onClose,
+}: {
   day: number;
   canEarn: boolean;
   careMode?: boolean;
-  alreadyDone: boolean;
   onEarn: () => void;
+  onClose: () => void;
 }) {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
@@ -4017,83 +4074,88 @@ function WellnessBlock(props: {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
       if (!s.session) return;
-      const r = await getWellnessProgress({
-        data: { accessToken: s.session.access_token, day: props.day },
-      });
+      const r = await getWellnessProgress({ data: { accessToken: s.session.access_token, day } });
       if (r.ok) setDone(new Set(r.done));
     } catch {
-      /* progresso é secundário */
+      /* progresso é secundário — não bloqueia a tela */
     }
   }
   useEffect(() => {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.day]);
+  }, [day]);
 
-  // Quando uma atividade termina, avisa o pai e recarrega o placar (acende a
-  // estrela). O grant cai no servidor; o pequeno atraso garante o refetch certo.
   function handleEarn() {
-    props.onEarn();
+    onEarn();
     setTimeout(refresh, 500);
   }
 
-  const total = WELLNESS_TYPES.length;
-  const doneCount = WELLNESS_TYPES.filter((a) => done.has(a.key)).length;
-  const allDone = doneCount === total;
+  const activity = openIdx !== null ? WELLNESS_TYPES[openIdx] : null;
+  const Chosen = activity?.Comp;
 
   return (
-    <div className="mt-4">
-      {!props.careMode && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-500/25 dark:bg-emerald-500/5">
-          <p className="text-sm font-bold text-foreground">🌿 Bem-estar de hoje</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {doneCount === 0
-              ? "Faça 1 atividade pra ganhar a estrela de bem-estar ⭐. Cada uma rende Sementinhas 🌱."
-              : allDone
-                ? "Todas as atividades feitas! 🌿✨"
-                : `Estrela de bem-estar garantida ⭐ · ${doneCount}/${total} feitas — faça mais pra ganhar mais 🌱`}
-          </p>
-        </div>
-      )}
+    <div
+      className="fixed inset-0 z-[60] overflow-y-auto"
+      style={{ background: "linear-gradient(180deg,#fdf3ec 0%,#f7e2d8 100%)" }}
+    >
+      <button
+        onClick={activity ? () => setOpenIdx(null) : onClose}
+        aria-label={activity ? "Voltar" : "Fechar"}
+        className="press fixed right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-lg text-slate-600 shadow-md backdrop-blur"
+      >
+        ✕
+      </button>
 
-      <div className="mt-3 grid grid-cols-5 gap-1.5">
-        {WELLNESS_TYPES.map((a, i) => {
-          const isDone = done.has(a.key);
-          const active = openIdx === i;
-          return (
-            <button
-              key={a.key}
-              onClick={() => setOpenIdx(active ? null : i)}
-              className={`press flex flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-center transition-colors ${
-                active
-                  ? "border-primary bg-primary/10"
-                  : isDone
-                    ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/10"
-                    : "border-border hover:border-primary/40"
-              }`}
-            >
-              <span className="text-xl leading-none">{a.emoji}</span>
-              <span className="text-[10px] font-semibold leading-tight text-foreground/70">
-                {a.label}
-              </span>
-              <span className="text-[10px] leading-none text-emerald-600 dark:text-emerald-400">
-                {isDone ? "✓" : " "}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {openIdx !== null &&
-        (() => {
-          const a = WELLNESS_TYPES[openIdx];
-          const Chosen = a.Comp;
-          return (
-            <div className="mt-3">
-              <Chosen {...props} alreadyDone={done.has(a.key)} onEarn={handleEarn} />
+      <div className="mx-auto max-w-md px-5 pb-16 pt-[calc(3.5rem+env(safe-area-inset-top))]">
+        {activity && Chosen ? (
+          <div>
+            <p className="mb-3 text-center text-sm font-bold text-foreground/60">
+              {activity.emoji} {WELLNESS_META[activity.key]?.title ?? activity.label}
+            </p>
+            <Chosen
+              day={day}
+              canEarn={canEarn}
+              careMode={careMode}
+              alreadyDone={done.has(activity.key)}
+              onEarn={handleEarn}
+            />
+          </div>
+        ) : (
+          <>
+            <h2 className="font-serif text-2xl text-foreground">Bem-estar de hoje 🌿</h2>
+            {!careMode && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Escolha um momento pra você e o bebê. Faça <strong>1</strong> pra ganhar a estrela
+                de bem-estar ⭐ — quanto mais, mais Sementinhas 🌱.
+              </p>
+            )}
+            <div className="mt-5 flex flex-col gap-3">
+              {WELLNESS_TYPES.map((a, i) => {
+                const meta = WELLNESS_META[a.key];
+                const isDone = !careMode && done.has(a.key);
+                return (
+                  <button
+                    key={a.key}
+                    onClick={() => setOpenIdx(i)}
+                    className={`press relative flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br ${meta.grad} p-4 text-left text-white shadow-[0_10px_26px_-10px_rgba(0,0,0,0.35)]`}
+                  >
+                    <span className="text-4xl drop-shadow-sm">{a.emoji}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-base font-extrabold">{meta.title}</span>
+                      <span className="block text-xs text-white/90">{meta.desc}</span>
+                    </span>
+                    {isDone && (
+                      <span className="shrink-0 rounded-full bg-white/25 px-2.5 py-1 text-xs font-bold">
+                        ✓ feito
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          );
-        })()}
+          </>
+        )}
+      </div>
     </div>
   );
 }
