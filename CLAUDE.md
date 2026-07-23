@@ -117,3 +117,33 @@ Tabelas (ver `supabase/migrations/`):
 - `src/lib/lovable-error-reporting.ts` — no-op fora do Lovable (usa
   `window.__lovableEvents`).
 - `.lovable/project.json` — metadados do template.
+
+## Backlog — pendências combinadas (lembrar de resolver)
+
+> Registrado a pedido do Cláudio. NÃO estão implementadas — são os próximos
+> grandes blocos. Ao retomar, confirmar prioridade antes de construir.
+
+### 1. Agenda real com o médico (booking por horário + lista de espera)
+
+Hoje `agendamento` só cria um **pedido** (`appointment_requests`), não é reserva
+por horário. Objetivo:
+
+- Médico define **disponibilidade** (slots recorrentes + exceções/bloqueios).
+- Paciente marca em um **horário disponível** (confirma na hora, não "pedido").
+- Se o horário preferido estiver cheio, o sistema **sugere outros horários**.
+- Sem vaga → entra em **lista de espera** e é avisada quando abrir vaga.
+- Tabelas prováveis: `doctor_availability`, `appointments` (estado do booking),
+  `appointment_waitlist`. Integrar com o painel do médico e com o Google
+  Agenda/Meet que já existem (ver `docs/GOOGLE_MEET.md`).
+
+### 2. Ciclo menstrual estilo Apple Health + cérebro do paciente
+
+Já existe a aba "Ciclo Menstrual". Evoluir para uma experiência tipo Apple
+Health (Cycle Tracking):
+
+- Previsão de ciclo e janela fértil, registro de sintomas, calendário visual,
+  lembretes.
+- **Integrar os dados do ciclo ao "cérebro do paciente"** (IA do consultório,
+  `src/lib/secondbrain.server.ts`) para insights personalizados.
+- Regras que continuam valendo: a IA médica NUNCA responde/aprende sem
+  aprovação do médico; dado sensível (LGPD) só com consentimento explícito.
