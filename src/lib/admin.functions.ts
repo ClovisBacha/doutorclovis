@@ -466,6 +466,47 @@ export const markAppointmentPaid = createServerFn({ method: "POST" })
       : { ok: true as const, error: null };
   });
 
+const BroadcastSchema = z.object({
+  accessToken: z.string().min(10),
+  title: z.string().trim().min(2).max(80),
+  body: z.string().trim().min(2).max(300),
+});
+
+/**
+ * Envio manual de notificação: o médico manda um aviso (push) pra TODAS as
+ * próprias pacientes. Escopo multi-tenant — o assinante só alcança as pacientes
+ * do próprio doctor_id; a equipe alcança todas. No-op se o push não estiver
+ * configurado. É comunicação direta do médico, então não é silenciada pelo
+ * Modo Cuidado (que só cala a gamificação do app, não a voz do médico).
+ */
+export const sendDoctorBroadcast = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => BroadcastSchema.parse(i))
+  .handler(async ({ data }) => {
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, error: "Sem permissão.", sent: 0 };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { pushConfigured, sendPushToUser } = await import("@/lib/push.server");
+    if (!pushConfigured())
+      return { ok: false as const, error: "Notificações ainda não configuradas.", sent: 0 };
+
+    const { data: patients } = await scopedBy(
+      (supabaseAdmin as any).from("patient_profiles").select("id"),
+      scope,
+    );
+    const ids = ((patients ?? []) as { id: string }[]).map((p) => p.id);
+
+    let sent = 0;
+    for (const id of ids) {
+      const res = await sendPushToUser(id, {
+        title: data.title,
+        body: data.body,
+        url: "/minha-conta",
+      });
+      if (res.sent > 0) sent++;
+    }
+    return { ok: true as const, error: null, sent };
+  });
+
 export type AdminWaitlistEntry = {
   id: string;
   patient_name: string;
