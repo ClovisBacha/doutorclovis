@@ -37,6 +37,7 @@ import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { hapticKick, hapticTap } from "@/lib/haptics";
+import { createBreathAudio } from "@/lib/breath-audio";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { subscribeToPush, vapidPublicKey } from "@/lib/push";
@@ -758,6 +759,8 @@ function MinhaContaPage() {
         <WeekMilestoneModal
           week={milestoneWeek}
           babyName={profile?.baby_name ?? null}
+          motherName={profile?.display_name?.split(" ")[0] ?? ""}
+          tone={profile?.baby_skin_tone ?? 0}
           onClose={() => setMilestoneWeek(null)}
         />
       )}
@@ -1418,48 +1421,98 @@ function OnboardingRitual({
 function WeekMilestoneModal({
   week,
   babyName,
+  motherName,
+  tone,
   onClose,
 }: {
   week: number;
   babyName: string | null;
+  motherName: string;
+  tone: number;
   onClose: () => void;
 }) {
   const baby = babyForWeek(week);
+  const [sound, setSound] = useState(false);
+  const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
+
   useEffect(() => {
     fireConfetti();
+    return () => {
+      audioRef.current?.stop();
+    };
   }, []);
 
+  function toggleSound() {
+    if (sound) {
+      audioRef.current?.stop();
+      audioRef.current = null;
+      setSound(false);
+    } else {
+      audioRef.current = createBreathAudio();
+      audioRef.current.start();
+      setSound(true);
+    }
+  }
+
   function handleClose() {
+    audioRef.current?.stop();
     celebrateChime();
     celebrateHaptic();
     onClose();
   }
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]"
+    <div className="fixed inset-0 z-[110] flex flex-col items-center justify-center overflow-y-auto bg-[image:var(--gradient-warm)] p-6 text-center">
+      {/* brilhos ambiente */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 -top-20 h-72 w-72 rounded-full bg-primary/15 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-rose-200/40 blur-3xl"
+      />
+
+      {/* botão de som (canto) */}
+      <button
+        onClick={toggleSound}
+        aria-label={sound ? "Desligar som" : "Ligar som ambiente"}
+        className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card/70 text-lg backdrop-blur"
       >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl"
-        />
-        <p className="relative text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-          Novo marco
+        {sound ? "🔊" : "🔈"}
+      </button>
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.92, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="relative flex max-w-sm flex-col items-center"
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+          {motherName ? `${motherName}, chegou um novo marco` : "Chegou um novo marco"}
         </p>
-        <p className="relative mt-3 text-6xl">🎉</p>
-        <h2 className="relative mt-4 font-serif text-3xl leading-tight">Semana {week}!</h2>
-        <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground">
+
+        <div className="float-slow mt-6">
+          <BabyIllustration
+            week={week}
+            tone={tone}
+            showInfo={false}
+            className="h-52 w-52 drop-shadow-[0_18px_44px_rgba(168,90,68,0.22)] md:h-64 md:w-64"
+          />
+        </div>
+
+        <h2 className="mt-6 font-serif leading-none">
+          <span className="text-6xl">{week}</span>
+          <span className="ml-2 text-2xl text-muted-foreground">semanas</span>
+        </h2>
+        <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-foreground">
           {babyName ? `${babyName} agora` : "Seu bebê agora"} tem o tamanho de{" "}
-          <span className="font-semibold text-foreground">{baby.fruit.toLowerCase()}</span>.{" "}
-          {baby.desc}
+          <span className="font-semibold">{baby.fruit.toLowerCase()}</span>. {baby.desc}
         </p>
+
         <button
           onClick={handleClose}
-          className="relative mt-6 w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
+          className="press mt-8 rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
         >
           Que alegria! 💛
         </button>
