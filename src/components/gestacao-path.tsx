@@ -3047,6 +3047,24 @@ const MOVIMENTOS: Movimento[] = [
     cue: "Em pé, incline a bacia para frente e para trás, bem devagar.",
     secs: 30,
   },
+  {
+    emoji: "🙌",
+    name: "Alongar os braços pro alto",
+    cue: "Entrelace os dedos, vire as palmas pra cima e estique — respira fundo.",
+    secs: 30,
+  },
+  {
+    emoji: "🪑",
+    name: "Torção suave sentada",
+    cue: "Sentada, gire o tronco devagar pra um lado, depois pro outro.",
+    secs: 30,
+  },
+  {
+    emoji: "🐾",
+    name: "Balanço na quatro apoios",
+    cue: "De quatro apoios, balance o quadril pra frente e pra trás — alivia as costas.",
+    secs: 40,
+  },
 ];
 
 /** 3 movimentos do dia (rotação determinística por dia). */
@@ -3290,6 +3308,42 @@ const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
       "Agradeça ao seu corpo por estar cuidando de duas vidas.",
       "Respire mais uma vez, sorrindo por dentro.",
       "Abra os olhos levando essa calma com você.",
+    ],
+  },
+  {
+    theme: "Sono tranquilo",
+    emoji: "😴",
+    lines: [
+      "Deite-se de lado, com um travesseiro apoiando a barriga.",
+      "Solte o peso do corpo no colchão, parte por parte.",
+      "Deixe a respiração ficar longa e silenciosa.",
+      "Imagine cada pensamento indo embora como uma nuvem.",
+      "Não precisa dormir agora — só descansar já basta.",
+      "Fique nesse aconchego mais um pouquinho.",
+    ],
+  },
+  {
+    theme: "Coragem pro parto",
+    emoji: "🦁",
+    lines: [
+      "Respire fundo e sinta a força que já existe em você.",
+      "Seu corpo sabe o caminho — ele foi feito pra isso.",
+      "A cada respiração, diga por dentro: 'eu sou capaz'.",
+      "O medo pode vir junto — e você segue mesmo assim.",
+      "Milhões de mulheres já fizeram isso. Você não está só.",
+      "Guarde essa confiança pra quando precisar dela.",
+    ],
+  },
+  {
+    theme: "Aqui e agora",
+    emoji: "🍃",
+    lines: [
+      "Sinta os pontos do corpo que tocam o chão ou a cadeira.",
+      "Perceba 3 sons ao seu redor, sem julgar.",
+      "Perceba o ar tocando a sua pele.",
+      "Não há passado nem futuro neste instante — só agora.",
+      "Você e o bebê, respirando, neste exato momento.",
+      "Leve essa presença pro resto do dia.",
     ],
   },
 ];
@@ -3536,6 +3590,24 @@ const BONDING_ROTEIROS: { emoji: string; lines: string[] }[] = [
       "Se sentir um chutinho, responda com um toque suave.",
       "É a primeira 'conversa' de vocês.",
       "Sorria — ele sente quando você está bem.",
+    ],
+  },
+  {
+    emoji: "📖",
+    lines: [
+      "Escolha uma historinha ou um poema curto.",
+      "Leia em voz alta, devagar, com carinho.",
+      "O som da sua voz já é um abraço pra ele.",
+      "Não importa o quê — importa vocês juntos.",
+    ],
+  },
+  {
+    emoji: "💭",
+    lines: [
+      "Feche os olhos e imagine o rostinho do bebê.",
+      "Pense em uma coisa que você mal pode esperar pra viver com ele.",
+      "Guarde esse sonho no coração.",
+      "Ele está chegando, no tempo certo. 💛",
     ],
   },
 ];
