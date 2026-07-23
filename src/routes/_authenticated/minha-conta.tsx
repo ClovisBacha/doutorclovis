@@ -12332,6 +12332,13 @@ function ConquistasTab() {
               .filter((a) => Date.now() - new Date(a.unlocked_at).getTime() < 30000)
               .map((a) => a.achievement_key);
         setNewBadges(recent);
+        // Comemora conquista nova (confete + som + vibração). `recent` já vem
+        // vazio no Modo Cuidado, então a celebração respeita o luto.
+        if (recent.length > 0) {
+          fireConfetti();
+          celebrateChime();
+          celebrateHaptic();
+        }
       }
       // Concede o check-in do dia (idempotente) e lê o saldo já com conquistas
       // e marcos contabilizados acima.

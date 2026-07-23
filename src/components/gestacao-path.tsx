@@ -12,6 +12,21 @@ import {
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
 import { createBreathAudio, vibratePhase } from "@/lib/breath-audio";
+import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
+
+/**
+ * Comemora o bônus por VARIAR as atividades (a "sequência" da semana): confete
+ * + som + vibração. Só dispara quando o bônus foi de fato concedido. O reward
+ * já é gated por Modo Cuidado no servidor e no gate `canEarn`.
+ */
+function celebrateIfBonus(r: unknown): void {
+  const bonus = (r as { bonus?: number }).bonus ?? 0;
+  if (bonus > 0) {
+    fireConfetti();
+    celebrateChime();
+    celebrateHaptic();
+  }
+}
 
 /** Hash estável de string → número (posiciona decorações de forma determinística). */
 function hashStr(s: string): number {
@@ -2823,6 +2838,7 @@ function BreathingBlock({
       if (r.ok && r.granted > 0) {
         setReward(r.granted);
         onEarn();
+        celebrateIfBonus(r);
       }
     } catch {
       /* recompensa é secundária */
@@ -3126,6 +3142,7 @@ function MovementBlock({
       if (r.ok && r.granted > 0) {
         setReward(r.granted);
         onEarn();
+        celebrateIfBonus(r);
       }
     } catch {
       /* recompensa é secundária */
@@ -3401,6 +3418,7 @@ function MeditationBlock({
       if (r.ok && r.granted > 0) {
         setReward(r.granted);
         onEarn();
+        celebrateIfBonus(r);
       }
     } catch {
       /* recompensa é secundária */
@@ -3658,6 +3676,7 @@ function BondingBlock({
       if (r.ok && r.granted > 0) {
         setReward(r.granted);
         onEarn();
+        celebrateIfBonus(r);
       }
     } catch {
       /* recompensa é secundária */
@@ -3828,6 +3847,7 @@ function GratitudeBlock({
           if (r.ok && r.granted > 0) {
             setReward(r.granted);
             onEarn();
+            celebrateIfBonus(r);
           }
         }
       }
