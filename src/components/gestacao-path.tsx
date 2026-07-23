@@ -1670,21 +1670,9 @@ export function GestacaoPath({
             );
           }
 
-          if (node.kind === "mascot") {
-            return (
-              <div
-                key={`m${node.y}`}
-                className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 select-none"
-                style={{ left: `${node.x}%`, top: `${node.y}px` }}
-                aria-hidden
-              >
-                <div className="float-slow text-7xl drop-shadow-[0_8px_10px_rgba(0,0,0,0.12)]">
-                  {node.emoji}
-                </div>
-                <div className="mx-auto mt-1.5 h-2.5 w-14 rounded-full bg-slate-900/10 blur-[3px]" />
-              </div>
-            );
-          }
+          // Tela limpa: sem decorações grátis. Só os itens do Cantinho que a
+          // paciente COMPROU aparecem (renderizados acima, via `decor`).
+          if (node.kind === "mascot") return null;
 
           if (node.kind === "week-header") {
             const tm = trimMeta(node.week);
@@ -1875,6 +1863,16 @@ export function GestacaoPath({
                     <span className="dc-coin-shine" aria-hidden />
                   </div>
                 </div>
+                {/* 3 estrelas do dia (Humor · Quiz · Bem-estar) — enchem conforme
+                    completa; some no Modo Cuidado e nos dias futuros (bloqueados). */}
+                {!isFuture && !careMode && (
+                  <div className="mt-1.5 flex gap-0.5 text-sm leading-none drop-shadow-sm">
+                    {[0, 1, 2].map((i) => {
+                      const filled = done ? 3 : isToday ? tasksDone : 0;
+                      return <span key={i}>{i < filled ? "⭐" : "☆"}</span>;
+                    })}
+                  </div>
+                )}
               </button>
             </div>
           );
