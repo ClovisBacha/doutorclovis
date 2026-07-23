@@ -36,7 +36,7 @@ import {
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
-import { AlertFab } from "@/components/alert-fab";
+import { EmergencySheet } from "@/components/emergency-sheet";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
 import { shareMilestoneCard } from "@/lib/share-card";
@@ -414,6 +414,7 @@ function MinhaContaPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [milestoneWeek, setMilestoneWeek] = useState<number | null>(null);
+  const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Puxar-para-atualizar: recarrega o perfil e remonta o conteúdo da aba atual
@@ -767,11 +768,27 @@ function MinhaContaPage() {
         />
       )}
 
-      {/* ── Sinais de alerta sempre à mão (some no Modo Cuidado) ── */}
-      {!careMode && <AlertFab />}
+      {/* ── Central de emergência (aberta pelo SOS da barra) ────── */}
+      {emergencyOpen && !careMode && (
+        <EmergencySheet
+          info={{
+            name: profile?.display_name?.split(" ")[0] ?? null,
+            weekLabel: gest ? `${gest.weeks}s ${gest.days}d` : null,
+            bloodType: profile?.blood_type ?? null,
+            allergies: profile?.allergies ?? null,
+            emergencyContact: profile?.emergency_contact ?? null,
+            emergencyPhone: profile?.emergency_phone ?? null,
+          }}
+          onClose={() => setEmergencyOpen(false)}
+        />
+      )}
 
       {/* ── App bottom nav (mobile only) ─────────────────────── */}
-      <AppBottomNav activeSection={activeSection} onSelect={handleBottomNav} />
+      <AppBottomNav
+        activeSection={activeSection}
+        onSelect={handleBottomNav}
+        onEmergency={careMode ? undefined : () => setEmergencyOpen(true)}
+      />
 
       {/* ── Jornada do Bebê (toque na foto) + popup Premium ─────── */}
       {journeyOpen && gest && (
