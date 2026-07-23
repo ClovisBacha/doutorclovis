@@ -33,6 +33,7 @@ import {
   type WaitlistEntry,
 } from "@/lib/waitlist.functions";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
+import { Stagger, StaggerItem } from "@/components/motion-primitives";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
@@ -1138,9 +1139,9 @@ function BabyTab({
   const bpmDefault = profile.fetal_bpm ?? (gest.weeks < 14 ? 160 : gest.weeks < 28 ? 145 : 135);
 
   return (
-    <div className="space-y-6">
+    <Stagger className="space-y-6">
       {/* ── Hero imersivo: o bebê é o protagonista ─────────────────────── */}
-      <div className="relative overflow-hidden rounded-3xl border border-border bg-[image:var(--gradient-warm)] p-6 shadow-[var(--shadow-card)] md:p-10">
+      <StaggerItem className="relative overflow-hidden rounded-3xl border border-border bg-[image:var(--gradient-warm)] p-6 shadow-[var(--shadow-card)] md:p-10">
         {/* brilhos suaves ao fundo */}
         <div
           aria-hidden
@@ -1232,10 +1233,10 @@ function BabyTab({
             )}
           </div>
         </div>
-      </div>
+      </StaggerItem>
 
       {/* ── Linha de cards: DPP · próxima consulta · exame ─────────────── */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <StaggerItem className="grid gap-4 md:grid-cols-3">
         <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <p className="text-xs uppercase tracking-[0.22em] text-primary">
             DPP — Data provável do parto
@@ -1279,27 +1280,29 @@ function BabyTab({
           </p>
           <p className="mt-2 text-sm leading-relaxed text-foreground">{exam}</p>
         </div>
-      </div>
+      </StaggerItem>
 
       {/* ── Sentir o coração: vibra no ritmo do bebê (BPM real se o médico
              registrou na consulta; senão, o típico do trimestre) ─────────── */}
-      <HeartbeatFeel
-        defaultBpm={bpmDefault}
-        babyName={profile.baby_name}
-        sourceNote={
-          profile.fetal_bpm
-            ? `Ritmo real medido pelo seu médico${
-                profile.fetal_bpm_at
-                  ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
-                  : ""
-              } 💗`
-            : undefined
-        }
-        compact
-      />
+      <StaggerItem>
+        <HeartbeatFeel
+          defaultBpm={bpmDefault}
+          babyName={profile.baby_name}
+          sourceNote={
+            profile.fetal_bpm
+              ? `Ritmo real medido pelo seu médico${
+                  profile.fetal_bpm_at
+                    ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
+                    : ""
+                } 💗`
+              : undefined
+          }
+          compact
+        />
+      </StaggerItem>
       {/* Segunda gestação: historical alerts */}
       {(profile.pregnancy_number ?? 1) >= 2 && (
-        <div className="col-span-full rounded-3xl border border-primary/25 bg-primary/8 p-6">
+        <StaggerItem className="col-span-full rounded-3xl border border-primary/25 bg-primary/8 p-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">
             🔁 2ª Gestação — Histórico da anterior
           </p>
@@ -1370,9 +1373,9 @@ function BabyTab({
               </div>
             )}
           </div>
-        </div>
+        </StaggerItem>
       )}
-    </div>
+    </Stagger>
   );
 }
 
@@ -14048,10 +14051,14 @@ function CicloMenstrualTab() {
     <div className="space-y-6">
       {/* Ciclo visual — estilo Apple Health */}
       {model ? (
-        <div className="space-y-4">
-          <CicloHero model={model} />
-          <CicloCalendario model={model} />
-        </div>
+        <Stagger className="space-y-4">
+          <StaggerItem>
+            <CicloHero model={model} />
+          </StaggerItem>
+          <StaggerItem>
+            <CicloCalendario model={model} />
+          </StaggerItem>
+        </Stagger>
       ) : (
         <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center">
           <p className="mb-2 text-4xl">🌸</p>
