@@ -250,7 +250,6 @@ type Gest = ReturnType<typeof computeGestation>;
 const TABS = [
   "Bebê",
   "Caminho",
-  "Carta do Bebê",
   "Calendário",
   "Linha do Tempo",
   "Diário",
@@ -262,7 +261,6 @@ const TABS = [
   "Meditações",
   "Sons",
   "Exercícios",
-  "Quartinho",
   "Clima",
   "Alertas",
   "Pré-consulta",
@@ -271,9 +269,6 @@ const TABS = [
   "Consultas",
   "Teleconsulta",
   "Acompanhante",
-  "Conta Regressiva",
-  "Álbum",
-  "Nome do Bebê",
   "FAQ",
   "Pânico",
   "Carteirinha",
@@ -299,12 +294,10 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
     tabs: [
       "Bebê",
       "Caminho",
-      "Carta do Bebê",
       "Calendário",
       "Linha do Tempo",
       "Chutes",
       "Contrações",
-      "Conta Regressiva",
       "Carteirinha",
     ],
   },
@@ -325,16 +318,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Família",
-    tabs: [
-      "Diário",
-      "Humor",
-      "Acompanhante",
-      "Quartinho",
-      "Álbum",
-      "Nome do Bebê",
-      "Pós-parto",
-      "Apoio Emocional",
-    ],
+    tabs: ["Diário", "Humor", "Acompanhante", "Pós-parto", "Apoio Emocional"],
   },
   {
     label: "Consultas",
@@ -910,7 +894,7 @@ function MinhaContaPage() {
           <div key={tab} className="mt-6 tab-enter">
             <TabErrorBoundary tabName={tab}>
               {tab === "Bebê" && (
-                <BabyTab
+                <BebeHub
                   profile={profile}
                   gest={gest}
                   onNavigate={goToTab}
@@ -927,9 +911,6 @@ function MinhaContaPage() {
                   onOpenShop={() => goToTab("Cantinho")}
                 />
               )}
-              {tab === "Carta do Bebê" && (
-                <CartaBebêTab profile={profile} gest={gest} onNavigate={goToTab} />
-              )}
               {tab === "Calendário" && (
                 <PrenatalCalendarTab profile={profile} gest={gest} onNavigate={goToTab} />
               )}
@@ -945,7 +926,6 @@ function MinhaContaPage() {
               {tab === "Meditações" && <MeditacoesTab gest={gest} />}
               {tab === "Sons" && <SonsBebêTab gest={gest} />}
               {tab === "Exercícios" && <ExerciciosTab gest={gest} />}
-              {tab === "Quartinho" && <QuartinhoTab gest={gest} />}
               {tab === "Clima" && <ClimaTab gest={gest} />}
               {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
               {tab === "Pré-consulta" && <PreConsultaTab profile={profile} gest={gest} />}
@@ -954,16 +934,6 @@ function MinhaContaPage() {
               {tab === "Consultas" && <ConsultasTab />}
               {tab === "Teleconsulta" && <TeleconsultaTab profile={profile} />}
               {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
-              {tab === "Conta Regressiva" && (
-                <CountdownTab
-                  profile={profile}
-                  gest={gest}
-                  onNavigate={goToTab}
-                  careMode={careMode}
-                />
-              )}
-              {tab === "Álbum" && <AlbumTab profile={profile} />}
-              {tab === "Nome do Bebê" && <NomeTab profile={profile} />}
               {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
               {tab === "Pânico" && <PânicoTab profile={profile} onNavigate={goToTab} />}
               {tab === "Carteirinha" && (
@@ -999,6 +969,71 @@ function MinhaContaPage() {
 }
 
 /* ---------- Bebê ---------- */
+/**
+ * Hub "Bebê": junta numa tela só (com sub-abas) tudo que é sobre o bebê —
+ * a semana, a contagem regressiva, o álbum, os nomes, a carta e o enxoval.
+ * Antes eram 6 abas separadas; agora é 1 (menos poluição visual).
+ */
+const BEBE_SUBTABS = [
+  { key: "semana", label: "Semana" },
+  { key: "contagem", label: "Contagem" },
+  { key: "album", label: "Álbum" },
+  { key: "nome", label: "Nomes" },
+  { key: "carta", label: "Carta" },
+  { key: "quartinho", label: "Enxoval" },
+] as const;
+
+function BebeHub({
+  profile,
+  gest,
+  onNavigate,
+  onBabyTap,
+  careMode,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+  onBabyTap: () => void;
+  careMode: boolean;
+}) {
+  const [sub, setSub] = useState<(typeof BEBE_SUBTABS)[number]["key"]>("semana");
+  return (
+    <div className="space-y-5">
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+        {BEBE_SUBTABS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSub(s.key)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+              sub === s.key
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-foreground/55 hover:text-foreground/80"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {sub === "semana" && (
+        <BabyTab
+          profile={profile}
+          gest={gest}
+          onNavigate={onNavigate}
+          onBabyTap={onBabyTap}
+          careMode={careMode}
+        />
+      )}
+      {sub === "contagem" && (
+        <CountdownTab profile={profile} gest={gest} onNavigate={onNavigate} careMode={careMode} />
+      )}
+      {sub === "album" && <AlbumTab profile={profile} />}
+      {sub === "nome" && <NomeTab profile={profile} />}
+      {sub === "carta" && <CartaBebêTab profile={profile} gest={gest} onNavigate={onNavigate} />}
+      {sub === "quartinho" && <QuartinhoTab gest={gest} />}
+    </div>
+  );
+}
+
 function BabyTab({
   profile,
   gest,
