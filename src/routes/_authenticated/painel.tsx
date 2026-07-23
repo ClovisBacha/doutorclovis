@@ -14,6 +14,7 @@ import {
   proposeAppointmentTime,
   markAppointmentPaid,
   getDoctorWaitlist,
+  sendDoctorBroadcast,
   type AdminAppointment,
   type AdminPreConsulta,
   type AdminQuestion,
@@ -420,6 +421,7 @@ function PainelPage() {
               onRefresh={load}
             />
             <WaitlistSection />
+            <BroadcastSection />
           </div>
         )}
         {tab === "Agenda" && <AgendaSection />}
@@ -1125,6 +1127,77 @@ function DashboardSkeleton() {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="h-52 animate-pulse rounded-3xl bg-secondary" />
         <div className="h-52 animate-pulse rounded-3xl bg-secondary" />
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Aviso por push (envio manual) ---------- */
+function BroadcastSection() {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function send() {
+    if (title.trim().length < 2 || body.trim().length < 2) {
+      toast("Escreva um título e uma mensagem.");
+      return;
+    }
+    if (!confirm("Enviar este aviso por notificação para as suas pacientes?")) return;
+    setSending(true);
+    try {
+      const res = await sendDoctorBroadcast({
+        data: { accessToken: await token(), title: title.trim(), body: body.trim() },
+      });
+      if (res.ok) {
+        toast.success(
+          res.sent > 0
+            ? `Aviso enviado para ${res.sent} paciente${res.sent > 1 ? "s" : ""} 🔔`
+            : "Nenhuma paciente com notificações ativas ainda.",
+        );
+        setTitle("");
+        setBody("");
+      } else {
+        toast.error(res.error || "Não consegui enviar agora.");
+      }
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <p className="font-serif text-lg">Enviar aviso às pacientes</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Manda uma notificação (push) para as suas pacientes que ativaram os lembretes. Ótimo para
+        recados como mudança de horário do consultório.
+      </p>
+      <div className="mt-4 space-y-3">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={80}
+          placeholder="Título (ex.: Aviso do consultório)"
+          className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm"
+        />
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          maxLength={300}
+          rows={3}
+          placeholder="Mensagem (ex.: Amanhã atenderemos a partir das 10h.)"
+          className="w-full resize-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm"
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{body.length}/300</span>
+          <button
+            onClick={send}
+            disabled={sending}
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {sending ? "Enviando…" : "Enviar aviso"}
+          </button>
+        </div>
       </div>
     </div>
   );
