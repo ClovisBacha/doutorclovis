@@ -15197,6 +15197,7 @@ function CicloMenstrualTab() {
                       ))}
                     <button
                       onClick={() => handleDelete(cycle.id)}
+                      aria-label="Excluir este ciclo"
                       className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground hover:border-red-300 hover:text-red-500"
                     >
                       ×
