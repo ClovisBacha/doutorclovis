@@ -169,6 +169,92 @@ function buildClinicalBlock(
   ].join("\n");
 }
 
+/**
+ * Bloco de CICLO + BEM-ESTAR da paciente para o system prompt. Lê os dados
+ * DELA no banco (menstrual_cycles + humor recente do diário) — fonte confiável,
+ * nunca do texto do cliente. Só o `mood` (rótulo curto) do diário entra, NUNCA
+ * o conteúdo do diário (privacidade). É CONTEXTO pra acolher/contextualizar
+ * (fase do ciclo, TPM, humor), não conduta: a regra de cobertura do cérebro do
+ * médico continua mandando no que a IA pode afirmar. LGPD: é o dado da própria
+ * paciente, na conversa dela com a IA do consultório dela.
+ */
+async function buildCycleMoodBlock(patientId: string): Promise<string> {
+  const fmt = (ymd: string) => new Date(ymd + "T00:00:00").toLocaleDateString("pt-BR");
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const [cyclesRes, moodsRes] = await Promise.all([
+      sb
+        .from("menstrual_cycles")
+        .select("start_date, end_date, symptoms")
+        .eq("user_id", patientId)
+        .order("start_date", { ascending: false })
+        .limit(6),
+      sb
+        .from("journal_entries")
+        .select("mood")
+        .eq("user_id", patientId)
+        .not("mood", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+    const lines: string[] = [];
+    const cs = (cyclesRes.data ?? []) as {
+      start_date: string;
+      end_date: string | null;
+      symptoms: string[] | null;
+    }[];
+    if (cs.length) {
+      const last = cs[0];
+      lines.push(
+        `- Último período: início em ${fmt(last.start_date)}${last.end_date ? ` (fim ${fmt(last.end_date)})` : ""}.`,
+      );
+      if (cs.length >= 2) {
+        const starts = cs
+          .map((c) => new Date(c.start_date + "T00:00:00Z").getTime())
+          .sort((a, b) => b - a);
+        let sum = 0;
+        let n = 0;
+        for (let i = 0; i < starts.length - 1; i++) {
+          const d = Math.round((starts[i] - starts[i + 1]) / 86400000);
+          if (d >= 15 && d <= 60) {
+            sum += d;
+            n++;
+          }
+        }
+        if (n) {
+          const avg = Math.round(sum / n);
+          const lastStartMs = new Date(last.start_date + "T00:00:00Z").getTime();
+          const cycleDay = Math.floor((Date.now() - lastStartMs) / 86400000) + 1;
+          const next = new Date(lastStartMs + avg * 86400000).toISOString().slice(0, 10);
+          if (cycleDay >= 1 && cycleDay <= 60) {
+            lines.push(
+              `- Ciclo médio ~${avg} dias; hoje é ~dia ${cycleDay}. Próximo período previsto por volta de ${fmt(next)}.`,
+            );
+          }
+        }
+      }
+      if (last.symptoms?.length) {
+        lines.push(`- Sintomas do último ciclo: ${last.symptoms.slice(0, 8).join(", ")}.`);
+      }
+    }
+    const moodList = ((moodsRes.data ?? []) as { mood: string | null }[])
+      .map((m) => m.mood)
+      .filter(Boolean);
+    if (moodList.length) {
+      lines.push(`- Humor recente (mais recente primeiro): ${moodList.join(", ")}.`);
+    }
+    if (!lines.length) return "";
+    return [
+      "## Ciclo e bem-estar da paciente (fonte: sistema — confiável)",
+      ...lines,
+      "Use com sensibilidade para acolher e contextualizar (fase do ciclo, TPM, como ela vem se sentindo). NÃO faça diagnóstico nem conduta a partir disto — siga a regra de cobertura do bloco do médico. Não recite os dados de volta sem necessidade.",
+    ].join("\n");
+  } catch {
+    return "";
+  }
+}
+
 /** Extrai o texto da última mensagem de usuário (formato UIMessage com parts). */
 function lastUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -224,11 +310,14 @@ export const Route = createFileRoute("/api/chat")({
           // getBrainContext/getChatMemory são safe (falha vira bloco vazio).
           const userText = lastUserText(messages);
           const { getChatMemory, memoryBlock } = await import("@/lib/chat-memory.server");
-          const [brain, memorySummary] = await Promise.all([
+          const [brain, memorySummary, cicloBemEstar] = await Promise.all([
             // Fonte resolvida: local por padrão; DoctorThink remoto se ligado
             // (env + flag doctorthink_remote). Fallback local em qualquer falha.
             getBrainContextResolved(userText, patient.doctorId, "app"),
             getChatMemory(patient.patientId, patient.doctorId),
+            // Ciclo + humor DELA (fonte confiável): a IA conversa com sensibilidade
+            // à fase do ciclo e a como ela vem se sentindo.
+            buildCycleMoodBlock(patient.patientId),
           ]);
           const memoria = memoryBlock(memorySummary);
           const base = medicalSystemPrompt(patient.doctorName);
@@ -249,6 +338,7 @@ export const Route = createFileRoute("/api/chat")({
           system = [
             base,
             patient.clinicalBlock,
+            cicloBemEstar,
             memoria,
             brain.enabledApp && brain.block ? brain.block : "",
             confianca,
