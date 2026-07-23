@@ -17,7 +17,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
 import { ymdLocal } from "@/lib/utils";
 import { getMyDoctor } from "@/lib/doctors.functions";
-import { getMyAppointments, type MyAppointment } from "@/lib/appointments.functions";
+import {
+  getMyAppointments,
+  respondToProposedTime,
+  type MyAppointment,
+} from "@/lib/appointments.functions";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
@@ -5768,6 +5772,12 @@ const APPT_STATUS_UI: Record<
   pending: { label: "Aguardando confirmação", cls: "bg-amber-100 text-amber-700", emoji: "⏳" },
   done: { label: "Realizada", cls: "bg-slate-100 text-slate-500", emoji: "✔️" },
   cancelled: { label: "Não confirmada", cls: "bg-rose-100 text-rose-600", emoji: "✖️" },
+  counter_proposed: {
+    label: "Horário sugerido — responda",
+    cls: "bg-violet-100 text-violet-700",
+    emoji: "🗓️",
+  },
+  declined: { label: "Você recusou", cls: "bg-rose-100 text-rose-600", emoji: "✖️" },
 };
 
 function formatApptDate(ymd: string): string {
@@ -5784,6 +5794,7 @@ function formatApptDate(ymd: string): string {
 function ConsultasTab() {
   const [appts, setAppts] = useState<MyAppointment[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(true);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -5929,9 +5940,31 @@ function ConsultasTab() {
     }
   }
 
+  async function respondProposal(id: string, approve: boolean) {
+    if (respondingId) return;
+    setRespondingId(id);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) {
+      setRespondingId(null);
+      return;
+    }
+    const res = await respondToProposedTime({
+      data: { accessToken: s.session.access_token, id, approve },
+    });
+    if (res.ok) {
+      toast(approve ? "Horário confirmado! ✅" : "Horário recusado.");
+      const r = await getMyAppointments({ data: { accessToken: s.session.access_token } });
+      if (r.ok) setAppts(r.appointments);
+    } else {
+      toast(res.error ?? "Não foi possível responder");
+    }
+    setRespondingId(null);
+  }
+
   // Ordenação: confirmadas futuras primeiro (mais próxima no topo), depois
   // pendentes, depois histórico (realizadas/não confirmadas) mais recente antes.
   const today = ymdLocal();
+  const proposed = appts.filter((a) => a.status === "counter_proposed");
   const upcoming = appts
     .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
     .sort((a, b) =>
@@ -5987,6 +6020,45 @@ function ConsultasTab() {
           </div>
         ) : (
           <div className="mt-4 space-y-2.5">
+            {proposed.map((a) => (
+              <div
+                key={a.id}
+                className="rounded-2xl border-2 border-violet-300 bg-violet-50/70 p-4"
+              >
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.counter_proposed.cls}`}
+                >
+                  {APPT_STATUS_UI.counter_proposed.emoji} {APPT_STATUS_UI.counter_proposed.label}
+                </span>
+                <p className="mt-2 text-sm text-foreground/80">
+                  O horário que você pediu não estava livre. O médico sugeriu:
+                </p>
+                <p className="mt-1 text-base font-extrabold text-violet-800">
+                  {a.proposed_date ? formatApptDate(a.proposed_date) : "—"} · {a.proposed_time}
+                </p>
+                {a.price_brl != null && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Valor: R$ {(a.price_brl / 100).toFixed(2)}
+                  </p>
+                )}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => respondProposal(a.id, true)}
+                    disabled={respondingId === a.id}
+                    className="press flex-1 rounded-full bg-emerald-500 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+                  >
+                    Aprovar este horário
+                  </button>
+                  <button
+                    onClick={() => respondProposal(a.id, false)}
+                    disabled={respondingId === a.id}
+                    className="press rounded-full border border-border px-4 py-2 text-xs font-bold text-muted-foreground disabled:opacity-40"
+                  >
+                    Recusar
+                  </button>
+                </div>
+              </div>
+            ))}
             {upcoming.map((a, i) => (
               <div
                 key={a.id}

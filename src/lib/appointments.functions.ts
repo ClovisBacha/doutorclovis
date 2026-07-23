@@ -133,7 +133,9 @@ export type MyAppointment = {
   preferred_time: string;
   confirmed_date: string | null;
   confirmed_time: string | null;
-  status: "pending" | "confirmed" | "done" | "cancelled";
+  proposed_date: string | null;
+  proposed_time: string | null;
+  status: "pending" | "confirmed" | "done" | "cancelled" | "counter_proposed" | "declined";
   reason: string;
   price_brl: number | null;
   payment_status: string | null;
@@ -150,7 +152,7 @@ export const getMyAppointments = createServerFn({ method: "POST" })
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("appointment_requests")
       .select(
-        "id, preferred_date, preferred_time, confirmed_date, confirmed_time, status, reason, price_brl, payment_status, created_at",
+        "id, preferred_date, preferred_time, confirmed_date, confirmed_time, proposed_date, proposed_time, status, reason, price_brl, payment_status, created_at",
       )
       // ilike mantém a insensibilidade a maiúsculas para linhas antigas, mas o
       // e-mail precisa ter %/_ escapados: sem isso viram curingas LIKE e uma
@@ -163,4 +165,126 @@ export const getMyAppointments = createServerFn({ method: "POST" })
       return { ok: false as const, appointments: [] as MyAppointment[] };
     }
     return { ok: true as const, appointments: (rows ?? []) as MyAppointment[] };
+  });
+
+/**
+ * A paciente APROVA ou RECUSA o horário sugerido pelo médico (contraproposta).
+ * Aprovar → vira 'confirmed' com o horário sugerido (checa conflito de slot na
+ * agenda do MESMO médico). Recusar → 'declined'. A paciente é identificada pelo
+ * e-mail da sessão (a consulta é por e-mail, sem user_id); só age na PRÓPRIA
+ * consulta e só quando ela está de fato 'counter_proposed'. Server-only.
+ */
+export const respondToProposedTime = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({ accessToken: z.string().min(10), id: z.string().uuid(), approve: z.boolean() })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u, error: uerr } = await supabaseAdmin.auth.getUser(data.accessToken);
+    const email = u?.user?.email;
+    if (uerr || !email) return { ok: false as const, error: "Não autenticado" };
+
+    // Só a PRÓPRIA consulta (e-mail bate) e só se estiver aguardando resposta.
+    const { data: row } = await (supabaseAdmin as any)
+      .from("appointment_requests")
+      .select(
+        "id, patient_name, patient_email, doctor_id, status, proposed_date, proposed_time, price_brl",
+      )
+      .eq("id", data.id)
+      .maybeSingle();
+    if (
+      !row ||
+      String(row.patient_email ?? "").toLowerCase() !== email.toLowerCase() ||
+      row.status !== "counter_proposed"
+    ) {
+      return { ok: false as const, error: "Consulta não encontrada" };
+    }
+
+    if (!data.approve) {
+      await (supabaseAdmin as any)
+        .from("appointment_requests")
+        .update({ status: "declined" })
+        .eq("id", data.id);
+      // Avisa o consultório que a paciente recusou (best-effort).
+      try {
+        const { sendEmail, emailLayout } = await import("@/lib/email.server");
+        const notify = (process.env.ADMIN_EMAILS || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (notify.length) {
+          await sendEmail({
+            to: notify,
+            replyTo: row.patient_email,
+            subject: `Horário sugerido recusado — ${row.patient_name ?? "paciente"}`,
+            html: emailLayout(
+              "Contraproposta recusada",
+              `<p style="margin:0 0 6px">${esc(row.patient_name ?? "A paciente")} recusou o horário sugerido. Talvez queira sugerir outro.</p>`,
+            ),
+          });
+        }
+      } catch (e) {
+        console.error("decline email failed", e);
+      }
+      return { ok: true as const, status: "declined" as const };
+    }
+
+    // APROVOU: confirma o horário sugerido, checando conflito na agenda do médico.
+    if (!row.proposed_date || !row.proposed_time) {
+      return { ok: false as const, error: "Horário sugerido inválido" };
+    }
+    let clashQ = (supabaseAdmin as any)
+      .from("appointment_requests")
+      .select("id")
+      .eq("status", "confirmed")
+      .eq("confirmed_date", row.proposed_date)
+      .eq("confirmed_time", row.proposed_time)
+      .neq("id", data.id);
+    // Conflito só na agenda do MESMO médico (isolamento multi-tenant).
+    clashQ = row.doctor_id ? clashQ.eq("doctor_id", row.doctor_id) : clashQ.is("doctor_id", null);
+    const { data: clash } = await clashQ.limit(1);
+    if (clash?.length) {
+      return {
+        ok: false as const,
+        error: "Esse horário acabou de ser preenchido. Peça um novo horário ao médico.",
+      };
+    }
+
+    const { error: upErr } = await (supabaseAdmin as any)
+      .from("appointment_requests")
+      .update({
+        status: "confirmed",
+        confirmed_date: row.proposed_date,
+        confirmed_time: row.proposed_time,
+      })
+      .eq("id", data.id)
+      .eq("status", "counter_proposed"); // trava idempotente contra corrida
+    if (upErr) return { ok: false as const, error: "Não foi possível confirmar" };
+
+    // Avisa o consultório que a paciente aprovou (best-effort).
+    try {
+      const { sendEmail, emailLayout } = await import("@/lib/email.server");
+      const notify = (process.env.ADMIN_EMAILS || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const dataBr = new Date(row.proposed_date + "T00:00:00").toLocaleDateString("pt-BR");
+      if (notify.length) {
+        await sendEmail({
+          to: notify,
+          replyTo: row.patient_email,
+          subject: `Horário confirmado pela paciente — ${row.patient_name ?? "paciente"}`,
+          html: emailLayout(
+            "Consulta confirmada",
+            `<p style="margin:0 0 6px">${esc(row.patient_name ?? "A paciente")} aprovou o horário sugerido: ${dataBr} às ${esc(row.proposed_time)}.</p>`,
+          ),
+        });
+      }
+    } catch (e) {
+      console.error("approve email failed", e);
+    }
+
+    return { ok: true as const, status: "confirmed" as const };
   });
