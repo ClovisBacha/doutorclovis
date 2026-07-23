@@ -112,7 +112,13 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
       p_item: item.id,
       p_price: item.price,
     });
-    if (error) return { ok: false as const, error: "Falha na compra" };
+    if (error) {
+      // Surface o motivo real (ex.: função ausente, permissão) — ajuda o
+      // diagnóstico em produção em vez de um "Falha na compra" opaco.
+      const m = (error as { message?: string; code?: string })?.message ?? "erro desconhecido";
+      console.error("[buyCantinhoItem] RPC error:", error);
+      return { ok: false as const, error: `Erro no banco: ${m}` };
+    }
     const r = (res ?? {}) as { ok?: boolean; error?: string; balance?: number };
     if (!r.ok) {
       const msg =
@@ -120,7 +126,7 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
           ? "Sementinhas insuficientes"
           : r.error === "ja_possui"
             ? "Você já tem este item"
-            : "Não foi possível comprar";
+            : `Não foi possível comprar (${r.error ?? "motivo desconhecido"})`;
       return { ok: false as const, error: msg, balance: r.balance ?? 0 };
     }
     return { ok: true as const, balance: r.balance ?? 0, itemId: item.id };
