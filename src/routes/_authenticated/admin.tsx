@@ -82,7 +82,6 @@ const PATIENT_TABS = [
   "Álbum",
   "Nome do Bebê",
   "FAQ",
-  "Pânico",
   "Carteirinha",
   "Pós-parto",
   "Conquistas",

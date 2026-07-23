@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { toast } from "sonner";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { DOCTOR } from "@/lib/doctor.config";
+import { savePanicEvent } from "@/lib/escola.functions";
+import { supabase } from "@/integrations/supabase/client";
 
 type Info = {
   name?: string | null;
@@ -26,6 +29,54 @@ function doctorTel(): string {
  */
 export function EmergencySheet({ info, onClose }: { info: Info; onClose: () => void }) {
   const [qr, setQr] = useState<string | null>(null);
+  const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
+
+  // "Botão de pânico": pega a localização e registra o alerta pro contato de
+  // emergência/médico (mesma função que era a aba Pânico). Best-effort.
+  async function sendLocation() {
+    if (panic !== "idle") return;
+    setPanic("sending");
+    try {
+      let lat: number | null = null;
+      let lng: number | null = null;
+      let address: string | null = null;
+      if (navigator?.geolocation) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
+          );
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
+          try {
+            const resp = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            );
+            address = (await resp.json()).display_name ?? null;
+          } catch {
+            /* nome do local é opcional */
+          }
+        } catch {
+          /* sem permissão de localização: registra sem coordenadas */
+        }
+      }
+      const { data: s } = await supabase.auth.getSession();
+      const res = s.session
+        ? await savePanicEvent({
+            data: { accessToken: s.session.access_token, latitude: lat, longitude: lng, address },
+          })
+        : { ok: false as const };
+      if (!res.ok) {
+        setPanic("idle");
+        toast.error("Não consegui registrar o alerta — ligue 192 imediatamente.");
+        return;
+      }
+      setPanic("sent");
+      toast.success("Alerta com sua localização enviado 💛");
+    } catch {
+      setPanic("idle");
+      toast.error("Não consegui registrar o alerta — ligue 192 imediatamente.");
+    }
+  }
 
   const card = [
     "FICHA DE EMERGÊNCIA - GESTANTE",
@@ -94,6 +145,19 @@ export function EmergencySheet({ info, onClose }: { info: Info; onClose: () => v
             📞 Ligar para {DOCTOR.name.split(" ").slice(0, 2).join(" ")}
           </a>
         )}
+
+        {/* Botão de pânico: registra a localização pro contato de emergência */}
+        <button
+          onClick={sendLocation}
+          disabled={panic !== "idle"}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-600 disabled:opacity-60 dark:text-rose-300"
+        >
+          {panic === "sending"
+            ? "📍 Enviando sua localização…"
+            : panic === "sent"
+              ? "✓ Localização enviada"
+              : "🆘 Enviar minha localização"}
+        </button>
 
         {/* Carteirinha de emergência (QR gerado no aparelho) */}
         <div className="mt-5 rounded-2xl border border-border bg-secondary/40 p-4">

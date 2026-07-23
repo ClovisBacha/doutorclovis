@@ -80,7 +80,7 @@ import {
   type NameEntry,
   type NameSession,
 } from "@/lib/family.functions";
-import { getCourseProgress, savePanicEvent, type CourseProgress } from "@/lib/escola.functions";
+import { getCourseProgress, type CourseProgress } from "@/lib/escola.functions";
 import { COURSE_MODULES } from "@/lib/course-modules";
 import {
   checkAndAwardAchievements,
@@ -272,7 +272,6 @@ const TABS = [
   "Consultas",
   "Acompanhante",
   "FAQ",
-  "Pânico",
   "Carteirinha",
   "Pós-parto",
   "Recompensas",
@@ -314,7 +313,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Aprender",
-    tabs: ["FAQ", "Pânico", "Recompensas"],
+    tabs: ["FAQ", "Recompensas"],
   },
   {
     label: "Médico",
@@ -1050,7 +1049,6 @@ function MinhaContaPage() {
                 {tab === "Consultas" && <ConsultasHub profile={profile} gest={gest} />}
                 {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
                 {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
-                {tab === "Pânico" && <PânicoTab profile={profile} onNavigate={goToTab} />}
                 {tab === "Carteirinha" && (
                   <CardTab profile={profile} gest={gest} onNavigate={goToTab} />
                 )}
@@ -11140,264 +11138,6 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
           Pergunte ao assistente de IA
         </button>
       </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   Feature 41 — Botão do Pânico
-───────────────────────────────────────────────────────────────────────────── */
-
-function PânicoTab({
-  profile,
-  onNavigate,
-}: {
-  profile: Profile | null;
-  onNavigate: (tab: string) => void;
-}) {
-  const [status, setStatus] = useState<"idle" | "locating" | "sent" | "error" | "save_error">(
-    "idle",
-  );
-  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(
-    null,
-  );
-  const [lastSent, setLastSent] = useState<Date | null>(null);
-  const [cooldown, setCooldown] = useState(0);
-
-  useEffect(() => {
-    if (cooldown > 0) {
-      const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
-      return () => clearTimeout(t);
-    }
-  }, [cooldown]);
-
-  async function handlePanic() {
-    if (cooldown > 0 || status === "locating") return;
-    setStatus("locating");
-
-    if (!navigator?.geolocation) {
-      setStatus("error");
-      return;
-    }
-
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
-      );
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-
-      let address: string | null = null;
-      try {
-        const resp = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-        );
-        const json = await resp.json();
-        address = json.display_name ?? null;
-      } catch {
-        // location name is optional
-      }
-
-      setLocation({ lat, lng, address: address ?? undefined });
-
-      const { data: s } = await supabase.auth.getSession();
-      const res = s.session
-        ? await savePanicEvent({
-            data: {
-              accessToken: s.session.access_token,
-              latitude: lat,
-              longitude: lng,
-              address,
-            },
-          })
-        : { ok: false as const };
-
-      if (!res.ok) {
-        setStatus("save_error");
-        toast.error("Não foi possível registrar o alerta — ligue 192 imediatamente");
-        return;
-      }
-
-      setStatus("sent");
-      setLastSent(new Date());
-      setCooldown(60);
-    } catch (e) {
-      setStatus("error");
-    }
-  }
-
-  return (
-    <div className="max-w-lg mx-auto space-y-6">
-      {/* Emergency panel */}
-      <div className="rounded-3xl border-2 border-red-300 bg-red-50 p-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-4">
-          Emergência obstétrica
-        </p>
-
-        {/* Big panic button */}
-        <button
-          onClick={handlePanic}
-          disabled={cooldown > 0 || status === "locating"}
-          className={`w-full rounded-2xl py-8 text-white font-bold text-xl transition-all shadow-lg ${
-            cooldown > 0
-              ? "bg-gray-400 cursor-not-allowed"
-              : status === "sent"
-                ? "bg-green-500"
-                : "bg-red-600 hover:bg-red-700 active:scale-95"
-          }`}
-        >
-          {status === "locating" ? (
-            <span>📍 Localizando...</span>
-          ) : status === "sent" ? (
-            <span>✓ Alerta enviado</span>
-          ) : (
-            <span>🆘 BOTÃO DE PÂNICO</span>
-          )}
-        </button>
-
-        {cooldown > 0 && (
-          <p className="mt-2 text-center text-xs text-red-600">
-            Disponível novamente em {cooldown}s
-          </p>
-        )}
-
-        {status === "sent" && location && (
-          <div className="mt-3 rounded-xl bg-white p-3 text-sm">
-            <p className="font-medium text-green-700">✓ Alerta registrado</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
-            </p>
-            {location.address && (
-              <p className="text-xs text-muted-foreground mt-0.5 truncate">{location.address}</p>
-            )}
-            {lastSent && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Às {lastSent.toLocaleTimeString("pt-BR")}
-              </p>
-            )}
-            <a
-              href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 block text-xs text-primary hover:underline"
-            >
-              Ver no Google Maps →
-            </a>
-          </div>
-        )}
-
-        {status === "error" && (
-          <div className="mt-3 rounded-xl bg-white p-3 text-sm text-primary">
-            <p className="font-medium">Não foi possível obter localização.</p>
-            <p className="text-xs mt-1">
-              Permita o acesso à localização no navegador e tente novamente. Mesmo assim, os números
-              abaixo estão disponíveis.
-            </p>
-          </div>
-        )}
-
-        {status === "save_error" && (
-          <div className="mt-3 rounded-xl bg-white p-3 text-sm text-red-700">
-            <p className="font-medium">O alerta não pôde ser registrado.</p>
-            <p className="text-xs mt-1">
-              Sua localização foi obtida, mas o alerta não pôde ser registrado. Ligue{" "}
-              <strong>192</strong> e avise seu contato de emergência diretamente.
-            </p>
-            {location && (
-              <p className="text-xs text-muted-foreground mt-1">
-                📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
-                {location.address ? ` — ${location.address}` : ""}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Emergency numbers — large tap targets */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-          Ligue agora com um toque
-        </p>
-        <div className="space-y-2">
-          {[
-            {
-              label: "SAMU",
-              subtitle: "Serviço de Atendimento Móvel de Urgência",
-              number: "192",
-              color: "bg-red-600",
-            },
-            {
-              label: "Bombeiros / Resgate",
-              subtitle: "Resgate de emergência",
-              number: "193",
-              color: "bg-primary/60",
-            },
-            { label: "CVV", subtitle: "Apoio emocional 24h", number: "188", color: "bg-primary" },
-          ].map(({ label, subtitle, number, color }) => (
-            <a
-              key={number}
-              href={`tel:${number}`}
-              className={`flex items-center gap-4 rounded-2xl ${color} px-5 py-4 text-white shadow-sm`}
-            >
-              <span className="text-3xl font-bold">{number}</span>
-              <div>
-                <p className="font-semibold">{label}</p>
-                <p className="text-xs opacity-90">{subtitle}</p>
-              </div>
-            </a>
-          ))}
-
-          {profile?.emergency_phone && (
-            <a
-              href={`tel:${profile.emergency_phone}`}
-              className="flex items-center gap-4 rounded-2xl bg-primary px-5 py-4 text-white shadow-sm"
-            >
-              <span className="text-2xl">📞</span>
-              <div>
-                <p className="font-semibold">
-                  {profile.emergency_contact ?? "Contato de emergência"}
-                </p>
-                <p className="text-xs opacity-90">{profile.emergency_phone}</p>
-              </div>
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* Sinais de emergência */}
-      <div className="rounded-2xl border border-border bg-card p-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-          Quando ir IMEDIATAMENTE ao hospital
-        </p>
-        <ul className="space-y-2 text-sm">
-          {[
-            "🩸 Sangramento intenso",
-            "💧 Bolsa rompeu (líquido claro saindo)",
-            "😵 Contrações a cada 5 min por 1 hora",
-            "👀 Visão turva, dor de cabeça intensa, inchaço súbito",
-            "👶 Bebê parou de se mover",
-            "🤢 Vômitos incontroláveis",
-            "🌡️ Febre acima de 38°C",
-          ].map((s) => (
-            <li key={s} className="flex items-center gap-2">
-              <span>{s}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <p className="text-center text-xs text-muted-foreground px-4">
-        O botão registra sua localização GPS; seu acompanhante designado poderá vê-la na página de
-        acompanhamento (últimos 30 minutos). Configure o contato de emergência em{" "}
-        <button
-          type="button"
-          onClick={() => onNavigate("Perfil")}
-          className="font-semibold underline underline-offset-2 hover:opacity-80"
-        >
-          Perfil
-        </button>
-        .
-      </p>
     </div>
   );
 }
