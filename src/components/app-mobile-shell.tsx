@@ -47,7 +47,6 @@ export type AppTab =
   | "Saúde"
   | "Nutrição"
   | "Bem-estar"
-  | "Clima"
   | "Alertas"
   | "Consultas"
   | "Acompanhante"
@@ -55,8 +54,7 @@ export type AppTab =
   | "Carteirinha"
   | "Pós-parto"
   | "Recompensas"
-  | "Ciclo Menstrual"
-  | "Preventivos"
+  | "Saúde da mulher"
   | "Médico"
   | "Chat IA"
   | "Perfil"
@@ -67,16 +65,7 @@ export type BottomSection = "home" | "gestacao" | "saude" | "consultas" | "eu";
 const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
   gestacao: ["Bebê", "Caminho", "Calendário", "Registros", "Carteirinha"],
-  saude: [
-    "Saúde",
-    "Exames",
-    "Nutrição",
-    "Bem-estar",
-    "Clima",
-    "Alertas",
-    "Ciclo Menstrual",
-    "Preventivos",
-  ],
+  saude: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
   consultas: ["Consultas", "Médico"],
   eu: ["Acompanhante", "Pós-parto", "FAQ", "Recompensas", "Chat IA", "Perfil"],
 };
