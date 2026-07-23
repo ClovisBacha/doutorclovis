@@ -357,6 +357,12 @@ export const confirmAppointment = createServerFn({ method: "POST" })
              <p style="margin:10px 0 0;font-size:13px;color:#9b8178">Precisa remarcar? Responda este e-mail.</p>`,
           ),
         });
+        const { sendPushToEmail } = await import("@/lib/push.server");
+        await sendPushToEmail(row.patient_email, {
+          title: "Consulta confirmada ✅",
+          body: `${(row.patient_name ?? "").split(" ")[0] || "Tudo certo"}: ${dataBr} às ${data.confirmedTime}.`,
+          url: "/minha-conta",
+        });
       }
     } catch (e) {
       console.error("confirmation email failed", e);
@@ -427,6 +433,12 @@ export const proposeAppointmentTime = createServerFn({ method: "POST" })
              <p style="margin:14px 0 0">Abra a aba <strong>Consultas</strong> no app para <strong>aprovar</strong> ou <strong>recusar</strong> esse horário.</p>
              <p style="margin:10px 0 0"><a href="https://www.obstetrica.com.br/minha-conta" style="color:#a85a44">Abrir o app →</a></p>`,
           ),
+        });
+        const { sendPushToEmail } = await import("@/lib/push.server");
+        await sendPushToEmail(row.patient_email, {
+          title: "Novo horário sugerido 🗓️",
+          body: `O médico sugeriu ${dataBr} às ${data.proposedTime}. Toque para aprovar ou recusar.`,
+          url: "/minha-conta",
         });
       }
     } catch (e) {
