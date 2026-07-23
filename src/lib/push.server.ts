@@ -126,6 +126,25 @@ async function sendOne(sub: SubRow, payload: Buffer): Promise<number> {
 }
 
 /**
+ * Envia push para uma paciente identificada por e-mail (resolve o user_id pela
+ * RPC `get_user_id_by_email`). Best-effort: engole qualquer erro e nunca lança —
+ * seguro pra chamar no meio de um fluxo (confirmação de consulta etc.).
+ */
+export async function sendPushToEmail(email: string, payload: PushPayload): Promise<void> {
+  if (!pushConfigured()) return;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: uid } = await (supabaseAdmin as any).rpc("get_user_id_by_email", {
+      p_email: email.toLowerCase(),
+    });
+    if (!uid) return;
+    await sendPushToUser(uid as string, payload);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
  * Envia uma notificação para todas as inscrições de um usuário. Retorna quantas
  * foram entregues/falharam. Poda inscrições que o navegador descartou (404/410).
  */

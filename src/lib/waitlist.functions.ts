@@ -78,6 +78,13 @@ async function notifyOffer(row: {
   } catch (e) {
     console.error("waitlist offer email failed", e);
   }
+  // Push (best-effort, não lança): "vaga liberada, responda em Nh".
+  const { sendPushToEmail } = await import("@/lib/push.server");
+  await sendPushToEmail(row.patient_email, {
+    title: "Abriu uma vaga! 🗓️",
+    body: `${fmtDateBr(row.offer_date)} às ${row.offer_time ?? ""} — você tem ${WAITLIST_RESPONSE_HOURS}h pra aceitar no app.`,
+    url: "/minha-conta",
+  });
 }
 
 /** Casa doctor_id no filtro (null vira `.is`). */
