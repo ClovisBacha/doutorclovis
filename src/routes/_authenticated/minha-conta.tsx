@@ -7995,8 +7995,10 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
 const MOOD_VALUE: Record<string, number> = {
   "🥰": 5,
   "😊": 4,
+  "😌": 4, // tranquila (check-in rápido da home)
   "😴": 3,
   "🤢": 2,
+  "😟": 2, // ansiosa (check-in rápido da home)
   "😢": 1,
   "😰": 1,
 };
@@ -8004,8 +8006,10 @@ const MOOD_VALUE: Record<string, number> = {
 const MOOD_LABEL: Record<string, string> = {
   "🥰": "Muito bem",
   "😊": "Bem",
+  "😌": "Tranquila",
   "😴": "Cansada",
   "🤢": "Mal-estar",
+  "😟": "Ansiosa",
   "😢": "Triste",
   "😰": "Ansiosa",
 };
