@@ -9,6 +9,7 @@ import {
   grantDailyQuizReward,
   grantWellnessReward,
   getWellnessProgress,
+  grantDayStarsBonus,
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
@@ -998,7 +999,8 @@ export function GestacaoPath({
     lsSet(LS.dayTasks(D), state);
     if (sheet?.kind === "day" && sheet.D === D) setDayTasks(state);
     if (D === todayD) setTodayTasks(state);
-    const allDone = state.humor && state.desafio && state.leitura;
+    // As 3 estrelas do dia: Humor + Quiz (desafio) + Bem-estar (≥1 atividade).
+    const allDone = state.humor && state.desafio && state.bemestar;
     if (allDone && !doneDays.includes(D)) {
       const next = [...doneDays, D];
       setDoneDays(next);
@@ -1006,7 +1008,29 @@ export function GestacaoPath({
       setRevealing(true);
       setTimeout(() => setRevealing(false), 1800);
       collectSticker(Math.floor(D / 7), false);
-      toast.success(`🎉 Dia ${D - journeyStartD + 1} da jornada completo!`);
+      // 3 estrelas fechadas hoje (fora do Modo Cuidado): bônus + celebração.
+      if (D === todayD && !careMode) {
+        fireConfetti();
+        celebrateChime();
+        celebrateHaptic();
+        (async () => {
+          try {
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { data: s } = await supabase.auth.getSession();
+            if (s.session) {
+              const r = await grantDayStarsBonus({
+                data: { accessToken: s.session.access_token, day: D },
+              });
+              if (r.ok && r.granted > 0) toast.success(`⭐⭐⭐ 3 estrelas! +${r.granted} 🌱`);
+              else toast.success("⭐⭐⭐ 3 estrelas do dia!");
+            }
+          } catch {
+            /* o bônus é secundário */
+          }
+        })();
+      } else {
+        toast.success(`🎉 Dia ${D - journeyStartD + 1} da jornada completo!`);
+      }
     }
   }
 
@@ -1029,9 +1053,6 @@ export function GestacaoPath({
   function reallyOpenDay(D: number) {
     setDayTasks(dayTaskState(D));
     setSheet({ kind: "day", D });
-    if (D === todayD) {
-      setTimeout(() => markDayTask(D, "leitura", true), 600);
-    }
   }
 
   function openDay(D: number) {
@@ -1785,7 +1806,7 @@ export function GestacaoPath({
           const dia = isToday ? 84 : 64;
           const dayOfWeek = (D % 7) + 1;
           const tasksDone = isToday
-            ? [checkedToday || todayTasks.humor, todayTasks.desafio, todayTasks.leitura].filter(
+            ? [checkedToday || todayTasks.humor, todayTasks.desafio, todayTasks.bemestar].filter(
                 Boolean,
               ).length
             : 0;
@@ -1893,7 +1914,7 @@ export function GestacaoPath({
           // Progresso explícito das 3 tarefas — evita o "respondi o quiz e o
           // dia não completou" (faltava o check-in de humor).
           const humorOk = isToday ? checkedToday || !!state.humor : !!state.humor;
-          const tasksChecked = [humorOk, !!state.desafio, !!state.leitura].filter(Boolean).length;
+          const tasksChecked = [humorOk, !!state.desafio, !!state.bemestar].filter(Boolean).length;
           const missingHumorHint =
             isToday && !humorOk
               ? "Quase lá! Falta o check-in de humor — feche esta aula e toque em como você está 💛"
@@ -1941,8 +1962,20 @@ export function GestacaoPath({
                 </div>
 
                 <div className="mb-4 rounded-2xl bg-emerald-50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                    ✅ Complete as 3 para ganhar o dia · {tasksChecked}/3
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                      Estrelas do dia
+                    </p>
+                    <div className="flex gap-0.5 text-xl leading-none">
+                      {[0, 1, 2].map((i) => (
+                        <span key={i}>{i < tasksChecked ? "⭐" : "☆"}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="mt-1 text-[11px] font-medium text-emerald-700/90">
+                    {tasksChecked >= 3
+                      ? "3 estrelas! Dia fechado com bônus 🌟"
+                      : `${tasksChecked}/3 — humor, quiz e bem-estar fecham o dia e rendem um bônus 🌱`}
                   </p>
                   <div className="mt-2 flex flex-col gap-2">
                     {[
@@ -1954,7 +1987,11 @@ export function GestacaoPath({
                             emoji: quizEmoji,
                           }
                         : { id: "desafio", label: ch.label, emoji: ch.emoji },
-                      { id: "leitura", label: `Ler sobre ${babyLabel} hoje (abaixo)`, emoji: "📖" },
+                      {
+                        id: "bemestar",
+                        label: "Fazer 1 atividade de bem-estar (abaixo)",
+                        emoji: "🌿",
+                      },
                     ].map((t) => {
                       const checked = t.id === "humor" && isToday ? checkedToday : !!state[t.id];
                       // Com quiz, a tarefa "desafio" completa ao responder o quiz.
@@ -4009,19 +4046,14 @@ function WellnessBlock(props: {
   return (
     <div className="mt-4">
       {!props.careMode && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-500/25 dark:bg-amber-500/5">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-bold text-foreground">Desafio de bem-estar de hoje</p>
-            <div className="flex gap-0.5 text-base leading-none">
-              {WELLNESS_TYPES.map((a) => (
-                <span key={a.key}>{done.has(a.key) ? "⭐" : "☆"}</span>
-              ))}
-            </div>
-          </div>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-500/25 dark:bg-emerald-500/5">
+          <p className="text-sm font-bold text-foreground">🌿 Bem-estar de hoje</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {allDone
-              ? "Você completou todas! Desafio do dia fechado 🌟"
-              : `${doneCount} de ${total} — faça todas pra fechar o dia e ganhar o bônus 💛`}
+            {doneCount === 0
+              ? "Faça 1 atividade pra ganhar a estrela de bem-estar ⭐. Cada uma rende Sementinhas 🌱."
+              : allDone
+                ? "Todas as atividades feitas! 🌿✨"
+                : `Estrela de bem-estar garantida ⭐ · ${doneCount}/${total} feitas — faça mais pra ganhar mais 🌱`}
           </p>
         </div>
       )}
