@@ -264,9 +264,7 @@ const TABS = [
   "Pânico",
   "Carteirinha",
   "Pós-parto",
-  "Conquistas",
-  "Cantinho",
-  "Loja",
+  "Recompensas",
   "Consulta Particular",
   "Ciclo Menstrual",
   "Preventivos",
@@ -305,7 +303,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Aprender",
-    tabs: ["FAQ", "Pânico", "Conquistas", "Cantinho", "Loja"],
+    tabs: ["FAQ", "Pânico", "Recompensas"],
   },
   {
     label: "Médico",
@@ -900,7 +898,7 @@ function MinhaContaPage() {
                   gest={gest}
                   quizPremium={!!profile?.quiz_premium}
                   careMode={careMode}
-                  onOpenShop={() => goToTab("Cantinho")}
+                  onOpenShop={() => goToTab("Recompensas")}
                 />
               )}
               {tab === "Calendário" && (
@@ -920,9 +918,7 @@ function MinhaContaPage() {
                 <CardTab profile={profile} gest={gest} onNavigate={goToTab} />
               )}
               {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
-              {tab === "Conquistas" && <ConquistasTab />}
-              {tab === "Cantinho" && <CantinhoTab careMode={careMode} />}
-              {tab === "Loja" && <LojaTab gest={gest} />}
+              {tab === "Recompensas" && <RecompensasHub careMode={careMode} gest={gest} />}
               {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
               {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
               {tab === "Preventivos" && <PreventivosTab />}
@@ -11729,6 +11725,43 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
 /* ─────────────────────────────────────────────────────────
    Feature 16 — Conquistas
 ───────────────────────────────────────────────────────── */
+/**
+ * Hub "Recompensas": junta o Cantinho (jardim/moeda), as Conquistas e a Loja
+ * numa tela só com sub-abas. Começa no Cantinho (coração das recompensas), que
+ * é pra onde o botão da lojinha do jogo aponta.
+ */
+const RECOMPENSAS_SUBTABS = [
+  { key: "cantinho", label: "Meu Cantinho" },
+  { key: "conquistas", label: "Conquistas" },
+  { key: "loja", label: "Loja" },
+] as const;
+
+function RecompensasHub({ careMode, gest }: { careMode: boolean; gest: Gest }) {
+  const [sub, setSub] = useState<(typeof RECOMPENSAS_SUBTABS)[number]["key"]>("cantinho");
+  return (
+    <div className="space-y-5">
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+        {RECOMPENSAS_SUBTABS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSub(s.key)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+              sub === s.key
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-foreground/55 hover:text-foreground/80"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {sub === "cantinho" && <CantinhoTab careMode={careMode} />}
+      {sub === "conquistas" && <ConquistasTab />}
+      {sub === "loja" && <LojaTab gest={gest} />}
+    </div>
+  );
+}
+
 function ConquistasTab() {
   const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
