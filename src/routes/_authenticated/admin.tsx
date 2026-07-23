@@ -85,7 +85,6 @@ const PATIENT_TABS = [
   "Pós-parto",
   "Conquistas",
   "Loja",
-  "Consulta Particular",
   "Saúde da mulher",
   "Médico",
   "Chat IA",
