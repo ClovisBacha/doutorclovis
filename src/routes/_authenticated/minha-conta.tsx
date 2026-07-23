@@ -36,6 +36,7 @@ import {
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { hapticKick, hapticTap } from "@/lib/haptics";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { subscribeToPush, vapidPublicKey } from "@/lib/push";
@@ -1757,7 +1758,10 @@ function BabyTab({
         <div className="relative grid items-center gap-6 md:grid-cols-[auto_1fr] md:gap-12">
           {/* Bebê grande, flutuando devagar — toque abre a Jornada */}
           <button
-            onClick={onBabyTap}
+            onClick={() => {
+              hapticTap();
+              onBabyTap?.();
+            }}
             aria-label="Ver a jornada do bebê"
             className="float-slow mx-auto transition-transform active:scale-[0.97]"
           >
@@ -2192,6 +2196,7 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
 
   async function tap() {
     if (!active) return;
+    hapticKick(); // vínculo tátil: o bebê "chuta de volta"
     const next = count + 1;
     setCount(next);
     if (next >= 10) {
@@ -2274,7 +2279,9 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
               }}
             >
               <div>
-                <div className="font-serif text-5xl">{count}</div>
+                <div key={count} className="pop-in font-serif text-5xl">
+                  {count}
+                </div>
                 <div className="text-xs uppercase tracking-widest opacity-80">/ 10 chutes</div>
               </div>
             </button>
