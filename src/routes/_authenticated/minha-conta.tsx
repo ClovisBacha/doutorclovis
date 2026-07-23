@@ -36,6 +36,7 @@ import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem } from "@/components/motion-primitives";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
+import { subscribeToPush, vapidPublicKey } from "@/lib/push";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
@@ -2696,6 +2697,11 @@ function ProfileTab({
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
       setNotifPermission(Notification.permission);
+      // Já autorizou antes? Garante que existe uma inscrição de push salva no
+      // banco (silencioso — não abre prompt quando a permissão já é "granted").
+      if (Notification.permission === "granted" && vapidPublicKey()) {
+        subscribeToPush().catch(() => {});
+      }
     }
   }, []);
 
@@ -3138,12 +3144,26 @@ function ProfileTab({
             <button
               onClick={async () => {
                 if (!("Notification" in window)) return;
-                const perm = await Notification.requestPermission();
-                setNotifPermission(perm);
-                if (perm === "granted") {
-                  if ("serviceWorker" in navigator) {
+                const res = await subscribeToPush();
+                if (res.ok) {
+                  setNotifPermission("granted");
+                  toast.success("Lembretes ativados 🔔");
+                } else if (res.reason === "denied") {
+                  setNotifPermission("denied");
+                } else if (res.reason === "ios-not-installed") {
+                  toast(
+                    "No iPhone, adicione o app à Tela de Início primeiro (botão Compartilhar → Adicionar à Tela de Início) para receber lembretes.",
+                  );
+                } else if (res.reason === "no-key") {
+                  // Chaves de push ainda não configuradas no ambiente: mantém o
+                  // comportamento antigo (só pede permissão) para não regredir.
+                  const perm = await Notification.requestPermission();
+                  setNotifPermission(perm);
+                  if (perm === "granted" && "serviceWorker" in navigator) {
                     navigator.serviceWorker.register("/sw.js").catch(() => {});
                   }
+                } else {
+                  toast("Não consegui ativar os lembretes agora. Tente novamente.");
                 }
               }}
               className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white"
