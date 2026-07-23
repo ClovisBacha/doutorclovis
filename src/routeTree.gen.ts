@@ -42,6 +42,7 @@ import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
 import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
 import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
+import { Route as ApiWaitlistTickRouteImport } from './routes/api/waitlist-tick'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
@@ -221,6 +222,11 @@ const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
   path: '/api/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWaitlistTickRoute = ApiWaitlistTickRouteImport.update({
+  id: '/api/waitlist-tick',
+  path: '/api/waitlist-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   id: '/api/transcribe',
   path: '/api/transcribe',
@@ -333,6 +339,7 @@ export interface FileRoutesByFullPath {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/waitlist-tick': typeof ApiWaitlistTickRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
@@ -381,6 +388,7 @@ export interface FileRoutesByTo {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/waitlist-tick': typeof ApiWaitlistTickRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
@@ -431,6 +439,7 @@ export interface FileRoutesById {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/api/waitlist-tick': typeof ApiWaitlistTickRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos_/cadastro': typeof MedicosCadastroRoute
   '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
@@ -481,6 +490,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/stripe-webhook'
     | '/api/transcribe'
+    | '/api/waitlist-tick'
     | '/api/whatsapp'
     | '/medicos/cadastro'
     | '/medicos/google-callback'
@@ -529,6 +539,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/stripe-webhook'
     | '/api/transcribe'
+    | '/api/waitlist-tick'
     | '/api/whatsapp'
     | '/medicos/cadastro'
     | '/medicos/google-callback'
@@ -578,6 +589,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/stripe-webhook'
     | '/api/transcribe'
+    | '/api/waitlist-tick'
     | '/api/whatsapp'
     | '/medicos_/cadastro'
     | '/medicos_/google-callback'
@@ -625,6 +637,7 @@ export interface RootRouteChildren {
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  ApiWaitlistTickRoute: typeof ApiWaitlistTickRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
   MedicosCadastroRoute: typeof MedicosCadastroRoute
   MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
@@ -866,6 +879,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/waitlist-tick': {
+      id: '/api/waitlist-tick'
+      path: '/api/waitlist-tick'
+      fullPath: '/api/waitlist-tick'
+      preLoaderRoute: typeof ApiWaitlistTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/transcribe': {
       id: '/api/transcribe'
       path: '/api/transcribe'
@@ -1021,6 +1041,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNutritionRoute: ApiNutritionRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  ApiWaitlistTickRoute: ApiWaitlistTickRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,
   MedicosCadastroRoute: MedicosCadastroRoute,
   MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,

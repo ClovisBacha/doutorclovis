@@ -149,6 +149,14 @@ export const getMyAppointments = createServerFn({ method: "POST" })
     const { data: u, error: uerr } = await supabaseAdmin.auth.getUser(data.accessToken);
     const email = u?.user?.email;
     if (uerr || !email) return { ok: false as const, appointments: [] as MyAppointment[] };
+    // Varredura preguiçosa: aproveita a visita pra avançar a fila de espera
+    // (expira ofertas vencidas e passa pra próxima), sem depender só do cron.
+    try {
+      const { sweepWaitlist } = await import("@/lib/waitlist.functions");
+      await sweepWaitlist(supabaseAdmin);
+    } catch {
+      /* fila é secundária ao carregar consultas */
+    }
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("appointment_requests")
       .select(

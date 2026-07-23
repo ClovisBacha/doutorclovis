@@ -219,9 +219,22 @@ export const updateAppointmentStatus = createServerFn({ method: "POST" })
       try {
         const { data: row } = await (supabaseAdmin as any)
           .from("appointment_requests")
-          .select("patient_name, patient_email, preferred_date, preferred_time")
+          .select(
+            "patient_name, patient_email, preferred_date, preferred_time, confirmed_date, confirmed_time, doctor_id",
+          )
           .eq("id", data.id)
           .maybeSingle();
+        // Se a consulta cancelada ESTAVA confirmada, a vaga abre: oferece à 1ª
+        // da fila de espera daquela semana (cascata cuida do resto).
+        if (row?.confirmed_date && row?.confirmed_time) {
+          const { offerFreedSlot } = await import("@/lib/waitlist.functions");
+          await offerFreedSlot(
+            supabaseAdmin,
+            (row.doctor_id as string | null) ?? null,
+            row.confirmed_date,
+            row.confirmed_time,
+          );
+        }
         if (row?.patient_email) {
           const { sendEmail, emailLayout } = await import("@/lib/email.server");
           const dataBr = new Date(row.preferred_date + "T00:00:00").toLocaleDateString("pt-BR");
