@@ -142,5 +142,40 @@ Estas eram pendências de backlog; já estão em produção. Precisam do
   recente do diário (só o rótulo `mood`, nunca o conteúdo). É contexto de
   bem-estar (fonte confiável), NÃO conduta — o portão de cobertura do cérebro do
   médico continua mandando. LGPD: dado da própria paciente, na conversa dela.
-- Futuro possível (não feito): calendário visual estilo Apple Health, janela
-  fértil no app, lembretes de ciclo, disponibilidade por slots do médico.
+- Ciclo visual estilo Apple Health: **feito** (anel de fases + calendário
+  mensal na aba Ciclo Menstrual). Ver `CicloHero`/`CicloCalendario` em
+  `minha-conta.tsx`.
+
+## Experiência "app de milhões" (IMPLEMENTADO — jul/2026)
+
+- **Movimento**: primitivas `Reveal`/`Stagger`/`StaggerItem` em
+  `src/components/motion-primitives.tsx` (usam `motion`, respeitam
+  `prefers-reduced-motion`). Aplicadas na home (Bebê) e no Ciclo visual.
+- **Onboarding**: `OnboardingRitual` (primeiro acesso, escreve nos campos do
+  Perfil; sem coluna nova; "pular" lembrado em `localStorage`).
+- **Celebração**: `src/lib/celebrate.ts` (confete em canvas + som Web Audio +
+  vibração). Marco de nova semana em `WeekMilestoneModal`. Nunca em Modo Cuidado.
+
+## Notificações push (IMPLEMENTADO — jul/2026)
+
+Web Push **sem dependência externa** — o envio é 100% `node:crypto`
+(`src/lib/push.server.ts`: aes128gcm RFC 8291/8188 + VAPID ES256 RFC 8292),
+validado contra a lib `web-push` como oráculo. Cliente inscreve em
+`src/lib/push.ts` → tabela `push_subscriptions` (RLS).
+
+**Para ATIVAR (env vars):**
+
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (servidor).
+- `VITE_VAPID_PUBLIC_KEY` = **mesma** pública (vai pro navegador).
+- Gere com `npx web-push generate-vapid-keys` (ou peça ao Claude). Sem as
+  chaves, tudo vira no-op — nada quebra. iPhone só recebe push com o app
+  **instalado na Tela de Início** (iOS 16.4+).
+
+**Gatilhos:**
+
+- **Consulta** (evento): confirmação, contraproposta e vaga liberada disparam
+  push junto com o e-mail (`sendPushToEmail` em `admin.functions`/`waitlist`).
+- **Dicas semanais**: `/api/push-weekly-tick` (cron diário no `vercel.json`,
+  `CRON_SECRET`). Stateless — notifica quem tem `gest.days === 0`.
+- **Envio manual**: `sendDoctorBroadcast` (painel → aba Agendamentos), escopado
+  por `doctor_id`.
