@@ -32,6 +32,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
 import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
+import { hapticTap } from "@/lib/haptics";
 
 /* ================================================================
    Tipos
@@ -292,7 +293,10 @@ export function AppBottomNav({
           return (
             <button
               key={id}
-              onClick={() => onSelect(id)}
+              onClick={() => {
+                hapticTap();
+                onSelect(id);
+              }}
               aria-current={active ? "page" : undefined}
               aria-label={label}
               className="flex min-w-0 flex-1 flex-col items-center py-1 transition-colors duration-200"
