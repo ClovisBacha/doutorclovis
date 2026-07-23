@@ -8,6 +8,7 @@ import {
   grantLessonReward,
   grantDailyQuizReward,
   grantWellnessReward,
+  getWellnessProgress,
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
@@ -3959,6 +3960,13 @@ const WELLNESS_TYPES = [
   { key: "gratitude", emoji: "✨", label: "Gratidão", Comp: GratitudeBlock },
 ] as const;
 
+/**
+ * Desafio de bem-estar do dia: a paciente faz TODAS as atividades (respirar,
+ * mexer, meditar, momento com o bebê, gratidão) — cada uma acende uma estrela e
+ * rende Sementinhas; completar todas fecha o dia com um bônus (celebração vem do
+ * bônus da recompensa). Nunca punitivo: fazer só uma já ganha. No Modo Cuidado,
+ * some o placar/estrelas (as atividades continuam disponíveis, sem gamificação).
+ */
 function WellnessBlock(props: {
   day: number;
   canEarn: boolean;
@@ -3966,28 +3974,96 @@ function WellnessBlock(props: {
   alreadyDone: boolean;
   onEarn: () => void;
 }) {
-  // Sugestão do dia (rotação) — mas a paciente escolhe se quiser.
-  const [pick, setPick] = useState<number>(props.day % WELLNESS_TYPES.length);
-  const Chosen = WELLNESS_TYPES[pick].Comp;
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [done, setDone] = useState<Set<string>>(new Set());
+
+  async function refresh() {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return;
+      const r = await getWellnessProgress({
+        data: { accessToken: s.session.access_token, day: props.day },
+      });
+      if (r.ok) setDone(new Set(r.done));
+    } catch {
+      /* progresso é secundário */
+    }
+  }
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.day]);
+
+  // Quando uma atividade termina, avisa o pai e recarrega o placar (acende a
+  // estrela). O grant cai no servidor; o pequeno atraso garante o refetch certo.
+  function handleEarn() {
+    props.onEarn();
+    setTimeout(refresh, 500);
+  }
+
+  const total = WELLNESS_TYPES.length;
+  const doneCount = WELLNESS_TYPES.filter((a) => done.has(a.key)).length;
+  const allDone = doneCount === total;
+
   return (
-    <div>
-      <div className="scrollbar-hide mt-4 flex gap-2 overflow-x-auto">
-        {WELLNESS_TYPES.map((a, i) => (
-          <button
-            key={a.key}
-            onClick={() => setPick(i)}
-            className={`press flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
-              pick === i
-                ? "bg-slate-800 text-white"
-                : "border border-border text-foreground/55 hover:text-foreground/80"
-            }`}
-          >
-            <span>{a.emoji}</span>
-            {a.label}
-          </button>
-        ))}
+    <div className="mt-4">
+      {!props.careMode && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-500/25 dark:bg-amber-500/5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-bold text-foreground">Desafio de bem-estar de hoje</p>
+            <div className="flex gap-0.5 text-base leading-none">
+              {WELLNESS_TYPES.map((a) => (
+                <span key={a.key}>{done.has(a.key) ? "⭐" : "☆"}</span>
+              ))}
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {allDone
+              ? "Você completou todas! Desafio do dia fechado 🌟"
+              : `${doneCount} de ${total} — faça todas pra fechar o dia e ganhar o bônus 💛`}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-3 grid grid-cols-5 gap-1.5">
+        {WELLNESS_TYPES.map((a, i) => {
+          const isDone = done.has(a.key);
+          const active = openIdx === i;
+          return (
+            <button
+              key={a.key}
+              onClick={() => setOpenIdx(active ? null : i)}
+              className={`press flex flex-col items-center gap-1 rounded-2xl border px-1 py-2 text-center transition-colors ${
+                active
+                  ? "border-primary bg-primary/10"
+                  : isDone
+                    ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+                    : "border-border hover:border-primary/40"
+              }`}
+            >
+              <span className="text-xl leading-none">{a.emoji}</span>
+              <span className="text-[10px] font-semibold leading-tight text-foreground/70">
+                {a.label}
+              </span>
+              <span className="text-[10px] leading-none text-emerald-600 dark:text-emerald-400">
+                {isDone ? "✓" : " "}
+              </span>
+            </button>
+          );
+        })}
       </div>
-      <Chosen {...props} />
+
+      {openIdx !== null &&
+        (() => {
+          const a = WELLNESS_TYPES[openIdx];
+          const Chosen = a.Comp;
+          return (
+            <div className="mt-3">
+              <Chosen {...props} alreadyDone={done.has(a.key)} onEarn={handleEarn} />
+            </div>
+          );
+        })()}
     </div>
   );
 }

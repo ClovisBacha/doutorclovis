@@ -29,15 +29,6 @@ export const SEMENTINHAS = {
 /** Conquistas "grandes" que valem mais (marcos de conclusão). */
 export const BIG_ACHIEVEMENTS = new Set(["course_complete", "prenatal_done"]);
 
-/** Reasons das 5 atividades de bem-estar (usado no bônus por variar). */
-const WELLNESS_REASONS = new Set([
-  "Respiração do dia 🌬️",
-  "Movimento do dia 🤸",
-  "Meditação do dia 🧘",
-  "Momento com o bebê 💛",
-  "Gratidão do dia ✨",
-]);
-
 type Db = ReturnType<typeof typedDb>;
 // dedupeKey é obrigatório: ganho sem chave duplicaria (NULL não conflita no
 // índice único). Gastos NÃO passam por aqui — usam insert direto (dedupe_key NULL).
@@ -296,8 +287,10 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
     if (!gest) return { ok: true as const, granted: 0 };
     const todayDay = Math.max(7, Math.min(300, gest.totalDays));
     if (Math.abs(data.day - todayDay) > 1) return { ok: true as const, granted: 0 };
-    // Uma recompensa de bem-estar por dia (independe do tipo de atividade).
-    const dedupeKey = `wellness:${cycle}:${data.day}`;
+    // Recompensa POR ATIVIDADE (uma vez por dia cada). Fazer TODAS rende mais —
+    // é o "desafio do dia". Nunca punitivo: fazer só uma já ganha.
+    const keyFor = (a: string) => `wellness:${a}:${cycle}:${data.day}`;
+    const dedupeKey = keyFor(data.activity);
 
     const { data: existing } = await db
       .from("sementinhas_ledger")
@@ -305,7 +298,6 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
       .eq("user_id", uid)
       .eq("dedupe_key", dedupeKey)
       .maybeSingle();
-    if (existing) return { ok: true as const, granted: 0 };
 
     const reason =
       data.activity === "breathing"
@@ -318,45 +310,85 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
               ? "Momento com o bebê 💛"
               : "Gratidão do dia ✨";
     const amount = 5; // base fixa por concluir (nunca punitivo)
-    await grantSementinhas(db, uid, [{ amount, reason, dedupeKey }]);
-
-    // BÔNUS POR VARIAR: se, nos últimos 7 dias, a paciente já experimentou 3+
-    // TIPOS diferentes de atividade, ganha um bônus semanal (uma vez por
-    // semana). Incentiva variar, não repetir. Conta pelos "reason" (fixos).
-    let bonus = 0;
-    try {
-      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-      const { data: recent } = await db
-        .from("sementinhas_ledger")
-        .select("reason")
-        .eq("user_id", uid)
-        .gte("created_at", weekAgo);
-      const distinct = new Set(
-        ((recent ?? []) as { reason: string }[])
-          .map((r) => r.reason)
-          .filter((rs) => WELLNESS_REASONS.has(rs)),
-      );
-      if (distinct.size >= 3) {
-        const weekBucket = Math.floor(Date.now() / (7 * 86400000));
-        const varietyKey = `wellness_variety:${cycle}:${weekBucket}`;
-        const { data: had } = await db
-          .from("sementinhas_ledger")
-          .select("amount")
-          .eq("user_id", uid)
-          .eq("dedupe_key", varietyKey)
-          .maybeSingle();
-        if (!had) {
-          bonus = 15;
-          await grantSementinhas(db, uid, [
-            { amount: bonus, reason: "Bônus por variar as atividades 🌈", dedupeKey: varietyKey },
-          ]);
-        }
-      }
-    } catch {
-      /* bônus é secundário */
+    let granted = 0;
+    if (!existing) {
+      await grantSementinhas(db, uid, [{ amount, reason, dedupeKey }]);
+      granted = amount;
     }
 
-    return { ok: true as const, granted: amount + bonus, bonus };
+    // Quantas atividades já foram feitas hoje (fonte da verdade: o ledger).
+    const allKeys = WELLNESS_ACTIVITIES.map(keyFor);
+    const { data: rows } = await db
+      .from("sementinhas_ledger")
+      .select("dedupe_key")
+      .eq("user_id", uid)
+      .in("dedupe_key", allKeys);
+    const doneSet = new Set(((rows ?? []) as { dedupe_key: string }[]).map((r) => r.dedupe_key));
+    doneSet.add(dedupeKey); // acabou de ganhar (pode não estar no SELECT ainda)
+    const doneCount = WELLNESS_ACTIVITIES.filter((a) => doneSet.has(keyFor(a))).length;
+    const allDone = doneCount === WELLNESS_ACTIVITIES.length;
+
+    // BÔNUS por fechar o desafio (todas as atividades do dia). Uma vez por dia.
+    let bonus = 0;
+    if (allDone) {
+      const allKey = `wellness_all:${cycle}:${data.day}`;
+      const { data: hadAll } = await db
+        .from("sementinhas_ledger")
+        .select("amount")
+        .eq("user_id", uid)
+        .eq("dedupe_key", allKey)
+        .maybeSingle();
+      if (!hadAll) {
+        bonus = 15;
+        await grantSementinhas(db, uid, [
+          { amount: bonus, reason: "Desafio do dia completo! 🌟", dedupeKey: allKey },
+        ]);
+      }
+    }
+
+    return { ok: true as const, granted: granted + bonus, bonus, doneCount, allDone };
+  });
+
+/** Atividades do desafio diário de bem-estar (ordem = ordem no jogo). */
+const WELLNESS_ACTIVITIES = [
+  "breathing",
+  "movement",
+  "meditation",
+  "bonding",
+  "gratitude",
+] as const;
+
+/** Progresso do desafio de bem-estar de HOJE (quais atividades já foram feitas). */
+export const getWellnessProgress = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), day: z.number().int().min(1).max(400) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = typedDb(supabaseAdmin);
+    const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (error || !u.user) return { ok: false as const, done: [] as string[], allDone: false };
+    const uid = u.user.id;
+    // Modo Cuidado: sem gamificação — desafio "vazio".
+    if (await isCareModeActive(supabaseAdmin, uid))
+      return { ok: true as const, done: [] as string[], allDone: false };
+    const { cycle, gest } = await loadCycleAndGestation(supabaseAdmin, uid);
+    if (!gest) return { ok: true as const, done: [] as string[], allDone: false };
+
+    const keyFor = (a: string) => `wellness:${a}:${cycle}:${data.day}`;
+    const allKeys = WELLNESS_ACTIVITIES.map(keyFor);
+    const { data: rows } = await db
+      .from("sementinhas_ledger")
+      .select("dedupe_key")
+      .eq("user_id", uid)
+      .in("dedupe_key", allKeys);
+    const doneSet = new Set(((rows ?? []) as { dedupe_key: string }[]).map((r) => r.dedupe_key));
+    const done = WELLNESS_ACTIVITIES.filter((a) => doneSet.has(keyFor(a)));
+    return {
+      ok: true as const,
+      done: done as string[],
+      allDone: done.length === WELLNESS_ACTIVITIES.length,
+    };
   });
 
 // Nota: o GASTO de Sementinhas é feito pela RPC atômica buy_cantinho_item
