@@ -11,6 +11,7 @@ import {
   setQuestionAnswered,
   updateAppointmentStatus,
   confirmAppointment,
+  proposeAppointmentTime,
   markAppointmentPaid,
   type AdminAppointment,
   type AdminPreConsulta,
@@ -121,12 +122,16 @@ const STATUS_LABEL: Record<string, string> = {
   confirmed: "Confirmada",
   done: "Realizada",
   cancelled: "Cancelada",
+  counter_proposed: "Aguardando paciente",
+  declined: "Recusada",
 };
 const STATUS_STYLE: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800",
   confirmed: "bg-emerald-100 text-emerald-800",
   done: "bg-sky-100 text-sky-800",
   cancelled: "bg-rose-100 text-rose-700",
+  counter_proposed: "bg-violet-100 text-violet-800",
+  declined: "bg-rose-100 text-rose-700",
 };
 
 const PANEL_TABS = [
@@ -1166,6 +1171,31 @@ function AppointmentsSection({
     onRefresh();
   }
 
+  // Contraproposta: usa a mesma data/hora do formulário, mas em vez de confirmar
+  // SUGERE à paciente (ela aprova/recusa no app).
+  async function saveProposal(a: AdminAppointment) {
+    if (!confirmForm.date || !confirmForm.time) return;
+    setSaving(true);
+    const res = await proposeAppointmentTime({
+      data: {
+        accessToken: await token(),
+        id: a.id,
+        proposedDate: confirmForm.date,
+        proposedTime: confirmForm.time,
+        priceBrl: confirmForm.price ? Math.round(Number(confirmForm.price) * 100) : null,
+        internalNotes: confirmForm.notes || null,
+      },
+    });
+    setSaving(false);
+    if (!res.ok) {
+      toast.error(res.error || "Não foi possível sugerir o horário. Tente novamente.");
+      return;
+    }
+    toast.success("Horário sugerido! A paciente vai aprovar no app.");
+    setExpandedId(null);
+    onRefresh(); // recarrega do servidor (status vira "Aguardando paciente")
+  }
+
   async function markPaid(id: string) {
     const res = await markAppointmentPaid({ data: { accessToken: await token(), id } });
     if (!res.ok) {
@@ -1381,13 +1411,24 @@ function AppointmentsSection({
                         />
                       </div>
                     </div>
-                    <div className="mt-3 flex gap-2">
+                    <p className="mt-3 text-[11px] text-muted-foreground">
+                      Confirme direto no horário pedido, ou <strong>sugira outro</strong> — a
+                      paciente aprova no app.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <button
                         onClick={() => saveConfirmation(a)}
                         disabled={saving || !confirmForm.date || !confirmForm.time}
                         className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
                       >
                         {saving ? "Salvando…" : "✓ Confirmar consulta"}
+                      </button>
+                      <button
+                        onClick={() => saveProposal(a)}
+                        disabled={saving || !confirmForm.date || !confirmForm.time}
+                        className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                      >
+                        🗓️ Sugerir este horário
                       </button>
                       <button
                         onClick={() => setExpandedId(null)}
@@ -1400,7 +1441,7 @@ function AppointmentsSection({
                 )}
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {a.status === "pending" && (
+                  {(a.status === "pending" || a.status === "counter_proposed") && (
                     <button
                       onClick={() => {
                         setExpandedId(isExpanded ? null : a.id);
@@ -1413,7 +1454,9 @@ function AppointmentsSection({
                       }}
                       className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white"
                     >
-                      Confirmar com horário
+                      {a.status === "counter_proposed"
+                        ? "Confirmar / sugerir horário"
+                        : "Confirmar com horário"}
                     </button>
                   )}
                   {(["done", "cancelled", "pending"] as const).map((s) => (

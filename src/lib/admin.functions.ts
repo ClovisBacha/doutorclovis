@@ -1,6 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+/** Escapa texto do usuário antes de interpolar em HTML de e-mail (anti-injeção). */
+function esc(s: string | null | undefined): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // Quem é "o médico": e-mails autorizados, separados por vírgula em ADMIN_EMAILS.
 // Ex.: ADMIN_EMAILS="bachaclovis@gmail.com,secretaria@consultorio.com"
 function adminEmails() {
@@ -220,8 +230,8 @@ export const updateAppointmentStatus = createServerFn({ method: "POST" })
             replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
             subject: "Sobre sua solicitação de consulta",
             html: emailLayout(
-              `Olá, ${(row.patient_name ?? "").split(" ")[0] || "tudo bem"}!`,
-              `<p style="margin:0 0 14px">Não foi possível confirmar sua consulta solicitada para ${dataBr} às ${row.preferred_time}.</p>
+              `Olá, ${esc((row.patient_name ?? "").split(" ")[0]) || "tudo bem"}!`,
+              `<p style="margin:0 0 14px">Não foi possível confirmar sua consulta solicitada para ${dataBr} às ${esc(row.preferred_time)}.</p>
                <p style="margin:0 0 6px">Responda este e-mail ou solicite um novo horário — teremos prazer em encontrar uma alternativa.</p>`,
             ),
           });
@@ -283,11 +293,23 @@ export const confirmAppointment = createServerFn({ method: "POST" })
         status: "confirmed",
         confirmed_date: data.confirmedDate,
         confirmed_time: data.confirmedTime,
+        proposed_date: null,
+        proposed_time: null,
         price_brl: data.priceBrl,
         internal_notes: data.internalNotes,
       })
       .eq("id", data.id);
-    if (error) return { ok: false as const, error: error.message };
+    // 23505 = índice único do slot (doctor_id, confirmed_date, confirmed_time):
+    // outra consulta foi confirmada nesse horário na fração de segundo entre a
+    // checagem acima e este UPDATE. Backstop real contra double-booking.
+    if (error)
+      return {
+        ok: false as const,
+        error:
+          (error as { code?: string }).code === "23505"
+            ? "Já existe consulta confirmada nesse horário."
+            : error.message,
+      };
 
     // Fecha o ciclo com a paciente: e-mail de confirmação com data/hora.
     // Não bloqueia o fluxo se o e-mail falhar ou não estiver configurado.
@@ -313,7 +335,7 @@ export const confirmAppointment = createServerFn({ method: "POST" })
           replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
           subject: "Sua consulta foi confirmada ✅",
           html: emailLayout(
-            `Olá, ${(row.patient_name ?? "").split(" ")[0] || "tudo bem"}!`,
+            `Olá, ${esc((row.patient_name ?? "").split(" ")[0]) || "tudo bem"}!`,
             `<p style="margin:0 0 14px">Sua consulta foi <strong>confirmada</strong>:</p>
              <p style="margin:0 0 6px"><strong>Data:</strong> ${dataBr}</p>
              <p style="margin:0 0 6px"><strong>Horário:</strong> ${data.confirmedTime}</p>
@@ -330,9 +352,78 @@ export const confirmAppointment = createServerFn({ method: "POST" })
     return { ok: true as const, error: null };
   });
 
-const PaidSchema = z.object({ accessToken: z.string().min(10), id: z.string().uuid() });
+const ProposeSchema = z.object({
+  accessToken: z.string().min(10),
+  id: z.string().uuid(),
+  proposedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  proposedTime: z.string().min(4).max(8),
+  priceBrl: z.number().int().nullable(),
+  internalNotes: z.string().max(2000).nullable(),
+});
 
-/** Marca o pagamento de uma consulta como recebido (service role). */
+/**
+ * Contraproposta: quando o horário pedido não dá, o médico SUGERE outro. Não
+ * confirma nada ainda — grava proposed_date/time + status 'counter_proposed' e
+ * avisa a paciente pra aprovar (ou recusar) no app. A confirmação real só
+ * acontece quando ela aprova (respondToProposedTime).
+ */
+export const proposeAppointmentTime = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => ProposeSchema.parse(i))
+  .handler(async ({ data }) => {
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, error: "Sem permissão." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (!(await assertOwnsRow(supabaseAdmin as any, "appointment_requests", data.id, scope)))
+      return { ok: false as const, error: "Sem permissão." };
+
+    const { error } = await (supabaseAdmin as any)
+      .from("appointment_requests")
+      .update({
+        status: "counter_proposed",
+        proposed_date: data.proposedDate,
+        proposed_time: data.proposedTime,
+        price_brl: data.priceBrl,
+        internal_notes: data.internalNotes,
+      })
+      .eq("id", data.id);
+    if (error) return { ok: false as const, error: error.message };
+
+    // Avisa a paciente que há um horário sugerido pra aprovar (best-effort).
+    try {
+      const { data: row } = await (supabaseAdmin as any)
+        .from("appointment_requests")
+        .select("patient_name, patient_email")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (row?.patient_email) {
+        const { sendEmail, emailLayout } = await import("@/lib/email.server");
+        const dataBr = new Date(data.proposedDate + "T00:00:00").toLocaleDateString("pt-BR", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+        });
+        await sendEmail({
+          to: row.patient_email,
+          replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+          subject: "O médico sugeriu um novo horário 🗓️",
+          html: emailLayout(
+            `Olá, ${esc((row.patient_name ?? "").split(" ")[0]) || "tudo bem"}!`,
+            `<p style="margin:0 0 14px">O horário que você pediu não estava disponível, então o médico <strong>sugeriu um novo horário</strong>:</p>
+             <p style="margin:0 0 6px"><strong>Data:</strong> ${dataBr}</p>
+             <p style="margin:0 0 6px"><strong>Horário:</strong> ${data.proposedTime}</p>
+             <p style="margin:14px 0 0">Abra a aba <strong>Consultas</strong> no app para <strong>aprovar</strong> ou <strong>recusar</strong> esse horário.</p>
+             <p style="margin:10px 0 0"><a href="https://www.obstetrica.com.br/minha-conta" style="color:#a85a44">Abrir o app →</a></p>`,
+          ),
+        });
+      }
+    } catch (e) {
+      console.error("counter-proposal email failed", e);
+    }
+
+    return { ok: true as const, error: null };
+  });
+
+const PaidSchema = z.object({ accessToken: z.string().min(10), id: z.string().uuid() });
 export const markAppointmentPaid = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => PaidSchema.parse(i))
   .handler(async ({ data }) => {
