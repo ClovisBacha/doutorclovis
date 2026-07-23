@@ -328,25 +328,38 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
     const doneCount = WELLNESS_ACTIVITIES.filter((a) => doneSet.has(keyFor(a))).length;
     const allDone = doneCount === WELLNESS_ACTIVITIES.length;
 
-    // BÔNUS por fechar o desafio (todas as atividades do dia). Uma vez por dia.
-    let bonus = 0;
-    if (allDone) {
-      const allKey = `wellness_all:${cycle}:${data.day}`;
-      const { data: hadAll } = await db
-        .from("sementinhas_ledger")
-        .select("amount")
-        .eq("user_id", uid)
-        .eq("dedupe_key", allKey)
-        .maybeSingle();
-      if (!hadAll) {
-        bonus = 15;
-        await grantSementinhas(db, uid, [
-          { amount: bonus, reason: "Desafio do dia completo! 🌟", dedupeKey: allKey },
-        ]);
-      }
-    }
+    // (O bônus do dia agora é por fechar as 3 ESTRELAS — Humor + Quiz +
+    // Bem-estar — via grantDayStarsBonus. Aqui cada atividade só rende a sua.)
+    return { ok: true as const, granted, doneCount, allDone };
+  });
 
-    return { ok: true as const, granted: granted + bonus, bonus, doneCount, allDone };
+/** Bônus por fechar as 3 estrelas do dia (Humor + Quiz + Bem-estar). 1x/dia. */
+export const grantDayStarsBonus = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), day: z.number().int().min(1).max(400) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = typedDb(supabaseAdmin);
+    const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (error || !u.user) return { ok: false as const, granted: 0 };
+    const uid = u.user.id;
+    if (await isCareModeActive(supabaseAdmin, uid)) return { ok: true as const, granted: 0 };
+    const { cycle, gest } = await loadCycleAndGestation(supabaseAdmin, uid);
+    if (!gest) return { ok: true as const, granted: 0 };
+    const todayDay = Math.max(7, Math.min(300, gest.totalDays));
+    if (Math.abs(data.day - todayDay) > 1) return { ok: true as const, granted: 0 };
+    const dedupeKey = `day_stars:${cycle}:${data.day}`;
+    const { data: had } = await db
+      .from("sementinhas_ledger")
+      .select("amount")
+      .eq("user_id", uid)
+      .eq("dedupe_key", dedupeKey)
+      .maybeSingle();
+    if (had) return { ok: true as const, granted: 0 };
+    const amount = 20;
+    await grantSementinhas(db, uid, [{ amount, reason: "3 estrelas do dia! 🌟", dedupeKey }]);
+    return { ok: true as const, granted: amount };
   });
 
 /** Atividades do desafio diário de bem-estar (ordem = ordem no jogo). */
