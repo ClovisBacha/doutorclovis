@@ -55,7 +55,6 @@ export type AppTab =
   | "Carteirinha"
   | "Pós-parto"
   | "Recompensas"
-  | "Consulta Particular"
   | "Ciclo Menstrual"
   | "Preventivos"
   | "Médico"
@@ -78,7 +77,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
     "Ciclo Menstrual",
     "Preventivos",
   ],
-  consultas: ["Consultas", "Consulta Particular"],
+  consultas: ["Consultas"],
   eu: ["Acompanhante", "Pós-parto", "FAQ", "Recompensas", "Médico", "Chat IA", "Perfil"],
 };
 

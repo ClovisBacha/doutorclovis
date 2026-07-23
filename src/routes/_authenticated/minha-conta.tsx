@@ -275,7 +275,6 @@ const TABS = [
   "Carteirinha",
   "Pós-parto",
   "Recompensas",
-  "Consulta Particular",
   "Ciclo Menstrual",
   "Preventivos",
   "Médico",
@@ -309,7 +308,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Consultas",
-    tabs: ["Consultas", "Consulta Particular"],
+    tabs: ["Consultas"],
   },
   {
     label: "Aprender",
@@ -1054,7 +1053,6 @@ function MinhaContaPage() {
                 )}
                 {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
                 {tab === "Recompensas" && <RecompensasHub careMode={careMode} gest={gest} />}
-                {tab === "Consulta Particular" && <ConsultaParticularTab profile={profile} />}
                 {tab === "Ciclo Menstrual" && <CicloMenstrualTab />}
                 {tab === "Preventivos" && <PreventivosTab />}
                 {tab === "Médico" && <MédicoTab />}
@@ -7005,6 +7003,7 @@ const CONSULTAS_SUBTABS = [
   { key: "checklist", label: "Checklist" },
   { key: "parto", label: "Plano de parto" },
   { key: "tele", label: "Teleconsulta" },
+  { key: "particular", label: "Particular" },
 ] as const;
 
 function ConsultasHub({ profile, gest }: { profile: Profile | null; gest: Gest }) {
@@ -7033,6 +7032,7 @@ function ConsultasHub({ profile, gest }: { profile: Profile | null; gest: Gest }
         {sub === "checklist" && <ChecklistTab gest={gest} />}
         {sub === "parto" && <PlanoPártoTab profile={profile} />}
         {sub === "tele" && <TeleconsultaTab profile={profile} />}
+        {sub === "particular" && <ConsultaParticularTab profile={profile} />}
       </Fade>
     </div>
   );
