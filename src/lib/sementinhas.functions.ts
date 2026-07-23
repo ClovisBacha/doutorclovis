@@ -29,6 +29,15 @@ export const SEMENTINHAS = {
 /** Conquistas "grandes" que valem mais (marcos de conclusão). */
 export const BIG_ACHIEVEMENTS = new Set(["course_complete", "prenatal_done"]);
 
+/** Reasons das 5 atividades de bem-estar (usado no bônus por variar). */
+const WELLNESS_REASONS = new Set([
+  "Respiração do dia 🌬️",
+  "Movimento do dia 🤸",
+  "Meditação do dia 🧘",
+  "Momento com o bebê 💛",
+  "Gratidão do dia ✨",
+]);
+
 type Db = ReturnType<typeof typedDb>;
 // dedupeKey é obrigatório: ganho sem chave duplicaria (NULL não conflita no
 // índice único). Gastos NÃO passam por aqui — usam insert direto (dedupe_key NULL).
@@ -310,7 +319,44 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
               : "Gratidão do dia ✨";
     const amount = 5; // base fixa por concluir (nunca punitivo)
     await grantSementinhas(db, uid, [{ amount, reason, dedupeKey }]);
-    return { ok: true as const, granted: amount };
+
+    // BÔNUS POR VARIAR: se, nos últimos 7 dias, a paciente já experimentou 3+
+    // TIPOS diferentes de atividade, ganha um bônus semanal (uma vez por
+    // semana). Incentiva variar, não repetir. Conta pelos "reason" (fixos).
+    let bonus = 0;
+    try {
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+      const { data: recent } = await db
+        .from("sementinhas_ledger")
+        .select("reason")
+        .eq("user_id", uid)
+        .gte("created_at", weekAgo);
+      const distinct = new Set(
+        ((recent ?? []) as { reason: string }[])
+          .map((r) => r.reason)
+          .filter((rs) => WELLNESS_REASONS.has(rs)),
+      );
+      if (distinct.size >= 3) {
+        const weekBucket = Math.floor(Date.now() / (7 * 86400000));
+        const varietyKey = `wellness_variety:${cycle}:${weekBucket}`;
+        const { data: had } = await db
+          .from("sementinhas_ledger")
+          .select("amount")
+          .eq("user_id", uid)
+          .eq("dedupe_key", varietyKey)
+          .maybeSingle();
+        if (!had) {
+          bonus = 15;
+          await grantSementinhas(db, uid, [
+            { amount: bonus, reason: "Bônus por variar as atividades 🌈", dedupeKey: varietyKey },
+          ]);
+        }
+      }
+    } catch {
+      /* bônus é secundário */
+    }
+
+    return { ok: true as const, granted: amount + bonus, bonus };
   });
 
 // Nota: o GASTO de Sementinhas é feito pela RPC atômica buy_cantinho_item
