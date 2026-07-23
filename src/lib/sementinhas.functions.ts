@@ -270,7 +270,7 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         day: z.number().int().min(1).max(400),
-        activity: z.enum(["breathing", "movement", "meditation"]),
+        activity: z.enum(["breathing", "movement", "meditation", "bonding", "gratitude"]),
       })
       .parse(i),
   )
@@ -303,7 +303,11 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
         ? "Respiração do dia 🌬️"
         : data.activity === "movement"
           ? "Movimento do dia 🤸"
-          : "Meditação do dia 🧘";
+          : data.activity === "meditation"
+            ? "Meditação do dia 🧘"
+            : data.activity === "bonding"
+              ? "Momento com o bebê 💛"
+              : "Gratidão do dia ✨";
     const amount = 5; // base fixa por concluir (nunca punitivo)
     await grantSementinhas(db, uid, [{ amount, reason, dedupeKey }]);
     return { ok: true as const, granted: amount };

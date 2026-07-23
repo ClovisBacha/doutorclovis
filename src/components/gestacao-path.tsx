@@ -3507,7 +3507,357 @@ function MeditationBlock({
   );
 }
 
-/** Motor da "atividade de bem-estar do dia": alterna respiração, movimento e meditação. */
+/* ══════════════════ Momento com o bebê (vínculo) ══════════════════ */
+
+const BONDING_ROTEIROS: { emoji: string; lines: string[] }[] = [
+  {
+    emoji: "💛",
+    lines: [
+      "Leve a mão até a barriga, com carinho.",
+      "Respire fundo e diga, baixinho: 'oi, meu amor'.",
+      "Conte pro bebê uma coisa boa que você sente por ele.",
+      "Fique em silêncio um instante, só sentindo a presença.",
+      "Esse momento é só de vocês dois. 💛",
+    ],
+  },
+  {
+    emoji: "🎵",
+    lines: [
+      "Escolha uma música ou cantarole algo que você gosta.",
+      "O bebê já escuta sons — e a sua voz o acalma.",
+      "Balance devagar, como se embalasse ele.",
+      "Deixe que ele sinta o seu ritmo.",
+    ],
+  },
+  {
+    emoji: "👣",
+    lines: [
+      "Fique quietinha e preste atenção nos movimentos.",
+      "Se sentir um chutinho, responda com um toque suave.",
+      "É a primeira 'conversa' de vocês.",
+      "Sorria — ele sente quando você está bem.",
+    ],
+  },
+];
+
+function BondingBlock({
+  day,
+  canEarn,
+  careMode = false,
+  alreadyDone,
+  onEarn,
+}: {
+  day: number;
+  canEarn: boolean;
+  careMode?: boolean;
+  alreadyDone: boolean;
+  onEarn: () => void;
+}) {
+  const roteiro = useMemo(() => BONDING_ROTEIROS[day % BONDING_ROTEIROS.length], [day]);
+  const [open, setOpen] = useState(false);
+  const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
+  const [idx, setIdx] = useState(0);
+  const [reward, setReward] = useState<number | null>(null);
+  const grantedRef = useRef(false);
+
+  useEffect(() => {
+    if (phase !== "active") return;
+    const t = setTimeout(() => {
+      if (idx + 1 >= roteiro.lines.length) {
+        setPhase("done");
+        finish();
+      } else setIdx(idx + 1);
+    }, 11000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, idx]);
+
+  async function finish() {
+    if (grantedRef.current || !canEarn || careMode) return;
+    grantedRef.current = true;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) return;
+      const r = await grantWellnessReward({
+        data: { accessToken: token, day, activity: "bonding" },
+      });
+      if (r.ok && r.granted > 0) {
+        setReward(r.granted);
+        onEarn();
+      }
+    } catch {
+      /* recompensa é secundária */
+    }
+  }
+
+  function begin() {
+    setIdx(0);
+    setReward(null);
+    grantedRef.current = false;
+    setPhase("active");
+  }
+  function close() {
+    setOpen(false);
+    setPhase("intro");
+  }
+
+  return (
+    <>
+      <div className="mt-4 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-rose-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">💛</span>
+          <div className="flex-1">
+            <p className="text-sm font-extrabold text-amber-800">Momento com o bebê</p>
+            <p className="text-xs text-amber-700/80">
+              Um instante de vínculo {alreadyDone ? "· feito hoje ✓" : ""}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setOpen(true);
+            setPhase("intro");
+          }}
+          className="press mt-3 w-full rounded-full bg-amber-500 py-2.5 text-sm font-extrabold text-white"
+        >
+          {alreadyDone ? "Repetir o momento" : "Começar"}
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-amber-100 via-rose-50 to-white"
+          style={{ paddingTop: "var(--safe-top)" }}
+        >
+          <div className="flex items-center px-4 py-3">
+            <button
+              onClick={close}
+              aria-label="Fechar"
+              className="press text-2xl leading-none text-slate-400"
+            >
+              ✕
+            </button>
+            <span className="flex-1" />
+            <span className="w-6" />
+          </div>
+          {phase === "intro" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <span className="text-6xl">{roteiro.emoji}</span>
+              <h3 className="mt-4 text-2xl font-extrabold text-amber-900">Momento com o bebê</h3>
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-amber-800/80">
+                Um ritual curtinho de conexão. Vá com calma e curta cada passo. 💛
+              </p>
+              <button
+                onClick={begin}
+                className="press mt-8 rounded-full bg-amber-500 px-8 py-3 text-sm font-extrabold text-white"
+              >
+                Começar
+              </button>
+            </div>
+          )}
+          {phase === "active" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-10 text-center">
+              <span className="text-5xl opacity-80">{roteiro.emoji}</span>
+              <p
+                key={idx}
+                className="dc-q-slide mt-8 max-w-sm text-2xl font-semibold leading-relaxed text-amber-900"
+              >
+                {roteiro.lines[idx]}
+              </p>
+              <button
+                onClick={() => {
+                  if (idx + 1 >= roteiro.lines.length) {
+                    setPhase("done");
+                    finish();
+                  } else setIdx(idx + 1);
+                }}
+                className="press mt-10 text-xs font-bold text-amber-500"
+              >
+                Continuar →
+              </button>
+            </div>
+          )}
+          {phase === "done" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              {!careMode && <ConfettiBurst />}
+              <span className="dc-result-in text-6xl">💛</span>
+              <h3 className="mt-3 text-2xl font-extrabold text-amber-900">Que amor 💛</h3>
+              <p className="mt-1 text-sm text-amber-800/80">Vocês dois se conectaram hoje.</p>
+              {!careMode && reward != null && reward > 0 && (
+                <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
+                  +{reward} 🌱 Sementinhas!
+                </div>
+              )}
+              <button
+                onClick={close}
+                className="press mt-8 w-full max-w-xs rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+              >
+                Voltar ao caminho
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ══════════════════ Gratidão do dia (vai pro diário) ══════════════════ */
+
+function GratitudeBlock({
+  day,
+  canEarn,
+  careMode = false,
+  alreadyDone,
+  onEarn,
+}: {
+  day: number;
+  canEarn: boolean;
+  careMode?: boolean;
+  alreadyDone: boolean;
+  onEarn: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [phase, setPhase] = useState<"write" | "done">("write");
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [reward, setReward] = useState<number | null>(null);
+
+  async function save() {
+    if (saving || text.trim().length < 2) return;
+    setSaving(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        setSaving(false);
+        return;
+      }
+      // Guarda no diário (registro da paciente).
+      await (
+        supabase as unknown as {
+          from: (t: string) => {
+            insert: (v: Record<string, unknown>) => Promise<{ error: unknown }>;
+          };
+        }
+      )
+        .from("journal_entries")
+        .insert({ user_id: u.user.id, content: `Gratidão: ${text.trim()}`, mood: "🙏" });
+      // Recompensa (uma por dia, como as outras atividades de bem-estar).
+      if (canEarn && !careMode) {
+        const { data: s } = await supabase.auth.getSession();
+        const token = s.session?.access_token;
+        if (token) {
+          const r = await grantWellnessReward({
+            data: { accessToken: token, day, activity: "gratitude" },
+          });
+          if (r.ok && r.granted > 0) {
+            setReward(r.granted);
+            onEarn();
+          }
+        }
+      }
+      setPhase("done");
+    } catch {
+      /* ignore */
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function close() {
+    setOpen(false);
+    setPhase("write");
+    setText("");
+  }
+
+  return (
+    <>
+      <div className="mt-4 rounded-2xl border border-yellow-100 bg-gradient-to-br from-yellow-50 to-amber-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">✨</span>
+          <div className="flex-1">
+            <p className="text-sm font-extrabold text-amber-800">Gratidão do dia</p>
+            <p className="text-xs text-amber-700/80">
+              Uma coisa boa de hoje {alreadyDone ? "· feito hoje ✓" : ""}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setOpen(true);
+            setPhase("write");
+          }}
+          className="press mt-3 w-full rounded-full bg-amber-500 py-2.5 text-sm font-extrabold text-white"
+        >
+          {alreadyDone ? "Escrever de novo" : "Escrever"}
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-yellow-100 via-amber-50 to-white"
+          style={{ paddingTop: "var(--safe-top)" }}
+        >
+          <div className="flex items-center px-4 py-3">
+            <button
+              onClick={close}
+              aria-label="Fechar"
+              className="press text-2xl leading-none text-slate-400"
+            >
+              ✕
+            </button>
+          </div>
+          {phase === "write" ? (
+            <div className="flex flex-1 flex-col items-center px-8 pt-6 text-center">
+              <span className="text-6xl">✨</span>
+              <h3 className="mt-4 text-2xl font-extrabold text-amber-900">O que foi bom hoje?</h3>
+              <p className="mt-2 max-w-xs text-sm text-amber-800/80">
+                Pode ser bem pequeno. Isso vai pro seu diário. 💛
+              </p>
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value.slice(0, 300))}
+                rows={4}
+                placeholder="Hoje eu fiquei grata por…"
+                className="mt-5 w-full max-w-sm resize-none rounded-2xl border border-amber-200 bg-white p-3 text-sm outline-none focus:border-amber-400"
+              />
+              <button
+                onClick={save}
+                disabled={saving || text.trim().length < 2}
+                className="press mt-4 w-full max-w-sm rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-40"
+              >
+                Guardar
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              {!careMode && <ConfettiBurst />}
+              <span className="dc-result-in text-6xl">✨</span>
+              <h3 className="mt-3 text-2xl font-extrabold text-amber-900">Guardado 💛</h3>
+              <p className="mt-1 text-sm text-amber-800/80">Anotei no seu diário.</p>
+              {!careMode && reward != null && reward > 0 && (
+                <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
+                  +{reward} 🌱 Sementinhas!
+                </div>
+              )}
+              <button
+                onClick={close}
+                className="press mt-8 w-full max-w-xs rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+              >
+                Voltar ao caminho
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Motor da "atividade de bem-estar do dia": 5 tipos que se alternam por dia. */
 function WellnessBlock(props: {
   day: number;
   canEarn: boolean;
@@ -3515,11 +3865,13 @@ function WellnessBlock(props: {
   alreadyDone: boolean;
   onEarn: () => void;
 }) {
-  // Rotação por dia pra dar variedade: respiração → movimento → meditação.
-  const which = props.day % 3;
+  // Rotação por dia: respiração → movimento → meditação → bebê → gratidão.
+  const which = props.day % 5;
   if (which === 0) return <BreathingBlock {...props} />;
   if (which === 1) return <MovementBlock {...props} />;
-  return <MeditationBlock {...props} />;
+  if (which === 2) return <MeditationBlock {...props} />;
+  if (which === 3) return <BondingBlock {...props} />;
+  return <GratitudeBlock {...props} />;
 }
 
 /* ══════════════════ Quiz diário da professora (dentro do sheet do dia) ══════════════════
