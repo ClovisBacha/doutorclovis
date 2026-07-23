@@ -107,7 +107,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Acompanhe sua gestação semana a semana, converse com IA especializada, agende consultas e muito mais. Desenvolvido com especialistas em gestação de alto risco.",
       },
       { name: "author", content: "Obstétrica" },
+      // Cor da barra do sistema (Android/PWA): terracota no claro; combina com
+      // o fundo escuro no modo escuro. O fallback sem media cobre navegadores
+      // que não suportam theme-color por media query.
       { name: "theme-color", content: "#a8574a" },
+      { name: "theme-color", content: "#0f1115", media: "(prefers-color-scheme: dark)" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
