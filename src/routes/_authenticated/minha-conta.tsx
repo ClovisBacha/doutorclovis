@@ -35,6 +35,7 @@ import {
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem } from "@/components/motion-primitives";
 import { motion, AnimatePresence } from "motion/react";
+import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
@@ -404,6 +405,7 @@ function MinhaContaPage() {
   const [isDoctor, setIsDoctor] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [milestoneWeek, setMilestoneWeek] = useState<number | null>(null);
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
   // Jornada do Bebê (toque na foto do bebê) + popup do Premium (gatilho)
@@ -575,6 +577,36 @@ function MinhaContaPage() {
     })();
   }, []);
 
+  // Comemoração de nova semana de gestação: quando a semana avança em relação
+  // à última vista (guardada por usuário no localStorage), abre o modal de
+  // marco com confete. Nunca em Modo Cuidado. Não dispara no 1º carregamento
+  // (só registra a semana atual).
+  useEffect(() => {
+    if (!userId || !profile) return;
+    const g = computeGestation({
+      lmp: profile.lmp_date,
+      referenceDate: profile.reference_date,
+      referenceWeeks: profile.reference_weeks,
+      referenceDays: profile.reference_days,
+    });
+    if (!g) return;
+    const careOn = Boolean((profile as { care_mode?: boolean }).care_mode);
+    const key = `lastWeek:${userId}`;
+    let stored: number | null = null;
+    try {
+      const v = localStorage.getItem(key);
+      stored = v ? Number(v) : null;
+    } catch {
+      /* modo privado */
+    }
+    if (stored !== null && g.weeks > stored && !careOn) setMilestoneWeek(g.weeks);
+    try {
+      localStorage.setItem(key, String(g.weeks));
+    } catch {
+      /* modo privado */
+    }
+  }, [userId, profile]);
+
   async function signOut() {
     await supabase.auth.signOut();
     // Limpa a jornada local (dc-path-*) e o marcador de sync: num aparelho
@@ -693,6 +725,15 @@ function MinhaContaPage() {
             }
             setShowOnboarding(false);
           }}
+        />
+      )}
+
+      {/* ── Marco: nova semana de gestação (com confete) ────────── */}
+      {milestoneWeek !== null && (
+        <WeekMilestoneModal
+          week={milestoneWeek}
+          babyName={profile?.baby_name ?? null}
+          onClose={() => setMilestoneWeek(null)}
         />
       )}
 
@@ -1329,6 +1370,67 @@ function OnboardingRitual({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Marco de nova semana (comemoração) ---------- */
+
+/**
+ * Modal celebrativo quando a gestação avança de semana. Confete dispara ao
+ * montar (visual); som + vibração vão no clique do botão (política de autoplay
+ * e Vibration API exigem gesto do usuário). Nunca é aberto em Modo Cuidado —
+ * quem decide isso é o gatilho, não este componente.
+ */
+function WeekMilestoneModal({
+  week,
+  babyName,
+  onClose,
+}: {
+  week: number;
+  babyName: string | null;
+  onClose: () => void;
+}) {
+  const baby = babyForWeek(week);
+  useEffect(() => {
+    fireConfetti();
+  }, []);
+
+  function handleClose() {
+    celebrateChime();
+    celebrateHaptic();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-5 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]"
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl"
+        />
+        <p className="relative text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+          Novo marco
+        </p>
+        <p className="relative mt-3 text-6xl">🎉</p>
+        <h2 className="relative mt-4 font-serif text-3xl leading-tight">Semana {week}!</h2>
+        <p className="relative mt-2 text-sm leading-relaxed text-muted-foreground">
+          {babyName ? `${babyName} agora` : "Seu bebê agora"} tem o tamanho de{" "}
+          <span className="font-semibold text-foreground">{baby.fruit.toLowerCase()}</span>.{" "}
+          {baby.desc}
+        </p>
+        <button
+          onClick={handleClose}
+          className="relative mt-6 w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
+        >
+          Que alegria! 💛
+        </button>
+      </motion.div>
     </div>
   );
 }
