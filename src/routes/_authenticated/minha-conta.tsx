@@ -33,7 +33,7 @@ import {
   type WaitlistEntry,
 } from "@/lib/waitlist.functions";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
-import { Stagger, StaggerItem } from "@/components/motion-primitives";
+import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { subscribeToPush, vapidPublicKey } from "@/lib/push";
@@ -1469,11 +1469,13 @@ function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: strin
           </button>
         ))}
       </div>
-      {sub === "meditacoes" && <MeditacoesTab gest={gest} />}
-      {sub === "sons" && <SonsBebêTab gest={gest} />}
-      {sub === "exercicios" && <ExerciciosTab gest={gest} />}
-      {sub === "humor" && <HumorTab />}
-      {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
+      <Fade key={sub}>
+        {sub === "meditacoes" && <MeditacoesTab gest={gest} />}
+        {sub === "sons" && <SonsBebêTab gest={gest} />}
+        {sub === "exercicios" && <ExerciciosTab gest={gest} />}
+        {sub === "humor" && <HumorTab />}
+        {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
+      </Fade>
     </div>
   );
 }
@@ -1508,12 +1510,14 @@ function RegistrosHub({ profile, gest }: { profile: Profile | null; gest: Gest }
           </button>
         ))}
       </div>
-      {sub === "diario" && <JournalTab profile={profile} gest={gest} />}
-      {sub === "chutes" && (
-        <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
-      )}
-      {sub === "contracoes" && <ContracoesTab weeks={gest?.weeks ?? null} />}
-      {sub === "timeline" && <TimelineTab profile={profile} gest={gest} />}
+      <Fade key={sub}>
+        {sub === "diario" && <JournalTab profile={profile} gest={gest} />}
+        {sub === "chutes" && (
+          <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
+        )}
+        {sub === "contracoes" && <ContracoesTab weeks={gest?.weeks ?? null} />}
+        {sub === "timeline" && <TimelineTab profile={profile} gest={gest} />}
+      </Fade>
     </div>
   );
 }
@@ -1563,22 +1567,24 @@ function BebeHub({
           </button>
         ))}
       </div>
-      {sub === "semana" && (
-        <BabyTab
-          profile={profile}
-          gest={gest}
-          onNavigate={onNavigate}
-          onBabyTap={onBabyTap}
-          careMode={careMode}
-        />
-      )}
-      {sub === "contagem" && (
-        <CountdownTab profile={profile} gest={gest} onNavigate={onNavigate} careMode={careMode} />
-      )}
-      {sub === "album" && <AlbumTab profile={profile} />}
-      {sub === "nome" && <NomeTab profile={profile} />}
-      {sub === "carta" && <CartaBebêTab profile={profile} gest={gest} onNavigate={onNavigate} />}
-      {sub === "quartinho" && <QuartinhoTab gest={gest} />}
+      <Fade key={sub}>
+        {sub === "semana" && (
+          <BabyTab
+            profile={profile}
+            gest={gest}
+            onNavigate={onNavigate}
+            onBabyTap={onBabyTap}
+            careMode={careMode}
+          />
+        )}
+        {sub === "contagem" && (
+          <CountdownTab profile={profile} gest={gest} onNavigate={onNavigate} careMode={careMode} />
+        )}
+        {sub === "album" && <AlbumTab profile={profile} />}
+        {sub === "nome" && <NomeTab profile={profile} />}
+        {sub === "carta" && <CartaBebêTab profile={profile} gest={gest} onNavigate={onNavigate} />}
+        {sub === "quartinho" && <QuartinhoTab gest={gest} />}
+      </Fade>
     </div>
   );
 }
@@ -6597,12 +6603,14 @@ function ConsultasHub({ profile, gest }: { profile: Profile | null; gest: Gest }
           </button>
         ))}
       </div>
-      {sub === "agenda" && <ConsultasTab />}
-      {sub === "preparo" && <PreConsultaTab profile={profile} gest={gest} />}
-      {sub === "perguntas" && <QuestionsTab gest={gest} />}
-      {sub === "checklist" && <ChecklistTab gest={gest} />}
-      {sub === "parto" && <PlanoPártoTab profile={profile} />}
-      {sub === "tele" && <TeleconsultaTab profile={profile} />}
+      <Fade key={sub}>
+        {sub === "agenda" && <ConsultasTab />}
+        {sub === "preparo" && <PreConsultaTab profile={profile} gest={gest} />}
+        {sub === "perguntas" && <QuestionsTab gest={gest} />}
+        {sub === "checklist" && <ChecklistTab gest={gest} />}
+        {sub === "parto" && <PlanoPártoTab profile={profile} />}
+        {sub === "tele" && <TeleconsultaTab profile={profile} />}
+      </Fade>
     </div>
   );
 }
@@ -12291,9 +12299,11 @@ function RecompensasHub({ careMode, gest }: { careMode: boolean; gest: Gest }) {
           </button>
         ))}
       </div>
-      {sub === "cantinho" && <CantinhoTab careMode={careMode} />}
-      {sub === "conquistas" && <ConquistasTab />}
-      {sub === "loja" && <LojaTab gest={gest} />}
+      <Fade key={sub}>
+        {sub === "cantinho" && <CantinhoTab careMode={careMode} />}
+        {sub === "conquistas" && <ConquistasTab />}
+        {sub === "loja" && <LojaTab gest={gest} />}
+      </Fade>
     </div>
   );
 }

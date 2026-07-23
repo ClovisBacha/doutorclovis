@@ -65,6 +65,25 @@ export function Stagger({ children, className }: BaseProps) {
   );
 }
 
+/**
+ * Fade + subida sutil ao montar. Ideal pra trocar conteúdo de sub-aba: passe
+ * `key` (ex.: a sub-aba atual) pra reanimar a cada troca.
+ */
+export function Fade({ children, className }: BaseProps) {
+  const reduce = useReducedMotion();
+  if (reduce) return <div className={className}>{children}</div>;
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.32, ease: EASE }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 /** Item de um `Stagger`. */
 export function StaggerItem({ children, className }: BaseProps) {
   const reduce = useReducedMotion();
