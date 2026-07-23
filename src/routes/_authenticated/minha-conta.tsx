@@ -22,6 +22,15 @@ import {
   respondToProposedTime,
   type MyAppointment,
 } from "@/lib/appointments.functions";
+import {
+  joinWaitlist,
+  getMyWaitlist,
+  leaveWaitlist,
+  respondWaitlistOffer,
+  mondayOf,
+  WAITLIST_RESPONSE_HOURS,
+  type WaitlistEntry,
+} from "@/lib/waitlist.functions";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
@@ -5791,6 +5800,169 @@ function formatApptDate(ymd: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * Fila de espera: quando não há horário na semana, a paciente entra na fila.
+ * Se abrir vaga (alguém cancela), ela recebe uma OFERTA com prazo de resposta —
+ * aceita ou recusa aqui. Se não responder no prazo, passa pra próxima.
+ */
+function WaitlistCard() {
+  const [entries, setEntries] = useState<WaitlistEntry[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [week, setWeek] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    const res = await getMyWaitlist({ data: { accessToken: s.session.access_token } });
+    if (res.ok) setEntries(res.entries);
+    setLoaded(true);
+  }
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function join() {
+    if (busy || !week) return;
+    setBusy(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) {
+      setBusy(false);
+      return;
+    }
+    const res = await joinWaitlist({
+      data: { accessToken: s.session.access_token, weekStart: mondayOf(week) },
+    });
+    if (res.ok) {
+      toast(res.already ? "Você já estava na fila dessa semana." : "Você entrou na fila 💛");
+      setWeek("");
+      await load();
+    } else {
+      toast(res.error ?? "Não foi possível entrar na fila");
+    }
+    setBusy(false);
+  }
+
+  async function leave(id: string) {
+    setBusy(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (s.session) {
+      await leaveWaitlist({ data: { accessToken: s.session.access_token, id } });
+      await load();
+    }
+    setBusy(false);
+  }
+
+  async function respond(id: string, accept: boolean) {
+    if (busy) return;
+    setBusy(true);
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) {
+      setBusy(false);
+      return;
+    }
+    const res = await respondWaitlistOffer({
+      data: { accessToken: s.session.access_token, id, accept },
+    });
+    if (res.ok) toast(accept ? "Vaga confirmada! ✅" : "Vaga recusada.");
+    else toast(res.error ?? "Não foi possível responder");
+    await load();
+    setBusy(false);
+  }
+
+  if (!loaded) return null;
+
+  const offers = entries.filter((e) => e.status === "offered");
+  const waiting = entries.filter((e) => e.status === "waiting");
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <p className="font-serif text-lg">Fila de espera</p>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        Sem horário na semana que você quer? Entre na fila — se abrir vaga, a gente te avisa aqui e
+        por e-mail.
+      </p>
+
+      {offers.map((e) => (
+        <div
+          key={e.id}
+          className="mt-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50/70 p-4"
+        >
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+            🎉 Abriu uma vaga!
+          </span>
+          <p className="mt-2 text-base font-extrabold text-emerald-800">
+            {e.offer_date ? formatApptDate(e.offer_date) : "—"} · {e.offer_time}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Responda em até {WAITLIST_RESPONSE_HOURS}h
+            {e.offer_deadline
+              ? ` (até ${new Date(e.offer_deadline).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })})`
+              : ""}{" "}
+            — depois passa pra próxima.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => respond(e.id, true)}
+              disabled={busy}
+              className="press flex-1 rounded-full bg-emerald-500 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+            >
+              Aceitar vaga
+            </button>
+            <button
+              onClick={() => respond(e.id, false)}
+              disabled={busy}
+              className="press rounded-full border border-border px-4 py-2 text-xs font-bold text-muted-foreground disabled:opacity-40"
+            >
+              Recusar
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {waiting.map((e) => (
+        <div
+          key={e.id}
+          className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-border bg-background p-3"
+        >
+          <span className="text-sm">
+            ⏳ Na fila — semana de{" "}
+            <strong>{new Date(e.week_start + "T00:00:00").toLocaleDateString("pt-BR")}</strong>
+          </span>
+          <button
+            onClick={() => leave(e.id)}
+            disabled={busy}
+            className="press text-xs font-bold text-muted-foreground hover:text-rose-600 disabled:opacity-40"
+          >
+            Sair
+          </button>
+        </div>
+      ))}
+
+      <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-border/60 pt-4">
+        <div>
+          <label className="block text-xs font-semibold text-muted-foreground">
+            Escolha um dia da semana desejada
+          </label>
+          <input
+            type="date"
+            value={week}
+            onChange={(e) => setWeek(e.target.value)}
+            className="mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </div>
+        <button
+          onClick={join}
+          disabled={busy || !week}
+          className="press rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-40"
+        >
+          Entrar na fila dessa semana
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ConsultasTab() {
   const [appts, setAppts] = useState<MyAppointment[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(true);
@@ -6133,6 +6305,9 @@ function ConsultasTab() {
           </div>
         )}
       </div>
+
+      {/* Fila de espera */}
+      <WaitlistCard />
 
       {/* Recording card */}
       <div className="rounded-3xl border border-border bg-card p-6">
