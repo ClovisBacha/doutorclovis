@@ -56,43 +56,50 @@ export async function subscribeToPush(): Promise<PushSupport> {
   const key = vapidPublicKey();
   if (!key) return { ok: false, reason: "no-key" };
 
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") return { ok: false, reason: "denied" };
+  // Envolve tudo que pode REJEITAR (permissão, registro do SW e sobretudo o
+  // pushManager.subscribe, que rejeita quando o serviço de push recusa a chave)
+  // pra função NUNCA lançar — o botão que a chama trata o {ok:false}.
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return { ok: false, reason: "denied" };
 
-  const reg = await navigator.serviceWorker.register("/sw.js");
-  await navigator.serviceWorker.ready;
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
 
-  const existing = await reg.pushManager.getSubscription();
-  const sub =
-    existing ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(key),
-    }));
+    const existing = await reg.pushManager.getSubscription();
+    const sub =
+      existing ??
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      }));
 
-  const json = sub.toJSON();
-  const endpoint = sub.endpoint;
-  const p256dh = json.keys?.p256dh;
-  const auth = json.keys?.auth;
-  if (!endpoint || !p256dh || !auth) return { ok: false, reason: "bad-sub" };
+    const json = sub.toJSON();
+    const endpoint = sub.endpoint;
+    const p256dh = json.keys?.p256dh;
+    const auth = json.keys?.auth;
+    if (!endpoint || !p256dh || !auth) return { ok: false, reason: "bad-sub" };
 
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return { ok: false, reason: "no-session" };
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return { ok: false, reason: "no-session" };
 
-  const { error } = await (
-    supabase as unknown as {
-      from: (t: string) => {
-        upsert: (v: unknown, o: unknown) => Promise<{ error: unknown }>;
-      };
-    }
-  )
-    .from("push_subscriptions")
-    .upsert(
-      { user_id: u.user.id, endpoint, p256dh, auth_key: auth },
-      { onConflict: "user_id,endpoint" },
-    );
-  if (error) return { ok: false, reason: "db" };
-  return { ok: true };
+    const { error } = await (
+      supabase as unknown as {
+        from: (t: string) => {
+          upsert: (v: unknown, o: unknown) => Promise<{ error: unknown }>;
+        };
+      }
+    )
+      .from("push_subscriptions")
+      .upsert(
+        { user_id: u.user.id, endpoint, p256dh, auth_key: auth },
+        { onConflict: "user_id,endpoint" },
+      );
+    if (error) return { ok: false, reason: "db" };
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
 }
 
 /** Cancela a inscrição no navegador e remove a linha do banco. */
