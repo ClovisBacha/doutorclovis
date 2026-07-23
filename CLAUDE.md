@@ -118,32 +118,29 @@ Tabelas (ver `supabase/migrations/`):
   `window.__lovableEvents`).
 - `.lovable/project.json` — metadados do template.
 
-## Backlog — pendências combinadas (lembrar de resolver)
+## Fluxo de agenda + ciclo/cérebro (IMPLEMENTADO — jul/2026)
 
-> Registrado a pedido do Cláudio. NÃO estão implementadas — são os próximos
-> grandes blocos. Ao retomar, confirmar prioridade antes de construir.
+Estas eram pendências de backlog; já estão em produção. Precisam do
+`supabase/APLICAR_AGENDA.sql` rodado no banco (contraproposta + fila de espera).
 
-### 1. Agenda real com o médico (booking por horário + lista de espera)
+### Agenda (contraproposta + fila de espera)
 
-Hoje `agendamento` só cria um **pedido** (`appointment_requests`), não é reserva
-por horário. Objetivo:
+- **Contraproposta**: o médico sugere outro horário (`proposeAppointmentTime`,
+  status `counter_proposed`); a paciente aprova/recusa (`respondToProposedTime`).
+  Colunas `proposed_date/time` em `appointment_requests`. Backstop de
+  double-booking: índice único parcial `appt_confirmed_slot`.
+- **Fila de espera por semana** (`appointment_waitlist`): sem horário, a paciente
+  entra na fila; ao cancelar uma consulta confirmada, `offerFreedSlot` oferta à
+  1ª da fila com prazo de **4h**; sem resposta → cascata pra próxima
+  (`sweepWaitlist`). Cascata roda preguiçosa (ao abrir Consultas/Fila) e por cron
+  seguro `/api/waitlist-tick` (`CRON_SECRET`). Ver `src/lib/waitlist.functions.ts`.
 
-- Médico define **disponibilidade** (slots recorrentes + exceções/bloqueios).
-- Paciente marca em um **horário disponível** (confirma na hora, não "pedido").
-- Se o horário preferido estiver cheio, o sistema **sugere outros horários**.
-- Sem vaga → entra em **lista de espera** e é avisada quando abrir vaga.
-- Tabelas prováveis: `doctor_availability`, `appointments` (estado do booking),
-  `appointment_waitlist`. Integrar com o painel do médico e com o Google
-  Agenda/Meet que já existem (ver `docs/GOOGLE_MEET.md`).
+### Ciclo menstrual + cérebro do paciente
 
-### 2. Ciclo menstrual estilo Apple Health + cérebro do paciente
-
-Já existe a aba "Ciclo Menstrual". Evoluir para uma experiência tipo Apple
-Health (Cycle Tracking):
-
-- Previsão de ciclo e janela fértil, registro de sintomas, calendário visual,
-  lembretes.
-- **Integrar os dados do ciclo ao "cérebro do paciente"** (IA do consultório,
-  `src/lib/secondbrain.server.ts`) para insights personalizados.
-- Regras que continuam valendo: a IA médica NUNCA responde/aprende sem
-  aprovação do médico; dado sensível (LGPD) só com consentimento explícito.
+- `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o
+  ciclo (último período, ciclo médio, dia do ciclo, previsão, sintomas) + humor
+  recente do diário (só o rótulo `mood`, nunca o conteúdo). É contexto de
+  bem-estar (fonte confiável), NÃO conduta — o portão de cobertura do cérebro do
+  médico continua mandando. LGPD: dado da própria paciente, na conversa dela.
+- Futuro possível (não feito): calendário visual estilo Apple Health, janela
+  fértil no app, lembretes de ciclo, disponibilidade por slots do médico.
