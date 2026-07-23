@@ -38,6 +38,7 @@ import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
+import { shareMilestoneCard } from "@/lib/share-card";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { subscribeToPush, vapidPublicKey } from "@/lib/push";
@@ -1510,12 +1511,25 @@ function WeekMilestoneModal({
           <span className="font-semibold">{baby.fruit.toLowerCase()}</span>. {baby.desc}
         </p>
 
-        <button
-          onClick={handleClose}
-          className="press mt-8 rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
-        >
-          Que alegria! 💛
-        </button>
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <button
+            onClick={async () => {
+              hapticTap();
+              const r = await shareMilestoneCard({ week, fruit: baby.fruit, babyName, motherName });
+              if (r === "downloaded") toast("Imagem salva! É só postar 💛");
+              else if (r === "error") toast("Não consegui gerar a imagem agora.");
+            }}
+            className="press rounded-full border border-primary/40 bg-card/70 px-8 py-3 text-sm font-semibold text-primary backdrop-blur"
+          >
+            📤 Compartilhar esse momento
+          </button>
+          <button
+            onClick={handleClose}
+            className="press rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
+          >
+            Que alegria! 💛
+          </button>
+        </div>
       </motion.div>
     </div>
   );
@@ -1952,6 +1966,25 @@ function BabyTab({
               <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-foreground md:mx-0 md:text-base">
                 {baby.desc}
               </p>
+            )}
+
+            {!careMode && (
+              <button
+                onClick={async () => {
+                  hapticTap();
+                  const r = await shareMilestoneCard({
+                    week: gest.weeks,
+                    fruit: baby.fruit,
+                    babyName: profile.baby_name,
+                    motherName: profile.display_name?.split(" ")[0] ?? null,
+                  });
+                  if (r === "downloaded") toast("Imagem salva! É só postar 💛");
+                  else if (r === "error") toast("Não consegui gerar a imagem agora.");
+                }}
+                className="press mt-4 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-card/60 px-4 py-2 text-xs font-semibold text-primary backdrop-blur"
+              >
+                📤 Compartilhar minha semana
+              </button>
             )}
 
             {/* Progresso da jornada (silenciado no Modo Cuidado) */}
