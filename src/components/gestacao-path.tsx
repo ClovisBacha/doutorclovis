@@ -11,6 +11,7 @@ import {
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
+import { createBreathAudio, vibratePhase } from "@/lib/breath-audio";
 
 /** Hash estável de string → número (posiciona decorações de forma determinística). */
 function hashStr(s: string): number {
@@ -2766,22 +2767,25 @@ function BreathingBlock({
   const [phase, setPhase] = useState<"intro" | "in" | "hold" | "out" | "done">("intro");
   const [cycle, setCycle] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
+  const [sound, setSound] = useState(true);
   const grantedRef = useRef(false);
+  const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
 
   // Loop das respirações: inspire → segure → expire, BREATH_CYCLES vezes.
+  // Ao ENTRAR em cada fase, dispara a vibração e o som (que incha/afina junto).
   useEffect(() => {
     if (phase !== "in" && phase !== "hold" && phase !== "out") return;
-    if (cycle === 0 && phase === "in") buzz();
-    let cancelled = false;
     const dur =
       phase === "in"
         ? BREATH_PATTERN.in
         : phase === "hold"
           ? BREATH_PATTERN.hold
           : BREATH_PATTERN.out;
+    vibratePhase(phase);
+    audioRef.current?.setPhase(phase, dur);
+    let cancelled = false;
     const t = setTimeout(() => {
       if (cancelled) return;
-      buzz();
       if (phase === "in") setPhase("hold");
       else if (phase === "hold") setPhase("out");
       else {
@@ -2801,6 +2805,9 @@ function BreathingBlock({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, cycle]);
+
+  // Garante que o áudio pare se o componente sair da tela.
+  useEffect(() => () => audioRef.current?.stop(), []);
 
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
@@ -2826,18 +2833,39 @@ function BreathingBlock({
     setCycle(0);
     setReward(null);
     grantedRef.current = false;
+    if (sound) {
+      audioRef.current = createBreathAudio();
+      audioRef.current.start();
+    }
     setPhase("in");
   }
 
   function close() {
+    audioRef.current?.stop();
+    audioRef.current = null;
     setOpen(false);
     setPhase("intro");
   }
 
+  function toggleSound() {
+    setSound((on) => {
+      const next = !on;
+      if (!next) {
+        audioRef.current?.stop();
+        audioRef.current = null;
+      } else if (phase === "in" || phase === "hold" || phase === "out") {
+        audioRef.current = createBreathAudio();
+        audioRef.current.start();
+      }
+      return next;
+    });
+  }
+
   const label =
     phase === "in" ? "Inspire" : phase === "hold" ? "Segure" : phase === "out" ? "Expire" : "";
-  // Escala do círculo: cresce ao inspirar, mantém ao segurar, encolhe ao expirar.
-  const scale = phase === "in" || phase === "hold" ? 1 : phase === "out" ? 0.55 : 0.7;
+  // Escala do círculo: começa pequeno (desaproxima), incha ao inspirar/segurar,
+  // encolhe ao expirar — igual ao "Respirar" do iPhone/Apple Watch.
+  const scale = phase === "in" || phase === "hold" ? 1 : phase === "out" ? 0.5 : 0.5;
   const scaleDur = phase === "in" ? BREATH_PATTERN.in : phase === "out" ? BREATH_PATTERN.out : 0;
 
   return (
@@ -2876,12 +2904,20 @@ function BreathingBlock({
             >
               ✕
             </button>
-            {(phase === "in" || phase === "hold" || phase === "out") && (
+            {phase === "in" || phase === "hold" || phase === "out" ? (
               <p className="flex-1 text-center text-xs font-bold uppercase tracking-wider text-sky-500">
                 Ciclo {Math.min(cycle + 1, BREATH_CYCLES)} de {BREATH_CYCLES}
               </p>
+            ) : (
+              <span className="flex-1" />
             )}
-            <span className="w-6" />
+            <button
+              onClick={toggleSound}
+              aria-label={sound ? "Desligar som" : "Ligar som"}
+              className="press text-xl leading-none"
+            >
+              {sound ? "🔊" : "🔇"}
+            </button>
           </div>
 
           {phase === "intro" && (
@@ -3276,8 +3312,12 @@ function MeditationBlock({
   const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
   const [idx, setIdx] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
+  const [sound, setSound] = useState(true);
   const grantedRef = useRef(false);
+  const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
   const SECS_PER_LINE = 12;
+
+  useEffect(() => () => audioRef.current?.stop(), []);
 
   useEffect(() => {
     if (phase !== "active") return;
@@ -3317,11 +3357,32 @@ function MeditationBlock({
     setIdx(0);
     setReward(null);
     grantedRef.current = false;
+    if (sound) {
+      audioRef.current = createBreathAudio();
+      audioRef.current.start();
+      audioRef.current.ambient();
+    }
     setPhase("active");
   }
   function close() {
+    audioRef.current?.stop();
+    audioRef.current = null;
     setOpen(false);
     setPhase("intro");
+  }
+  function toggleSound() {
+    setSound((on) => {
+      const next = !on;
+      if (!next) {
+        audioRef.current?.stop();
+        audioRef.current = null;
+      } else if (phase === "active") {
+        audioRef.current = createBreathAudio();
+        audioRef.current.start();
+        audioRef.current.ambient();
+      }
+      return next;
+    });
   }
 
   return (
@@ -3360,15 +3421,23 @@ function MeditationBlock({
             >
               ✕
             </button>
-            {phase === "active" && (
+            {phase === "active" ? (
               <div className="mx-3 h-1.5 flex-1 overflow-hidden rounded-full bg-violet-200">
                 <div
                   className="h-full rounded-full bg-violet-500 transition-all duration-1000"
                   style={{ width: `${((idx + 1) / med.lines.length) * 100}%` }}
                 />
               </div>
+            ) : (
+              <span className="flex-1" />
             )}
-            <span className="w-6" />
+            <button
+              onClick={toggleSound}
+              aria-label={sound ? "Desligar som" : "Ligar som"}
+              className="press text-xl leading-none"
+            >
+              {sound ? "🔊" : "🔇"}
+            </button>
           </div>
 
           {phase === "intro" && (
