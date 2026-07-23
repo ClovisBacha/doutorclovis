@@ -5,6 +5,7 @@ import {
   AppHomeScreen,
   SectionHeader,
   tabToSection,
+  tabsForSection,
   type AppTab,
   type BottomSection,
   type NextAppointment,
@@ -827,8 +828,29 @@ function MinhaContaPage() {
             />
           )}
 
-          {/* Category selector */}
-          <div className="print:hidden mt-2 md:mt-6 flex gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {/* Celular: UMA barra só — as abas da seção do menu de baixo (o menu
+              de baixo já faz o papel de categoria; corta um seletor empilhado). */}
+          <div className="print:hidden mt-2 flex gap-1 overflow-x-auto pb-1 md:hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {tabsForSection(activeSection).map((t) => (
+              <button
+                key={t}
+                onClick={() => {
+                  setTab(t as Tab);
+                  setMobileHome(false);
+                }}
+                className={`press flex-shrink-0 rounded-full px-3.5 py-2 text-sm transition-colors ${
+                  tab === t
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "text-foreground/60 hover:text-foreground/80"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop: seletor de categorias (tem espaço de sobra) */}
+          <div className="print:hidden mt-6 hidden gap-1.5 overflow-x-auto pb-1 md:flex [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {CATEGORIES.map((cat) => {
               const active = categoryOfTab(tab) === cat.label;
               const cs = CAT_STYLE[cat.label] ?? CAT_STYLE["Gestação"];
@@ -852,8 +874,8 @@ function MinhaContaPage() {
             })}
           </div>
 
-          {/* Tab row */}
-          <div className="print:hidden mt-3 flex gap-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {/* Desktop: linha de abas da categoria ativa */}
+          <div className="print:hidden mt-3 hidden gap-0 overflow-x-auto md:flex [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <div className="flex min-w-full gap-1">
               {CATEGORIES.find((c) => c.label === categoryOfTab(tab))?.tabs.map((t) => {
                 const cs = CAT_STYLE[categoryOfTab(tab)] ?? CAT_STYLE["Gestação"];
