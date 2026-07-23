@@ -3199,7 +3199,246 @@ function MovementBlock({
   );
 }
 
-/** Motor da "atividade de bem-estar do dia": alterna respiração e movimento. */
+/* ══════════════════ Meditação relâmpago (atividade de bem-estar) ══════════════════
+   Meditação guiada curta (~1,5 min): frases calmas que avançam sozinhas, tema
+   do dia. Recompensa fixa por concluir (nunca punitiva). */
+
+const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
+  {
+    theme: "Calma",
+    emoji: "🌊",
+    lines: [
+      "Feche os olhos e solte os ombros.",
+      "Sinta o ar entrando… e saindo, sem pressa.",
+      "A cada expiração, solte um pouco da tensão do dia.",
+      "Você está segura. Seu bebê está bem aqui com você.",
+      "Deixe o corpo pesar, como se afundasse em algo macio.",
+      "Fique mais um instante, só respirando.",
+      "Quando quiser, abra os olhos devagar.",
+    ],
+  },
+  {
+    theme: "Conexão com o bebê",
+    emoji: "💛",
+    lines: [
+      "Leve uma das mãos até a barriga, sem apertar.",
+      "Respire fundo e imagine esse ar chegando até o bebê.",
+      "Por dentro, mande um 'oi' carinhoso pra ele.",
+      "Sinta que, agora, vocês dois estão respirando juntos.",
+      "Não precisa fazer nada — só estar aqui já é cuidado.",
+      "Guarde essa sensação de vínculo.",
+      "Abra os olhos quando estiver pronta.",
+    ],
+  },
+  {
+    theme: "Descanso",
+    emoji: "🌙",
+    lines: [
+      "Acomode-se do jeito mais confortável possível.",
+      "Solte a mandíbula, solte a testa, solte as mãos.",
+      "Deixe a respiração ficar mais lenta, sozinha.",
+      "Imagine um lugar tranquilo e seguro só seu.",
+      "Aqui, não há nada pra resolver agora.",
+      "Descanse mais um pouco nesse lugar.",
+      "Volte devagar, sem pressa.",
+    ],
+  },
+  {
+    theme: "Gratidão",
+    emoji: "✨",
+    lines: [
+      "Respire fundo uma vez, bem devagar.",
+      "Pense em uma coisa boa que aconteceu hoje.",
+      "Pode ser bem pequena — um gole de água, um sol na pele.",
+      "Deixe esse pensamento aquecer o peito.",
+      "Agradeça ao seu corpo por estar cuidando de duas vidas.",
+      "Respire mais uma vez, sorrindo por dentro.",
+      "Abra os olhos levando essa calma com você.",
+    ],
+  },
+];
+
+function MeditationBlock({
+  day,
+  canEarn,
+  careMode = false,
+  alreadyDone,
+  onEarn,
+}: {
+  day: number;
+  canEarn: boolean;
+  careMode?: boolean;
+  alreadyDone: boolean;
+  onEarn: () => void;
+}) {
+  const med = useMemo(() => MEDITACOES[day % MEDITACOES.length], [day]);
+  const [open, setOpen] = useState(false);
+  const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
+  const [idx, setIdx] = useState(0);
+  const [reward, setReward] = useState<number | null>(null);
+  const grantedRef = useRef(false);
+  const SECS_PER_LINE = 12;
+
+  useEffect(() => {
+    if (phase !== "active") return;
+    const t = setTimeout(() => {
+      if (idx + 1 >= med.lines.length) {
+        setPhase("done");
+        finish();
+      } else {
+        setIdx(idx + 1);
+      }
+    }, SECS_PER_LINE * 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, idx]);
+
+  async function finish() {
+    if (grantedRef.current || !canEarn || careMode) return;
+    grantedRef.current = true;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) return;
+      const r = await grantWellnessReward({
+        data: { accessToken: token, day, activity: "meditation" },
+      });
+      if (r.ok && r.granted > 0) {
+        setReward(r.granted);
+        onEarn();
+      }
+    } catch {
+      /* recompensa é secundária */
+    }
+  }
+
+  function begin() {
+    setIdx(0);
+    setReward(null);
+    grantedRef.current = false;
+    setPhase("active");
+  }
+  function close() {
+    setOpen(false);
+    setPhase("intro");
+  }
+
+  return (
+    <>
+      <div className="mt-4 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🧘</span>
+          <div className="flex-1">
+            <p className="text-sm font-extrabold text-violet-800">Meditação do dia</p>
+            <p className="text-xs text-violet-700/80">
+              {med.theme} · ~1,5 min {alreadyDone ? "· feito hoje ✓" : ""}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setOpen(true);
+            setPhase("intro");
+          }}
+          className="press mt-3 w-full rounded-full bg-violet-500 py-2.5 text-sm font-extrabold text-white"
+        >
+          {alreadyDone ? "Meditar de novo" : "Começar a meditar"}
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-violet-100 via-fuchsia-50 to-white"
+          style={{ paddingTop: "var(--safe-top)" }}
+        >
+          <div className="flex items-center px-4 py-3">
+            <button
+              onClick={close}
+              aria-label="Fechar"
+              className="press text-2xl leading-none text-slate-400"
+            >
+              ✕
+            </button>
+            {phase === "active" && (
+              <div className="mx-3 h-1.5 flex-1 overflow-hidden rounded-full bg-violet-200">
+                <div
+                  className="h-full rounded-full bg-violet-500 transition-all duration-1000"
+                  style={{ width: `${((idx + 1) / med.lines.length) * 100}%` }}
+                />
+              </div>
+            )}
+            <span className="w-6" />
+          </div>
+
+          {phase === "intro" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <span className="text-6xl">{med.emoji}</span>
+              <h3 className="mt-4 text-2xl font-extrabold text-violet-900">{med.theme}</h3>
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-violet-800/80">
+                Uma meditação curtinha. Deixe as frases te guiarem, sem esforço. Encontre uma
+                posição confortável. 💜
+              </p>
+              <button
+                onClick={begin}
+                className="press mt-8 rounded-full bg-violet-500 px-8 py-3 text-sm font-extrabold text-white"
+              >
+                Começar
+              </button>
+            </div>
+          )}
+
+          {phase === "active" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-10 text-center">
+              <span className="text-5xl opacity-80">{med.emoji}</span>
+              <p
+                key={idx}
+                className="dc-q-slide mt-8 max-w-sm text-2xl font-semibold leading-relaxed text-violet-900"
+              >
+                {med.lines[idx]}
+              </p>
+              <button
+                onClick={() => {
+                  if (idx + 1 >= med.lines.length) {
+                    setPhase("done");
+                    finish();
+                  } else setIdx(idx + 1);
+                }}
+                className="press mt-10 text-xs font-bold text-violet-500"
+              >
+                Continuar →
+              </button>
+            </div>
+          )}
+
+          {phase === "done" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              {!careMode && <ConfettiBurst />}
+              <span className="dc-result-in text-6xl">🧘</span>
+              <h3 className="mt-3 text-2xl font-extrabold text-violet-900">Que paz 💜</h3>
+              <p className="mt-1 text-sm text-violet-800/80">
+                Você tirou um tempinho só pra você. Leve essa calma com você.
+              </p>
+              {!careMode && reward != null && reward > 0 && (
+                <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
+                  +{reward} 🌱 Sementinhas!
+                </div>
+              )}
+              <button
+                onClick={close}
+                className="press mt-8 w-full max-w-xs rounded-full bg-violet-500 py-3 text-sm font-extrabold text-white"
+              >
+                Voltar ao caminho
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Motor da "atividade de bem-estar do dia": alterna respiração, movimento e meditação. */
 function WellnessBlock(props: {
   day: number;
   canEarn: boolean;
@@ -3207,8 +3446,11 @@ function WellnessBlock(props: {
   alreadyDone: boolean;
   onEarn: () => void;
 }) {
-  // Alterna por dia pra dar variedade (par: respiração; ímpar: movimento).
-  return props.day % 2 === 0 ? <BreathingBlock {...props} /> : <MovementBlock {...props} />;
+  // Rotação por dia pra dar variedade: respiração → movimento → meditação.
+  const which = props.day % 3;
+  if (which === 0) return <BreathingBlock {...props} />;
+  if (which === 1) return <MovementBlock {...props} />;
+  return <MeditationBlock {...props} />;
 }
 
 /* ══════════════════ Quiz diário da professora (dentro do sheet do dia) ══════════════════
