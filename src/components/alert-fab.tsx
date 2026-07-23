@@ -23,7 +23,7 @@ export function AlertFab() {
           setOpen(true);
         }}
         aria-label="Sinais de alerta na gestação"
-        className="press fixed bottom-24 right-4 z-40 flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-card/90 px-3.5 py-2 text-xs font-semibold text-amber-700 shadow-lg backdrop-blur md:bottom-6 dark:text-amber-300"
+        className="press fixed right-4 z-40 flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-card/90 px-3.5 py-2 text-xs font-semibold text-amber-700 shadow-lg backdrop-blur bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-6 dark:text-amber-300"
       >
         <span aria-hidden>⚠️</span> Sinais de alerta
       </button>
@@ -35,7 +35,7 @@ export function AlertFab() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-card p-6 shadow-xl sm:rounded-3xl"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-card p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl sm:rounded-3xl sm:pb-6"
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border sm:hidden" />
             <p className="font-serif text-xl text-foreground">Quando procurar o médico</p>
