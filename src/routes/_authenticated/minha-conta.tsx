@@ -34,6 +34,7 @@ import {
 } from "@/lib/waitlist.functions";
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem } from "@/components/motion-primitives";
+import { motion, AnimatePresence } from "motion/react";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
 import { checkIsAdmin } from "@/lib/admin.functions";
@@ -401,6 +402,8 @@ function MinhaContaPage() {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDoctor, setIsDoctor] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
   // Jornada do Bebê (toque na foto do bebê) + popup do Premium (gatilho)
@@ -527,21 +530,27 @@ function MinhaContaPage() {
         .eq("id", u.user.id)
         .maybeSingle();
       setProfile(data);
+      setUserId(u.user.id);
 
       // Papel ANTES de liberar o render: sem isso o médico via o app da
       // gestante piscar por 2-3 round-trips até o bloqueio assumir.
+      let roleIsPatient = true;
       try {
         const { data: s } = await supabase.auth.getSession();
         if (s.session?.access_token) {
           const r = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
           setIsAdmin(r.isAdmin);
+          if (r.isAdmin) roleIsPatient = false;
           // Médico cadastrado (ativo OU não) é médico — não usa o app da
           // gestante (o render abaixo troca o app pela tela de redirecionamento
           // ao /painel). Admin nunca entra aqui: continua vendo tudo p/ testar.
           if (!r.isAdmin) {
             try {
               const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
-              if (me.ok && me.doctor) setIsDoctor(true);
+              if (me.ok && me.doctor) {
+                setIsDoctor(true);
+                roleIsPatient = false;
+              }
             } catch {
               /* sem perfil de médico → é gestante, segue no app */
             }
@@ -549,6 +558,19 @@ function MinhaContaPage() {
         }
       } finally {
         setLoading(false);
+      }
+
+      // Ritual de boas-vindas: só pra paciente que ainda não tem âncora de
+      // gestação (sem DUM, DPP ou ultrassom) e que não dispensou o convite.
+      if (roleIsPatient) {
+        const hasAnchor = !!(data?.lmp_date || data?.due_date || data?.reference_date);
+        let dismissed = false;
+        try {
+          dismissed = !!localStorage.getItem(`onboarded:${u.user.id}`);
+        } catch {
+          /* modo privado: sem persistência do "pular" */
+        }
+        if (!hasAnchor && !dismissed) setShowOnboarding(true);
       }
     })();
   }, []);
@@ -658,6 +680,22 @@ function MinhaContaPage() {
 
   return (
     <>
+      {/* ── Ritual de boas-vindas (primeiro acesso) ─────────────── */}
+      {showOnboarding && (
+        <OnboardingRitual
+          initialName={profile?.display_name?.split(" ")[0] ?? ""}
+          onClose={(saved) => {
+            if (saved) setProfile(saved);
+            try {
+              if (userId) localStorage.setItem(`onboarded:${userId}`, "1");
+            } catch {
+              /* modo privado */
+            }
+            setShowOnboarding(false);
+          }}
+        />
+      )}
+
       {/* ── App bottom nav (mobile only) ─────────────────────── */}
       <AppBottomNav activeSection={activeSection} onSelect={handleBottomNav} />
 
@@ -940,6 +978,358 @@ function MinhaContaPage() {
         </div>
       </section>
     </>
+  );
+}
+
+/* ---------- Ritual de boas-vindas (primeiro acesso) ---------- */
+
+const ONBOARD_STEPS = 5;
+const ONBOARD_EASE = [0.16, 1, 0.3, 1] as const;
+
+/**
+ * Onboarding acolhedor de primeiro acesso. Coleta o essencial (como chamar a
+ * paciente, a âncora da gestação, o nome do bebê e uma foto) escrevendo nos
+ * MESMOS campos do Perfil (`patient_profiles`) — não cria coluna nova, então
+ * funciona mesmo com as migrations pendentes em produção. Tudo é opcional e
+ * pode ser pulado; ao terminar, o app já abre personalizado.
+ */
+function OnboardingRitual({
+  initialName,
+  onClose,
+}: {
+  initialName: string;
+  onClose: (saved: Profile | null) => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState(initialName);
+  const [mode, setMode] = useState<"dum" | "us">("dum");
+  const [lmp, setLmp] = useState("");
+  const [usDate, setUsDate] = useState(new Date().toISOString().split("T")[0]);
+  const [usWeeks, setUsWeeks] = useState("");
+  const [usDays, setUsDays] = useState("");
+  const [babyName, setBabyName] = useState("");
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const next = () => setStep((s) => Math.min(ONBOARD_STEPS - 1, s + 1));
+  const back = () => setStep((s) => Math.max(0, s - 1));
+  const hasAnchor = mode === "dum" ? !!lmp : !!usWeeks;
+
+  function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        const min = Math.min(img.width, img.height);
+        ctx.drawImage(
+          img,
+          (img.width - min) / 2,
+          (img.height - min) / 2,
+          min,
+          min,
+          0,
+          0,
+          size,
+          size,
+        );
+        setAvatar(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function finish() {
+    setSaving(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        toast.error("Sua sessão expirou — entre novamente.");
+        onClose(null);
+        return;
+      }
+      const payload: any = { id: u.user.id, updated_at: new Date().toISOString() };
+      if (name.trim()) payload.display_name = name.trim();
+      if (babyName.trim()) payload.baby_name = babyName.trim();
+      if (avatar) payload.avatar_url = avatar;
+      if (mode === "dum" && lmp) {
+        payload.lmp_date = lmp;
+        payload.due_date = dueDateFromLmp(lmp);
+      } else if (mode === "us" && usWeeks) {
+        payload.reference_date = usDate;
+        payload.reference_weeks = Number(usWeeks);
+        payload.reference_days = usDays ? Number(usDays) : 0;
+      }
+      let { data, error } = await (supabase as any)
+        .from("patient_profiles")
+        .upsert(payload)
+        .select()
+        .single();
+      if (error && String(error.message || "").includes("avatar_url")) {
+        delete payload.avatar_url;
+        ({ data, error } = await (supabase as any)
+          .from("patient_profiles")
+          .upsert(payload)
+          .select()
+          .single());
+      }
+      if (error) {
+        toast.error("Não consegui salvar agora. Você pode ajustar depois no Perfil.");
+        onClose(null);
+        return;
+      }
+      onClose(data as Profile);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const stepBody = (() => {
+    switch (step) {
+      case 0:
+        return (
+          <div className="text-center">
+            <p className="text-6xl">🌸</p>
+            <h2 className="mt-5 font-serif text-3xl leading-tight">Bem-vinda 💛</h2>
+            <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
+              Este é o seu espaço para viver a gestação com tranquilidade — acompanhando o bebê
+              semana a semana, com o seu médico por perto. Vamos deixar tudo com a sua cara em 1
+              minutinho.
+            </p>
+          </div>
+        );
+      case 1:
+        return (
+          <div>
+            <p className="text-4xl">👋</p>
+            <h2 className="mt-4 font-serif text-2xl">Como você gostaria de ser chamada?</h2>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Seu primeiro nome"
+              onKeyDown={(e) => e.key === "Enter" && next()}
+              className="mt-5 w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
+            />
+          </div>
+        );
+      case 2:
+        return (
+          <div>
+            <p className="text-4xl">🤰</p>
+            <h2 className="mt-4 font-serif text-2xl">Vamos calcular a idade do bebê</h2>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setMode("dum")}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  mode === "dum"
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border text-muted-foreground"
+                }`}
+              >
+                Última menstruação
+              </button>
+              <button
+                onClick={() => setMode("us")}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  mode === "us"
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border text-muted-foreground"
+                }`}
+              >
+                Pelo ultrassom
+              </button>
+            </div>
+            {mode === "dum" ? (
+              <div className="mt-4">
+                <label className="mb-1.5 block text-sm font-medium">
+                  1º dia da última menstruação
+                </label>
+                <input
+                  type="date"
+                  value={lmp}
+                  onChange={(e) => setLmp(e.target.value)}
+                  className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
+                />
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Data do ultrassom</label>
+                  <input
+                    type="date"
+                    value={usDate}
+                    onChange={(e) => setUsDate(e.target.value)}
+                    className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="mb-1.5 block text-sm font-medium">Semanas</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={42}
+                      value={usWeeks}
+                      onChange={(e) => setUsWeeks(e.target.value)}
+                      placeholder="12"
+                      className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="mb-1.5 block text-sm font-medium">Dias</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={6}
+                      value={usDays}
+                      onChange={(e) => setUsDays(e.target.value)}
+                      placeholder="3"
+                      className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={next}
+              className="mt-4 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Ainda não sei a data — pular por agora
+            </button>
+          </div>
+        );
+      case 3:
+        return (
+          <div>
+            <p className="text-4xl">👶</p>
+            <h2 className="mt-4 font-serif text-2xl">Um toque pessoal (opcional)</h2>
+            <label className="mt-5 block text-sm font-medium">Já escolheram um nome?</label>
+            <input
+              value={babyName}
+              onChange={(e) => setBabyName(e.target.value)}
+              placeholder="Nome do bebê"
+              className="mt-1.5 w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
+            />
+            <div className="mt-5 flex items-center gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
+                {avatar ? (
+                  <img src={avatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-2xl">📷</span>
+                )}
+              </div>
+              <label className="cursor-pointer rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary hover:text-primary">
+                {avatar ? "Trocar foto" : "Adicionar sua foto"}
+                <input type="file" accept="image/*" onChange={handleAvatar} className="hidden" />
+              </label>
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <div className="text-center">
+            <p className="text-6xl">🎉</p>
+            <h2 className="mt-5 font-serif text-3xl leading-tight">
+              Tudo pronto{name.trim() ? `, ${name.trim()}` : ""}! 💛
+            </h2>
+            <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
+              {hasAnchor
+                ? "Seu acompanhamento já está calculado. A partir de agora o app se ajusta à sua semana de gestação."
+                : "Você pode informar a data da gestação quando quiser, lá no Perfil. Seu espaço está pronto."}
+            </p>
+          </div>
+        );
+    }
+  })();
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[image:var(--gradient-warm)] p-5">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
+      />
+      <div className="relative w-full max-w-md rounded-3xl border border-border bg-card/90 p-7 shadow-[var(--shadow-card)] backdrop-blur md:p-9">
+        {/* Progresso */}
+        <div className="mb-6 flex items-center justify-center gap-1.5">
+          {Array.from({ length: ONBOARD_STEPS }).map((_, i) => (
+            <span
+              key={i}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === step ? "w-6 bg-primary" : i < step ? "w-1.5 bg-primary/50" : "w-1.5 bg-border"
+              }`}
+            />
+          ))}
+        </div>
+
+        <div className="min-h-[240px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.28, ease: ONBOARD_EASE }}
+            >
+              {stepBody}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Ações */}
+        <div className="mt-7 flex items-center justify-between gap-3">
+          {step > 0 && step < ONBOARD_STEPS - 1 ? (
+            <button
+              onClick={back}
+              className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              Voltar
+            </button>
+          ) : (
+            <span />
+          )}
+
+          {step < ONBOARD_STEPS - 1 ? (
+            <button
+              onClick={next}
+              disabled={step === 2 && !hasAnchor}
+              className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90 disabled:opacity-40"
+            >
+              {step === 0 ? "Começar" : "Continuar"}
+            </button>
+          ) : (
+            <button
+              onClick={finish}
+              disabled={saving}
+              className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {saving ? "Salvando…" : "Entrar no meu espaço"}
+            </button>
+          )}
+        </div>
+
+        {step < ONBOARD_STEPS - 1 && (
+          <button
+            onClick={() => onClose(null)}
+            className="mt-4 block w-full text-center text-xs text-muted-foreground/70 hover:text-foreground"
+          >
+            Pular por agora
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
