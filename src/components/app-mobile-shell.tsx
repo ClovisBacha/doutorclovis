@@ -52,7 +52,6 @@ export type AppTab =
   | "Consultas"
   | "Acompanhante"
   | "FAQ"
-  | "Pânico"
   | "Carteirinha"
   | "Pós-parto"
   | "Recompensas"
@@ -80,7 +79,7 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
     "Preventivos",
   ],
   consultas: ["Consultas", "Consulta Particular"],
-  eu: ["Acompanhante", "Pós-parto", "FAQ", "Pânico", "Recompensas", "Médico", "Chat IA", "Perfil"],
+  eu: ["Acompanhante", "Pós-parto", "FAQ", "Recompensas", "Médico", "Chat IA", "Perfil"],
 };
 
 export function tabToSection(t: AppTab): BottomSection {
