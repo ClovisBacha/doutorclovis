@@ -3857,7 +3857,16 @@ function GratitudeBlock({
   );
 }
 
-/** Motor da "atividade de bem-estar do dia": 5 tipos que se alternam por dia. */
+/** Motor da "atividade de bem-estar do dia": 5 tipos. O dia SUGERE um (rotação),
+ *  mas a paciente pode ESCOLHER outro nas fichinhas. */
+const WELLNESS_TYPES = [
+  { key: "breathing", emoji: "🌬️", label: "Respirar", Comp: BreathingBlock },
+  { key: "movement", emoji: "🤸", label: "Mexer", Comp: MovementBlock },
+  { key: "meditation", emoji: "🧘", label: "Meditar", Comp: MeditationBlock },
+  { key: "bonding", emoji: "💛", label: "Bebê", Comp: BondingBlock },
+  { key: "gratitude", emoji: "✨", label: "Gratidão", Comp: GratitudeBlock },
+] as const;
+
 function WellnessBlock(props: {
   day: number;
   canEarn: boolean;
@@ -3865,13 +3874,30 @@ function WellnessBlock(props: {
   alreadyDone: boolean;
   onEarn: () => void;
 }) {
-  // Rotação por dia: respiração → movimento → meditação → bebê → gratidão.
-  const which = props.day % 5;
-  if (which === 0) return <BreathingBlock {...props} />;
-  if (which === 1) return <MovementBlock {...props} />;
-  if (which === 2) return <MeditationBlock {...props} />;
-  if (which === 3) return <BondingBlock {...props} />;
-  return <GratitudeBlock {...props} />;
+  // Sugestão do dia (rotação) — mas a paciente escolhe se quiser.
+  const [pick, setPick] = useState<number>(props.day % WELLNESS_TYPES.length);
+  const Chosen = WELLNESS_TYPES[pick].Comp;
+  return (
+    <div>
+      <div className="scrollbar-hide mt-4 flex gap-2 overflow-x-auto">
+        {WELLNESS_TYPES.map((a, i) => (
+          <button
+            key={a.key}
+            onClick={() => setPick(i)}
+            className={`press flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+              pick === i
+                ? "bg-slate-800 text-white"
+                : "border border-border text-foreground/55 hover:text-foreground/80"
+            }`}
+          >
+            <span>{a.emoji}</span>
+            {a.label}
+          </button>
+        ))}
+      </div>
+      <Chosen {...props} />
+    </div>
+  );
 }
 
 /* ══════════════════ Quiz diário da professora (dentro do sheet do dia) ══════════════════
