@@ -17,6 +17,7 @@ import {
   CreditCard,
   FileText,
   Footprints,
+  LifeBuoy,
   Map,
   Heart,
   Home,
@@ -246,9 +247,11 @@ const NAV_ITEMS: { id: BottomSection; Icon: LucideIcon; label: string }[] = [
 export function AppBottomNav({
   activeSection,
   onSelect,
+  onEmergency,
 }: {
   activeSection: BottomSection;
   onSelect: (s: BottomSection) => void;
+  onEmergency?: () => void;
 }) {
   // Estilo Instagram: rolando para BAIXO (lendo conteúdo) a barra encolhe e
   // some com os rótulos; rolando para CIMA (procurando navegação) ela volta ao
@@ -325,6 +328,32 @@ export function AppBottomNav({
             </button>
           );
         })}
+
+        {onEmergency && (
+          <button
+            onClick={() => {
+              hapticTap();
+              onEmergency();
+            }}
+            aria-label="Emergência"
+            className="flex min-w-0 flex-1 flex-col items-center py-1 transition-colors duration-200"
+          >
+            <div
+              className={`flex items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                compact ? "h-9 w-9" : "h-9 w-12"
+              }`}
+            >
+              <LifeBuoy className="h-5 w-5 text-rose-500" strokeWidth={1.9} />
+            </div>
+            <span
+              className={`overflow-hidden text-[10px] font-medium text-rose-500 transition-all duration-300 ${
+                compact ? "max-h-0 opacity-0" : "mt-0.5 max-h-4 opacity-100"
+              }`}
+            >
+              SOS
+            </span>
+          </button>
+        )}
       </div>
     </nav>
   );
