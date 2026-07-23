@@ -235,6 +235,18 @@
     background: color-mix(in oklab, var(--primary) 22%, transparent);
   }
 
+  /* Foco visível só pra teclado (não aparece no clique do mouse). Acessibilidade:
+     antes os botões ficavam sem indicação nenhuma de foco. Segue a forma do
+     elemento (outline respeita border-radius nos navegadores modernos). */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* Remove o outline default quando NÃO é foco de teclado. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
   @media (pointer: fine) {
     ::-webkit-scrollbar {
       width: 10px;
