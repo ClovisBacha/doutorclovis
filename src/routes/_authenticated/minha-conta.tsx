@@ -2371,8 +2371,17 @@ function ChecklistTab({ gest }: { gest: Gest }) {
   }, []);
 
   async function toggle(it: ChecklistItem) {
-    await (supabase as any).from("checklist_items").update({ done: !it.done }).eq("id", it.id);
-    setItems((arr) => arr.map((x) => (x.id === it.id ? { ...x, done: !x.done } : x)));
+    const nextDone = !it.done;
+    // Optimista: marca na hora; reverte se o servidor recusar.
+    setItems((arr) => arr.map((x) => (x.id === it.id ? { ...x, done: nextDone } : x)));
+    const { error } = await (supabase as any)
+      .from("checklist_items")
+      .update({ done: nextDone })
+      .eq("id", it.id);
+    if (error) {
+      setItems((arr) => arr.map((x) => (x.id === it.id ? { ...x, done: it.done } : x)));
+      toast.error("Não consegui salvar agora. Tente de novo.");
+    }
   }
   async function add() {
     if (!label.trim()) return;
@@ -2385,8 +2394,14 @@ function ChecklistTab({ gest }: { gest: Gest }) {
     load();
   }
   async function remove(id: string) {
-    await (supabase as any).from("checklist_items").delete().eq("id", id);
+    // Optimista: some da lista na hora; restaura se falhar.
+    const prev = items;
     setItems((arr) => arr.filter((x) => x.id !== id));
+    const { error } = await (supabase as any).from("checklist_items").delete().eq("id", id);
+    if (error) {
+      setItems(prev);
+      toast.error("Não consegui remover agora. Tente de novo.");
+    }
   }
 
   const groups = useMemo(() => {
