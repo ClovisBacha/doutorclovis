@@ -4698,24 +4698,66 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
     load();
   }
 
+  const babyLabel = babyName ? babyName : "o nosso bebê";
+  function inviteMessage(url: string): string {
+    return `Oi! 💛 Criei um espaço pra você acompanhar comigo a gestação ${
+      babyName ? `de ${babyName}` : "do nosso bebê"
+    } — dá pra ver a evolução semana a semana, o tamanho do bebê e os momentos. É só abrir: ${url}`;
+  }
+  async function copyLink(url: string) {
+    hapticTap();
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copiado 💛");
+    } catch {
+      toast("Copie o link manualmente 💛");
+    }
+  }
+  function shareWhatsApp(url: string) {
+    hapticTap();
+    window.open(`https://wa.me/?text=${encodeURIComponent(inviteMessage(url))}`, "_blank");
+  }
+  async function shareNative(url: string) {
+    hapticTap();
+    const nav = navigator as Navigator & { share?: (d: unknown) => Promise<void> };
+    if (nav.share) {
+      try {
+        await nav.share({ title: "Acompanhe nossa gestação 💛", text: inviteMessage(url) });
+      } catch {
+        /* usuária cancelou */
+      }
+    } else {
+      copyLink(url);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Convidar acompanhante</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Gere um link para o papai, vovó ou alguém especial acompanhar a evolução
-          {babyName ? ` de ${babyName}` : " do bebê"} (visualização).
+          Traga o papai, a vovó ou alguém especial pra viver essa fase com você. Com o link, a
+          pessoa acompanha a evolução {babyLabel === "o nosso bebê" ? "do bebê" : `de ${babyName}`}{" "}
+          semana a semana — só visualização, você controla e pode revogar quando quiser.
         </p>
-        <div className="mt-4 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>👶 Semana e tamanho do bebê</span>
+          <span>📸 Álbum</span>
+          <span>💗 Batimentos</span>
+        </div>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nome do acompanhante (opcional)"
-            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="flex-1 rounded-xl border border-input bg-background px-4 py-2.5 text-sm"
           />
           <button
-            onClick={create}
-            className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground"
+            onClick={() => {
+              hapticTap();
+              create();
+            }}
+            className="press rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground"
           >
             Gerar convite
           </button>
@@ -4724,7 +4766,9 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
 
       <div className="space-y-3">
         {invites.length === 0 && (
-          <p className="text-sm text-muted-foreground">Nenhum convite ainda.</p>
+          <p className="text-sm text-muted-foreground">
+            Nenhum convite ainda — gere um acima e mande no WhatsApp. 💛
+          </p>
         )}
         {invites.map((i) => {
           const url = `${window.location.origin}/acompanhar/${i.token}`;
@@ -4739,17 +4783,24 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
                   revogar
                 </button>
               </div>
-              <div className="mt-2 flex gap-2">
-                <input
-                  readOnly
-                  value={url}
-                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-xs"
-                />
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <button
-                  onClick={() => navigator.clipboard.writeText(url)}
-                  className="rounded-full bg-secondary px-4 py-2 text-xs"
+                  onClick={() => shareWhatsApp(url)}
+                  className="press col-span-2 flex items-center justify-center gap-1.5 rounded-full bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white sm:col-span-1"
                 >
-                  Copiar
+                  <span>💬</span> WhatsApp
+                </button>
+                <button
+                  onClick={() => copyLink(url)}
+                  className="press rounded-full border border-border px-4 py-2.5 text-sm font-medium"
+                >
+                  Copiar link
+                </button>
+                <button
+                  onClick={() => shareNative(url)}
+                  className="press rounded-full border border-border px-4 py-2.5 text-sm font-medium"
+                >
+                  Compartilhar
                 </button>
               </div>
             </div>
