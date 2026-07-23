@@ -252,16 +252,33 @@ export const respondToProposedTime = createServerFn({ method: "POST" })
       };
     }
 
-    const { error: upErr } = await (supabaseAdmin as any)
+    const { data: updRows, error: upErr } = await (supabaseAdmin as any)
       .from("appointment_requests")
       .update({
         status: "confirmed",
         confirmed_date: row.proposed_date,
         confirmed_time: row.proposed_time,
+        proposed_date: null,
+        proposed_time: null,
       })
       .eq("id", data.id)
-      .eq("status", "counter_proposed"); // trava idempotente contra corrida
-    if (upErr) return { ok: false as const, error: "Não foi possível confirmar" };
+      .eq("status", "counter_proposed") // trava idempotente contra corrida
+      .select("id");
+    // 23505 = índice único do slot: alguém confirmou esse horário no meio do
+    // caminho (backstop real contra double-booking, além da checagem acima).
+    if (upErr) {
+      return {
+        ok: false as const,
+        error:
+          (upErr as { code?: string }).code === "23505"
+            ? "Esse horário acabou de ser preenchido. Peça um novo horário ao médico."
+            : "Não foi possível confirmar",
+      };
+    }
+    // 0 linhas → o pedido já tinha sido respondido (perdeu a corrida do status).
+    if (!updRows || updRows.length === 0) {
+      return { ok: false as const, error: "Esse pedido já foi respondido." };
+    }
 
     // Avisa o consultório que a paciente aprovou (best-effort).
     try {
