@@ -308,15 +308,11 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Consultas",
-    tabs: ["Consultas"],
+    tabs: ["Consultas", "Médico"],
   },
   {
     label: "Aprender",
     tabs: ["FAQ", "Recompensas"],
-  },
-  {
-    label: "Médico",
-    tabs: ["Médico"],
   },
   {
     label: "Conta",

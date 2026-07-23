@@ -77,8 +77,8 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
     "Ciclo Menstrual",
     "Preventivos",
   ],
-  consultas: ["Consultas"],
-  eu: ["Acompanhante", "Pós-parto", "FAQ", "Recompensas", "Médico", "Chat IA", "Perfil"],
+  consultas: ["Consultas", "Médico"],
+  eu: ["Acompanhante", "Pós-parto", "FAQ", "Recompensas", "Chat IA", "Perfil"],
 };
 
 export function tabToSection(t: AppTab): BottomSection {
