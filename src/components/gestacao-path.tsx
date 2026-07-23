@@ -2024,9 +2024,9 @@ export function GestacaoPath({
                     <QuizPaywall week={week} />
                   ))}
 
-                {/* Atividade de bem-estar do dia (respiração guiada) */}
-                <BreathingBlock
-                  key={`breath-${D}`}
+                {/* Atividade de bem-estar do dia (alterna respiração / movimento) */}
+                <WellnessBlock
+                  key={`wellness-${D}`}
                   day={D}
                   canEarn={isToday}
                   careMode={careMode}
@@ -2965,6 +2965,250 @@ function BreathingBlock({
       )}
     </>
   );
+}
+
+/* ══════════════════ Movimento do dia (atividade de bem-estar) ══════════════════
+   Movimentos LEVES e seguros em qualquer trimestre (sentada/em pé, sem deitar
+   de costas). Sequência curta com cronômetro. Sempre com aviso de confirmar
+   com o médico. Recompensa fixa por concluir (nunca punitiva). */
+
+type Movimento = { emoji: string; name: string; cue: string; secs: number };
+
+const MOVIMENTOS: Movimento[] = [
+  {
+    emoji: "💆",
+    name: "Rolar os ombros",
+    cue: "Gire os ombros para trás, devagar e amplo.",
+    secs: 30,
+  },
+  {
+    emoji: "🙆",
+    name: "Alongar o pescoço",
+    cue: "Incline a orelha em direção ao ombro; troque de lado sem forçar.",
+    secs: 30,
+  },
+  {
+    emoji: "🐈",
+    name: "Gato-camelo suave",
+    cue: "De quatro apoios, alterne arredondar e relaxar a coluna com a respiração.",
+    secs: 40,
+  },
+  {
+    emoji: "🦋",
+    name: "Abertura de quadril",
+    cue: "Sentada, solas dos pés juntas, deixe os joelhos caírem suaves.",
+    secs: 30,
+  },
+  {
+    emoji: "🦶",
+    name: "Círculos de tornozelo",
+    cue: "Pés no ar, desenhe círculos lentos — ajuda a circulação e o inchaço.",
+    secs: 30,
+  },
+  {
+    emoji: "🧍",
+    name: "Inclinação pélvica em pé",
+    cue: "Em pé, incline a bacia para frente e para trás, bem devagar.",
+    secs: 30,
+  },
+];
+
+/** 3 movimentos do dia (rotação determinística por dia). */
+function movimentosForDay(day: number): Movimento[] {
+  const start = day % MOVIMENTOS.length;
+  return [0, 1, 2].map((k) => MOVIMENTOS[(start + k) % MOVIMENTOS.length]);
+}
+
+function MovementBlock({
+  day,
+  canEarn,
+  careMode = false,
+  alreadyDone,
+  onEarn,
+}: {
+  day: number;
+  canEarn: boolean;
+  careMode?: boolean;
+  alreadyDone: boolean;
+  onEarn: () => void;
+}) {
+  const seq = useMemo(() => movimentosForDay(day), [day]);
+  const [open, setOpen] = useState(false);
+  const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
+  const [idx, setIdx] = useState(0);
+  const [secs, setSecs] = useState(0);
+  const [reward, setReward] = useState<number | null>(null);
+  const grantedRef = useRef(false);
+
+  useEffect(() => {
+    if (phase !== "active") return;
+    if (secs <= 0) {
+      if (idx + 1 >= seq.length) {
+        setPhase("done");
+        finish();
+      } else {
+        setIdx(idx + 1);
+        setSecs(seq[idx + 1].secs);
+        buzz();
+      }
+      return;
+    }
+    const t = setTimeout(() => setSecs((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, secs, idx]);
+
+  async function finish() {
+    if (grantedRef.current || !canEarn || careMode) return;
+    grantedRef.current = true;
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) return;
+      const r = await grantWellnessReward({
+        data: { accessToken: token, day, activity: "movement" },
+      });
+      if (r.ok && r.granted > 0) {
+        setReward(r.granted);
+        onEarn();
+      }
+    } catch {
+      /* recompensa é secundária */
+    }
+  }
+
+  function begin() {
+    setIdx(0);
+    setSecs(seq[0].secs);
+    setReward(null);
+    grantedRef.current = false;
+    setPhase("active");
+    buzz();
+  }
+  function close() {
+    setOpen(false);
+    setPhase("intro");
+  }
+
+  const cur = seq[idx];
+
+  return (
+    <>
+      <div className="mt-4 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 p-4">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🤸</span>
+          <div className="flex-1">
+            <p className="text-sm font-extrabold text-emerald-800">Movimento do dia</p>
+            <p className="text-xs text-emerald-700/80">
+              3 movimentos leves e seguros {alreadyDone ? "· feito hoje ✓" : ""}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setOpen(true);
+            setPhase("intro");
+          }}
+          className="press mt-3 w-full rounded-full bg-emerald-500 py-2.5 text-sm font-extrabold text-white"
+        >
+          {alreadyDone ? "Mover de novo" : "Começar a mexer"}
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-emerald-100 via-teal-50 to-white"
+          style={{ paddingTop: "var(--safe-top)" }}
+        >
+          <div className="flex items-center px-4 py-3">
+            <button
+              onClick={close}
+              aria-label="Fechar"
+              className="press text-2xl leading-none text-slate-400"
+            >
+              ✕
+            </button>
+            {phase === "active" && (
+              <p className="flex-1 text-center text-xs font-bold uppercase tracking-wider text-emerald-500">
+                {idx + 1} de {seq.length}
+              </p>
+            )}
+            <span className="w-6" />
+          </div>
+
+          {phase === "intro" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <span className="text-6xl">🤸</span>
+              <h3 className="mt-4 text-2xl font-extrabold text-emerald-900">Movimento do dia</h3>
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-emerald-800/80">
+                3 movimentos suaves pra soltar o corpo. Vá no seu ritmo e pare se sentir qualquer
+                desconforto.
+              </p>
+              <p className="mt-2 max-w-xs text-[11px] text-emerald-700/70">
+                Confirme com seu médico se algum movimento não é indicado pra você.
+              </p>
+              <button
+                onClick={begin}
+                className="press mt-8 rounded-full bg-emerald-500 px-8 py-3 text-sm font-extrabold text-white"
+              >
+                Começar
+              </button>
+            </div>
+          )}
+
+          {phase === "active" && cur && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <span className="text-7xl">{cur.emoji}</span>
+              <h3 className="mt-4 text-2xl font-extrabold text-emerald-900">{cur.name}</h3>
+              <p className="mt-2 max-w-xs text-sm leading-relaxed text-emerald-800/80">{cur.cue}</p>
+              <p className="mt-6 tabular-nums text-5xl font-extrabold text-emerald-600">{secs}s</p>
+              <button
+                onClick={() => setSecs(0)}
+                className="press mt-8 rounded-full border border-emerald-300 px-6 py-2 text-xs font-bold text-emerald-700"
+              >
+                Próximo →
+              </button>
+            </div>
+          )}
+
+          {phase === "done" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              {!careMode && <ConfettiBurst />}
+              <span className="dc-result-in text-6xl">💪</span>
+              <h3 className="mt-3 text-2xl font-extrabold text-emerald-900">Corpo soltinho! 🎉</h3>
+              <p className="mt-1 text-sm text-emerald-800/80">
+                Você cuidou de você e do bebê hoje.
+              </p>
+              {!careMode && reward != null && reward > 0 && (
+                <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
+                  +{reward} 🌱 Sementinhas!
+                </div>
+              )}
+              <button
+                onClick={close}
+                className="press mt-8 w-full max-w-xs rounded-full bg-emerald-500 py-3 text-sm font-extrabold text-white"
+              >
+                Voltar ao caminho
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Motor da "atividade de bem-estar do dia": alterna respiração e movimento. */
+function WellnessBlock(props: {
+  day: number;
+  canEarn: boolean;
+  careMode?: boolean;
+  alreadyDone: boolean;
+  onEarn: () => void;
+}) {
+  // Alterna por dia pra dar variedade (par: respiração; ímpar: movimento).
+  return props.day % 2 === 0 ? <BreathingBlock {...props} /> : <MovementBlock {...props} />;
 }
 
 /* ══════════════════ Quiz diário da professora (dentro do sheet do dia) ══════════════════
