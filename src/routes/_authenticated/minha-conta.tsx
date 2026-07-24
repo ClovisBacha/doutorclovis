@@ -1029,7 +1029,8 @@ function MinhaContaPage() {
                     onOpenShop={() => goToTab("Recompensas")}
                   />
                 )}
-                {tab === "Calendário" && (
+                {/* Calendário e Consultas agora são uma tela só (unificada). */}
+                {(tab === "Calendário" || tab === "Consultas") && (
                   <PrenatalCalendarTab profile={profile} gest={gest} onNavigate={goToTab} />
                 )}
                 {tab === "Registros" && <RegistrosHub profile={profile} gest={gest} />}
@@ -1039,7 +1040,6 @@ function MinhaContaPage() {
                 {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
                 {tab === "Bem-estar" && <BemEstarHub gest={gest} onNavigate={goToTab} />}
                 {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
-                {tab === "Consultas" && <ConsultasHub profile={profile} gest={gest} />}
                 {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
                 {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
                 {tab === "Carteirinha" && (
@@ -6121,20 +6121,12 @@ function PrenatalCalendarTab({
             Marcos do pré-natal e suas consultas, no dia certo.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={() => onNavigate("Consultas")}
-            className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)] hover:opacity-90"
-          >
-            Agendar
-          </button>
-          <button
-            onClick={downloadAllIcs}
-            className="rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:text-primary"
-          >
-            ↓ .ics
-          </button>
-        </div>
+        <button
+          onClick={downloadAllIcs}
+          className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:text-primary"
+        >
+          ↓ .ics
+        </button>
       </div>
 
       {/* Alternância Mês / Lista */}
@@ -6256,10 +6248,9 @@ function PrenatalCalendarTab({
                     const time = a.confirmed_time ?? a.proposed_time ?? a.preferred_time;
                     const st = APPT_STATUS[a.status] ?? APPT_STATUS.pending;
                     return (
-                      <button
+                      <div
                         key={`d-appt-${a.id}`}
-                        onClick={() => onNavigate("Consultas")}
-                        className="block w-full rounded-2xl border border-primary/40 bg-primary/5 p-3 text-left hover:bg-primary/10"
+                        className="block w-full rounded-2xl border border-primary/40 bg-primary/5 p-3 text-left"
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
@@ -6279,7 +6270,7 @@ function PrenatalCalendarTab({
                         <p className="mt-1 text-sm font-medium text-foreground">
                           {a.reason || "Consulta"}
                         </p>
-                      </button>
+                      </div>
                     );
                   }
                   const m = it.m;
@@ -6319,10 +6310,9 @@ function PrenatalCalendarTab({
               const time = a.confirmed_time ?? a.proposed_time ?? a.preferred_time;
               const st = APPT_STATUS[a.status] ?? APPT_STATUS.pending;
               return (
-                <button
+                <div
                   key={`appt-${a.id}`}
-                  onClick={() => onNavigate("Consultas")}
-                  className="relative block w-full rounded-2xl border border-primary/40 bg-primary/5 p-4 text-left shadow-sm transition-colors hover:bg-primary/10"
+                  className="relative block w-full rounded-2xl border border-primary/40 bg-primary/5 p-4 text-left shadow-sm"
                 >
                   <div className="absolute -left-4 top-5 h-3 w-3 rounded-full border-2 border-primary bg-primary" />
                   <div className="flex flex-wrap items-center gap-2">
@@ -6348,7 +6338,7 @@ function PrenatalCalendarTab({
                       {time ? ` · ${time.slice(0, 5)}` : ""}
                     </p>
                   )}
-                </button>
+                </div>
               );
             }
 
@@ -6427,6 +6417,12 @@ function PrenatalCalendarTab({
           })}
         </div>
       )}
+
+      {/* ── Consultas integradas: tudo (agendar, preparar, teleconsulta…) aqui ── */}
+      <div className="mt-2 border-t border-border pt-5">
+        <p className="mb-4 text-xs uppercase tracking-[0.22em] text-primary">Minhas consultas</p>
+        <ConsultasHub profile={profile} gest={gest} />
+      </div>
     </div>
   );
 }
