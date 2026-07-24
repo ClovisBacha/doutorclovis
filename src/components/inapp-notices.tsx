@@ -1,7 +1,6 @@
 /**
  * Avisos in-app para usuários logados (médicos e pacientes):
  *  - Comunicados do dono (banner dispensável, filtrado por papel no servidor).
- *  - Pesquisa de NPS curta (1x a cada 90 dias), papel detectado no servidor.
  *
  * Montado no layout autenticado; não aparece no console do dono (/admin).
  */
@@ -13,7 +12,6 @@ import {
   dismissAnnouncement,
   type Announcement,
 } from "@/lib/announcements.functions";
-import { shouldAskNps, submitNps } from "@/lib/nps.functions";
 
 async function token(): Promise<string> {
   const { data } = await supabase.auth.getSession();
@@ -28,7 +26,6 @@ const LEVEL_CLS: Record<string, string> = {
 
 export function InAppNotices() {
   const [anns, setAnns] = useState<Announcement[]>([]);
-  const [askNps, setAskNps] = useState(false);
   // Reativo à navegação client-side: o layout persiste, então não dá pra
   // depender de um snapshot de window.location (some/aparece ao trocar de rota).
   const onAdmin = useLocation({ select: (l) => l.pathname.startsWith("/admin") });
@@ -39,12 +36,8 @@ export function InAppNotices() {
       const tk = await token();
       if (!tk) return;
       try {
-        const [a, n] = await Promise.all([
-          getActiveAnnouncements({ data: { accessToken: tk } }),
-          shouldAskNps({ data: { accessToken: tk } }),
-        ]);
+        const a = await getActiveAnnouncements({ data: { accessToken: tk } });
         if (a.ok) setAnns(a.announcements);
-        if (n.ok && n.ask) setAskNps(true);
       } catch {
         /* silencioso */
       }
@@ -52,7 +45,7 @@ export function InAppNotices() {
   }, [onAdmin]);
 
   if (onAdmin) return null;
-  if (anns.length === 0 && !askNps) return null;
+  if (anns.length === 0) return null;
 
   async function dismiss(id: string) {
     setAnns((prev) => prev.filter((a) => a.id !== id));
@@ -83,83 +76,6 @@ export function InAppNotices() {
           </button>
         </div>
       ))}
-      {askNps && <NpsPrompt onClose={() => setAskNps(false)} />}
-    </div>
-  );
-}
-
-function NpsPrompt({ onClose }: { onClose: () => void }) {
-  const [score, setScore] = useState<number | null>(null);
-  const [comment, setComment] = useState("");
-  const [done, setDone] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  async function send() {
-    if (score === null) return;
-    setBusy(true);
-    try {
-      await submitNps({
-        data: { accessToken: await token(), score, comment: comment.trim() || null },
-      });
-      setDone(true);
-      setTimeout(onClose, 2500);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (done)
-    return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">
-        Obrigado pelo feedback! 💚
-      </div>
-    );
-
-  return (
-    <div className="rounded-2xl border border-border bg-card px-4 py-3">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium">De 0 a 10, o quanto você recomendaria a Obstétrica?</p>
-        <button
-          onClick={onClose}
-          aria-label="Fechar"
-          className="rounded-full px-2 text-lg leading-none text-muted-foreground hover:text-foreground"
-        >
-          ×
-        </button>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {Array.from({ length: 11 }, (_, i) => i).map((n) => (
-          <button
-            key={n}
-            onClick={() => setScore(n)}
-            className={`h-9 w-9 rounded-lg border text-sm font-semibold tabular-nums transition-colors ${
-              score === n
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border text-muted-foreground hover:border-primary/50"
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-      {score !== null && (
-        <div className="mt-3 space-y-2">
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Quer contar o porquê? (opcional)"
-            rows={2}
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-          />
-          <button
-            onClick={send}
-            disabled={busy}
-            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-          >
-            {busy ? "Enviando…" : "Enviar"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

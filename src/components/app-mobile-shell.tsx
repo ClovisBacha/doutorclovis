@@ -801,23 +801,20 @@ export function AppHomeScreen({
           return (
             <button
               onClick={() => onNavigate(m.tab)}
-              className="shine group w-full rounded-3xl border border-primary/25 bg-primary/6 text-left shadow-[var(--shadow-card)] transition-all duration-300 active:scale-[0.98] hover:border-primary/40 hover:bg-primary/10"
+              className="group flex w-full items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-3.5 py-2.5 text-left transition-colors duration-300 active:scale-[0.99] hover:border-primary/35 hover:bg-primary/10"
             >
-              <div className="flex items-center gap-3.5 px-4 py-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-2xl ring-1 ring-primary/20">
-                  {m.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-                    Marco da semana {gest.weeks}
-                  </p>
-                  <p className="mt-0.5 text-[14px] font-bold leading-tight text-foreground">
-                    {m.title}
-                  </p>
-                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{m.text}</p>
-                </div>
-                <ChevronRight className="h-5 w-5 shrink-0 text-primary transition-transform duration-300 group-hover:translate-x-0.5" />
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-lg ring-1 ring-primary/15">
+                {m.icon}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary/80">
+                  Semana {gest.weeks}
+                </p>
+                <p className="truncate text-[13px] font-semibold leading-tight text-foreground">
+                  {m.title}
+                </p>
               </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-primary/60 transition-transform duration-300 group-hover:translate-x-0.5" />
             </button>
           );
         })()}
