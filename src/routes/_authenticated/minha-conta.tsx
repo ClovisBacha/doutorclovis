@@ -919,7 +919,6 @@ function MinhaContaPage() {
                 onNavigate={mobileNavigate}
                 nextAppointment={nextAppt}
                 babyTone={profile?.baby_skin_tone ?? 0}
-                onBabyTap={() => setJourneyOpen(true)}
                 careMode={careMode}
               />
             </div>
@@ -3230,6 +3229,23 @@ function ProfileTab({
   return (
     <div className="space-y-6">
       <CareModeToggle careMode={careMode} onToggle={onToggleCare} />
+
+      {/* Convidar acompanhante — ação ocasional, vive aqui no Perfil */}
+      <button
+        onClick={() => onNavigate("Acompanhante")}
+        className="flex w-full items-center gap-3 rounded-3xl border border-violet-200 bg-violet-50/50 px-4 py-3 text-left transition-colors hover:bg-violet-50"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-lg ring-1 ring-violet-200">
+          👥
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">Acompanhante</p>
+          <p className="text-xs text-muted-foreground">
+            Convide seu par ou família pra acompanhar a gestação
+          </p>
+        </div>
+        <span className="shrink-0 text-violet-400">›</span>
+      </button>
 
       {/* Foto + nome da paciente */}
       <div className="flex items-center gap-4 rounded-3xl border border-border bg-card p-5">

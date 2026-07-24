@@ -14,13 +14,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Gamepad2,
-  Gift,
   HelpCircle,
   LifeBuoy,
   Heart,
   MessageCircle,
   NotebookPen,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
@@ -468,39 +466,6 @@ export type NextAppointment = { dateLabel: string; typeLabel: string };
 
 // Grade de atalhos na tela do Bebê — o hub central. Cobre tudo que NÃO está na
 // barra de baixo (Saúde/Exames/Nutrição etc. já são alcançados pelo ícone Saúde).
-const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = [
-  {
-    Icon: Baby,
-    label: "Semana",
-    tab: "Bebê",
-    color: "bg-pink-50 text-pink-600 ring-pink-200",
-  },
-  {
-    Icon: NotebookPen,
-    label: "Registros",
-    tab: "Registros",
-    color: "bg-orange-50 text-orange-600 ring-orange-200",
-  },
-  {
-    Icon: Users,
-    label: "Acompanhante",
-    tab: "Acompanhante",
-    color: "bg-violet-50 text-violet-600 ring-violet-200",
-  },
-  {
-    Icon: Heart,
-    label: "Pós-parto",
-    tab: "Pós-parto",
-    color: "bg-rose-50 text-rose-600 ring-rose-200",
-  },
-  {
-    Icon: Gift,
-    label: "Recompensas",
-    tab: "Recompensas",
-    color: "bg-fuchsia-50 text-fuchsia-600 ring-fuchsia-200",
-  },
-];
-
 export function AppHomeScreen({
   firstName,
   babyName,
@@ -508,7 +473,6 @@ export function AppHomeScreen({
   onNavigate,
   nextAppointment,
   babyTone = 0,
-  onBabyTap,
   careMode = false,
 }: {
   firstName: string;
@@ -518,8 +482,6 @@ export function AppHomeScreen({
   nextAppointment?: NextAppointment | null;
   /** Tom de pele do bebê (índice na paleta BABY_TONES). */
   babyTone?: number;
-  /** Toque na foto do bebê → abre a Jornada do Bebê (gatilho Premium). */
-  onBabyTap?: () => void;
   /** Modo Cuidado: silencia contagem, tamanho do bebê, streak e desafio. */
   careMode?: boolean;
 }) {
@@ -615,10 +577,10 @@ export function AppHomeScreen({
               </div>
 
               {/* Bebê protagonista — GRANDE, flutuando, dono da tela.
-                  Toque abre a Jornada do Bebê (estágios + gatilho Premium). */}
+                  Toque abre a aba do Bebê com a semana detalhada. */}
               <button
-                onClick={onBabyTap}
-                aria-label="Ver a jornada do bebê"
+                onClick={() => onNavigate("Bebê")}
+                aria-label="Ver a semana do bebê"
                 className="float-slow flex flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
               >
                 <BabyIllustration
@@ -809,37 +771,43 @@ export function AppHomeScreen({
         </div>
       </button>
 
-      {/* ── Grade de ícones ─────────────────────────────────────────── */}
-      <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-          Acesso rápido
-        </p>
-        <div className="grid grid-cols-4 gap-2">
-          {GRID.map(({ Icon, label, tab, color }, i) => {
-            const isHeartIcon = Icon === Heart;
-            return (
-              <button
-                key={tab}
-                onClick={() => onNavigate(tab)}
-                style={{ animationDelay: `${i * 45}ms` }}
-                className="card-3d fade-slide-up spotlight-card group flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-card p-2.5 hover:border-primary/30"
-              >
-                <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-110 group-hover:-rotate-3 group-active:scale-90 ${color}`}
-                >
-                  <Icon
-                    className={`h-5 w-5 ${isHeartIcon ? "heartbeat-icon" : ""}`}
-                    strokeWidth={1.8}
-                  />
-                </div>
-                <span className="text-[10px] font-medium leading-tight text-center text-foreground/80">
-                  {label}
-                </span>
-              </button>
-            );
-          })}
+      {/* ── Registros (uso diário: diário, chutes, contrações) ── */}
+      <button
+        onClick={() => onNavigate("Registros")}
+        className="shine group w-full rounded-3xl border border-primary/15 bg-primary/5 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/30 hover:bg-primary/8"
+      >
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 ring-1 ring-orange-200">
+            <NotebookPen className="h-5 w-5" strokeWidth={1.8} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-foreground">Registros</p>
+            <p className="text-xs text-muted-foreground">Diário, chutes e contrações</p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-primary/40 transition-transform duration-300 group-hover:translate-x-1" />
         </div>
-      </div>
+      </button>
+
+      {/* ── Pós-parto: aparece só na reta final (a partir da semana 36) ── */}
+      {gest && gest.weeks >= 36 && !careMode && (
+        <button
+          onClick={() => onNavigate("Pós-parto")}
+          className="shine group w-full rounded-3xl border border-rose-200 bg-rose-50/60 text-left transition-all duration-300 active:scale-[0.98] hover:bg-rose-50"
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 ring-1 ring-rose-200">
+              <Heart className="h-5 w-5" strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">Pós-parto</p>
+              <p className="text-xs text-muted-foreground">
+                Cuidados com você e o bebê depois do parto
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-rose-400 transition-transform duration-300 group-hover:translate-x-1" />
+          </div>
+        </button>
+      )}
 
       {/* ── Card do médico ──────────────────────────────────────────── */}
       <button
