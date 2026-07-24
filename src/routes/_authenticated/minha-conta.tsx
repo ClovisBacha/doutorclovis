@@ -1549,7 +1549,6 @@ const BEMESTAR_SUBTABS = [
   { key: "exercicios", label: "Exercícios" },
   { key: "humor", label: "Humor" },
   { key: "apoio", label: "Apoio emocional" },
-  { key: "clima", label: "Clima" },
 ] as const;
 
 function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) => void }) {
@@ -1577,7 +1576,6 @@ function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: strin
         {sub === "exercicios" && <ExerciciosTab gest={gest} />}
         {sub === "humor" && <HumorTab />}
         {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
-        {sub === "clima" && <ClimaTab gest={gest} />}
       </Fade>
     </div>
   );
@@ -11228,236 +11226,6 @@ function aqiLabel(aqi: number): { label: string; color: string } {
   return { label: "Muito ruim", color: "text-red-600" };
 }
 
-function ClimaTab({ gest }: { gest: Gest }) {
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-
-  async function fetchWeather() {
-    setLoading(true);
-    setError(null);
-    if (!navigator?.geolocation) {
-      setError("Seu navegador não suporta geolocalização. Tente em Chrome ou Firefox.");
-      setLoading(false);
-      return;
-    }
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
-      );
-      const { latitude: lat, longitude: lon } = pos.coords;
-
-      const [wx, aq] = await Promise.all([
-        fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code&timezone=auto`,
-        ).then((r) => r.json()),
-        fetch(
-          `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=european_aqi,pm2_5&timezone=auto`,
-        )
-          .then((r) => r.json())
-          .catch(() => null),
-      ]);
-
-      setWeather({
-        temp: Math.round(wx.current.temperature_2m),
-        apparentTemp: Math.round(wx.current.apparent_temperature),
-        humidity: Math.round(wx.current.relative_humidity_2m),
-        weatherCode: wx.current.weather_code,
-        aqi: aq?.current?.european_aqi ?? null,
-        pm25: aq?.current?.pm2_5 ?? null,
-      });
-      setLastUpdate(new Date());
-    } catch (e) {
-      setError(
-        "Não foi possível obter sua localização. Permita o acesso no navegador e tente novamente.",
-      );
-    }
-    setLoading(false);
-  }
-
-  const isHot = weather && weather.temp >= 35;
-  const isVeryHot = weather && weather.temp >= 38;
-  const aqiBad = weather?.aqi != null && weather.aqi > 40;
-  const aqiVeryBad = weather?.aqi != null && weather.aqi > 60;
-  const hasAlert = isHot || aqiBad;
-
-  return (
-    <div className="max-w-xl space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-serif text-xl">Clima e qualidade do ar</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Alertas específicos para gestantes
-            </p>
-          </div>
-          {lastUpdate && (
-            <span className="text-xs text-muted-foreground">
-              {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          )}
-        </div>
-
-        {!weather && !loading && (
-          <button
-            onClick={fetchWeather}
-            className="w-full rounded-2xl bg-primary py-3 text-sm font-medium text-white"
-          >
-            📍 Ver condições atuais
-          </button>
-        )}
-
-        {loading && (
-          <div className="py-6 text-center text-muted-foreground text-sm">
-            Obtendo localização...
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-xl bg-primary/6 border border-primary/20 p-4 text-sm text-primary">
-            {error}
-          </div>
-        )}
-
-        {weather && (
-          <>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-2xl bg-secondary/40 p-4">
-                <p className="text-4xl text-center">{weatherEmoji(weather.weatherCode)}</p>
-                <p
-                  className={`mt-2 text-center text-3xl font-bold ${isVeryHot ? "text-red-600" : isHot ? "text-primary" : ""}`}
-                >
-                  {weather.temp}°C
-                </p>
-                <p className="text-center text-xs text-muted-foreground mt-0.5">
-                  {weatherDesc(weather.weatherCode)}
-                </p>
-                <p className="text-center text-xs text-muted-foreground">
-                  Sensação: {weather.apparentTemp}°C
-                </p>
-              </div>
-              <div className="rounded-2xl bg-secondary/40 p-4 flex flex-col justify-center gap-3">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Umidade</p>
-                  <p className="text-xl font-semibold">{weather.humidity}%</p>
-                </div>
-                {weather.aqi != null && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase">
-                      Qualidade do ar
-                    </p>
-                    <p className={`text-xl font-semibold ${aqiLabel(weather.aqi).color}`}>
-                      {aqiLabel(weather.aqi).label}
-                    </p>
-                    <p className="text-xs text-muted-foreground">IQA: {weather.aqi}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <button
-              onClick={fetchWeather}
-              className="mt-3 w-full rounded-xl border border-border py-2 text-xs text-muted-foreground hover:bg-secondary"
-            >
-              Atualizar
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Alerts */}
-      {weather && hasAlert && (
-        <div className="space-y-3">
-          {isVeryHot && (
-            <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-2">
-                ⚠️ Onda de calor — Risco alto para gestantes
-              </p>
-              <ul className="space-y-1.5 text-sm text-red-800">
-                <li>
-                  🌡️ Temperatura extrema ({weather.temp}°C) — superaquecimento fetal é perigoso
-                </li>
-                <li>💧 Beba pelo menos 3L de água ao longo do dia</li>
-                <li>❄️ Fique em ambientes refrigerados (ar-condicionado ou ventilador)</li>
-                <li>🚫 Evite sol das 10h às 17h sem necessidade</li>
-                <li>👁️ Procure o médico se sentir tontura, coração acelerado ou parar de urinar</li>
-              </ul>
-            </div>
-          )}
-          {isHot && !isVeryHot && (
-            <div className="rounded-2xl border border-primary/20 bg-primary/6 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
-                🌡️ Temperatura elevada ({weather.temp}°C)
-              </p>
-              <ul className="space-y-1.5 text-sm text-foreground">
-                <li>💧 Aumente a ingestão de água — mínimo 2,5L por dia</li>
-                <li>👗 Use roupas leves e frescas (algodão, linho)</li>
-                <li>🕙 Evite sol entre 10h e 16h</li>
-                <li>🧴 Aplique protetor solar FPS 50+ se sair</li>
-                <li>🍋 Aposte em frutas hidratantes: melancia, pepino, laranja</li>
-              </ul>
-            </div>
-          )}
-          {aqiVeryBad && (
-            <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-2">
-                😷 Qualidade do ar muito ruim (IQA: {weather.aqi})
-              </p>
-              <ul className="space-y-1.5 text-sm text-red-800">
-                <li>🏠 FIQUE EM CASA — feche janelas e portas</li>
-                <li>🌬️ Use purificador de ar se disponível</li>
-                <li>🚫 Cancele atividades ao ar livre</li>
-                <li>😮‍💨 Procure o médico se sentir falta de ar, tosse ou dor no peito</li>
-              </ul>
-            </div>
-          )}
-          {aqiBad && !aqiVeryBad && (
-            <div className="rounded-2xl border border-primary/25 bg-primary/8 p-5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
-                😷 Qualidade do ar moderada (IQA: {weather.aqi})
-              </p>
-              <ul className="space-y-1.5 text-sm text-foreground">
-                <li>🌬️ Limite exercícios físicos intensos ao ar livre</li>
-                <li>🕙 Prefira horários com menor tráfego (manhã cedo ou noite)</li>
-                <li>💧 Mantenha boa hidratação para ajudar as vias aéreas</li>
-                <li>🤧 Se sentir irritação nasal ou tosse persistente, informe ao médico</li>
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-
-      {weather && !hasAlert && (
-        <div className="rounded-2xl border border-green-300 bg-green-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-green-700 mb-1">
-            ✅ Condições favoráveis para gestantes
-          </p>
-          <p className="text-sm text-green-800">
-            {weather.temp < 28
-              ? "Temperatura agradável! Ótimo para uma caminhada leve de 20-30 minutos."
-              : "Temperatura amena. Hidrate-se bem e aproveite com moderação."}
-            {weather.aqi != null && weather.aqi <= 20
-              ? " O ar está limpo — excelente para respirar fundo!"
-              : ""}
-          </p>
-        </div>
-      )}
-
-      {!weather && !loading && (
-        <div className="rounded-2xl border border-border bg-secondary/30 p-5 text-sm text-muted-foreground">
-          <p className="font-medium mb-2">Por que isso é importante na gestação?</p>
-          <ul className="space-y-1">
-            <li>🌡️ Calor extremo pode causar desidratação e risco ao feto</li>
-            <li>😷 Poluição do ar está ligada a parto prematuro e baixo peso ao nascer</li>
-            <li>💧 Gestantes precisam de mais hidratação — especialmente no calor</li>
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ─────────────────────────────────────────────────────────────────────────────
    Feature 50 — Portal Pós-parto
 ───────────────────────────────────────────────────────────────────────────── */
@@ -13538,6 +13306,9 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   const [cat, setCat] = useState<CantinhoType | "all">("all");
   const [buying, setBuying] = useState<string | null>(null);
   const [collection, setCollection] = useState({ owned: 0, total: 0, complete: false });
+  // As formas de ganhar Sementinhas ficam num bloco só, recolhido por padrão,
+  // pra não empilhar 4 cards e poluir a tela (fica "Ganhe mais 🌱 ›").
+  const [showEarn, setShowEarn] = useState(false);
   // Layout livre da cena: cada paciente arruma os itens onde quiser. Posições
   // em % (responsivo) salvas no aparelho — sem SQL, persiste ao reabrir o app.
   const [uid, setUid] = useState<string | null>(null);
@@ -13779,17 +13550,33 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
         )}
       </div>
 
-      {/* Ganhe compartilhando no Instagram (aparece só quando a Meta está ligada) */}
-      {!careMode && <InstagramShareCard />}
-
-      {/* Ganhe avaliando o app (aparece só quando há loja publicada) */}
-      {!careMode && <RatingRewardCard onEarned={(n) => setSaldo((s) => s + n)} />}
-
-      {/* Deixe seu depoimento (100 🌱 quando o médico aprova) */}
-      {!careMode && <TestimonialCard />}
-
-      {/* Indique uma amiga (100 🌱 quando ela cria a conta) */}
-      {!careMode && <ReferralCard />}
+      {/* Ganhe mais Sementinhas — um bloco só, recolhido, no lugar de 4 cards
+          soltos empilhados (Instagram, avaliar, depoimento, indicar). */}
+      {!careMode && (
+        <div className="rounded-3xl border border-emerald-100 bg-emerald-50/40">
+          <button
+            onClick={() => setShowEarn((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+              🌱 Ganhe mais Sementinhas
+            </span>
+            <span
+              className={`text-emerald-600 transition-transform duration-300 ${showEarn ? "rotate-90" : ""}`}
+            >
+              ›
+            </span>
+          </button>
+          {showEarn && (
+            <div className="space-y-2 px-3 pb-3">
+              <InstagramShareCard />
+              <RatingRewardCard onEarned={(n) => setSaldo((s) => s + n)} />
+              <TestimonialCard />
+              <ReferralCard />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Loja de itens */}
       <div>
