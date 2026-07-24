@@ -225,18 +225,33 @@ function useWeather(): WeatherState | null {
    AppBottomNav — indicador pill ativo estilo iOS (#5)
    ================================================================ */
 
+// Cada ícone com sua cor própria (sempre colorido, não só quando ativo) — deixa
+// a barra mais divertida. `pill` é o fundo da mesma cor quando a aba está ativa.
 const NAV_ITEMS: {
   id: BottomSection;
   Icon: LucideIcon;
   label: string;
-  variant?: "chat";
+  color: string;
+  pill: string;
 }[] = [
   // Ordem visual pedida (após o SOS, que é renderizado antes): Saúde · Bebê ·
   // Jogo · Chat. Com o SOS na frente fica: SOS · Saúde · Bebê · Jogo · Chat.
-  { id: "saude", Icon: Heart, label: "Saúde" },
-  { id: "home", Icon: Baby, label: "Bebê" },
-  { id: "jogo", Icon: Gamepad2, label: "Jogo" },
-  { id: "chat", Icon: MessageCircle, label: "Chat", variant: "chat" },
+  {
+    id: "saude",
+    Icon: Heart,
+    label: "Saúde",
+    color: "text-emerald-500",
+    pill: "bg-emerald-500/15",
+  },
+  { id: "home", Icon: Baby, label: "Bebê", color: "text-pink-500", pill: "bg-pink-500/15" },
+  {
+    id: "jogo",
+    Icon: Gamepad2,
+    label: "Jogo",
+    color: "text-fuchsia-500",
+    pill: "bg-fuchsia-500/15",
+  },
+  { id: "chat", Icon: MessageCircle, label: "Chat", color: "text-sky-500", pill: "bg-sky-500/15" },
 ];
 
 export function AppBottomNav({
@@ -313,16 +328,8 @@ export function AppBottomNav({
           </button>
         )}
 
-        {NAV_ITEMS.map(({ id, Icon, label, variant }) => {
+        {NAV_ITEMS.map(({ id, Icon, label, color, pill }) => {
           const active = activeSection === id;
-          // Chat é o gesto de destaque: cor da marca permanente (mesmo inativo).
-          const isChat = variant === "chat";
-          const iconColor = isChat || active ? "text-primary" : "text-muted-foreground";
-          const pillBg = isChat
-            ? "bg-primary/15 scale-105"
-            : active
-              ? "pop-in bg-primary/12 scale-105"
-              : "scale-100";
           return (
             <button
               key={id}
@@ -334,24 +341,25 @@ export function AppBottomNav({
               aria-label={label}
               className="flex min-w-0 flex-1 flex-col items-center py-1 transition-colors duration-200"
             >
-              {/* Pill de fundo — expande com mola quando ativa (key retrigger do pop-in) */}
+              {/* Pill de fundo — na cor do ícone, expande com mola quando ativa */}
               <div
                 key={active ? "on" : "off"}
                 className={`flex items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
                   compact ? "h-9 w-9" : "h-9 w-12"
-                } ${pillBg}`}
+                } ${active ? `pop-in ${pill} scale-105` : "scale-100"}`}
               >
+                {/* Ícone SEMPRE colorido (mais divertido); cresce um tico quando ativo */}
                 <Icon
-                  className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${iconColor} ${
-                    active && !isChat ? "scale-110" : "scale-100"
+                  className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${color} ${
+                    active ? "scale-110" : "scale-100"
                   }`}
-                  strokeWidth={active || isChat ? 2.5 : 1.8}
+                  strokeWidth={active ? 2.6 : 2.1}
                 />
               </div>
               <span
-                className={`overflow-hidden text-[10px] font-medium transition-all duration-300 ${
+                className={`overflow-hidden text-[10px] transition-all duration-300 ${
                   compact ? "max-h-0 opacity-0" : "mt-0.5 max-h-4 opacity-100"
-                } ${isChat || active ? "text-primary" : "text-muted-foreground"}`}
+                } ${active ? `${color} font-bold` : "font-medium text-muted-foreground"}`}
               >
                 {label}
               </span>
