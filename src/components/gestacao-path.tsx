@@ -73,7 +73,10 @@ function hashStr(s: string): number {
    `s` = escala (1 ≈ 2rem). Salvo no aparelho, por usuária. */
 export type PlacedDecor = { k: string; id: string; x: number; y: number; s: number };
 
-const DECOR_MAX = 60;
+// Teto de enfeites na trilha. Cada um é um <span> com uma animação CSS de
+// transform/opacity (roda na GPU, não repinta layout) e ~60 bytes no blob
+// salvo — 120 cabe folgado em celular antigo sem engasgar o scroll.
+const DECOR_MAX = 120;
 const DECOR_MIN_SCALE = 0.5;
 const DECOR_MAX_SCALE = 4.5;
 
@@ -81,20 +84,19 @@ function clampN(n: number, a: number, b: number): number {
   return Math.max(a, Math.min(b, n));
 }
 
-function decorStoreKey(uid: string) {
-  return `caminho:decor:${uid}`;
-}
+/* A decoração da trilha é da PACIENTE, não do aparelho: usa o prefixo
+   `dc-path-`, então entra no blob de `journey_state` e volta igualzinha em
+   qualquer celular/navegador onde ela entrar (mesma sincronização da jornada). */
+const DECOR_KEY = "dc-path-decor";
 
 /** Handoff do Cantinho → Caminho: abre o jogo já no modo "Arrumar". */
 export const ARRANGE_FLAG = "caminho:arrumar";
 
 type DecorSave = { v: 1; items: PlacedDecor[]; seen: string[] };
 
-function loadDecor(uid: string): DecorSave | null {
+function loadDecor(): DecorSave | null {
   try {
-    const raw = localStorage.getItem(decorStoreKey(uid));
-    if (!raw) return null;
-    const p = JSON.parse(raw) as Partial<DecorSave>;
+    const p = lsGet<Partial<DecorSave> | null>(DECOR_KEY, null);
     if (!p || !Array.isArray(p.items)) return null;
     const items = p.items
       .filter((it) => it && typeof it.id === "string" && CANTINHO_BY_ID[it.id])
@@ -113,12 +115,9 @@ function loadDecor(uid: string): DecorSave | null {
   }
 }
 
-function saveDecor(uid: string, items: PlacedDecor[], seen: string[]) {
-  try {
-    localStorage.setItem(decorStoreKey(uid), JSON.stringify({ v: 1, items, seen } as DecorSave));
-  } catch {
-    /* storage cheio/indisponível: segue só em memória */
-  }
+function saveDecor(items: PlacedDecor[], seen: string[]) {
+  // lsSet agenda o push pra nuvem — o layout viaja com a paciente.
+  lsSet(DECOR_KEY, { v: 1, items, seen } as DecorSave);
 }
 
 /** Espalha itens novos pela trilha (ponto de partida; a paciente arruma depois). */
@@ -135,7 +134,10 @@ function seedDecor(ids: string[], height: number, offset: number): PlacedDecor[]
     for (let e = 0; e < copies; e++) {
       const y = 130 + (((h % 400) + e * 880 + idx * 270) % span);
       const side = (e + idx) % 2;
-      const x = side === 0 ? 8 + ((h >> (e + 2)) % 10) : 82 + ((h >> (e + 2)) % 10);
+      // `>>>` (não `>>`): hash acima de 2^31 vira NEGATIVO no shift com sinal e
+      // o resto sai negativo — item nascia fora da tela ou em cima das lições.
+      const jitter = (h >>> (e + 2)) % 10;
+      const x = side === 0 ? 8 + jitter : 82 + jitter;
       out.push({
         k: `s${idx}-${e}-${id}`,
         id,
@@ -949,7 +951,6 @@ export function GestacaoPath({
   // Decoração PERSONALIZADA da trilha: a paciente define posição e tamanho de
   // cada enfeite direto aqui no jogo (modo "Arrumar"). Fica no aparelho, por
   // usuária — as lições e o cenário nunca são tocados.
-  const [uid, setUid] = useState<string | null>(null);
   const [placed, setPlaced] = useState<PlacedDecor[]>([]);
   const [decorReady, setDecorReady] = useState(false);
   const [arranging, setArranging] = useState(false);
@@ -957,6 +958,10 @@ export function GestacaoPath({
   // Itens já espalhados alguma vez: o que foi apagado não volta sozinho, mas
   // uma compra nova aparece na trilha automaticamente.
   const seenRef = useRef<string[]>([]);
+  // Última versão já gravada (evita regravar/sincronizar sem mudança real).
+  const savedRef = useRef<string>("");
+  // Espelho de `arranging` p/ o efeito de hidratação não depender do estado.
+  const arrangingRef = useRef(false);
   const dragRef = useRef<{
     k: string;
     mode: "move" | "size";
@@ -988,23 +993,6 @@ export function GestacaoPath({
         const { data: s } = await supabase.auth.getSession();
         const token = s.session?.access_token;
         if (!token || !s.session) return;
-        // Layout salvo da trilha (posição/tamanho escolhidos pela paciente).
-        const userId = s.session.user.id;
-        setUid(userId);
-        const saved = loadDecor(userId);
-        if (saved) {
-          seenRef.current = saved.seen;
-          setPlaced(saved.items);
-        }
-        setDecorReady(true);
-        try {
-          if (sessionStorage.getItem(ARRANGE_FLAG) === "1") {
-            sessionStorage.removeItem(ARRANGE_FLAG);
-            setArranging(true);
-          }
-        } catch {
-          /* sem sessionStorage: entra no modo Arrumar pelo botão mesmo */
-        }
         const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
         // Modo Cuidado: esconde a barra de moeda e as decorações (não celebra).
         if (w.ok) setSaldo(w.careMode ? null : w.balance);
@@ -1157,26 +1145,79 @@ export function GestacaoPath({
   /* ── Modo "Arrumar": a trilha é a tela de decoração ────────────────────
      Enfeite novo entra espalhado sozinho; depois a paciente arrasta pra onde
      quiser e escolhe o tamanho. O que ela apagou não volta. */
-  const decorables = useMemo(
-    () => decor.filter((id) => CANTINHO_BY_ID[id] && CANTINHO_BY_ID[id].type !== "ceu"),
+
+  // Bandeja: TUDO que ela tem, menos cenário (fundo é papel de parede, não
+  // emoji). Céu entra aqui também — se ela quiser uma nuvem parada na trilha,
+  // pode; a faixa que passeia lá no alto continua existindo do mesmo jeito.
+  const trayItems = useMemo(
+    () => decor.filter((id) => CANTINHO_BY_ID[id] && CANTINHO_BY_ID[id].type !== "fundo"),
     [decor],
   );
+  // Espalhados sozinhos: só os de chão (o céu já se vira sozinho lá em cima).
+  const seedables = useMemo(
+    () => trayItems.filter((id) => CANTINHO_BY_ID[id].type !== "ceu"),
+    [trayItems],
+  );
+  // Só desenha o que ela REALMENTE possui (e nada em Modo Cuidado). Enquanto a
+  // lista de itens não chegou do servidor, confia no layout salvo — evita a
+  // trilha piscar vazia a cada abertura.
+  const visiblePlaced = useMemo(() => {
+    if (careMode) return [];
+    if (decor.length === 0) return placed;
+    const owned = new Set(decor);
+    return placed.filter((p) => owned.has(p.id));
+  }, [placed, decor, careMode]);
+
+  // Hidrata do storage no mount E de novo quando o pull da nuvem trouxer o
+  // layout de outro aparelho (hydratedAt muda). Nunca no meio de um arrasto:
+  // o que ela está fazendo AGORA na tela vale mais que o que a nuvem mandou.
+  useEffect(() => {
+    if (arrangingRef.current) return;
+    const saved = loadDecor();
+    if (saved) {
+      seenRef.current = saved.seen;
+      setPlaced(saved.items);
+      savedRef.current = JSON.stringify(saved.items);
+    }
+    setDecorReady(true);
+  }, [hydratedAt]);
+
+  arrangingRef.current = arranging;
+
+  // Chegou do Cantinho pedindo pra arrumar? Abre já no modo de edição.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(ARRANGE_FLAG) === "1") {
+        sessionStorage.removeItem(ARRANGE_FLAG);
+        setArranging(true);
+      }
+    } catch {
+      /* sem sessionStorage: ela entra pelo botão Arrumar mesmo */
+    }
+  }, []);
 
   useEffect(() => {
-    if (!decorReady || !uid || height <= 0) return;
-    const fresh = decorables.filter((id) => !seenRef.current.includes(id));
+    if (!decorReady || height <= 0) return;
+    const fresh = seedables.filter((id) => !seenRef.current.includes(id));
     if (fresh.length === 0) return;
     seenRef.current = [...seenRef.current, ...fresh];
     setPlaced((prev) => [...prev, ...seedDecor(fresh, height, prev.length)].slice(0, DECOR_MAX));
-  }, [decorables, decorReady, uid, height]);
+  }, [seedables, decorReady, height]);
 
   // Salva com folga: arrastar dispara dezenas de updates por segundo e não vale
-  // escrever no storage a cada pixel.
+  // escrever (e sincronizar) a cada pixel.
   useEffect(() => {
-    if (!decorReady || !uid) return;
-    const t = setTimeout(() => saveDecor(uid, placed, seenRef.current), 400);
+    if (!decorReady) return;
+    const t = setTimeout(() => {
+      const next = JSON.stringify(placed);
+      // Nada mudou de verdade (ex.: logo depois de hidratar): não escreve nem
+      // acorda a sincronização da jornada à toa.
+      if (next === savedRef.current) return;
+      savedRef.current = next;
+      saveDecor(placed, seenRef.current);
+    }, 400);
     return () => clearTimeout(t);
-  }, [placed, decorReady, uid]);
+  }, [placed, decorReady]);
 
   function startDecorDrag(e: React.PointerEvent, p: PlacedDecor, mode: "move" | "size") {
     if (!arranging) return;
@@ -1214,7 +1255,7 @@ export function GestacaoPath({
 
   function addDecor(id: string) {
     if (placed.length >= DECOR_MAX) {
-      toast.error("A trilha está cheia de enfeites — apague algum antes.");
+      toast.error(`A trilha já tem ${DECOR_MAX} enfeites — tire algum com o ✕ antes.`);
       return;
     }
     // Nasce no meio do que está à vista, pra ela ver o item aparecer.
@@ -1235,8 +1276,8 @@ export function GestacaoPath({
   }
 
   function reseedDecor() {
-    seenRef.current = decorables;
-    setPlaced(seedDecor(decorables, height, 0).slice(0, DECOR_MAX));
+    seenRef.current = seedables;
+    setPlaced(seedDecor(seedables, height, 0).slice(0, DECOR_MAX));
     setSelDecor(null);
   }
 
@@ -1845,7 +1886,7 @@ export function GestacaoPath({
             @media (prefers-reduced-motion: reduce) { .dc-shop-fab { animation: none !important; } }
           `}</style>
           <div className="fixed bottom-24 right-4 z-40 flex items-center gap-2 md:bottom-8">
-            {decorables.length > 0 && (
+            {trayItems.length > 0 && (
               <button
                 onClick={() => setArranging(true)}
                 aria-label="Arrumar os enfeites da trilha"
@@ -1877,12 +1918,15 @@ export function GestacaoPath({
 
       {/* Barra do modo Arrumar: bandeja de enfeites + sair. Fica ACIMA da
           barra do app (z-50) pra ela terminar sem sair da trilha. */}
-      {arranging && (
+      {arranging && !careMode && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-3 pt-2 shadow-[0_-6px_24px_rgba(0,0,0,0.12)] backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] leading-snug text-muted-foreground">
               Arraste pra mover · <span className="font-bold text-emerald-600">⤢</span> pra mudar o
               tamanho · <span className="font-bold text-rose-500">✕</span> pra tirar
+              <span className="ml-1 tabular-nums opacity-70">
+                ({visiblePlaced.length}/{DECOR_MAX})
+              </span>
             </p>
             <button
               onClick={() => {
@@ -1898,7 +1942,7 @@ export function GestacaoPath({
             className="flex gap-2 overflow-x-auto pb-1 pt-2"
             style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
           >
-            {decorables.map((id) => {
+            {trayItems.map((id) => {
               const item = CANTINHO_BY_ID[id];
               if (!item) return null;
               return (
@@ -1985,8 +2029,8 @@ export function GestacaoPath({
                       left: 0,
                       // 5 faixas de altura + tamanho/opacidade variando dão
                       // profundidade (o que está "mais longe" é menor e mais claro).
-                      fontSize: `${1.35 + ((h >> 3) % 4) * 0.22}rem`,
-                      opacity: 0.55 + ((h >> 5) % 4) * 0.12,
+                      fontSize: `${1.35 + ((h >>> 3) % 4) * 0.22}rem`,
+                      opacity: 0.55 + ((h >>> 5) % 4) * 0.12,
                       animation: `dcSkyDrift ${dur}s linear infinite`,
                       animationDelay: `-${offset.toFixed(1)}s`,
                     }}
@@ -2012,7 +2056,7 @@ export function GestacaoPath({
         )}
 
         {/* Enfeites onde a paciente colocou, do tamanho que ela escolheu. */}
-        {placed.map((p) => {
+        {visiblePlaced.map((p) => {
           const item = CANTINHO_BY_ID[p.id];
           if (!item) return null;
           const sel = arranging && selDecor === p.k;
