@@ -482,12 +482,6 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     color: "bg-orange-50 text-orange-600 ring-orange-200",
   },
   {
-    Icon: CalendarDays,
-    label: "Calendário",
-    tab: "Calendário",
-    color: "bg-blue-50 text-blue-600 ring-blue-200",
-  },
-  {
     Icon: Users,
     label: "Acompanhante",
     tab: "Acompanhante",
@@ -785,45 +779,35 @@ export function AppHomeScreen({
           );
         })()}
 
-      {/* ── Próxima consulta (#10) ──────────────────────────────────── */}
-      {nextAppointment ? (
-        <button
-          onClick={() => onNavigate("Consultas")}
-          className="shine group w-full rounded-3xl border border-primary/20 bg-primary/6 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/35 hover:bg-primary/10 shadow-[var(--shadow-card)]"
-        >
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-105 group-hover:-rotate-3">
-              <CalendarDays className="h-5 w-5 text-primary" strokeWidth={1.8} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
-                Próxima consulta
-              </p>
+      {/* ── Meu calendário (consultas + marcos, tudo integrado dentro) ── */}
+      <button
+        onClick={() => onNavigate("Calendário")}
+        className="shine group w-full rounded-3xl border border-primary/20 bg-primary/6 text-left shadow-[var(--shadow-card)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/35 hover:bg-primary/10"
+      >
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-105 group-hover:-rotate-3">
+            <CalendarDays className="h-5 w-5 text-primary" strokeWidth={1.8} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
+              Meu calendário
+            </p>
+            {nextAppointment ? (
+              <>
+                <p className="mt-0.5 text-sm font-medium text-foreground">
+                  Próxima consulta · {nextAppointment.dateLabel}
+                </p>
+                <p className="text-xs text-muted-foreground">{nextAppointment.typeLabel}</p>
+              </>
+            ) : (
               <p className="mt-0.5 text-sm font-medium text-foreground">
-                {nextAppointment.dateLabel}
+                Consultas, exames e marcos — tudo aqui
               </p>
-              <p className="text-xs text-muted-foreground">{nextAppointment.typeLabel}</p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-primary/50 transition-transform duration-300 group-hover:translate-x-1" />
+            )}
           </div>
-        </button>
-      ) : (
-        <button
-          onClick={() => onNavigate("Consultas")}
-          className="shine group w-full rounded-3xl border border-primary/12 bg-primary/5 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/25 hover:bg-primary/8"
-        >
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15 text-primary transition-transform duration-300 group-hover:scale-105">
-              <CalendarDays className="h-5 w-5" strokeWidth={1.8} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">Minhas consultas</p>
-              <p className="text-xs text-muted-foreground">Agende ou acompanhe suas consultas</p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-primary/40 transition-transform duration-300 group-hover:translate-x-1" />
-          </div>
-        </button>
-      )}
+          <ChevronRight className="h-4 w-4 shrink-0 text-primary/50 transition-transform duration-300 group-hover:translate-x-1" />
+        </div>
+      </button>
 
       {/* ── Grade de ícones ─────────────────────────────────────────── */}
       <div>
