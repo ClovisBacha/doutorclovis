@@ -970,7 +970,16 @@ export function GestacaoPath({
     ox: number;
     oy: number;
     os: number;
+    /** Trilha inteira antes deste arrasto (vira o passo do Desfazer). */
+    before: PlacedDecor[];
+    /** O dedo saiu do lugar? Só aí vira um passo de verdade. */
+    moved: boolean;
   } | null>(null);
+  // Pilha do Desfazer: um passo por AÇÃO (um arrasto, um item colocado, um
+  // item tirado) — nunca "apagar tudo". Fica só em memória, de propósito: é
+  // pra corrigir um errinho na hora, não é histórico permanente.
+  const histRef = useRef<PlacedDecor[][]>([]);
+  const [histLen, setHistLen] = useState(0);
   const [checkin, setCheckin] = useState<Checkin>({ last: "", streak: 0 });
   const [dayTasks, setDayTasks] = useState<Record<string, boolean>>({});
   // Estado dedicado do dia de HOJE: alimenta o anel segmentado sem vazar o
@@ -1184,6 +1193,14 @@ export function GestacaoPath({
 
   arrangingRef.current = arranging;
 
+  // Cada sessão de Arrumar começa com o Desfazer zerado: ele desfaz o que ela
+  // acabou de fazer, nunca algo de uma visita anterior que ela nem lembra.
+  useEffect(() => {
+    if (!arranging) return;
+    histRef.current = [];
+    setHistLen(0);
+  }, [arranging]);
+
   // Chegou do Cantinho pedindo pra arrumar? Abre já no modo de edição.
   useEffect(() => {
     try {
@@ -1219,12 +1236,39 @@ export function GestacaoPath({
     return () => clearTimeout(t);
   }, [placed, decorReady]);
 
+  const DECOR_HIST_MAX = 40;
+
+  /** Guarda o estado ANTES de uma mudança, pra ela poder voltar um passo. */
+  function pushHistory(before: PlacedDecor[]) {
+    histRef.current = [...histRef.current.slice(-(DECOR_HIST_MAX - 1)), before];
+    setHistLen(histRef.current.length);
+  }
+
+  /** Volta UM passo. Nunca mexe no resto do que ela montou. */
+  function undoDecor() {
+    const before = histRef.current.pop();
+    setHistLen(histRef.current.length);
+    if (!before) return;
+    setPlaced(before);
+    setSelDecor(null);
+  }
+
   function startDecorDrag(e: React.PointerEvent, p: PlacedDecor, mode: "move" | "size") {
     if (!arranging) return;
     e.preventDefault();
     e.stopPropagation();
     setSelDecor(p.k);
-    dragRef.current = { k: p.k, mode, sx: e.clientX, sy: e.clientY, ox: p.x, oy: p.y, os: p.s };
+    dragRef.current = {
+      k: p.k,
+      mode,
+      sx: e.clientX,
+      sy: e.clientY,
+      ox: p.x,
+      oy: p.y,
+      os: p.s,
+      before: placed,
+      moved: false,
+    };
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   }
 
@@ -1235,6 +1279,12 @@ export function GestacaoPath({
     const el = pathRef.current;
     if (!d || !el) return;
     const r = el.getBoundingClientRect();
+    // Um toque que não arrastou nada não vira passo do Desfazer.
+    if (!d.moved && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) < 4) return;
+    if (!d.moved) {
+      d.moved = true;
+      pushHistory(d.before);
+    }
     if (d.mode === "move") {
       const x = clampN(d.ox + ((e.clientX - d.sx) / Math.max(1, r.width)) * 100, 3, 97);
       const y = clampN(d.oy + (e.clientY - d.sy), 20, Math.max(20, height - 20));
@@ -1266,18 +1316,14 @@ export function GestacaoPath({
       y = clampN(window.innerHeight / 2 - r.top, 40, Math.max(40, height - 40));
     }
     const k = `u${placed.length}-${id}-${Math.round(y)}`;
+    pushHistory(placed);
     setPlaced((prev) => [...prev, { k, id, x: 50, y, s: 1.4 }]);
     setSelDecor(k);
   }
 
   function removeDecor(k: string) {
+    pushHistory(placed);
     setPlaced((prev) => prev.filter((p) => p.k !== k));
-    setSelDecor(null);
-  }
-
-  function reseedDecor() {
-    seenRef.current = seedables;
-    setPlaced(seedDecor(seedables, height, 0).slice(0, DECOR_MAX));
     setSelDecor(null);
   }
 
@@ -1920,7 +1966,7 @@ export function GestacaoPath({
           barra do app (z-50) pra ela terminar sem sair da trilha. */}
       {arranging && !careMode && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-3 pt-2 shadow-[0_-6px_24px_rgba(0,0,0,0.12)] backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] leading-snug text-muted-foreground">
               Arraste pra mover · <span className="font-bold text-emerald-600">⤢</span> pra mudar o
               tamanho · <span className="font-bold text-rose-500">✕</span> pra tirar
@@ -1928,6 +1974,17 @@ export function GestacaoPath({
                 ({visiblePlaced.length}/{DECOR_MAX})
               </span>
             </p>
+            {/* Desfazer volta UM passo (o último arrasto, o último item posto
+                ou tirado). Não existe "apagar tudo": um toque sem querer nunca
+                pode levar embora o que ela montou. */}
+            <button
+              onClick={undoDecor}
+              disabled={histLen === 0}
+              aria-label="Desfazer a última mudança"
+              className="press shrink-0 rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 disabled:opacity-40"
+            >
+              ↩︎ <span className="text-[13px]">Desfazer</span>
+            </button>
             <button
               onClick={() => {
                 setArranging(false);
@@ -1957,14 +2014,6 @@ export function GestacaoPath({
                 </button>
               );
             })}
-            <button
-              onClick={reseedDecor}
-              title="Espalhar tudo de novo"
-              aria-label="Espalhar os enfeites de novo"
-              className="press flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl ring-1 ring-slate-200"
-            >
-              ↺
-            </button>
           </div>
         </div>
       )}
