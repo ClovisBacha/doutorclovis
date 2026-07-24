@@ -442,9 +442,14 @@ function MinhaContaPage() {
   const [premiumOpen, setPremiumOpen] = useState(false);
   // Navegação disparada de DENTRO de uma aba (ex.: "Configure em Perfil") —
   // troca a aba e sai da home mobile, senão o destino fica escondido no celular.
-  const goToTab = (t: string) => {
+  // Sub-aba pedida no destino (hoje só o hub de Consultas usa): o marco da
+  // semana "plano de parto" abre direto em Plano de parto, e "mala da
+  // maternidade" direto no Checklist, em vez de cair sempre na Agenda.
+  const [consultasSub, setConsultasSub] = useState<string | null>(null);
+  const goToTab = (t: string, sub?: string) => {
     setTab(t as Tab);
     setMobileHome(false);
+    setConsultasSub(sub ?? null);
   };
 
   // Modo Cuidado 🤍 — lido do perfil; pausa a gamificação globalmente.
@@ -680,11 +685,14 @@ function MinhaContaPage() {
   const firstName = profile?.display_name?.split(" ")[0] ?? "mamãe";
 
   // Mobile navigation helpers
-  const activeSection: BottomSection = mobileHome ? "home" : tabToSection(tab as AppTab);
+  // `null` = tela filha do hub (Calendário, Registros, Médico…): nenhuma pílula
+  // acesa, em vez de acender "Bebê" fora do Bebê.
+  const activeSection: BottomSection | null = mobileHome ? "home" : tabToSection(tab as AppTab);
 
-  function mobileNavigate(t: AppTab) {
+  function mobileNavigate(t: AppTab, sub?: string) {
     setTab(t as Tab);
     setMobileHome(false);
+    setConsultasSub(sub ?? null);
   }
 
   function handleBottomNav(section: BottomSection) {
@@ -779,6 +787,10 @@ function MinhaContaPage() {
             medications: profile?.medications ?? null,
           }}
           onClose={() => setEmergencyOpen(false)}
+          onOpenCard={() => {
+            setEmergencyOpen(false);
+            goToTab("Carteirinha");
+          }}
         />
       )}
 
@@ -1047,7 +1059,12 @@ function MinhaContaPage() {
                 )}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}
                 {(tab === "Calendário" || tab === "Consultas") && (
-                  <PrenatalCalendarTab profile={profile} gest={gest} onNavigate={goToTab} />
+                  <PrenatalCalendarTab
+                    profile={profile}
+                    gest={gest}
+                    onNavigate={goToTab}
+                    consultasSub={consultasSub}
+                  />
                 )}
                 {tab === "Registros" && <RegistrosHub profile={profile} gest={gest} />}
                 {tab === "Saúde" && (
@@ -6007,10 +6024,13 @@ function PrenatalCalendarTab({
   profile,
   gest,
   onNavigate,
+  consultasSub = null,
 }: {
   profile: Profile | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
+  /** Sub-aba inicial do hub de Consultas (deep link vindo do marco da semana). */
+  consultasSub?: string | null;
 }) {
   // Suas consultas reais entram na MESMA linha do tempo dos marcos do pré-natal
   // (o calendário vira o lugar único: marcos recomendados + suas consultas).
@@ -6445,7 +6465,7 @@ function PrenatalCalendarTab({
       {/* ── Consultas integradas: tudo (agendar, preparar, teleconsulta…) aqui ── */}
       <div className="mt-2 border-t border-border pt-5">
         <p className="mb-4 text-xs uppercase tracking-[0.22em] text-primary">Minhas consultas</p>
-        <ConsultasHub profile={profile} gest={gest} />
+        <ConsultasHub profile={profile} gest={gest} initialSub={consultasSub} />
       </div>
     </div>
   );
@@ -7360,10 +7380,36 @@ const CONSULTAS_SUBTABS = [
   { key: "particular", label: "Particular" },
 ] as const;
 
-function ConsultasHub({ profile, gest }: { profile: Profile | null; gest: Gest }) {
-  const [sub, setSub] = useState<(typeof CONSULTAS_SUBTABS)[number]["key"]>("agenda");
+type ConsultasSub = (typeof CONSULTAS_SUBTABS)[number]["key"];
+
+function isConsultasSub(v: unknown): v is ConsultasSub {
+  return CONSULTAS_SUBTABS.some((s) => s.key === v);
+}
+
+function ConsultasHub({
+  profile,
+  gest,
+  initialSub = null,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  initialSub?: string | null;
+}) {
+  const [sub, setSub] = useState<ConsultasSub>(isConsultasSub(initialSub) ? initialSub : "agenda");
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Deep link (marco da semana → "Plano de parto"/"Checklist"): troca a sub-aba
+  // e rola até o hub, senão a paciente abre o calendário e não vê que mudou.
+  useEffect(() => {
+    if (!isConsultasSub(initialSub)) return;
+    setSub(initialSub);
+    const t = setTimeout(
+      () => rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      120,
+    );
+    return () => clearTimeout(t);
+  }, [initialSub]);
   return (
-    <div className="space-y-5">
+    <div ref={rootRef} className="space-y-5">
       <div className="scrollbar-hide flex gap-2 overflow-x-auto">
         {CONSULTAS_SUBTABS.map((s) => (
           <button

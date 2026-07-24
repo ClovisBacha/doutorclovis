@@ -31,7 +31,16 @@ function doctorTel(): string {
  * carteirinha com QR (gerado no próprio aparelho — LGPD, sem serviço externo)
  * pra mostrar no hospital.
  */
-export function EmergencySheet({ info, onClose }: { info: Info; onClose: () => void }) {
+export function EmergencySheet({
+  info,
+  onClose,
+  onOpenCard,
+}: {
+  info: Info;
+  onClose: () => void;
+  /** Abre a carteirinha completa (QR grande, copiar, imprimir) fora do SOS. */
+  onOpenCard?: () => void;
+}) {
   const [qr, setQr] = useState<string | null>(null);
   const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
   // Carteirinha recolhida por padrão; toca pra ver tudo (fica dentro do SOS).
@@ -230,6 +239,15 @@ export function EmergencySheet({ info, onClose }: { info: Info; onClose: () => v
                 ))}
               </div>
             </>
+          )}
+
+          {cardOpen && onOpenCard && (
+            <button
+              onClick={onOpenCard}
+              className="press mt-3 w-full rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground"
+            >
+              Abrir carteirinha completa (copiar / imprimir) →
+            </button>
           )}
 
           {(!info.bloodType || !info.emergencyContact) && (

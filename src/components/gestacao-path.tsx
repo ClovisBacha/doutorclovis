@@ -1712,15 +1712,24 @@ export function GestacaoPath({
                 <div className="dc-decor pointer-events-none sticky top-14 z-0 h-0 select-none">
                   {sky.map((item) => {
                     const h = hashStr(item.id);
+                    // Duração própria + atraso NEGATIVO proporcional a ela: cada
+                    // item nasce num ponto diferente da travessia (0–100%), em
+                    // vez de todos amontoados no começo do céu.
+                    const dur = 55 + (h % 5) * 12;
+                    const offset = ((h % 97) / 97) * dur;
                     return (
                       <span
                         key={item.id}
-                        className="absolute inline-block text-3xl opacity-80 drop-shadow-sm"
+                        className="absolute inline-block drop-shadow-sm"
                         style={{
-                          top: `${4 + (h % 3) * 20}px`,
+                          top: `${2 + (h % 5) * 16}px`,
                           left: 0,
-                          animation: `dcSkyDrift ${55 + (h % 5) * 12}s linear infinite`,
-                          animationDelay: `-${h % 50}s`,
+                          // 5 faixas de altura + tamanho/opacidade variando dão
+                          // profundidade (o que está "mais longe" é menor e mais claro).
+                          fontSize: `${1.35 + ((h >> 3) % 4) * 0.22}rem`,
+                          opacity: 0.55 + ((h >> 5) % 4) * 0.12,
+                          animation: `dcSkyDrift ${dur}s linear infinite`,
+                          animationDelay: `-${offset.toFixed(1)}s`,
                         }}
                         aria-hidden
                         title={item.name}
@@ -2942,8 +2951,11 @@ function BreathingBlock({
       const r = await grantWellnessReward({
         data: { accessToken: token, day, activity: "breathing" },
       });
-      if (r.ok && r.granted > 0) {
-        setReward(r.granted);
+      // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
+      // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
+      // isso não pode apagar o progresso da estrela.
+      if (r.ok) {
+        if (r.granted > 0) setReward(r.granted);
         onEarn();
       }
     } catch {
@@ -3267,8 +3279,11 @@ function MovementBlock({
       const r = await grantWellnessReward({
         data: { accessToken: token, day, activity: "movement" },
       });
-      if (r.ok && r.granted > 0) {
-        setReward(r.granted);
+      // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
+      // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
+      // isso não pode apagar o progresso da estrela.
+      if (r.ok) {
+        if (r.granted > 0) setReward(r.granted);
         onEarn();
       }
     } catch {
@@ -3584,8 +3599,11 @@ function MeditationBlock({
       const r = await grantWellnessReward({
         data: { accessToken: token, day, activity: "meditation" },
       });
-      if (r.ok && r.granted > 0) {
-        setReward(r.granted);
+      // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
+      // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
+      // isso não pode apagar o progresso da estrela.
+      if (r.ok) {
+        if (r.granted > 0) setReward(r.granted);
         onEarn();
       }
     } catch {
@@ -3946,8 +3964,11 @@ function BondingBlock({
       const r = await grantWellnessReward({
         data: { accessToken: token, day, activity: "bonding" },
       });
-      if (r.ok && r.granted > 0) {
-        setReward(r.granted);
+      // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
+      // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
+      // isso não pode apagar o progresso da estrela.
+      if (r.ok) {
+        if (r.granted > 0) setReward(r.granted);
         onEarn();
       }
     } catch {
@@ -4201,8 +4222,8 @@ function GratitudeBlock({
           const r = await grantWellnessReward({
             data: { accessToken: token, day, activity: "gratitude" },
           });
-          if (r.ok && r.granted > 0) {
-            setReward(r.granted);
+          if (r.ok) {
+            if (r.granted > 0) setReward(r.granted);
             onEarn();
           }
         }
