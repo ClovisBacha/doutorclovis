@@ -24,10 +24,15 @@ const FREE_ITEM_IDS = CANTINHO_ITEMS.filter(
  */
 
 async function authUid(accessToken: string): Promise<string | null> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
-  if (error || !data.user) return null;
-  return data.user.id;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
+    if (error || !data.user) return null;
+    return data.user.id;
+  } catch (e) {
+    console.error("[cantinho authUid] erro:", e);
+    return null;
+  }
 }
 
 /** Saldo + itens que a paciente já possui. */
@@ -80,56 +85,67 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
     z.object({ accessToken: z.string().min(10), itemId: z.string().min(1).max(80) }).parse(i),
   )
   .handler(async ({ data }) => {
-    const uid = await authUid(data.accessToken);
-    if (!uid) return { ok: false as const, error: "Não autenticado" };
-    const item = CANTINHO_BY_ID[data.itemId];
-    if (!item) return { ok: false as const, error: "Item inexistente" };
-    // Troféu da coleção não se compra — desbloqueia ao completar a coleção.
-    if (item.id === CANTINHO_COMPLETIONIST_ID) {
-      return { ok: false as const, error: "Desbloqueia ao completar a coleção 👑" };
-    }
-    // Item grátis não passa pela compra — já é da paciente desde o início.
-    if (item.price <= 0) return { ok: false as const, error: "Este item já é seu 💛" };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Gate de Premium no servidor: item premium só p/ assinante (nunca confia no cliente).
-    if (item.premium) {
-      const { data: prof } = await supabaseAdmin
-        .from("patient_profiles")
-        .select("quiz_premium")
-        .eq("id", uid)
-        .single();
-      if (!(prof as { quiz_premium?: boolean } | null)?.quiz_premium) {
-        return { ok: false as const, error: "Item exclusivo do Premium" };
+    // TUDO num try/catch: a compra NUNCA lança pro cliente. Qualquer exceção
+    // (import, RPC, rede) vira um { ok:false, error } com a mensagem real, que
+    // o app mostra no toast — em vez do "Não consegui comprar agora" genérico.
+    try {
+      const uid = await authUid(data.accessToken);
+      if (!uid) return { ok: false as const, error: "Sua sessão expirou — entre novamente." };
+      const item = CANTINHO_BY_ID[data.itemId];
+      if (!item) return { ok: false as const, error: "Item inexistente" };
+      // Troféu da coleção não se compra — desbloqueia ao completar a coleção.
+      if (item.id === CANTINHO_COMPLETIONIST_ID) {
+        return { ok: false as const, error: "Desbloqueia ao completar a coleção 👑" };
       }
+      // Item grátis não passa pela compra — já é da paciente desde o início.
+      if (item.price <= 0) return { ok: false as const, error: "Este item já é seu 💛" };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      // Gate de Premium no servidor: item premium só p/ assinante (nunca confia no cliente).
+      if (item.premium) {
+        // maybeSingle (não single): .single() LANÇA quando não há linha de perfil,
+        // e era isso que derrubava a compra de itens premium com erro opaco.
+        const { data: prof } = await supabaseAdmin
+          .from("patient_profiles")
+          .select("quiz_premium")
+          .eq("id", uid)
+          .maybeSingle();
+        if (!(prof as { quiz_premium?: boolean } | null)?.quiz_premium) {
+          return { ok: false as const, error: "Item exclusivo do Premium 💎" };
+        }
+      }
+      // A função buy_cantinho_item não está nos tipos gerados; cast tipado.
+      const rpc = supabaseAdmin.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: unknown }>;
+      const { data: res, error } = await rpc("buy_cantinho_item", {
+        p_user: uid,
+        p_item: item.id,
+        p_price: item.price,
+      });
+      if (error) {
+        // Surface o motivo real (ex.: função ausente, permissão) — ajuda o
+        // diagnóstico em produção em vez de um "Falha na compra" opaco.
+        const m = (error as { message?: string; code?: string })?.message ?? "erro desconhecido";
+        console.error("[buyCantinhoItem] RPC error:", error);
+        return { ok: false as const, error: `Erro no banco: ${m}` };
+      }
+      const r = (res ?? {}) as { ok?: boolean; error?: string; balance?: number };
+      if (!r.ok) {
+        const msg =
+          r.error === "saldo_insuficiente"
+            ? "Sementinhas insuficientes 🌱"
+            : r.error === "ja_possui"
+              ? "Você já tem este item 💛"
+              : `Não foi possível comprar (${r.error ?? "motivo desconhecido"})`;
+        return { ok: false as const, error: msg, balance: r.balance ?? 0 };
+      }
+      return { ok: true as const, balance: r.balance ?? 0, itemId: item.id };
+    } catch (e) {
+      const m = (e as { message?: string })?.message ?? String(e);
+      console.error("[buyCantinhoItem] exceção:", e);
+      return { ok: false as const, error: `Erro ao comprar: ${m}` };
     }
-    // A função buy_cantinho_item não está nos tipos gerados; cast tipado.
-    const rpc = supabaseAdmin.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: unknown; error: unknown }>;
-    const { data: res, error } = await rpc("buy_cantinho_item", {
-      p_user: uid,
-      p_item: item.id,
-      p_price: item.price,
-    });
-    if (error) {
-      // Surface o motivo real (ex.: função ausente, permissão) — ajuda o
-      // diagnóstico em produção em vez de um "Falha na compra" opaco.
-      const m = (error as { message?: string; code?: string })?.message ?? "erro desconhecido";
-      console.error("[buyCantinhoItem] RPC error:", error);
-      return { ok: false as const, error: `Erro no banco: ${m}` };
-    }
-    const r = (res ?? {}) as { ok?: boolean; error?: string; balance?: number };
-    if (!r.ok) {
-      const msg =
-        r.error === "saldo_insuficiente"
-          ? "Sementinhas insuficientes"
-          : r.error === "ja_possui"
-            ? "Você já tem este item"
-            : `Não foi possível comprar (${r.error ?? "motivo desconhecido"})`;
-      return { ok: false as const, error: msg, balance: r.balance ?? 0 };
-    }
-    return { ok: true as const, balance: r.balance ?? 0, itemId: item.id };
   });
 
 /** Equipa (ou limpa, com null) o cenário ativo do Cantinho. Só 1 por vez. */
