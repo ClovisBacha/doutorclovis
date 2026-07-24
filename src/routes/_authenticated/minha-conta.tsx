@@ -753,6 +753,13 @@ function MinhaContaPage() {
             allergies: profile?.allergies ?? null,
             emergencyContact: profile?.emergency_contact ?? null,
             emergencyPhone: profile?.emergency_phone ?? null,
+            babyName: profile?.baby_name ?? null,
+            dpp: (() => {
+              const due =
+                profile?.due_date ?? (profile?.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
+              return due ? new Date(`${due}T00:00:00`).toLocaleDateString("pt-BR") : null;
+            })(),
+            medications: profile?.medications ?? null,
           }}
           onClose={() => setEmergencyOpen(false)}
         />
