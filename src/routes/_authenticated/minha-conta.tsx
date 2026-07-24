@@ -5961,6 +5961,14 @@ function toGoogleCalUrl(label: string, date: Date) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+// Rótulo/cor do status da consulta, mostrado no calendário.
+const APPT_STATUS: Record<string, { label: string; cls: string }> = {
+  pending: { label: "Aguardando confirmação", cls: "bg-amber-100 text-amber-700" },
+  counter_proposed: { label: "Novo horário proposto", cls: "bg-amber-100 text-amber-700" },
+  confirmed: { label: "Confirmada", cls: "bg-emerald-100 text-emerald-700" },
+  done: { label: "Realizada", cls: "bg-secondary text-muted-foreground" },
+};
+
 function PrenatalCalendarTab({
   profile,
   gest,
@@ -5970,6 +5978,18 @@ function PrenatalCalendarTab({
   gest: Gest;
   onNavigate: (tab: string) => void;
 }) {
+  // Suas consultas reais entram na MESMA linha do tempo dos marcos do pré-natal
+  // (o calendário vira o lugar único: marcos recomendados + suas consultas).
+  const [appts, setAppts] = useState<MyAppointment[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return;
+      const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
+      if (res.ok) setAppts(res.appointments);
+    })();
+  }, []);
+
   if (!profile || (!profile.lmp_date && !profile.reference_date)) {
     return (
       <div className="rounded-3xl border border-border bg-card p-8 text-center">
@@ -5988,7 +6008,6 @@ function PrenatalCalendarTab({
     );
   }
 
-  const currentWeek = gest?.weeks ?? 0;
   const today = new Date();
 
   function downloadAllIcs() {
@@ -6031,41 +6050,102 @@ function PrenatalCalendarTab({
     URL.revokeObjectURL(url);
   }
 
+  // Linha do tempo unificada: marcos do pré-natal + suas consultas reais,
+  // ordenados por data (consultas canceladas/recusadas ficam de fora).
+  type TLItem =
+    | { kind: "milestone"; date: Date | null; m: Milestone }
+    | { kind: "appt"; date: Date | null; a: MyAppointment };
+  const items: TLItem[] = [
+    ...PRENATAL_MILESTONES.map(
+      (m): TLItem => ({ kind: "milestone", date: weekToDate(m.week, profile), m }),
+    ),
+    ...appts
+      .filter((a) => a.status !== "cancelled" && a.status !== "declined")
+      .map((a): TLItem => {
+        const ds = a.confirmed_date ?? a.proposed_date ?? a.preferred_date;
+        return { kind: "appt", date: ds ? new Date(`${ds}T00:00:00`) : null, a };
+      }),
+  ].sort((x, y) => {
+    if (!x.date) return 1;
+    if (!y.date) return -1;
+    return x.date.getTime() - y.date.getTime();
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">
-            Calendário do Pré-natal
-          </p>
+          <p className="text-xs uppercase tracking-[0.22em] text-primary">Meu Calendário</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Todos os marcos, exames e consultas da sua gestação.
+            Seus marcos do pré-natal e suas consultas, tudo em ordem.
           </p>
         </div>
-        <button
-          onClick={downloadAllIcs}
-          className="rounded-full border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary"
-        >
-          ↓ Baixar .ics
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => onNavigate("Consultas")}
+            className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)] hover:opacity-90"
+          >
+            Agendar
+          </button>
+          <button
+            onClick={downloadAllIcs}
+            className="rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:text-primary"
+          >
+            ↓ .ics
+          </button>
+        </div>
       </div>
 
       <div className="relative space-y-3 pl-6">
         {/* Vertical line */}
         <div className="absolute left-2.5 top-0 bottom-0 w-px bg-border" />
 
-        {PRENATAL_MILESTONES.map((m, idx) => {
-          const date = weekToDate(m.week, profile);
+        {items.map((it, idx) => {
+          // ── Sua consulta real ──────────────────────────────────────
+          if (it.kind === "appt") {
+            const a = it.a;
+            const time = a.confirmed_time ?? a.proposed_time ?? a.preferred_time;
+            const st = APPT_STATUS[a.status] ?? APPT_STATUS.pending;
+            return (
+              <button
+                key={`appt-${a.id}`}
+                onClick={() => onNavigate("Consultas")}
+                className="relative block w-full rounded-2xl border border-primary/40 bg-primary/5 p-4 text-left shadow-sm transition-colors hover:bg-primary/10"
+              >
+                <div className="absolute -left-4 top-5 h-3 w-3 rounded-full border-2 border-primary bg-primary" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                    Sua consulta
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
+                    {st.label}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm font-medium text-foreground">{a.reason || "Consulta"}</p>
+                {it.date && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {it.date.toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                    {time ? ` · ${time.slice(0, 5)}` : ""}
+                  </p>
+                )}
+              </button>
+            );
+          }
+
+          // ── Marco do pré-natal ─────────────────────────────────────
+          const m = it.m;
+          const date = it.date;
           const isPast = date != null && date < today;
-          const isCurrent =
-            m.week === currentWeek ||
-            (m.week === Math.ceil(currentWeek / 2) * 2 && Math.abs(m.week - currentWeek) <= 1);
           const isUpcoming =
             !isPast && date != null && date.getTime() - today.getTime() < 21 * 86400000;
 
           return (
             <div
-              key={idx}
+              key={`ms-${idx}`}
               className={`relative rounded-2xl border p-4 transition-all ${
                 isPast
                   ? "border-border bg-card opacity-60"
