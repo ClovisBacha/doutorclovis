@@ -65,20 +65,25 @@ const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   saude: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
 };
 
-export function tabToSection(t: AppTab): BottomSection {
+/**
+ * Seção da barra de baixo correspondente à aba aberta — ou `null` quando a aba
+ * é uma tela FILHA do hub (Calendário, Registros, Médico, FAQ…). Antes essas
+ * telas devolviam "home" e acendiam a pílula "Bebê" com outra tela aberta, o
+ * que confundia: o indicador dizia "você está no Bebê" fora do Bebê.
+ */
+export function tabToSection(t: AppTab): BottomSection | null {
   for (const [section, tabs] of Object.entries(SECTION_TABS) as [
     BottomSection,
     readonly AppTab[],
   ][]) {
     if ((tabs as string[]).includes(t)) return section;
   }
-  // Tudo que não é Jogo/Chat/Saúde faz parte da tela principal do Bebê (o hub).
-  return "home";
+  return null;
 }
 
 /** Abas de uma seção do menu de baixo (uma barra só no celular). */
-export function tabsForSection(section: BottomSection): readonly AppTab[] {
-  return SECTION_TABS[section];
+export function tabsForSection(section: BottomSection | null): readonly AppTab[] {
+  return section ? SECTION_TABS[section] : [];
 }
 
 /* ================================================================
@@ -253,7 +258,7 @@ export function AppBottomNav({
   onSelect,
   onEmergency,
 }: {
-  activeSection: BottomSection;
+  activeSection: BottomSection | null;
   onSelect: (s: BottomSection) => void;
   onEmergency?: () => void;
 }) {
@@ -383,6 +388,8 @@ const WEEK_MILESTONES: {
   title: string;
   text: string;
   tab: AppTab;
+  /** Sub-aba do hub de Consultas em que o marco deve abrir (ex.: "parto"). */
+  sub?: string;
 }[] = [
   {
     min: 6,
@@ -439,6 +446,7 @@ const WEEK_MILESTONES: {
     title: "Hora de montar o plano de parto",
     text: "Registre suas preferências e converse com seu médico na próxima consulta.",
     tab: "Consultas",
+    sub: "parto",
   },
   {
     min: 34,
@@ -447,6 +455,7 @@ const WEEK_MILESTONES: {
     title: "Prepare a mala da maternidade",
     text: "O checklist completo te guia peça por peça — deixe pronta até a semana 36.",
     tab: "Consultas",
+    sub: "checklist",
   },
   {
     min: 37,
@@ -478,7 +487,8 @@ export function AppHomeScreen({
   firstName: string;
   babyName: string | null;
   gest: GestInfo;
-  onNavigate: (tab: AppTab) => void;
+  /** `sub` abre direto numa sub-aba do destino (ex.: Consultas → "parto"). */
+  onNavigate: (tab: AppTab, sub?: string) => void;
   nextAppointment?: NextAppointment | null;
   /** Tom de pele do bebê (índice na paleta BABY_TONES). */
   babyTone?: number;
@@ -722,7 +732,7 @@ export function AppHomeScreen({
           if (!m) return null;
           return (
             <button
-              onClick={() => onNavigate(m.tab)}
+              onClick={() => onNavigate(m.tab, m.sub)}
               className="group flex w-full items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-3.5 py-2.5 text-left transition-colors duration-300 active:scale-[0.99] hover:border-primary/35 hover:bg-primary/10"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-lg ring-1 ring-primary/15">
