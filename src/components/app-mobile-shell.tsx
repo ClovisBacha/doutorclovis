@@ -14,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
-  FileText,
   Gamepad2,
   Gift,
   HelpCircle,
@@ -22,8 +21,6 @@ import {
   Heart,
   MessageCircle,
   NotebookPen,
-  Stethoscope,
-  UserCircle,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -492,18 +489,6 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     color: "bg-blue-50 text-blue-600 ring-blue-200",
   },
   {
-    Icon: FileText,
-    label: "Consultas",
-    tab: "Consultas",
-    color: "bg-sky-50 text-sky-600 ring-sky-200",
-  },
-  {
-    Icon: Stethoscope,
-    label: "Médico",
-    tab: "Médico",
-    color: "bg-primary/10 text-primary ring-primary/20",
-  },
-  {
     Icon: CreditCard,
     label: "Carteirinha",
     tab: "Carteirinha",
@@ -526,18 +511,6 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     label: "Recompensas",
     tab: "Recompensas",
     color: "bg-fuchsia-50 text-fuchsia-600 ring-fuchsia-200",
-  },
-  {
-    Icon: HelpCircle,
-    label: "FAQ",
-    tab: "FAQ",
-    color: "bg-teal-50 text-teal-600 ring-teal-200",
-  },
-  {
-    Icon: UserCircle,
-    label: "Perfil",
-    tab: "Perfil",
-    color: "bg-secondary text-secondary-foreground ring-border",
   },
 ];
 
@@ -912,6 +885,15 @@ export function AppHomeScreen({
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
         </div>
+      </button>
+
+      {/* ── Rodapé discreto: Ajuda/FAQ (baixa frequência, fora da grade) ── */}
+      <button
+        onClick={() => onNavigate("FAQ")}
+        className="mx-auto flex items-center gap-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <HelpCircle className="h-3.5 w-3.5" />
+        Dúvidas frequentes
       </button>
     </div>
   );

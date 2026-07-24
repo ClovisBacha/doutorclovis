@@ -848,6 +848,17 @@ function MinhaContaPage() {
                   Painel
                 </Link>
               )}
+              {/* Perfil/ajustes — engrenagem no topo (saiu da grade de atalhos). */}
+              <button
+                onClick={() => {
+                  setTab("Perfil");
+                  setMobileHome(false);
+                }}
+                aria-label="Perfil e ajustes"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-base text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+              >
+                ⚙️
+              </button>
               <button
                 onClick={signOut}
                 className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
