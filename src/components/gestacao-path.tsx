@@ -4917,36 +4917,47 @@ const WELLNESS_TYPES = [
   { key: "gratitude", emoji: "✨", label: "Gratidão", Comp: GratitudeBlock },
 ] as const;
 
-/** Cor + descrição de cada jogo (cards coloridos da tela de jogos). */
-const WELLNESS_META: Record<string, { title: string; grad: string; desc: string }> = {
+/**
+ * Título, descrição e o par de cores do vidro de cada jogo (`.liquid-glass`
+ * pinta com `--lg-a`/`--lg-b`). São hex e não classe do Tailwind porque o
+ * material precisa da cor como valor: mistura com transparência, sombra
+ * colorida e rim entram por `color-mix`, não por utilitário.
+ */
+const WELLNESS_META: Record<string, { title: string; a: string; b: string; desc: string }> = {
   aula: {
     title: "Aula de hoje",
-    grad: "from-indigo-400 to-blue-500",
+    a: "#818cf8",
+    b: "#3b82f6",
     desc: "A lição da professora + o quiz da semana.",
   },
   breathing: {
     title: "Respirar",
-    grad: "from-sky-400 to-cyan-500",
+    a: "#38bdf8",
+    b: "#06b6d4",
     desc: "Respiração guiada com som e vibração pra acalmar.",
   },
   movement: {
     title: "Movimento",
-    grad: "from-amber-400 to-orange-500",
+    a: "#fbbf24",
+    b: "#f97316",
     desc: "3 movimentos leves com cronômetro pra soltar o corpo.",
   },
   meditation: {
     title: "Meditar",
-    grad: "from-violet-400 to-purple-500",
+    a: "#a78bfa",
+    b: "#a855f7",
     desc: "Meditação guiada curtinha, com som ambiente.",
   },
   bonding: {
     title: "Momento com o bebê",
-    grad: "from-rose-400 to-pink-500",
+    a: "#fb7185",
+    b: "#ec4899",
     desc: "Uma carta de 1 minuto pra ler em voz alta pro bebê.",
   },
   gratitude: {
     title: "Gratidão",
-    grad: "from-emerald-400 to-green-500",
+    a: "#34d399",
+    b: "#16a34a",
     desc: "Guarde uma coisa boa do seu dia no diário.",
   },
 };
@@ -5080,7 +5091,11 @@ function WellnessScreen({
       <button
         onClick={openKey ? () => setOpenKey(null) : onClose}
         aria-label={openKey ? "Voltar" : "Fechar"}
-        className="press fixed right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-lg text-slate-600 shadow-md backdrop-blur"
+        className="press fixed right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-lg text-slate-600 backdrop-blur-xl"
+        style={{
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.5), 0 8px 20px -8px rgba(80,50,40,0.45)",
+        }}
       >
         ✕
       </button>
@@ -5144,7 +5159,13 @@ function WellnessScreen({
 
             {/* Placar do dia: 3 estrelas que enchem em metades */}
             {!careMode && (
-              <div className="mt-4 flex items-center justify-between rounded-3xl bg-white/75 px-4 py-3 shadow-sm backdrop-blur">
+              <div
+                className="mt-4 flex items-center justify-between rounded-[26px] bg-white/55 px-4 py-3 backdrop-blur-xl"
+                style={{
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(255,255,255,0.5), 0 10px 26px -14px rgba(80,50,40,0.45)",
+                }}
+              >
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-600">
                     Estrelas do dia
@@ -5165,27 +5186,44 @@ function WellnessScreen({
                   <button
                     key={c.key}
                     onClick={() => setOpenKey(c.key)}
-                    style={{ animationDelay: `${i * 55}ms` }}
-                    className={`press fade-slide-up relative flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br ${meta.grad} p-4 text-left text-white shadow-[0_10px_26px_-10px_rgba(0,0,0,0.35)]`}
+                    style={
+                      {
+                        animationDelay: `${i * 55}ms`,
+                        "--lg-a": meta.a,
+                        "--lg-b": meta.b,
+                        // O reflexo entra em cascata, um card atrás do outro.
+                        "--lg-delay": `${i * 0.5}s`,
+                        // Vidro deixa passar o creme do fundo: a sombrinha no
+                        // texto garante o contraste nos tons mais claros.
+                        textShadow: "0 1px 2px rgba(0,0,0,0.22)",
+                      } as React.CSSProperties
+                    }
+                    className="press fade-slide-up liquid-glass flex items-center gap-3.5 overflow-hidden rounded-[26px] p-3.5 text-left text-white"
                   >
-                    <span
-                      className="text-4xl drop-shadow-sm"
-                      style={{
-                        animation: "dc-float 3.2s ease-in-out infinite",
-                        animationDelay: `${i * 350}ms`,
-                      }}
-                    >
-                      {c.emoji}
+                    {/* A lente segura o emoji no centro — antes ele era um span
+                        solto e a animação o empurrava pra fora do card. */}
+                    <span className="liquid-lens relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px]">
+                      <span
+                        className="text-[26px] leading-none drop-shadow-sm"
+                        style={{
+                          animation: "dc-float 3.2s ease-in-out infinite",
+                          animationDelay: `${i * 350}ms`,
+                        }}
+                      >
+                        {c.emoji}
+                      </span>
                     </span>
-                    <span className="min-w-0 flex-1">
+                    <span className="relative z-10 min-w-0 flex-1">
                       <span className="block text-base font-extrabold">{meta.title}</span>
                       <span className="block text-xs text-white/90">{meta.desc}</span>
                     </span>
                     {/* Meia estrela do jogo: apagada → acesa quando completa */}
                     {!careMode && (
                       <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${
-                          isDone ? "bg-white/30" : "bg-black/15 text-white/85"
+                        className={`relative z-10 shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold backdrop-blur-sm ${
+                          isDone
+                            ? "bg-white/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+                            : "bg-black/15 text-white/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
                         }`}
                       >
                         {isDone ? "⭐ ½ ✓" : "☆ ½"}
