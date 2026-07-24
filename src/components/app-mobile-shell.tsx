@@ -17,13 +17,13 @@ import {
   CreditCard,
   FileText,
   Footprints,
+  Gamepad2,
   LifeBuoy,
-  Map,
+  LayoutGrid,
   Heart,
   Home,
   MessageCircle,
   NotebookPen,
-  Sparkles,
   Stethoscope,
   UserCircle,
   type LucideIcon,
@@ -60,14 +60,29 @@ export type AppTab =
   | "Perfil"
   | "Exames";
 
-export type BottomSection = "home" | "gestacao" | "saude" | "consultas" | "eu";
+// Barra de baixo repensada: Jogo e Chat viram destino de 1 toque; o resto
+// (Gestação, Consultas, Família, Aprender, Conta) mora no "Menu". SOS continua
+// como botão vermelho à parte (onEmergency).
+export type BottomSection = "home" | "jogo" | "chat" | "saude" | "menu";
 
 const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
-  gestacao: ["Bebê", "Caminho", "Calendário", "Registros", "Carteirinha"],
+  jogo: ["Caminho"],
+  chat: ["Chat IA"],
   saude: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
-  consultas: ["Consultas", "Médico"],
-  eu: ["Acompanhante", "Pós-parto", "FAQ", "Recompensas", "Chat IA", "Perfil"],
+  menu: [
+    "Bebê",
+    "Calendário",
+    "Registros",
+    "Carteirinha",
+    "Consultas",
+    "Médico",
+    "Acompanhante",
+    "Pós-parto",
+    "FAQ",
+    "Recompensas",
+    "Perfil",
+  ],
 };
 
 export function tabToSection(t: AppTab): BottomSection {
@@ -77,7 +92,8 @@ export function tabToSection(t: AppTab): BottomSection {
   ][]) {
     if ((tabs as string[]).includes(t)) return section;
   }
-  return "gestacao";
+  // Tudo que não é âncora de Jogo/Chat/Saúde cai no Menu.
+  return "menu";
 }
 
 /** Abas de uma seção do menu de baixo (uma barra só no celular). */
@@ -223,12 +239,17 @@ function useWeather(): WeatherState | null {
    AppBottomNav — indicador pill ativo estilo iOS (#5)
    ================================================================ */
 
-const NAV_ITEMS: { id: BottomSection; Icon: LucideIcon; label: string }[] = [
+const NAV_ITEMS: {
+  id: BottomSection;
+  Icon: LucideIcon;
+  label: string;
+  variant?: "chat";
+}[] = [
   { id: "home", Icon: Home, label: "Início" },
-  { id: "gestacao", Icon: Baby, label: "Gestação" },
+  { id: "jogo", Icon: Gamepad2, label: "Jogo" },
+  { id: "chat", Icon: MessageCircle, label: "Chat", variant: "chat" },
   { id: "saude", Icon: Heart, label: "Saúde" },
-  { id: "consultas", Icon: CalendarDays, label: "Consultas" },
-  { id: "eu", Icon: UserCircle, label: "Eu" },
+  { id: "menu", Icon: LayoutGrid, label: "Menu" },
 ];
 
 export function AppBottomNav({
@@ -278,8 +299,16 @@ export function AppBottomNav({
           compact ? "w-[64%] px-1.5 py-1" : "w-[92%] max-w-md px-2 py-1.5"
         }`}
       >
-        {NAV_ITEMS.map(({ id, Icon, label }) => {
+        {NAV_ITEMS.map(({ id, Icon, label, variant }) => {
           const active = activeSection === id;
+          // Chat é o gesto de destaque: cor da marca permanente (mesmo inativo).
+          const isChat = variant === "chat";
+          const iconColor = isChat || active ? "text-primary" : "text-muted-foreground";
+          const pillBg = isChat
+            ? "bg-primary/15 scale-105"
+            : active
+              ? "pop-in bg-primary/12 scale-105"
+              : "scale-100";
           return (
             <button
               key={id}
@@ -296,19 +325,19 @@ export function AppBottomNav({
                 key={active ? "on" : "off"}
                 className={`flex items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
                   compact ? "h-9 w-9" : "h-9 w-12"
-                } ${active ? "pop-in bg-primary/12 scale-105" : "scale-100"}`}
+                } ${pillBg}`}
               >
                 <Icon
-                  className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-                    active ? "text-primary scale-110" : "text-muted-foreground scale-100"
+                  className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${iconColor} ${
+                    active && !isChat ? "scale-110" : "scale-100"
                   }`}
-                  strokeWidth={active ? 2.5 : 1.8}
+                  strokeWidth={active || isChat ? 2.5 : 1.8}
                 />
               </div>
               <span
                 className={`overflow-hidden text-[10px] font-medium transition-all duration-300 ${
                   compact ? "max-h-0 opacity-0" : "mt-0.5 max-h-4 opacity-100"
-                } ${active ? "text-primary" : "text-muted-foreground"}`}
+                } ${isChat || active ? "text-primary" : "text-muted-foreground"}`}
               >
                 {label}
               </span>
@@ -490,22 +519,10 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     color: "bg-orange-50 text-orange-600 ring-orange-200",
   },
   {
-    Icon: Map,
-    label: "Jornada",
-    tab: "Caminho",
-    color: "bg-fuchsia-50 text-fuchsia-600 ring-fuchsia-200",
-  },
-  {
     Icon: Stethoscope,
     label: "Médico",
     tab: "Médico",
     color: "bg-primary/10 text-primary ring-primary/20",
-  },
-  {
-    Icon: MessageCircle,
-    label: "Chat IA",
-    tab: "Chat IA",
-    color: "bg-indigo-50 text-indigo-600 ring-indigo-200",
   },
   {
     Icon: UserCircle,
@@ -514,28 +531,6 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     color: "bg-secondary text-secondary-foreground ring-border",
   },
 ];
-
-/**
- * Lê do cache local da jornada (dc-path-*) a chama e o estado do desafio de
- * hoje. Leitura duplicada de propósito: não puxa o módulo pesado do jogo.
- */
-function readJourneyStats(totalDays: number | null): { streak: number; todayDone: boolean } {
-  if (typeof window === "undefined" || totalDays == null) return { streak: 0, todayDone: false };
-  try {
-    const doneDays: number[] = JSON.parse(localStorage.getItem("dc-path-done-days") ?? "[]");
-    const todayD = Math.max(7, Math.min(300, totalDays));
-    const set = new Set(doneDays);
-    let s = 0;
-    let d = set.has(todayD) ? todayD : todayD - 1;
-    while (set.has(d)) {
-      s++;
-      d--;
-    }
-    return { streak: s, todayDone: set.has(todayD) };
-  } catch {
-    return { streak: 0, todayDone: false };
-  }
-}
 
 export function AppHomeScreen({
   firstName,
@@ -572,7 +567,6 @@ export function AppHomeScreen({
         : "3º trimestre"
     : null;
   const weather = useWeather();
-  const [journey] = useState(() => readJourneyStats(gest?.totalDays ?? null));
 
   const h = new Date().getHours();
   const isMadrugada = h < 5;
@@ -789,37 +783,6 @@ export function AppHomeScreen({
         </div>
       </div>
 
-      {/* ── Jornada do dia: o game em destaque (silenciado no Modo Cuidado) ── */}
-      {gest && !careMode && (
-        <button
-          onClick={() => onNavigate("Caminho")}
-          className="group w-full overflow-hidden rounded-3xl bg-gradient-to-r from-pink-500 via-fuchsia-500 to-violet-500 p-[2px] text-left shadow-[var(--shadow-card)] transition-all duration-300 active:scale-[0.98]"
-        >
-          <div className="flex items-center gap-3.5 rounded-[calc(1.5rem-2px)] bg-gradient-to-r from-pink-500/95 to-violet-500/95 px-4 py-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl shadow-inner">
-              {journey.todayDone ? "✅" : "🎁"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">
-                Jornada diária · Jogo
-              </p>
-              <p className="mt-0.5 text-[15px] font-extrabold leading-tight text-white">
-                {journey.todayDone
-                  ? "Desafio de hoje completo! 🎉"
-                  : "Seu desafio de hoje te espera!"}
-              </p>
-              <p className="mt-0.5 text-[11px] font-medium text-white/85">
-                🔥 {journey.streak} {journey.streak === 1 ? "dia seguido" : "dias seguidos"} · 📚
-                lições e figurinhas no caminho
-              </p>
-            </div>
-            <span className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-extrabold text-fuchsia-600 shadow-md transition-transform duration-300 group-hover:scale-105">
-              Jogar
-            </span>
-          </div>
-        </button>
-      )}
-
       {/* ── Marco da semana (silenciado no Modo Cuidado) ──── */}
       {gest &&
         !careMode &&
@@ -942,23 +905,6 @@ export function AppHomeScreen({
             <p className="mt-1 text-[10px] text-muted-foreground">{DOCTOR.crm}</p>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
-        </div>
-      </button>
-
-      {/* ── Chat IA destaque ─────────────────────────────────────────── */}
-      <button
-        onClick={() => onNavigate("Chat IA")}
-        className="group w-full rounded-3xl bg-[var(--gradient-primary)] p-5 text-left transition-all duration-300 active:scale-[0.98]"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15">
-            <Sparkles className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <p className="font-serif text-lg text-primary-foreground">Chat com IA</p>
-            <p className="text-xs text-primary-foreground/80">Tire dúvidas a qualquer hora</p>
-          </div>
-          <ChevronRight className="ml-auto h-4 w-4 text-primary-foreground/70 transition-transform duration-300 group-hover:translate-x-1" />
         </div>
       </button>
     </div>
