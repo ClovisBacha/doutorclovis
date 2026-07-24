@@ -676,23 +676,14 @@ function MinhaContaPage() {
       return;
     }
     setMobileHome(false);
-    // Jogo/Chat abrem DIRETO no tab; Saúde na saúde; Menu no navegador (Bebê).
+    // Jogo/Chat abrem DIRETO no tab; Saúde na saúde. (Bebê = home, tratado acima.)
     const sectionMap: Record<Exclude<BottomSection, "home">, Tab> = {
       jogo: "Caminho",
       chat: "Chat IA",
       saude: "Saúde",
-      menu: "Bebê",
     };
     setTab(sectionMap[section]);
   }
-
-  const SECTION_TITLES: Record<BottomSection, string> = {
-    home: "Início",
-    jogo: "Jogo",
-    chat: "Chat com a IA",
-    saude: "Saúde",
-    menu: "Menu",
-  };
 
   // Médico (não-admin) NÃO usa o app da gestante: bebê, diário, jogo e afins
   // são exclusivos das pacientes. O espaço dele é o /painel. A conta admin
@@ -846,7 +837,7 @@ function MinhaContaPage() {
           {/* ── Mobile top bar ───────────────────────────────────── */}
           <div className="flex md:hidden items-center justify-between mb-4">
             <p className="font-serif text-xl leading-tight text-foreground">
-              {mobileHome ? `${dayGreeting()}, ${firstName} 💛` : SECTION_TITLES[activeSection]}
+              {mobileHome ? `${dayGreeting()}, ${firstName} 💛` : tab}
             </p>
             <div className="flex items-center gap-2">
               {(isAdmin || isDoctor) && (
@@ -919,12 +910,7 @@ function MinhaContaPage() {
           {/* ── Desktop & mobile (when tab selected): category nav + tabs ── */}
           <div className={mobileHome ? "hidden md:block" : "block"}>
             {/* Section back-button on mobile */}
-            {!mobileHome && (
-              <SectionHeader
-                title={SECTION_TITLES[activeSection]}
-                onHome={() => setMobileHome(true)}
-              />
-            )}
+            {!mobileHome && <SectionHeader title={tab} onHome={() => setMobileHome(true)} />}
 
             {/* Celular: UMA barra só — as abas da seção do menu de baixo (o menu
               de baixo já faz o papel de categoria; corta um seletor empilhado).
