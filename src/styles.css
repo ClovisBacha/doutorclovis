@@ -1106,13 +1106,17 @@ button:active > .duo3d {
     transform: scale(1) rotate(0);
   }
 }
+/* Flutuar no lugar. Sem `translate(-50%,-50%)` de propósito: quem usa isto são
+   spans em fluxo (emoji de card), e o offset os arrancava meio card pra fora.
+   Quem precisar centrar em absoluto centra com `left/top` + `translate` próprio
+   num elemento de fora — a animação não deve carregar posicionamento. */
 @keyframes dc-float {
   0%,
   100% {
-    transform: translate(-50%, -50%) translateY(0) rotate(-3deg);
+    transform: translateY(0) rotate(-3deg);
   }
   50% {
-    transform: translate(-50%, -50%) translateY(-7px) rotate(3deg);
+    transform: translateY(-7px) rotate(3deg);
   }
 }
 .dc-quiz-in {
@@ -1137,6 +1141,86 @@ button:active > .duo3d {
   .dc-result-in,
   .dc-float {
     animation: none !important;
+  }
+}
+
+/* ══════════════ Liquid Glass — material dos cards de jogo ══════════════
+   Vidro de verdade, não plástico colorido: o fundo da tela atravessa
+   (backdrop-filter), a luz bate na quina de cima (rim claro), escorre e
+   escurece embaixo (rim escuro), e um brilho especular passeia devagar.
+   A cor vem de fora em --lg-a/--lg-b, então cada jogo pinta o seu vidro
+   sem uma classe por cor. Anima só transform/opacity — zero repaint. */
+.liquid-glass {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--lg-a) 88%, transparent) 0%,
+      color-mix(in oklab, var(--lg-b) 70%, transparent) 100%
+    ),
+    /* piso branco: sem ele o vidro fica leitoso demais sobre fundo escuro */
+    linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.06));
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 -10px 20px -12px rgba(0, 0, 0, 0.35),
+    0 14px 32px -14px color-mix(in oklab, var(--lg-b) 75%, transparent);
+}
+/* Especular fixo: a luz da quina superior esquerda, como em vidro curvo. */
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(130% 90% at 10% -25%, rgba(255, 255, 255, 0.5) 0%, transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 44%);
+  pointer-events: none;
+}
+/* Reflexo que passeia — o "líquido" do Liquid Glass. Atraso por card em
+   --lg-delay pra virar onda na lista em vez de seis piscadas juntas. */
+.liquid-glass::after {
+  content: "";
+  position: absolute;
+  inset: -50% -60%;
+  z-index: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 47.5%,
+    rgba(255, 255, 255, 0.24) 50%,
+    transparent 52.5%
+  );
+  animation: lgSweep 7s ease-in-out infinite;
+  animation-delay: var(--lg-delay, 0s);
+  pointer-events: none;
+}
+@keyframes lgSweep {
+  0%,
+  100% {
+    transform: translateX(-42%);
+  }
+  50% {
+    transform: translateX(42%);
+  }
+}
+/* Lente do emoji: pastilha de vidro que segura o emoji no centro. */
+.liquid-lens {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.14));
+  backdrop-filter: blur(6px) saturate(160%);
+  -webkit-backdrop-filter: blur(6px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.12),
+    0 5px 14px -6px rgba(0, 0, 0, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-glass::after {
+    animation: none;
+    opacity: 0.35;
   }
 }
 
