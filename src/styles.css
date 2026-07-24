@@ -1139,3 +1139,30 @@ button:active > .duo3d {
     animation: none !important;
   }
 }
+
+/* Corações que sobem — Momento com o bebê (jogo). Transform/opacity apenas. */
+@keyframes dcHeartRise {
+  0% {
+    transform: translateY(30px) scale(0.5);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(-64vh) scale(1.2);
+    opacity: 0;
+  }
+}
+.dc-heart {
+  position: absolute;
+  bottom: 6%;
+  animation: dcHeartRise linear infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-heart {
+    animation: none;
+    opacity: 0;
+  }
+}
