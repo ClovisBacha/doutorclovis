@@ -259,6 +259,21 @@ type Invite = { id: string; token: string; companion_name: string | null; create
 
 type Gest = ReturnType<typeof computeGestation>;
 
+// ── Cache curto da lista de consultas ────────────────────────────────────────
+// A tela unificada (Calendário + Consultas) e o card da home pediam a MESMA
+// lista 3x ao abrir. Cache de 30s no módulo; ações que mudam a agenda passam
+// force=true para revalidar na hora.
+let apptsCache: { at: number; appointments: MyAppointment[] } | null = null;
+async function fetchAppointmentsCached(force = false): Promise<MyAppointment[]> {
+  if (!force && apptsCache && Date.now() - apptsCache.at < 30_000) return apptsCache.appointments;
+  const { data: s } = await supabase.auth.getSession();
+  if (!s.session) return apptsCache?.appointments ?? [];
+  const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
+  if (!res.ok) return apptsCache?.appointments ?? [];
+  apptsCache = { at: Date.now(), appointments: res.appointments };
+  return res.appointments;
+}
+
 const TABS = [
   "Bebê",
   "Caminho",
@@ -416,6 +431,8 @@ function MinhaContaPage() {
     } catch {
       /* rede instável: ainda assim remonta a aba abaixo */
     }
+    // Card "Próxima consulta" da home também atualiza no pull-to-refresh.
+    await loadNextAppt(true).catch(() => {});
     setRefreshKey((k) => k + 1);
   }
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
@@ -442,31 +459,31 @@ function MinhaContaPage() {
   // Próxima consulta confirmada → card na home mobile (fecha o ciclo
   // médico→paciente também na primeira tela do app).
   const [nextAppt, setNextAppt] = useState<NextAppointment | null>(null);
+  async function loadNextAppt(force = false) {
+    try {
+      const appointments = await fetchAppointmentsCached(force);
+      const today = ymdLocal();
+      const next = appointments
+        .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
+        .sort((a, b) =>
+          (a.confirmed_date! + (a.confirmed_time ?? "")).localeCompare(
+            b.confirmed_date! + (b.confirmed_time ?? ""),
+          ),
+        )[0];
+      setNextAppt(
+        next
+          ? {
+              dateLabel: `${formatApptDate(next.confirmed_date!)} · ${next.confirmed_time ?? ""}`,
+              typeLabel: next.reason,
+            }
+          : null,
+      );
+    } catch {
+      /* card é enhancement — sem consulta, sem card */
+    }
+  }
   useEffect(() => {
-    (async () => {
-      try {
-        const { data: s } = await supabase.auth.getSession();
-        if (!s.session) return;
-        const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
-        if (!res.ok) return;
-        const today = ymdLocal();
-        const next = res.appointments
-          .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
-          .sort((a, b) =>
-            (a.confirmed_date! + (a.confirmed_time ?? "")).localeCompare(
-              b.confirmed_date! + (b.confirmed_time ?? ""),
-            ),
-          )[0];
-        if (next) {
-          setNextAppt({
-            dateLabel: `${formatApptDate(next.confirmed_date!)} · ${next.confirmed_time ?? ""}`,
-            typeLabel: next.reason,
-          });
-        }
-      } catch {
-        /* card é enhancement — sem consulta, sem card */
-      }
-    })();
+    loadNextAppt();
   }, []);
 
   // Baixa a jornada da nuvem e arma a barreira anti-push logo no mount da
@@ -3001,13 +3018,7 @@ function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session) {
-        setLoaded(true);
-        return;
-      }
-      const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
-      if (res.ok) setAppts(res.appointments);
+      setAppts(await fetchAppointmentsCached());
       setLoaded(true);
     })();
   }, []);
@@ -6013,10 +6024,7 @@ function PrenatalCalendarTab({
   const [selectedYmd, setSelectedYmd] = useState<string>(() => ymdLocal());
   useEffect(() => {
     (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session) return;
-      const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
-      if (res.ok) setAppts(res.appointments);
+      setAppts(await fetchAppointmentsCached());
     })();
   }, []);
 
@@ -7566,10 +7574,7 @@ function ConsultasTab() {
     loadNotes();
     (async () => {
       try {
-        const { data: s } = await supabase.auth.getSession();
-        if (!s.session) return;
-        const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
-        if (res.ok) setAppts(res.appointments);
+        setAppts(await fetchAppointmentsCached());
       } finally {
         setLoadingAppts(false);
       }
@@ -7611,7 +7616,11 @@ function ConsultasTab() {
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeRef.current });
         setAudioBlob(blob);
-        setAudioUrl(URL.createObjectURL(blob));
+        // Revoga a URL anterior antes de criar outra (evita vazar blobs).
+        setAudioUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
         mediaStream.getTracks().forEach((t) => t.stop());
       };
       mr.start();
@@ -7619,7 +7628,10 @@ function ConsultasTab() {
       setRecording(true);
       setResult(null);
       setAudioBlob(null);
-      setAudioUrl(null);
+      setAudioUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
       setSavedMsg(null);
     } catch (err) {
       stream?.getTracks().forEach((t) => t.stop());
@@ -7683,7 +7695,10 @@ function ConsultasTab() {
         setSavedMsg("Nota salva com sucesso ✓");
         setResult(null);
         setAudioBlob(null);
-        setAudioUrl(null);
+        setAudioUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
         loadNotes();
       }
     } finally {
@@ -7704,8 +7719,7 @@ function ConsultasTab() {
     });
     if (res.ok) {
       toast(approve ? "Horário confirmado! ✅" : "Horário recusado.");
-      const r = await getMyAppointments({ data: { accessToken: s.session.access_token } });
-      if (r.ok) setAppts(r.appointments);
+      setAppts(await fetchAppointmentsCached(true));
     } else {
       toast(res.error ?? "Não foi possível responder");
     }
@@ -13622,6 +13636,9 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   // em % (responsivo) salvas no aparelho — sem SQL, persiste ao reabrir o app.
   const [uid, setUid] = useState<string | null>(null);
   const [layout, setLayout] = useState<Record<string, { x: number; y: number }>>({});
+  // Espelho do layout p/ salvar no pointer-up sem efeito colateral no updater.
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
   const [arranging, setArranging] = useState(false);
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const dragId = useRef<string | null>(null);
@@ -13705,10 +13722,8 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   function onScenePointerUp() {
     if (!dragId.current) return;
     dragId.current = null;
-    setLayout((prev) => {
-      saveLayout(prev);
-      return prev;
-    });
+    // Salva a partir do ref (efeito colateral fora do updater — StrictMode-safe).
+    saveLayout(layoutRef.current);
   }
 
   if (loading) return <TabSkeleton />;
@@ -13792,7 +13807,7 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
         ref={sceneRef}
         onPointerMove={onScenePointerMove}
         onPointerUp={onScenePointerUp}
-        onPointerLeave={onScenePointerUp}
+        onPointerCancel={onScenePointerUp}
         className="relative overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100"
         style={{ height: 300 }}
       >

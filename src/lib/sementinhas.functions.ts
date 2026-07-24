@@ -328,12 +328,12 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
     const doneCount = WELLNESS_ACTIVITIES.filter((a) => doneSet.has(keyFor(a))).length;
     const allDone = doneCount === WELLNESS_ACTIVITIES.length;
 
-    // (O bônus do dia agora é por fechar as 3 ESTRELAS — Humor + Quiz +
-    // Bem-estar — via grantDayStarsBonus. Aqui cada atividade só rende a sua.)
+    // (O bônus do dia é por fechar as 3 ESTRELAS — os 6 jogos, cada um valendo
+    // meia — via grantDayStarsBonus. Aqui cada atividade só rende a sua.)
     return { ok: true as const, granted, doneCount, allDone };
   });
 
-/** Bônus por fechar as 3 estrelas do dia (Humor + Quiz + Bem-estar). 1x/dia. */
+/** Bônus por fechar as 3 estrelas do dia (6 jogos × meia estrela). 1x/dia. */
 export const grantDayStarsBonus = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ accessToken: z.string().min(10), day: z.number().int().min(1).max(400) }).parse(i),
@@ -349,6 +349,17 @@ export const grantDayStarsBonus = createServerFn({ method: "POST" })
     if (!gest) return { ok: true as const, granted: 0 };
     const todayDay = Math.max(7, Math.min(300, gest.totalDays));
     if (Math.abs(data.day - todayDay) > 1) return { ok: true as const, granted: 0 };
+    // Anti-fraude: o bônus só sai se o LEDGER confirmar as 5 atividades de
+    // bem-estar do dia (não confia no cliente dizer "fechei").
+    const wellnessKeys = WELLNESS_ACTIVITIES.map((a) => `wellness:${a}:${cycle}:${data.day}`);
+    const { data: wrows } = await db
+      .from("sementinhas_ledger")
+      .select("dedupe_key")
+      .eq("user_id", uid)
+      .in("dedupe_key", wellnessKeys);
+    if (((wrows ?? []) as { dedupe_key: string }[]).length < WELLNESS_ACTIVITIES.length) {
+      return { ok: true as const, granted: 0 };
+    }
     const dedupeKey = `day_stars:${cycle}:${data.day}`;
     const { data: had } = await db
       .from("sementinhas_ledger")
