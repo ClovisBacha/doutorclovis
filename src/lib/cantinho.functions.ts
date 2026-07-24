@@ -113,12 +113,18 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
           return { ok: false as const, error: "Item exclusivo do Premium 💎" };
         }
       }
-      // A função buy_cantinho_item não está nos tipos gerados; cast tipado.
-      const rpc = supabaseAdmin.rpc as unknown as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ data: unknown; error: unknown }>;
-      const { data: res, error } = await rpc("buy_cantinho_item", {
+      // Chama o RPC DIRETO no objeto (sem extrair o método pra uma variável):
+      // extrair perdia o `this`, e por dentro o supabase-js lê `this.rest` —
+      // dava "Cannot read properties of undefined (reading 'rest')" e derrubava
+      // TODA compra. Manter a chamada ligada ao supabaseAdmin preserva o `this`.
+      const { data: res, error } = await (
+        supabaseAdmin as unknown as {
+          rpc: (
+            fn: string,
+            args: Record<string, unknown>,
+          ) => Promise<{ data: unknown; error: unknown }>;
+        }
+      ).rpc("buy_cantinho_item", {
         p_user: uid,
         p_item: item.id,
         p_price: item.price,
