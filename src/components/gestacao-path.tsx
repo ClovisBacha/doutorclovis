@@ -30,6 +30,44 @@ function celebrateIfBonus(r: unknown): void {
   }
 }
 
+/* ── Estrelas do dia em MEIAS: 6 jogos × ½⭐ = 3⭐ ─────────────────────────
+   Os 5 jogos de bem-estar + a aula da professora. Cada um vale meia estrela. */
+const WELLNESS_HALF_KEYS = [
+  "w_breathing",
+  "w_movement",
+  "w_meditation",
+  "w_bonding",
+  "w_gratitude",
+] as const;
+
+function halvesFromState(s: Record<string, boolean>): number {
+  return WELLNESS_HALF_KEYS.filter((k) => s[k]).length + (s.desafio ? 1 : 0);
+}
+
+/** 3 estrelas que enchem em METADES (0–6). Base cinza, recheio por cima. */
+function StarMeter({ halves, size = "text-xl" }: { halves: number; size?: string }) {
+  return (
+    <span className={`inline-flex gap-0.5 ${size} leading-none`} aria-label={`${halves / 2} de 3`}>
+      {[0, 1, 2].map((i) => {
+        const fill = Math.max(0, Math.min(2, halves - i * 2)); // 0 | 1 (meia) | 2 (cheia)
+        return (
+          <span key={i} className="relative inline-block">
+            <span className="opacity-30 grayscale">⭐</span>
+            {fill > 0 && (
+              <span
+                className="absolute inset-y-0 left-0 overflow-hidden whitespace-nowrap"
+                style={{ width: fill === 2 ? "100%" : "50%" }}
+              >
+                ⭐
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 /** Hash estável de string → número (posiciona decorações de forma determinística). */
 function hashStr(s: string): number {
   let h = 0;
@@ -736,11 +774,13 @@ function arcPath(cx: number, cy: number, r: number, start: number, end: number) 
   return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
 }
 
-function TaskRing({ done, color }: { done: number; color: string }) {
-  // 3 segmentos de 104° com folgas de 16°, começando no topo
-  const segs = [0, 1, 2].map((i) => {
-    const start = i * 120 + 8;
-    return arcPath(50, 50, 46, start, start + 104);
+function TaskRing({ done, total = 3, color }: { done: number; total?: number; color: string }) {
+  // Segmentos iguais com folga, começando no topo (ex.: 6 jogos = 6 arcos)
+  const seg = 360 / total;
+  const pad = total > 4 ? 5 : 8;
+  const segs = Array.from({ length: total }, (_, i) => {
+    const start = i * seg + pad;
+    return arcPath(50, 50, 46, start, start + seg - pad * 2);
   });
   return (
     <svg
@@ -999,8 +1039,8 @@ export function GestacaoPath({
     lsSet(LS.dayTasks(D), state);
     if (sheet?.kind === "day" && sheet.D === D) setDayTasks(state);
     if (D === todayD) setTodayTasks(state);
-    // As 3 estrelas do dia: Humor + Quiz (desafio) + Bem-estar (≥1 atividade).
-    const allDone = state.humor && state.desafio && state.bemestar;
+    // As 3 estrelas do dia agora são 6 MEIAS: aula + os 5 jogos de bem-estar.
+    const allDone = halvesFromState(state) >= 6;
     if (allDone && !doneDays.includes(D)) {
       const next = [...doneDays, D];
       setDoneDays(next);
@@ -1795,11 +1835,8 @@ export function GestacaoPath({
           const palette = done || isToday ? tm : isPast ? MISSED : LOCKED;
           const dia = isToday ? 84 : 64;
           const dayOfWeek = (D % 7) + 1;
-          const tasksDone = isToday
-            ? [checkedToday || todayTasks.humor, todayTasks.desafio, todayTasks.bemestar].filter(
-                Boolean,
-              ).length
-            : 0;
+          // Progresso de hoje em MEIAS estrelas (0–6): aula + 5 jogos de bem-estar.
+          const halvesToday = isToday ? halvesFromState(todayTasks) : 0;
 
           return (
             <div key={`d${D}`}>
@@ -1837,7 +1874,7 @@ export function GestacaoPath({
                     />
                   )}
                   {/* Anel segmentado: 3 segmentos = as 3 tarefas de hoje */}
-                  {isToday && <TaskRing done={done ? 3 : tasksDone} color={tm.main} />}
+                  {isToday && <TaskRing done={done ? 6 : halvesToday} total={6} color={tm.main} />}
                   <div
                     className={`duo3d relative flex items-center justify-center overflow-hidden rounded-full ${
                       isToday && !done ? "dc-chest" : ""
@@ -1865,14 +1902,11 @@ export function GestacaoPath({
                     <span className="dc-coin-shine" aria-hidden />
                   </div>
                 </div>
-                {/* 3 estrelas do dia (Humor · Quiz · Bem-estar) — enchem conforme
-                    completa; some no Modo Cuidado e nos dias futuros (bloqueados). */}
+                {/* 3 estrelas do dia em MEIAS (6 jogos) — enchem conforme joga;
+                    some no Modo Cuidado e nos dias futuros (bloqueados). */}
                 {!isFuture && !careMode && (
-                  <div className="mt-1.5 flex gap-0.5 text-sm leading-none drop-shadow-sm">
-                    {[0, 1, 2].map((i) => {
-                      const filled = done ? 3 : isToday ? tasksDone : 0;
-                      return <span key={i}>{i < filled ? "⭐" : "☆"}</span>;
-                    })}
+                  <div className="mt-1.5 drop-shadow-sm">
+                    <StarMeter halves={done ? 6 : halvesToday} size="text-sm" />
                   </div>
                 )}
               </button>
@@ -1885,15 +1919,55 @@ export function GestacaoPath({
       <div className="h-16" />
 
       {/* Intro imersiva da aula (Duolingo): moeda salta, depois o sheet abre */}
-      {wellnessDay !== null && (
-        <WellnessScreen
-          day={wellnessDay}
-          canEarn={wellnessDay === todayD}
-          careMode={careMode}
-          onEarn={() => markDayTask(wellnessDay as number, "bemestar", true)}
-          onClose={() => setWellnessDay(null)}
-        />
-      )}
+      {wellnessDay !== null &&
+        (() => {
+          const D = wellnessDay;
+          const isT = D === todayD;
+          const wk = Math.max(1, Math.min(42, Math.floor(D / 7)));
+          const q = quizForDay(D);
+          const st = sheet?.kind === "day" && sheet.D === D ? dayTasks : dayTaskState(D);
+          const chD = challengeForDay(D);
+          const lessonDone = !!st.desafio || doneDays.includes(D);
+          return (
+            <WellnessScreen
+              day={D}
+              canEarn={isT}
+              careMode={careMode}
+              halves={doneDays.includes(D) ? 6 : halvesFromState(st)}
+              lesson={
+                q
+                  ? {
+                      kind: "quiz" as const,
+                      quiz: q,
+                      emoji: quizEmojiForDay(D),
+                      week: wk,
+                      alreadyDone: lessonDone,
+                      locked: !isT && !quizPremium,
+                      showAd: isT && !quizPremium,
+                    }
+                  : {
+                      kind: "challenge" as const,
+                      label: chD.label,
+                      emoji: chD.emoji,
+                      alreadyDone: lessonDone,
+                    }
+              }
+              onEarn={(key) => {
+                markDayTask(D, `w_${key}`, true);
+                markDayTask(D, "bemestar", true); // legado: ≥1 atividade feita
+              }}
+              onEarnLesson={() => markDayTask(D, "desafio", true)}
+              onSyncWellness={(keys) => {
+                // Espelha o progresso do servidor (outro aparelho) nas meias locais.
+                const cur = dayTaskState(D);
+                keys.forEach((k) => {
+                  if (!cur[`w_${k}`]) markDayTask(D, `w_${k}`, true);
+                });
+              }}
+              onClose={() => setWellnessDay(null)}
+            />
+          );
+        })()}
 
       {intro !== null && (
         <QuizIntro
@@ -1913,22 +1987,13 @@ export function GestacaoPath({
         (() => {
           const D = sheet.D;
           const week = Math.max(1, Math.min(42, Math.floor(D / 7)));
-          const baby = babyForWeek(week);
           const ch = challengeForDay(D);
-          const quiz = quizForDay(D);
-          const quizEmoji = quizEmojiForDay(D);
           const isToday = D === todayD;
           const state = isToday ? dayTasks : dayTaskState(D);
           const done = doneDays.includes(D);
           const tm = trimMeta(week);
-          // Progresso explícito das 3 tarefas — evita o "respondi o quiz e o
-          // dia não completou" (faltava o check-in de humor).
-          const humorOk = isToday ? checkedToday || !!state.humor : !!state.humor;
-          const tasksChecked = [humorOk, !!state.desafio, !!state.bemestar].filter(Boolean).length;
-          const missingHumorHint =
-            isToday && !humorOk
-              ? "Quase lá! Falta o check-in de humor — feche esta aula e toque em como você está 💛"
-              : null;
+          // Placar do dia em MEIAS estrelas: aula + 5 jogos de bem-estar.
+          const halves = done ? 6 : halvesFromState(state);
           return (
             <div
               className="fixed inset-0 z-50 flex items-end"
@@ -1971,143 +2036,45 @@ export function GestacaoPath({
                   </button>
                 </div>
 
-                <div className="mb-4 rounded-2xl bg-emerald-50 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                      Estrelas do dia
-                    </p>
-                    <div className="flex gap-0.5 text-xl leading-none">
-                      {[0, 1, 2].map((i) => (
-                        <span key={i}>{i < tasksChecked ? "⭐" : "☆"}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="mt-1 text-[11px] font-medium text-emerald-700/90">
-                    {tasksChecked >= 3
-                      ? "3 estrelas! Dia fechado com bônus 🌟"
-                      : `${tasksChecked}/3 — humor, quiz e bem-estar fecham o dia e rendem um bônus 🌱`}
-                  </p>
-                  <div className="mt-2 flex flex-col gap-2">
-                    {[
-                      { id: "humor", label: "Check-in: como você está?", emoji: "🙂" },
-                      quiz
-                        ? {
-                            id: "desafio",
-                            label: "Aula da professora de hoje (abaixo)",
-                            emoji: quizEmoji,
-                          }
-                        : { id: "desafio", label: ch.label, emoji: ch.emoji },
-                      {
-                        id: "bemestar",
-                        label: "Fazer 1 atividade de bem-estar",
-                        emoji: "🌿",
-                      },
-                    ].map((t) => {
-                      const checked = t.id === "humor" && isToday ? checkedToday : !!state[t.id];
-                      // Com quiz, a tarefa "desafio" completa ao responder o quiz.
-                      const canToggle = isToday && t.id === "desafio" && !quiz;
-                      return (
-                        <div key={t.id} className="flex items-center gap-2">
-                          <button
-                            onClick={() => canToggle && markDayTask(D, t.id, !state[t.id])}
-                            disabled={!canToggle && t.id === "desafio"}
-                            className={`press flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-xs font-black text-white transition-colors ${
-                              checked
-                                ? "border-emerald-500 bg-emerald-500"
-                                : "border-emerald-300 bg-white"
-                            }`}
-                            aria-label={checked ? "Feito" : "Marcar"}
-                          >
-                            {checked ? "✓" : ""}
-                          </button>
-                          <span
-                            className={`flex-1 text-sm ${checked ? "text-emerald-600 line-through" : "text-emerald-900"}`}
-                          >
-                            {t.emoji} {t.label}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {!isToday && !done && (
-                    <p className="mt-2 text-[11px] text-emerald-700/70">
-                      Desafios valem no dia — mas a leitura e as figurinhas ficam para sempre 💜
-                    </p>
-                  )}
-                </div>
-
-                <div className="mb-4 flex items-center gap-3 rounded-2xl bg-pink-50 p-4">
-                  <span className="text-4xl">{FRUIT_EMOJI[week] ?? "🍼"}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-extrabold">
-                      {babyLabel} está do tamanho de {baby.fruit.toLowerCase()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      📏 {baby.size} · ⚖️ {baby.weight}
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      {baby.desc.replace("seu bebê", babyLabel)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* PONTO 1 · Orientação pós-data mais séria nas semanas 41–42 */}
-                <div className="mb-4 rounded-2xl border border-sky-100 bg-sky-50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-sky-600">
-                    🩺 Orientação médica
-                  </p>
-                  <p className="mt-1.5 text-sm leading-relaxed text-sky-900">
-                    {week >= 41 ? POSDATA_GUIDANCE : consultaForWeek(week)}
-                  </p>
-                  {week >= 41 && (
-                    <a
-                      href="/agendamento"
-                      className="press mt-3 inline-block rounded-full bg-sky-500 px-4 py-2 text-xs font-bold text-white"
-                    >
-                      Agendar consulta desta semana
-                    </a>
-                  )}
-                </div>
-
-                {quiz &&
-                  (isToday || quizPremium ? (
-                    <DailyQuizBlock
-                      key={`quiz-${D}`}
-                      quiz={quiz}
-                      emoji={quizEmoji}
-                      week={week}
-                      day={D}
-                      alreadyDone={!!state.desafio || done}
-                      canEarn={isToday}
-                      careMode={careMode}
-                      missingHint={missingHumorHint}
-                      showPremiumAd={isToday && !quizPremium}
-                      onEarn={() => markDayTask(D, "desafio", true)}
-                    />
-                  ) : (
-                    <QuizPaywall week={week} />
-                  ))}
-
-                {/* Bem-estar do dia: abre a TELA CHEIA de atividades (cards). */}
+                {/* HERÓI: os 6 jogos do dia (aula + bem-estar) — abre a tela cheia.
+                    Cada jogo vale MEIA estrela; as 3 fecham o dia com bônus. */}
                 <button
                   onClick={() => setWellnessDay(D)}
-                  className="press mt-4 flex w-full items-center justify-between gap-3 rounded-3xl bg-gradient-to-br from-emerald-400 to-green-500 p-4 text-left text-white shadow-[0_10px_26px_-10px_rgba(0,0,0,0.35)]"
+                  className="press relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-pink-500 via-fuchsia-500 to-violet-500 p-5 text-left text-white shadow-[0_14px_30px_-10px_rgba(192,38,211,0.55)]"
                 >
-                  <span className="flex items-center gap-3">
-                    <span className="text-3xl drop-shadow-sm">🌿</span>
-                    <span>
-                      <span className="block text-base font-extrabold">
-                        Atividades de bem-estar
+                  <span className="pointer-events-none absolute -right-6 -top-8 text-[110px] opacity-15">
+                    🎮
+                  </span>
+                  <span className="relative block">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold uppercase tracking-[0.18em] text-white/85">
+                        Jogos do dia
                       </span>
-                      <span className="block text-xs text-white/90">
-                        {state.bemestar
-                          ? "Estrela de bem-estar conquistada ⭐"
-                          : "Respirar · meditar · momento com o bebê…"}
-                      </span>
+                      {!careMode && <StarMeter halves={halves} size="text-2xl" />}
+                    </span>
+                    <span className="mt-2 block text-xl font-extrabold leading-tight">
+                      {halves >= 6
+                        ? "3 estrelas! Dia completo 🌟"
+                        : `${halves} de 6 jogos · cada um vale meia ⭐`}
+                    </span>
+                    <span className="mt-1.5 flex items-center gap-1.5 text-2xl">
+                      <span>📚</span>
+                      <span>🌬️</span>
+                      <span>🤸</span>
+                      <span>🧘</span>
+                      <span>💛</span>
+                      <span>✨</span>
+                    </span>
+                    <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-extrabold text-fuchsia-600 shadow-md">
+                      {halves >= 6 ? "Rejogar" : "Jogar"} ›
                     </span>
                   </span>
-                  <span className="text-2xl leading-none">›</span>
                 </button>
+                {!isToday && !done && (
+                  <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                    As estrelas valem no dia — a leitura e as figurinhas ficam pra sempre 💜
+                  </p>
+                )}
 
                 {isToday && (
                   <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
@@ -2840,10 +2807,25 @@ function BreathingBlock({
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<"intro" | "in" | "hold" | "out" | "done">("intro");
   const [cycle, setCycle] = useState(0);
+  const [tick, setTick] = useState(0); // segundos restantes da fase (contagem viva)
   const [reward, setReward] = useState<number | null>(null);
   const [sound, setSound] = useState(true);
   const grantedRef = useRef(false);
   const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
+
+  // Contagem regressiva visível dentro do círculo (1s em 1s).
+  useEffect(() => {
+    if (phase !== "in" && phase !== "hold" && phase !== "out") return;
+    const dur =
+      phase === "in"
+        ? BREATH_PATTERN.in
+        : phase === "hold"
+          ? BREATH_PATTERN.hold
+          : BREATH_PATTERN.out;
+    setTick(Math.round(dur / 1000));
+    const iv = setInterval(() => setTick((t) => Math.max(1, t - 1)), 1000);
+    return () => clearInterval(iv);
+  }, [phase, cycle]);
 
   // Loop das respirações: inspire → segure → expire, BREATH_CYCLES vezes.
   // Ao ENTRAR em cada fase, dispara a vibração e o som (que incha/afina junto).
@@ -3015,6 +2997,16 @@ function BreathingBlock({
           {(phase === "in" || phase === "hold" || phase === "out") && (
             <div className="flex flex-1 flex-col items-center justify-center">
               <div className="relative flex h-72 w-72 items-center justify-center">
+                {/* Aura girando devagar — dá vida ao círculo sem repaint pesado */}
+                <div
+                  className="absolute -inset-4 rounded-full opacity-60 blur-2xl"
+                  style={{
+                    background:
+                      "conic-gradient(from 0deg, rgba(56,189,248,0.35), rgba(34,211,238,0.12), rgba(129,140,248,0.28), rgba(56,189,248,0.35))",
+                    animation: "orbitSpin 16s linear infinite",
+                  }}
+                  aria-hidden
+                />
                 <div
                   className="absolute inset-0 rounded-full bg-sky-300/30"
                   style={{
@@ -3036,7 +3028,7 @@ function BreathingBlock({
                   aria-hidden
                 />
                 <div
-                  className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 text-white shadow-lg"
+                  className="flex h-32 w-32 flex-col items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 text-white shadow-lg"
                   style={{
                     transform: `scale(${scale})`,
                     transitionProperty: "transform",
@@ -3045,9 +3037,21 @@ function BreathingBlock({
                   }}
                 >
                   <span className="text-base font-extrabold">{label}</span>
+                  <span className="tabular-nums text-2xl font-black leading-none">{tick}</span>
                 </div>
               </div>
-              <p className="mt-10 text-lg font-bold text-sky-800">{label}…</p>
+              <p className="mt-8 text-lg font-bold text-sky-800">{label}…</p>
+              {/* Bolinhas dos ciclos — enchem conforme respira */}
+              <div className="mt-3 flex gap-1.5">
+                {Array.from({ length: BREATH_CYCLES }, (_, i) => (
+                  <span
+                    key={i}
+                    className={`h-2 w-2 rounded-full transition-colors ${
+                      i < cycle ? "bg-sky-500" : i === cycle ? "bg-sky-400/70" : "bg-sky-200"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           )}
 
@@ -3289,13 +3293,55 @@ function MovementBlock({
 
           {phase === "active" && cur && (
             <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-              <span className="text-7xl">{cur.emoji}</span>
-              <h3 className="mt-4 text-2xl font-extrabold text-emerald-900">{cur.name}</h3>
+              {/* Anel de contagem ao redor do movimento (esvazia com o tempo) */}
+              <div className="relative flex h-52 w-52 items-center justify-center">
+                <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="#a7f3d0" strokeWidth="6" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 45}
+                    strokeDashoffset={(1 - secs / cur.secs) * 2 * Math.PI * 45}
+                    style={{ transition: "stroke-dashoffset 1s linear" }}
+                  />
+                </svg>
+                <div className="flex flex-col items-center">
+                  <span
+                    className="text-6xl"
+                    style={{ animation: "dc-float 2.6s ease-in-out infinite" }}
+                  >
+                    {cur.emoji}
+                  </span>
+                  <span className="mt-1 tabular-nums text-3xl font-extrabold text-emerald-600">
+                    {secs}s
+                  </span>
+                </div>
+              </div>
+              <h3 className="mt-5 text-2xl font-extrabold text-emerald-900">{cur.name}</h3>
               <p className="mt-2 max-w-xs text-sm leading-relaxed text-emerald-800/80">{cur.cue}</p>
-              <p className="mt-6 tabular-nums text-5xl font-extrabold text-emerald-600">{secs}s</p>
+              {/* Passos da sequência */}
+              <div className="mt-4 flex gap-1.5">
+                {seq.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-2 w-6 rounded-full transition-colors ${
+                      i < idx
+                        ? "bg-emerald-500"
+                        : i === idx
+                          ? "bg-emerald-400/70"
+                          : "bg-emerald-200"
+                    }`}
+                  />
+                ))}
+              </div>
               <button
                 onClick={() => setSecs(0)}
-                className="press mt-8 rounded-full border border-emerald-300 px-6 py-2 text-xs font-bold text-emerald-700"
+                className="press mt-6 rounded-full border border-emerald-300 bg-white/70 px-6 py-2 text-xs font-bold text-emerald-700 backdrop-blur"
               >
                 Próximo →
               </button>
@@ -3590,21 +3636,35 @@ function MeditationBlock({
 
           {phase === "active" && (
             <div className="flex flex-1 flex-col items-center justify-center px-10 text-center">
-              <span className="text-5xl opacity-80">{med.emoji}</span>
+              {/* Halo que "respira" devagar atrás do tema — âncora visual da calma */}
+              <div className="relative flex h-28 w-28 items-center justify-center">
+                <div
+                  className="absolute inset-0 rounded-full bg-violet-300/40 blur-xl"
+                  style={{ animation: "haloBreathe 7s ease-in-out infinite" }}
+                  aria-hidden
+                />
+                <div
+                  className="absolute -inset-4 rounded-full bg-fuchsia-200/30 blur-2xl"
+                  style={{ animation: "haloBreathe 9s ease-in-out infinite reverse" }}
+                  aria-hidden
+                />
+                <span className="relative text-5xl">{med.emoji}</span>
+              </div>
               <p
                 key={idx}
-                className="dc-q-slide mt-8 max-w-sm text-2xl font-semibold leading-relaxed text-violet-900"
+                className="dc-q-slide mt-8 max-w-sm font-serif text-[26px] font-semibold leading-relaxed text-violet-900"
               >
                 {med.lines[idx]}
               </p>
               <button
                 onClick={() => {
+                  buzz(16);
                   if (idx + 1 >= med.lines.length) {
                     setPhase("done");
                     finish();
                   } else setIdx(idx + 1);
                 }}
-                className="press mt-10 text-xs font-bold text-violet-500"
+                className="press mt-10 rounded-full border border-violet-200 bg-white/70 px-6 py-2 text-xs font-bold text-violet-500 backdrop-blur"
               >
                 Continuar →
               </button>
@@ -3638,53 +3698,140 @@ function MeditationBlock({
   );
 }
 
-/* ══════════════════ Momento com o bebê (vínculo) ══════════════════ */
+/* ══════════════════ Momento com o bebê — Cartas de 1 minuto ══════════════════
+   Cartinhas de amor pra LER EM VOZ ALTA pro bebê (ele já reconhece a voz da
+   mãe por volta da semana 25 — e o coraçãozinho acalma quando ela fala).
+   Uma carta por dia (rotação), leitura guiada linha a linha, ~1 minuto. */
 
-const BONDING_ROTEIROS: { emoji: string; lines: string[] }[] = [
+const BONDING_LETTERS: { title: string; emoji: string; lines: string[] }[] = [
   {
+    title: "Pra você, que eu ainda não vi",
     emoji: "💛",
     lines: [
-      "Leve a mão até a barriga, com carinho.",
-      "Respire fundo e diga, baixinho: 'oi, meu amor'.",
-      "Conte pro bebê uma coisa boa que você sente por ele.",
-      "Fique em silêncio um instante, só sentindo a presença.",
-      "Esse momento é só de vocês dois. 💛",
+      "Oi, meu amor. Sou eu — a sua mãe.",
+      "A gente ainda não se viu, mas eu já te conheço de cor.",
+      "Sei quando você acorda, sei quando você dança aí dentro.",
+      "Todo dia eu invento o seu rostinho de um jeito novo.",
+      "E todos os jeitos são lindos, porque são você.",
+      "Cresce tranquilo, que aqui fora já existe um amor te esperando.",
+      "Um beijo, do tamanho do céu. 💛",
     ],
   },
   {
+    title: "O dia em que soubemos de você",
+    emoji: "🌱",
+    lines: [
+      "Deixa eu te contar uma história: o dia em que você começou.",
+      "Foi um dia comum — e de repente virou o mais importante da minha vida.",
+      "Duas listras rosas, e o mundo inteiro mudou de cor.",
+      "Meu coração bateu tão forte que acho que você ouviu daí.",
+      "Eu ri, chorei, e liguei pra quem eu mais amo.",
+      "Desde aquele dia, tudo o que eu faço tem você dentro.",
+      "Essa é a nossa primeira história. Ainda vamos escrever mil. 🌱",
+    ],
+  },
+  {
+    title: "O mundo que te espera",
+    emoji: "🌍",
+    lines: [
+      "Meu bem, deixa eu te contar do mundo aqui fora.",
+      "Tem sol que esquenta o rosto e chuva que canta no telhado.",
+      "Tem cheiro de café de manhã e de terra molhada à tarde.",
+      "Tem gente que já te ama sem nunca ter te visto.",
+      "Tem música — ah, você vai amar música.",
+      "Não precisa ter pressa. Mas saiba: é bonito aqui.",
+      "E vai ficar mais bonito ainda quando você chegar. 🌍",
+    ],
+  },
+  {
+    title: "A sua casa",
+    emoji: "🏠",
+    lines: [
+      "Hoje eu quero te contar da sua casa.",
+      "Tem um cantinho que a gente arruma devagarinho pra você.",
+      "Cada roupinha dobrada é um 'te espero' silencioso.",
+      "As paredes já sabem o seu nome — eu falo dele todo dia.",
+      "Sua casa não é feita de tijolo, é feita de espera boa.",
+      "E o seu melhor lugar já está pronto faz tempo:",
+      "é aqui, no meu colo. 🏠",
+    ],
+  },
+  {
+    title: "Sua canção falada",
     emoji: "🎵",
     lines: [
-      "Escolha uma música ou cantarole algo que você gosta.",
-      "O bebê já escuta sons — e a sua voz o acalma.",
-      "Balance devagar, como se embalasse ele.",
-      "Deixe que ele sinta o seu ritmo.",
+      "Dizem que a minha voz é a sua música preferida.",
+      "Então hoje eu vou te dar uma canção falada.",
+      "Você é o meu sol de todo dia, mesmo quando chove.",
+      "Você é o meu sonho mais corajoso.",
+      "Você é a melhor parte de todos os meus planos.",
+      "Guarda essa melodia aí no peito.",
+      "Quando você nascer, eu canto de novo — bem baixinho, no seu ouvido. 🎵",
     ],
   },
   {
-    emoji: "👣",
+    title: "Você é coragem",
+    emoji: "🦁",
     lines: [
-      "Fique quietinha e preste atenção nos movimentos.",
-      "Se sentir um chutinho, responda com um toque suave.",
-      "É a primeira 'conversa' de vocês.",
-      "Sorria — ele sente quando você está bem.",
+      "Sabia que você já me deixou mais corajosa?",
+      "Antes de você, eu tinha medo de um monte de coisas.",
+      "Agora eu tenho força que eu nem sabia que existia.",
+      "É que amor grande faz a gente crescer por dentro.",
+      "Se um dia você tiver medo, lembra: coragem corre no seu sangue.",
+      "A gente já é um time, eu e você.",
+      "E time que se ama não se solta. 🦁",
     ],
   },
   {
-    emoji: "📖",
+    title: "O nosso primeiro passeio",
+    emoji: "🌳",
     lines: [
-      "Escolha uma historinha ou um poema curto.",
-      "Leia em voz alta, devagar, com carinho.",
-      "O som da sua voz já é um abraço pra ele.",
-      "Não importa o quê — importa vocês juntos.",
+      "Fecha os olhinhos — deixa eu te levar num sonho.",
+      "No nosso primeiro passeio, vai ter sol peneirado entre as folhas.",
+      "Eu vou te mostrar o céu e você vai piscar, encantado.",
+      "Um cachorro vai latir longe, e eu vou dizer: 'olha, au-au!'",
+      "Você vai dormir no meio do passeio, e tudo bem.",
+      "O mundo pode esperar — eu vou estar ocupada te olhando.",
+      "Já estou com saudade desse dia que ainda não aconteceu. 🌳",
     ],
   },
   {
-    emoji: "💭",
+    title: "Obrigada por me escolher",
+    emoji: "🌷",
     lines: [
-      "Feche os olhos e imagine o rostinho do bebê.",
-      "Pense em uma coisa que você mal pode esperar pra viver com ele.",
-      "Guarde esse sonho no coração.",
-      "Ele está chegando, no tempo certo. 💛",
+      "Hoje o recado é curto e é o mais verdadeiro de todos.",
+      "De todos os lugares do universo, você veio parar aqui.",
+      "Bem no meu colo, bem no meu peito, bem em mim.",
+      "Obrigada por me escolher pra ser a sua mãe.",
+      "Eu prometo errar tentando acertar, todos os dias.",
+      "E te amar sem instruções, sem medida e sem fim.",
+      "Você já é a melhor coisa que eu fiz. 🌷",
+    ],
+  },
+  {
+    title: "Pros dias difíceis",
+    emoji: "🌧️",
+    lines: [
+      "Meu amor, nem todo dia aqui fora é fácil — e tudo bem.",
+      "Hoje talvez a mamãe esteja cansada, e sabe o que me levanta?",
+      "Você. Um chutinho seu vale por dez xícaras de café.",
+      "Quando eu falo com você, o dia desamarra os nós.",
+      "Então fica aí, quietinho, sendo o meu melhor motivo.",
+      "A gente atravessa qualquer chuva juntos.",
+      "Depois dela, eu te mostro o arco-íris. 🌧️→🌈",
+    ],
+  },
+  {
+    title: "Até já, meu amor",
+    emoji: "💌",
+    lines: [
+      "Essa cartinha é só pra dizer: até já.",
+      "Cada dia que passa é um dia a menos pra eu te ver.",
+      "Eu conto as semanas como quem conta estrelas.",
+      "Você não tem ideia da festa que é você existir.",
+      "Termina de crescer com calma — capricha nesse coração.",
+      "Que aqui fora, o meu já é todo seu.",
+      "Até já, meu amor. Assinado: a mamãe. 💌",
     ],
   },
 ];
@@ -3702,21 +3849,25 @@ function BondingBlock({
   alreadyDone: boolean;
   onEarn: () => void;
 }) {
-  const roteiro = useMemo(() => BONDING_ROTEIROS[day % BONDING_ROTEIROS.length], [day]);
+  const carta = useMemo(() => BONDING_LETTERS[day % BONDING_LETTERS.length], [day]);
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
   const [idx, setIdx] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
+  const [sound, setSound] = useState(true);
   const grantedRef = useRef(false);
+  const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
+
+  useEffect(() => () => audioRef.current?.stop(), []);
 
   useEffect(() => {
     if (phase !== "active") return;
     const t = setTimeout(() => {
-      if (idx + 1 >= roteiro.lines.length) {
+      if (idx + 1 >= carta.lines.length) {
         setPhase("done");
         finish();
       } else setIdx(idx + 1);
-    }, 11000);
+    }, 10000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, idx]);
@@ -3746,42 +3897,93 @@ function BondingBlock({
     setIdx(0);
     setReward(null);
     grantedRef.current = false;
+    if (sound) {
+      audioRef.current = createBreathAudio();
+      audioRef.current.start();
+      audioRef.current.ambient();
+    }
     setPhase("active");
   }
   function close() {
+    audioRef.current?.stop();
+    audioRef.current = null;
     setOpen(false);
     setPhase("intro");
   }
+  function toggleSound() {
+    setSound((on) => {
+      const next = !on;
+      if (!next) {
+        audioRef.current?.stop();
+        audioRef.current = null;
+      } else if (phase === "active") {
+        audioRef.current = createBreathAudio();
+        audioRef.current.start();
+        audioRef.current.ambient();
+      }
+      return next;
+    });
+  }
+
+  // Corações flutuando pro alto — o "clima" da carta (posições determinísticas).
+  const hearts = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, i) => ({
+        left: `${8 + ((i * 13 + day * 7) % 84)}%`,
+        delay: `${(i * 1.3) % 6}s`,
+        dur: `${6 + (i % 3) * 2}s`,
+        emoji: i % 3 === 0 ? "💗" : i % 3 === 1 ? "💛" : "🤍",
+        size: i % 2 === 0 ? "text-2xl" : "text-lg",
+      })),
+    [day],
+  );
 
   return (
     <>
-      <div className="mt-4 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-rose-50 p-4">
+      <div className="mt-4 rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 to-pink-50 p-4">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">💛</span>
+          <span className="text-2xl">{carta.emoji}</span>
           <div className="flex-1">
-            <p className="text-sm font-extrabold text-amber-800">Momento com o bebê</p>
-            <p className="text-xs text-amber-700/80">
-              Um instante de vínculo {alreadyDone ? "· feito hoje ✓" : ""}
+            <p className="text-sm font-extrabold text-rose-800">Carta de hoje pro bebê</p>
+            <p className="text-xs text-rose-700/80">
+              “{carta.title}” · 1 min em voz alta {alreadyDone ? "· lida hoje ✓" : ""}
             </p>
           </div>
         </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-rose-700/70">
+          Leia em voz alta, devagar: o bebê já reconhece a sua voz — e o coraçãozinho dele acalma
+          quando você fala. 💛
+        </p>
         <button
           onClick={() => {
             setOpen(true);
             setPhase("intro");
           }}
-          className="press mt-3 w-full rounded-full bg-amber-500 py-2.5 text-sm font-extrabold text-white"
+          className="press mt-3 w-full rounded-full bg-rose-500 py-2.5 text-sm font-extrabold text-white"
         >
-          {alreadyDone ? "Repetir o momento" : "Começar"}
+          {alreadyDone ? "Ler outra vez 💌" : "Abrir a carta 💌"}
         </button>
       </div>
 
       {open && (
         <div
-          className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-amber-100 via-rose-50 to-white"
+          className="dc-quiz-in fixed inset-0 z-50 flex flex-col overflow-hidden bg-gradient-to-b from-rose-100 via-pink-50 to-white"
           style={{ paddingTop: "var(--safe-top)" }}
         >
-          <div className="flex items-center px-4 py-3">
+          {/* Corações subindo — só durante a leitura e no final */}
+          {(phase === "active" || phase === "done") &&
+            hearts.map((h, i) => (
+              <span
+                key={i}
+                aria-hidden
+                className={`dc-heart ${h.size}`}
+                style={{ left: h.left, animationDelay: h.delay, animationDuration: h.dur }}
+              >
+                {h.emoji}
+              </span>
+            ))}
+
+          <div className="relative flex items-center px-4 py-3">
             <button
               onClick={close}
               aria-label="Fechar"
@@ -3789,52 +3991,86 @@ function BondingBlock({
             >
               ✕
             </button>
-            <span className="flex-1" />
-            <span className="w-6" />
+            {phase === "active" ? (
+              <div className="flex flex-1 items-center justify-center gap-1 text-sm">
+                {carta.lines.map((_, i) => (
+                  <span key={i} className={i <= idx ? "" : "opacity-30 grayscale"}>
+                    💗
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="flex-1" />
+            )}
+            <button
+              onClick={toggleSound}
+              aria-label={sound ? "Desligar som" : "Ligar som"}
+              className="press text-xl leading-none"
+            >
+              {sound ? "🔊" : "🔇"}
+            </button>
           </div>
+
           {phase === "intro" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-              <span className="text-6xl">{roteiro.emoji}</span>
-              <h3 className="mt-4 text-2xl font-extrabold text-amber-900">Momento com o bebê</h3>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-amber-800/80">
-                Um ritual curtinho de conexão. Vá com calma e curta cada passo. 💛
+            <div className="relative flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <span className="text-6xl" style={{ animation: "dc-float 3s ease-in-out infinite" }}>
+                💌
+              </span>
+              <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-rose-400">
+                Carta de hoje
+              </p>
+              <h3 className="mt-1 font-serif text-3xl font-extrabold text-rose-900">
+                {carta.title} {carta.emoji}
+              </h3>
+              <p className="mt-4 max-w-xs text-sm leading-relaxed text-rose-800/80">
+                Encontre um lugar calmo, mão na barriga… e leia <strong>em voz alta</strong>,
+                devagar. A sua voz é o som preferido do bebê. 💛
               </p>
               <button
                 onClick={begin}
-                className="press mt-8 rounded-full bg-amber-500 px-8 py-3 text-sm font-extrabold text-white"
+                className="press mt-8 rounded-full bg-rose-500 px-10 py-3 text-sm font-extrabold text-white shadow-[0_10px_24px_-8px_rgba(244,63,94,0.6)]"
               >
-                Começar
+                Começar a ler 💗
               </button>
             </div>
           )}
+
           {phase === "active" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-10 text-center">
-              <span className="text-5xl opacity-80">{roteiro.emoji}</span>
+            <div className="relative flex flex-1 flex-col items-center justify-center px-8 text-center">
               <p
                 key={idx}
-                className="dc-q-slide mt-8 max-w-sm text-2xl font-semibold leading-relaxed text-amber-900"
+                className="dc-q-slide max-w-sm font-serif text-[26px] font-semibold leading-relaxed text-rose-900"
               >
-                {roteiro.lines[idx]}
+                {carta.lines[idx]}
+              </p>
+              <p className="mt-8 text-[11px] font-semibold uppercase tracking-wider text-rose-300">
+                leia em voz alta, no seu ritmo
               </p>
               <button
                 onClick={() => {
-                  if (idx + 1 >= roteiro.lines.length) {
+                  buzz(16);
+                  if (idx + 1 >= carta.lines.length) {
                     setPhase("done");
                     finish();
                   } else setIdx(idx + 1);
                 }}
-                className="press mt-10 text-xs font-bold text-amber-500"
+                className="press mt-4 rounded-full border border-rose-200 bg-white/70 px-6 py-2 text-xs font-bold text-rose-500 backdrop-blur"
               >
-                Continuar →
+                Próxima linha →
               </button>
             </div>
           )}
+
           {phase === "done" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+            <div className="relative flex flex-1 flex-col items-center justify-center px-8 text-center">
               {!careMode && <ConfettiBurst />}
-              <span className="dc-result-in text-6xl">💛</span>
-              <h3 className="mt-3 text-2xl font-extrabold text-amber-900">Que amor 💛</h3>
-              <p className="mt-1 text-sm text-amber-800/80">Vocês dois se conectaram hoje.</p>
+              <span className="dc-result-in text-6xl">💋</span>
+              <h3 className="mt-3 font-serif text-3xl font-extrabold text-rose-900">
+                Beijo entregue
+              </h3>
+              <p className="mt-2 max-w-xs text-sm leading-relaxed text-rose-800/80">
+                Ele ouviu a sua voz — e, do jeitinho dele, guardou cada palavra. 💛
+              </p>
               {!careMode && reward != null && reward > 0 && (
                 <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
                   +{reward} 🌱 Sementinhas!
@@ -3842,9 +4078,9 @@ function BondingBlock({
               )}
               <button
                 onClick={close}
-                className="press mt-8 w-full max-w-xs rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+                className="press mt-8 w-full max-w-xs rounded-full bg-rose-500 py-3 text-sm font-extrabold text-white"
               >
-                Voltar ao caminho
+                Voltar aos jogos
               </button>
             </div>
           )}
@@ -3968,12 +4204,32 @@ function GratitudeBlock({
               <p className="mt-2 max-w-xs text-sm text-amber-800/80">
                 Pode ser bem pequeno. Isso vai pro seu diário. 💛
               </p>
+              {/* Fichinhas de 1 toque — destravam a escrita nos dias cansados */}
+              <div className="mt-4 flex max-w-sm flex-wrap justify-center gap-1.5">
+                {[
+                  "Meu bebê mexeu 🦶",
+                  "Um carinho que recebi 💕",
+                  "Uma boa notícia 📩",
+                  "Comi algo gostoso 🍓",
+                  "Descansei um pouquinho 😴",
+                ].map((chip) => (
+                  <button
+                    key={chip}
+                    onClick={() =>
+                      setText((t) => (t.trim() ? `${t.trim()} · ${chip}` : chip).slice(0, 300))
+                    }
+                    className="press rounded-full border border-amber-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-amber-700"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value.slice(0, 300))}
                 rows={4}
                 placeholder="Hoje eu fiquei grata por…"
-                className="mt-5 w-full max-w-sm resize-none rounded-2xl border border-amber-200 bg-white p-3 text-sm outline-none focus:border-amber-400"
+                className="mt-3 w-full max-w-sm resize-none rounded-2xl border border-amber-200 bg-white p-3 text-sm outline-none focus:border-amber-400"
               />
               <button
                 onClick={save}
@@ -4008,8 +4264,7 @@ function GratitudeBlock({
   );
 }
 
-/** Motor da "atividade de bem-estar do dia": 5 tipos. O dia SUGERE um (rotação),
- *  mas a paciente pode ESCOLHER outro nas fichinhas. */
+/** Motor dos "jogos do dia": os 5 de bem-estar + a AULA (que virou jogo). */
 const WELLNESS_TYPES = [
   { key: "breathing", emoji: "🌬️", label: "Respirar", Comp: BreathingBlock },
   { key: "movement", emoji: "🤸", label: "Mexer", Comp: MovementBlock },
@@ -4018,34 +4273,93 @@ const WELLNESS_TYPES = [
   { key: "gratitude", emoji: "✨", label: "Gratidão", Comp: GratitudeBlock },
 ] as const;
 
-/** Cor + descrição de cada atividade (cards bonitos da tela de bem-estar). */
+/** Cor + descrição de cada jogo (cards coloridos da tela de jogos). */
 const WELLNESS_META: Record<string, { title: string; grad: string; desc: string }> = {
+  aula: {
+    title: "Aula de hoje",
+    grad: "from-indigo-400 to-blue-500",
+    desc: "A lição da professora + o quiz da semana.",
+  },
   breathing: {
     title: "Respirar",
     grad: "from-sky-400 to-cyan-500",
-    desc: "Respiração guiada de 1 minuto pra acalmar.",
+    desc: "Respiração guiada com som e vibração pra acalmar.",
   },
   movement: {
     title: "Movimento",
     grad: "from-amber-400 to-orange-500",
-    desc: "Movimentos leves e seguros pra soltar o corpo.",
+    desc: "3 movimentos leves com cronômetro pra soltar o corpo.",
   },
   meditation: {
     title: "Meditar",
     grad: "from-violet-400 to-purple-500",
-    desc: "Uma meditação curtinha pra relaxar.",
+    desc: "Meditação guiada curtinha, com som ambiente.",
   },
   bonding: {
     title: "Momento com o bebê",
     grad: "from-rose-400 to-pink-500",
-    desc: "Um instante só de conexão com o bebê.",
+    desc: "Uma carta de 1 minuto pra ler em voz alta pro bebê.",
   },
   gratitude: {
     title: "Gratidão",
     grad: "from-emerald-400 to-green-500",
-    desc: "Escreva uma coisa boa do seu dia.",
+    desc: "Guarde uma coisa boa do seu dia no diário.",
   },
 };
+
+/** A "aula" na tela de jogos: quiz da professora ou o desafio simples do dia. */
+type WellnessLesson =
+  | {
+      kind: "quiz";
+      quiz: DailyQuiz;
+      emoji: string;
+      week: number;
+      alreadyDone: boolean;
+      locked: boolean;
+      showAd: boolean;
+    }
+  | { kind: "challenge"; label: string; emoji: string; alreadyDone: boolean };
+
+/** Desafio simples do dia (quando não há quiz): confirmar que fez. */
+function ChallengeBlock({
+  label,
+  emoji,
+  alreadyDone,
+  canEarn,
+  onEarn,
+}: {
+  label: string;
+  emoji: string;
+  alreadyDone: boolean;
+  canEarn: boolean;
+  onEarn: () => void;
+}) {
+  const [doneNow, setDoneNow] = useState(false);
+  const isDone = alreadyDone || doneNow;
+  return (
+    <div className="mt-4 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-blue-50 p-4">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">{emoji}</span>
+        <div className="flex-1">
+          <p className="text-sm font-extrabold text-indigo-800">Desafio do dia</p>
+          <p className="text-xs text-indigo-700/80">{isDone ? "Feito hoje ✓" : label}</p>
+        </div>
+      </div>
+      <button
+        onClick={() => {
+          if (isDone || !canEarn) return;
+          setDoneNow(true);
+          onEarn();
+          toast.success("📚 Desafio do dia completo! +½ ⭐");
+        }}
+        disabled={isDone || !canEarn}
+        className="press mt-3 w-full rounded-full bg-indigo-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-50"
+      >
+        {isDone ? "Completo ✓" : canEarn ? "Marcar como feito ✓" : "Válido só no dia 💜"}
+      </button>
+    </div>
+  );
+}
 
 /**
  * Tela CHEIA de bem-estar: cards coloridos com as atividades. Abre instantâneo
@@ -4057,16 +4371,25 @@ function WellnessScreen({
   day,
   canEarn,
   careMode,
+  halves,
+  lesson,
   onEarn,
+  onEarnLesson,
+  onSyncWellness,
   onClose,
 }: {
   day: number;
   canEarn: boolean;
   careMode?: boolean;
-  onEarn: () => void;
+  /** Meias estrelas do dia (0–6): aula + 5 jogos de bem-estar. */
+  halves: number;
+  lesson: WellnessLesson;
+  onEarn: (key: string) => void;
+  onEarnLesson: () => void;
+  onSyncWellness?: (keys: string[]) => void;
   onClose: () => void;
 }) {
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
 
   async function refresh() {
@@ -4075,7 +4398,11 @@ function WellnessScreen({
       const { data: s } = await supabase.auth.getSession();
       if (!s.session) return;
       const r = await getWellnessProgress({ data: { accessToken: s.session.access_token, day } });
-      if (r.ok) setDone(new Set(r.done));
+      if (r.ok) {
+        setDone(new Set(r.done));
+        // Espelha o servidor (ex.: jogou em outro aparelho) nas meias locais.
+        if (r.done.length) onSyncWellness?.(r.done);
+      }
     } catch {
       /* progresso é secundário — não bloqueia a tela */
     }
@@ -4085,13 +4412,21 @@ function WellnessScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day]);
 
-  function handleEarn() {
-    onEarn();
+  function handleEarn(key: string) {
+    onEarn(key);
     setTimeout(refresh, 500);
   }
 
-  const activity = openIdx !== null ? WELLNESS_TYPES[openIdx] : null;
+  const activity = openKey ? WELLNESS_TYPES.find((a) => a.key === openKey) : null;
   const Chosen = activity?.Comp;
+  const openMeta = openKey ? WELLNESS_META[openKey] : null;
+  const lessonEmoji = lesson.emoji;
+
+  // Os 6 cards: aula primeiro (o conteúdo do dia), depois os 5 de bem-estar.
+  const cards: { key: string; emoji: string; done: boolean }[] = [
+    { key: "aula", emoji: lessonEmoji || "📚", done: lesson.alreadyDone },
+    ...WELLNESS_TYPES.map((a) => ({ key: a.key, emoji: a.emoji, done: done.has(a.key) })),
+  ];
 
   return (
     <div
@@ -4099,60 +4434,129 @@ function WellnessScreen({
       style={{ background: "linear-gradient(180deg,#fdf3ec 0%,#f7e2d8 100%)" }}
     >
       <button
-        onClick={activity ? () => setOpenIdx(null) : onClose}
-        aria-label={activity ? "Voltar" : "Fechar"}
+        onClick={openKey ? () => setOpenKey(null) : onClose}
+        aria-label={openKey ? "Voltar" : "Fechar"}
         className="press fixed right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-lg text-slate-600 shadow-md backdrop-blur"
       >
         ✕
       </button>
 
       <div className="mx-auto max-w-md px-5 pb-16 pt-[calc(3.5rem+env(safe-area-inset-top))]">
-        {activity && Chosen ? (
+        {openKey === "aula" ? (
           <div>
             <p className="mb-3 text-center text-sm font-bold text-foreground/60">
-              {activity.emoji} {WELLNESS_META[activity.key]?.title ?? activity.label}
+              {lessonEmoji || "📚"} {WELLNESS_META.aula.title}
+            </p>
+            {lesson.kind === "quiz" ? (
+              lesson.locked ? (
+                <QuizPaywall week={lesson.week} />
+              ) : (
+                <DailyQuizBlock
+                  key={`wq-${day}`}
+                  quiz={lesson.quiz}
+                  emoji={lesson.emoji}
+                  week={lesson.week}
+                  day={day}
+                  alreadyDone={lesson.alreadyDone}
+                  canEarn={canEarn}
+                  careMode={careMode}
+                  missingHint={null}
+                  showPremiumAd={lesson.showAd}
+                  onEarn={onEarnLesson}
+                />
+              )
+            ) : (
+              <ChallengeBlock
+                label={lesson.label}
+                emoji={lesson.emoji}
+                alreadyDone={lesson.alreadyDone}
+                canEarn={canEarn}
+                onEarn={onEarnLesson}
+              />
+            )}
+          </div>
+        ) : activity && Chosen ? (
+          <div>
+            <p className="mb-3 text-center text-sm font-bold text-foreground/60">
+              {activity.emoji} {openMeta?.title ?? activity.label}
             </p>
             <Chosen
               day={day}
               canEarn={canEarn}
               careMode={careMode}
               alreadyDone={done.has(activity.key)}
-              onEarn={handleEarn}
+              onEarn={() => handleEarn(activity.key)}
             />
           </div>
         ) : (
           <>
-            <h2 className="font-serif text-2xl text-foreground">Bem-estar de hoje 🌿</h2>
+            <h2 className="font-serif text-2xl text-foreground">Jogos do dia 🎮</h2>
             {!careMode && (
               <p className="mt-1 text-sm text-muted-foreground">
-                Escolha um momento pra você e o bebê. Faça <strong>1</strong> pra ganhar a estrela
-                de bem-estar ⭐ — quanto mais, mais Sementinhas 🌱.
+                Cada jogo vale <strong>meia estrela</strong> — complete os 6 pra fechar as 3 ⭐ do
+                dia e ganhar o bônus 🌱.
               </p>
             )}
+
+            {/* Placar do dia: 3 estrelas que enchem em metades */}
+            {!careMode && (
+              <div className="mt-4 flex items-center justify-between rounded-3xl bg-white/75 px-4 py-3 shadow-sm backdrop-blur">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-600">
+                    Estrelas do dia
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {halves >= 6 ? "Dia completo! 🌟" : `${halves} de 6 jogos`}
+                  </p>
+                </div>
+                <StarMeter halves={halves} size="text-3xl" />
+              </div>
+            )}
+
             <div className="mt-5 flex flex-col gap-3">
-              {WELLNESS_TYPES.map((a, i) => {
-                const meta = WELLNESS_META[a.key];
-                const isDone = !careMode && done.has(a.key);
+              {cards.map((c, i) => {
+                const meta = WELLNESS_META[c.key];
+                const isDone = !careMode && c.done;
                 return (
                   <button
-                    key={a.key}
-                    onClick={() => setOpenIdx(i)}
-                    className={`press relative flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br ${meta.grad} p-4 text-left text-white shadow-[0_10px_26px_-10px_rgba(0,0,0,0.35)]`}
+                    key={c.key}
+                    onClick={() => setOpenKey(c.key)}
+                    style={{ animationDelay: `${i * 55}ms` }}
+                    className={`press fade-slide-up relative flex items-center gap-4 overflow-hidden rounded-3xl bg-gradient-to-br ${meta.grad} p-4 text-left text-white shadow-[0_10px_26px_-10px_rgba(0,0,0,0.35)]`}
                   >
-                    <span className="text-4xl drop-shadow-sm">{a.emoji}</span>
+                    <span
+                      className="text-4xl drop-shadow-sm"
+                      style={{
+                        animation: "dc-float 3.2s ease-in-out infinite",
+                        animationDelay: `${i * 350}ms`,
+                      }}
+                    >
+                      {c.emoji}
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-base font-extrabold">{meta.title}</span>
                       <span className="block text-xs text-white/90">{meta.desc}</span>
                     </span>
-                    {isDone && (
-                      <span className="shrink-0 rounded-full bg-white/25 px-2.5 py-1 text-xs font-bold">
-                        ✓ feito
+                    {/* Meia estrela do jogo: apagada → acesa quando completa */}
+                    {!careMode && (
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${
+                          isDone ? "bg-white/30" : "bg-black/15 text-white/85"
+                        }`}
+                      >
+                        {isDone ? "⭐ ½ ✓" : "☆ ½"}
                       </span>
                     )}
                   </button>
                 );
               })}
             </div>
+
+            {!careMode && halves >= 6 && (
+              <p className="mt-5 text-center text-sm font-bold text-fuchsia-700">
+                ⭐⭐⭐ Todas as estrelas de hoje! Volte amanhã pra manter a chama 🔥
+              </p>
+            )}
           </>
         )}
       </div>
