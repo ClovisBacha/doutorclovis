@@ -107,7 +107,13 @@ import {
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
 import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
-import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
+import {
+  GestacaoPath,
+  ensureInitialJourneyPull,
+  lsGet,
+  lsSet,
+  ARRANGE_FLAG,
+} from "@/components/gestacao-path";
 import {
   searchDoctors,
   requestDoctor,
@@ -1079,7 +1085,9 @@ function MinhaContaPage() {
                   <CardTab profile={profile} gest={gest} onNavigate={goToTab} />
                 )}
                 {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
-                {tab === "Recompensas" && <RecompensasHub careMode={careMode} gest={gest} />}
+                {tab === "Recompensas" && (
+                  <RecompensasHub careMode={careMode} gest={gest} onNavigate={goToTab} />
+                )}
                 {tab === "Saúde da mulher" && <SaudeMulherHub />}
                 {tab === "Médico" && <MédicoTab />}
                 {tab === "Exames" && <ExamesTab gest={gest} />}
@@ -12625,7 +12633,15 @@ const RECOMPENSAS_SUBTABS = [
   { key: "loja", label: "Loja" },
 ] as const;
 
-function RecompensasHub({ careMode, gest }: { careMode: boolean; gest: Gest }) {
+function RecompensasHub({
+  careMode,
+  gest,
+  onNavigate,
+}: {
+  careMode: boolean;
+  gest: Gest;
+  onNavigate?: (t: string) => void;
+}) {
   const [sub, setSub] = useState<(typeof RECOMPENSAS_SUBTABS)[number]["key"]>("cantinho");
   return (
     <div className="space-y-5">
@@ -12645,7 +12661,7 @@ function RecompensasHub({ careMode, gest }: { careMode: boolean; gest: Gest }) {
         ))}
       </div>
       <Fade key={sub}>
-        {sub === "cantinho" && <CantinhoTab careMode={careMode} />}
+        {sub === "cantinho" && <CantinhoTab careMode={careMode} onNavigate={onNavigate} />}
         {sub === "conquistas" && <ConquistasTab />}
         {sub === "loja" && <LojaTab gest={gest} />}
       </Fade>
@@ -13666,7 +13682,13 @@ function ReferralCard() {
   );
 }
 
-function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
+function CantinhoTab({
+  careMode = false,
+  onNavigate,
+}: {
+  careMode?: boolean;
+  onNavigate?: (t: string) => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
   const [owned, setOwned] = useState<string[]>([]);
@@ -13678,16 +13700,10 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   // As formas de ganhar Sementinhas ficam num bloco só, recolhido por padrão,
   // pra não empilhar 4 cards e poluir a tela (fica "Ganhe mais 🌱 ›").
   const [showEarn, setShowEarn] = useState(false);
-  // Layout livre da cena: cada paciente arruma os itens onde quiser. Posições
-  // em % (responsivo) salvas no aparelho — sem SQL, persiste ao reabrir o app.
+  // Vitrine do cantinho: mostra o que ela tem. ARRUMAR (posição + tamanho) é
+  // na trilha do jogo, que é a tela grande de verdade — aqui só o resumo.
   const [uid, setUid] = useState<string | null>(null);
   const [layout, setLayout] = useState<Record<string, { x: number; y: number }>>({});
-  // Espelho do layout p/ salvar no pointer-up sem efeito colateral no updater.
-  const layoutRef = useRef(layout);
-  layoutRef.current = layout;
-  const [arranging, setArranging] = useState(false);
-  const sceneRef = useRef<HTMLDivElement | null>(null);
-  const dragId = useRef<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -13744,32 +13760,15 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
     const row = Math.floor(idx / cols);
     return { x: 18 + col * 21, y: 30 + row * 24 };
   }
-  function saveLayout(next: Record<string, { x: number; y: number }>) {
-    if (uid) {
-      try {
-        localStorage.setItem(`cantinho:layout:${uid}`, JSON.stringify(next));
-      } catch {
-        /* storage cheio/indisponível: mantém em memória */
-      }
+  // Manda pra trilha do jogo já no modo Arrumar (é lá que ela posiciona e
+  // redimensiona cada enfeite, na tela grande).
+  function arrumarNaTrilha() {
+    try {
+      sessionStorage.setItem(ARRANGE_FLAG, "1");
+    } catch {
+      /* sem sessionStorage: ela abre o Arrumar pelo botão da trilha */
     }
-  }
-  function onDecorPointerDown(e: React.PointerEvent, id: string) {
-    if (!arranging) return;
-    dragId.current = id;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-  }
-  function onScenePointerMove(e: React.PointerEvent) {
-    if (!arranging || !dragId.current || !sceneRef.current) return;
-    const r = sceneRef.current.getBoundingClientRect();
-    const x = Math.max(6, Math.min(94, ((e.clientX - r.left) / r.width) * 100));
-    const y = Math.max(8, Math.min(92, ((e.clientY - r.top) / r.height) * 100));
-    setLayout((prev) => ({ ...prev, [dragId.current as string]: { x, y } }));
-  }
-  function onScenePointerUp() {
-    if (!dragId.current) return;
-    dragId.current = null;
-    // Salva a partir do ref (efeito colateral fora do updater — StrictMode-safe).
-    saveLayout(layoutRef.current);
+    onNavigate?.("Caminho");
   }
 
   if (loading) return <TabSkeleton />;
@@ -13850,10 +13849,6 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
 
       {/* A cena do cantinho — quadro onde a paciente arruma os itens à vontade */}
       <div
-        ref={sceneRef}
-        onPointerMove={onScenePointerMove}
-        onPointerUp={onScenePointerUp}
-        onPointerCancel={onScenePointerUp}
         className="relative overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100"
         style={{ height: 300 }}
       >
@@ -13876,46 +13871,30 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
               return (
                 <div
                   key={i.id}
-                  onPointerDown={(e) => onDecorPointerDown(e, i.id)}
                   title={i.name}
-                  className={`absolute select-none text-5xl drop-shadow-sm ${
-                    arranging ? "cursor-grab touch-none active:cursor-grabbing" : ""
-                  }`}
+                  className="pointer-events-none absolute select-none text-5xl drop-shadow-sm"
                   style={{
                     left: `${pos.x}%`,
                     top: `${pos.y}%`,
                     transform: "translate(-50%, -50%)",
-                    touchAction: arranging ? "none" : undefined,
                   }}
                 >
-                  <span
-                    className={
-                      arranging
-                        ? "inline-block rounded-2xl bg-white/50 p-1 ring-2 ring-emerald-300"
-                        : ""
-                    }
-                  >
-                    {i.emoji}
-                  </span>
+                  {i.emoji}
                 </div>
               );
             })}
 
-            {/* Botão arrumar / pronto */}
+            {/* Arrumar é na trilha do jogo — aqui é só a vitrine */}
             <button
-              onClick={() => setArranging((a) => !a)}
-              className={`press absolute right-3 top-3 z-10 rounded-full px-3 py-1.5 text-[11px] font-bold shadow-sm ${
-                arranging ? "bg-emerald-500 text-white" : "bg-white/85 text-emerald-700"
-              }`}
+              onClick={arrumarNaTrilha}
+              className="press absolute right-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-bold text-emerald-700 shadow-sm"
             >
-              {arranging ? "Pronto ✓" : "Arrumar ✏️"}
+              Arrumar na trilha ✏️
             </button>
 
-            {arranging && (
-              <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[11px] font-medium text-emerald-800/80">
-                Arraste os itens pra onde quiser 💛
-              </p>
-            )}
+            <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[11px] font-medium text-emerald-800/80">
+              Coloque cada enfeite onde quiser — e do tamanho que quiser — no seu Caminho 💛
+            </p>
           </>
         )}
       </div>

@@ -65,6 +65,131 @@ function hashStr(s: string): number {
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return h;
 }
+
+/* ── Decoração do Caminho (modo "Arrumar") ────────────────────────────────
+   A paciente decora a PRÓPRIA trilha do jogo: escolhe onde cada item comprado
+   fica e de que tamanho. O mesmo item pode ser colocado várias vezes.
+   `x` = % da largura da trilha (responsivo), `y` = px ao longo dela,
+   `s` = escala (1 ≈ 2rem). Salvo no aparelho, por usuária. */
+export type PlacedDecor = { k: string; id: string; x: number; y: number; s: number };
+
+const DECOR_MAX = 60;
+const DECOR_MIN_SCALE = 0.5;
+const DECOR_MAX_SCALE = 4.5;
+
+function clampN(n: number, a: number, b: number): number {
+  return Math.max(a, Math.min(b, n));
+}
+
+function decorStoreKey(uid: string) {
+  return `caminho:decor:${uid}`;
+}
+
+/** Handoff do Cantinho → Caminho: abre o jogo já no modo "Arrumar". */
+export const ARRANGE_FLAG = "caminho:arrumar";
+
+type DecorSave = { v: 1; items: PlacedDecor[]; seen: string[] };
+
+function loadDecor(uid: string): DecorSave | null {
+  try {
+    const raw = localStorage.getItem(decorStoreKey(uid));
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Partial<DecorSave>;
+    if (!p || !Array.isArray(p.items)) return null;
+    const items = p.items
+      .filter((it) => it && typeof it.id === "string" && CANTINHO_BY_ID[it.id])
+      .map((it, i) => ({
+        k: typeof it.k === "string" && it.k ? it.k : `p${i}`,
+        id: it.id,
+        x: clampN(Number(it.x) || 50, 3, 97),
+        y: Math.max(0, Number(it.y) || 0),
+        s: clampN(Number(it.s) || 1, DECOR_MIN_SCALE, DECOR_MAX_SCALE),
+      }))
+      .slice(0, DECOR_MAX);
+    const seen = Array.isArray(p.seen) ? p.seen.filter((s) => typeof s === "string") : [];
+    return { v: 1, items, seen };
+  } catch {
+    return null; // layout corrompido: volta pro automático
+  }
+}
+
+function saveDecor(uid: string, items: PlacedDecor[], seen: string[]) {
+  try {
+    localStorage.setItem(decorStoreKey(uid), JSON.stringify({ v: 1, items, seen } as DecorSave));
+  } catch {
+    /* storage cheio/indisponível: segue só em memória */
+  }
+}
+
+/** Espalha itens novos pela trilha (ponto de partida; a paciente arruma depois). */
+function seedDecor(ids: string[], height: number, offset: number): PlacedDecor[] {
+  const out: PlacedDecor[] = [];
+  const span = Math.max(240, height - 260);
+  ids.forEach((id, i) => {
+    const item = CANTINHO_BY_ID[id];
+    if (!item) return;
+    const h = hashStr(id);
+    const idx = offset + i;
+    const especial = item.type === "especial";
+    const copies = especial ? 1 : 2;
+    for (let e = 0; e < copies; e++) {
+      const y = 130 + (((h % 400) + e * 880 + idx * 270) % span);
+      const side = (e + idx) % 2;
+      const x = side === 0 ? 8 + ((h >> (e + 2)) % 10) : 82 + ((h >> (e + 2)) % 10);
+      out.push({
+        k: `s${idx}-${e}-${id}`,
+        id,
+        x,
+        y,
+        s: especial ? 1.6 : item.type === "planta" ? 1.25 : 1,
+      });
+    }
+  });
+  return out;
+}
+
+/** Um item decorando a trilha. Fora do modo Arrumar, só enfeita (sem cliques). */
+function DecorSprite({ p, still = false }: { p: PlacedDecor; still?: boolean }) {
+  const item = CANTINHO_BY_ID[p.id];
+  if (!item) return null;
+  const h = hashStr(p.k);
+  const delay = `${(h % 24) * 0.22}s`;
+  const especial = item.type === "especial";
+  const anim =
+    item.type === "bicho"
+      ? "dcWander 7s ease-in-out infinite"
+      : item.type === "planta"
+        ? "dcSway 5.5s ease-in-out infinite"
+        : "dcHover 4s ease-in-out infinite";
+  return (
+    <>
+      {especial && (
+        <span
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{
+            width: `${p.s * 3.4}rem`,
+            height: `${p.s * 3.4}rem`,
+            background: "radial-gradient(circle, rgba(255,214,120,0.55), transparent 70%)",
+            animation: still ? undefined : "dcGlow 3.6s ease-in-out infinite",
+            animationDelay: delay,
+          }}
+          aria-hidden
+        />
+      )}
+      <span
+        className="relative inline-block leading-none"
+        style={{
+          fontSize: `${(p.s * 2).toFixed(2)}rem`,
+          animation: still ? undefined : anim,
+          animationDelay: delay,
+          transformOrigin: item.type === "planta" ? "50% 90%" : "50% 50%",
+        }}
+      >
+        {item.emoji}
+      </span>
+    </>
+  );
+}
 import {
   quizForDay,
   quizEmojiForDay,
@@ -821,6 +946,26 @@ export function GestacaoPath({
   // Itens do Cantinho que decoram o Caminho (não-fundo) + o fundo ativo.
   const [decor, setDecor] = useState<string[]>([]);
   const [fundoBg, setFundoBg] = useState<string | null>(null);
+  // Decoração PERSONALIZADA da trilha: a paciente define posição e tamanho de
+  // cada enfeite direto aqui no jogo (modo "Arrumar"). Fica no aparelho, por
+  // usuária — as lições e o cenário nunca são tocados.
+  const [uid, setUid] = useState<string | null>(null);
+  const [placed, setPlaced] = useState<PlacedDecor[]>([]);
+  const [decorReady, setDecorReady] = useState(false);
+  const [arranging, setArranging] = useState(false);
+  const [selDecor, setSelDecor] = useState<string | null>(null);
+  // Itens já espalhados alguma vez: o que foi apagado não volta sozinho, mas
+  // uma compra nova aparece na trilha automaticamente.
+  const seenRef = useRef<string[]>([]);
+  const dragRef = useRef<{
+    k: string;
+    mode: "move" | "size";
+    sx: number;
+    sy: number;
+    ox: number;
+    oy: number;
+    os: number;
+  } | null>(null);
   const [checkin, setCheckin] = useState<Checkin>({ last: "", streak: 0 });
   const [dayTasks, setDayTasks] = useState<Record<string, boolean>>({});
   // Estado dedicado do dia de HOJE: alimenta o anel segmentado sem vazar o
@@ -842,7 +987,24 @@ export function GestacaoPath({
         const { supabase } = await import("@/integrations/supabase/client");
         const { data: s } = await supabase.auth.getSession();
         const token = s.session?.access_token;
-        if (!token) return;
+        if (!token || !s.session) return;
+        // Layout salvo da trilha (posição/tamanho escolhidos pela paciente).
+        const userId = s.session.user.id;
+        setUid(userId);
+        const saved = loadDecor(userId);
+        if (saved) {
+          seenRef.current = saved.seen;
+          setPlaced(saved.items);
+        }
+        setDecorReady(true);
+        try {
+          if (sessionStorage.getItem(ARRANGE_FLAG) === "1") {
+            sessionStorage.removeItem(ARRANGE_FLAG);
+            setArranging(true);
+          }
+        } catch {
+          /* sem sessionStorage: entra no modo Arrumar pelo botão mesmo */
+        }
         const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
         // Modo Cuidado: esconde a barra de moeda e as decorações (não celebra).
         if (w.ok) setSaldo(w.careMode ? null : w.balance);
@@ -991,6 +1153,92 @@ export function GestacaoPath({
   );
 
   const pathRef = useRef<HTMLDivElement>(null);
+
+  /* ── Modo "Arrumar": a trilha é a tela de decoração ────────────────────
+     Enfeite novo entra espalhado sozinho; depois a paciente arrasta pra onde
+     quiser e escolhe o tamanho. O que ela apagou não volta. */
+  const decorables = useMemo(
+    () => decor.filter((id) => CANTINHO_BY_ID[id] && CANTINHO_BY_ID[id].type !== "ceu"),
+    [decor],
+  );
+
+  useEffect(() => {
+    if (!decorReady || !uid || height <= 0) return;
+    const fresh = decorables.filter((id) => !seenRef.current.includes(id));
+    if (fresh.length === 0) return;
+    seenRef.current = [...seenRef.current, ...fresh];
+    setPlaced((prev) => [...prev, ...seedDecor(fresh, height, prev.length)].slice(0, DECOR_MAX));
+  }, [decorables, decorReady, uid, height]);
+
+  // Salva com folga: arrastar dispara dezenas de updates por segundo e não vale
+  // escrever no storage a cada pixel.
+  useEffect(() => {
+    if (!decorReady || !uid) return;
+    const t = setTimeout(() => saveDecor(uid, placed, seenRef.current), 400);
+    return () => clearTimeout(t);
+  }, [placed, decorReady, uid]);
+
+  function startDecorDrag(e: React.PointerEvent, p: PlacedDecor, mode: "move" | "size") {
+    if (!arranging) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setSelDecor(p.k);
+    dragRef.current = { k: p.k, mode, sx: e.clientX, sy: e.clientY, ox: p.x, oy: p.y, os: p.s };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  }
+
+  // O ponteiro fica capturado no item, mas o evento sobe até a trilha — por
+  // isso mover/soltar moram aqui, no contêiner que dá as coordenadas.
+  function onPathPointerMove(e: React.PointerEvent) {
+    const d = dragRef.current;
+    const el = pathRef.current;
+    if (!d || !el) return;
+    const r = el.getBoundingClientRect();
+    if (d.mode === "move") {
+      const x = clampN(d.ox + ((e.clientX - d.sx) / Math.max(1, r.width)) * 100, 3, 97);
+      const y = clampN(d.oy + (e.clientY - d.sy), 20, Math.max(20, height - 20));
+      setPlaced((prev) => prev.map((p) => (p.k === d.k ? { ...p, x, y } : p)));
+    } else {
+      const s = clampN(
+        d.os + (e.clientX - d.sx + (e.clientY - d.sy)) / 160,
+        DECOR_MIN_SCALE,
+        DECOR_MAX_SCALE,
+      );
+      setPlaced((prev) => prev.map((p) => (p.k === d.k ? { ...p, s } : p)));
+    }
+  }
+
+  function endDecorDrag() {
+    dragRef.current = null;
+  }
+
+  function addDecor(id: string) {
+    if (placed.length >= DECOR_MAX) {
+      toast.error("A trilha está cheia de enfeites — apague algum antes.");
+      return;
+    }
+    // Nasce no meio do que está à vista, pra ela ver o item aparecer.
+    const el = pathRef.current;
+    let y = Math.min(220, Math.max(40, height - 40));
+    if (el) {
+      const r = el.getBoundingClientRect();
+      y = clampN(window.innerHeight / 2 - r.top, 40, Math.max(40, height - 40));
+    }
+    const k = `u${placed.length}-${id}-${Math.round(y)}`;
+    setPlaced((prev) => [...prev, { k, id, x: 50, y, s: 1.4 }]);
+    setSelDecor(k);
+  }
+
+  function removeDecor(k: string) {
+    setPlaced((prev) => prev.filter((p) => p.k !== k));
+    setSelDecor(null);
+  }
+
+  function reseedDecor() {
+    seenRef.current = decorables;
+    setPlaced(seedDecor(decorables, height, 0).slice(0, DECOR_MAX));
+    setSelDecor(null);
+  }
 
   // Centraliza o nó de HOJE na tela ao abrir (scroll da própria página)
   useEffect(() => {
@@ -1585,8 +1833,9 @@ export function GestacaoPath({
         )}
       </div>
 
-      {/* Botão flutuante da lojinha (Cantinho) — silenciado no Modo Cuidado */}
-      {!careMode && onOpenShop && (
+      {/* Botões flutuantes: lojinha + "Arrumar" — silenciados no Modo Cuidado
+          e escondidos enquanto ela está arrumando (a barra de baixo assume). */}
+      {!careMode && !arranging && (
         <>
           <style>{`
             @keyframes dc-shop-glow {
@@ -1595,21 +1844,85 @@ export function GestacaoPath({
             }
             @media (prefers-reduced-motion: reduce) { .dc-shop-fab { animation: none !important; } }
           `}</style>
-          <button
-            onClick={onOpenShop}
-            aria-label="Abrir o Cantinho"
-            className="dc-shop-fab press fixed bottom-24 right-4 z-40 flex items-center gap-2 rounded-full bg-gradient-to-br from-emerald-400 via-lime-400 to-emerald-500 px-4 py-3 text-white ring-2 ring-white/70 md:bottom-8"
-            style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
-          >
-            <span className="text-xl leading-none">🛍️</span>
-            <span className="text-sm font-extrabold leading-none">Cantinho</span>
-            {saldo != null && (
-              <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold leading-none">
-                🌱 {saldo}
-              </span>
+          <div className="fixed bottom-24 right-4 z-40 flex items-center gap-2 md:bottom-8">
+            {decorables.length > 0 && (
+              <button
+                onClick={() => setArranging(true)}
+                aria-label="Arrumar os enfeites da trilha"
+                className="press flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-3 text-slate-700 shadow-[0_6px_18px_rgba(0,0,0,0.14)] ring-1 ring-slate-200 backdrop-blur"
+              >
+                <span className="text-lg leading-none">✏️</span>
+                <span className="text-sm font-extrabold leading-none">Arrumar</span>
+              </button>
             )}
-          </button>
+            {onOpenShop && (
+              <button
+                onClick={onOpenShop}
+                aria-label="Abrir o Cantinho"
+                className="dc-shop-fab press flex items-center gap-2 rounded-full bg-gradient-to-br from-emerald-400 via-lime-400 to-emerald-500 px-4 py-3 text-white ring-2 ring-white/70"
+                style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
+              >
+                <span className="text-xl leading-none">🛍️</span>
+                <span className="text-sm font-extrabold leading-none">Cantinho</span>
+                {saldo != null && (
+                  <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold leading-none">
+                    🌱 {saldo}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
         </>
+      )}
+
+      {/* Barra do modo Arrumar: bandeja de enfeites + sair. Fica ACIMA da
+          barra do app (z-50) pra ela terminar sem sair da trilha. */}
+      {arranging && (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-3 pt-2 shadow-[0_-6px_24px_rgba(0,0,0,0.12)] backdrop-blur">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Arraste pra mover · <span className="font-bold text-emerald-600">⤢</span> pra mudar o
+              tamanho · <span className="font-bold text-rose-500">✕</span> pra tirar
+            </p>
+            <button
+              onClick={() => {
+                setArranging(false);
+                setSelDecor(null);
+              }}
+              className="press shrink-0 rounded-full bg-emerald-500 px-4 py-2 text-sm font-extrabold text-white"
+            >
+              Pronto ✓
+            </button>
+          </div>
+          <div
+            className="flex gap-2 overflow-x-auto pb-1 pt-2"
+            style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+          >
+            {decorables.map((id) => {
+              const item = CANTINHO_BY_ID[id];
+              if (!item) return null;
+              return (
+                <button
+                  key={id}
+                  onClick={() => addDecor(id)}
+                  title={`Colocar ${item.name} na trilha`}
+                  aria-label={`Colocar ${item.name} na trilha`}
+                  className="press flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-2xl ring-1 ring-slate-200"
+                >
+                  {item.emoji}
+                </button>
+              );
+            })}
+            <button
+              onClick={reseedDecor}
+              title="Espalhar tudo de novo"
+              aria-label="Espalhar os enfeites de novo"
+              className="press flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl ring-1 ring-slate-200"
+            >
+              ↺
+            </button>
+          </div>
+        </div>
       )}
 
       {!checkedToday && (
@@ -1633,7 +1946,14 @@ export function GestacaoPath({
 
       {/* ── Caminho contínuo em tela cheia (Duolingo-style) ──
           Sem caixa nem scroll interno: a página inteira É o caminho. */}
-      <div ref={pathRef} className="relative -mx-5 md:mx-0" style={{ height: `${height}px` }}>
+      <div
+        ref={pathRef}
+        className="relative -mx-5 md:mx-0"
+        style={{ height: `${height}px` }}
+        onPointerMove={arranging ? onPathPointerMove : undefined}
+        onPointerUp={arranging ? endDecorDrag : undefined}
+        onPointerCancel={arranging ? endDecorDrag : undefined}
+      >
         {/* Cenário (papel de parede) equipado — atrás de tudo */}
         {fundoBg && (
           <div
@@ -1642,108 +1962,128 @@ export function GestacaoPath({
             aria-hidden
           />
         )}
-        {/* Itens do Cantinho decoram o Caminho POR TIPO:
-            céu = faixa no alto derivando; planta/objeto/bicho/especial = "ecos"
-            repetidos ao longo da trilha (sempre tem decoração à vista), nas
-            margens (nunca cobrem as lições). */}
+        {/* Céu: itens do tipo "céu" continuam automáticos — grudam no topo
+            da tela enquanto rola e derivam devagar (não entram no Arrumar). */}
         {(() => {
-          const items = decor.map((id) => CANTINHO_BY_ID[id]).filter(Boolean);
-          const sky = items.filter((i) => i.type === "ceu");
-          const ground = items.filter((i) => i.type !== "ceu" && i.type !== "fundo");
-
-          // Ecos: cada item aparece várias vezes trilha abaixo (limite p/ perf).
-          const maxEchoes = ground.length
-            ? Math.max(2, Math.min(6, Math.floor(36 / ground.length)))
-            : 0;
-          const els: React.ReactNode[] = [];
-          ground.forEach((item, gi) => {
-            const h = hashStr(item.id);
-            const especial = item.type === "especial";
-            const step = especial ? 1500 : 950;
-            const n = Math.max(1, Math.min(maxEchoes, Math.ceil(height / step)));
-            for (let e = 0; e < n; e++) {
-              const top = 60 + (((h % 500) + e * step + gi * 137) % Math.max(1, height - 140));
-              const side = (e + gi) % 2;
-              const left = side === 0 ? 4 + ((h >> (e + 2)) % 8) : 88 + ((h >> (e + 2)) % 8);
-              const delay = `${((h >> e) % 24) * 0.22}s`;
-              els.push(
-                <span
-                  key={`${item.id}-${e}`}
-                  className="dc-decor pointer-events-none absolute select-none drop-shadow-sm"
-                  style={{ left: `${left}%`, top: `${top}px`, transform: "translate(-50%,-50%)" }}
-                  aria-hidden
-                  title={item.name}
-                >
-                  {especial && (
-                    <span
-                      className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                      style={{
-                        background:
-                          "radial-gradient(circle, rgba(255,214,120,0.55), transparent 70%)",
-                        animation: "dcGlow 3.6s ease-in-out infinite",
-                        animationDelay: delay,
-                      }}
-                    />
-                  )}
+          const sky = decor.map((id) => CANTINHO_BY_ID[id]).filter((i) => i && i.type === "ceu");
+          if (sky.length === 0) return null;
+          return (
+            <div className="dc-decor pointer-events-none sticky top-14 z-0 h-0 select-none">
+              {sky.map((item) => {
+                const h = hashStr(item.id);
+                // Duração própria + atraso NEGATIVO proporcional a ela: cada
+                // item nasce num ponto diferente da travessia (0–100%), em
+                // vez de todos amontoados no começo do céu.
+                const dur = 55 + (h % 5) * 12;
+                const offset = ((h % 97) / 97) * dur;
+                return (
                   <span
-                    className={`relative inline-block ${especial ? "text-5xl" : item.type === "planta" ? "text-4xl" : "text-3xl"} opacity-90`}
+                    key={item.id}
+                    className="absolute inline-block drop-shadow-sm"
                     style={{
-                      animation:
-                        item.type === "bicho"
-                          ? "dcWander 7s ease-in-out infinite"
-                          : item.type === "planta"
-                            ? "dcSway 5.5s ease-in-out infinite"
-                            : "dcHover 4s ease-in-out infinite",
-                      animationDelay: delay,
-                      transformOrigin: item.type === "planta" ? "50% 90%" : "50% 50%",
+                      top: `${2 + (h % 5) * 16}px`,
+                      left: 0,
+                      // 5 faixas de altura + tamanho/opacidade variando dão
+                      // profundidade (o que está "mais longe" é menor e mais claro).
+                      fontSize: `${1.35 + ((h >> 3) % 4) * 0.22}rem`,
+                      opacity: 0.55 + ((h >> 5) % 4) * 0.12,
+                      animation: `dcSkyDrift ${dur}s linear infinite`,
+                      animationDelay: `-${offset.toFixed(1)}s`,
                     }}
+                    aria-hidden
+                    title={item.name}
                   >
                     {item.emoji}
                   </span>
-                </span>,
-              );
-            }
-          });
-
-          return (
-            <>
-              {/* Céu: gruda no topo da tela enquanto rola e deriva devagar */}
-              {sky.length > 0 && (
-                <div className="dc-decor pointer-events-none sticky top-14 z-0 h-0 select-none">
-                  {sky.map((item) => {
-                    const h = hashStr(item.id);
-                    // Duração própria + atraso NEGATIVO proporcional a ela: cada
-                    // item nasce num ponto diferente da travessia (0–100%), em
-                    // vez de todos amontoados no começo do céu.
-                    const dur = 55 + (h % 5) * 12;
-                    const offset = ((h % 97) / 97) * dur;
-                    return (
-                      <span
-                        key={item.id}
-                        className="absolute inline-block drop-shadow-sm"
-                        style={{
-                          top: `${2 + (h % 5) * 16}px`,
-                          left: 0,
-                          // 5 faixas de altura + tamanho/opacidade variando dão
-                          // profundidade (o que está "mais longe" é menor e mais claro).
-                          fontSize: `${1.35 + ((h >> 3) % 4) * 0.22}rem`,
-                          opacity: 0.55 + ((h >> 5) % 4) * 0.12,
-                          animation: `dcSkyDrift ${dur}s linear infinite`,
-                          animationDelay: `-${offset.toFixed(1)}s`,
-                        }}
-                        aria-hidden
-                        title={item.name}
-                      >
-                        {item.emoji}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-              {els}
-            </>
+                );
+              })}
+            </div>
           );
         })()}
+
+        {/* Escudo do modo Arrumar: cobre as lições pra um toque na trilha não
+            abrir o dia por engano. As lições em si ficam intactas. */}
+        {arranging && (
+          <div
+            className="absolute inset-0 z-30"
+            onPointerDown={() => setSelDecor(null)}
+            aria-hidden
+          />
+        )}
+
+        {/* Enfeites onde a paciente colocou, do tamanho que ela escolheu. */}
+        {placed.map((p) => {
+          const item = CANTINHO_BY_ID[p.id];
+          if (!item) return null;
+          const sel = arranging && selDecor === p.k;
+          return (
+            <span
+              key={p.k}
+              className={`dc-decor absolute select-none drop-shadow-sm ${
+                arranging ? "cursor-grab" : "pointer-events-none"
+              }`}
+              style={{
+                left: `${p.x}%`,
+                top: `${p.y}px`,
+                transform: "translate(-50%,-50%)",
+                // Só o item arrastado trava o scroll da página.
+                touchAction: arranging ? "none" : undefined,
+                zIndex: arranging ? 31 : undefined,
+              }}
+              title={item.name}
+              aria-hidden={!arranging}
+              onPointerDown={arranging ? (e) => startDecorDrag(e, p, "move") : undefined}
+            >
+              {sel && (
+                <span
+                  className="absolute -inset-4 rounded-2xl border-2 border-dashed border-emerald-400 bg-emerald-50/40"
+                  aria-hidden
+                />
+              )}
+              <DecorSprite p={p} still={sel} />
+              {sel && (
+                <>
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => removeDecor(p.k)}
+                    aria-label={`Tirar ${item.name} da trilha`}
+                    className="absolute -left-6 -top-6 flex h-8 w-8 items-center justify-center rounded-full bg-rose-500 text-sm font-bold text-white shadow-md"
+                  >
+                    ✕
+                  </button>
+                  <span
+                    role="slider"
+                    tabIndex={0}
+                    aria-label={`Tamanho de ${item.name}`}
+                    aria-valuemin={DECOR_MIN_SCALE}
+                    aria-valuemax={DECOR_MAX_SCALE}
+                    aria-valuenow={Number(p.s.toFixed(2))}
+                    onPointerDown={(e) => startDecorDrag(e, p, "size")}
+                    onKeyDown={(e) => {
+                      const step = e.key === "ArrowUp" ? 0.2 : e.key === "ArrowDown" ? -0.2 : 0;
+                      if (!step) return;
+                      e.preventDefault();
+                      setPlaced((prev) =>
+                        prev.map((q) =>
+                          q.k === p.k
+                            ? {
+                                ...q,
+                                s: clampN(q.s + step, DECOR_MIN_SCALE, DECOR_MAX_SCALE),
+                              }
+                            : q,
+                        ),
+                      );
+                    }}
+                    className="absolute -bottom-6 -right-6 flex h-8 w-8 cursor-nwse-resize touch-none items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white shadow-md"
+                  >
+                    ⤢
+                  </span>
+                </>
+              )}
+            </span>
+          );
+        })}
         {nodes.map((node) => {
           if (node.kind === "phase-banner") {
             const p = node.phase;
