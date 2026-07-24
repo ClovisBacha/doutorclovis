@@ -1656,31 +1656,99 @@ export function GestacaoPath({
             aria-hidden
           />
         )}
-        {/* Itens do Cantinho decoram as margens da trilha (não cobrem as lições) */}
-        {decor.map((id, k) => {
-          const item = CANTINHO_BY_ID[id];
-          if (!item) return null;
-          const h = hashStr(id);
-          const side = k % 2;
-          const left = side === 0 ? 3 + (h % 9) : 88 + (h % 9);
-          const top = 6 + ((h >> 4) % 88);
+        {/* Itens do Cantinho decoram o Caminho POR TIPO:
+            céu = faixa no alto derivando; planta/objeto/bicho/especial = "ecos"
+            repetidos ao longo da trilha (sempre tem decoração à vista), nas
+            margens (nunca cobrem as lições). */}
+        {(() => {
+          const items = decor.map((id) => CANTINHO_BY_ID[id]).filter(Boolean);
+          const sky = items.filter((i) => i.type === "ceu");
+          const ground = items.filter((i) => i.type !== "ceu" && i.type !== "fundo");
+
+          // Ecos: cada item aparece várias vezes trilha abaixo (limite p/ perf).
+          const maxEchoes = ground.length
+            ? Math.max(2, Math.min(6, Math.floor(36 / ground.length)))
+            : 0;
+          const els: React.ReactNode[] = [];
+          ground.forEach((item, gi) => {
+            const h = hashStr(item.id);
+            const especial = item.type === "especial";
+            const step = especial ? 1500 : 950;
+            const n = Math.max(1, Math.min(maxEchoes, Math.ceil(height / step)));
+            for (let e = 0; e < n; e++) {
+              const top = 60 + (((h % 500) + e * step + gi * 137) % Math.max(1, height - 140));
+              const side = (e + gi) % 2;
+              const left = side === 0 ? 4 + ((h >> (e + 2)) % 8) : 88 + ((h >> (e + 2)) % 8);
+              const delay = `${((h >> e) % 24) * 0.22}s`;
+              els.push(
+                <span
+                  key={`${item.id}-${e}`}
+                  className="dc-decor pointer-events-none absolute select-none drop-shadow-sm"
+                  style={{ left: `${left}%`, top: `${top}px`, transform: "translate(-50%,-50%)" }}
+                  aria-hidden
+                  title={item.name}
+                >
+                  {especial && (
+                    <span
+                      className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                      style={{
+                        background:
+                          "radial-gradient(circle, rgba(255,214,120,0.55), transparent 70%)",
+                        animation: "dcGlow 3.6s ease-in-out infinite",
+                        animationDelay: delay,
+                      }}
+                    />
+                  )}
+                  <span
+                    className={`relative inline-block ${especial ? "text-5xl" : item.type === "planta" ? "text-4xl" : "text-3xl"} opacity-90`}
+                    style={{
+                      animation:
+                        item.type === "bicho"
+                          ? "dcWander 7s ease-in-out infinite"
+                          : item.type === "planta"
+                            ? "dcSway 5.5s ease-in-out infinite"
+                            : "dcHover 4s ease-in-out infinite",
+                      animationDelay: delay,
+                      transformOrigin: item.type === "planta" ? "50% 90%" : "50% 50%",
+                    }}
+                  >
+                    {item.emoji}
+                  </span>
+                </span>,
+              );
+            }
+          });
+
           return (
-            <span
-              key={id}
-              className="dc-float pointer-events-none absolute select-none text-3xl opacity-90 drop-shadow-sm"
-              style={{
-                left: `${left}%`,
-                top: `${top}%`,
-                transform: "translate(-50%,-50%)",
-                animationDelay: `${(h % 20) * 0.16}s`,
-              }}
-              aria-hidden
-              title={item.name}
-            >
-              {item.emoji}
-            </span>
+            <>
+              {/* Céu: gruda no topo da tela enquanto rola e deriva devagar */}
+              {sky.length > 0 && (
+                <div className="dc-decor pointer-events-none sticky top-14 z-0 h-0 select-none">
+                  {sky.map((item) => {
+                    const h = hashStr(item.id);
+                    return (
+                      <span
+                        key={item.id}
+                        className="absolute inline-block text-3xl opacity-80 drop-shadow-sm"
+                        style={{
+                          top: `${4 + (h % 3) * 20}px`,
+                          left: 0,
+                          animation: `dcSkyDrift ${55 + (h % 5) * 12}s linear infinite`,
+                          animationDelay: `-${h % 50}s`,
+                        }}
+                        aria-hidden
+                        title={item.name}
+                      >
+                        {item.emoji}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              {els}
+            </>
           );
-        })}
+        })()}
         {nodes.map((node) => {
           if (node.kind === "phase-banner") {
             const p = node.phase;
@@ -1872,6 +1940,18 @@ export function GestacaoPath({
                       className="dc-halo pointer-events-none absolute inset-0 rounded-full"
                       style={{ boxShadow: `0 0 30px 6px ${tm.main}55` }}
                     />
+                  )}
+                  {/* Faísca orbitando a bolinha de hoje — juice de "é aqui!" */}
+                  {isToday && !done && (
+                    <span
+                      className="pointer-events-none absolute -inset-4"
+                      style={{ animation: "orbitSpin 8s linear infinite" }}
+                      aria-hidden
+                    >
+                      <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-lg drop-shadow-sm">
+                        ✨
+                      </span>
+                    </span>
                   )}
                   {/* Anel segmentado: 3 segmentos = as 3 tarefas de hoje */}
                   {isToday && <TaskRing done={done ? 6 : halvesToday} total={6} color={tm.main} />}
