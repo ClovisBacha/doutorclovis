@@ -9,23 +9,22 @@
  */
 import { useState, useEffect } from "react";
 import {
-  AlertTriangle,
   Baby,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   CreditCard,
   FileText,
-  Footprints,
   Gamepad2,
+  Gift,
+  HelpCircle,
   LifeBuoy,
-  LayoutGrid,
   Heart,
-  Home,
   MessageCircle,
   NotebookPen,
   Stethoscope,
   UserCircle,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
@@ -60,29 +59,16 @@ export type AppTab =
   | "Perfil"
   | "Exames";
 
-// Barra de baixo repensada: Jogo e Chat viram destino de 1 toque; o resto
-// (Gestação, Consultas, Família, Aprender, Conta) mora no "Menu". SOS continua
-// como botão vermelho à parte (onEmergency).
-export type BottomSection = "home" | "jogo" | "chat" | "saude" | "menu";
+// Barra de baixo enxuta (5 = Bebê + Jogo + Chat + Saúde + SOS). O "Bebê" é a
+// tela principal (imagem + infos + grade de atalhos pra tudo). Jogo e Chat são
+// destino de 1 toque; SOS continua como botão vermelho à parte (onEmergency).
+export type BottomSection = "home" | "jogo" | "chat" | "saude";
 
 const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
   jogo: ["Caminho"],
   chat: ["Chat IA"],
   saude: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
-  menu: [
-    "Bebê",
-    "Calendário",
-    "Registros",
-    "Carteirinha",
-    "Consultas",
-    "Médico",
-    "Acompanhante",
-    "Pós-parto",
-    "FAQ",
-    "Recompensas",
-    "Perfil",
-  ],
 };
 
 export function tabToSection(t: AppTab): BottomSection {
@@ -92,8 +78,8 @@ export function tabToSection(t: AppTab): BottomSection {
   ][]) {
     if ((tabs as string[]).includes(t)) return section;
   }
-  // Tudo que não é âncora de Jogo/Chat/Saúde cai no Menu.
-  return "menu";
+  // Tudo que não é Jogo/Chat/Saúde faz parte da tela principal do Bebê (o hub).
+  return "home";
 }
 
 /** Abas de uma seção do menu de baixo (uma barra só no celular). */
@@ -245,11 +231,10 @@ const NAV_ITEMS: {
   label: string;
   variant?: "chat";
 }[] = [
-  { id: "home", Icon: Home, label: "Início" },
+  { id: "home", Icon: Baby, label: "Bebê" },
   { id: "jogo", Icon: Gamepad2, label: "Jogo" },
   { id: "chat", Icon: MessageCircle, label: "Chat", variant: "chat" },
   { id: "saude", Icon: Heart, label: "Saúde" },
-  { id: "menu", Icon: LayoutGrid, label: "Menu" },
 ];
 
 export function AppBottomNav({
@@ -474,13 +459,20 @@ function milestoneForWeek(weeks: number) {
 
 export type NextAppointment = { dateLabel: string; typeLabel: string };
 
+// Grade de atalhos na tela do Bebê — o hub central. Cobre tudo que NÃO está na
+// barra de baixo (Saúde/Exames/Nutrição etc. já são alcançados pelo ícone Saúde).
 const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = [
-  { Icon: Baby, label: "Bebê", tab: "Bebê", color: "bg-pink-50 text-pink-600 ring-pink-200" },
   {
-    Icon: Footprints,
-    label: "Chutes",
+    Icon: Baby,
+    label: "Semana",
+    tab: "Bebê",
+    color: "bg-pink-50 text-pink-600 ring-pink-200",
+  },
+  {
+    Icon: NotebookPen,
+    label: "Registros",
     tab: "Registros",
-    color: "bg-violet-50 text-violet-600 ring-violet-200",
+    color: "bg-orange-50 text-orange-600 ring-orange-200",
   },
   {
     Icon: CalendarDays,
@@ -489,40 +481,46 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     color: "bg-blue-50 text-blue-600 ring-blue-200",
   },
   {
-    Icon: CreditCard,
-    label: "Carteirinha",
-    tab: "Carteirinha",
-    color: "bg-amber-50 text-amber-600 ring-amber-200",
-  },
-  {
-    Icon: Heart,
-    label: "Saúde",
-    tab: "Saúde",
-    color: "bg-emerald-50 text-emerald-600 ring-emerald-200",
-  },
-  {
-    Icon: AlertTriangle,
-    label: "Alertas",
-    tab: "Alertas",
-    color: "bg-rose-50 text-rose-600 ring-rose-200",
-  },
-  {
     Icon: FileText,
     label: "Consultas",
     tab: "Consultas",
     color: "bg-sky-50 text-sky-600 ring-sky-200",
   },
   {
-    Icon: NotebookPen,
-    label: "Diário",
-    tab: "Registros",
-    color: "bg-orange-50 text-orange-600 ring-orange-200",
-  },
-  {
     Icon: Stethoscope,
     label: "Médico",
     tab: "Médico",
     color: "bg-primary/10 text-primary ring-primary/20",
+  },
+  {
+    Icon: CreditCard,
+    label: "Carteirinha",
+    tab: "Carteirinha",
+    color: "bg-amber-50 text-amber-600 ring-amber-200",
+  },
+  {
+    Icon: Users,
+    label: "Acompanhante",
+    tab: "Acompanhante",
+    color: "bg-violet-50 text-violet-600 ring-violet-200",
+  },
+  {
+    Icon: Heart,
+    label: "Pós-parto",
+    tab: "Pós-parto",
+    color: "bg-rose-50 text-rose-600 ring-rose-200",
+  },
+  {
+    Icon: Gift,
+    label: "Recompensas",
+    tab: "Recompensas",
+    color: "bg-fuchsia-50 text-fuchsia-600 ring-fuchsia-200",
+  },
+  {
+    Icon: HelpCircle,
+    label: "FAQ",
+    tab: "FAQ",
+    color: "bg-teal-50 text-teal-600 ring-teal-200",
   },
   {
     Icon: UserCircle,
