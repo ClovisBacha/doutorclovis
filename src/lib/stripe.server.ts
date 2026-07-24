@@ -206,6 +206,10 @@ export function verifyStripeSignature(
   const t = parts["t"];
   const v1 = parts["v1"];
   if (!t || !v1) return false;
+  // Janela de tolerância (5 min): um webhook válido capturado não pode ser
+  // reenviado indefinidamente (anti-replay, igual à SDK oficial do Stripe).
+  const ts = Number(t);
+  if (!Number.isFinite(ts) || Math.abs(Date.now() - ts * 1000) > 5 * 60 * 1000) return false;
   const expected = crypto.createHmac("sha256", secret).update(`${t}.${payload}`).digest("hex");
   const a = Buffer.from(expected);
   const b = Buffer.from(v1);

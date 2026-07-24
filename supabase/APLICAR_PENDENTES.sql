@@ -2453,3 +2453,324 @@ ALTER TABLE public.patient_profiles
 -- ════════════════════════════════════════════════════════════════════════
 ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS cantinho_fundo text;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- BLOCO 2026-07-24: migrations que faltavam no consolidado (idempotentes)
+-- harden_grants, lives/consultas do médico, admin control suite,
+-- instagram_share, testimonials, patient_referral, contraproposta e
+-- lista de espera de consultas.
+-- ═══════════════════════════════════════════════════════════════════════
+
+-- ── 20260718030000_harden_grants.sql ──
+-- ════════════════════════════════════════════════════════════════════════
+-- Reforço de segurança: REVOKE explícito nas tabelas server-only
+-- ════════════════════════════════════════════════════════════════════════
+-- Estas tabelas já estavam seguras (RLS habilitado sem policy → zero linhas
+-- para anon/authenticated), mas dependiam só disso. Verificação em produção
+-- (2026-07-18) mostrou que o SELECT era permitido no nível de GRANT (voltava
+-- vazio). Cinto e suspensório: como todo o acesso é via service_role no
+-- servidor, revogamos o GRANT também — igual a brain_entries/clinics/chat_*.
+-- Nenhuma delas é acessada direto do navegador (verificado no código).
+
+REVOKE ALL ON public.brain_gaps            FROM anon, authenticated;
+REVOKE ALL ON public.brain_feedback        FROM anon, authenticated;
+REVOKE ALL ON public.brain_hits            FROM anon, authenticated;
+REVOKE ALL ON public.epds_logs             FROM anon, authenticated;
+REVOKE ALL ON public.experience_leads      FROM anon, authenticated;
+REVOKE ALL ON public.whatsapp_conversations FROM anon, authenticated;
+
+-- ── 20260719030000_lives_consultas_doctor.sql ──
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260719030000 — Lives e Consultas Pagas por médico (multi-inquilino)
+-- ════════════════════════════════════════════════════════════════════════
+-- Cada médico passa a ter SUAS lives (divulga para as pacientes dele) e SUAS
+-- consultas particulares (recorte por doctor_id). O super-admin continua vendo
+-- tudo pelo /admin (financeiro agregado por médico). "Lives da Obstétrica"
+-- (globais) fica como conceito futuro: doctor_id NULL = live da plataforma.
+
+ALTER TABLE public.lives
+  ADD COLUMN IF NOT EXISTS doctor_id uuid;
+
+ALTER TABLE public.private_consultations
+  ADD COLUMN IF NOT EXISTS doctor_id uuid;
+
+-- Backfill: vincula cada consulta paga ao médico da paciente (patient_profiles).
+-- Lives já existentes ficam com doctor_id NULL (globais/"Obstétrica"): não há
+-- como inferir o dono de uma live antiga, então elas seguem no feed público.
+UPDATE public.private_consultations pc
+   SET doctor_id = pp.doctor_id
+  FROM public.patient_profiles pp
+ WHERE pp.id = pc.patient_user_id
+   AND pc.doctor_id IS NULL
+   AND pp.doctor_id IS NOT NULL;
+
+-- FK para doctors (ON DELETE SET NULL, igual às demais colunas doctor_id):
+-- se um médico for removido, a live/consulta vira "sem médico" em vez de sumir.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'lives_doctor_id_fkey') THEN
+    ALTER TABLE public.lives
+      ADD CONSTRAINT lives_doctor_id_fkey
+      FOREIGN KEY (doctor_id) REFERENCES public.doctors(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'private_consultations_doctor_id_fkey'
+  ) THEN
+    ALTER TABLE public.private_consultations
+      ADD CONSTRAINT private_consultations_doctor_id_fkey
+      FOREIGN KEY (doctor_id) REFERENCES public.doctors(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_lives_doctor_id
+  ON public.lives(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_private_consultations_doctor_id
+  ON public.private_consultations(doctor_id);
+
+-- ── 20260720000000_admin_control_suite.sql ──
+-- ════════════════════════════════════════════════════════════════════════
+-- 20260720000000 — Suite de controle do dono (super-admin)
+-- ════════════════════════════════════════════════════════════════════════
+-- Tabelas novas para: comunicados (broadcast), feature flags, NPS, log de
+-- auditoria (LGPD) e incidentes de pagamento (reembolsos/disputas do Stripe).
+-- Todas server-only: RLS ligado sem policy + REVOKE anon/authenticated +
+-- GRANT service_role — todo acesso passa por server functions (supabaseAdmin).
+
+-- ── Comunicados (broadcast) ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.platform_announcements (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title      text NOT NULL,
+  body       text NOT NULL,
+  audience   text NOT NULL DEFAULT 'todos',  -- 'medicos' | 'pacientes' | 'todos'
+  level      text NOT NULL DEFAULT 'info',    -- 'info' | 'success' | 'warning'
+  active     boolean NOT NULL DEFAULT true,
+  starts_at  timestamptz,
+  ends_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_announcements_active ON public.platform_announcements(active);
+
+CREATE TABLE IF NOT EXISTS public.announcement_dismissals (
+  announcement_id uuid NOT NULL,
+  user_id         uuid NOT NULL,
+  dismissed_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (announcement_id, user_id)
+);
+
+-- ── Feature flags / kill switch ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.platform_flags (
+  key         text PRIMARY KEY,
+  enabled     boolean NOT NULL DEFAULT true,
+  rollout_pct int NOT NULL DEFAULT 100,  -- 0..100 (rollout gradual determinístico)
+  description text,
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- ── NPS (satisfação de médicos e pacientes) ──────────────────────────────
+CREATE TABLE IF NOT EXISTS public.nps_responses (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL,
+  role       text NOT NULL,              -- 'medico' | 'paciente'
+  score      int NOT NULL,               -- 0..10
+  comment    text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_nps_created ON public.nps_responses(created_at);
+CREATE INDEX IF NOT EXISTS idx_nps_user ON public.nps_responses(user_id);
+
+-- ── Log de auditoria (LGPD / segurança) ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.audit_log (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_id    uuid,
+  actor_email text,
+  action      text NOT NULL,             -- 'doctor.status' | 'coupon.create' | ...
+  target      text,                      -- id/descrição do alvo
+  meta        jsonb,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON public.audit_log(action);
+
+-- ── Incidentes de pagamento (reembolsos / disputas do Stripe) ────────────
+CREATE TABLE IF NOT EXISTS public.payment_incidents (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind               text NOT NULL,       -- 'refund' | 'dispute'
+  stripe_charge_id   text,
+  stripe_customer_id text,
+  user_id            uuid,
+  amount_cents       int NOT NULL DEFAULT 0,
+  reason             text,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (kind, stripe_charge_id)
+);
+CREATE INDEX IF NOT EXISTS idx_payment_incidents_created ON public.payment_incidents(created_at);
+
+-- ── Segurança: tudo server-only ──────────────────────────────────────────
+ALTER TABLE public.platform_announcements   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.announcement_dismissals  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.platform_flags           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nps_responses            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_log                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payment_incidents        ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON public.platform_announcements  FROM anon, authenticated;
+REVOKE ALL ON public.announcement_dismissals FROM anon, authenticated;
+REVOKE ALL ON public.platform_flags          FROM anon, authenticated;
+REVOKE ALL ON public.nps_responses           FROM anon, authenticated;
+REVOKE ALL ON public.audit_log               FROM anon, authenticated;
+REVOKE ALL ON public.payment_incidents       FROM anon, authenticated;
+
+GRANT ALL ON public.platform_announcements  TO service_role;
+GRANT ALL ON public.announcement_dismissals TO service_role;
+GRANT ALL ON public.platform_flags          TO service_role;
+GRANT ALL ON public.nps_responses           TO service_role;
+GRANT ALL ON public.audit_log               TO service_role;
+GRANT ALL ON public.payment_incidents       TO service_role;
+
+-- ── 20260722160000_instagram_share.sql ──
+-- ════════════════════════════════════════════════════════════════════════
+-- Compartilhamento no Instagram → 100 Sementinhas (automático)
+-- ════════════════════════════════════════════════════════════════════════
+-- A paciente registra o @ dela do Instagram; quando ela marca @obstetrica.app
+-- num Story, o webhook do Instagram (Graph/Messaging API) casa o @ com a conta
+-- e credita 100 🌱 (no máx. 1x por semana, idempotente pelo ledger). O crédito
+-- é sempre server-only, como todo ganho de Sementinhas.
+
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS instagram_handle text;
+
+-- Busca por @ no webhook + garante que um @ pertence a UMA conta (anti-roubo de
+-- crédito num empate). Parcial: permite vários NULL (quem não registrou).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_profiles_instagram_handle
+  ON public.patient_profiles (instagram_handle)
+  WHERE instagram_handle IS NOT NULL;
+
+-- ── 20260722170000_testimonials.sql ──
+-- ════════════════════════════════════════════════════════════════════════
+-- Depoimentos das pacientes → 100 Sementinhas ao ser APROVADO pelo médico
+-- ════════════════════════════════════════════════════════════════════════
+-- A paciente escreve um depoimento no app; o Dr. Clóvis aprova no painel; ao
+-- aprovar, ela ganha 100 🌱 (uma vez) e o depoimento pode aparecer na página
+-- pública de depoimentos. Nada é publicado sem aprovação (mesma ética do resto
+-- do app). Tudo passa pelas server functions (service role) — tabela server-only.
+
+CREATE TABLE IF NOT EXISTS public.testimonials (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE REFERENCES auth.users (id) ON DELETE CASCADE,
+  display_name text,
+  body text NOT NULL,
+  status text NOT NULL DEFAULT 'pending', -- pending | approved | rejected
+  created_at timestamptz NOT NULL DEFAULT now(),
+  reviewed_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS idx_testimonials_status ON public.testimonials (status);
+
+ALTER TABLE public.testimonials ENABLE ROW LEVEL SECURITY;
+
+-- Acesso só pela service role (server functions). O cliente nunca lê/escreve
+-- direto — evita exposição de depoimentos pendentes/rejeitados de outras contas.
+REVOKE ALL ON public.testimonials FROM anon, authenticated;
+GRANT ALL ON public.testimonials TO service_role;
+
+-- ── 20260722180000_patient_referral.sql ──
+-- ════════════════════════════════════════════════════════════════════════
+-- Indicar uma amiga → 100 Sementinhas quando ela cria a conta
+-- ════════════════════════════════════════════════════════════════════════
+-- Cada paciente tem um código próprio (referral_code). Quando uma amiga entra
+-- pelo link (?amiga=CODE) e cria a conta, a indicadora ganha 100 🌱 — uma vez
+-- por amiga. `referred_by` guarda quem indicou (fixado uma vez). Crédito
+-- server-only, como todo ganho de Sementinhas.
+
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS referral_code text;
+
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS referred_by uuid;
+
+-- Código único por paciente (parcial: permite vários NULL de quem ainda não gerou).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_profiles_referral_code
+  ON public.patient_profiles (referral_code)
+  WHERE referral_code IS NOT NULL;
+
+-- Busca de quem uma paciente indicou (para contar indicações).
+CREATE INDEX IF NOT EXISTS idx_patient_profiles_referred_by
+  ON public.patient_profiles (referred_by);
+
+-- IMUTABILIDADE (anti-fraude): a paciente NÃO pode escrever essas duas colunas
+-- pelo próprio cliente (RLS é por LINHA, não por coluna). Sem isto, ela poderia
+-- resetar `referred_by` pra null e reindicar-se a vários "indicadores". Só a
+-- service role (server functions) grava — a paciente segue editando o resto do
+-- perfil normalmente (o cliente nunca inclui estas colunas no payload).
+REVOKE UPDATE (referred_by, referral_code) ON public.patient_profiles FROM authenticated;
+
+-- ── 20260723010000_appointment_counterproposal.sql ──
+-- ════════════════════════════════════════════════════════════════════════
+-- Contraproposta de horário: o médico sugere outro horário e a paciente aprova
+-- ════════════════════════════════════════════════════════════════════════
+-- Fluxo: paciente pede horário → se não der, o médico SUGERE outro (status
+-- 'counter_proposed' + proposed_date/proposed_time) → a paciente recebe e
+-- APROVA (vira 'confirmed') ou RECUSA ('declined'). Tudo pelas server functions
+-- (service role); a paciente nunca escreve direto nesta tabela.
+
+ALTER TABLE public.appointment_requests
+  ADD COLUMN IF NOT EXISTS proposed_date date;
+
+ALTER TABLE public.appointment_requests
+  ADD COLUMN IF NOT EXISTS proposed_time text;
+
+-- Backstop contra double-booking: dois pedidos não podem ficar 'confirmed' no
+-- MESMO horário do MESMO médico. Parcial (só 'confirmed'); NULLS NOT DISTINCT
+-- (PG15+) faz o índice valer também para a instalação única (doctor_id NULL).
+-- Se a criação falhar por já existir duplicata em produção, remova/ajuste as
+-- confirmações conflitantes e rode de novo.
+CREATE UNIQUE INDEX IF NOT EXISTS appt_confirmed_slot
+  ON public.appointment_requests (doctor_id, confirmed_date, confirmed_time)
+  NULLS NOT DISTINCT
+  WHERE status = 'confirmed';
+
+-- ── 20260723020000_appointment_waitlist.sql ──
+-- ════════════════════════════════════════════════════════════════════════
+-- Fila de espera por semana + cascata quando abre vaga
+-- ════════════════════════════════════════════════════════════════════════
+-- Sem horário na semana desejada, a paciente entra na FILA daquela semana.
+-- Quando uma consulta confirmada é CANCELADA, a vaga é oferecida à 1ª da fila,
+-- que tem 4h pra aceitar; se não responder, passa pra próxima (cascata). Tudo
+-- server-only (service role) — a paciente nunca escreve direto nesta tabela.
+
+CREATE TABLE IF NOT EXISTS public.appointment_waitlist (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  doctor_id uuid,
+  patient_name text NOT NULL,
+  patient_email text NOT NULL,
+  patient_phone text,
+  reason text,
+  week_start date NOT NULL, -- segunda-feira da semana desejada
+  status text NOT NULL DEFAULT 'waiting', -- waiting|offered|booked|expired|declined|cancelled
+  offer_date date, -- data do slot ofertado (veio do cancelamento)
+  offer_time text,
+  offer_deadline timestamptz, -- prazo pra responder à oferta (4h)
+  offered_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Ordem da fila e busca por (médico, semana, status).
+CREATE INDEX IF NOT EXISTS idx_waitlist_queue
+  ON public.appointment_waitlist (doctor_id, week_start, status, created_at);
+
+-- Cron/varredura: ofertas vencidas.
+CREATE INDEX IF NOT EXISTS idx_waitlist_deadline
+  ON public.appointment_waitlist (status, offer_deadline);
+
+-- Uma paciente não entra duas vezes na MESMA semana enquanto está ativa.
+-- NULLS NOT DISTINCT (PG15+) é ESSENCIAL: na instalação única o doctor_id é
+-- NULL em todas as linhas; sem isto o índice não deduplicaria nada.
+DROP INDEX IF EXISTS public.idx_waitlist_unique_active;
+CREATE UNIQUE INDEX idx_waitlist_unique_active
+  ON public.appointment_waitlist (doctor_id, week_start, lower(patient_email))
+  NULLS NOT DISTINCT
+  WHERE status IN ('waiting', 'offered');
+
+ALTER TABLE public.appointment_waitlist ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.appointment_waitlist FROM anon, authenticated;
+GRANT ALL ON public.appointment_waitlist TO service_role;

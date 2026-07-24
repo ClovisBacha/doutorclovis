@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { babyForWeek, consultaForWeek } from "@/lib/gestacao";
+import { babyForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
 import {
@@ -21,15 +21,6 @@ import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
  * + som + vibração. Só dispara quando o bônus foi de fato concedido. O reward
  * já é gated por Modo Cuidado no servidor e no gate `canEarn`.
  */
-function celebrateIfBonus(r: unknown): void {
-  const bonus = (r as { bonus?: number }).bonus ?? 0;
-  if (bonus > 0) {
-    fireConfetti();
-    celebrateChime();
-    celebrateHaptic();
-  }
-}
-
 /* ── Estrelas do dia em MEIAS: 6 jogos × ½⭐ = 3⭐ ─────────────────────────
    Os 5 jogos de bem-estar + a aula da professora. Cada um vale meia estrela. */
 const WELLNESS_HALF_KEYS = [
@@ -296,11 +287,6 @@ function challengeForPosDay(D: number): Challenge {
 }
 
 /* ══════════════════════ ORIENTAÇÕES MÉDICAS ══════════════════════ */
-
-const POSDATA_GUIDANCE =
-  "Pós-data: consultas 2x por semana com cardiotocografia e avaliação do líquido amniótico. " +
-  "Converse com o seu médico sobre o planejamento da indução. Conte os movimentos do bebê " +
-  "todos os dias — se diminuírem, vá direto à maternidade.";
 
 const POS_GUIDANCE: Record<number, string> = {
   1: "Descanso e amamentação em livre demanda. Teste do pezinho entre o 3º e o 5º dia. Agende a revisão pós-parto (7–10 dias).",
@@ -2959,7 +2945,6 @@ function BreathingBlock({
       if (r.ok && r.granted > 0) {
         setReward(r.granted);
         onEarn();
-        celebrateIfBonus(r);
       }
     } catch {
       /* recompensa é secundária */
@@ -3285,7 +3270,6 @@ function MovementBlock({
       if (r.ok && r.granted > 0) {
         setReward(r.granted);
         onEarn();
-        celebrateIfBonus(r);
       }
     } catch {
       /* recompensa é secundária */
@@ -3603,7 +3587,6 @@ function MeditationBlock({
       if (r.ok && r.granted > 0) {
         setReward(r.granted);
         onEarn();
-        celebrateIfBonus(r);
       }
     } catch {
       /* recompensa é secundária */
@@ -3966,7 +3949,6 @@ function BondingBlock({
       if (r.ok && r.granted > 0) {
         setReward(r.granted);
         onEarn();
-        celebrateIfBonus(r);
       }
     } catch {
       /* recompensa é secundária */
@@ -4222,7 +4204,6 @@ function GratitudeBlock({
           if (r.ok && r.granted > 0) {
             setReward(r.granted);
             onEarn();
-            celebrateIfBonus(r);
           }
         }
       }
