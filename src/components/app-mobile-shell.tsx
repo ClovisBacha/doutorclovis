@@ -13,7 +13,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  CreditCard,
   Gamepad2,
   Gift,
   HelpCircle,
@@ -487,12 +486,6 @@ const GRID: { Icon: LucideIcon; label: string; tab: AppTab; color: string }[] = 
     label: "Calendário",
     tab: "Calendário",
     color: "bg-blue-50 text-blue-600 ring-blue-200",
-  },
-  {
-    Icon: CreditCard,
-    label: "Carteirinha",
-    tab: "Carteirinha",
-    color: "bg-amber-50 text-amber-600 ring-amber-200",
   },
   {
     Icon: Users,

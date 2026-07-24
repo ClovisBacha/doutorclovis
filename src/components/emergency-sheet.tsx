@@ -13,6 +13,10 @@ type Info = {
   allergies?: string | null;
   emergencyContact?: string | null;
   emergencyPhone?: string | null;
+  // Carteirinha completa (aberta ao tocar na ficha, dentro do próprio SOS).
+  babyName?: string | null;
+  dpp?: string | null;
+  medications?: string | null;
 };
 
 // Número do médico em formato tel: a partir do link do WhatsApp (wa.me/<num>).
@@ -30,6 +34,8 @@ function doctorTel(): string {
 export function EmergencySheet({ info, onClose }: { info: Info; onClose: () => void }) {
   const [qr, setQr] = useState<string | null>(null);
   const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
+  // Carteirinha recolhida por padrão; toca pra ver tudo (fica dentro do SOS).
+  const [cardOpen, setCardOpen] = useState(false);
 
   // "Botão de pânico": pega a localização e registra o alerta pro contato de
   // emergência/médico (mesma função que era a aba Pânico). Best-effort.
@@ -81,12 +87,17 @@ export function EmergencySheet({ info, onClose }: { info: Info; onClose: () => v
   const card = [
     "FICHA DE EMERGÊNCIA - GESTANTE",
     `Nome: ${info.name || "-"}`,
+    info.babyName ? `Bebe: ${info.babyName}` : "",
     `Idade gestacional: ${info.weekLabel || "-"}`,
+    info.dpp ? `DPP: ${info.dpp}` : "",
     `Tipo sanguineo: ${info.bloodType || "-"}`,
     `Alergias: ${info.allergies || "nenhuma informada"}`,
+    `Medicamentos: ${info.medications || "nenhum"}`,
     `Contato emergencia: ${info.emergencyContact || "-"} ${info.emergencyPhone || ""}`.trim(),
     `Medico: ${DOCTOR.name} - ${DOCTOR.whatsappDisplay}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   useEffect(() => {
     QRCode.toDataURL(card, { margin: 1, width: 260, errorCorrectionLevel: "M" })
@@ -159,12 +170,25 @@ export function EmergencySheet({ info, onClose }: { info: Info; onClose: () => v
               : "🆘 Enviar minha localização"}
         </button>
 
-        {/* Carteirinha de emergência (QR gerado no aparelho) */}
+        {/* Carteirinha de emergência (QR gerado no aparelho) — toca pra ver tudo */}
         <div className="mt-5 rounded-2xl border border-border bg-secondary/40 p-4">
-          <p className="text-sm font-semibold text-foreground">Ficha de emergência</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Mostre este QR no hospital — ele traz seus dados essenciais.
-          </p>
+          <button
+            onClick={() => setCardOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 text-left"
+          >
+            <div>
+              <p className="text-sm font-semibold text-foreground">Carteirinha de emergência</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Mostre o QR no hospital · toque para ver tudo
+              </p>
+            </div>
+            <span
+              className={`shrink-0 text-muted-foreground transition-transform duration-300 ${cardOpen ? "rotate-90" : ""}`}
+            >
+              ›
+            </span>
+          </button>
+
           <div className="mt-3 flex items-center gap-4">
             <div className="shrink-0 rounded-xl bg-white p-2">
               {qr ? (
@@ -180,6 +204,34 @@ export function EmergencySheet({ info, onClose }: { info: Info; onClose: () => v
               <Row label="Contato" value={info.emergencyContact} />
             </dl>
           </div>
+
+          {cardOpen && (
+            <>
+              <dl className="mt-3 space-y-1 border-t border-border pt-3 text-xs">
+                {info.babyName && <Row label="Bebê" value={info.babyName} />}
+                <Row label="DPP" value={info.dpp} />
+                <Row label="Medicamentos" value={info.medications || "nenhum"} />
+                <Row label="Tel. emergência" value={info.emergencyPhone} />
+                <Row label="Médico" value={`${DOCTOR.name} · ${DOCTOR.crm}`} />
+              </dl>
+              <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
+                {[
+                  { label: "Bombeiros", number: "193" },
+                  { label: "CVV (apoio)", number: "188" },
+                ].map(({ label, number }) => (
+                  <a
+                    key={number}
+                    href={`tel:${number}`}
+                    className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-xs"
+                  >
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-bold text-foreground">{number}</span>
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
+
           {(!info.bloodType || !info.emergencyContact) && (
             <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400">
               Complete tipo sanguíneo e contato de emergência no seu Perfil para a ficha ficar
