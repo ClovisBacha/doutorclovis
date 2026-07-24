@@ -5988,6 +5988,13 @@ function PrenatalCalendarTab({
   // Suas consultas reais entram na MESMA linha do tempo dos marcos do pré-natal
   // (o calendário vira o lugar único: marcos recomendados + suas consultas).
   const [appts, setAppts] = useState<MyAppointment[]>([]);
+  // Visão do mês (grade tipo Google) x Lista (linha do tempo). Mês é o padrão.
+  const [mode, setMode] = useState<"mes" | "lista">("mes");
+  const [viewMonth, setViewMonth] = useState(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), 1);
+  });
+  const [selectedYmd, setSelectedYmd] = useState<string>(() => ymdLocal());
   useEffect(() => {
     (async () => {
       const { data: s } = await supabase.auth.getSession();
@@ -6078,13 +6085,40 @@ function PrenatalCalendarTab({
     return x.date.getTime() - y.date.getTime();
   });
 
+  // Eventos por dia (chave = YYYY-MM-DD local) para a grade do mês.
+  const byDay = new Map<string, TLItem[]>();
+  for (const it of items) {
+    if (!it.date) continue;
+    const key = ymdLocal(it.date);
+    const arr = byDay.get(key);
+    if (arr) arr.push(it);
+    else byDay.set(key, [it]);
+  }
+
+  // Grade do mês visível: semanas começando no domingo (padrão Google/pt-BR).
+  const yr = viewMonth.getFullYear();
+  const mo = viewMonth.getMonth();
+  const firstWeekday = new Date(yr, mo, 1).getDay(); // 0=dom
+  const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const todayYmd = ymdLocal(today);
+  const selectedEvents = byDay.get(selectedYmd) ?? [];
+
+  function shiftMonth(delta: number) {
+    setViewMonth((v) => new Date(v.getFullYear(), v.getMonth() + delta, 1));
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-primary">Meu Calendário</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Seus marcos do pré-natal e suas consultas, tudo em ordem.
+            Marcos do pré-natal e suas consultas, no dia certo.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -6103,120 +6137,296 @@ function PrenatalCalendarTab({
         </div>
       </div>
 
-      <div className="relative space-y-3 pl-6">
-        {/* Vertical line */}
-        <div className="absolute left-2.5 top-0 bottom-0 w-px bg-border" />
+      {/* Alternância Mês / Lista */}
+      <div className="inline-flex rounded-full bg-secondary p-1 text-xs font-semibold">
+        {(["mes", "lista"] as const).map((mkey) => (
+          <button
+            key={mkey}
+            onClick={() => setMode(mkey)}
+            className={`rounded-full px-4 py-1.5 transition-colors ${
+              mode === mkey ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+            }`}
+          >
+            {mkey === "mes" ? "Mês" : "Lista"}
+          </button>
+        ))}
+      </div>
 
-        {items.map((it, idx) => {
-          // ── Sua consulta real ──────────────────────────────────────
-          if (it.kind === "appt") {
-            const a = it.a;
-            const time = a.confirmed_time ?? a.proposed_time ?? a.preferred_time;
-            const st = APPT_STATUS[a.status] ?? APPT_STATUS.pending;
-            return (
-              <button
-                key={`appt-${a.id}`}
-                onClick={() => onNavigate("Consultas")}
-                className="relative block w-full rounded-2xl border border-primary/40 bg-primary/5 p-4 text-left shadow-sm transition-colors hover:bg-primary/10"
-              >
-                <div className="absolute -left-4 top-5 h-3 w-3 rounded-full border-2 border-primary bg-primary" />
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
-                    Sua consulta
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}>
-                    {st.label}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm font-medium text-foreground">{a.reason || "Consulta"}</p>
-                {it.date && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {it.date.toLocaleDateString("pt-BR", {
-                      day: "2-digit",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                    {time ? ` · ${time.slice(0, 5)}` : ""}
-                  </p>
-                )}
-              </button>
-            );
-          }
-
-          // ── Marco do pré-natal ─────────────────────────────────────
-          const m = it.m;
-          const date = it.date;
-          const isPast = date != null && date < today;
-          const isUpcoming =
-            !isPast && date != null && date.getTime() - today.getTime() < 21 * 86400000;
-
-          return (
-            <div
-              key={`ms-${idx}`}
-              className={`relative rounded-2xl border p-4 transition-all ${
-                isPast
-                  ? "border-border bg-card opacity-60"
-                  : isUpcoming
-                    ? "border-primary/40 bg-primary/5 shadow-sm"
-                    : "border-border bg-card"
-              }`}
+      {mode === "mes" ? (
+        <>
+          {/* Cabeçalho do mês + navegação */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => shiftMonth(-1)}
+              aria-label="Mês anterior"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
             >
-              {/* Timeline dot */}
-              <div
-                className={`absolute -left-4 top-5 h-3 w-3 rounded-full border-2 ${
-                  isPast
-                    ? "border-border bg-background"
-                    : isUpcoming
-                      ? "border-primary bg-primary"
-                      : "border-primary/40 bg-background"
-                }`}
-              />
+              ‹
+            </button>
+            <p className="font-serif text-lg capitalize text-foreground">
+              {viewMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+            </p>
+            <button
+              onClick={() => shiftMonth(1)}
+              aria-label="Próximo mês"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
+            >
+              ›
+            </button>
+          </div>
 
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
-                    >
-                      {TYPE_LABEL[m.type]}
-                    </span>
-                    <span className="text-xs text-muted-foreground">Semana {m.week}</span>
-                    {isPast && <span className="text-xs text-emerald-600">✓ concluído</span>}
-                    {isUpcoming && !isPast && (
-                      <span className="text-xs font-medium text-primary">Em breve!</span>
-                    )}
-                  </div>
-                  <p
-                    className={`mt-1 text-sm font-medium ${isPast ? "text-muted-foreground" : "text-foreground"}`}
+          {/* Grade do mês */}
+          <div className="rounded-3xl border border-border bg-card p-3">
+            <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => (
+                <div key={d} className="py-1">
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {cells.map((day, i) => {
+                if (day === null) return <div key={`e-${i}`} />;
+                const ymd = ymdLocal(new Date(yr, mo, day));
+                const evs = byDay.get(ymd);
+                const isToday = ymd === todayYmd;
+                const isSelected = ymd === selectedYmd;
+                const hasAppt = evs?.some((e) => e.kind === "appt");
+                const hasMs = evs?.some((e) => e.kind === "milestone");
+                return (
+                  <button
+                    key={ymd}
+                    onClick={() => setSelectedYmd(ymd)}
+                    className={`relative flex aspect-square flex-col items-center justify-center rounded-xl text-sm transition-colors ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground font-bold"
+                        : isToday
+                          ? "bg-primary/10 font-bold text-primary"
+                          : "text-foreground hover:bg-secondary"
+                    }`}
                   >
-                    {m.label}
+                    {day}
+                    {evs && (
+                      <span className="absolute bottom-1 flex gap-0.5">
+                        {hasAppt && (
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-primary-foreground" : "bg-primary"}`}
+                          />
+                        )}
+                        {hasMs && (
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-primary-foreground/70" : "bg-emerald-500"}`}
+                          />
+                        )}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Legenda */}
+            <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Consulta
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Marco do pré-natal
+              </span>
+            </div>
+          </div>
+
+          {/* Eventos do dia selecionado */}
+          <div>
+            <p className="mb-2 text-sm font-semibold capitalize text-foreground">
+              {new Date(`${selectedYmd}T00:00:00`).toLocaleDateString("pt-BR", {
+                weekday: "long",
+                day: "2-digit",
+                month: "long",
+              })}
+            </p>
+            {selectedEvents.length === 0 ? (
+              <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+                Nada marcado neste dia.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {selectedEvents.map((it, idx) => {
+                  if (it.kind === "appt") {
+                    const a = it.a;
+                    const time = a.confirmed_time ?? a.proposed_time ?? a.preferred_time;
+                    const st = APPT_STATUS[a.status] ?? APPT_STATUS.pending;
+                    return (
+                      <button
+                        key={`d-appt-${a.id}`}
+                        onClick={() => onNavigate("Consultas")}
+                        className="block w-full rounded-2xl border border-primary/40 bg-primary/5 p-3 text-left hover:bg-primary/10"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                            Sua consulta
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}
+                          >
+                            {st.label}
+                          </span>
+                          {time && (
+                            <span className="text-xs text-muted-foreground">
+                              {time.slice(0, 5)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {a.reason || "Consulta"}
+                        </p>
+                      </button>
+                    );
+                  }
+                  const m = it.m;
+                  return (
+                    <div
+                      key={`d-ms-${idx}`}
+                      className="rounded-2xl border border-border bg-card p-3"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
+                        >
+                          {TYPE_LABEL[m.type]}
+                        </span>
+                        <span className="text-xs text-muted-foreground">Semana {m.week}</span>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-foreground">{m.label}</p>
+                      {m.detail && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">{m.detail}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="relative space-y-3 pl-6">
+          {/* Vertical line */}
+          <div className="absolute left-2.5 top-0 bottom-0 w-px bg-border" />
+
+          {items.map((it, idx) => {
+            // ── Sua consulta real ──────────────────────────────────────
+            if (it.kind === "appt") {
+              const a = it.a;
+              const time = a.confirmed_time ?? a.proposed_time ?? a.preferred_time;
+              const st = APPT_STATUS[a.status] ?? APPT_STATUS.pending;
+              return (
+                <button
+                  key={`appt-${a.id}`}
+                  onClick={() => onNavigate("Consultas")}
+                  className="relative block w-full rounded-2xl border border-primary/40 bg-primary/5 p-4 text-left shadow-sm transition-colors hover:bg-primary/10"
+                >
+                  <div className="absolute -left-4 top-5 h-3 w-3 rounded-full border-2 border-primary bg-primary" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                      Sua consulta
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}
+                    >
+                      {st.label}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm font-medium text-foreground">
+                    {a.reason || "Consulta"}
                   </p>
-                  {m.detail && <p className="mt-0.5 text-xs text-muted-foreground">{m.detail}</p>}
-                  {date && (
+                  {it.date && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {date.toLocaleDateString("pt-BR", {
+                      {it.date.toLocaleDateString("pt-BR", {
                         day: "2-digit",
                         month: "long",
                         year: "numeric",
                       })}
+                      {time ? ` · ${time.slice(0, 5)}` : ""}
                     </p>
                   )}
+                </button>
+              );
+            }
+
+            // ── Marco do pré-natal ─────────────────────────────────────
+            const m = it.m;
+            const date = it.date;
+            const isPast = date != null && date < today;
+            const isUpcoming =
+              !isPast && date != null && date.getTime() - today.getTime() < 21 * 86400000;
+
+            return (
+              <div
+                key={`ms-${idx}`}
+                className={`relative rounded-2xl border p-4 transition-all ${
+                  isPast
+                    ? "border-border bg-card opacity-60"
+                    : isUpcoming
+                      ? "border-primary/40 bg-primary/5 shadow-sm"
+                      : "border-border bg-card"
+                }`}
+              >
+                {/* Timeline dot */}
+                <div
+                  className={`absolute -left-4 top-5 h-3 w-3 rounded-full border-2 ${
+                    isPast
+                      ? "border-border bg-background"
+                      : isUpcoming
+                        ? "border-primary bg-primary"
+                        : "border-primary/40 bg-background"
+                  }`}
+                />
+
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
+                      >
+                        {TYPE_LABEL[m.type]}
+                      </span>
+                      <span className="text-xs text-muted-foreground">Semana {m.week}</span>
+                      {isPast && <span className="text-xs text-emerald-600">✓ concluído</span>}
+                      {isUpcoming && !isPast && (
+                        <span className="text-xs font-medium text-primary">Em breve!</span>
+                      )}
+                    </div>
+                    <p
+                      className={`mt-1 text-sm font-medium ${isPast ? "text-muted-foreground" : "text-foreground"}`}
+                    >
+                      {m.label}
+                    </p>
+                    {m.detail && <p className="mt-0.5 text-xs text-muted-foreground">{m.detail}</p>}
+                    {date && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {date.toLocaleDateString("pt-BR", {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                    )}
+                  </div>
+                  {date && !isPast && (
+                    <a
+                      href={toGoogleCalUrl(m.label, date)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 rounded-full border border-primary/30 px-3 py-1 text-xs text-primary hover:bg-primary/5"
+                    >
+                      + Agenda
+                    </a>
+                  )}
                 </div>
-                {date && !isPast && (
-                  <a
-                    href={toGoogleCalUrl(m.label, date)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 rounded-full border border-primary/30 px-3 py-1 text-xs text-primary hover:bg-primary/5"
-                  >
-                    + Agenda
-                  </a>
-                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
