@@ -129,6 +129,12 @@ Ritmo pedagógico por `D % 7` — vale para as duas peças:
 primeiro; as listas `CHALLENGES_T1/T2/T3/POSDATA/POS_*` só entram como rede de
 segurança para dias fora da faixa (DUM corrigida, gestação além de 42s).
 
+**Desenho da trilha:** todo dia é um nó, inclusive os anteriores à entrada na
+jornada — o que separa grátis de premium é o portão da aula (`quizPremium`),
+nunca o desenho. A cada 7 dias entra uma `WeekBar` (barra da semana com fruta,
+marco, placar de 7 pontinhos), e é nela que mora o álbum da semana — antes era
+uma moeda "memória" solta na trilha.
+
 Ao editar o conteúdo, rode a auditoria antes de commitar — ela cobra cobertura
 completa, gabarito dentro da faixa, "marque todos" sem todas as alternativas
 corretas e enunciado repetido dentro de 14 dias:
