@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
+    "audit:conteudo": "node scripts/audit-conteudo.mjs",
     "prepare": "husky"
   },
   "dependencies": {

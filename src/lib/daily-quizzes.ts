@@ -20,9 +20,16 @@
  */
 import raw from "./daily-quizzes.data.json";
 
-/** Uma pergunta. `kind` "choice" = uma correta; "multi" = marque todas. */
+/**
+ * Uma pergunta. "choice" = uma correta; "multi" = marque todas.
+ *
+ * O rótulo aparece como `type` no JSON e como `kind` no formato legado — os
+ * dois são aceitos. Na prática o sinal decisivo é `a` ser array, mas ler só
+ * `kind` deixava `type` morto e a divergência passava despercebida.
+ */
 export type QuizQuestion = {
   kind?: "choice" | "multi";
+  type?: "choice" | "multi";
   q: string;
   o: string[];
   /** Índice da correta (choice) ou lista de índices corretos (multi). */
