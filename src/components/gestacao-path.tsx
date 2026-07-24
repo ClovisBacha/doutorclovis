@@ -771,39 +771,33 @@ function ConfettiBurst({ big = false }: { big?: boolean }) {
 /* ══════════════════════ Layout do caminho ══════════════════════ */
 
 const DAY_ROW = 84;
-const ALBUM_ROW = 116;
-const WEEK_HEADER = 44;
+const WEEK_HEADER = 88;
 
 type PathNode =
   | { kind: "week-header"; week: number; y: number }
-  | { kind: "day"; D: number; week: number; y: number; x: number; row: number }
-  | { kind: "album-week"; week: number; y: number; x: number; row: number };
+  | { kind: "day"; D: number; week: number; y: number; x: number; row: number };
 
-/** Monta os nós da fase: semanas pré-jornada viram nó-álbum; as demais, 7 dias. */
-function buildPhaseNodes(
-  phase: Phase,
-  journeyStartD: number,
-): { nodes: PathNode[]; height: number } {
+/**
+ * Monta os nós da fase: barra da semana + os 7 dias, sempre.
+ *
+ * Semanas anteriores à entrada na jornada já viraram uma única moeda "memória",
+ * e quem entrava na semana 30 não via dia nenhum das 29 primeiras. Agora todo
+ * dia existe no caminho — o que separa é o portão premium na aula, não o
+ * desenho da trilha. O álbum da semana mudou de casa: mora na barra.
+ */
+function buildPhaseNodes(phase: Phase): { nodes: PathNode[]; height: number } {
   const nodes: PathNode[] = [];
   let y = 30;
   let row = 0;
   const xOf = (r: number) => 50 + 27 * Math.sin((r * Math.PI) / 4);
 
   for (let w = phase.from; w <= phase.to; w++) {
-    const weekStartD = w * 7;
-    const weekEndD = w * 7 + 6;
-    if (weekEndD < journeyStartD) {
-      nodes.push({ kind: "album-week", week: w, y: y + ALBUM_ROW / 2, x: xOf(row), row });
-      y += ALBUM_ROW;
+    nodes.push({ kind: "week-header", week: w, y });
+    y += WEEK_HEADER;
+    for (let D = w * 7; D <= w * 7 + 6; D++) {
+      nodes.push({ kind: "day", D, week: w, y: y + DAY_ROW / 2, x: xOf(row), row });
+      y += DAY_ROW;
       row++;
-    } else {
-      nodes.push({ kind: "week-header", week: w, y });
-      y += WEEK_HEADER;
-      for (let D = Math.max(weekStartD, journeyStartD); D <= weekEndD; D++) {
-        nodes.push({ kind: "day", D, week: w, y: y + DAY_ROW / 2, x: xOf(row), row });
-        y += DAY_ROW;
-        row++;
-      }
     }
   }
   return { nodes, height: y + 40 };
@@ -812,8 +806,7 @@ function buildPhaseNodes(
 /* ── Caminho contínuo estilo Duolingo: todas as fases numa página só ── */
 
 const IDAY_ROW = 104;
-const IALBUM_ROW = 112;
-const IWEEK_HEADER = 72; // folga para o balão "Desafio de hoje" não cobrir o pill da semana
+const IWEEK_HEADER = 112; // folga para o balão "Desafio de hoje" não cobrir a barra da semana
 const IBANNER_ROW = 120;
 const ILESSON_ROW = 116;
 
@@ -829,10 +822,7 @@ type JourneyNode =
 const MASCOTS = ["🧸", "🦢", "🌷", "🍼", "🐘", "🌈", "🐥", "🧦"];
 
 /** Uma página só: banners de seção entre as fases, dias grandes, mascotes ao lado. */
-function buildFullJourney(
-  phases: Phase[],
-  journeyStartD: number,
-): { nodes: JourneyNode[]; height: number } {
+function buildFullJourney(phases: Phase[]): { nodes: JourneyNode[]; height: number } {
   const nodes: JourneyNode[] = [];
   let y = 8;
   let row = 0;
@@ -854,30 +844,144 @@ function buildFullJourney(
     nodes.push({ kind: "phase-banner", phase: p, y });
     y += IBANNER_ROW;
     for (let w = p.from; w <= p.to; w++) {
-      const weekStartD = w * 7;
-      const weekEndD = w * 7 + 6;
-      if (weekEndD < journeyStartD) {
+      nodes.push({ kind: "week-header", week: w, y });
+      y += IWEEK_HEADER;
+      for (let D = w * 7; D <= w * 7 + 6; D++) {
         const x = xOf(row);
-        nodes.push({ kind: "album-week", week: w, y: y + IALBUM_ROW / 2, x, row });
-        maybeMascot(x, y, IALBUM_ROW);
-        y += IALBUM_ROW;
+        nodes.push({ kind: "day", D, week: w, y: y + IDAY_ROW / 2, x, row });
+        maybeMascot(x, y, IDAY_ROW);
+        y += IDAY_ROW;
         row++;
-      } else {
-        nodes.push({ kind: "week-header", week: w, y });
-        y += IWEEK_HEADER;
-        for (let D = Math.max(weekStartD, journeyStartD); D <= weekEndD; D++) {
-          const x = xOf(row);
-          nodes.push({ kind: "day", D, week: w, y: y + IDAY_ROW / 2, x, row });
-          maybeMascot(x, y, IDAY_ROW);
-          y += IDAY_ROW;
-          row++;
-        }
       }
       // (Opção A) As lições do curso saíram do Caminho — o ensino é só o
       // "desafio do dia" (aula por semana). Sem nós de LIÇÃO na trilha.
     }
   }
   return { nodes, height: y + 40 };
+}
+
+/* ══════════════════════ Barra divisória da semana ══════════════════════ */
+
+/**
+ * A cada 7 dias o caminho para e anuncia onde estamos.
+ *
+ * Era um pill branco de 11px espremido entre duas bolinhas; virou uma faixa
+ * que divide de verdade — e que carrega informação em vez de só rotular: as 7
+ * bolinhas dão o placar da semana num relance e a moeda da fruta abre o álbum
+ * (a antiga moeda "memória" da trilha, que saiu quando todo dia virou nó).
+ */
+function WeekBar({
+  title,
+  sub,
+  emoji,
+  main,
+  lip,
+  days,
+  current,
+  onAlbum,
+  albumDone,
+}: {
+  title: string;
+  sub?: string;
+  emoji: string;
+  main: string;
+  lip: string;
+  /** Um item por dia da semana, na ordem. */
+  days: { done: boolean; today: boolean; future: boolean }[];
+  current: boolean;
+  onAlbum?: () => void;
+  albumDone?: boolean;
+}) {
+  const feitos = days.filter((d) => d.done).length;
+  const Moeda = onAlbum ? "button" : "div";
+  return (
+    <>
+      {/* Fio que atravessa a trilha: é ele que faz a faixa ler como divisória */}
+      <div
+        aria-hidden
+        className="h-px w-full"
+        style={{
+          background: `linear-gradient(90deg, transparent, color-mix(in oklab, ${main} 55%, white) 50%, transparent)`,
+        }}
+      />
+      <div
+        className="mt-1.5 flex items-center gap-3 rounded-2xl px-3 py-2.5 backdrop-blur-sm"
+        style={{
+          background: `linear-gradient(100deg, color-mix(in oklab, ${main} 18%, white) 0%, color-mix(in oklab, ${main} 7%, white) 100%)`,
+          border: `1px solid color-mix(in oklab, ${main} 30%, white)`,
+          boxShadow: current
+            ? `0 3px 0 color-mix(in oklab, ${lip} 32%, white), 0 0 0 2px ${main}55`
+            : `0 3px 0 color-mix(in oklab, ${lip} 22%, white)`,
+        }}
+      >
+        <div className="relative shrink-0">
+          <Moeda
+            {...(onAlbum
+              ? { onClick: onAlbum, type: "button" as const, "aria-label": `Álbum: ${title}` }
+              : {})}
+            className={`duo3d relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full ${
+              onAlbum ? "press" : ""
+            }`}
+            style={
+              {
+                background: `radial-gradient(120% 120% at 32% 24%, color-mix(in oklab, ${main} 45%, white) 0%, ${main} 62%, color-mix(in oklab, ${main} 80%, black) 100%)`,
+                "--lip": lip,
+                boxShadow: `0 4px 0 ${lip}`,
+              } as React.CSSProperties
+            }
+          >
+            <span className="relative z-10 text-xl">{emoji}</span>
+            <span className="dc-coin-shine" aria-hidden />
+          </Moeda>
+          {/* Fora da moeda: o `overflow-hidden` que arredonda o brilho cortaria o selo */}
+          {albumDone && (
+            <span
+              className="pointer-events-none absolute -right-1 -top-1 rounded-full bg-white px-1 text-[9px] font-black text-emerald-500 shadow-sm"
+              aria-label="figurinha coletada"
+            >
+              ✓
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 truncate text-[15px] font-extrabold leading-tight text-slate-700">
+            {title}
+            {current && (
+              <span
+                className="rounded-full px-1.5 py-px text-[9px] font-black uppercase tracking-wider text-white"
+                style={{ background: main }}
+              >
+                agora
+              </span>
+            )}
+          </p>
+          <p className="truncate text-[11px] font-semibold leading-tight text-slate-500">
+            {sub ?? `${feitos} de 7 dias`}
+          </p>
+        </div>
+
+        {/* Placar da semana: 7 pontinhos, um por dia */}
+        <div className="flex shrink-0 items-center gap-1" aria-hidden>
+          {days.map((d, i) => (
+            <span
+              key={i}
+              className="h-1.5 w-1.5 rounded-full"
+              style={{
+                background: d.done
+                  ? main
+                  : d.future
+                    ? "#dde5ee"
+                    : `color-mix(in oklab, ${main} 26%, white)`,
+                outline: d.today ? `2px solid ${main}` : undefined,
+                outlineOffset: d.today ? "1.5px" : undefined,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  );
 }
 
 /* ── Anel de progresso segmentado (Duolingo): 3 segmentos = 3 tarefas do dia ── */
@@ -1150,10 +1254,7 @@ export function GestacaoPath({
   }, [doneDays, todayD, hasGest]);
 
   // Caminho contínuo: todas as fases numa página só, como o Duolingo
-  const { nodes, height } = useMemo(
-    () => buildFullJourney(phases, journeyStartD),
-    [phases, journeyStartD],
-  );
+  const { nodes, height } = useMemo(() => buildFullJourney(phases), [phases]);
 
   const pathRef = useRef<HTMLDivElement>(null);
 
@@ -2219,19 +2320,36 @@ export function GestacaoPath({
           if (node.kind === "mascot") return null;
 
           if (node.kind === "week-header") {
-            const tm = trimMeta(node.week);
+            const ms = MILESTONES[node.week];
+            const start = node.week * 7;
+            // Semana inteira no futuro fica cinza, igual às bolinhas dos dias:
+            // a cor é a régua de "isso já é seu" no caminho todo.
+            const porVir = start > todayD;
+            const tm = porVir ? LOCKED : trimMeta(node.week);
+            const dias = Array.from({ length: 7 }, (_, i) => ({
+              done: doneDays.includes(start + i),
+              today: start + i === todayD,
+              future: start + i > todayD,
+            }));
             return (
               <div
                 key={`h${node.week}`}
-                className="absolute left-1/2 -translate-x-1/2"
+                className="absolute inset-x-3 md:inset-x-0"
                 style={{ top: `${node.y + 8}px` }}
               >
-                <span
-                  className={`rounded-full bg-white/90 px-3.5 py-1 text-[11px] font-extrabold shadow-sm backdrop-blur-sm ${tm.softText}`}
-                >
-                  Semana {node.week} {FRUIT_EMOJI[node.week] ?? ""}
-                  {MILESTONES[node.week] ? ` · ${MILESTONES[node.week].emoji}` : ""}
-                </span>
+                <WeekBar
+                  title={`Semana ${node.week}`}
+                  sub={ms ? `${ms.emoji} ${ms.label}` : undefined}
+                  emoji={FRUIT_EMOJI[node.week] ?? "🍼"}
+                  main={tm.main}
+                  lip={tm.lip}
+                  days={dias}
+                  current={todayD >= start && todayD <= start + 6}
+                  // O álbum só abre a partir da semana atual — antes disso não
+                  // há memória para guardar, e a figurinha estragaria a surpresa.
+                  onAlbum={porVir ? undefined : () => openAlbum(node.week)}
+                  albumDone={stickers.includes(node.week)}
+                />
               </div>
             );
           }
@@ -2288,41 +2406,6 @@ export function GestacaoPath({
                   }`}
                 >
                   {done ? "Lição completa" : "Lição"}
-                </span>
-              </button>
-            );
-          }
-
-          if (node.kind === "album-week") {
-            const collected = stickers.includes(node.week);
-            const tm = trimMeta(node.week);
-            // Desbloqueado é COLORIDO (Duolingo): cinza fica só para o futuro.
-            // Não colecionada = moeda mais clara da mesma cor, convidando o toque.
-            return (
-              <button
-                key={`a${node.week}`}
-                onClick={() => openAlbum(node.week)}
-                className="group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none"
-                style={{ left: `${node.x}%`, top: `${node.y}px` }}
-                aria-label={`Memória da semana ${node.week}`}
-              >
-                <div
-                  className="duo3d flex h-16 w-16 items-center justify-center rounded-full"
-                  style={
-                    {
-                      background: collected
-                        ? `linear-gradient(180deg, color-mix(in oklab, ${tm.main} 82%, white) 0%, ${tm.main} 55%)`
-                        : `color-mix(in oklab, ${tm.main} 38%, white)`,
-                      "--lip": collected ? tm.lip : `color-mix(in oklab, ${tm.lip} 55%, white)`,
-                      boxShadow: `0 6px 0 var(--lip)`,
-                    } as React.CSSProperties
-                  }
-                >
-                  <span className="relative z-10 text-2xl">{FRUIT_EMOJI[node.week] ?? "🍼"}</span>
-                  <span className="dc-coin-shine" aria-hidden />
-                </div>
-                <span className="mt-1 rounded-full bg-white/85 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400 shadow-sm">
-                  memória
                 </span>
               </button>
             );
@@ -2969,7 +3052,16 @@ function LessonSheet({
 const QUIZ_PRICE_MONTHLY = 19.9;
 const QUIZ_PRICE_ANNUAL_MONTH = 9.9; // 12x — cobrado anualmente (R$ 118,80/ano)
 
-function QuizPaywall({ week, context = "past" }: { week: number; context?: "past" | "ad" }) {
+function QuizPaywall({
+  week,
+  context = "past",
+  peek,
+}: {
+  week: number;
+  context?: "past" | "ad";
+  /** A aula que está atrás do portão — o conteúdo aparece, jogar é que não. */
+  peek?: DailyQuiz | null;
+}) {
   const [plan, setPlan] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
@@ -3127,6 +3219,37 @@ function QuizPaywall({ week, context = "past" }: { week: number; context?: "past
           )}
         </div>
       </div>
+
+      {/* O que está atrás do portão. Esconder a aula inteira fazia o dia
+          passado parecer vazio; aqui os exercícios aparecem (só o enunciado —
+          as alternativas e o gabarito continuam do lado de dentro). */}
+      {peek && peek.questions.length > 0 && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-white/70 p-3">
+          <p className="text-[11px] font-black uppercase tracking-wider text-amber-600">
+            Nesta aula · {peek.questions.length} exercícios
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-amber-900/80">
+            {peek.teach}
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {peek.questions.map((q, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-2 text-[11px] leading-snug text-amber-800"
+              >
+                <span
+                  className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[9px] font-black text-amber-600"
+                  aria-hidden
+                >
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1">{q.q}</span>
+                <span aria-hidden>🔒</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <PlanCard
@@ -4970,7 +5093,7 @@ function WellnessScreen({
             </p>
             {lesson.kind === "quiz" ? (
               lesson.locked ? (
-                <QuizPaywall week={lesson.week} />
+                <QuizPaywall week={lesson.week} peek={lesson.quiz} />
               ) : (
                 <DailyQuizBlock
                   key={`wq-${day}`}
@@ -5507,7 +5630,7 @@ function PosPartoJourney({
 
   const phase = phases[selectedPhase] ?? phases[0];
   // Jornada pós-parto começa no nascimento: sem semanas-álbum aqui
-  const { nodes, height } = useMemo(() => buildPhaseNodes(phase, 7), [phase]);
+  const { nodes, height } = useMemo(() => buildPhaseNodes(phase), [phase]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -5713,22 +5836,30 @@ function PosPartoJourney({
         <div className="relative" style={{ height: `${height}px` }}>
           {nodes.map((node) => {
             if (node.kind === "week-header") {
-              const pm = posMeta(node.week);
+              const start = node.week * 7;
+              const pm = start > todayD ? LOCKED : posMeta(node.week);
+              const dias = Array.from({ length: 7 }, (_, i) => ({
+                done: posDone.includes(start + i),
+                today: start + i === todayD,
+                future: start + i > todayD,
+              }));
               return (
                 <div
                   key={`h${node.week}`}
-                  className="absolute left-1/2 -translate-x-1/2"
+                  className="absolute inset-x-2"
                   style={{ top: `${node.y + 8}px` }}
                 >
-                  <span
-                    className={`rounded-full bg-white/90 px-3 py-1 text-[11px] font-extrabold shadow-sm ${pm.softText}`}
-                  >
-                    Semana {node.week} de vida {POS_EMOJI[node.week] ?? ""}
-                  </span>
+                  <WeekBar
+                    title={`Semana ${node.week} de vida`}
+                    emoji={POS_EMOJI[node.week] ?? "🍼"}
+                    main={pm.main}
+                    lip={pm.lip}
+                    days={dias}
+                    current={todayD >= start && todayD <= start + 6}
+                  />
                 </div>
               );
             }
-            if (node.kind === "album-week") return null;
 
             const { D, week } = node;
             const isToday = D === todayD;
