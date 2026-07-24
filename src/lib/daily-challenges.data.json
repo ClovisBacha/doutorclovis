@@ -1,0 +1,1518 @@
+{
+  "gest": {
+    "7": {
+      "label": "Anotar o 1º dia da última menstruação",
+      "emoji": "📅"
+    },
+    "8": {
+      "label": "Registrar como está o fluxo hoje",
+      "emoji": "🩸"
+    },
+    "9": {
+      "label": "Começar o ácido fólico ainda hoje",
+      "emoji": "💊"
+    },
+    "10": {
+      "label": "Zerar o álcool a partir de agora",
+      "emoji": "🚫"
+    },
+    "11": {
+      "label": "Separar seus exames antigos numa pasta",
+      "emoji": "📁"
+    },
+    "12": {
+      "label": "Caminhar 15 minutos sem pressa",
+      "emoji": "🚶"
+    },
+    "13": {
+      "label": "Reler o que anotou nesta primeira semana",
+      "emoji": "🔁"
+    },
+    "14": {
+      "label": "Marcar a janela fértil no calendário",
+      "emoji": "🥚"
+    },
+    "15": {
+      "label": "Reparar no muco cervical mais elástico",
+      "emoji": "💧"
+    },
+    "16": {
+      "label": "Trocar o refrigerante do almoço por água",
+      "emoji": "🥤"
+    },
+    "17": {
+      "label": "Listar seus remédios pra mostrar ao médico",
+      "emoji": "📝"
+    },
+    "18": {
+      "label": "Abrir a aba Consultas e pedir um horário",
+      "emoji": "📆"
+    },
+    "19": {
+      "label": "Dormir 30 minutos mais cedo esta noite",
+      "emoji": "🌙"
+    },
+    "20": {
+      "label": "Revisar seus hábitos da semana na aba Saúde",
+      "emoji": "🔍"
+    },
+    "21": {
+      "label": "Ler sobre a implantação que começa agora",
+      "emoji": "🌱"
+    },
+    "22": {
+      "label": "Observar se aparece um escape rosado",
+      "emoji": "🌸"
+    },
+    "23": {
+      "label": "Incluir uma folha verde escura no almoço",
+      "emoji": "🥬"
+    },
+    "24": {
+      "label": "Evitar cigarro e ambientes com fumaça",
+      "emoji": "🚭"
+    },
+    "25": {
+      "label": "Anotar dúvidas na aba Consultas pro médico",
+      "emoji": "❓"
+    },
+    "26": {
+      "label": "Fazer 10 minutos de Meditações à noite",
+      "emoji": "🧘"
+    },
+    "27": {
+      "label": "Escolher 1 hábito desta semana pra manter",
+      "emoji": "⭐"
+    },
+    "28": {
+      "label": "Ver no app o tamanho do embrião agora",
+      "emoji": "🔬"
+    },
+    "29": {
+      "label": "Observar se os seios estão mais sensíveis",
+      "emoji": "💗"
+    },
+    "30": {
+      "label": "Anotar o lanche da tarde na aba Nutrição",
+      "emoji": "🍎"
+    },
+    "31": {
+      "label": "Trocar o café da tarde por descafeinado",
+      "emoji": "☕"
+    },
+    "32": {
+      "label": "Fazer o teste de gravidez pela manhã",
+      "emoji": "🧪"
+    },
+    "33": {
+      "label": "Contar a novidade pra quem você confia",
+      "emoji": "💬"
+    },
+    "34": {
+      "label": "Registrar no Diário como recebeu a notícia",
+      "emoji": "📓"
+    },
+    "35": {
+      "label": "Descobrir que o coraçãozinho já bate",
+      "emoji": "💓"
+    },
+    "36": {
+      "label": "Anotar o enjoo do dia na aba Saúde",
+      "emoji": "🤢"
+    },
+    "37": {
+      "label": "Comer uma bolacha salgada antes de levantar",
+      "emoji": "🍪"
+    },
+    "38": {
+      "label": "Registrar qualquer sangramento em Alertas",
+      "emoji": "🚨"
+    },
+    "39": {
+      "label": "Agendar a primeira consulta de pré-natal",
+      "emoji": "🏥"
+    },
+    "40": {
+      "label": "Montar sua playlist calma na aba Bem-estar",
+      "emoji": "🎵"
+    },
+    "41": {
+      "label": "Revisar o que mudou no seu corpo na semana",
+      "emoji": "🪞"
+    },
+    "42": {
+      "label": "Ver como o coração do bebê bate rapidinho",
+      "emoji": "🫀"
+    },
+    "43": {
+      "label": "Descansar 20 minutos quando o cansaço vier",
+      "emoji": "😴"
+    },
+    "44": {
+      "label": "Beber água em goles pequenos o dia todo",
+      "emoji": "🚰"
+    },
+    "45": {
+      "label": "Avisar o médico se vomitar tudo que come",
+      "emoji": "📞"
+    },
+    "46": {
+      "label": "Marcar o primeiro ultrassom na aba Exames",
+      "emoji": "🩻"
+    },
+    "47": {
+      "label": "Dar bom dia pro bebê ao acordar",
+      "emoji": "🌞"
+    },
+    "48": {
+      "label": "Listar as 3 coisas que aliviaram seu enjoo",
+      "emoji": "📔"
+    },
+    "49": {
+      "label": "Ver o bebê do tamanho de um mirtilo",
+      "emoji": "🫐"
+    },
+    "50": {
+      "label": "Trocar o sutiã por um mais confortável",
+      "emoji": "👙"
+    },
+    "51": {
+      "label": "Dividir o jantar em duas porções menores",
+      "emoji": "🍲"
+    },
+    "52": {
+      "label": "Anotar cólicas fortes pra contar ao médico",
+      "emoji": "🩺"
+    },
+    "53": {
+      "label": "Guardar os exames de sangue na aba Exames",
+      "emoji": "🧾"
+    },
+    "54": {
+      "label": "Escrever uma carta curta pro seu bebê",
+      "emoji": "💌"
+    },
+    "55": {
+      "label": "Fechar a semana 7 revendo sua Carteirinha",
+      "emoji": "📗"
+    },
+    "56": {
+      "label": "Veja o bebê do tamanho de uma framboesa",
+      "emoji": "🫐"
+    },
+    "57": {
+      "label": "Anote no Diário a hora em que o enjoo aperta",
+      "emoji": "🤢"
+    },
+    "58": {
+      "label": "Coma um biscoito seco antes de sair da cama",
+      "emoji": "🍪"
+    },
+    "59": {
+      "label": "Leia a aba Alertas e saiba quando ligar",
+      "emoji": "🚨"
+    },
+    "60": {
+      "label": "Separe os pedidos de exame do 1º trimestre",
+      "emoji": "📄"
+    },
+    "61": {
+      "label": "Ouça 5 minutos de Meditações antes de dormir",
+      "emoji": "🎧"
+    },
+    "62": {
+      "label": "Releia o Diário da semana e marque 1 vitória",
+      "emoji": "🏅"
+    },
+    "63": {
+      "label": "Saiba: o bebê já se mexe sem você sentir",
+      "emoji": "🌱"
+    },
+    "64": {
+      "label": "Registre em Saúde quantas horas você dormiu",
+      "emoji": "😴"
+    },
+    "65": {
+      "label": "Troque o café da tarde por suco de laranja",
+      "emoji": "🍊"
+    },
+    "66": {
+      "label": "Salve o telefone da maternidade no celular",
+      "emoji": "📞"
+    },
+    "67": {
+      "label": "Liste 3 dúvidas para a próxima consulta",
+      "emoji": "📝"
+    },
+    "68": {
+      "label": "Escreva uma carta curta pro bebê no Diário",
+      "emoji": "💌"
+    },
+    "69": {
+      "label": "Reveja a semana: o que aliviou o enjoo?",
+      "emoji": "🔎"
+    },
+    "70": {
+      "label": "Repare: as unhas do bebê começam a nascer",
+      "emoji": "💅"
+    },
+    "71": {
+      "label": "Meça a cintura e anote a mudança no Diário",
+      "emoji": "📏"
+    },
+    "72": {
+      "label": "Inclua uma fonte de ferro no almoço de hoje",
+      "emoji": "🥬"
+    },
+    "73": {
+      "label": "Observe a cor do corrimento e avise se mudar",
+      "emoji": "👀"
+    },
+    "74": {
+      "label": "Pergunte ao médico se cabe o exame NIPT",
+      "emoji": "🧬"
+    },
+    "75": {
+      "label": "Peça 15 minutos de colo com o celular longe",
+      "emoji": "🤗"
+    },
+    "76": {
+      "label": "Confira quantos dias do Diário você preencheu",
+      "emoji": "📅"
+    },
+    "77": {
+      "label": "Celebre: o bebê já abre e fecha as mãozinhas",
+      "emoji": "👶"
+    },
+    "78": {
+      "label": "Veja se a calça está apertando na barriga",
+      "emoji": "👖"
+    },
+    "79": {
+      "label": "Faça 5 refeições menores para segurar a azia",
+      "emoji": "🍲"
+    },
+    "80": {
+      "label": "Avise no app qualquer sangramento, mesmo leve",
+      "emoji": "🩸"
+    },
+    "81": {
+      "label": "Agende a translucência nucal em Consultas",
+      "emoji": "📆"
+    },
+    "82": {
+      "label": "Chame seu par para ouvir uma Meditação junto",
+      "emoji": "💞"
+    },
+    "83": {
+      "label": "Escolha 1 hábito da semana para levar adiante",
+      "emoji": "🔁"
+    },
+    "84": {
+      "label": "Saiba: o bebê já tem impressões digitais",
+      "emoji": "👆"
+    },
+    "85": {
+      "label": "Note se a sonolência da tarde está cedendo",
+      "emoji": "🌞"
+    },
+    "86": {
+      "label": "Capriche no cálcio: iogurte no lanche de hoje",
+      "emoji": "🥛"
+    },
+    "87": {
+      "label": "Teste se a dor de cabeça cede com água e sono",
+      "emoji": "💧"
+    },
+    "88": {
+      "label": "Leve a Carteirinha no ultrassom desta janela",
+      "emoji": "📘"
+    },
+    "89": {
+      "label": "Escolha quem vai saber da gravidez esta semana",
+      "emoji": "🎉"
+    },
+    "90": {
+      "label": "Guarde a imagem do ultrassom no Álbum",
+      "emoji": "📁"
+    },
+    "91": {
+      "label": "Veja: as cordas vocais do bebê se formam agora",
+      "emoji": "🎵"
+    },
+    "92": {
+      "label": "Use a energia nova para alongar 10 minutos",
+      "emoji": "🤸"
+    },
+    "93": {
+      "label": "Aumente as fibras para o intestino funcionar",
+      "emoji": "🥗"
+    },
+    "94": {
+      "label": "Revise em Alertas quando ir à emergência",
+      "emoji": "🏥"
+    },
+    "95": {
+      "label": "Confira os resultados na aba Exames",
+      "emoji": "🔬"
+    },
+    "96": {
+      "label": "Tire a primeira foto da barriga para o Álbum",
+      "emoji": "📸"
+    },
+    "97": {
+      "label": "Escreva no Diário como foi entrar no 2º tri",
+      "emoji": "📓"
+    },
+    "98": {
+      "label": "Imagine: o bebê faz caretas e chupa o dedo",
+      "emoji": "😝"
+    },
+    "99": {
+      "label": "Passe hidratante na barriga e nos seios hoje",
+      "emoji": "🧴"
+    },
+    "100": {
+      "label": "Monte o almoço com metade do prato de legumes",
+      "emoji": "🥕"
+    },
+    "101": {
+      "label": "Anote sua pressão de hoje na aba Saúde",
+      "emoji": "🩺"
+    },
+    "102": {
+      "label": "Marque a consulta do 2º trimestre em Consultas",
+      "emoji": "📌"
+    },
+    "103": {
+      "label": "Ponha uma música e converse com a barriga",
+      "emoji": "🎶"
+    },
+    "104": {
+      "label": "Compare seu peso com o do início da gestação",
+      "emoji": "📊"
+    },
+    "105": {
+      "label": "Fale perto da barriga: ele já capta sons",
+      "emoji": "👂"
+    },
+    "106": {
+      "label": "Anote na aba Saúde seu peso desta semana",
+      "emoji": "📋"
+    },
+    "107": {
+      "label": "Coma uma fonte de ferro no almoço de hoje",
+      "emoji": "🥩"
+    },
+    "108": {
+      "label": "Leia a aba Alertas e saiba o que é urgência",
+      "emoji": "🚨"
+    },
+    "109": {
+      "label": "Confira na Carteirinha se falta alguma vacina",
+      "emoji": "💉"
+    },
+    "110": {
+      "label": "Escreva no Diário um desejo para a semana 15",
+      "emoji": "📖"
+    },
+    "111": {
+      "label": "Releia seu Diário da semana 15 antes de dormir",
+      "emoji": "🌙"
+    },
+    "112": {
+      "label": "Feche os olhos e imagine 12 cm de bebê",
+      "emoji": "👶"
+    },
+    "113": {
+      "label": "Durma de lado com travesseiro entre as pernas",
+      "emoji": "🛌"
+    },
+    "114": {
+      "label": "Troque o refrigerante por água com limão",
+      "emoji": "🍋"
+    },
+    "115": {
+      "label": "Vire na cama devagar: o ligamento estica",
+      "emoji": "🤰"
+    },
+    "116": {
+      "label": "Agende o morfológico pela aba Consultas",
+      "emoji": "📅"
+    },
+    "117": {
+      "label": "Ponha uma música baixinha e veja se reage",
+      "emoji": "🎵"
+    },
+    "118": {
+      "label": "Registre em Chutes a primeira mexida sentida",
+      "emoji": "👣"
+    },
+    "119": {
+      "label": "Pense nele treinando sugar o dedinho agora",
+      "emoji": "🍼"
+    },
+    "120": {
+      "label": "Passe hidratante na barriga após o banho",
+      "emoji": "🧴"
+    },
+    "121": {
+      "label": "Coma uma fruta cítrica junto com o feijão",
+      "emoji": "🍊"
+    },
+    "122": {
+      "label": "Beba mais água hoje: cãibra à noite pede isso",
+      "emoji": "💧"
+    },
+    "123": {
+      "label": "Organize seus laudos antigos na aba Exames",
+      "emoji": "📂"
+    },
+    "124": {
+      "label": "Liste três nomes de menina e três de menino",
+      "emoji": "📝"
+    },
+    "125": {
+      "label": "Tire a foto da barriga da semana 17 no Álbum",
+      "emoji": "📸"
+    },
+    "126": {
+      "label": "Escolha uma canção só dele e cante hoje",
+      "emoji": "🎶"
+    },
+    "127": {
+      "label": "Suba escadas devagar: seu equilíbrio mudou",
+      "emoji": "🪜"
+    },
+    "128": {
+      "label": "Inclua iogurte natural no lanche da tarde",
+      "emoji": "🥛"
+    },
+    "129": {
+      "label": "Meça sua pressão hoje e registre em Saúde",
+      "emoji": "🩺"
+    },
+    "130": {
+      "label": "Confirme a data do morfológico em Consultas",
+      "emoji": "📆"
+    },
+    "131": {
+      "label": "Convide o pai a falar com a barriga hoje",
+      "emoji": "👨"
+    },
+    "132": {
+      "label": "Veja quantos dias você registrou em Saúde",
+      "emoji": "📊"
+    },
+    "133": {
+      "label": "Deite de lado e sinta 5 minutos de mexidas",
+      "emoji": "🤍"
+    },
+    "134": {
+      "label": "Massageie a panturrilha antes de deitar",
+      "emoji": "🦵"
+    },
+    "135": {
+      "label": "Divida o jantar em duas porções menores",
+      "emoji": "🍴"
+    },
+    "136": {
+      "label": "Se der tontura, sente no chão e não force",
+      "emoji": "😵"
+    },
+    "137": {
+      "label": "Anote 3 perguntas para a próxima consulta",
+      "emoji": "❓"
+    },
+    "138": {
+      "label": "Ouça 10 minutos em Meditações à noite",
+      "emoji": "🎧"
+    },
+    "139": {
+      "label": "Compare no Álbum a barriga da 15 e da 19",
+      "emoji": "👀"
+    },
+    "140": {
+      "label": "Brinde com um suco: chegou na metade",
+      "emoji": "🥂"
+    },
+    "141": {
+      "label": "Meça a barriga com fita e anote em Saúde",
+      "emoji": "📏"
+    },
+    "142": {
+      "label": "Capriche na folha verde escura no almoço",
+      "emoji": "🥬"
+    },
+    "143": {
+      "label": "Repare no inchaço dos pés no fim do dia",
+      "emoji": "🦶"
+    },
+    "144": {
+      "label": "Leve a Carteirinha ao morfológico",
+      "emoji": "📘"
+    },
+    "145": {
+      "label": "Guarde a imagem do morfológico no Álbum",
+      "emoji": "🩻"
+    },
+    "146": {
+      "label": "Conte no Diário como foi ver o bebê",
+      "emoji": "💜"
+    },
+    "147": {
+      "label": "Beba algo gelado e espere a reação dele",
+      "emoji": "🧊"
+    },
+    "148": {
+      "label": "Alongue a lombar por 2 minutos ao acordar",
+      "emoji": "🤸"
+    },
+    "149": {
+      "label": "Prove um sabor novo: ele sente pelo líquido",
+      "emoji": "🍲"
+    },
+    "150": {
+      "label": "Avise em Alertas se a dor de cabeça insistir",
+      "emoji": "🤕"
+    },
+    "151": {
+      "label": "Salve o laudo do morfológico na aba Exames",
+      "emoji": "📄"
+    },
+    "152": {
+      "label": "Converse em casa sobre a maternidade escolhida",
+      "emoji": "🏥"
+    },
+    "153": {
+      "label": "Reveja a semana 21 e planeje a semana 22",
+      "emoji": "🔁"
+    },
+    "154": {
+      "label": "Pare 2 minutos e sinta o bebê se mexer",
+      "emoji": "👶"
+    },
+    "155": {
+      "label": "Alongue a lombar por 5 minutos ao acordar",
+      "emoji": "🧘"
+    },
+    "156": {
+      "label": "Inclua uma fonte de ferro no almoço",
+      "emoji": "🥬"
+    },
+    "157": {
+      "label": "Defina quem te leva à maternidade na hora H",
+      "emoji": "🚗"
+    },
+    "158": {
+      "label": "Confira o morfológico na aba Exames",
+      "emoji": "🔬"
+    },
+    "159": {
+      "label": "Conte ao bebê como foi o seu dia hoje",
+      "emoji": "💬"
+    },
+    "160": {
+      "label": "Releia suas anotações da semana 22",
+      "emoji": "📖"
+    },
+    "161": {
+      "label": "Registre no Diário o chute mais forte",
+      "emoji": "🦶"
+    },
+    "162": {
+      "label": "Eleve as pernas 15 minutos hoje à noite",
+      "emoji": "🦵"
+    },
+    "163": {
+      "label": "Inclua uma fonte de cálcio no lanche da tarde",
+      "emoji": "🥛"
+    },
+    "164": {
+      "label": "Leia sobre as Braxton Hicks na aba Alertas",
+      "emoji": "🚨"
+    },
+    "165": {
+      "label": "Marque hoje a consulta da semana 24",
+      "emoji": "📅"
+    },
+    "166": {
+      "label": "Peça 10 minutos de massagem nos pés",
+      "emoji": "💆"
+    },
+    "167": {
+      "label": "Veja sua curva de peso na aba Saúde",
+      "emoji": "📈"
+    },
+    "168": {
+      "label": "Celebre: hoje o bebê alcança 24 semanas",
+      "emoji": "🎉"
+    },
+    "169": {
+      "label": "Meça a barriga e anote a circunferência",
+      "emoji": "📏"
+    },
+    "170": {
+      "label": "Faça um lanche com proteína e fibra",
+      "emoji": "🥜"
+    },
+    "171": {
+      "label": "Meça sua pressão e registre na aba Saúde",
+      "emoji": "🩺"
+    },
+    "172": {
+      "label": "Peça o pedido do TOTG na próxima consulta",
+      "emoji": "🧪"
+    },
+    "173": {
+      "label": "Ouça uma meditação curta antes de dormir",
+      "emoji": "🎧"
+    },
+    "174": {
+      "label": "Liste 3 dúvidas para levar ao Dr. Clóvis",
+      "emoji": "📝"
+    },
+    "175": {
+      "label": "Note em que hora do dia o bebê mexe mais",
+      "emoji": "⏰"
+    },
+    "176": {
+      "label": "Jante mais cedo hoje para aliviar a azia",
+      "emoji": "🔥"
+    },
+    "177": {
+      "label": "Evite fritura no jantar e veja o refluxo",
+      "emoji": "🍳"
+    },
+    "178": {
+      "label": "Fique atenta a dor de cabeça que não passa",
+      "emoji": "🤕"
+    },
+    "179": {
+      "label": "Guarde o resultado do TOTG na aba Exames",
+      "emoji": "📄"
+    },
+    "180": {
+      "label": "Escreva uma carta para o bebê no Diário",
+      "emoji": "💌"
+    },
+    "181": {
+      "label": "Revise os sinais de alerta da semana 25",
+      "emoji": "📋"
+    },
+    "182": {
+      "label": "Identifique os soluços do bebê hoje",
+      "emoji": "🫧"
+    },
+    "183": {
+      "label": "Use sapato confortável: o pé está inchando",
+      "emoji": "👟"
+    },
+    "184": {
+      "label": "Reduza o sal do prato e beba mais água",
+      "emoji": "🧂"
+    },
+    "185": {
+      "label": "Observe se o inchaço some ao acordar",
+      "emoji": "🦵"
+    },
+    "186": {
+      "label": "Cheque se a dTpa está na sua Carteirinha",
+      "emoji": "💉"
+    },
+    "187": {
+      "label": "Coloque uma música e dance devagar",
+      "emoji": "🎶"
+    },
+    "188": {
+      "label": "Anote no Diário o padrão de chutes da semana",
+      "emoji": "🌙"
+    },
+    "189": {
+      "label": "Teste a contagem de chutes na aba Chutes",
+      "emoji": "👣"
+    },
+    "190": {
+      "label": "Apoie a barriga com um travesseiro ao deitar",
+      "emoji": "🛏️"
+    },
+    "191": {
+      "label": "Prepare um lanche noturno leve para hoje",
+      "emoji": "🥛"
+    },
+    "192": {
+      "label": "Combine quando ligar para a maternidade",
+      "emoji": "☎️"
+    },
+    "193": {
+      "label": "Veja a próxima consulta na aba Consultas",
+      "emoji": "🗓️"
+    },
+    "194": {
+      "label": "Separe hoje o primeiro item da mala",
+      "emoji": "🧳"
+    },
+    "195": {
+      "label": "Procure um curso de gestante na sua cidade",
+      "emoji": "🎓"
+    },
+    "196": {
+      "label": "Comemore: começa o terceiro trimestre",
+      "emoji": "🥳"
+    },
+    "197": {
+      "label": "Veja se saiu colostro sem apertar o seio",
+      "emoji": "🤱"
+    },
+    "198": {
+      "label": "Inclua iogurte ou queijo branco no lanche",
+      "emoji": "🧀"
+    },
+    "199": {
+      "label": "Conte 10 movimentos do bebê ainda hoje",
+      "emoji": "🔢"
+    },
+    "200": {
+      "label": "Veja tipagem e fator Rh na Carteirinha",
+      "emoji": "🩸"
+    },
+    "201": {
+      "label": "Tire a foto da barriga de 28 semanas",
+      "emoji": "📸"
+    },
+    "202": {
+      "label": "Pergunte ao Dr. Clóvis sobre a anti-D",
+      "emoji": "❓"
+    },
+    "203": {
+      "label": "Contar 10 movimentos do bebê na aba Chutes",
+      "emoji": "👣"
+    },
+    "204": {
+      "label": "Elevar as pernas 15 min contra o inchaço",
+      "emoji": "🦵"
+    },
+    "205": {
+      "label": "Comer uma fonte de ferro no almoço de hoje",
+      "emoji": "🥩"
+    },
+    "206": {
+      "label": "Medir sua pressão e anotar na aba Saúde",
+      "emoji": "🩺"
+    },
+    "207": {
+      "label": "Ver quando é seu ultrassom de crescimento",
+      "emoji": "🔍"
+    },
+    "208": {
+      "label": "Contar ao bebê como foi seu dia hoje",
+      "emoji": "💬"
+    },
+    "209": {
+      "label": "Revisar seus registros da semana no Diário",
+      "emoji": "📖"
+    },
+    "210": {
+      "label": "Notar a hora em que o bebê mais se mexe",
+      "emoji": "⏰"
+    },
+    "211": {
+      "label": "Deitar de lado com travesseiro entre as pernas",
+      "emoji": "😴"
+    },
+    "212": {
+      "label": "Trocar o doce da tarde por uma fruta",
+      "emoji": "🍓"
+    },
+    "213": {
+      "label": "Revisar os sinais de pré-eclâmpsia (Alertas)",
+      "emoji": "🚨"
+    },
+    "214": {
+      "label": "Levar a Carteirinha na próxima consulta",
+      "emoji": "📋"
+    },
+    "215": {
+      "label": "Ouvir uma meditação de 5 min (Meditações)",
+      "emoji": "🧘"
+    },
+    "216": {
+      "label": "Anotar 3 dúvidas para a próxima consulta",
+      "emoji": "❓"
+    },
+    "217": {
+      "label": "Perceber os soluços rítmicos do bebê hoje",
+      "emoji": "🥁"
+    },
+    "218": {
+      "label": "Respirar fundo 5 vezes se faltar o ar",
+      "emoji": "💨"
+    },
+    "219": {
+      "label": "Fazer refeições menores para aliviar a azia",
+      "emoji": "🍲"
+    },
+    "220": {
+      "label": "Checar se mãos e rosto amanheceram inchados",
+      "emoji": "✋"
+    },
+    "221": {
+      "label": "Marcar a consulta da quinzena (Consultas)",
+      "emoji": "📅"
+    },
+    "222": {
+      "label": "Escolher uma música para embalar o bebê",
+      "emoji": "🎶"
+    },
+    "223": {
+      "label": "Registrar seu peso da semana na aba Saúde",
+      "emoji": "📈"
+    },
+    "224": {
+      "label": "Descobrir se o bebê está de cabeça pra baixo",
+      "emoji": "🙃"
+    },
+    "225": {
+      "label": "Alongar as costas por 5 minutos hoje",
+      "emoji": "🤸"
+    },
+    "226": {
+      "label": "Incluir uma gordura boa: abacate ou castanha",
+      "emoji": "🥑"
+    },
+    "227": {
+      "label": "Anotar dor de cabeça forte no Diário",
+      "emoji": "🤕"
+    },
+    "228": {
+      "label": "Perguntar sobre o ultrassom com doppler",
+      "emoji": "🔎"
+    },
+    "229": {
+      "label": "Pôr a mão na barriga e respirar junto",
+      "emoji": "🤲"
+    },
+    "230": {
+      "label": "Reler as anotações da última consulta",
+      "emoji": "📓"
+    },
+    "231": {
+      "label": "Reparar em qual lado ficam os pés do bebê",
+      "emoji": "🧭"
+    },
+    "232": {
+      "label": "Testar uma posição nova para dormir melhor",
+      "emoji": "🛌"
+    },
+    "233": {
+      "label": "Trocar o pão branco pelo integral hoje",
+      "emoji": "🍞"
+    },
+    "234": {
+      "label": "Salvar o telefone da maternidade no celular",
+      "emoji": "📱"
+    },
+    "235": {
+      "label": "Guardar o último resultado na aba Exames",
+      "emoji": "📄"
+    },
+    "236": {
+      "label": "Escrever um desejo para o bebê no Diário",
+      "emoji": "💌"
+    },
+    "237": {
+      "label": "Começar o rascunho do seu plano de parto",
+      "emoji": "📝"
+    },
+    "238": {
+      "label": "Perceber como os chutes viraram empurrões",
+      "emoji": "👊"
+    },
+    "239": {
+      "label": "Aliviar a cãibra puxando o pé para cima",
+      "emoji": "🦶"
+    },
+    "240": {
+      "label": "Beber um copo de água a cada duas horas",
+      "emoji": "💧"
+    },
+    "241": {
+      "label": "Saber quando abrir a aba Contrações",
+      "emoji": "⏳"
+    },
+    "242": {
+      "label": "Escolher o pediatra do bebê nesta semana",
+      "emoji": "🏥"
+    },
+    "243": {
+      "label": "Ver um vídeo de aula de amamentação",
+      "emoji": "🤱"
+    },
+    "244": {
+      "label": "Separar mais 3 itens da mala da maternidade",
+      "emoji": "🧳"
+    },
+    "245": {
+      "label": "Fazer a contagem de 10 movimentos em 2 horas",
+      "emoji": "🔢"
+    },
+    "246": {
+      "label": "Descansar de lado 20 min no fim da tarde",
+      "emoji": "😌"
+    },
+    "247": {
+      "label": "Comer devagar e parar antes de encher",
+      "emoji": "🥄"
+    },
+    "248": {
+      "label": "Rever quando ir direto à maternidade",
+      "emoji": "🚑"
+    },
+    "249": {
+      "label": "Confirmar a próxima consulta em Consultas",
+      "emoji": "📆"
+    },
+    "250": {
+      "label": "Tirar a foto de 35 semanas para o Álbum",
+      "emoji": "📸"
+    },
+    "251": {
+      "label": "Ler o plano de parto em voz alta com alguém",
+      "emoji": "📢"
+    },
+    "252": {
+      "label": "Note se os chutes viraram rolos e empurrões",
+      "emoji": "🌀"
+    },
+    "253": {
+      "label": "Repare se respirar ficou mais fácil hoje",
+      "emoji": "🫁"
+    },
+    "254": {
+      "label": "Junte ferro e suco de laranja no almoço",
+      "emoji": "🍊"
+    },
+    "255": {
+      "label": "Salve no mapa a rota até a maternidade",
+      "emoji": "🚗"
+    },
+    "256": {
+      "label": "Faça a cultura de estreptococo B (35-37s)",
+      "emoji": "🧪"
+    },
+    "257": {
+      "label": "Escreva no Diário uma carta pro seu bebê",
+      "emoji": "💌"
+    },
+    "258": {
+      "label": "Releia o plano de parto e ajuste um item",
+      "emoji": "📋"
+    },
+    "259": {
+      "label": "Comemore: hoje começa o termo, 37 semanas",
+      "emoji": "🎉"
+    },
+    "260": {
+      "label": "Alivie a azia jantando mais cedo hoje",
+      "emoji": "🌙"
+    },
+    "261": {
+      "label": "Deixe uma garrafa de água ao lado da cama",
+      "emoji": "💧"
+    },
+    "262": {
+      "label": "Cronometre em Contrações e cheque o 5-1-1",
+      "emoji": "⏰"
+    },
+    "263": {
+      "label": "Leve a Carteirinha na consulta desta semana",
+      "emoji": "📒"
+    },
+    "264": {
+      "label": "Peça uma massagem nos pés hoje à noite",
+      "emoji": "💆"
+    },
+    "265": {
+      "label": "Separe documentos e cartão do plano na mala",
+      "emoji": "🎒"
+    },
+    "266": {
+      "label": "Perceba os soluços rítmicos lá embaixo",
+      "emoji": "🫧"
+    },
+    "267": {
+      "label": "Eleve as pernas 15 minutos após o almoço",
+      "emoji": "🦵"
+    },
+    "268": {
+      "label": "Divida o dia em 5 refeições menores",
+      "emoji": "🥗"
+    },
+    "269": {
+      "label": "Aprenda a diferença entre bolsa rota e xixi",
+      "emoji": "💦"
+    },
+    "270": {
+      "label": "Pergunte a posição do bebê na consulta",
+      "emoji": "🩺"
+    },
+    "271": {
+      "label": "Ouça 10 minutos em Meditações antes de dormir",
+      "emoji": "🎧"
+    },
+    "272": {
+      "label": "Combine quem cuida da casa no dia do parto",
+      "emoji": "🏠"
+    },
+    "273": {
+      "label": "Observe o ritmo de sono e vigília do bebê",
+      "emoji": "😴"
+    },
+    "274": {
+      "label": "Repare se a barriga baixou nestes dias",
+      "emoji": "🤰"
+    },
+    "275": {
+      "label": "Congele um jantar pronto para o pós-parto",
+      "emoji": "🍲"
+    },
+    "276": {
+      "label": "Reconheça o tampão mucoso sem se assustar",
+      "emoji": "🌸"
+    },
+    "277": {
+      "label": "Anote 3 dúvidas para a próxima consulta",
+      "emoji": "❓"
+    },
+    "278": {
+      "label": "Escreva no plano de parto: pele a pele já",
+      "emoji": "🤍"
+    },
+    "279": {
+      "label": "Confira a mala do bebê item por item",
+      "emoji": "🧸"
+    },
+    "280": {
+      "label": "Conte os movimentos do bebê após o café",
+      "emoji": "👣"
+    },
+    "281": {
+      "label": "Caminhe 20 minutos em ritmo confortável",
+      "emoji": "🚶"
+    },
+    "282": {
+      "label": "Capriche na fibra: mamão, aveia e ameixa",
+      "emoji": "🥣"
+    },
+    "283": {
+      "label": "Deixe os contatos de emergência na tela",
+      "emoji": "📞"
+    },
+    "284": {
+      "label": "Peça o atestado da licença-maternidade",
+      "emoji": "📄"
+    },
+    "285": {
+      "label": "Faça 10 respirações lentas antes de deitar",
+      "emoji": "🧘"
+    },
+    "286": {
+      "label": "Repasse o plano de parto com quem vai com você",
+      "emoji": "🤝"
+    },
+    "287": {
+      "label": "Conte os chutes duas vezes: manhã e noite",
+      "emoji": "🦶"
+    },
+    "288": {
+      "label": "Descanse deitada do lado esquerdo hoje",
+      "emoji": "🛌"
+    },
+    "289": {
+      "label": "Monte um kit de lanches para a maternidade",
+      "emoji": "🍫"
+    },
+    "290": {
+      "label": "Ligue na hora se sentir menos movimento",
+      "emoji": "🚨"
+    },
+    "291": {
+      "label": "Agende a cardiotocografia desta semana",
+      "emoji": "📈"
+    },
+    "292": {
+      "label": "Silencie os grupos que aumentam a ansiedade",
+      "emoji": "📵"
+    },
+    "293": {
+      "label": "Converse sobre indução com o Dr. Clóvis",
+      "emoji": "💬"
+    },
+    "294": {
+      "label": "Repita a contagem se o bebê andar quietinho",
+      "emoji": "💗"
+    },
+    "295": {
+      "label": "Alongue as costas apoiada na parede",
+      "emoji": "🤸"
+    },
+    "296": {
+      "label": "Relembre a primeira mamada na hora dourada",
+      "emoji": "🤱"
+    },
+    "297": {
+      "label": "Vá à maternidade se o líquido vier esverdeado",
+      "emoji": "🆘"
+    },
+    "298": {
+      "label": "Pergunte sobre o perfil biofísico fetal",
+      "emoji": "🔬"
+    },
+    "299": {
+      "label": "Escolha uma distração leve para a espera",
+      "emoji": "🎬"
+    },
+    "300": {
+      "label": "Deixe a mala no carro e o celular carregado",
+      "emoji": "🚙"
+    }
+  },
+  "pos": {
+    "7": {
+      "label": "Conte as mamadas de hoje: 8 a 12 é o normal",
+      "emoji": "🍼"
+    },
+    "8": {
+      "label": "Olhe os lóquios: vermelho vivo é esperado",
+      "emoji": "🩸"
+    },
+    "9": {
+      "label": "Deixe um copo d'água em cada canto da casa",
+      "emoji": "💧"
+    },
+    "10": {
+      "label": "Cheque o coto umbilical: seco e sem cheiro",
+      "emoji": "🌿"
+    },
+    "11": {
+      "label": "Confirme pezinho, orelhinha e coraçãozinho",
+      "emoji": "🦶"
+    },
+    "12": {
+      "label": "Durma no primeiro cochilo do bebê, sem culpa",
+      "emoji": "😴"
+    },
+    "13": {
+      "label": "Feche a semana 1: agende a revisão pós-parto",
+      "emoji": "📔"
+    },
+    "14": {
+      "label": "Veja se o bebê já voltou ao peso de nascer",
+      "emoji": "📈"
+    },
+    "15": {
+      "label": "Mama dura? Ordenhe um pouco antes de ofertar",
+      "emoji": "🤱"
+    },
+    "16": {
+      "label": "Monte 3 lanches que se comem com uma mão só",
+      "emoji": "🥣"
+    },
+    "17": {
+      "label": "Mamilo rachado? Reveja a pega na aréola",
+      "emoji": "🌸"
+    },
+    "18": {
+      "label": "Marque a primeira consulta com o pediatra",
+      "emoji": "🏥"
+    },
+    "19": {
+      "label": "Baby blues: chore se precisar e chame alguém",
+      "emoji": "🫂"
+    },
+    "20": {
+      "label": "Some suas horas de sono e peça um cochilo",
+      "emoji": "🌙"
+    },
+    "21": {
+      "label": "Note os sinais de fome antes de virar choro",
+      "emoji": "👶"
+    },
+    "22": {
+      "label": "Comece o exercício do assoalho pélvico",
+      "emoji": "🧘"
+    },
+    "23": {
+      "label": "Reforce o ferro no prato: feijão e folhas",
+      "emoji": "🫘"
+    },
+    "24": {
+      "label": "Releia em Alertas os sinais do puerpério",
+      "emoji": "🚨"
+    },
+    "25": {
+      "label": "Anote as dúvidas para a consulta puerperal",
+      "emoji": "📝"
+    },
+    "26": {
+      "label": "Delegue uma tarefa da casa hoje, sem culpa",
+      "emoji": "🧺"
+    },
+    "27": {
+      "label": "Feche a semana 3 com uma foto no Álbum",
+      "emoji": "📸"
+    },
+    "28": {
+      "label": "Na cólica: colo, barriga pra baixo e calma",
+      "emoji": "🤗"
+    },
+    "29": {
+      "label": "Repare se os lóquios já clarearam de cor",
+      "emoji": "🫧"
+    },
+    "30": {
+      "label": "Beba água toda vez que sentar pra amamentar",
+      "emoji": "🥤"
+    },
+    "31": {
+      "label": "Choro que não cede há horas? Ligue ao médico",
+      "emoji": "📞"
+    },
+    "32": {
+      "label": "Agende a consulta puerperal de 30 a 40 dias",
+      "emoji": "📅"
+    },
+    "33": {
+      "label": "Saia de casa 15 minutos só pra respirar",
+      "emoji": "🚶"
+    },
+    "34": {
+      "label": "Revise o 1º mês: o que já ficou mais fácil?",
+      "emoji": "✨"
+    },
+    "35": {
+      "label": "Fique cara a cara: o sorriso social vem aí",
+      "emoji": "😊"
+    },
+    "36": {
+      "label": "Perceba como a barriga vem encolhendo",
+      "emoji": "🪞"
+    },
+    "37": {
+      "label": "Coma uma fruta com vitamina C no lanche",
+      "emoji": "🍊"
+    },
+    "38": {
+      "label": "Tristeza que não passa merece ajuda médica",
+      "emoji": "🧠"
+    },
+    "39": {
+      "label": "Leve a dúvida de contracepção ao médico",
+      "emoji": "🩺"
+    },
+    "40": {
+      "label": "Ouça uma faixa curta em Meditações",
+      "emoji": "🎧"
+    },
+    "41": {
+      "label": "Escreva no Diário 3 coisas que você aprendeu",
+      "emoji": "📖"
+    },
+    "42": {
+      "label": "Converse com o bebê e espere a resposta",
+      "emoji": "💬"
+    },
+    "43": {
+      "label": "Pergunte ao médico quando voltar a treinar",
+      "emoji": "🏃"
+    },
+    "44": {
+      "label": "Deixe o jantar adiantado ainda de manhã",
+      "emoji": "🍲"
+    },
+    "45": {
+      "label": "Guarde o telefone do consultório no celular",
+      "emoji": "🔔"
+    },
+    "46": {
+      "label": "Separe a caderneta: vacinas de 2 meses vêm aí",
+      "emoji": "💉"
+    },
+    "47": {
+      "label": "Combine 1 hora só sua neste fim de semana",
+      "emoji": "🌻"
+    },
+    "48": {
+      "label": "Feche as 6 semanas: registre no Pós-parto",
+      "emoji": "🎉"
+    },
+    "49": {
+      "label": "Veja se o bebê já firma a cabeça no colo",
+      "emoji": "👶"
+    },
+    "50": {
+      "label": "Alongue ombros e pescoço depois da mamada",
+      "emoji": "🧘"
+    },
+    "51": {
+      "label": "Deixe uma garrafa de água em cada cômodo",
+      "emoji": "💧"
+    },
+    "52": {
+      "label": "Reveja em Alertas os sinais de mastite",
+      "emoji": "🚨"
+    },
+    "53": {
+      "label": "Confirme sua consulta puerperal em Consultas",
+      "emoji": "📅"
+    },
+    "54": {
+      "label": "Provoque o sorriso social com caretas e voz",
+      "emoji": "😊"
+    },
+    "55": {
+      "label": "Anote no Diário a rotina que já funciona",
+      "emoji": "📔"
+    },
+    "56": {
+      "label": "Repare como o bebê se acalma com sua voz",
+      "emoji": "👂"
+    },
+    "57": {
+      "label": "Separe a caderneta de vacinação do bebê",
+      "emoji": "📖"
+    },
+    "58": {
+      "label": "Leve água e um lanche para a sala de vacina",
+      "emoji": "🥪"
+    },
+    "59": {
+      "label": "Veja em Alertas quando a febre preocupa",
+      "emoji": "🤒"
+    },
+    "60": {
+      "label": "Hoje é dia: vacinas de 2 meses do bebê",
+      "emoji": "💉"
+    },
+    "61": {
+      "label": "Ofereça colo e peito se a perninha doer",
+      "emoji": "🤱"
+    },
+    "62": {
+      "label": "Registre em Saúde as vacinas de 2 meses",
+      "emoji": "📝"
+    },
+    "63": {
+      "label": "Comece a soneca sempre no mesmo cantinho",
+      "emoji": "😴"
+    },
+    "64": {
+      "label": "Faça 10 contrações do assoalho pélvico",
+      "emoji": "🌸"
+    },
+    "65": {
+      "label": "Leve uma fruta para comer entre as mamadas",
+      "emoji": "🍎"
+    },
+    "66": {
+      "label": "Pare o exercício se doer ou voltar a sangrar",
+      "emoji": "🛑"
+    },
+    "67": {
+      "label": "Pergunte ao médico se já pode treinar leve",
+      "emoji": "🩺"
+    },
+    "68": {
+      "label": "Caminhe 15 minutos com o bebê no carrinho",
+      "emoji": "🚶"
+    },
+    "69": {
+      "label": "Marque em Bem-estar os dias que se moveu",
+      "emoji": "✅"
+    },
+    "70": {
+      "label": "Deixe o bebê com quem confia por uma hora",
+      "emoji": "⏳"
+    },
+    "71": {
+      "label": "Tome um banho longo enquanto alguém dá colo",
+      "emoji": "🚿"
+    },
+    "72": {
+      "label": "Ordenhe e etiquete o leite com data e hora",
+      "emoji": "🍼"
+    },
+    "73": {
+      "label": "Peça ajuda se a tristeza durar o dia todo",
+      "emoji": "💬"
+    },
+    "74": {
+      "label": "Marque em Consultas a ida ao pediatra",
+      "emoji": "📆"
+    },
+    "75": {
+      "label": "Escreva no Diário como você está de verdade",
+      "emoji": "📓"
+    },
+    "76": {
+      "label": "Liste quem te apoia na volta ao trabalho",
+      "emoji": "🤝"
+    },
+    "77": {
+      "label": "Mova um chocalho e veja os olhos seguirem",
+      "emoji": "🎈"
+    },
+    "78": {
+      "label": "Ative o abdômen com 3 séries de respiração",
+      "emoji": "💪"
+    },
+    "79": {
+      "label": "Beba um copo de água a cada mamada de hoje",
+      "emoji": "🥤"
+    },
+    "80": {
+      "label": "Faça o tummy time acordada e de olho nele",
+      "emoji": "🤸"
+    },
+    "81": {
+      "label": "Anote em Consultas as dúvidas dos 3 meses",
+      "emoji": "📒"
+    },
+    "82": {
+      "label": "Converse e espere: o balbucio é resposta",
+      "emoji": "🔊"
+    },
+    "83": {
+      "label": "Guarde no Álbum a cabecinha mais firme",
+      "emoji": "📸"
+    },
+    "84": {
+      "label": "Anote os marcos do bebê para o pediatra",
+      "emoji": "🧸"
+    },
+    "85": {
+      "label": "Agradeça ao seu corpo por estes 3 meses",
+      "emoji": "💗"
+    },
+    "86": {
+      "label": "Repita a refeição que mais te sustentou",
+      "emoji": "🥗"
+    },
+    "87": {
+      "label": "Revise em Alertas o que ainda pede atenção",
+      "emoji": "🔔"
+    },
+    "88": {
+      "label": "Leve a caderneta: vacina meningo C de 3 meses",
+      "emoji": "🏥"
+    },
+    "89": {
+      "label": "Feche o dia com uma faixa em Meditações",
+      "emoji": "🎧"
+    },
+    "90": {
+      "label": "Releia o Diário e celebre o 4º trimestre",
+      "emoji": "🎉"
+    }
+  }
+}

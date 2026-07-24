@@ -110,6 +110,33 @@ Tabelas (ver `supabase/migrations/`):
 `src/lib/ai-gateway.server.ts`. Requer `GOOGLE_GENERATIVE_AI_API_KEY`; o modelo
 é definido por `CHAT_MODEL` (padrão `gemini-2.5-flash`).
 
+## Conteúdo diário da jornada (Caminho)
+
+Cada dia da jornada tem **duas** peças de conteúdo, ambas indexadas pelo dia
+gestacional `D = semana * 7 + diaDaSemana` (0–6):
+
+| Peça                          | Arquivo                              | Cobertura                                                          |
+| ----------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| **Aula da professora** (quiz) | `src/lib/daily-quizzes.data.json`    | gestação D 7–300 (semanas 1–42), 294 dias, 1331 perguntas          |
+| **Desafio do dia**            | `src/lib/daily-challenges.data.json` | gestação D 7–300 + pós-parto D 7–90 (12 semanas de vida), 378 dias |
+
+No pós-parto, `D = idade do bebê em dias + 7`.
+
+Ritmo pedagógico por `D % 7` — vale para as duas peças:
+`0 bebê · 1 corpo · 2 nutrição · 3 sinais · 4 exames · 5 vínculo · 6 revisão`.
+
+`challengeForDay` / `challengeForPosDay` (em `gestacao-path.tsx`) leem a tabela
+primeiro; as listas `CHALLENGES_T1/T2/T3/POSDATA/POS_*` só entram como rede de
+segurança para dias fora da faixa (DUM corrigida, gestação além de 42s).
+
+Ao editar o conteúdo, rode a auditoria antes de commitar — ela cobra cobertura
+completa, gabarito dentro da faixa, "marque todos" sem todas as alternativas
+corretas e enunciado repetido dentro de 14 dias:
+
+```bash
+bun run audit:conteudo
+```
+
 ## Resquícios do Lovable (opcional remover)
 
 - `@lovable.dev/vite-tanstack-config` — preset de build (funciona; remover é

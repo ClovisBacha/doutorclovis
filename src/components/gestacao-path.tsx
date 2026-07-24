@@ -199,6 +199,7 @@ import {
   isMultiQuestion,
   type DailyQuiz,
 } from "@/lib/daily-quizzes";
+import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
@@ -392,8 +393,11 @@ const CHALLENGES_POS_3: Challenge[] = [
   { id: "diario", label: "Escrever uma memória no Diário", emoji: "📖" },
 ];
 
-/** Desafio determinístico do dia gestacional D (mesmo dia = mesmo desafio). */
+/** Desafio do dia gestacional D — texto próprio do dia (D 7..300). */
 function challengeForDay(D: number): Challenge {
+  const custom = gestChallenge(D);
+  if (custom) return custom;
+  // Fora da faixa escrita (DUM corrigida, jornada além de 42s): rede de segurança.
   const week = Math.floor(D / 7);
   const pool =
     week >= 41
@@ -403,14 +407,16 @@ function challengeForDay(D: number): Challenge {
         : week <= 27
           ? CHALLENGES_T2
           : CHALLENGES_T3;
-  return pool[D % pool.length];
+  return pool[Math.abs(D) % pool.length];
 }
 
-/** Desafio determinístico do dia pós-parto (D em pseudo-dias, semana 1–12). */
+/** Desafio do dia pós-parto (D em pseudo-dias = idade do bebê + 7, 7..90). */
 function challengeForPosDay(D: number): Challenge {
+  const custom = posChallenge(D);
+  if (custom) return custom;
   const week = Math.floor(D / 7);
   const pool = week <= 4 ? CHALLENGES_POS_1 : week <= 8 ? CHALLENGES_POS_2 : CHALLENGES_POS_3;
-  return pool[D % pool.length];
+  return pool[Math.abs(D) % pool.length];
 }
 
 /* ══════════════════════ ORIENTAÇÕES MÉDICAS ══════════════════════ */

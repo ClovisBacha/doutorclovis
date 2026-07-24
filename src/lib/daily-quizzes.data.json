@@ -306,10 +306,15 @@
     "funFact": "Tudo o que você aprendeu nesta semana vale mesmo antes do positivo — cuidar-se cedo é o maior presente para o futuro bebê.",
     "questions": [
       {
-        "q": "Quanto tempo dura, em média, uma gestação completa?",
-        "o": ["Cerca de 40 semanas", "Cerca de 52 semanas", "Cerca de 30 semanas"],
+        "type": "choice",
+        "q": "Na revisão da semana 1: a partir de quando o álcool e o cigarro devem ser zero?",
+        "o": [
+          "Desde já, antes mesmo do teste positivo",
+          "Só a partir do 2º trimestre",
+          "Só depois das 12 semanas"
+        ],
         "a": 0,
-        "why": "A gestação dura em torno de 40 semanas, contadas a partir da DUM."
+        "why": "Não existe quantidade segura: o ideal é zerar álcool e cigarro já na fase de tentar engravidar, antes de o teste dar positivo."
       },
       {
         "q": "Verdadeiro ou falso: o ácido fólico só precisa começar depois do teste positivo.",
@@ -1005,10 +1010,11 @@
         "why": "Higienizar vegetais, usar luvas e evitar as fezes do gato afastam o parasita; café não tem relação."
       },
       {
-        "q": "Onde acontece a fecundação?",
-        "o": ["Dentro do útero", "Na trompa", "No ovário"],
-        "a": 1,
-        "why": "O espermatozoide encontra o óvulo na trompa; só depois o embrião viaja até o útero."
+        "type": "choice",
+        "q": "Quantos dias, em média, o embrião leva da trompa até chegar ao útero?",
+        "o": ["De 3 a 5 dias", "Poucos minutos", "Cerca de 3 semanas"],
+        "a": 0,
+        "why": "O embrião se divide enquanto viaja pela trompa e leva de 3 a 5 dias até alcançar o útero, onde vai se implantar."
       },
       {
         "q": "Amiga diz: 'faça o teste hoje, 2 dias após a relação!'. O certo é?",
@@ -1872,7 +1878,8 @@
         "o": [
           "Conversar sobre o bebê com o parceiro",
           "Guardar a imagem do ultrassom",
-          "Escolher um apelidinho carinhoso"
+          "Escolher um apelidinho carinhoso",
+          "Evitar falar do bebê para não se apegar"
         ],
         "a": [0, 1, 2],
         "why": "Todos aproximam a família do bebê e tornam a gestação mais concreta e afetiva."
@@ -7577,15 +7584,16 @@
         "why": "A partir de cerca de 24 semanas, com suporte intensivo, há chance de sobrevida fora do útero."
       },
       {
-        "q": "Marque o que é verdade sobre a semana 23:",
+        "type": "multi",
+        "q": "Marque o que o surfactante faz pelos pulmões do bebê: (marque todos)",
         "o": [
-          "O bebê atinge a viabilidade fetal",
-          "Os pulmões começam a produzir surfactante",
-          "O bebê já está pronto para nascer sem cuidados",
-          "Ele pesa cerca de 600 g"
+          "Mantém abertos os pequenos sacos de ar",
+          "É essencial para respirar depois do nascimento",
+          "Começa a ser produzido por volta da semana 23",
+          "Dispensa a UTI neonatal em caso de prematuridade"
         ],
-        "a": [0, 1, 3],
-        "why": "Viabilidade, surfactante e o peso são reais; a sobrevida depende de suporte intensivo, ele não está pronto para nascer sem cuidados."
+        "a": [0, 1, 2],
+        "why": "O surfactante mantém os alvéolos abertos e é essencial para respirar fora do útero — mas não substitui o suporte da UTI num prematuro."
       },
       {
         "q": "Verdadeiro ou falso: a viabilidade fetal significa que o bebê já pode nascer sem nenhum cuidado especial.",
@@ -7600,10 +7608,11 @@
         "why": "O surfactante evita que os alvéolos colabem, essencial para respirar depois."
       },
       {
-        "q": "Na semana 23, o bebê pesa aproximadamente...",
-        "o": ["Cerca de 600 g", "Cerca de 60 g", "Cerca de 3 kg"],
+        "type": "choice",
+        "q": "Na semana 23, o bebê mede aproximadamente...",
+        "o": ["Cerca de 30 cm", "Cerca de 10 cm", "Cerca de 50 cm"],
         "a": 0,
-        "why": "Por volta de 600 g e 30 cm, crescendo a cada semana."
+        "why": "Por volta da semana 23 o bebê mede uns 30 cm da cabeça ao pé — ainda vai mais que dobrar de peso até o nascimento."
       }
     ]
   },
@@ -9732,14 +9741,10 @@
     "questions": [
       {
         "type": "choice",
-        "q": "Por que os movimentos mudam de padrão na semana 30?",
-        "o": [
-          "Já está pronto para nascer",
-          "O bebê tem menos espaço no útero",
-          "Ele para de se mexer"
-        ],
-        "a": 1,
-        "why": "Menos espaço muda os chutes para rolamentos e pressões, mas ele segue ativo."
+        "q": "Refeições menores e não deitar logo após comer servem para aliviar...",
+        "o": ["A azia", "As cãibras", "A dor de cabeça"],
+        "a": 0,
+        "why": "Com o útero comprimindo o estômago, porções menores e ficar sentada depois de comer são o que mais alivia a azia."
       },
       {
         "type": "choice",
@@ -10099,10 +10104,14 @@
       },
       {
         "type": "choice",
-        "q": "Na semana 31, o bebê pesa aproximadamente...",
-        "o": ["3,4 kg", "1,8 kg", "600 g"],
-        "a": 1,
-        "why": "Cerca de 1,8 kg, ficando mais 'fofinho' com a gordura."
+        "q": "O que já aconteceu com as unhas do bebê na semana 31?",
+        "o": [
+          "Chegaram à ponta dos dedos das mãos e dos pés",
+          "Ainda nem começaram a se formar",
+          "Só aparecem depois do nascimento"
+        ],
+        "a": 0,
+        "why": "Na semana 31 as unhas já alcançaram a ponta dos dedos — por isso alguns bebês nascem precisando cortá-las."
       },
       {
         "type": "multi",
@@ -11989,7 +11998,8 @@
         "o": [
           "A mala da mãe e do bebê",
           "Os documentos e o cartão da gestante separados",
-          "O trajeto até a maternidade em mente"
+          "O trajeto até a maternidade em mente",
+          "A certidão de nascimento do bebê"
         ],
         "a": [0, 1, 2],
         "why": "Mala pronta, documentos à mão e trajeto conhecido reduzem o estresse na hora H — todos ajudam."
@@ -12341,7 +12351,8 @@
         "o": [
           "Banho morno e bola de pilates",
           "Massagem e caminhada",
-          "Analgesia peridural na fase ativa"
+          "Analgesia peridural na fase ativa",
+          "Ficar deitada de costas o tempo todo"
         ],
         "a": [0, 1, 2],
         "why": "Métodos naturais (banho, bola, massagem, caminhada) e a peridural na fase ativa são todos recursos válidos de alívio."
@@ -12387,7 +12398,8 @@
         "o": [
           "Sensação de a barriga ter 'baixado'",
           "Respirar um pouco mais aliviada",
-          "Vontade de fazer xixi mais vezes"
+          "Vontade de fazer xixi mais vezes",
+          "Os movimentos do bebê somem por completo"
         ],
         "a": [0, 1, 2],
         "why": "Com o encaixe, a barriga baixa e alivia o pulmão e o estômago, mas a bexiga fica mais comprimida — daí o xixi frequente."
@@ -12597,7 +12609,8 @@
         "o": [
           "Ajuda a regular a temperatura do bebê",
           "Acalma mãe e bebê",
-          "Favorece a primeira mamada"
+          "Favorece a primeira mamada",
+          "Substituir a avaliação do pediatra no nascimento"
         ],
         "a": [0, 1, 2],
         "why": "O pele a pele regula temperatura e respiração, acalma os dois e estimula a primeira mamada — todos são benefícios."
@@ -12964,6 +12977,800 @@
         "o": ["Verdadeiro", "Falso"],
         "a": 0,
         "why": "Verdadeiro. O movimento diário é o melhor termômetro do bem-estar do bebê e continua até o parto."
+      }
+    ]
+  },
+  "287": {
+    "teach": "Você entrou na semana 41 e seu bebê está oficialmente na reta pós-data — ainda dentro do que é considerado normal. Ele pesa em média entre 3,4 e 3,7 kg, mede perto de 51 cm, e as unhas já passaram das pontinhas dos dedos; boa parte do vérnix (a camada branca que protegia a pele) se foi, então ele pode nascer com a pele mais sequinha e descamando. O espaço ficou apertado, e por isso os movimentos mudam de estilo: menos chutes soltos, mais rolamentos, empurrões e alongamentos — mas a quantidade não deve cair. A placenta continua trabalhando, e é justamente por isso que, a partir de agora, seu médico passa a vigiar de perto o bem-estar do bebê.",
+    "funFact": "Bebês que nascem depois da 41ª semana costumam vir com unhas compridas o bastante para arranhar o próprio rosto — muitas maternidades já entregam a luvinha por causa disso.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Na semana 41, o que muda no jeito de o bebê se mexer?",
+        "o": [
+          "Ele para de se mexer, e isso é esperado",
+          "Os movimentos mudam de estilo, mas a quantidade não deve cair",
+          "Ele só se mexe durante as contrações"
+        ],
+        "a": 1,
+        "why": "Com pouco espaço, os chutes viram rolamentos e empurrões. O estilo muda; a quantidade diária, não."
+      },
+      {
+        "type": "choice",
+        "q": "Por que a pele de muitos bebês pós-data nasce sequinha e descamando?",
+        "o": [
+          "Porque grande parte do vérnix protetor já se foi",
+          "Porque o líquido amniótico fica ácido no fim",
+          "Porque o bebê deixou de receber vitaminas"
+        ],
+        "a": 0,
+        "why": "O vérnix, aquela camada branca que impermeabiliza a pele, vai sumindo perto do termo — a pele fica mais exposta ao líquido."
+      },
+      {
+        "type": "multi",
+        "q": "O que é esperado do bebê na semana 41? (marque todos)",
+        "o": [
+          "Unhas que já passam das pontas dos dedos",
+          "Peso médio acima de 3,4 kg",
+          "Ficar dias parado, sem se mexer"
+        ],
+        "a": [0, 1],
+        "why": "Unhas longas e peso acima de 3,4 kg são típicos desta fase. Ficar dias sem se mexer nunca é esperado."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: chegar à semana 41 já significa, por si só, que a placenta parou de funcionar.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 1,
+        "why": "Falso. A placenta segue trabalhando; o que muda é que ela passa a ser vigiada mais de perto por exames."
+      },
+      {
+        "type": "choice",
+        "q": "O espaço apertado dentro do útero na semana 41 explica:",
+        "o": [
+          "Chutes soltos darem lugar a rolamentos e empurrões",
+          "O bebê passar 24 horas sem qualquer movimento",
+          "A necessidade de o bebê nascer no mesmo dia"
+        ],
+        "a": 0,
+        "why": "Sem espaço para chutar longe, o bebê se movimenta empurrando e girando — continua ativo, de outro jeito."
+      }
+    ]
+  },
+  "288": {
+    "teach": "Nesta fase, a consulta ganha um personagem novo: o seu colo do útero. No toque, o obstetra avalia cinco coisas — se o colo está amolecido ou firme, mais curto (apagado) ou grosso, aberto ou fechado, virado para trás ou já para frente, e quão baixa está a cabeça do bebê. Essa soma é o índice de Bishop, e ela ajuda a prever se o corpo está maduro para entrar em trabalho de parto ou se vai precisar de um preparo antes de qualquer indução. Enquanto isso, você sente a pressão pélvica aumentar, dorme picado, vai mais vezes ao banheiro e pode ter contrações de treinamento mais fortes e frequentes — nada disso é o mesmo que trabalho de parto ativo.",
+    "funFact": "Um colo maduro literalmente vira para frente antes do parto: ele sai da posição posterior, quase escondido atrás, e se alinha com o canal vaginal.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "O que o índice de Bishop avalia?",
+        "o": [
+          "As condições do colo do útero e a altura da cabeça do bebê",
+          "O peso estimado do bebê ao nascer",
+          "A quantidade de líquido amniótico"
+        ],
+        "a": 0,
+        "why": "Bishop soma consistência, apagamento, dilatação e posição do colo, mais a altura da apresentação do bebê."
+      },
+      {
+        "type": "choice",
+        "q": "Para que serve saber se o colo está maduro ou desfavorável?",
+        "o": [
+          "Para definir a data exata do nascimento",
+          "Para planejar se a indução precisa de um preparo antes",
+          "Para estimar a cor de cabelo do bebê"
+        ],
+        "a": 1,
+        "why": "Colo desfavorável costuma exigir uma etapa de amadurecimento antes de se provocar contrações."
+      },
+      {
+        "type": "multi",
+        "q": "O que o obstetra checa no exame do colo do útero? (marque todos)",
+        "o": [
+          "Se está amolecido ou ainda firme",
+          "Se já está apagado, ou seja, mais curto",
+          "A posição em que o bebê vai dormir em casa"
+        ],
+        "a": [0, 1],
+        "why": "Consistência e apagamento são dois dos itens avaliados no toque; o resto é planejamento de berço, não exame."
+      },
+      {
+        "type": "choice",
+        "q": "Contrações de treinamento mais fortes na semana 41 significam:",
+        "o": [
+          "Que o trabalho de parto ativo já começou",
+          "Que o corpo está se preparando, sem ser trabalho de parto ativo",
+          "Que é preciso ir à maternidade imediatamente"
+        ],
+        "a": 1,
+        "why": "Elas apertam e passam sem formar um padrão regular e progressivo — é preparo, não trabalho de parto ativo."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: um colo desfavorável impede qualquer possibilidade de indução.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 1,
+        "why": "Falso. Colo desfavorável não impede: apenas muda o caminho, começando por métodos que amadurecem o colo."
+      }
+    ]
+  },
+  "289": {
+    "teach": "A espera da semana 41 pede combustível constante, não sacrifício. Beba água ao longo do dia: a hidratação materna influencia o volume de líquido amniótico, e ficar desidratada no calor deixa as contrações de treinamento ainda mais incômodas. Prefira refeições menores e mais frequentes — o estômago está espremido, e jejum longo derruba sua energia justo agora, quando o trabalho de parto pode começar a qualquer hora. Caminhadas leves, banho morno e a bola ajudam no encaixe e no desconforto pélvico. E cuidado com as receitas de internet para apressar o parto, como óleo de rícino e chás concentrados: nada disso entra sem conversa com o seu médico.",
+    "funFact": "O líquido amniótico é trocado várias vezes por dia: boa parte dele é produzida pelo xixi do próprio bebê e reabsorvida quando ele engole.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Por que manter boa hidratação é ainda mais importante na semana 41?",
+        "o": [
+          "Porque a hidratação materna influencia o volume de líquido amniótico",
+          "Porque a água aumenta a dilatação em 2 cm",
+          "Porque a água substitui as refeições no fim da gestação"
+        ],
+        "a": 0,
+        "why": "O líquido amniótico depende do equilíbrio de água do seu corpo — beber bem ajuda a mantê-lo."
+      },
+      {
+        "type": "choice",
+        "q": "Qual estratégia alimentar faz mais sentido nesta reta final da espera?",
+        "o": [
+          "Ficar em jejum enquanto espera o parto começar",
+          "Refeições menores e mais frequentes ao longo do dia",
+          "Uma única refeição grande por dia"
+        ],
+        "a": 1,
+        "why": "Com o estômago comprimido pelo útero, porções menores caem melhor e mantêm a energia estável."
+      },
+      {
+        "type": "multi",
+        "q": "O que ajuda a aliviar o desconforto pélvico da espera pós-data? (marque todos)",
+        "o": ["Caminhadas leves", "Banho morno", "Passar o dia inteiro deitada sem se levantar"],
+        "a": [0, 1],
+        "why": "Movimento suave e calor aliviam a pelve. Imobilidade total piora dores, circulação e disposição."
+      },
+      {
+        "type": "choice",
+        "q": "Sobre receitas caseiras para apressar o parto, como óleo de rícino:",
+        "o": [
+          "Podem ser usadas livremente, já que são naturais",
+          "Só devem ser consideradas depois de conversar com o seu médico",
+          "São obrigatórias a partir da semana 41"
+        ],
+        "a": 1,
+        "why": "Natural não é sinônimo de seguro. Qualquer tentativa de estimular o parto passa antes pelo seu obstetra."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: jejum prolongado é uma boa forma de se preparar para o trabalho de parto.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 1,
+        "why": "Falso. O trabalho de parto exige energia; chegar em jejum longo por conta própria só cansa mais."
+      }
+    ]
+  },
+  "290": {
+    "teach": "Na pós-data, alguns sinais deixam de ser observe e veja e passam a ser vá agora. Movimentos claramente diminuídos, ou um dia diferente de todos os outros, é o primeiro deles — não espere amanhecer nem tente truques em casa para o bebê acordar. Sangramento vermelho-vivo, dor abdominal contínua que não alivia entre as contrações, febre, dor de cabeça forte com visão embaçada e bolsa rota com líquido esverdeado ou amarronzado também pedem maternidade no mesmo momento. Esse líquido escuro é mecônio, o primeiro cocô do bebê, e a equipe precisa saber para acompanhar de perto. Bolsa rota com líquido claro também é motivo de ir, mesmo sem nenhuma contração.",
+    "funFact": "O mecônio é verde-escuro, quase preto, porque é feito de bile, muco e células que o bebê engoliu junto com o líquido amniótico ao longo de meses.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Bolsa rota com líquido esverdeado na semana 41 significa:",
+        "o": [
+          "Ir à maternidade imediatamente",
+          "Esperar em casa até as contrações ficarem regulares",
+          "Aguardar a próxima consulta já marcada"
+        ],
+        "a": 0,
+        "why": "Líquido esverdeado indica mecônio: o bebê precisa ser avaliado e monitorado na maternidade sem demora."
+      },
+      {
+        "type": "choice",
+        "q": "Por que o mecônio deixa o líquido amniótico esverdeado?",
+        "o": [
+          "Porque é feito de bile, muco e células engolidas pelo bebê",
+          "Porque contém sangue da placenta",
+          "Porque se mistura com o leite materno"
+        ],
+        "a": 0,
+        "why": "A bile dá a cor verde-escura. Quando o bebê elimina o mecônio no útero, o líquido tinge de verde."
+      },
+      {
+        "type": "multi",
+        "q": "Quais situações pedem maternidade no mesmo momento na pós-data? (marque todas)",
+        "o": [
+          "Movimentos do bebê claramente diminuídos",
+          "Dor abdominal contínua que não alivia",
+          "Uma contração de treinamento isolada à tarde"
+        ],
+        "a": [0, 1],
+        "why": "Redução de movimentos e dor contínua são alertas imediatos. Uma contração isolada, não."
+      },
+      {
+        "type": "choice",
+        "q": "Se a bolsa romper com líquido claro e nenhuma contração aparecer, você deve:",
+        "o": [
+          "Esperar em casa até as contrações começarem",
+          "Ir à maternidade mesmo sem sentir contração",
+          "Tomar banho de banheira para relaxar"
+        ],
+        "a": 1,
+        "why": "Bolsa rota é sempre motivo de avaliação, com ou sem contração — e banho de imersão fica descartado."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: perceber o bebê diferente de todos os outros dias pode esperar até a manhã seguinte.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 1,
+        "why": "Falso. Mudança clara no padrão de movimentos é avaliação na hora, não amanhã."
+      }
+    ]
+  },
+  "291": {
+    "teach": "A partir da semana 41, as consultas costumam ficar mais próximas — muitas vezes uma ou duas vezes por semana — com exames que olham o bem-estar do bebê em tempo real. A cardiotocografia registra os batimentos e as acelerações do coração dele junto com as contrações. O perfil biofísico soma a esse traçado mais quatro observações feitas no ultrassom: movimentos respiratórios, movimentos do corpo, tônus muscular e a quantidade de líquido amniótico, com uma nota para cada item. O índice de líquido amniótico (ILA), ou a medida do maior bolsão, mostra se o líquido está diminuindo, algo comum depois do termo. E quando há dúvida sobre o fluxo de sangue da placenta, entra o doppler, que mede a circulação no cordão e nos vasos do bebê.",
+    "funFact": "No perfil biofísico o médico procura o bebê respirando dentro da barriga: ele treina o movimento do diafragma sem nenhum ar, só com líquido.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Quantos itens o perfil biofísico fetal avalia?",
+        "o": ["Dois", "Cinco", "Dez"],
+        "a": 1,
+        "why": "São cinco: cardiotocografia, movimentos respiratórios, movimentos do corpo, tônus e líquido amniótico."
+      },
+      {
+        "type": "multi",
+        "q": "O que o perfil biofísico observa no ultrassom? (marque todos)",
+        "o": [
+          "Movimentos respiratórios do bebê",
+          "Tônus muscular do bebê",
+          "O tipo sanguíneo da mãe"
+        ],
+        "a": [0, 1],
+        "why": "Movimentos respiratórios e tônus são dois dos parâmetros observados. Tipo sanguíneo é exame de sangue, não ultrassom."
+      },
+      {
+        "type": "choice",
+        "q": "Para que serve o ILA, o índice de líquido amniótico?",
+        "o": [
+          "Para estimar a quantidade de líquido em volta do bebê",
+          "Para medir o comprimento do bebê",
+          "Para recalcular a data provável do parto"
+        ],
+        "a": 0,
+        "why": "O ILA soma bolsões de líquido em quatro quadrantes do útero e dá uma medida do volume disponível."
+      },
+      {
+        "type": "choice",
+        "q": "Quando o doppler costuma entrar na avaliação da pós-data?",
+        "o": [
+          "Quando há dúvida sobre o fluxo de sangue da placenta e do cordão",
+          "Sempre que a gestante está ansiosa",
+          "Apenas depois que o bebê nasce"
+        ],
+        "a": 0,
+        "why": "O doppler avalia a circulação entre placenta e bebê — útil quando se suspeita de queda no aporte."
+      },
+      {
+        "type": "choice",
+        "q": "Com que frequência as consultas costumam ficar depois da semana 41?",
+        "o": [
+          "Uma vez por mês",
+          "Uma ou duas vezes por semana",
+          "Somente se você sentir algo errado"
+        ],
+        "a": 1,
+        "why": "A vigilância se intensifica: consultas e exames de vitalidade passam a ser semanais ou duas vezes por semana."
+      }
+    ]
+  },
+  "292": {
+    "teach": "A parte mais difícil da semana 41 raramente é física: é o telefone, com as mensagens de e aí, já nasceu chegando todo santo dia e cansando mais do que a barriga. Combine com alguém da sua rede para ser porta-voz, avise que você dará notícia quando quiser e permita-se silenciar o grupo sem culpa nenhuma. Aproveite para conferir a mala pela última vez — documentos, cartão de pré-natal, carregador, roupinha de saída, itens de higiene — e deixe tudo no carro ou perto da porta. E transforme a contagem de movimentos em ritual de vínculo: deite de lado depois de comer, mão na barriga, e sinta seu bebê responder, porque é vigilância e afeto no mesmo gesto.",
+    "funFact": "Deitar do lado esquerdo melhora o retorno de sangue ao seu coração e costuma deixar o bebê mais ativo — por isso é a posição clássica para contar movimentos.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Uma estratégia prática para lidar com o já nasceu? de todo mundo é:",
+        "o": [
+          "Combinar com alguém da rede para ser porta-voz",
+          "Bloquear todos os contatos para sempre",
+          "Deixar de comparecer às consultas"
+        ],
+        "a": 0,
+        "why": "Delegar as respostas a uma pessoa de confiança poupa sua energia sem cortar sua rede de apoio."
+      },
+      {
+        "type": "multi",
+        "q": "O que não pode faltar na mala já pronta da semana 41? (marque todos)",
+        "o": [
+          "Documentos e cartão de pré-natal",
+          "Roupinha de saída do bebê",
+          "O berço desmontado"
+        ],
+        "a": [0, 1],
+        "why": "Documentos e a roupinha de saída são essenciais. O berço fica em casa, montado e esperando."
+      },
+      {
+        "type": "choice",
+        "q": "Qual posição costuma ser recomendada para contar os movimentos do bebê?",
+        "o": [
+          "Em pé, caminhando rápido",
+          "Deitada de lado, preferencialmente o esquerdo",
+          "De barriga para baixo"
+        ],
+        "a": 1,
+        "why": "Deitada de lado, com atenção voltada à barriga, você percebe muito mais movimentos do que em atividade."
+      },
+      {
+        "type": "choice",
+        "q": "Contar os movimentos na pós-data é, na prática:",
+        "o": [
+          "Uma vigilância do bem-estar do bebê que você faz em casa",
+          "Um exame que substitui a cardiotocografia",
+          "Algo que só faz sentido antes da semana 30"
+        ],
+        "a": 0,
+        "why": "É o seu monitor doméstico entre uma consulta e outra — complementa os exames, não os substitui."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: sentir ansiedade e impaciência na semana 41 é normal e não significa que você não está preparada.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 0,
+        "why": "Verdadeiro. Esperar sem data é desgastante — a ansiedade não mede o seu preparo para ser mãe."
+      }
+    ]
+  },
+  "293": {
+    "teach": "Fechando a semana 41: o bebê continua crescendo, com unhas longas e pele mais sequinha, e seus movimentos mudam de estilo sem diminuir de quantidade. Nas consultas, o colo entra em cena — amolecimento, apagamento, dilatação, posição e altura da cabeça formam o índice de Bishop — e a vigilância aumenta com cardiotocografia, perfil biofísico, medida do líquido e doppler quando indicado. Em casa, o combustível é hidratação, refeições leves e movimento suave, sem receitas caseiras por conta própria. Os alertas de ir agora seguem firmes: movimentos diminuídos, sangramento vivo, dor contínua, febre e líquido esverdeado. E a espera tem prazo: seu obstetra conversa com você sobre indução para não ultrapassar 42 semanas completas.",
+    "funFact": "Poucas gestações bem acompanhadas chegam a completar 42 semanas — justamente porque a conversa sobre indução acontece antes disso.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Resumindo a semana 41, o que aumenta na rotina de acompanhamento?",
+        "o": [
+          "A frequência das consultas e dos exames de vitalidade fetal",
+          "O número de ultrassons morfológicos",
+          "A quantidade de vacinas da gestante"
+        ],
+        "a": 0,
+        "why": "Passado o termo, o foco é vigiar o bem-estar do bebê com mais frequência até o nascimento."
+      },
+      {
+        "type": "multi",
+        "q": "Quais exames vigiam o bem-estar do bebê na pós-data? (marque todos)",
+        "o": ["Cardiotocografia", "Perfil biofísico fetal", "Teste do pezinho"],
+        "a": [0, 1],
+        "why": "Cardiotocografia e perfil biofísico avaliam o bebê antes de nascer. O pezinho é feito depois do nascimento."
+      },
+      {
+        "type": "choice",
+        "q": "Sobre a duração da gestação, o que seu obstetra costuma combinar com você?",
+        "o": [
+          "Esperar o tempo que for necessário, sem qualquer limite",
+          "Conversar sobre indução para não ultrapassar 42 semanas completas",
+          "Marcar cesárea automática assim que chegar na semana 41"
+        ],
+        "a": 1,
+        "why": "Prolongar além de 42 semanas completas não é conduta habitual: a indução é discutida antes disso."
+      },
+      {
+        "type": "choice",
+        "q": "Qual destes NÃO é um sinal de ir à maternidade agora?",
+        "o": [
+          "Líquido esverdeado saindo após a bolsa romper",
+          "Sangramento vermelho-vivo",
+          "Uma noite mal dormida por causa da azia"
+        ],
+        "a": 2,
+        "why": "Azia e insônia são desconfortos esperados. Líquido esverdeado e sangramento vivo são urgência."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: mesmo com menos espaço, a quantidade diária de movimentos do bebê deve continuar a mesma na semana 41.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 0,
+        "why": "Verdadeiro. Muda o tipo de movimento, nunca a frequência — queda clara pede avaliação imediata."
+      }
+    ]
+  },
+  "294": {
+    "teach": "Semana 42: a partir de 42 semanas completas a gestação passa a ser chamada de pós-termo, um território a que quase nenhuma gestação bem acompanhada chega. Alguns bebês seguem ganhando peso e podem ficar grandes; outros trilham o caminho oposto e desenvolvem a chamada síndrome da pós-maturidade — pele muito seca, descamada e enrugada, quase sem gordura sob os braços e as coxas, unhas longas e um olhar curiosamente alerta. Isso acontece quando a placenta, que tem tempo de vida limitado, começa a entregar menos oxigênio e nutrientes do que o bebê precisa. Por isso a decisão de nascer nesta faixa não é sobre pressa: é sobre não deixar o bebê depender de uma placenta que já trabalhou demais.",
+    "funFact": "A placenta é o único órgão humano que se forma para durar poucos meses: ela nasce, amadurece, envelhece e se despede junto com a gestação.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "A partir de quando a gestação é chamada de pós-termo?",
+        "o": ["De 40 semanas completas", "De 41 semanas completas", "De 42 semanas completas"],
+        "a": 2,
+        "why": "Pós-termo é o nome dado a partir de 42 semanas completas — bem depois do intervalo considerado a termo."
+      },
+      {
+        "type": "choice",
+        "q": "O que é a síndrome da pós-maturidade?",
+        "o": [
+          "Um conjunto de sinais no bebê, como pele muito seca e pouca gordura",
+          "Uma infecção materna típica do fim da gestação",
+          "Um tipo raro de contração muito dolorosa"
+        ],
+        "a": 0,
+        "why": "É o quadro do bebê que passou tempo demais com aporte reduzido: pele descamada, magro e alerta."
+      },
+      {
+        "type": "multi",
+        "q": "Por que ultrapassar 42 semanas exige atenção redobrada? (marque todos)",
+        "o": [
+          "A placenta pode entregar menos oxigênio e nutrientes",
+          "Alguns bebês crescem muito e dificultam a passagem no parto",
+          "Porque o bebê perde o reflexo de mamar dentro do útero"
+        ],
+        "a": [0, 1],
+        "why": "Placenta menos eficiente e bebês grandes são os dois riscos reais. O reflexo de sucção não se perde."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: completar 42 semanas é o desfecho habitual de uma gestação bem acompanhada.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 1,
+        "why": "Falso. É a exceção: o acompanhamento intensificado costuma levar ao nascimento antes desse limite."
+      },
+      {
+        "type": "choice",
+        "q": "Ao longo da gestação, a placenta:",
+        "o": [
+          "Cresce indefinidamente, sem mudar de função",
+          "Tem tempo de vida limitado e perde eficiência no fim",
+          "Só começa a se formar no último mês"
+        ],
+        "a": 1,
+        "why": "Ela é um órgão temporário: cumpre sua função e vai reduzindo o desempenho conforme a gestação se estende."
+      }
+    ]
+  },
+  "295": {
+    "teach": "Seu corpo está no ápice da carga. O útero atingiu o volume máximo, a sínfise púbica dói, o inchaço nos pés aumenta, a azia insiste e dormir virou uma sequência de cochilos. Cada incômodo tem explicação: o útero sozinho sai de cerca de 70 gramas para perto de 1 quilo, e a soma com bebê, placenta e líquido empurra seu centro de gravidade para frente, sobrecarregando a lombar. Também é comum sentir contrações irregulares que apertam e somem sem virar padrão. Nada disso é sinal de fraqueza: é um corpo terminando um trabalho de dez meses — e reconhecer o cansaço serve para você pedir ajuda, não para aguentar calada.",
+    "funFact": "O útero é o músculo que mais cresce no corpo humano: multiplica seu peso mais de dez vezes ao longo da gestação e volta ao tamanho original depois.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Por que a dor lombar piora tanto no fim da gestação?",
+        "o": [
+          "Porque o centro de gravidade se desloca para frente e sobrecarrega a lombar",
+          "Porque a coluna encolhe alguns centímetros",
+          "Porque o bebê pressiona diretamente o pescoço"
+        ],
+        "a": 0,
+        "why": "O peso à frente muda a postura e a musculatura lombar passa a trabalhar dobrado para equilibrar."
+      },
+      {
+        "type": "choice",
+        "q": "Contrações irregulares que apertam e somem sem formar padrão são:",
+        "o": [
+          "Sempre uma emergência obstétrica",
+          "Esperadas nesta fase, diferentes do trabalho de parto ativo",
+          "Prova de que o parto começará dentro de uma hora"
+        ],
+        "a": 1,
+        "why": "Sem ritmo, sem progressão e sem aumento de intensidade, elas são preparo — não trabalho de parto."
+      },
+      {
+        "type": "multi",
+        "q": "Quais desconfortos são esperados na semana 42? (marque todos)",
+        "o": [
+          "Dor na sínfise púbica",
+          "Sono fracionado em vários cochilos",
+          "Febre alta com calafrios"
+        ],
+        "a": [0, 1],
+        "why": "Dor pélvica e sono picado são esperados. Febre com calafrios nunca é: precisa de avaliação."
+      },
+      {
+        "type": "choice",
+        "q": "Quanto o útero chega a pesar no fim da gestação?",
+        "o": ["Cerca de 70 gramas", "Cerca de 1 quilo", "Cerca de 10 quilos"],
+        "a": 1,
+        "why": "Ele parte de aproximadamente 70 gramas antes da gestação e chega perto de 1 quilo no fim."
+      },
+      {
+        "type": "choice",
+        "q": "Sentir-se exausta na semana 42 indica que você deve:",
+        "o": [
+          "Aguentar calada até o parto acontecer",
+          "Pedir ajuda à sua rede e contar o cansaço ao seu médico",
+          "Suspender as consultas para descansar mais"
+        ],
+        "a": 1,
+        "why": "Cansaço extremo é informação clínica e social: dividir a carga e relatar ao médico é parte do cuidado."
+      }
+    ]
+  },
+  "296": {
+    "teach": "Se a indução já foi combinada, vale ajustar os hábitos ao roteiro do hospital. Pergunte à equipe o que você pode comer e beber antes de internar e durante o processo: cada serviço tem sua orientação, e chegar em jejum longo por conta própria só rouba energia. Uma indução pode levar horas ou até mais de um dia, então leve o que ajuda a atravessar — água, os lanches liberados pela equipe, chinelo, meia, fone com sua playlist. Entre uma etapa e outra, caminhar pelo corredor, usar a bola e tomar banho morno costumam ser liberados e aliviam bastante. E mantenha o intestino funcionando com fibras e água: prisão de ventre no fim da gestação atrapalha mais do que parece.",
+    "funFact": "O gasto de energia de um trabalho de parto se compara ao de uma prova de longa distância — por isso hidratação e reposição, quando liberadas, fazem diferença real.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Sobre comer e beber antes de uma indução, o correto é:",
+        "o": [
+          "Entrar em jejum total por decisão própria",
+          "Perguntar à equipe que cuida de você o que está liberado",
+          "Fazer uma refeição enorme na véspera para estocar energia"
+        ],
+        "a": 1,
+        "why": "As orientações mudam de serviço para serviço; quem define é a equipe que vai conduzir a sua indução."
+      },
+      {
+        "type": "choice",
+        "q": "Quanto tempo pode durar um processo de indução do parto?",
+        "o": [
+          "Sempre menos de uma hora",
+          "De algumas horas a mais de um dia",
+          "Exatamente doze horas para todas as gestantes"
+        ],
+        "a": 1,
+        "why": "Indução é processo, não interruptor: o tempo varia com as condições do colo e a resposta do seu corpo."
+      },
+      {
+        "type": "multi",
+        "q": "O que costuma ajudar durante as pausas de uma indução? (marque todos)",
+        "o": [
+          "Caminhar pelo corredor quando liberado",
+          "Banho morno",
+          "Ficar imóvel na cama até o parto"
+        ],
+        "a": [0, 1],
+        "why": "Movimento e calor aliviam a dor e favorecem a descida do bebê. Imobilidade prolongada não ajuda."
+      },
+      {
+        "type": "choice",
+        "q": "Fibras e água no fim da gestação servem principalmente para:",
+        "o": [
+          "Acelerar a dilatação do colo",
+          "Manter o intestino funcionando e evitar prisão de ventre",
+          "Dobrar o volume de líquido amniótico"
+        ],
+        "a": 1,
+        "why": "Intestino preso somado ao útero grande vira desconforto sério — fibras e água resolvem boa parte."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: levar itens de conforto, como meia, chinelo e uma playlist, ajuda a atravessar melhor uma indução longa.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 0,
+        "why": "Verdadeiro. Conforto e familiaridade reduzem tensão, e menos tensão ajuda o trabalho de parto a fluir."
+      }
+    ]
+  },
+  "297": {
+    "teach": "Vale entender por que 41 e 42 semanas não são a mesma coisa. Entre 41 e 42 a vigilância aumenta, mas os riscos ainda são baixos; depois de 42 semanas completas eles sobem de forma mais nítida. O líquido amniótico tende a diminuir (o oligoâmnio), cresce a chance de o bebê eliminar mecônio, o cordão fica mais sujeito a compressões e a placenta perde eficiência. Por isso o obstetra costuma recomendar interromper a gestação quando aparece qualquer um desses achados: líquido baixo, traçado alterado na cardiotocografia, movimentos reduzidos, crescimento estacionado ou uma condição materna como pressão alta. E essa recomendação não é uma derrota do parto normal — na maioria das vezes ela abre caminho para uma indução, não para uma cesárea direta.",
+    "funFact": "Quando o líquido diminui, o cordão umbilical perde a almofada que o protegia e passa a ser comprimido com muito mais facilidade a cada contração.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "O que significa oligoâmnio?",
+        "o": [
+          "Excesso de líquido amniótico",
+          "Quantidade reduzida de líquido amniótico",
+          "Ausência total de movimentos fetais"
+        ],
+        "a": 1,
+        "why": "Oligoâmnio é líquido amniótico abaixo do esperado — achado comum e importante na pós-data."
+      },
+      {
+        "type": "choice",
+        "q": "Comparando 41 e 42 semanas, o que muda?",
+        "o": [
+          "Depois de 42 semanas completas os riscos sobem de forma mais nítida",
+          "Os riscos são exatamente iguais nas duas faixas",
+          "Depois de 42 semanas os riscos diminuem"
+        ],
+        "a": 0,
+        "why": "Entre 41 e 42 se intensifica a vigilância; passando de 42 completas, o risco cresce de modo mais claro."
+      },
+      {
+        "type": "multi",
+        "q": "Quais achados costumam levar o obstetra a recomendar interromper a gestação na pós-data? (marque todos)",
+        "o": [
+          "Líquido amniótico baixo",
+          "Cardiotocografia com traçado alterado",
+          "Ansiedade da família para conhecer o bebê"
+        ],
+        "a": [0, 1],
+        "why": "A decisão é clínica: líquido baixo e traçado alterado pesam; a ansiedade da família, sozinha, não."
+      },
+      {
+        "type": "choice",
+        "q": "Quando o líquido amniótico diminui, o principal risco para o bebê é:",
+        "o": [
+          "O cordão umbilical ser comprimido com mais facilidade",
+          "O bebê sentir frio dentro do útero",
+          "A placenta se descolar em todos os casos"
+        ],
+        "a": 0,
+        "why": "Sem a almofada de líquido, cada contração pode apertar o cordão e reduzir o fluxo de oxigênio."
+      },
+      {
+        "type": "choice",
+        "q": "Na maioria das vezes, recomendar o fim da gestação na pós-data significa:",
+        "o": [
+          "Cesárea imediata, sem discussão",
+          "Iniciar uma indução do trabalho de parto",
+          "Internar sem realizar nenhum exame"
+        ],
+        "a": 1,
+        "why": "Interromper a gestação não é sinônimo de cesárea: em geral se inicia uma indução, com o bebê monitorado."
+      }
+    ]
+  },
+  "298": {
+    "teach": "Induzir o parto é dar ao corpo o empurrão que ele ainda não deu sozinho, e existem caminhos diferentes conforme o seu colo. Quando ele está desfavorável, o primeiro passo é amadurecê-lo: há métodos mecânicos, como uma sonda com balão que faz pressão suave por dentro, e há métodos medicamentosos que amolecem o colo. Com o colo já favorável, a equipe pode romper a bolsa e usar medicação em soro para provocar contrações ritmadas, sempre com o bebê monitorado. Existe ainda o descolamento de membranas, feito no consultório durante o toque, que às vezes desencadeia o processo. Nada disso é escolhido por tabela: método, momento e via de parto são uma conversa entre você e o seu obstetra.",
+    "funFact": "A sonda com balão funciona sem nenhum remédio: a pressão mecânica sobre o colo estimula o próprio corpo a liberar as substâncias que iniciam o trabalho de parto.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Quando o colo ainda está desfavorável, o primeiro passo da indução costuma ser:",
+        "o": [
+          "Amadurecer o colo, por método mecânico ou medicamentoso",
+          "Romper a bolsa imediatamente",
+          "Partir direto para a cesárea"
+        ],
+        "a": 0,
+        "why": "Sem preparo do colo, a chance de a indução falhar é maior — por isso ele vem primeiro."
+      },
+      {
+        "type": "multi",
+        "q": "Quais destes são métodos usados para induzir ou preparar o parto? (marque todos)",
+        "o": [
+          "Sonda com balão no colo do útero",
+          "Descolamento de membranas durante o toque",
+          "Repouso absoluto na cama por três dias"
+        ],
+        "a": [0, 1],
+        "why": "Balão e descolamento de membranas são métodos reconhecidos. Repouso absoluto não induz parto nenhum."
+      },
+      {
+        "type": "choice",
+        "q": "Durante uma indução, o bebê é acompanhado por:",
+        "o": [
+          "Monitorização dos batimentos cardíacos",
+          "Nenhum acompanhamento até o nascimento",
+          "Apenas a contagem de movimentos feita por você"
+        ],
+        "a": 0,
+        "why": "A indução acontece com o coração do bebê monitorado, para ver como ele responde às contrações."
+      },
+      {
+        "type": "choice",
+        "q": "Quem decide o método de indução e a via de parto?",
+        "o": [
+          "Uma tabela padrão, igual para todas as gestantes",
+          "Você junto com o seu obstetra, caso a caso",
+          "Qualquer plantonista, sem conversar com você"
+        ],
+        "a": 1,
+        "why": "A escolha depende do seu colo, do bebê e da sua história — e é construída com informação e conversa."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: toda indução termina em cesárea.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 1,
+        "why": "Falso. Muitas induções evoluem para parto vaginal; a cesárea entra se houver indicação no caminho."
+      }
+    ]
+  },
+  "299": {
+    "teach": "Chegar até aqui e ouvir vamos induzir pode dar uma sensação de plano frustrado, principalmente se você sonhava com o trabalho de parto começando sozinho, em casa, no seu tempo. Esse luto é legítimo e merece nome, não silêncio — mas um bom plano de parto é um plano flexível: ele descreve suas preferências e continua valendo em tudo o que for possível. Você pode pedir acompanhante ao seu lado, ambiente mais calmo, liberdade de posição, alívio da dor quando quiser e o contato pele a pele logo após o nascimento, que também acontece em muitas cesáreas. Leve suas perguntas por escrito à próxima consulta: entender cada passo diminui o medo mais do que qualquer frase de conforto.",
+    "funFact": "O contato pele a pele nos primeiros minutos ajuda o bebê a estabilizar temperatura, respiração e glicose no sangue — funciona como uma incubadora natural.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Um bom plano de parto é aquele que:",
+        "o": [
+          "Descreve suas preferências e segue valendo no que for possível",
+          "Determina exatamente como tudo tem de acontecer",
+          "Deve ser descartado assim que se fala em indução"
+        ],
+        "a": 0,
+        "why": "Plano de parto é comunicação de desejos, não contrato — flexibilidade mantém você no comando do que dá."
+      },
+      {
+        "type": "multi",
+        "q": "O que você pode pedir mesmo em um parto induzido? (marque todos)",
+        "o": [
+          "Acompanhante ao seu lado",
+          "Contato pele a pele após o nascimento",
+          "Garantia por escrito da hora exata do parto"
+        ],
+        "a": [0, 1],
+        "why": "Acompanhante e pele a pele são direitos possíveis em quase todos os cenários. Hora exata ninguém garante."
+      },
+      {
+        "type": "choice",
+        "q": "Sentir frustração ao saber que o parto será induzido é:",
+        "o": [
+          "Sinal de que você não deseja o bebê",
+          "Um sentimento legítimo, que merece ser nomeado e acolhido",
+          "Motivo suficiente para adiar a indução por conta própria"
+        ],
+        "a": 1,
+        "why": "Frustração e amor convivem. Falar sobre isso ajuda muito mais do que engolir para parecer forte."
+      },
+      {
+        "type": "choice",
+        "q": "O contato pele a pele logo após o nascimento ajuda o bebê a:",
+        "o": [
+          "Estabilizar temperatura, respiração e glicemia",
+          "Ganhar meio quilo nas primeiras 24 horas",
+          "Dispensar a avaliação do pediatra"
+        ],
+        "a": 0,
+        "why": "O corpo da mãe regula o do bebê nos primeiros minutos — sem substituir a avaliação da equipe."
+      },
+      {
+        "type": "choice",
+        "q": "Levar perguntas por escrito à consulta da pós-data serve para:",
+        "o": [
+          "Entender cada passo e reduzir o medo do desconhecido",
+          "Testar o conhecimento do seu médico",
+          "Encurtar a consulta a qualquer custo"
+        ],
+        "a": 0,
+        "why": "Com as dúvidas anotadas, nada fica para trás e você sai da consulta com o cenário claro na cabeça."
+      }
+    ]
+  },
+  "300": {
+    "teach": "Última revisão da jornada. Pós-termo começa em 42 semanas completas, e chegar lá é raro justamente porque o acompanhamento se intensifica antes: consultas mais próximas, cardiotocografia, perfil biofísico, medida do líquido e doppler quando indicado. Os motivos para agir são conhecidos — líquido baixo, mecônio, compressão de cordão e placenta menos eficiente — e a resposta costuma ser a indução, com o método escolhido conforme as condições do seu colo, não uma cesárea automática. Em casa, o painel de alerta continua idêntico: movimentos diminuídos, sangramento vivo, dor contínua, febre e líquido esverdeado pedem maternidade agora. Você atravessou 42 semanas de um trabalho invisível e gigantesco — o encontro está logo ali.",
+    "funFact": "Desde o primeiro batimento, por volta das 6 semanas, até agora, o coração do seu bebê já bateu mais de 50 milhões de vezes dentro de você.",
+    "questions": [
+      {
+        "type": "choice",
+        "q": "Fechando a jornada: qual é a resposta mais comum quando a pós-data exige agir?",
+        "o": [
+          "A indução do trabalho de parto",
+          "A cesárea automática, sem avaliação",
+          "Aguardar mais duas semanas em casa"
+        ],
+        "a": 0,
+        "why": "Na maioria dos casos, agir significa induzir o parto com o bebê monitorado — não operar de imediato."
+      },
+      {
+        "type": "multi",
+        "q": "Quais riscos justificam não prolongar a gestação além de 42 semanas? (marque todos)",
+        "o": [
+          "Redução do líquido amniótico",
+          "Placenta com desempenho reduzido",
+          "Aumento do apetite da gestante"
+        ],
+        "a": [0, 1],
+        "why": "Líquido em queda e placenta menos eficiente são os motivos clínicos. Apetite não entra nessa conta."
+      },
+      {
+        "type": "choice",
+        "q": "O que orienta a escolha do método de indução?",
+        "o": [
+          "As condições do colo do útero, avaliadas pelo obstetra",
+          "O dia da semana em que você chega ao hospital",
+          "A preferência da família pelo nome do bebê"
+        ],
+        "a": 0,
+        "why": "Colo desfavorável começa pelo amadurecimento; colo favorável já permite partir para as contrações."
+      },
+      {
+        "type": "choice",
+        "q": "Na pós-data, qual destes sinais exige ir à maternidade agora?",
+        "o": [
+          "Movimentos do bebê claramente diminuídos",
+          "Vontade frequente de fazer xixi",
+          "Cansaço ao subir escadas"
+        ],
+        "a": 0,
+        "why": "Queda clara nos movimentos é o alerta número um. Xixi frequente e cansaço são esperados na reta final."
+      },
+      {
+        "type": "choice",
+        "q": "Verdadeiro ou falso: é o acompanhamento intensificado entre 41 e 42 semanas que faz poucas gestações chegarem ao pós-termo.",
+        "o": ["Verdadeiro", "Falso"],
+        "a": 0,
+        "why": "Verdadeiro. Vigiar de perto e combinar a indução no tempo certo evita que a gestação ultrapasse esse limite."
       }
     ]
   }
