@@ -13535,6 +13535,13 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
   const [cat, setCat] = useState<CantinhoType | "all">("all");
   const [buying, setBuying] = useState<string | null>(null);
   const [collection, setCollection] = useState({ owned: 0, total: 0, complete: false });
+  // Layout livre da cena: cada paciente arruma os itens onde quiser. Posições
+  // em % (responsivo) salvas no aparelho — sem SQL, persiste ao reabrir o app.
+  const [uid, setUid] = useState<string | null>(null);
+  const [layout, setLayout] = useState<Record<string, { x: number; y: number }>>({});
+  const [arranging, setArranging] = useState(false);
+  const sceneRef = useRef<HTMLDivElement | null>(null);
+  const dragId = useRef<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -13542,6 +13549,14 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
       if (!s.session?.access_token) {
         setLoading(false);
         return;
+      }
+      const userId = s.session.user.id;
+      setUid(userId);
+      try {
+        const raw = localStorage.getItem(`cantinho:layout:${userId}`);
+        if (raw) setLayout(JSON.parse(raw) as Record<string, { x: number; y: number }>);
+      } catch {
+        /* layout corrompido: ignora e usa posições padrão */
       }
       const res = await getCantinho({ data: { accessToken: s.session.access_token } });
       if (res.ok) {
@@ -13573,6 +13588,44 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
     } else {
       toast(id ? "Cenário aplicado! 🌄" : "Cenário removido");
     }
+  }
+
+  // Posição-padrão espalhada (por índice) pra item recém-comprado que ainda
+  // não foi arrumado — nunca empilha tudo no mesmo ponto.
+  function defaultPos(idx: number) {
+    const cols = 4;
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    return { x: 18 + col * 21, y: 30 + row * 24 };
+  }
+  function saveLayout(next: Record<string, { x: number; y: number }>) {
+    if (uid) {
+      try {
+        localStorage.setItem(`cantinho:layout:${uid}`, JSON.stringify(next));
+      } catch {
+        /* storage cheio/indisponível: mantém em memória */
+      }
+    }
+  }
+  function onDecorPointerDown(e: React.PointerEvent, id: string) {
+    if (!arranging) return;
+    dragId.current = id;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  }
+  function onScenePointerMove(e: React.PointerEvent) {
+    if (!arranging || !dragId.current || !sceneRef.current) return;
+    const r = sceneRef.current.getBoundingClientRect();
+    const x = Math.max(6, Math.min(94, ((e.clientX - r.left) / r.width) * 100));
+    const y = Math.max(8, Math.min(92, ((e.clientY - r.top) / r.height) * 100));
+    setLayout((prev) => ({ ...prev, [dragId.current as string]: { x, y } }));
+  }
+  function onScenePointerUp() {
+    if (!dragId.current) return;
+    dragId.current = null;
+    setLayout((prev) => {
+      saveLayout(prev);
+      return prev;
+    });
   }
 
   if (loading) return <TabSkeleton />;
@@ -13651,10 +13704,20 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
         </div>
       </div>
 
-      {/* A cena do cantinho */}
-      <div className="min-h-[180px] rounded-3xl border border-emerald-100 bg-gradient-to-b from-sky-50 via-white to-emerald-50 p-6">
+      {/* A cena do cantinho — quadro onde a paciente arruma os itens à vontade */}
+      <div
+        ref={sceneRef}
+        onPointerMove={onScenePointerMove}
+        onPointerUp={onScenePointerUp}
+        onPointerLeave={onScenePointerUp}
+        className="relative overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100"
+        style={{ height: 300 }}
+      >
+        {/* chãozinho no rodapé pra dar sensação de "cantinho" */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-emerald-200/70 to-transparent" />
+
         {ownedItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
             <p className="text-4xl">🌱</p>
             <p className="mt-2 font-serif text-lg text-foreground">Seu cantinho está começando</p>
             <p className="mt-1 max-w-xs text-sm text-muted-foreground">
@@ -13663,13 +13726,53 @@ function CantinhoTab({ careMode = false }: { careMode?: boolean }) {
             </p>
           </div>
         ) : (
-          <div className="flex flex-wrap items-end justify-center gap-3">
-            {ownedItems.map((i) => (
-              <span key={i.id} className="text-5xl drop-shadow-sm" title={i.name}>
-                {i.emoji}
-              </span>
-            ))}
-          </div>
+          <>
+            {ownedItems.map((i, idx) => {
+              const pos = layout[i.id] ?? defaultPos(idx);
+              return (
+                <div
+                  key={i.id}
+                  onPointerDown={(e) => onDecorPointerDown(e, i.id)}
+                  title={i.name}
+                  className={`absolute select-none text-5xl drop-shadow-sm ${
+                    arranging ? "cursor-grab touch-none active:cursor-grabbing" : ""
+                  }`}
+                  style={{
+                    left: `${pos.x}%`,
+                    top: `${pos.y}%`,
+                    transform: "translate(-50%, -50%)",
+                    touchAction: arranging ? "none" : undefined,
+                  }}
+                >
+                  <span
+                    className={
+                      arranging
+                        ? "inline-block rounded-2xl bg-white/50 p-1 ring-2 ring-emerald-300"
+                        : ""
+                    }
+                  >
+                    {i.emoji}
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* Botão arrumar / pronto */}
+            <button
+              onClick={() => setArranging((a) => !a)}
+              className={`press absolute right-3 top-3 z-10 rounded-full px-3 py-1.5 text-[11px] font-bold shadow-sm ${
+                arranging ? "bg-emerald-500 text-white" : "bg-white/85 text-emerald-700"
+              }`}
+            >
+              {arranging ? "Pronto ✓" : "Arrumar ✏️"}
+            </button>
+
+            {arranging && (
+              <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[11px] font-medium text-emerald-800/80">
+                Arraste os itens pra onde quiser 💛
+              </p>
+            )}
+          </>
         )}
       </div>
 
