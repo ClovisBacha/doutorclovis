@@ -676,21 +676,22 @@ function MinhaContaPage() {
       return;
     }
     setMobileHome(false);
+    // Jogo/Chat abrem DIRETO no tab; Saúde na saúde; Menu no navegador (Bebê).
     const sectionMap: Record<Exclude<BottomSection, "home">, Tab> = {
-      gestacao: "Bebê",
+      jogo: "Caminho",
+      chat: "Chat IA",
       saude: "Saúde",
-      consultas: "Consultas",
-      eu: "Perfil",
+      menu: "Bebê",
     };
     setTab(sectionMap[section]);
   }
 
   const SECTION_TITLES: Record<BottomSection, string> = {
     home: "Início",
-    gestacao: "Gestação",
+    jogo: "Jogo",
+    chat: "Chat com a IA",
     saude: "Saúde",
-    consultas: "Consultas",
-    eu: "Eu",
+    menu: "Menu",
   };
 
   // Médico (não-admin) NÃO usa o app da gestante: bebê, diário, jogo e afins
@@ -926,8 +927,13 @@ function MinhaContaPage() {
             )}
 
             {/* Celular: UMA barra só — as abas da seção do menu de baixo (o menu
-              de baixo já faz o papel de categoria; corta um seletor empilhado). */}
-            <div className="print:hidden mt-2 flex gap-1 overflow-x-auto pb-1 md:hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              de baixo já faz o papel de categoria; corta um seletor empilhado).
+              Jogo/Chat têm 1 aba só → escondemos a fileira (abrem limpos). */}
+            <div
+              className={`print:hidden mt-2 ${
+                tabsForSection(activeSection).length > 1 ? "flex" : "hidden"
+              } gap-1 overflow-x-auto pb-1 md:hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]`}
+            >
               {tabsForSection(activeSection).map((t) => (
                 <button
                   key={t}
