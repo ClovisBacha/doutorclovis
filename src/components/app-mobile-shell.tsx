@@ -736,7 +736,7 @@ export function AppHomeScreen({
               >
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute h-full max-h-[17rem] w-[86%] max-w-[15rem] rounded-[50%]"
+                  className="pointer-events-none absolute h-[min(19rem,36svh)] w-[min(17rem,32svh)] rounded-[50%]"
                   style={{
                     background:
                       "radial-gradient(closest-side, rgba(255,255,255,0.55) 0%," +
@@ -744,12 +744,17 @@ export function AppHomeScreen({
                     filter: "blur(2px)",
                   }}
                 />
+                {/* Altura e largura EXPLÍCITAS: a className cai no <svg>, cujo
+                    pai (dentro de BabyIllustration) não tem altura — com
+                    `h-full` o SVG resolvia contra `auto` e virava 0px, ou seja,
+                    o bebê sumia da tela. `min()` encolhe em aparelho curto sem
+                    depender da altura do pai. */}
                 <BabyIllustration
                   week={gest.weeks}
                   tone={babyTone}
                   showSac={false}
                   showInfo={false}
-                  className="float-slow relative aspect-square h-full max-h-[15rem] w-auto max-w-full drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
+                  className="float-slow relative h-[min(16rem,30svh)] w-[min(16rem,30svh)] drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
                 />
               </button>
 
