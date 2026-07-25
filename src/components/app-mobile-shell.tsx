@@ -734,7 +734,7 @@ export function AppHomeScreen({
             <>
               {/* Nome do bebê — protagonista, logo abaixo da barra */}
               {babyName && (
-                <div className="mt-4 text-center" style={overArt}>
+                <div className="mt-10 text-center" style={overArt}>
                   <p className={`text-[13px] font-medium tracking-[0.02em] ${heroLabel}`}>
                     Acompanhando
                   </p>
@@ -802,7 +802,7 @@ export function AppHomeScreen({
                   dobraria a opacidade e deixaria a emenda escura. */}
               <div className="mt-1 flex flex-col items-center">
                 <div
-                  className="px-7 pb-1 pt-3 text-center"
+                  className="px-6 pb-1 pt-2.5 text-center"
                   style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                 >
                   <p
@@ -823,7 +823,7 @@ export function AppHomeScreen({
                   </p>
                 </div>
 
-                <div className="w-full rounded-[26px] px-4 pb-3 pt-2" style={glass}>
+                <div className="w-full rounded-[26px] px-4 pb-5 pt-3" style={glass}>
                   {/* Medidas da semana (silenciadas no Modo Cuidado) */}
                   {!careMode && (
                     <>
@@ -844,7 +844,7 @@ export function AppHomeScreen({
                         />
                       </div>
 
-                      <div className="mt-2 grid grid-cols-3">
+                      <div className="mt-3 grid grid-cols-3">
                         {[
                           { emoji: "📏", value: baby.size, label: "Comprimento" },
                           { emoji: "⚖️", value: baby.weight, label: "Peso" },
