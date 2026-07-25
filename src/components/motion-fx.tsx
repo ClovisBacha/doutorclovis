@@ -1,3 +1,4 @@
+import { useLocation } from "@tanstack/react-router";
 import { useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 
 function prefersReducedMotion() {
@@ -201,6 +202,9 @@ export function Magnetic({
 export function ScrollProgress() {
   const ref = useRef<HTMLDivElement>(null);
   const frame = useRef(0);
+  // No app da paciente ela vira um tracinho rosa solto sobre o céu da home
+  // (a página rola pouco). É métrica de LEITURA — só faz sentido no site.
+  const { pathname } = useLocation();
 
   useEffect(() => {
     const el = ref.current;
@@ -230,6 +234,8 @@ export function ScrollProgress() {
     background:
       "linear-gradient(90deg, var(--primary), color-mix(in oklab, var(--primary) 55%, white))",
   };
+
+  if (pathname.startsWith("/minha-conta") || pathname.startsWith("/preview-home")) return null;
 
   return (
     <div

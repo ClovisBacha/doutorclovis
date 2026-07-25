@@ -98,7 +98,7 @@ export function BabyIllustration({
   const isWhiteBg = WHITE_BG_STAGES.has(stage);
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center">
       <svg
         viewBox="0 0 200 200"
         role="img"
