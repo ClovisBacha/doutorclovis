@@ -523,20 +523,31 @@ function BabyOrb() {
   return (
     <span
       aria-hidden
-      className="dc-orb pointer-events-none absolute rounded-full"
+      className="dc-orb pointer-events-none absolute rounded-[50%]"
       style={{
-        width: "min(19rem, 35svh)",
-        height: "min(19rem, 35svh)",
-        background:
-          // O miolo é quase transparente e a luz se acumula perto da borda: é
-          // isso que faz ler como ESFERA e não como disco chapado.
-          "radial-gradient(circle at 50% 46%, rgba(255,255,255,0.10) 0%," +
-          " rgba(255,252,254,0.13) 58%, rgba(255,246,251,0.30) 86%," +
-          " rgba(255,255,255,0.46) 96%, rgba(255,255,255,0) 100%)",
-        boxShadow:
-          // Aro largo e difuso em vez de linha de 1px: um anel nítido demais
-          // lê como círculo desenhado, não como bolha de luz.
-          "inset 0 0 26px 4px rgba(255,255,255,0.40), 0 0 54px 14px rgba(255,240,248,0.30)",
+        // Levemente mais alta que larga: a referência não é círculo perfeito,
+        // é ovo — e círculo exato lê como forma geométrica, não como ventre.
+        width: "min(17rem, 32svh)",
+        height: "min(17.6rem, 33svh)",
+        background: [
+          // A luz mora DENTRO e morre ANTES da borda. Concentrá-la no aro fazia
+          // a bolha virar anel desenhado, e o degrau do ramp virava um falso
+          // segundo círculo concêntrico.
+          "radial-gradient(circle at 50% 47%, rgba(255,251,253,0.30) 0%," +
+            " rgba(255,246,250,0.17) 40%, rgba(255,255,255,0.05) 66%," +
+            " rgba(255,255,255,0) 82%)",
+          // Luz vinda de cima à esquerda: sem direção, esfera lê como disco.
+          "radial-gradient(circle at 33% 29%, rgba(255,255,255,0.13) 0%," +
+            " rgba(255,255,255,0) 58%)",
+        ].join(", "),
+        // Véu: dentro da bolha o céu perde um pouco de nitidez e cor, como
+        // atrás de vidro. É o que faz ela OCUPAR volume em vez de ser um
+        // decalque — na referência nenhuma nuvem sobrevive nítida lá dentro.
+        backdropFilter: "blur(1.5px) saturate(0.9) brightness(1.03)",
+        WebkitBackdropFilter: "blur(1.5px) saturate(0.9) brightness(1.03)",
+        // Aro quase imperceptível + halo externo largo. A referência mede
+        // ~1,08× o brilho do céu na borda; o anel forte era o erro.
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12), 0 0 40px 14px rgba(255,244,250,0.14)",
       }}
     />
   );
