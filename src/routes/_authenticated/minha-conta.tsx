@@ -96,7 +96,12 @@ import {
   isCantinhoCollectionComplete,
   type CantinhoType,
 } from "@/lib/cantinho";
-import { getCantinho, buyCantinhoItem, setCantinhoFundo } from "@/lib/cantinho.functions";
+import {
+  getCantinho,
+  buyCantinhoItem,
+  setCantinhoFundo,
+  setSkyTheme,
+} from "@/lib/cantinho.functions";
 import { getInstagramShare, setInstagramHandle } from "@/lib/instagram.functions";
 import { getRatingReward, claimRatingReward } from "@/lib/rating.functions";
 import {
@@ -174,6 +179,8 @@ export const Route = createFileRoute("/_authenticated/minha-conta")({
 
 type Profile = {
   id: string;
+  /** Céu da home: null/"v2" = arte por período; "v1" = gradiente original. */
+  sky_theme?: string | null;
   display_name: string | null;
   baby_name: string | null;
   lmp_date: string | null;
@@ -962,6 +969,7 @@ function MinhaContaPage() {
                 nextAppointment={nextAppt}
                 babyTone={profile?.baby_skin_tone ?? 0}
                 careMode={careMode}
+                skyTheme={profile?.sky_theme === "v1" ? "v1" : "v2"}
               />
 
               {/* Menu do ☰: as ações que viviam na barra de topo da home
@@ -1143,7 +1151,13 @@ function MinhaContaPage() {
                 )}
                 {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
                 {tab === "Recompensas" && (
-                  <RecompensasHub careMode={careMode} gest={gest} onNavigate={goToTab} />
+                  <RecompensasHub
+                    careMode={careMode}
+                    gest={gest}
+                    onNavigate={goToTab}
+                    skyTheme={profile?.sky_theme === "v1" ? "v1" : "v2"}
+                    onSkyChange={(t) => setProfile((p) => (p ? { ...p, sky_theme: t } : p))}
+                  />
                 )}
                 {tab === "Saúde da mulher" && <SaudeMulherHub />}
                 {tab === "Médico" && <MédicoTab />}
@@ -12698,10 +12712,14 @@ function RecompensasHub({
   careMode,
   gest,
   onNavigate,
+  skyTheme,
+  onSkyChange,
 }: {
   careMode: boolean;
   gest: Gest;
   onNavigate?: (t: string) => void;
+  skyTheme?: "v2" | "v1";
+  onSkyChange?: (t: "v2" | "v1") => void;
 }) {
   const [sub, setSub] = useState<(typeof RECOMPENSAS_SUBTABS)[number]["key"]>("cantinho");
   return (
@@ -12722,7 +12740,14 @@ function RecompensasHub({
         ))}
       </div>
       <Fade key={sub}>
-        {sub === "cantinho" && <CantinhoTab careMode={careMode} onNavigate={onNavigate} />}
+        {sub === "cantinho" && (
+          <CantinhoTab
+            careMode={careMode}
+            onNavigate={onNavigate}
+            skyTheme={skyTheme}
+            onSkyChange={onSkyChange}
+          />
+        )}
         {sub === "conquistas" && <ConquistasTab />}
         {sub === "loja" && <LojaTab gest={gest} />}
       </Fade>
@@ -13746,14 +13771,21 @@ function ReferralCard() {
 function CantinhoTab({
   careMode = false,
   onNavigate,
+  skyTheme = "v2",
+  onSkyChange,
 }: {
   careMode?: boolean;
   onNavigate?: (t: string) => void;
+  /** Céu da home hoje — o item "Céu Clássico" marca "Em uso" a partir daqui. */
+  skyTheme?: "v2" | "v1";
+  /** Avisa a página para a home repintar sem esperar um reload. */
+  onSkyChange?: (t: "v2" | "v1") => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
   const [owned, setOwned] = useState<string[]>([]);
   const [premium, setPremium] = useState(false);
+  const [sky, setSky] = useState<"v2" | "v1">(skyTheme);
   const [equipped, setEquipped] = useState<string | null>(null);
   const [cat, setCat] = useState<CantinhoType | "all">("all");
   const [buying, setBuying] = useState<string | null>(null);
@@ -13797,6 +13829,21 @@ function CantinhoTab({
     })();
   }, []);
 
+  async function equipSkyTheme(theme: "v2" | "v1") {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session?.access_token) return;
+    const prev = sky;
+    setSky(theme); // otimista
+    const res = await setSkyTheme({ data: { accessToken: s.session.access_token, theme } });
+    if (!res.ok) {
+      setSky(prev);
+      toast(res.error ?? "Não foi possível trocar o céu");
+    } else {
+      toast(theme === "v1" ? "Céu Clássico aplicado 🌅" : "De volta ao céu novo ✨");
+      onSkyChange?.(theme);
+    }
+  }
+
   async function equipFundo(id: string | null) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session?.access_token) return;
@@ -13837,7 +13884,11 @@ function CantinhoTab({
   const ownedSet = new Set(owned);
   // A cena mostra só decorações que a paciente REALMENTE possui — cenários
   // (fundo) são papel de parede, não entram como emoji na cena.
-  const ownedItems = CANTINHO_ITEMS.filter((i) => ownedSet.has(i.id) && i.type !== "fundo");
+  // Enfeites que ela posiciona no Cantinho. Fora: `fundo` (é o cenário) e
+  // `tema` (veste a home do app, não entra na cena).
+  const ownedItems = CANTINHO_ITEMS.filter(
+    (i) => ownedSet.has(i.id) && i.type !== "fundo" && i.type !== "tema",
+  );
   const shopItems = CANTINHO_ITEMS.filter((i) => cat === "all" || i.type === cat);
 
   async function buy(itemId: string, price: number) {
@@ -14033,7 +14084,19 @@ function CantinhoTab({
                 </span>
                 <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
                 {has ? (
-                  i.type === "fundo" ? (
+                  i.type === "tema" ? (
+                    // Tema veste a HOME, não o cantinho: alterna V1 ⇄ V2.
+                    <button
+                      onClick={() => equipSkyTheme(sky === "v1" ? "v2" : "v1")}
+                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
+                        sky === "v1"
+                          ? "bg-emerald-500 text-white"
+                          : "border border-emerald-300 text-emerald-700"
+                      }`}
+                    >
+                      {sky === "v1" ? "Em uso ✓" : "Usar"}
+                    </button>
+                  ) : i.type === "fundo" ? (
                     <button
                       onClick={() => equipFundo(equipped === i.id ? null : i.id)}
                       className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${

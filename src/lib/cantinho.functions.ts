@@ -154,6 +154,44 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
     }
   });
 
+/**
+ * Troca o tema do céu da home. "v2" (arte por momento do dia) é o padrão e
+ * não custa nada; "v1" (o céu original) exige ter comprado `tema-ceu-v1`.
+ * A posse é checada AQUI e não no cliente — o cliente só pede.
+ */
+export const setSkyTheme = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), theme: z.enum(["v2", "v1"]) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const uid = await authUid(data.accessToken);
+    if (!uid) return { ok: false as const, error: "Não autenticado" };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.theme === "v1") {
+      const db = typedDb(supabaseAdmin);
+      const { data: owned } = await db
+        .from("cantinho_items")
+        .select("item_id")
+        .eq("user_id", uid)
+        .eq("item_id", "tema-ceu-v1")
+        .maybeSingle();
+      if (!owned) return { ok: false as const, error: "Você ainda não tem o Céu Clássico" };
+    }
+    const { error: upErr } = await (
+      supabaseAdmin.from("patient_profiles") as unknown as {
+        update: (v: { sky_theme: string }) => {
+          eq: (c: string, val: string) => Promise<{ error: unknown }>;
+        };
+      }
+    )
+      .update({ sky_theme: data.theme })
+      .eq("id", uid);
+    // 42703 = coluna ausente (migração pendente): a troca não persiste, mas o
+    // app não pode quebrar por causa disso. Reporta em vez de fingir sucesso.
+    if (upErr) return { ok: false as const, error: "Falha ao salvar" };
+    return { ok: true as const, theme: data.theme };
+  });
+
 /** Equipa (ou limpa, com null) o cenário ativo do Cantinho. Só 1 por vez. */
 export const setCantinhoFundo = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>

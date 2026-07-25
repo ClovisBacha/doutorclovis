@@ -26,6 +26,11 @@ import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
+import skyManha from "@/assets/sky/manha.webp";
+import skyDia from "@/assets/sky/dia.webp";
+import skyEntardecer from "@/assets/sky/entardecer.webp";
+import skyNoite from "@/assets/sky/noite.webp";
+import skyMadrugada from "@/assets/sky/madrugada.webp";
 import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 
@@ -492,14 +497,26 @@ function dateOffsetLabel(days: number): string {
 }
 
 /**
- * Véu de sonho: leva o céu real (que muda com hora e clima) para a paleta
- * lavanda→rosa→pêssego do conceito, deixando o gradiente de baixo ainda
- * modular a luz. A opacidade CRESCE para a base porque lá o céu diurno é
- * azul-esverdeado claro e, com véu fraco, o pêssego virava oliva.
+ * Véu de sonho do tema V1: leva o gradiente de céu à paleta lavanda→rosa→
+ * pêssego do conceito. A opacidade CRESCE para a base porque lá o céu diurno
+ * é azul-esverdeado claro e, com véu fraco, o pêssego virava oliva.
+ * No tema V2 (arte) o véu não entra — a foto já traz a atmosfera pronta.
  */
 const DREAM_VEIL =
   "linear-gradient(180deg, rgba(183,158,255,0.66) 0%, rgba(247,176,213,0.62) 38%," +
   " rgba(255,193,158,0.74) 72%, rgba(255,224,199,0.82) 100%)";
+
+/** Tema do céu da home. V2 = arte por período; V1 = o gradiente original. */
+export type SkyThemeId = "v2" | "v1";
+
+/** Arte de fundo de cada momento do dia (tema V2). */
+const SKY_ART: Record<ReturnType<typeof periodFor>, string> = {
+  madrugada: skyMadrugada,
+  manha: skyManha,
+  dia: skyDia,
+  entardecer: skyEntardecer,
+  noite: skyNoite,
+};
 
 export function AppHomeScreen({
   firstName,
@@ -510,6 +527,7 @@ export function AppHomeScreen({
   nextAppointment,
   babyTone = 0,
   careMode = false,
+  skyTheme = "v2",
 }: {
   firstName: string;
   babyName: string | null;
@@ -523,6 +541,8 @@ export function AppHomeScreen({
   babyTone?: number;
   /** Modo Cuidado: silencia contagem, tamanho do bebê, streak e desafio. */
   careMode?: boolean;
+  /** Tema do céu: "v2" (arte, padrão) ou "v1" (gradiente, comprado na Loja). */
+  skyTheme?: SkyThemeId;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
@@ -551,11 +571,24 @@ export function AppHomeScreen({
   const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
   const heroLabel = darkSky ? "text-white/60" : "text-primary";
 
+  const artTheme = skyTheme !== "v1";
+
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
      o céu escurece e o mesmo branco cegaria — então o vidro inverte e o texto
-     acompanha, mantendo o desenho e o contraste nos dois céus. */
+     acompanha, mantendo o desenho e o contraste nos dois céus.
+
+     Sobre a ARTE o vidro fecha mais: a foto tem contraste local (uma faixa de
+     pôr do sol acesa bem atrás de um cartão) que o gradiente liso não tem, e
+     com o vidro aberto o texto sumia justamente ali. */
+  const glassBg = darkSky
+    ? artTheme
+      ? "rgba(22,20,36,0.56)"
+      : "rgba(255,255,255,0.13)"
+    : artTheme
+      ? "rgba(255,255,255,0.82)"
+      : "rgba(255,255,255,0.72)";
   const glass: React.CSSProperties = {
-    background: darkSky ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.72)",
+    background: glassBg,
     backdropFilter: "blur(22px) saturate(170%)",
     WebkitBackdropFilter: "blur(22px) saturate(170%)",
     border: `1px solid ${darkSky ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.85)"}`,
@@ -565,6 +598,11 @@ export function AppHomeScreen({
   };
   const cardText = darkSky ? "text-white" : "text-foreground";
   const cardMuted = darkSky ? "text-white/60" : "text-muted-foreground";
+  /* Nome e etiqueta ficam SOBRE o céu, sem cartão atrás. Na arte isso pede
+     sombra: o fundo atrás deles muda de luminosidade ao longo do dia. */
+  const overArt: React.CSSProperties = artTheme
+    ? { textShadow: darkSky ? "0 2px 10px rgba(0,0,0,0.55)" : "0 1px 6px rgba(255,255,255,0.65)" }
+    : {};
 
   return (
     <div className="space-y-4 pb-2">
@@ -576,18 +614,33 @@ export function AppHomeScreen({
         className="shine relative -mx-5 -mt-2 flex min-h-[92svh] flex-col overflow-hidden px-5 pb-8 pt-[calc(0.5rem+env(safe-area-inset-top))] transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
-        {/* Céu vivo: sol/lua, estrelas à noite, nuvens à deriva, chuva */}
-        <SkyLayers
-          code={weather?.code ?? 1}
-          isDark={period === "madrugada" || period === "noite"}
-          mini
-          period={period}
-        />
+        {/* Arte do momento do dia (tema V2). Fica ACIMA do gradiente, que
+            continua atrás como cor de espera enquanto a imagem carrega —
+            assim nunca há um flash branco. `cover` recorta as sobras: a arte
+            é vertical, então em telas largas sobra em cima e embaixo, e é lá
+            que mora só céu. */}
+        {artTheme && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
+            style={{ backgroundImage: `url(${SKY_ART[period]})` }}
+          />
+        )}
 
-        {/* Véu pastel só no céu claro: à noite ele lavaria o escuro e as
-            estrelas sumiriam. AQUI entra a arte de fundo por semana/clima
-            quando ela chegar — uma camada a mais entre o véu e o conteúdo. */}
-        {!darkSky && (
+        {/* Céu vivo (sol/lua, estrelas, nuvens, chuva) só no tema V1: sobre a
+            arte ele brigaria com as nuvens já pintadas nela. */}
+        {!artTheme && (
+          <SkyLayers
+            code={weather?.code ?? 1}
+            isDark={period === "madrugada" || period === "noite"}
+            mini
+            period={period}
+          />
+        )}
+
+        {/* Véu pastel: só no V1 e só no céu claro — à noite lavaria o escuro
+            e as estrelas sumiriam. */}
+        {!artTheme && !darkSky && (
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0"
@@ -635,7 +688,7 @@ export function AppHomeScreen({
             <>
               {/* Nome do bebê — protagonista, logo abaixo da barra */}
               {babyName && (
-                <div className="mt-6 text-center">
+                <div className="mt-6 text-center" style={overArt}>
                   <p className={`text-[11px] font-bold uppercase tracking-[0.2em] ${heroLabel}`}>
                     Acompanhando
                   </p>
