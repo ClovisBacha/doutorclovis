@@ -17,6 +17,7 @@ import {
   HelpCircle,
   LifeBuoy,
   Heart,
+  Menu,
   MessageCircle,
   NotebookPen,
   type LucideIcon,
@@ -475,11 +476,37 @@ export type NextAppointment = { dateLabel: string; typeLabel: string };
 
 // Grade de atalhos na tela do Bebê — o hub central. Cobre tudo que NÃO está na
 // barra de baixo (Saúde/Exames/Nutrição etc. já são alcançados pelo ícone Saúde).
+/** "Bom dia" / "Boa tarde" / "Boa noite" pela hora local. */
+function dayGreetingLabel(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+/** dd/mm/aaaa a N dias de hoje (N negativo = passado). Só para exibição. */
+function dateOffsetLabel(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("pt-BR");
+}
+
+/**
+ * Véu de sonho: leva o céu real (que muda com hora e clima) para a paleta
+ * lavanda→rosa→pêssego do conceito, deixando o gradiente de baixo ainda
+ * modular a luz. A opacidade CRESCE para a base porque lá o céu diurno é
+ * azul-esverdeado claro e, com véu fraco, o pêssego virava oliva.
+ */
+const DREAM_VEIL =
+  "linear-gradient(180deg, rgba(183,158,255,0.66) 0%, rgba(247,176,213,0.62) 38%," +
+  " rgba(255,193,158,0.74) 72%, rgba(255,224,199,0.82) 100%)";
+
 export function AppHomeScreen({
   firstName,
   babyName,
   gest,
   onNavigate,
+  onOpenMenu,
   nextAppointment,
   babyTone = 0,
   careMode = false,
@@ -489,6 +516,8 @@ export function AppHomeScreen({
   gest: GestInfo;
   /** `sub` abre direto numa sub-aba do destino (ex.: Consultas → "parto"). */
   onNavigate: (tab: AppTab, sub?: string) => void;
+  /** Abre o menu (☰ do topo): perfil, painel e sair. */
+  onOpenMenu?: () => void;
   nextAppointment?: NextAppointment | null;
   /** Tom de pele do bebê (índice na paleta BABY_TONES). */
   babyTone?: number;
@@ -520,8 +549,22 @@ export function AppHomeScreen({
   // Cores de texto adaptadas ao céu do momento
   const heroText = darkSky ? "text-white/95" : "text-foreground";
   const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
-  const heroBadge = darkSky ? "bg-white/15 text-white/90" : "bg-card/80 text-foreground";
   const heroLabel = darkSky ? "text-white/60" : "text-primary";
+
+  /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
+     o céu escurece e o mesmo branco cegaria — então o vidro inverte e o texto
+     acompanha, mantendo o desenho e o contraste nos dois céus. */
+  const glass: React.CSSProperties = {
+    background: darkSky ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.72)",
+    backdropFilter: "blur(22px) saturate(170%)",
+    WebkitBackdropFilter: "blur(22px) saturate(170%)",
+    border: `1px solid ${darkSky ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.85)"}`,
+    boxShadow: darkSky
+      ? "inset 0 1px 0 rgba(255,255,255,0.25), 0 10px 30px -14px rgba(0,0,0,0.5)"
+      : "inset 0 1px 0 rgba(255,255,255,0.95), 0 12px 32px -16px rgba(120,80,90,0.45)",
+  };
+  const cardText = darkSky ? "text-white" : "text-foreground";
+  const cardMuted = darkSky ? "text-white/60" : "text-muted-foreground";
 
   return (
     <div className="space-y-4 pb-2">
@@ -530,7 +573,7 @@ export function AppHomeScreen({
           para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
           encosta nas quatro bordas para máxima imersão no celular. */}
       <div
-        className="shine relative -mx-5 -mt-2 flex min-h-[88svh] flex-col overflow-hidden px-5 pb-7 pt-6 transition-[background] duration-1000"
+        className="shine relative -mx-5 -mt-2 flex min-h-[92svh] flex-col overflow-hidden px-5 pb-8 pt-[calc(0.5rem+env(safe-area-inset-top))] transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Céu vivo: sol/lua, estrelas à noite, nuvens à deriva, chuva */}
@@ -541,166 +584,242 @@ export function AppHomeScreen({
           period={period}
         />
 
+        {/* Véu pastel só no céu claro: à noite ele lavaria o escuro e as
+            estrelas sumiriam. AQUI entra a arte de fundo por semana/clima
+            quando ela chegar — uma camada a mais entre o véu e o conteúdo. */}
+        {!darkSky && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{ background: DREAM_VEIL }}
+          />
+        )}
+
         <div className="relative flex flex-1 flex-col">
+          {/* ── Barra de topo flutuante: menu + clima ─────────────── */}
+          <div className="flex items-start justify-between gap-3">
+            <button
+              onClick={() => {
+                hapticTap();
+                onOpenMenu?.();
+              }}
+              aria-label="Menu"
+              className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+              style={glass}
+            >
+              <Menu className={`h-5 w-5 ${cardText}`} strokeWidth={2.2} />
+            </button>
+
+            {weather && (
+              <div
+                className="flex items-center gap-2.5 rounded-3xl px-3.5 py-2"
+                style={glass}
+                aria-label={`${weather.temp} graus, ${weather.condition}`}
+              >
+                <span className="text-2xl leading-none">{weather.emoji}</span>
+                <div className="leading-tight">
+                  <p className={`text-[15px] font-extrabold ${cardText}`}>{weather.temp}°C</p>
+                  <p className={`text-[10px] font-medium ${cardMuted}`}>{weather.condition}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {isMadrugada && (
-            <p className="text-[11px] text-white/65">🌙 Madrugada — tente descansar um pouco</p>
+            <p className="mt-3 text-[11px] text-white/65">
+              🌙 Madrugada — tente descansar um pouco
+            </p>
           )}
 
           {gest && baby ? (
             <>
-              {/* Nome do bebê no TOPO — protagonista da tela imersiva */}
+              {/* Nome do bebê — protagonista, logo abaixo da barra */}
               {babyName && (
-                <div className="mb-3 text-center">
-                  <p
-                    className={`text-[10px] font-semibold uppercase tracking-[0.24em] ${heroLabel}`}
-                  >
+                <div className="mt-6 text-center">
+                  <p className={`text-[11px] font-bold uppercase tracking-[0.2em] ${heroLabel}`}>
                     Acompanhando
                   </p>
-                  <p className={`mt-0.5 font-serif text-[1.75rem] leading-tight ${heroText}`}>
-                    {babyName}
+                  <p className={`mt-1 font-serif text-[2.6rem] font-bold leading-none ${heroText}`}>
+                    {babyName} <span className="align-middle text-[2rem]">💜</span>
                   </p>
                 </div>
               )}
 
-              {/* Dados de topo: trimestre + contagem regressiva p/ o parto */}
-              <div className="flex items-center justify-between gap-2">
+              {/* Pílulas: trimestre + contagem regressiva, centralizadas */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
                 <span
-                  className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                  className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                  style={glass}
                 >
-                  {trimestre}
+                  🤰 {trimestre}
                 </span>
                 {careMode ? null : reta ? (
                   <span
-                    className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                    className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                    style={glass}
                   >
-                    {reta.eyebrow} 💛
+                    💛 {reta.eyebrow}
                   </span>
                 ) : (
                   daysLeft != null && (
                     <span
-                      className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${heroBadge}`}
+                      className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                      style={glass}
                     >
-                      {daysLeft === 0 ? "É hoje! 🎉" : `Parto em ${daysLeft} dias 💛`}
+                      {daysLeft === 0 ? "🎉 É hoje!" : `📅 Parto em ${daysLeft} dias`}
                     </span>
                   )
                 )}
               </div>
 
-              {/* Bebê protagonista — GRANDE, flutuando, dono da tela.
+              {/* Bebê protagonista dentro de um halo de luz (o "ventre").
                   Toque abre a aba do Bebê com a semana detalhada. */}
               <button
                 onClick={() => onNavigate("Bebê")}
                 aria-label="Ver a semana do bebê"
-                className="float-slow flex flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
+                className="relative flex flex-1 items-center justify-center py-4 transition-transform active:scale-[0.97]"
               >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute h-[19rem] w-[17rem] rounded-[50%]"
+                  style={{
+                    background:
+                      "radial-gradient(closest-side, rgba(255,255,255,0.55) 0%," +
+                      " rgba(255,232,240,0.34) 52%, rgba(255,255,255,0) 78%)",
+                    filter: "blur(2px)",
+                  }}
+                />
                 <BabyIllustration
                   week={gest.weeks}
                   tone={babyTone}
                   showSac={false}
                   showInfo={false}
-                  className="h-56 w-56 drop-shadow-[0_14px_36px_rgba(0,0,0,0.16)]"
+                  className="float-slow relative h-64 w-64 drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
                 />
               </button>
 
-              {/* Número de semana — lente de vidro líquido translúcida */}
-              <div className="mt-1 flex flex-col items-center">
+              {/* ── Cartão da semana + medidas ─────────────────────── */}
+              <div className="mt-1 rounded-[28px] px-5 pb-4 pt-5" style={glass}>
                 <p
-                  className="leading-none"
+                  className={`text-center leading-none ${cardText}`}
                   style={{
                     fontFamily: "'Nunito', system-ui, sans-serif",
-                    fontSize: "3.7rem",
+                    fontSize: "3.4rem",
                     fontWeight: 700,
-                    letterSpacing: "-0.02em",
+                    letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums lining-nums",
-                    // Vidro líquido legível nos DOIS céus: claro no escuro,
-                    // escuro-quente no claro (contraste auditado).
-                    backgroundImage: darkSky
-                      ? "linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.45) 100%)"
-                      : "linear-gradient(180deg, rgba(62,38,28,0.9) 0%, rgba(62,38,28,0.55) 100%)",
-                    WebkitBackgroundClip: "text",
-                    backgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    color: "transparent",
-                    textShadow: darkSky
-                      ? [
-                          "0 -1px 1px rgba(255,255,255,0.55)",
-                          "0 1px 1px rgba(255,255,255,0.25)",
-                          "0 4px 10px rgba(0,0,0,0.18)",
-                        ].join(", ")
-                      : ["0 -1px 1px rgba(255,255,255,0.6)", "0 4px 10px rgba(0,0,0,0.08)"].join(
-                          ", ",
-                        ),
                   }}
                 >
                   {gest.weeks}
                 </p>
-                <p
-                  className={`mt-1.5 text-[11px] font-semibold uppercase opacity-70 ${heroMuted}`}
-                  style={{ fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: "0.18em" }}
-                >
-                  semanas{gest.days > 0 ? ` · ${gest.days} dias` : ""}
+                <p className={`mt-1 text-center text-[15px] font-semibold ${cardMuted}`}>
+                  {gest.weeks === 1 ? "semana" : "semanas"}
+                  {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
                 </p>
+
+                {/* Medidas da semana (silenciadas no Modo Cuidado) */}
+                {!careMode && (
+                  <>
+                    {/* Divisor com coração — o mesmo traço do conceito */}
+                    <div className="mt-3 flex items-center gap-2" aria-hidden>
+                      <span
+                        className="h-px flex-1"
+                        style={{
+                          background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"})`,
+                        }}
+                      />
+                      <span className="text-sm">💗</span>
+                      <span
+                        className="h-px flex-1"
+                        style={{
+                          background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"}, transparent)`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3">
+                      {[
+                        { emoji: "📏", value: baby.size, label: "Comprimento" },
+                        { emoji: "⚖️", value: baby.weight, label: "Peso" },
+                        { emoji: "🍅", value: baby.fruit, label: "Tamanho" },
+                      ].map((s, i) => (
+                        <div
+                          key={s.label}
+                          className={`flex flex-col items-center px-1 ${i < 2 ? "border-r" : ""}`}
+                          style={{
+                            borderColor: darkSky
+                              ? "rgba(255,255,255,0.16)"
+                              : "rgba(150,110,120,0.16)",
+                          }}
+                        >
+                          <span className="text-2xl leading-none">{s.emoji}</span>
+                          <p
+                            className={`mt-1.5 text-[15px] font-extrabold leading-tight ${cardText}`}
+                          >
+                            {s.value}
+                          </p>
+                          <p className={`text-[10px] font-medium ${cardMuted}`}>{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Badges liquid glass (silenciados no Modo Cuidado) */}
-              {!careMode && (
-                <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  {[baby.size, baby.weight, `🍓 ${baby.fruit}`].map((label) => (
-                    <span
-                      key={label}
-                      className="rounded-full px-3 py-1.5 text-[11px] font-semibold tracking-wide"
-                      style={{
-                        background: "rgba(255,255,255,0.18)",
-                        backdropFilter: "blur(20px)",
-                        WebkitBackdropFilter: "blur(20px)",
-                        border: "1px solid rgba(255,255,255,0.35)",
-                        boxShadow:
-                          "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.20)",
-                        color: darkSky ? "rgba(255,255,255,0.93)" : "rgba(30,20,14,0.82)",
-                      }}
-                    >
-                      {label}
-                    </span>
-                  ))}
+              {/* ── Cartão de progresso: início · % · parto previsto ── */}
+              <div className="mt-3 rounded-[24px] px-5 py-4" style={glass}>
+                <div className="flex items-end justify-between gap-2">
+                  <div className="text-left">
+                    <p className={`text-[10px] font-medium ${cardMuted}`}>Início</p>
+                    <p className={`text-[11px] font-bold ${cardText}`}>
+                      {dateOffsetLabel(-(gest.totalDays ?? 0))}
+                    </p>
+                  </div>
+                  <p className={`pb-0.5 text-[11px] font-bold ${cardMuted}`}>
+                    {Math.round(progress ?? 0)}% concluído
+                  </p>
+                  <div className="text-right">
+                    <p className={`text-[10px] font-medium ${cardMuted}`}>Parto previsto</p>
+                    <p className={`text-[11px] font-bold ${cardText}`}>
+                      {dateOffsetLabel(daysLeft ?? 0)}
+                    </p>
+                  </div>
                 </div>
-              )}
-
-              {/* Barra de progresso */}
-              <div className="mt-4">
-                <div className={`mb-1.5 flex justify-between text-[10px] ${heroMuted}`}>
-                  <span>Início</span>
-                  <span>{Math.round(progress ?? 0)}% concluído</span>
-                  <span>Parto</span>
-                </div>
-                <div
-                  className={`h-2 w-full rounded-full ${darkSky ? "bg-white/20" : "bg-border/60"}`}
-                >
+                {/* Trilho com o coração na posição de hoje */}
+                <div className="relative mt-3 h-2.5">
                   <div
-                    className={`h-2 rounded-full transition-all duration-700 ${darkSky ? "bg-white/70" : "bg-primary"}`}
-                    style={{ width: `${progress ?? 0}%` }}
+                    className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full"
+                    style={{
+                      background: darkSky ? "rgba(255,255,255,0.18)" : "rgba(150,110,130,0.16)",
+                    }}
                   />
+                  <div
+                    className="absolute left-0 top-1/2 h-2 -translate-y-1/2 rounded-full transition-all duration-700"
+                    style={{
+                      width: `${progress ?? 0}%`,
+                      background: "linear-gradient(90deg, #c4b5fd, #a855f7)",
+                    }}
+                  />
+                  <span
+                    aria-hidden
+                    className="absolute top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[11px] shadow-md transition-all duration-700"
+                    style={{ left: `${progress ?? 0}%`, background: "#fff" }}
+                  >
+                    💜
+                  </span>
                 </div>
               </div>
 
-              {/* Strip de clima — com fallback de cidade, sempre chega */}
+              {/* ── Saudação do dia com a dica do clima ─────────────── */}
               {weather && (
-                <div
-                  className={`mt-3 rounded-2xl backdrop-blur-sm px-3 py-2 flex items-start gap-2.5 ${
-                    darkSky ? "bg-white/15" : "bg-white/40"
-                  }`}
-                >
-                  <span className="text-lg leading-none mt-0.5">{weather.emoji}</span>
+                <div className="mt-3 flex items-start gap-3 rounded-[24px] px-5 py-4" style={glass}>
+                  <span className="mt-0.5 text-2xl leading-none">{weather.tipEmoji}</span>
                   <div className="min-w-0">
-                    <p
-                      className={`text-[11px] font-semibold ${darkSky ? "text-white/90" : "text-foreground/80"}`}
-                    >
-                      {weather.temp}°C · {weather.condition}
+                    <p className={`text-[15px] font-extrabold ${cardText}`}>
+                      {dayGreetingLabel()}
+                      {babyName ? `, ${babyName}!` : "!"}
                     </p>
-                    <p
-                      className={`text-[11px] mt-0.5 leading-snug ${darkSky ? "text-white/70" : "text-foreground/65"}`}
-                    >
-                      {weather.tipEmoji} {weather.tip}
-                    </p>
+                    <p className={`mt-0.5 text-[13px] leading-snug ${cardMuted}`}>{weather.tip}</p>
                   </div>
                 </div>
               )}

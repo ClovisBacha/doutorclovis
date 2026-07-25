@@ -443,6 +443,8 @@ function MinhaContaPage() {
   }
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
+  /** Menu do ☰ da home — guarda as ações que ficavam na barra de topo. */
+  const [homeMenu, setHomeMenu] = useState(false);
   // Jornada do Bebê (toque na foto do bebê) + popup do Premium (gatilho)
   const [journeyOpen, setJourneyOpen] = useState(false);
   const [premiumOpen, setPremiumOpen] = useState(false);
@@ -876,8 +878,12 @@ function MinhaContaPage() {
             </div>
           </div>
 
-          {/* ── Mobile top bar ───────────────────────────────────── */}
-          <div className="flex md:hidden items-center justify-between mb-4">
+          {/* ── Mobile top bar ─────────────────────────────────────
+              Na home ela some: o herói imersivo tem a própria barra flutuante
+              sobre o céu (☰ + clima), e estas mesmas ações moram no ☰. */}
+          <div
+            className={`${mobileHome ? "hidden" : "flex"} md:hidden items-center justify-between mb-4`}
+          >
             <p className="font-serif text-xl leading-tight text-foreground">
               {mobileHome ? `${dayGreeting()}, ${firstName} 💛` : tab}
             </p>
@@ -952,10 +958,61 @@ function MinhaContaPage() {
                 babyName={profile?.baby_name ?? null}
                 gest={gest}
                 onNavigate={mobileNavigate}
+                onOpenMenu={() => setHomeMenu(true)}
                 nextAppointment={nextAppt}
                 babyTone={profile?.baby_skin_tone ?? 0}
                 careMode={careMode}
               />
+
+              {/* Menu do ☰: as ações que viviam na barra de topo da home
+                  (saudação, Painel, Perfil e Sair) continuam todas aqui. */}
+              {homeMenu && (
+                <div
+                  className="fixed inset-0 z-[70] flex items-start justify-center bg-black/30 backdrop-blur-sm"
+                  onClick={() => setHomeMenu(false)}
+                >
+                  <div
+                    role="dialog"
+                    aria-label="Menu"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-[calc(3.5rem+env(safe-area-inset-top))] w-[86%] max-w-sm rounded-3xl border border-white/70 bg-card/95 p-2 shadow-[var(--shadow-float)] backdrop-blur-xl"
+                  >
+                    <p className="px-4 pb-1 pt-3 font-serif text-lg leading-tight text-foreground">
+                      {dayGreeting()}, {firstName} 💛
+                    </p>
+                    <div className="mt-1 space-y-0.5">
+                      {(isAdmin || isDoctor) && (
+                        <Link
+                          to="/painel"
+                          onClick={() => setHomeMenu(false)}
+                          className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-primary/8"
+                        >
+                          <span className="text-lg">🩺</span> Painel do médico
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => {
+                          setHomeMenu(false);
+                          setTab("Perfil");
+                          setMobileHome(false);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/8"
+                      >
+                        <span className="text-lg">⚙️</span> Perfil e ajustes
+                      </button>
+                      <button
+                        onClick={() => {
+                          setHomeMenu(false);
+                          signOut();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-primary/8"
+                      >
+                        <span className="text-lg">🚪</span> Sair
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
