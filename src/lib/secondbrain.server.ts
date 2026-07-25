@@ -88,10 +88,37 @@ function logBrainHit(doctorId: string, channel: BrainChannel): void {
  * a fila do painel ordena pelo que as pacientes mais perguntam. Best-effort:
  * tabela ausente (migração pendente) ou corrida no insert nunca quebram o chat.
  */
+/**
+ * "Como envio meu exame pelo app?" não é lacuna do médico — é suporte, e a IA
+ * já responde sozinha. Sem este filtro toda dúvida de uso caía na fila do
+ * painel (nada casa no cérebro clínico), afogando as perguntas que realmente
+ * pedem a palavra dele. Heurística de superfície de propósito: na dúvida
+ * REGISTRA (perder uma lacuna clínica é pior que uma de suporte a mais).
+ */
+const TERMOS_SUPORTE = new RegExp(
+  [
+    // superfície do produto (nomeia a coisa na tela)
+    "app|aplicativo|site|aba|tela|menu|bot(ã|a)o|(í|i)cone",
+    // conta e cobrança
+    "login|logar|senha|assinatura|assinar|premium|pagamento|cadastr|notifica(ç|c)",
+    // falha técnica
+    "instalar|atualiza(r|ç|c)|carregar|travand?o|travou|bug|sair da conta",
+  ].join("|"),
+  "i",
+);
+/* Fora de propósito: "plano" (plano de parto), "cartão" (cartão de pré-natal),
+   "entrar" (entrar na piscina) e "erro" (erro no exame) são palavras clínicas
+   no vocabulário da gestante — incluí-las derrubava lacunas de verdade. */
+
+export function isSuporteDoApp(question: string): boolean {
+  return TERMOS_SUPORTE.test(question);
+}
+
 export function logBrainGap(doctorId: string, question: string, channel: BrainChannel): void {
   const clean = question.trim().slice(0, 300);
   const norm = normalizeGapQuestion(clean);
   if (norm.length < 8) return; // "oi", "ok" etc. não são lacunas
+  if (isSuporteDoApp(clean)) return; // suporte do app não vira fila do médico
   void (async () => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
