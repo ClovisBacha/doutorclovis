@@ -621,7 +621,7 @@ export function AppHomeScreen({
         {artTheme && (
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
+            className="dc-sky-breathe pointer-events-none absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${SKY_ART[period]})` }}
           />
         )}
@@ -733,20 +733,6 @@ export function AppHomeScreen({
                 aria-label="Ver a semana do bebê"
                 className="relative flex min-h-0 flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
               >
-                {/* A bolha: esfera de luz com aro, centrada no bebê. É UI, e
-                    não parte da arte, para poder respirar devagar. */}
-                <span
-                  aria-hidden
-                  className="dc-orb pointer-events-none absolute h-[min(20rem,37svh)] w-[min(20rem,37svh)] rounded-full"
-                  style={{
-                    background:
-                      "radial-gradient(circle at 50% 46%, rgba(255,255,255,0.42) 0%," +
-                      " rgba(255,244,248,0.26) 46%, rgba(255,226,238,0.16) 72%," +
-                      " rgba(255,255,255,0.05) 88%, rgba(255,255,255,0) 100%)",
-                    boxShadow:
-                      "inset 0 0 46px 10px rgba(255,255,255,0.30), 0 0 60px 12px rgba(255,236,244,0.24)",
-                  }}
-                />
                 {/* Altura e largura EXPLÍCITAS: a className cai no <svg>, cujo
                     pai (dentro de BabyIllustration) não tem altura — com
                     `h-full` o SVG resolvia contra `auto` e virava 0px, ou seja,
@@ -757,7 +743,7 @@ export function AppHomeScreen({
                   tone={babyTone}
                   showSac={false}
                   showInfo={false}
-                  className="float-slow relative h-[min(16rem,30svh)] w-[min(16rem,30svh)] drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
+                  className="relative h-[min(14rem,27svh)] w-[min(14rem,27svh)] drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
                 />
               </button>
 
@@ -767,7 +753,7 @@ export function AppHomeScreen({
                   dobraria a opacidade e deixaria a emenda escura. */}
               <div className="mt-1 flex flex-col items-center">
                 <div
-                  className="px-9 pb-1 pt-3 text-center"
+                  className="px-7 pb-1 pt-3 text-center"
                   style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                 >
                   <p

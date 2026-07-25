@@ -1144,26 +1144,33 @@ button:active > .duo3d {
   }
 }
 
-/* ── Bolha do bebê na home: respira devagar ──────────────────────────
-   Escala e deriva mínimas de propósito. A arte de fundo tem uma esfera
-   própria atrás desta; um movimento largo desencaixaria as duas e o que
-   deveria ser "vivo" viraria erro de alinhamento. 11s é lento o bastante
-   para ser sentido sem ser percebido como animação. */
-@keyframes dcOrbBreathe {
+/* ── O céu da home respira devagar ───────────────────────────────────
+   A bolha que envolve o bebê é PINTADA na arte, não desenhada por cima:
+   uma esfera de UI sobre a esfera da arte dava duas bolas, com centros e
+   diâmetros diferentes, e a interseção virava uma silhueta de ovo. Elas
+   não têm como ficar alinhadas — `cover` move a da arte conforme a
+   proporção da tela, e a de UI fica presa ao container.
+
+   Então quem se move é a arte inteira. A escala parte de 1.04 para a
+   folga do zoom nunca revelar borda, e 16s deixa o movimento no limiar
+   do perceptível — a bolha parece viva sem parecer animação. */
+@keyframes dcSkyBreathe {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: scale(1.04);
   }
   50% {
-    transform: translateY(-7px) scale(1.035);
+    transform: scale(1.075) translateY(-0.6%);
   }
 }
-.dc-orb {
-  animation: dcOrbBreathe 11s ease-in-out infinite;
+.dc-sky-breathe {
+  animation: dcSkyBreathe 16s ease-in-out infinite;
+  will-change: transform;
 }
 @media (prefers-reduced-motion: reduce) {
-  .dc-orb {
+  .dc-sky-breathe {
     animation: none;
+    transform: scale(1.04);
   }
 }
 
