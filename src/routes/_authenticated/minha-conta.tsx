@@ -3264,8 +3264,6 @@ function ProfileTab({
 
   return (
     <div className="space-y-6">
-      <CareModeToggle careMode={careMode} onToggle={onToggleCare} />
-
       {/* Convidar acompanhante — ação ocasional, vive aqui no Perfil */}
       <button
         onClick={() => onNavigate("Acompanhante")}
@@ -3744,6 +3742,12 @@ function ProfileTab({
       >
         {saving ? "Salvando..." : "Salvar"}
       </button>
+
+      {/* Último elemento do Perfil, depois de Salvar: o Modo Cuidado é para um
+          momento difícil, não para o uso do dia a dia. No topo ele recebia a
+          gestante com a hipótese de uma perda toda vez que ela vinha só trocar
+          a foto; aqui embaixo continua fácil de achar para quem precisa. */}
+      <CareModeToggle careMode={careMode} onToggle={onToggleCare} />
     </div>
   );
 }

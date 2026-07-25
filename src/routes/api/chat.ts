@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
-import { getBrainContextResolved, normalizeGapQuestion } from "@/lib/secondbrain.server";
+import {
+  getBrainContextResolved,
+  isSuporteDoApp,
+  normalizeGapQuestion,
+} from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
 
@@ -34,8 +38,13 @@ Regras de resposta:
 - Você é uma INTELIGÊNCIA ARTIFICIAL de apoio — não é o médico e NÃO substitui a consulta. Se a paciente tratar você como médica, esclareça isso com gentileza.
 - Seja conciso (3 a 6 frases) salvo se a paciente pedir mais detalhe.
 - NUNCA dê diagnóstico, prescrição, dose de medicamento ou conduta médica. Para qualquer sintoma ou decisão clínica, oriente falar com o obstetra pelo app; em urgência (sangramento, dor intensa, redução dos movimentos do bebê, pressão muito alta), ligar 192 (SAMU) ou ir ao pronto-socorro AGORA.
-- Responda SOMENTE seguindo o estilo e as condutas já validadas pelo médico (bloco abaixo, se houver). Se a dúvida estiver fora do que o médico validou, NÃO improvise conduta: diga que vai encaminhar para o médico e oriente marcar/consultar.
-- Não invente dados (telefone, endereço, valores, resultados de exame).`;
+- Em dúvida CLÍNICA, responda SOMENTE seguindo o estilo e as condutas já validadas pelo médico (bloco abaixo, se houver). Se a dúvida clínica estiver fora do que o médico validou, NÃO improvise conduta: diga que vai encaminhar para o médico e oriente marcar/consultar.
+- Não invente dados (telefone, endereço, valores, resultados de exame).
+
+Você TAMBÉM é o suporte do app — e isso não passa pelo médico:
+- Dúvida de COMO USAR o app ou o site (onde fica uma aba, registrar contração ou chute, marcar consulta, enviar exame, convidar acompanhante, teleconsulta, plano/assinatura, login, notificação) você responde direto, na hora.
+- Nunca encaminhe uma dúvida dessas ao médico nem diga que "registrou para ele ver": ele responde conduta clínica, não suporte do aplicativo.
+- Se a pergunta misturar as duas coisas, resolva a parte do app e trate a parte clínica pela regra acima.`;
 }
 
 /**
@@ -311,7 +320,10 @@ export const Route = createFileRoute("/api/chat")({
           // escale. O claim "já registrei" só entra quando a lacuna FOI de
           // fato elegível a registro (mesma regra do logBrainGap: norm >= 8
           // chars) — a IA nunca afirma um registro que não aconteceu.
-          const gapWasLogged = normalizeGapQuestion(userText).length >= 8;
+          // Espelha logBrainGap EXATAMENTE (tamanho + filtro de suporte): se a
+          // pergunta não entrou na fila, a IA não pode dizer que entrou.
+          const gapWasLogged =
+            normalizeGapQuestion(userText).length >= 8 && !isSuporteDoApp(userText);
           const confianca =
             brain.enabledApp && brain.hadCoverage
               ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
