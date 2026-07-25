@@ -1144,6 +1144,29 @@ button:active > .duo3d {
   }
 }
 
+/* ── Bolha do bebê na home: respira devagar ──────────────────────────
+   Escala e deriva mínimas de propósito. A arte de fundo tem uma esfera
+   própria atrás desta; um movimento largo desencaixaria as duas e o que
+   deveria ser "vivo" viraria erro de alinhamento. 11s é lento o bastante
+   para ser sentido sem ser percebido como animação. */
+@keyframes dcOrbBreathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-7px) scale(1.035);
+  }
+}
+.dc-orb {
+  animation: dcOrbBreathe 11s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-orb {
+    animation: none;
+  }
+}
+
 /* ══════════════ Liquid Glass — material dos cards de jogo ══════════════
    Vidro de verdade, não plástico colorido: o fundo da tela atravessa
    (backdrop-filter), a luz bate na quina de cima (rim claro), escorre e

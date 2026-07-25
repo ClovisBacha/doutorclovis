@@ -585,8 +585,8 @@ export function AppHomeScreen({
       ? "rgba(22,20,36,0.56)"
       : "rgba(255,255,255,0.13)"
     : artTheme
-      ? "rgba(255,255,255,0.82)"
-      : "rgba(255,255,255,0.72)";
+      ? "rgba(255,255,255,0.72)"
+      : "rgba(255,255,255,0.66)";
   const glass: React.CSSProperties = {
     background: glassBg,
     backdropFilter: "blur(22px) saturate(170%)",
@@ -600,9 +600,8 @@ export function AppHomeScreen({
   const cardMuted = darkSky ? "text-white/60" : "text-muted-foreground";
   /* Nome e etiqueta ficam SOBRE o céu, sem cartão atrás. Na arte isso pede
      sombra: o fundo atrás deles muda de luminosidade ao longo do dia. */
-  const overArt: React.CSSProperties = artTheme
-    ? { textShadow: darkSky ? "0 2px 10px rgba(0,0,0,0.55)" : "0 1px 6px rgba(255,255,255,0.65)" }
-    : {};
+  const overArt: React.CSSProperties =
+    artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
 
   return (
     <div className="space-y-4 pb-2">
@@ -689,13 +688,13 @@ export function AppHomeScreen({
               {/* Nome do bebê — protagonista, logo abaixo da barra */}
               {babyName && (
                 <div className="mt-4 text-center" style={overArt}>
-                  <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${heroLabel}`}>
+                  <p className={`text-[13px] font-medium tracking-[0.02em] ${heroLabel}`}>
                     Acompanhando
                   </p>
                   <p
-                    className={`mt-0.5 font-serif text-[clamp(1.6rem,7.4vw,2.2rem)] font-bold leading-none ${heroText}`}
+                    className={`mt-0.5 font-serif text-[clamp(1.9rem,8.6vw,2.5rem)] font-normal leading-none ${heroText}`}
                   >
-                    {babyName} <span className="align-middle text-[0.8em]">💜</span>
+                    {babyName} <span className="align-middle text-[0.55em]">💜</span>
                   </p>
                 </div>
               )}
@@ -703,7 +702,7 @@ export function AppHomeScreen({
               {/* Pílulas: trimestre + contagem regressiva, centralizadas */}
               <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                 <span
-                  className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                  className={`rounded-full px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${cardText}`}
                   style={glass}
                 >
                   🤰 {trimestre}
@@ -734,14 +733,18 @@ export function AppHomeScreen({
                 aria-label="Ver a semana do bebê"
                 className="relative flex min-h-0 flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
               >
+                {/* A bolha: esfera de luz com aro, centrada no bebê. É UI, e
+                    não parte da arte, para poder respirar devagar. */}
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute h-[min(19rem,36svh)] w-[min(17rem,32svh)] rounded-[50%]"
+                  className="dc-orb pointer-events-none absolute h-[min(20rem,37svh)] w-[min(20rem,37svh)] rounded-full"
                   style={{
                     background:
-                      "radial-gradient(closest-side, rgba(255,255,255,0.55) 0%," +
-                      " rgba(255,232,240,0.34) 52%, rgba(255,255,255,0) 78%)",
-                    filter: "blur(2px)",
+                      "radial-gradient(circle at 50% 46%, rgba(255,255,255,0.42) 0%," +
+                      " rgba(255,244,248,0.26) 46%, rgba(255,226,238,0.16) 72%," +
+                      " rgba(255,255,255,0.05) 88%, rgba(255,255,255,0) 100%)",
+                    boxShadow:
+                      "inset 0 0 46px 10px rgba(255,255,255,0.30), 0 0 60px 12px rgba(255,236,244,0.24)",
                   }}
                 />
                 {/* Altura e largura EXPLÍCITAS: a className cai no <svg>, cujo
@@ -758,115 +761,132 @@ export function AppHomeScreen({
                 />
               </button>
 
-              {/* ── Cartão da semana + medidas ─────────────────────── */}
-              <div className="mt-1 rounded-[26px] px-4 pb-3 pt-4" style={glass}>
-                <p
-                  className={`text-center leading-none ${cardText}`}
-                  style={{
-                    fontFamily: "'Nunito', system-ui, sans-serif",
-                    fontSize: "clamp(2.2rem, 10vw, 3rem)",
-                    fontWeight: 700,
-                    letterSpacing: "-0.03em",
-                    fontVariantNumeric: "tabular-nums lining-nums",
-                  }}
+              {/* ── Cartão da semana em degrau ──────────────────────
+                  A aba do número SOBE do cartão, como no conceito. São dois
+                  irmãos encostados (não empilhados): vidro sobre vidro
+                  dobraria a opacidade e deixaria a emenda escura. */}
+              <div className="mt-1 flex flex-col items-center">
+                <div
+                  className="px-9 pb-1 pt-3 text-center"
+                  style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                 >
-                  {gest.weeks}
-                </p>
-                <p className={`mt-0.5 text-center text-[13px] font-semibold ${cardMuted}`}>
-                  {gest.weeks === 1 ? "semana" : "semanas"}
-                  {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
-                </p>
+                  <p
+                    className={`leading-none ${cardText}`}
+                    style={{
+                      fontFamily: "'Nunito', system-ui, sans-serif",
+                      fontSize: "clamp(2.1rem, 9vw, 2.8rem)",
+                      fontWeight: 400,
+                      letterSpacing: "-0.01em",
+                      fontVariantNumeric: "tabular-nums lining-nums",
+                    }}
+                  >
+                    {gest.weeks}
+                  </p>
+                  <p className={`mt-0.5 text-[13px] font-normal ${cardMuted}`}>
+                    {gest.weeks === 1 ? "semana" : "semanas"}
+                    {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
+                  </p>
+                </div>
 
-                {/* Medidas da semana (silenciadas no Modo Cuidado) */}
-                {!careMode && (
-                  <>
-                    {/* Divisor com coração — o mesmo traço do conceito */}
-                    <div className="mt-2 flex items-center gap-2" aria-hidden>
-                      <span
-                        className="h-px flex-1"
-                        style={{
-                          background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"})`,
-                        }}
-                      />
-                      <span className="text-sm">💗</span>
-                      <span
-                        className="h-px flex-1"
-                        style={{
-                          background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"}, transparent)`,
-                        }}
-                      />
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-3">
-                      {[
-                        { emoji: "📏", value: baby.size, label: "Comprimento" },
-                        { emoji: "⚖️", value: baby.weight, label: "Peso" },
-                        { emoji: "🍅", value: baby.fruit, label: "Tamanho" },
-                      ].map((s, i) => (
-                        <div
-                          key={s.label}
-                          className={`flex flex-col items-center px-1 ${i < 2 ? "border-r" : ""}`}
+                <div className="w-full rounded-[26px] px-4 pb-3 pt-2" style={glass}>
+                  {/* Medidas da semana (silenciadas no Modo Cuidado) */}
+                  {!careMode && (
+                    <>
+                      {/* Divisor com coração — o mesmo traço do conceito */}
+                      <div className="mt-1 flex items-center gap-2" aria-hidden>
+                        <span
+                          className="h-px flex-1"
                           style={{
-                            borderColor: darkSky
-                              ? "rgba(255,255,255,0.16)"
-                              : "rgba(150,110,120,0.16)",
+                            background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"})`,
                           }}
-                        >
-                          <span className="text-xl leading-none">{s.emoji}</span>
-                          <p
-                            className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
+                        />
+                        <span className="text-sm">💗</span>
+                        <span
+                          className="h-px flex-1"
+                          style={{
+                            background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"}, transparent)`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-3">
+                        {[
+                          { emoji: "📏", value: baby.size, label: "Comprimento" },
+                          { emoji: "⚖️", value: baby.weight, label: "Peso" },
+                          { emoji: "🍅", value: baby.fruit, label: "Tamanho" },
+                        ].map((s, i) => (
+                          <div
+                            key={s.label}
+                            className={`flex flex-col items-center px-1 ${i < 2 ? "border-r" : ""}`}
+                            style={{
+                              borderColor: darkSky
+                                ? "rgba(255,255,255,0.16)"
+                                : "rgba(150,110,120,0.16)",
+                            }}
                           >
-                            {s.value}
-                          </p>
-                          <p className={`text-[9px] font-medium ${cardMuted}`}>{s.label}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
+                            <span className="text-xl leading-none">{s.emoji}</span>
+                            <p
+                              className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
+                            >
+                              {s.value}
+                            </p>
+                            <p className={`text-[9px] font-normal opacity-80 ${cardMuted}`}>
+                              {s.label}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* ── Cartão de progresso: início · % · parto previsto ── */}
+              {/* ── Progresso em 3 colunas: a barra mora no MEIO, entre as
+                  duas datas — é assim no conceito, não largura cheia. ── */}
               <div className="mt-2.5 rounded-[22px] px-4 py-3" style={glass}>
-                <div className="flex items-end justify-between gap-2">
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
                   <div className="text-left">
                     <p className={`text-[10px] font-medium ${cardMuted}`}>Início</p>
                     <p className={`text-[11px] font-bold ${cardText}`}>
                       {dateOffsetLabel(-(gest.totalDays ?? 0))}
                     </p>
                   </div>
-                  <p className={`pb-0.5 text-[11px] font-bold ${cardMuted}`}>
-                    {Math.round(progress ?? 0)}% concluído
-                  </p>
+
+                  <div>
+                    <p className={`text-center text-[11px] font-bold ${cardMuted}`}>
+                      {Math.round(progress ?? 0)}% concluído
+                    </p>
+                    {/* Trilho com o coração na posição de hoje */}
+                    <div className="relative mt-1.5 h-5">
+                      <div
+                        className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full"
+                        style={{
+                          background: darkSky ? "rgba(255,255,255,0.18)" : "rgba(150,110,130,0.16)",
+                        }}
+                      />
+                      <div
+                        className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full transition-all duration-700"
+                        style={{
+                          width: `${progress ?? 0}%`,
+                          background: "linear-gradient(90deg, #c4b5fd, #a855f7)",
+                        }}
+                      />
+                      <span
+                        aria-hidden
+                        className="absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] shadow-md transition-all duration-700"
+                        style={{ left: `${progress ?? 0}%`, background: "#fff" }}
+                      >
+                        💜
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="text-right">
                     <p className={`text-[10px] font-medium ${cardMuted}`}>Parto previsto</p>
                     <p className={`text-[11px] font-bold ${cardText}`}>
                       {dateOffsetLabel(daysLeft ?? 0)}
                     </p>
                   </div>
-                </div>
-                {/* Trilho com o coração na posição de hoje */}
-                <div className="relative mt-2.5 h-2.5">
-                  <div
-                    className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full"
-                    style={{
-                      background: darkSky ? "rgba(255,255,255,0.18)" : "rgba(150,110,130,0.16)",
-                    }}
-                  />
-                  <div
-                    className="absolute left-0 top-1/2 h-2 -translate-y-1/2 rounded-full transition-all duration-700"
-                    style={{
-                      width: `${progress ?? 0}%`,
-                      background: "linear-gradient(90deg, #c4b5fd, #a855f7)",
-                    }}
-                  />
-                  <span
-                    aria-hidden
-                    className="absolute top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[11px] shadow-md transition-all duration-700"
-                    style={{ left: `${progress ?? 0}%`, background: "#fff" }}
-                  >
-                    💜
-                  </span>
                 </div>
               </div>
 
