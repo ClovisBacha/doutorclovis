@@ -529,8 +529,11 @@ function BabyOrb() {
         // é o que garante que a bola não toca as pílulas nem o cartão em
         // NENHUMA altura de tela (Safari com barra de endereço incluído).
         // Levemente mais alta que larga: a referência é ovo, não círculo.
-        height: "min(91%, 17.6rem)",
-        aspectRatio: "0.97",
+        // Preenche a caixa comum; 97% de largura deixa o ovo da referência.
+        inset: "0",
+        width: "97%",
+        height: "100%",
+        margin: "auto",
         background: [
           // A luz mora DENTRO e morre ANTES da borda. Concentrá-la no aro fazia
           // a bolha virar anel desenhado, e o degrau do ramp virava um falso
@@ -665,13 +668,13 @@ export function AppHomeScreen({
     artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
 
   return (
-    <div className="space-y-4 pb-2">
+    <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)]">
       {/* ── Hero imersivo: céu real do momento + bebê + clima ────────
           Full-bleed nas laterais (-mx-5 cancela o px-5 da página) e puxado
           para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
           encosta nas quatro bordas para máxima imersão no celular. */}
       <div
-        className="shine relative -mx-5 -mt-2 flex min-h-[100svh] flex-col overflow-hidden px-5 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] short:pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] transition-[background] duration-1000"
+        className="shine relative -mx-5 -mt-2 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Arte do momento do dia (tema V2). Fica ACIMA do gradiente, que
@@ -708,199 +711,226 @@ export function AppHomeScreen({
           />
         )}
 
-        <div className="relative flex flex-1 flex-col">
-          {/* ── Barra de topo flutuante: menu + clima ─────────────── */}
-          <div className="flex items-start justify-between gap-3">
-            <button
-              onClick={() => {
-                hapticTap();
-                onOpenMenu?.();
-              }}
-              aria-label="Menu"
-              className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-              style={glass}
-            >
-              <Menu className={`h-5 w-5 ${cardText}`} strokeWidth={2.2} />
-            </button>
-
-            {weather && (
-              <div
-                className="flex items-center gap-2.5 rounded-3xl px-3.5 py-2"
+        <div className="relative flex flex-col">
+          {/* ── PRIMEIRA DOBRA: uma tela exata, do topo ao cartão da semana.
+              O bebê é o protagonista e fica com TODO o espaço que sobrar —
+              por isso `h-[100svh]` aqui e não `min-h`: o que não couber vai
+              para a dobra de baixo em vez de espremer o bebê. ── */}
+          <div className="flex h-[100svh] flex-col pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(env(safe-area-inset-bottom,0px)+6rem)] short:pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)]">
+            {/* ── Barra de topo flutuante: menu + clima ─────────────── */}
+            <div className="flex items-start justify-between gap-3">
+              <button
+                onClick={() => {
+                  hapticTap();
+                  onOpenMenu?.();
+                }}
+                aria-label="Menu"
+                className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
                 style={glass}
-                aria-label={`${weather.temp} graus, ${weather.condition}`}
               >
-                <span className="text-2xl leading-none">{weather.emoji}</span>
-                <div className="leading-tight">
-                  <p className={`text-[15px] font-extrabold ${cardText}`}>{weather.temp}°C</p>
-                  <p className={`text-[10px] font-medium ${cardMuted}`}>{weather.condition}</p>
-                </div>
-              </div>
-            )}
-          </div>
+                <Menu className={`h-5 w-5 ${cardText}`} strokeWidth={2.2} />
+              </button>
 
-          {isMadrugada && (
-            <p className="mt-3 text-[11px] text-white/65">
-              🌙 Madrugada — tente descansar um pouco
-            </p>
-          )}
-
-          {gest && baby ? (
-            <>
-              {/* Nome do bebê — protagonista, logo abaixo da barra */}
-              {babyName && (
-                <div className="mt-4 short:mt-2 text-center" style={overArt}>
-                  <p className={`text-[13px] font-medium tracking-[0.02em] ${heroLabel}`}>
-                    Acompanhando
-                  </p>
-                  <p
-                    className={`mt-0.5 font-serif text-[clamp(1.9rem,8.6vw,2.5rem)] font-normal leading-none ${heroText}`}
-                  >
-                    {babyName} <span className="align-middle text-[0.55em]">💜</span>
-                  </p>
+              {weather && (
+                <div
+                  className="flex items-center gap-2.5 rounded-3xl px-3.5 py-2"
+                  style={glass}
+                  aria-label={`${weather.temp} graus, ${weather.condition}`}
+                >
+                  <span className="text-2xl leading-none">{weather.emoji}</span>
+                  <div className="leading-tight">
+                    <p className={`text-[15px] font-extrabold ${cardText}`}>{weather.temp}°C</p>
+                    <p className={`text-[10px] font-medium ${cardMuted}`}>{weather.condition}</p>
+                  </div>
                 </div>
               )}
+            </div>
 
-              {/* Pílulas: trimestre + contagem regressiva, centralizadas */}
-              <div className="mt-3 short:mt-2 flex flex-wrap items-center justify-center gap-2">
-                <span
-                  className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${cardText}`}
-                  style={glass}
-                >
-                  🤰 {trimestre}
-                </span>
-                {careMode ? null : reta ? (
+            {isMadrugada && (
+              <p className="mt-3 text-[11px] text-white/65">
+                🌙 Madrugada — tente descansar um pouco
+              </p>
+            )}
+
+            {gest && baby ? (
+              <>
+                {/* Nome do bebê — protagonista, logo abaixo da barra */}
+                {babyName && (
+                  <div className="mt-2 short:mt-1 text-center" style={overArt}>
+                    <p className={`text-[13px] font-medium tracking-[0.02em] ${heroLabel}`}>
+                      Acompanhando
+                    </p>
+                    <p
+                      className={`mt-0.5 font-serif text-[clamp(1.9rem,8.6vw,2.5rem)] font-normal leading-none ${heroText}`}
+                    >
+                      {babyName} <span className="align-middle text-[0.55em]">💜</span>
+                    </p>
+                  </div>
+                )}
+
+                {/* Pílulas: trimestre + contagem regressiva, centralizadas */}
+                <div className="mt-2.5 short:mt-2 flex flex-wrap items-center justify-center gap-2">
                   <span
-                    className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                    className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${cardText}`}
                     style={glass}
                   >
-                    💛 {reta.eyebrow}
+                    🤰 {trimestre}
                   </span>
-                ) : (
-                  daysLeft != null && (
+                  {careMode ? null : reta ? (
                     <span
                       className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
                       style={glass}
                     >
-                      {daysLeft === 0 ? "🎉 É hoje!" : `📅 Parto em ${daysLeft} dias`}
+                      💛 {reta.eyebrow}
                     </span>
-                  )
-                )}
-              </div>
+                  ) : (
+                    daysLeft != null && (
+                      <span
+                        className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                        style={glass}
+                      >
+                        {daysLeft === 0 ? "🎉 É hoje!" : `📅 Parto em ${daysLeft} dias`}
+                      </span>
+                    )
+                  )}
+                </div>
 
-              {/* Bebê protagonista dentro da bolha (o "ventre").
+                {/* Bebê protagonista dentro da bolha (o "ventre").
                   Toque abre a aba do Bebê com a semana detalhada. */}
-              <button
-                onClick={() => onNavigate("Bebê")}
-                aria-label="Ver a semana do bebê"
-                className="relative flex min-h-0 flex-1 items-center justify-center transition-transform active:scale-[0.97]"
-              >
-                {ART_HAS_ORB ? null : <BabyOrb />}
-                {/* Altura e largura EXPLÍCITAS: a className cai no <svg>, cujo
-                    pai (dentro de BabyIllustration) não tem altura — com
-                    `h-full` o SVG resolvia contra `auto` e virava 0px, ou seja,
-                    o bebê sumia da tela. `min()` encolhe em aparelho curto sem
-                    depender da altura do pai. O tamanho é o MESMO em todas as
-                    semanas: o que muda de semana para semana é o desenho. */}
-                {/* Wrapper ABSOLUTO: altura % dentro de item de flex resolve
-                    para 0 (o bebê sumia); `inset-0` dá altura definida e o
-                    h-full da corrente inteira volta a funcionar. */}
-                <span className="absolute inset-0 block">
-                  <BabyIllustration
-                    week={gest.weeks}
-                    tone={babyTone}
-                    showSac={false}
-                    showInfo={false}
-                    className="relative h-full max-h-[16rem] w-auto origin-center scale-[1.45] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
-                  />
-                </span>
-              </button>
+                <button
+                  onClick={() => onNavigate("Bebê")}
+                  aria-label="Ver a semana do bebê"
+                  className="relative flex min-h-0 flex-1 items-center justify-center py-1.5 transition-transform active:scale-[0.97]"
+                >
+                  {/* UMA caixa manda em bola e bebê. Antes cada um tinha a sua
+                    medida e em tela curta um escapava do outro. Ela cabe na
+                    faixa (`h-full`), na largura (`76vw`) e tem teto — nessa
+                    ordem, o que for menor vence. */}
+                  <div className="relative aspect-square h-full max-h-[min(76vw,26rem)]">
+                    {ART_HAS_ORB ? null : <BabyOrb />}
+                    {/* `scale` porque o SVG tem margem interna larga: a tinta do
+                      bebê é ~55% da caixa, e 1.43 leva ela a ~80% da bolha — a
+                      proporção que a referência tem. Medido na tela, não
+                      estimado: em 1.8 ela vazava (101% da bolha). O tamanho é o MESMO
+                      em todas as semanas; o que muda é o desenho. */}
+                    <BabyIllustration
+                      week={gest.weeks}
+                      tone={babyTone}
+                      showSac={false}
+                      showInfo={false}
+                      className="absolute inset-0 h-full w-full origin-center scale-[1.43] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
+                    />
+                  </div>
+                </button>
 
-              {/* ── Cartão da semana em degrau ──────────────────────
+                {/* ── Cartão da semana em degrau ──────────────────────
                   A aba do número SOBE do cartão, como no conceito. São dois
                   irmãos encostados (não empilhados): vidro sobre vidro
                   dobraria a opacidade e deixaria a emenda escura. */}
-              <div className="mt-1 flex flex-col items-center">
-                <div
-                  className="px-6 pb-1 pt-2 short:pt-1.5 text-center"
-                  style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
-                >
-                  <p
-                    className={`leading-none ${cardText}`}
-                    style={{
-                      fontFamily: "'Nunito', system-ui, sans-serif",
-                      fontSize: "clamp(2.1rem, 9vw, 2.8rem)",
-                      fontWeight: 400,
-                      letterSpacing: "-0.01em",
-                      fontVariantNumeric: "tabular-nums lining-nums",
-                    }}
+                <div className="mt-1 flex flex-col items-center">
+                  <div
+                    className="px-6 pb-1 pt-2 short:pt-1.5 text-center"
+                    style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                   >
-                    {gest.weeks}
-                  </p>
-                  <p className={`mt-0.5 text-[13px] font-normal ${cardMuted}`}>
-                    {gest.weeks === 1 ? "semana" : "semanas"}
-                    {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
-                  </p>
-                </div>
+                    <p
+                      className={`leading-none ${cardText}`}
+                      style={{
+                        fontFamily: "'Nunito', system-ui, sans-serif",
+                        fontSize: "clamp(2.1rem, 9vw, 2.8rem)",
+                        fontWeight: 400,
+                        letterSpacing: "-0.01em",
+                        fontVariantNumeric: "tabular-nums lining-nums",
+                      }}
+                    >
+                      {gest.weeks}
+                    </p>
+                    <p className={`mt-0.5 text-[13px] font-normal ${cardMuted}`}>
+                      {gest.weeks === 1 ? "semana" : "semanas"}
+                      {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
+                    </p>
+                  </div>
 
-                <div
-                  className="w-full rounded-[26px] px-4 pb-4 pt-3 short:pb-3 short:pt-2"
-                  style={glass}
-                >
-                  {/* Medidas da semana (silenciadas no Modo Cuidado) */}
-                  {!careMode && (
-                    <>
-                      {/* Divisor com coração — o mesmo traço do conceito */}
-                      <div className="mt-1 flex items-center gap-2" aria-hidden>
-                        <span
-                          className="h-px flex-1"
-                          style={{
-                            background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"})`,
-                          }}
-                        />
-                        <span className="text-sm">💗</span>
-                        <span
-                          className="h-px flex-1"
-                          style={{
-                            background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"}, transparent)`,
-                          }}
-                        />
-                      </div>
-
-                      <div className="mt-3 short:mt-2 grid grid-cols-3">
-                        {[
-                          { emoji: "📏", value: baby.size, label: "Comprimento" },
-                          { emoji: "⚖️", value: baby.weight, label: "Peso" },
-                          { emoji: "🍅", value: baby.fruit, label: "Tamanho" },
-                        ].map((s, i) => (
-                          <div
-                            key={s.label}
-                            className={`flex flex-col items-center px-1 ${i < 2 ? "border-r" : ""}`}
+                  <div
+                    className="w-full rounded-[26px] px-4 pb-4 pt-3 short:pb-3 short:pt-2"
+                    style={glass}
+                  >
+                    {/* Medidas da semana (silenciadas no Modo Cuidado) */}
+                    {!careMode && (
+                      <>
+                        {/* Divisor com coração — o mesmo traço do conceito */}
+                        <div className="mt-1 flex items-center gap-2" aria-hidden>
+                          <span
+                            className="h-px flex-1"
                             style={{
-                              borderColor: darkSky
-                                ? "rgba(255,255,255,0.16)"
-                                : "rgba(150,110,120,0.16)",
+                              background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"})`,
                             }}
-                          >
-                            <span className="text-xl short:text-lg leading-none">{s.emoji}</span>
-                            <p
-                              className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
-                            >
-                              {s.value}
-                            </p>
-                            <p className={`text-[9px] font-normal opacity-80 ${cardMuted}`}>
-                              {s.label}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+                          />
+                          <span className="text-sm">💗</span>
+                          <span
+                            className="h-px flex-1"
+                            style={{
+                              background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"}, transparent)`,
+                            }}
+                          />
+                        </div>
 
+                        <div className="mt-3 short:mt-2 grid grid-cols-3">
+                          {[
+                            { emoji: "📏", value: baby.size, label: "Comprimento" },
+                            { emoji: "⚖️", value: baby.weight, label: "Peso" },
+                            { emoji: "🍅", value: baby.fruit, label: "Tamanho" },
+                          ].map((s, i) => (
+                            <div
+                              key={s.label}
+                              className={`flex flex-col items-center px-1 ${i < 2 ? "border-r" : ""}`}
+                              style={{
+                                borderColor: darkSky
+                                  ? "rgba(255,255,255,0.16)"
+                                  : "rgba(150,110,120,0.16)",
+                              }}
+                            >
+                              <span className="text-xl short:text-lg leading-none">{s.emoji}</span>
+                              <p
+                                className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
+                              >
+                                {s.value}
+                              </p>
+                              <p className={`text-[9px] font-normal opacity-80 ${cardMuted}`}>
+                                {s.label}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* flex-1 centrado: sem isso o texto ficava colado no topo com
+               ~380px de gradiente vazio abaixo (hero tem min-h de 66svh). */
+              <div className="flex h-[100svh] flex-col items-center justify-center text-center">
+                <p className={`text-sm ${heroMuted}`}>
+                  Configure sua data de gestação em <strong>Perfil</strong> para ver o
+                  desenvolvimento.
+                </p>
+                <button
+                  onClick={() => onNavigate("Perfil")}
+                  className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                >
+                  Configurar perfil
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── SEGUNDA DOBRA: rola para ver. Progresso e recado do dia
+              saíram da primeira tela para o bebê caber grande. ── */}
+          {gest && baby && (
+            <div className="pt-4">
               {/* ── Progresso em 3 colunas: a barra mora no MEIO, entre as
                   duas datas — é assim no conceito, não largura cheia. ── */}
-              <div className="mt-2.5 short:mt-2 rounded-[22px] px-4 py-3 short:py-2" style={glass}>
+              <div className="rounded-[22px] px-4 py-3 short:py-2" style={glass}>
                 <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
                   <div className="text-left">
                     <p className={`text-[10px] font-medium ${cardMuted}`}>Início</p>
@@ -963,21 +993,6 @@ export function AppHomeScreen({
                   </div>
                 </div>
               )}
-            </>
-          ) : (
-            /* flex-1 centrado: sem isso o texto ficava colado no topo com
-               ~380px de gradiente vazio abaixo (hero tem min-h de 66svh). */
-            <div className="mt-3 flex flex-1 flex-col items-center justify-center text-center">
-              <p className={`text-sm ${heroMuted}`}>
-                Configure sua data de gestação em <strong>Perfil</strong> para ver o
-                desenvolvimento.
-              </p>
-              <button
-                onClick={() => onNavigate("Perfil")}
-                className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-              >
-                Configurar perfil
-              </button>
             </div>
           )}
         </div>
