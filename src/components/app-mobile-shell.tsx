@@ -506,6 +506,38 @@ const DREAM_VEIL =
   "linear-gradient(180deg, rgba(183,158,255,0.66) 0%, rgba(247,176,213,0.62) 38%," +
   " rgba(255,193,158,0.74) 72%, rgba(255,224,199,0.82) 100%)";
 
+/**
+ * As artes atuais têm a bolha PINTADA dentro delas — em posição e tamanho
+ * diferentes em cada uma, e nenhuma centrada. Como o bebê é uma camada de UI
+ * centrada na tela, ele não cai dentro da bolha nas cinco, e desenhar uma
+ * segunda bolha por cima dava duas esferas cruzadas.
+ *
+ * Quando as artes forem regeradas SÓ COM CÉU (sem esfera), troque para `false`:
+ * o `BabyOrb` abaixo assume, sempre centrado no bebê e respirando.
+ */
+const ART_HAS_ORB = true;
+
+/** A bolha desenhada pelo app: sempre centrada no bebê, com aro e respiração. */
+function BabyOrb() {
+  return (
+    <span
+      aria-hidden
+      className="dc-orb pointer-events-none absolute rounded-full"
+      style={{
+        width: "min(19rem, 35svh)",
+        height: "min(19rem, 35svh)",
+        background:
+          "radial-gradient(circle at 50% 44%, rgba(255,255,255,0.34) 0%," +
+          " rgba(255,246,250,0.20) 52%, rgba(255,228,240,0.12) 78%, rgba(255,255,255,0) 100%)",
+        boxShadow:
+          // aro nítido (o conceito tem um anel luminoso bem definido) + halo
+          "inset 0 0 0 1.5px rgba(255,255,255,0.72), inset 0 0 34px 6px rgba(255,255,255,0.22)," +
+          " 0 0 46px 10px rgba(255,238,246,0.28)",
+      }}
+    />
+  );
+}
+
 /** Tema do céu da home. V2 = arte por período; V1 = o gradiente original. */
 export type SkyThemeId = "v2" | "v1";
 
@@ -726,18 +758,20 @@ export function AppHomeScreen({
                 )}
               </div>
 
-              {/* Bebê protagonista dentro de um halo de luz (o "ventre").
+              {/* Bebê protagonista dentro da bolha (o "ventre").
                   Toque abre a aba do Bebê com a semana detalhada. */}
               <button
                 onClick={() => onNavigate("Bebê")}
                 aria-label="Ver a semana do bebê"
                 className="relative flex min-h-0 flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
               >
+                {ART_HAS_ORB ? null : <BabyOrb />}
                 {/* Altura e largura EXPLÍCITAS: a className cai no <svg>, cujo
                     pai (dentro de BabyIllustration) não tem altura — com
                     `h-full` o SVG resolvia contra `auto` e virava 0px, ou seja,
                     o bebê sumia da tela. `min()` encolhe em aparelho curto sem
-                    depender da altura do pai. */}
+                    depender da altura do pai. O tamanho é o MESMO em todas as
+                    semanas: o que muda de semana para semana é o desenho. */}
                 <BabyIllustration
                   week={gest.weeks}
                   tone={babyTone}

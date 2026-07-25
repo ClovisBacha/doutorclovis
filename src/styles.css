@@ -1167,10 +1167,30 @@ button:active > .duo3d {
   animation: dcSkyBreathe 16s ease-in-out infinite;
   will-change: transform;
 }
+
+/* A bolha desenhada pelo app (quando a arte vier sem esfera): mesma
+   respiração, aplicada ao elemento em vez do céu inteiro. */
+@keyframes dcOrbBreathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.03);
+  }
+}
+.dc-orb {
+  animation: dcOrbBreathe 16s ease-in-out infinite;
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dc-sky-breathe {
     animation: none;
     transform: scale(1.04);
+  }
+  .dc-orb {
+    animation: none;
   }
 }
 
