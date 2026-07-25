@@ -1144,6 +1144,56 @@ button:active > .duo3d {
   }
 }
 
+/* ── O céu da home respira devagar ───────────────────────────────────
+   A bolha que envolve o bebê é PINTADA na arte, não desenhada por cima:
+   uma esfera de UI sobre a esfera da arte dava duas bolas, com centros e
+   diâmetros diferentes, e a interseção virava uma silhueta de ovo. Elas
+   não têm como ficar alinhadas — `cover` move a da arte conforme a
+   proporção da tela, e a de UI fica presa ao container.
+
+   Então quem se move é a arte inteira. A escala parte de 1.04 para a
+   folga do zoom nunca revelar borda, e 16s deixa o movimento no limiar
+   do perceptível — a bolha parece viva sem parecer animação. */
+@keyframes dcSkyBreathe {
+  0%,
+  100% {
+    transform: scale(1.04);
+  }
+  50% {
+    transform: scale(1.075) translateY(-0.6%);
+  }
+}
+.dc-sky-breathe {
+  animation: dcSkyBreathe 16s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* A bolha desenhada pelo app (quando a arte vier sem esfera): mesma
+   respiração, aplicada ao elemento em vez do céu inteiro. */
+@keyframes dcOrbBreathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.03);
+  }
+}
+.dc-orb {
+  animation: dcOrbBreathe 16s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-sky-breathe {
+    animation: none;
+    transform: scale(1.04);
+  }
+  .dc-orb {
+    animation: none;
+  }
+}
+
 /* ══════════════ Liquid Glass — material dos cards de jogo ══════════════
    Vidro de verdade, não plástico colorido: o fundo da tela atravessa
    (backdrop-filter), a luz bate na quina de cima (rim claro), escorre e

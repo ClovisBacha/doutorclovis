@@ -506,6 +506,53 @@ const DREAM_VEIL =
   "linear-gradient(180deg, rgba(183,158,255,0.66) 0%, rgba(247,176,213,0.62) 38%," +
   " rgba(255,193,158,0.74) 72%, rgba(255,224,199,0.82) 100%)";
 
+/**
+ * As artes são SÓ CÉU — a bolha é desenhada aqui (`BabyOrb`), e é por isso que
+ * ela fica sempre exatamente centrada no bebê, em qualquer tela, e pode
+ * respirar. Na primeira leva a esfera vinha pintada dentro de cada imagem, em
+ * posição e tamanho diferentes: o bebê não caía dentro dela em nenhuma, e
+ * desenhar outra por cima dava duas esferas cruzadas.
+ *
+ * Se algum dia entrar uma arte COM esfera pintada, volte para `true` — senão a
+ * bolha desenhada aparece por cima da pintada e o defeito volta.
+ */
+const ART_HAS_ORB = false;
+
+/** A bolha desenhada pelo app: sempre centrada no bebê, com aro e respiração. */
+function BabyOrb() {
+  return (
+    <span
+      aria-hidden
+      className="dc-orb pointer-events-none absolute rounded-[50%]"
+      style={{
+        // Levemente mais alta que larga: a referência não é círculo perfeito,
+        // é ovo — e círculo exato lê como forma geométrica, não como ventre.
+        width: "min(17rem, 32svh)",
+        height: "min(17.6rem, 33svh)",
+        background: [
+          // A luz mora DENTRO e morre ANTES da borda. Concentrá-la no aro fazia
+          // a bolha virar anel desenhado, e o degrau do ramp virava um falso
+          // segundo círculo concêntrico.
+          "radial-gradient(circle at 50% 47%, rgba(255,251,253,0.30) 0%," +
+            " rgba(255,246,250,0.17) 40%, rgba(255,255,255,0.05) 66%," +
+            " rgba(255,255,255,0) 82%)",
+          // Luz vinda de cima à esquerda: sem direção, esfera lê como disco.
+          "radial-gradient(circle at 33% 29%, rgba(255,255,255,0.13) 0%," +
+            " rgba(255,255,255,0) 58%)",
+        ].join(", "),
+        // Véu: dentro da bolha o céu perde um pouco de nitidez e cor, como
+        // atrás de vidro. É o que faz ela OCUPAR volume em vez de ser um
+        // decalque — na referência nenhuma nuvem sobrevive nítida lá dentro.
+        backdropFilter: "blur(1.5px) saturate(0.9) brightness(1.03)",
+        WebkitBackdropFilter: "blur(1.5px) saturate(0.9) brightness(1.03)",
+        // Aro quase imperceptível + halo externo largo. A referência mede
+        // ~1,08× o brilho do céu na borda; o anel forte era o erro.
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12), 0 0 40px 14px rgba(255,244,250,0.14)",
+      }}
+    />
+  );
+}
+
 /** Tema do céu da home. V2 = arte por período; V1 = o gradiente original. */
 export type SkyThemeId = "v2" | "v1";
 
@@ -558,7 +605,18 @@ export function AppHomeScreen({
     : null;
   const weather = useWeather();
 
-  const h = new Date().getHours();
+  // Hora calculada NO CLIENTE. No SSR o relógio é o do servidor (UTC na
+  // Vercel), e o React não corrige atributo divergente na hidratação — a arte
+  // do céu ficava presa no período do servidor: quem abria o app às 8h podia
+  // ver o céu da noite. Renderiza "dia" (neutro) e corrige ao montar; o
+  // interval acompanha a virada de período com o app aberto.
+  const [h, setH] = useState(12);
+  useEffect(() => {
+    const tick = () => setH(new Date().getHours());
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
   const isMadrugada = h < 5;
   const period = periodFor(h);
   // Céu escuro (noite/madrugada) pede texto claro. O entardecer TERMINA claro
@@ -569,7 +627,8 @@ export function AppHomeScreen({
   // Cores de texto adaptadas ao céu do momento
   const heroText = darkSky ? "text-white/95" : "text-foreground";
   const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
-  const heroLabel = darkSky ? "text-white/60" : "text-primary";
+  // Roxo no céu claro (o rosé da marca sumia sobre o pêssego do entardecer).
+  const heroLabel = darkSky ? "text-white/60" : "text-violet-600";
 
   const artTheme = skyTheme !== "v1";
 
@@ -585,8 +644,8 @@ export function AppHomeScreen({
       ? "rgba(22,20,36,0.56)"
       : "rgba(255,255,255,0.13)"
     : artTheme
-      ? "rgba(255,255,255,0.82)"
-      : "rgba(255,255,255,0.72)";
+      ? "rgba(255,255,255,0.72)"
+      : "rgba(255,255,255,0.66)";
   const glass: React.CSSProperties = {
     background: glassBg,
     backdropFilter: "blur(22px) saturate(170%)",
@@ -600,9 +659,8 @@ export function AppHomeScreen({
   const cardMuted = darkSky ? "text-white/60" : "text-muted-foreground";
   /* Nome e etiqueta ficam SOBRE o céu, sem cartão atrás. Na arte isso pede
      sombra: o fundo atrás deles muda de luminosidade ao longo do dia. */
-  const overArt: React.CSSProperties = artTheme
-    ? { textShadow: darkSky ? "0 2px 10px rgba(0,0,0,0.55)" : "0 1px 6px rgba(255,255,255,0.65)" }
-    : {};
+  const overArt: React.CSSProperties =
+    artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
 
   return (
     <div className="space-y-4 pb-2">
@@ -622,7 +680,7 @@ export function AppHomeScreen({
         {artTheme && (
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
+            className="dc-sky-breathe pointer-events-none absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${SKY_ART[period]})` }}
           />
         )}
@@ -689,13 +747,13 @@ export function AppHomeScreen({
               {/* Nome do bebê — protagonista, logo abaixo da barra */}
               {babyName && (
                 <div className="mt-4 text-center" style={overArt}>
-                  <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${heroLabel}`}>
+                  <p className={`text-[13px] font-medium tracking-[0.02em] ${heroLabel}`}>
                     Acompanhando
                   </p>
                   <p
-                    className={`mt-0.5 font-serif text-[clamp(1.6rem,7.4vw,2.2rem)] font-bold leading-none ${heroText}`}
+                    className={`mt-0.5 font-serif text-[clamp(1.9rem,8.6vw,2.5rem)] font-normal leading-none ${heroText}`}
                   >
-                    {babyName} <span className="align-middle text-[0.8em]">💜</span>
+                    {babyName} <span className="align-middle text-[0.55em]">💜</span>
                   </p>
                 </div>
               )}
@@ -703,7 +761,7 @@ export function AppHomeScreen({
               {/* Pílulas: trimestre + contagem regressiva, centralizadas */}
               <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                 <span
-                  className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                  className={`rounded-full px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${cardText}`}
                   style={glass}
                 >
                   🤰 {trimestre}
@@ -727,146 +785,155 @@ export function AppHomeScreen({
                 )}
               </div>
 
-              {/* Bebê protagonista dentro de um halo de luz (o "ventre").
+              {/* Bebê protagonista dentro da bolha (o "ventre").
                   Toque abre a aba do Bebê com a semana detalhada. */}
               <button
                 onClick={() => onNavigate("Bebê")}
                 aria-label="Ver a semana do bebê"
-                className="relative flex min-h-0 flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
+                className="relative flex min-h-0 flex-1 items-center justify-center transition-transform active:scale-[0.97]"
               >
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute h-[min(19rem,36svh)] w-[min(17rem,32svh)] rounded-[50%]"
-                  style={{
-                    background:
-                      "radial-gradient(closest-side, rgba(255,255,255,0.55) 0%," +
-                      " rgba(255,232,240,0.34) 52%, rgba(255,255,255,0) 78%)",
-                    filter: "blur(2px)",
-                  }}
-                />
+                {ART_HAS_ORB ? null : <BabyOrb />}
                 {/* Altura e largura EXPLÍCITAS: a className cai no <svg>, cujo
                     pai (dentro de BabyIllustration) não tem altura — com
                     `h-full` o SVG resolvia contra `auto` e virava 0px, ou seja,
                     o bebê sumia da tela. `min()` encolhe em aparelho curto sem
-                    depender da altura do pai. */}
+                    depender da altura do pai. O tamanho é o MESMO em todas as
+                    semanas: o que muda de semana para semana é o desenho. */}
                 <BabyIllustration
                   week={gest.weeks}
                   tone={babyTone}
                   showSac={false}
                   showInfo={false}
-                  className="float-slow relative h-[min(16rem,30svh)] w-[min(16rem,30svh)] drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
+                  className="relative h-[min(16rem,30svh)] w-[min(16rem,30svh)] origin-center scale-[1.45] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
                 />
               </button>
 
-              {/* ── Cartão da semana + medidas ─────────────────────── */}
-              <div className="mt-1 rounded-[26px] px-4 pb-3 pt-4" style={glass}>
-                <p
-                  className={`text-center leading-none ${cardText}`}
-                  style={{
-                    fontFamily: "'Nunito', system-ui, sans-serif",
-                    fontSize: "clamp(2.2rem, 10vw, 3rem)",
-                    fontWeight: 700,
-                    letterSpacing: "-0.03em",
-                    fontVariantNumeric: "tabular-nums lining-nums",
-                  }}
+              {/* ── Cartão da semana em degrau ──────────────────────
+                  A aba do número SOBE do cartão, como no conceito. São dois
+                  irmãos encostados (não empilhados): vidro sobre vidro
+                  dobraria a opacidade e deixaria a emenda escura. */}
+              <div className="mt-1 flex flex-col items-center">
+                <div
+                  className="px-6 pb-1 pt-2 text-center"
+                  style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                 >
-                  {gest.weeks}
-                </p>
-                <p className={`mt-0.5 text-center text-[13px] font-semibold ${cardMuted}`}>
-                  {gest.weeks === 1 ? "semana" : "semanas"}
-                  {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
-                </p>
+                  <p
+                    className={`leading-none ${cardText}`}
+                    style={{
+                      fontFamily: "'Nunito', system-ui, sans-serif",
+                      fontSize: "clamp(2.1rem, 9vw, 2.8rem)",
+                      fontWeight: 400,
+                      letterSpacing: "-0.01em",
+                      fontVariantNumeric: "tabular-nums lining-nums",
+                    }}
+                  >
+                    {gest.weeks}
+                  </p>
+                  <p className={`mt-0.5 text-[13px] font-normal ${cardMuted}`}>
+                    {gest.weeks === 1 ? "semana" : "semanas"}
+                    {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
+                  </p>
+                </div>
 
-                {/* Medidas da semana (silenciadas no Modo Cuidado) */}
-                {!careMode && (
-                  <>
-                    {/* Divisor com coração — o mesmo traço do conceito */}
-                    <div className="mt-2 flex items-center gap-2" aria-hidden>
-                      <span
-                        className="h-px flex-1"
-                        style={{
-                          background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"})`,
-                        }}
-                      />
-                      <span className="text-sm">💗</span>
-                      <span
-                        className="h-px flex-1"
-                        style={{
-                          background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"}, transparent)`,
-                        }}
-                      />
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-3">
-                      {[
-                        { emoji: "📏", value: baby.size, label: "Comprimento" },
-                        { emoji: "⚖️", value: baby.weight, label: "Peso" },
-                        { emoji: "🍅", value: baby.fruit, label: "Tamanho" },
-                      ].map((s, i) => (
-                        <div
-                          key={s.label}
-                          className={`flex flex-col items-center px-1 ${i < 2 ? "border-r" : ""}`}
+                <div className="w-full rounded-[26px] px-4 pb-4 pt-3" style={glass}>
+                  {/* Medidas da semana (silenciadas no Modo Cuidado) */}
+                  {!careMode && (
+                    <>
+                      {/* Divisor com coração — o mesmo traço do conceito */}
+                      <div className="mt-1 flex items-center gap-2" aria-hidden>
+                        <span
+                          className="h-px flex-1"
                           style={{
-                            borderColor: darkSky
-                              ? "rgba(255,255,255,0.16)"
-                              : "rgba(150,110,120,0.16)",
+                            background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"})`,
                           }}
-                        >
-                          <span className="text-xl leading-none">{s.emoji}</span>
-                          <p
-                            className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
+                        />
+                        <span className="text-sm">💗</span>
+                        <span
+                          className="h-px flex-1"
+                          style={{
+                            background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"}, transparent)`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-3">
+                        {[
+                          { emoji: "📏", value: baby.size, label: "Comprimento" },
+                          { emoji: "⚖️", value: baby.weight, label: "Peso" },
+                          { emoji: "🍅", value: baby.fruit, label: "Tamanho" },
+                        ].map((s, i) => (
+                          <div
+                            key={s.label}
+                            className={`flex flex-col items-center px-1 ${i < 2 ? "border-r" : ""}`}
+                            style={{
+                              borderColor: darkSky
+                                ? "rgba(255,255,255,0.16)"
+                                : "rgba(150,110,120,0.16)",
+                            }}
                           >
-                            {s.value}
-                          </p>
-                          <p className={`text-[9px] font-medium ${cardMuted}`}>{s.label}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
+                            <span className="text-xl leading-none">{s.emoji}</span>
+                            <p
+                              className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
+                            >
+                              {s.value}
+                            </p>
+                            <p className={`text-[9px] font-normal opacity-80 ${cardMuted}`}>
+                              {s.label}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* ── Cartão de progresso: início · % · parto previsto ── */}
+              {/* ── Progresso em 3 colunas: a barra mora no MEIO, entre as
+                  duas datas — é assim no conceito, não largura cheia. ── */}
               <div className="mt-2.5 rounded-[22px] px-4 py-3" style={glass}>
-                <div className="flex items-end justify-between gap-2">
+                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
                   <div className="text-left">
                     <p className={`text-[10px] font-medium ${cardMuted}`}>Início</p>
                     <p className={`text-[11px] font-bold ${cardText}`}>
                       {dateOffsetLabel(-(gest.totalDays ?? 0))}
                     </p>
                   </div>
-                  <p className={`pb-0.5 text-[11px] font-bold ${cardMuted}`}>
-                    {Math.round(progress ?? 0)}% concluído
-                  </p>
+
+                  <div>
+                    <p className={`text-center text-[11px] font-bold ${cardMuted}`}>
+                      {Math.round(progress ?? 0)}% concluído
+                    </p>
+                    {/* Trilho com o coração na posição de hoje */}
+                    <div className="relative mt-1.5 h-5">
+                      <div
+                        className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full"
+                        style={{
+                          background: darkSky ? "rgba(255,255,255,0.18)" : "rgba(150,110,130,0.16)",
+                        }}
+                      />
+                      <div
+                        className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full transition-all duration-700"
+                        style={{
+                          width: `${progress ?? 0}%`,
+                          background: "linear-gradient(90deg, #c4b5fd, #a855f7)",
+                        }}
+                      />
+                      <span
+                        aria-hidden
+                        className="absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] shadow-md transition-all duration-700"
+                        style={{ left: `${progress ?? 0}%`, background: "#fff" }}
+                      >
+                        💜
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="text-right">
                     <p className={`text-[10px] font-medium ${cardMuted}`}>Parto previsto</p>
                     <p className={`text-[11px] font-bold ${cardText}`}>
                       {dateOffsetLabel(daysLeft ?? 0)}
                     </p>
                   </div>
-                </div>
-                {/* Trilho com o coração na posição de hoje */}
-                <div className="relative mt-2.5 h-2.5">
-                  <div
-                    className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full"
-                    style={{
-                      background: darkSky ? "rgba(255,255,255,0.18)" : "rgba(150,110,130,0.16)",
-                    }}
-                  />
-                  <div
-                    className="absolute left-0 top-1/2 h-2 -translate-y-1/2 rounded-full transition-all duration-700"
-                    style={{
-                      width: `${progress ?? 0}%`,
-                      background: "linear-gradient(90deg, #c4b5fd, #a855f7)",
-                    }}
-                  />
-                  <span
-                    aria-hidden
-                    className="absolute top-1/2 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[11px] shadow-md transition-all duration-700"
-                    style={{ left: `${progress ?? 0}%`, background: "#fff" }}
-                  >
-                    💜
-                  </span>
                 </div>
               </div>
 
@@ -880,7 +947,7 @@ export function AppHomeScreen({
                   <div className="min-w-0">
                     <p className={`text-[14px] font-extrabold ${cardText}`}>
                       {dayGreetingLabel()}
-                      {babyName ? `, ${babyName}!` : "!"}
+                      {babyName ? `, ${babyName}!` : "!"} {weather.emoji}
                     </p>
                     <p className={`mt-0.5 text-[12px] leading-snug ${cardMuted}`}>{weather.tip}</p>
                   </div>
