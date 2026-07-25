@@ -804,7 +804,7 @@ export function AppHomeScreen({
                   tone={babyTone}
                   showSac={false}
                   showInfo={false}
-                  className="relative h-[min(16rem,30svh)] w-[min(16rem,30svh)] drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
+                  className="relative h-[min(16rem,30svh)] w-[min(16rem,30svh)] origin-center scale-[1.45] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
                 />
               </button>
 
@@ -947,7 +947,7 @@ export function AppHomeScreen({
                   <div className="min-w-0">
                     <p className={`text-[14px] font-extrabold ${cardText}`}>
                       {dayGreetingLabel()}
-                      {babyName ? `, ${babyName}!` : "!"}
+                      {babyName ? `, ${babyName}!` : "!"} {weather.emoji}
                     </p>
                     <p className={`mt-0.5 text-[12px] leading-snug ${cardMuted}`}>{weather.tip}</p>
                   </div>
