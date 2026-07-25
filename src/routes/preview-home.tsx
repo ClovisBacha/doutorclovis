@@ -1,0 +1,43 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { AppBottomNav, AppHomeScreen } from "@/components/app-mobile-shell";
+
+/**
+ * Bancada de design da HOME — renderiza o AppHomeScreen REAL com dados fixos
+ * (semana 19 e 6 dias, os mesmos da referência aprovada), sem exigir login.
+ *
+ * Existe porque a home de verdade vive atrás do Supabase Auth: sem esta rota,
+ * cada conferência visual dependia de uma reprodução manual do layout, e as
+ * diferenças entre a reprodução e o componente real viravam erro em produção.
+ * Aqui o Playwright fotografa o próprio componente, período a período (a hora
+ * vem do relógio do navegador — o harness a controla com clock emulation).
+ *
+ * Não expõe nenhum dado: tudo é constante de exemplo. O overlay `fixed` cobre
+ * o shell público (header/rodapé) que o __root sempre desenha.
+ */
+export const Route = createFileRoute("/preview-home")({
+  head: () => ({
+    meta: [{ title: "Bancada da home" }, { name: "robots", content: "noindex" }],
+  }),
+  component: PreviewHome,
+});
+
+function PreviewHome() {
+  return (
+    <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
+      <div className="mx-auto max-w-md px-5 pt-2">
+        <AppHomeScreen
+          firstName="Clovis"
+          babyName="Clovis"
+          gest={{ weeks: 19, days: 6, totalDays: 139 }}
+          onNavigate={() => {}}
+          onOpenMenu={() => {}}
+          nextAppointment={null}
+          babyTone={0}
+          careMode={false}
+          skyTheme="v2"
+        />
+      </div>
+      <AppBottomNav activeSection="home" onSelect={() => {}} onEmergency={() => {}} />
+    </div>
+  );
+}

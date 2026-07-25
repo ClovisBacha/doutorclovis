@@ -605,7 +605,18 @@ export function AppHomeScreen({
     : null;
   const weather = useWeather();
 
-  const h = new Date().getHours();
+  // Hora calculada NO CLIENTE. No SSR o relógio é o do servidor (UTC na
+  // Vercel), e o React não corrige atributo divergente na hidratação — a arte
+  // do céu ficava presa no período do servidor: quem abria o app às 8h podia
+  // ver o céu da noite. Renderiza "dia" (neutro) e corrige ao montar; o
+  // interval acompanha a virada de período com o app aberto.
+  const [h, setH] = useState(12);
+  useEffect(() => {
+    const tick = () => setH(new Date().getHours());
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
   const isMadrugada = h < 5;
   const period = periodFor(h);
   // Céu escuro (noite/madrugada) pede texto claro. O entardecer TERMINA claro
@@ -616,7 +627,8 @@ export function AppHomeScreen({
   // Cores de texto adaptadas ao céu do momento
   const heroText = darkSky ? "text-white/95" : "text-foreground";
   const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
-  const heroLabel = darkSky ? "text-white/60" : "text-primary";
+  // Roxo no céu claro (o rosé da marca sumia sobre o pêssego do entardecer).
+  const heroLabel = darkSky ? "text-white/60" : "text-violet-600";
 
   const artTheme = skyTheme !== "v1";
 
@@ -734,7 +746,7 @@ export function AppHomeScreen({
             <>
               {/* Nome do bebê — protagonista, logo abaixo da barra */}
               {babyName && (
-                <div className="mt-10 text-center" style={overArt}>
+                <div className="mt-4 text-center" style={overArt}>
                   <p className={`text-[13px] font-medium tracking-[0.02em] ${heroLabel}`}>
                     Acompanhando
                   </p>
@@ -778,7 +790,7 @@ export function AppHomeScreen({
               <button
                 onClick={() => onNavigate("Bebê")}
                 aria-label="Ver a semana do bebê"
-                className="relative flex min-h-0 flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
+                className="relative flex min-h-0 flex-1 items-center justify-center transition-transform active:scale-[0.97]"
               >
                 {ART_HAS_ORB ? null : <BabyOrb />}
                 {/* Altura e largura EXPLÍCITAS: a className cai no <svg>, cujo
@@ -792,7 +804,7 @@ export function AppHomeScreen({
                   tone={babyTone}
                   showSac={false}
                   showInfo={false}
-                  className="relative h-[min(14rem,27svh)] w-[min(14rem,27svh)] drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
+                  className="relative h-[min(16rem,30svh)] w-[min(16rem,30svh)] drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
                 />
               </button>
 
@@ -802,7 +814,7 @@ export function AppHomeScreen({
                   dobraria a opacidade e deixaria a emenda escura. */}
               <div className="mt-1 flex flex-col items-center">
                 <div
-                  className="px-6 pb-1 pt-2.5 text-center"
+                  className="px-6 pb-1 pt-2 text-center"
                   style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                 >
                   <p
@@ -823,7 +835,7 @@ export function AppHomeScreen({
                   </p>
                 </div>
 
-                <div className="w-full rounded-[26px] px-4 pb-5 pt-3" style={glass}>
+                <div className="w-full rounded-[26px] px-4 pb-4 pt-3" style={glass}>
                   {/* Medidas da semana (silenciadas no Modo Cuidado) */}
                   {!careMode && (
                     <>
