@@ -507,15 +507,16 @@ const DREAM_VEIL =
   " rgba(255,193,158,0.74) 72%, rgba(255,224,199,0.82) 100%)";
 
 /**
- * As artes atuais têm a bolha PINTADA dentro delas — em posição e tamanho
- * diferentes em cada uma, e nenhuma centrada. Como o bebê é uma camada de UI
- * centrada na tela, ele não cai dentro da bolha nas cinco, e desenhar uma
- * segunda bolha por cima dava duas esferas cruzadas.
+ * As artes são SÓ CÉU — a bolha é desenhada aqui (`BabyOrb`), e é por isso que
+ * ela fica sempre exatamente centrada no bebê, em qualquer tela, e pode
+ * respirar. Na primeira leva a esfera vinha pintada dentro de cada imagem, em
+ * posição e tamanho diferentes: o bebê não caía dentro dela em nenhuma, e
+ * desenhar outra por cima dava duas esferas cruzadas.
  *
- * Quando as artes forem regeradas SÓ COM CÉU (sem esfera), troque para `false`:
- * o `BabyOrb` abaixo assume, sempre centrado no bebê e respirando.
+ * Se algum dia entrar uma arte COM esfera pintada, volte para `true` — senão a
+ * bolha desenhada aparece por cima da pintada e o defeito volta.
  */
-const ART_HAS_ORB = true;
+const ART_HAS_ORB = false;
 
 /** A bolha desenhada pelo app: sempre centrada no bebê, com aro e respiração. */
 function BabyOrb() {
@@ -527,12 +528,15 @@ function BabyOrb() {
         width: "min(19rem, 35svh)",
         height: "min(19rem, 35svh)",
         background:
-          "radial-gradient(circle at 50% 44%, rgba(255,255,255,0.34) 0%," +
-          " rgba(255,246,250,0.20) 52%, rgba(255,228,240,0.12) 78%, rgba(255,255,255,0) 100%)",
+          // O miolo é quase transparente e a luz se acumula perto da borda: é
+          // isso que faz ler como ESFERA e não como disco chapado.
+          "radial-gradient(circle at 50% 46%, rgba(255,255,255,0.10) 0%," +
+          " rgba(255,252,254,0.13) 58%, rgba(255,246,251,0.30) 86%," +
+          " rgba(255,255,255,0.46) 96%, rgba(255,255,255,0) 100%)",
         boxShadow:
-          // aro nítido (o conceito tem um anel luminoso bem definido) + halo
-          "inset 0 0 0 1.5px rgba(255,255,255,0.72), inset 0 0 34px 6px rgba(255,255,255,0.22)," +
-          " 0 0 46px 10px rgba(255,238,246,0.28)",
+          // Aro largo e difuso em vez de linha de 1px: um anel nítido demais
+          // lê como círculo desenhado, não como bolha de luz.
+          "inset 0 0 26px 4px rgba(255,255,255,0.40), 0 0 54px 14px rgba(255,240,248,0.30)",
       }}
     />
   );
