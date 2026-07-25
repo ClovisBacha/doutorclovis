@@ -611,7 +611,7 @@ export function AppHomeScreen({
           para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
           encosta nas quatro bordas para máxima imersão no celular. */}
       <div
-        className="shine relative -mx-5 -mt-2 flex min-h-[92svh] flex-col overflow-hidden px-5 pb-8 pt-[calc(0.5rem+env(safe-area-inset-top))] transition-[background] duration-1000"
+        className="shine relative -mx-5 -mt-2 flex min-h-[100svh] flex-col overflow-hidden px-5 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Arte do momento do dia (tema V2). Fica ACIMA do gradiente, que
@@ -688,27 +688,29 @@ export function AppHomeScreen({
             <>
               {/* Nome do bebê — protagonista, logo abaixo da barra */}
               {babyName && (
-                <div className="mt-6 text-center" style={overArt}>
-                  <p className={`text-[11px] font-bold uppercase tracking-[0.2em] ${heroLabel}`}>
+                <div className="mt-4 text-center" style={overArt}>
+                  <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${heroLabel}`}>
                     Acompanhando
                   </p>
-                  <p className={`mt-1 font-serif text-[2.6rem] font-bold leading-none ${heroText}`}>
-                    {babyName} <span className="align-middle text-[2rem]">💜</span>
+                  <p
+                    className={`mt-0.5 font-serif text-[clamp(1.6rem,7.4vw,2.2rem)] font-bold leading-none ${heroText}`}
+                  >
+                    {babyName} <span className="align-middle text-[0.8em]">💜</span>
                   </p>
                 </div>
               )}
 
               {/* Pílulas: trimestre + contagem regressiva, centralizadas */}
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                 <span
-                  className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                  className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
                   style={glass}
                 >
                   🤰 {trimestre}
                 </span>
                 {careMode ? null : reta ? (
                   <span
-                    className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                    className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
                     style={glass}
                   >
                     💛 {reta.eyebrow}
@@ -716,7 +718,7 @@ export function AppHomeScreen({
                 ) : (
                   daysLeft != null && (
                     <span
-                      className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                      className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
                       style={glass}
                     >
                       {daysLeft === 0 ? "🎉 É hoje!" : `📅 Parto em ${daysLeft} dias`}
@@ -730,11 +732,11 @@ export function AppHomeScreen({
               <button
                 onClick={() => onNavigate("Bebê")}
                 aria-label="Ver a semana do bebê"
-                className="relative flex flex-1 items-center justify-center py-4 transition-transform active:scale-[0.97]"
+                className="relative flex min-h-0 flex-1 items-center justify-center py-2 transition-transform active:scale-[0.97]"
               >
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute h-[19rem] w-[17rem] rounded-[50%]"
+                  className="pointer-events-none absolute h-full max-h-[17rem] w-[86%] max-w-[15rem] rounded-[50%]"
                   style={{
                     background:
                       "radial-gradient(closest-side, rgba(255,255,255,0.55) 0%," +
@@ -747,17 +749,17 @@ export function AppHomeScreen({
                   tone={babyTone}
                   showSac={false}
                   showInfo={false}
-                  className="float-slow relative h-64 w-64 drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
+                  className="float-slow relative aspect-square h-full max-h-[15rem] w-auto max-w-full drop-shadow-[0_18px_44px_rgba(120,70,90,0.28)]"
                 />
               </button>
 
               {/* ── Cartão da semana + medidas ─────────────────────── */}
-              <div className="mt-1 rounded-[28px] px-5 pb-4 pt-5" style={glass}>
+              <div className="mt-1 rounded-[26px] px-4 pb-3 pt-4" style={glass}>
                 <p
                   className={`text-center leading-none ${cardText}`}
                   style={{
                     fontFamily: "'Nunito', system-ui, sans-serif",
-                    fontSize: "3.4rem",
+                    fontSize: "clamp(2.2rem, 10vw, 3rem)",
                     fontWeight: 700,
                     letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums lining-nums",
@@ -765,7 +767,7 @@ export function AppHomeScreen({
                 >
                   {gest.weeks}
                 </p>
-                <p className={`mt-1 text-center text-[15px] font-semibold ${cardMuted}`}>
+                <p className={`mt-0.5 text-center text-[13px] font-semibold ${cardMuted}`}>
                   {gest.weeks === 1 ? "semana" : "semanas"}
                   {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
                 </p>
@@ -774,7 +776,7 @@ export function AppHomeScreen({
                 {!careMode && (
                   <>
                     {/* Divisor com coração — o mesmo traço do conceito */}
-                    <div className="mt-3 flex items-center gap-2" aria-hidden>
+                    <div className="mt-2 flex items-center gap-2" aria-hidden>
                       <span
                         className="h-px flex-1"
                         style={{
@@ -790,7 +792,7 @@ export function AppHomeScreen({
                       />
                     </div>
 
-                    <div className="mt-3 grid grid-cols-3">
+                    <div className="mt-2 grid grid-cols-3">
                       {[
                         { emoji: "📏", value: baby.size, label: "Comprimento" },
                         { emoji: "⚖️", value: baby.weight, label: "Peso" },
@@ -805,13 +807,13 @@ export function AppHomeScreen({
                               : "rgba(150,110,120,0.16)",
                           }}
                         >
-                          <span className="text-2xl leading-none">{s.emoji}</span>
+                          <span className="text-xl leading-none">{s.emoji}</span>
                           <p
-                            className={`mt-1.5 text-[15px] font-extrabold leading-tight ${cardText}`}
+                            className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
                           >
                             {s.value}
                           </p>
-                          <p className={`text-[10px] font-medium ${cardMuted}`}>{s.label}</p>
+                          <p className={`text-[9px] font-medium ${cardMuted}`}>{s.label}</p>
                         </div>
                       ))}
                     </div>
@@ -820,7 +822,7 @@ export function AppHomeScreen({
               </div>
 
               {/* ── Cartão de progresso: início · % · parto previsto ── */}
-              <div className="mt-3 rounded-[24px] px-5 py-4" style={glass}>
+              <div className="mt-2.5 rounded-[22px] px-4 py-3" style={glass}>
                 <div className="flex items-end justify-between gap-2">
                   <div className="text-left">
                     <p className={`text-[10px] font-medium ${cardMuted}`}>Início</p>
@@ -839,7 +841,7 @@ export function AppHomeScreen({
                   </div>
                 </div>
                 {/* Trilho com o coração na posição de hoje */}
-                <div className="relative mt-3 h-2.5">
+                <div className="relative mt-2.5 h-2.5">
                   <div
                     className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full"
                     style={{
@@ -865,14 +867,17 @@ export function AppHomeScreen({
 
               {/* ── Saudação do dia com a dica do clima ─────────────── */}
               {weather && (
-                <div className="mt-3 flex items-start gap-3 rounded-[24px] px-5 py-4" style={glass}>
-                  <span className="mt-0.5 text-2xl leading-none">{weather.tipEmoji}</span>
+                <div
+                  className="mt-2.5 flex items-start gap-3 rounded-[22px] px-4 py-3"
+                  style={glass}
+                >
+                  <span className="mt-0.5 text-xl leading-none">{weather.tipEmoji}</span>
                   <div className="min-w-0">
-                    <p className={`text-[15px] font-extrabold ${cardText}`}>
+                    <p className={`text-[14px] font-extrabold ${cardText}`}>
                       {dayGreetingLabel()}
                       {babyName ? `, ${babyName}!` : "!"}
                     </p>
-                    <p className={`mt-0.5 text-[13px] leading-snug ${cardMuted}`}>{weather.tip}</p>
+                    <p className={`mt-0.5 text-[12px] leading-snug ${cardMuted}`}>{weather.tip}</p>
                   </div>
                 </div>
               )}
