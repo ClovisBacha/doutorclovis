@@ -18,7 +18,12 @@
  * O PREÇO é a fonte da verdade no servidor: a compra valida o preço daqui.
  */
 
-export type CantinhoType = "fundo" | "ceu" | "planta" | "objeto" | "bicho" | "especial";
+/**
+ * `tema` é o único tipo que NÃO decora o Cantinho: veste o céu da home do app.
+ * Vive aqui porque a loja, a carteira e a RPC de compra são as mesmas — o que
+ * muda é só onde o item é aplicado.
+ */
+export type CantinhoType = "fundo" | "ceu" | "planta" | "objeto" | "bicho" | "especial" | "tema";
 
 export type CantinhoItem = {
   id: string;
@@ -30,6 +35,7 @@ export type CantinhoItem = {
 };
 
 export const CANTINHO_CATEGORIES: { key: CantinhoType; label: string }[] = [
+  { key: "tema", label: "Céu do app" },
   { key: "fundo", label: "Cenários" },
   { key: "ceu", label: "Céu" },
   { key: "planta", label: "Plantas" },
@@ -49,6 +55,18 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     emoji: "🎨",
     price: 0,
     type: "fundo",
+    premium: false,
+  },
+
+  // ── Céu do app ─────────────────────────────────────────────────────
+  // O céu original do app, de antes da arte por momento do dia. Guardado
+  // aqui para quem gostava dele: compra uma vez e troca quando quiser.
+  {
+    id: "tema-ceu-v1",
+    name: "Céu Clássico",
+    emoji: "🌅",
+    price: 90,
+    type: "tema",
     premium: false,
   },
 
@@ -260,8 +278,13 @@ export const CANTINHO_COMPLETIONIST_ID = "especial-colecao";
  * premium). Reachable por qualquer paciente dedicada — o troféu premia
  * dedicação, não assinatura. Os premium seguem sendo extras opcionais.
  */
+/*
+ * `tema` fica FORA da coleção: o troféu é por decorar o Cantinho, e o céu da
+ * home não decora nada aqui. Incluí-lo tiraria o troféu de quem já completou
+ * a coleção — a exigência passaria a ter um item que ela nunca comprou.
+ */
 export const CANTINHO_COMPLETION_REQUIRED: string[] = CANTINHO_ITEMS.filter(
-  (i) => i.price > 0 && !i.premium && i.id !== CANTINHO_COMPLETIONIST_ID,
+  (i) => i.price > 0 && !i.premium && i.type !== "tema" && i.id !== CANTINHO_COMPLETIONIST_ID,
 ).map((i) => i.id);
 
 /** True quando a paciente possui todos os itens exigidos pra coleção. */
