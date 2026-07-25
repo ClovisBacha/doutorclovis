@@ -302,7 +302,7 @@ export function AppBottomNav({
       style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
     >
       <div
-        className={`pointer-events-auto flex items-center justify-around rounded-full border border-border/60 bg-background/85 shadow-[0_10px_36px_rgba(0,0,0,0.14)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+        className={`pointer-events-auto flex items-center justify-around rounded-full border border-white/70 bg-white/95 shadow-[0_10px_36px_rgba(0,0,0,0.14)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
           compact ? "w-[64%] px-1.5 py-1" : "w-[92%] max-w-md px-2 py-1.5"
         }`}
       >
@@ -525,10 +525,12 @@ function BabyOrb() {
       aria-hidden
       className="dc-orb pointer-events-none absolute rounded-[50%]"
       style={{
-        // Levemente mais alta que larga: a referência não é círculo perfeito,
-        // é ovo — e círculo exato lê como forma geométrica, não como ventre.
-        width: "min(17rem, 32svh)",
-        height: "min(17.6rem, 33svh)",
+        // Presa à faixa do bebê: 94% da altura dela, nunca mais que isso —
+        // é o que garante que a bola não toca as pílulas nem o cartão em
+        // NENHUMA altura de tela (Safari com barra de endereço incluído).
+        // Levemente mais alta que larga: a referência é ovo, não círculo.
+        height: "min(91%, 17.6rem)",
+        aspectRatio: "0.97",
         background: [
           // A luz mora DENTRO e morre ANTES da borda. Concentrá-la no aro fazia
           // a bolha virar anel desenhado, e o degrau do ramp virava um falso
@@ -669,7 +671,7 @@ export function AppHomeScreen({
           para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
           encosta nas quatro bordas para máxima imersão no celular. */}
       <div
-        className="shine relative -mx-5 -mt-2 flex min-h-[100svh] flex-col overflow-hidden px-5 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] transition-[background] duration-1000"
+        className="shine relative -mx-5 -mt-2 flex min-h-[100svh] flex-col overflow-hidden px-5 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] short:pb-[calc(env(safe-area-inset-bottom,0px)+5.75rem)] transition-[background] duration-1000"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Arte do momento do dia (tema V2). Fica ACIMA do gradiente, que
@@ -746,7 +748,7 @@ export function AppHomeScreen({
             <>
               {/* Nome do bebê — protagonista, logo abaixo da barra */}
               {babyName && (
-                <div className="mt-4 text-center" style={overArt}>
+                <div className="mt-4 short:mt-2 text-center" style={overArt}>
                   <p className={`text-[13px] font-medium tracking-[0.02em] ${heroLabel}`}>
                     Acompanhando
                   </p>
@@ -759,16 +761,16 @@ export function AppHomeScreen({
               )}
 
               {/* Pílulas: trimestre + contagem regressiva, centralizadas */}
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <div className="mt-3 short:mt-2 flex flex-wrap items-center justify-center gap-2">
                 <span
-                  className={`rounded-full px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] ${cardText}`}
+                  className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${cardText}`}
                   style={glass}
                 >
                   🤰 {trimestre}
                 </span>
                 {careMode ? null : reta ? (
                   <span
-                    className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                    className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
                     style={glass}
                   >
                     💛 {reta.eyebrow}
@@ -776,7 +778,7 @@ export function AppHomeScreen({
                 ) : (
                   daysLeft != null && (
                     <span
-                      className={`rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
+                      className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
                       style={glass}
                     >
                       {daysLeft === 0 ? "🎉 É hoje!" : `📅 Parto em ${daysLeft} dias`}
@@ -799,13 +801,18 @@ export function AppHomeScreen({
                     o bebê sumia da tela. `min()` encolhe em aparelho curto sem
                     depender da altura do pai. O tamanho é o MESMO em todas as
                     semanas: o que muda de semana para semana é o desenho. */}
-                <BabyIllustration
-                  week={gest.weeks}
-                  tone={babyTone}
-                  showSac={false}
-                  showInfo={false}
-                  className="relative h-[min(16rem,30svh)] w-[min(16rem,30svh)] origin-center scale-[1.45] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
-                />
+                {/* Wrapper ABSOLUTO: altura % dentro de item de flex resolve
+                    para 0 (o bebê sumia); `inset-0` dá altura definida e o
+                    h-full da corrente inteira volta a funcionar. */}
+                <span className="absolute inset-0 block">
+                  <BabyIllustration
+                    week={gest.weeks}
+                    tone={babyTone}
+                    showSac={false}
+                    showInfo={false}
+                    className="relative h-full max-h-[16rem] w-auto origin-center scale-[1.45] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
+                  />
+                </span>
               </button>
 
               {/* ── Cartão da semana em degrau ──────────────────────
@@ -814,7 +821,7 @@ export function AppHomeScreen({
                   dobraria a opacidade e deixaria a emenda escura. */}
               <div className="mt-1 flex flex-col items-center">
                 <div
-                  className="px-6 pb-1 pt-2 text-center"
+                  className="px-6 pb-1 pt-2 short:pt-1.5 text-center"
                   style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                 >
                   <p
@@ -835,7 +842,10 @@ export function AppHomeScreen({
                   </p>
                 </div>
 
-                <div className="w-full rounded-[26px] px-4 pb-4 pt-3" style={glass}>
+                <div
+                  className="w-full rounded-[26px] px-4 pb-4 pt-3 short:pb-3 short:pt-2"
+                  style={glass}
+                >
                   {/* Medidas da semana (silenciadas no Modo Cuidado) */}
                   {!careMode && (
                     <>
@@ -856,7 +866,7 @@ export function AppHomeScreen({
                         />
                       </div>
 
-                      <div className="mt-3 grid grid-cols-3">
+                      <div className="mt-3 short:mt-2 grid grid-cols-3">
                         {[
                           { emoji: "📏", value: baby.size, label: "Comprimento" },
                           { emoji: "⚖️", value: baby.weight, label: "Peso" },
@@ -871,7 +881,7 @@ export function AppHomeScreen({
                                 : "rgba(150,110,120,0.16)",
                             }}
                           >
-                            <span className="text-xl leading-none">{s.emoji}</span>
+                            <span className="text-xl short:text-lg leading-none">{s.emoji}</span>
                             <p
                               className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
                             >
@@ -890,7 +900,7 @@ export function AppHomeScreen({
 
               {/* ── Progresso em 3 colunas: a barra mora no MEIO, entre as
                   duas datas — é assim no conceito, não largura cheia. ── */}
-              <div className="mt-2.5 rounded-[22px] px-4 py-3" style={glass}>
+              <div className="mt-2.5 short:mt-2 rounded-[22px] px-4 py-3 short:py-2" style={glass}>
                 <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
                   <div className="text-left">
                     <p className={`text-[10px] font-medium ${cardMuted}`}>Início</p>
@@ -904,7 +914,7 @@ export function AppHomeScreen({
                       {Math.round(progress ?? 0)}% concluído
                     </p>
                     {/* Trilho com o coração na posição de hoje */}
-                    <div className="relative mt-1.5 h-5">
+                    <div className="relative mt-1.5 h-5 short:h-4 short:mt-1">
                       <div
                         className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full"
                         style={{
@@ -940,7 +950,7 @@ export function AppHomeScreen({
               {/* ── Saudação do dia com a dica do clima ─────────────── */}
               {weather && (
                 <div
-                  className="mt-2.5 flex items-start gap-3 rounded-[22px] px-4 py-3"
+                  className="mt-2.5 short:mt-2 flex items-start gap-3 rounded-[22px] px-4 py-3 short:py-2"
                   style={glass}
                 >
                   <span className="mt-0.5 text-xl leading-none">{weather.tipEmoji}</span>

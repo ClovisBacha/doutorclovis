@@ -4,6 +4,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Tela CURTA: iPhone no Safari perde ~150px para a barra de endereço (svh
+   ~780 num aparelho de 932). O modo compacto espreme respiros e tipografia
+   da home para caber TUDO sem nada sobrepor nada. */
+@custom-variant short {
+  @media (max-height: 849px) {
+    @slot;
+  }
+}
+
 /*
  * Design system definition.
  *
@@ -1176,7 +1185,7 @@ button:active > .duo3d {
     transform: translateY(0) scale(1);
   }
   50% {
-    transform: translateY(-6px) scale(1.03);
+    transform: translateY(-3px) scale(1.015);
   }
 }
 .dc-orb {
