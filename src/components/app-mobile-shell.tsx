@@ -27,7 +27,9 @@ import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
 import skyManha from "@/assets/sky/manha.webp";
-import skyDia from "@/assets/sky/dia.webp";
+import skyMeioDia from "@/assets/sky/meio-dia.webp";
+import skyTarde from "@/assets/sky/tarde.webp";
+import skyGolden from "@/assets/sky/golden-hour.webp";
 import skyEntardecer from "@/assets/sky/entardecer.webp";
 import skyNoite from "@/assets/sky/noite.webp";
 import skyMadrugada from "@/assets/sky/madrugada.webp";
@@ -617,8 +619,10 @@ const SKY_SLOTS: { from: number; to: number; nome: string; src: string; dark: bo
   { from: 4, to: 6, nome: "pré-amanhecer", src: skyPreAmanhecer, dark: true },
   { from: 6, to: 8, nome: "amanhecer", src: skyAmanhecer, dark: false },
   { from: 8, to: 11, nome: "manhã", src: skyManha, dark: false },
-  { from: 11, to: 17, nome: "dia", src: skyDia, dark: false },
-  { from: 17, to: 19, nome: "entardecer", src: skyEntardecer, dark: false },
+  { from: 11, to: 14, nome: "meio-dia", src: skyMeioDia, dark: false },
+  { from: 14, to: 16, nome: "tarde", src: skyTarde, dark: false },
+  { from: 16, to: 18, nome: "golden hour", src: skyGolden, dark: false },
+  { from: 18, to: 19, nome: "entardecer", src: skyEntardecer, dark: false },
   { from: 19, to: 21, nome: "anoitecer", src: skyAnoitecer, dark: true },
   { from: 21, to: 24, nome: "noite", src: skyNoite, dark: true },
 ];
