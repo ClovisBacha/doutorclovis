@@ -56,14 +56,18 @@ type Particula = { x: number; y: number; delay: number; size?: number };
    a rotação mora DENTRO do keyframe, junto do deslocamento. */
 const ESTRELAS_CADENTES: Particula[] = [
   { x: 1, y: 20, delay: 0 }, // desce pela calha esquerda
-  { x: 86, y: 30, delay: 21 }, // e a seguinte, pela direita
+  { x: 86, y: 30, delay: 32 }, // e a seguinte, pela direita, 32s depois
 ];
 
 /* ── Pré-amanhecer (04–06): as últimas estrelas e a névoa baixa ─────
    A hora tem duas coisas ao mesmo tempo: o céu ainda tem estrela, e o chão
-   ainda tem neblina. A névoa é uma faixa única logo abaixo do bebê (zona
-   C, estendida) — mais para baixo ela cai atrás do cartão de medidas. */
-const NEVOAS: Particula[] = [{ x: 0, y: 55, delay: 0 }];
+   ainda tem neblina.
+   A névoa é uma faixa única na zona C. Medida ao vivo, a versão anterior
+   (y 55, 8% de altura) tinha o PICO em cima dos cartões e quase não pisava
+   no vão limpo entre o bebê e eles — lia como brilho de tela mal calibrado.
+   Agora é mais fina, o pico cai no vão, e só a barra de baixo escorrega
+   atrás do cartão: é esse o gesto de neblina assentando. */
+const NEVOAS: Particula[] = [{ x: 0, y: 53.5, delay: 0 }];
 const ESTRELAS_QUE_APAGAM: Particula[] = [
   { x: 24, y: 3.5, delay: 0, size: 3 },
   { x: 60, y: 4.5, delay: 5, size: 3 },
@@ -72,24 +76,25 @@ const ESTRELAS_QUE_APAGAM: Particula[] = [
 ];
 /* A arte do pré-amanhecer já vem cheia de estrelas pintadas, e ponto parado
    some no meio delas. O que NÃO existe na arte é movimento — por isso a cena
-   ganha um satélite: um pontinho atravessando a faixa livre do alto em 34s,
-   devagar o bastante para ser satélite e não estrela cadente. Às 5 da manhã é
-   o que se vê no céu de verdade. */
+   ganha um satélite: um pontinho atravessando a faixa livre do alto a 6px/s
+   — dezesseis vezes mais devagar que o meteoro da madrugada, então ninguém
+   confunde os dois. Às 5 da manhã é o que se vê no céu de verdade. */
 const SATELITE: Particula = { x: 16, y: 5.5, delay: 6, size: 3 };
 
 /* ── Anoitecer (19–21): as primeiras estrelas, acendendo em sequência ──
    Atrasos crescentes: elas aparecem uma a uma, como no céu de verdade.
-   Duas versões atrás havia estrelas em (41,11) e (80,14) — a primeira
-   sumia atrás do "Clovis", a segunda atrás da pílula do parto. E as de 2px
-   se perdiam no gradiente do pôr do sol. Agora todas têm 3px e ficam nas
-   zonas A e B. */
+   Todas com 3px (as de 2px se perdiam no gradiente do poente) e todas na
+   parte ESCURA do céu: nas calhas, a arte das 20h só é escura até y ~24%;
+   de 26% pra baixo entram as nuvens de fogo do pôr do sol, e estrela sobre
+   faixa alaranjada é astronomicamente errada — lê como pixel morto. As
+   primeiras estrelas nascem do lado escuro do céu. */
 const PRIMEIRAS_ESTRELAS: Particula[] = [
   { x: 22, y: 2.4, delay: 0, size: 3 },
   { x: 58, y: 4.2, delay: 1.6, size: 3 },
-  { x: 8, y: 21, delay: 3.4, size: 3 },
-  { x: 92, y: 27, delay: 5.1, size: 3 },
-  { x: 5, y: 36, delay: 6.8, size: 3 },
-  { x: 94, y: 42, delay: 8.2, size: 3 },
+  { x: 8, y: 19, delay: 3.4, size: 3 },
+  { x: 92, y: 18, delay: 5.1, size: 3 },
+  { x: 5, y: 24, delay: 6.8, size: 3 },
+  { x: 94, y: 23, delay: 8.2, size: 3 },
 ];
 
 /* ── Noite (21–24): vaga-lumes subindo nas laterais ─────────────────
@@ -104,70 +109,119 @@ const VAGALUMES: Particula[] = [
 ];
 
 /* ── Amanhecer (06–08): passarinhos ao longe ────────────────────────
-   Três, em alturas e atrasos diferentes, cruzando o alto do céu (acima da
-   tinta do bebê). É a hora em que eles cantam. Passar por trás da
-   assinatura por um instante não é defeito: pássaro distante faz isso. */
+   Os três moram na zona A (y 0–6), acima da assinatura. Antes dois deles
+   ficavam em y 6.5 e 11.8: um cruzava POR TRÁS das letras de "Clovis"
+   durante mais de um terço do ciclo, piscando nos vãos das letras, e o
+   outro pairava sobre o "Acompanhando" como um acento solto. Tamanhos
+   diferentes (12/9/11) devolvem a profundidade que a faixa estreita tira. */
 const PASSAROS: Particula[] = [
-  { x: 6, y: 2.5, delay: 0, size: 12 },
-  { x: 2, y: 11.8, delay: 11, size: 10 },
-  { x: 10, y: 6.5, delay: 22, size: 11 },
+  { x: 6, y: 2.4, delay: 0, size: 12 },
+  { x: 2, y: 4.0, delay: 15, size: 9 },
+  { x: 10, y: 5.4, delay: 30, size: 11 },
 ];
 
 /* ── Manhã (08–11): sementinhas de dente-de-leão ────────────────────
-   Nas calhas, subindo. Amarra com as Sementinhas, a moeda do app. */
+   Nas calhas, subindo. Amarra com as Sementinhas, a moeda do app.
+   A primeira versão era um círculo branco borrado: media 1,2:1 de
+   contraste sobre o céu creme e não tinha forma nenhuma — lia como poeira
+   no sensor. Agora é um paraquedinha desenhado, com filamentos e haste. */
 const SEMENTINHAS: Particula[] = [
-  { x: 8, y: 46, delay: 0, size: 6 },
-  { x: 91, y: 38, delay: 6, size: 5 },
-  { x: 13, y: 53, delay: 12, size: 4 },
-  { x: 87, y: 52, delay: 17, size: 6 },
+  { x: 8, y: 46, delay: 0, size: 9 },
+  { x: 91, y: 38, delay: 6, size: 8 },
+  { x: 11, y: 53, delay: 12, size: 7 },
+  { x: 87, y: 52, delay: 17, size: 9 },
 ];
 
 /* ── Meio-dia (11–14): o sol a pino ─────────────────────────────────
-   Dois registros da mesma ideia: o halo quente no alto (zona A, achatado
-   para não descer até o bebê — a versão anterior era um círculo de 62vw e
-   cobria a barriga dele) e os estalos de luz nas calhas, aquele brilho de
-   quatro pontas que só aparece com sol forte. */
+   Dois registros da mesma ideia: o halo quente entrando pelo topo do quadro
+   e os estalos de luz nas calhas, aquele brilho de quatro pontas que só
+   aparece com sol forte. */
 const ESTALOS: Particula[] = [
+  // Atrasos de 6 em 6 num ciclo de 18s: um estalo a cada 6s, espaçados por
+  // igual. Com 0/3.2/6.4 os três piscavam nos primeiros 6s e depois vinham
+  // 12s de silêncio — a mesma armadilha da "chuva de meteoro".
   { x: 5, y: 26, delay: 0 },
-  { x: 91, y: 34, delay: 3.2 },
-  { x: 8, y: 45, delay: 6.4 },
+  { x: 90, y: 41, delay: 6 }, // sobre a borda da nuvem pintada da calha direita
+  { x: 8, y: 45, delay: 12 },
 ];
 
-/* ── Tarde (14–16): nuvens à deriva no alto ─────────────────────── */
-const NUVENS: Particula[] = [
-  { x: 4, y: 7, delay: 0, size: 92 },
-  { x: 2, y: 15, delay: 24, size: 66 },
-];
+/* ── Tarde (14–16): o aviãozinho lá em cima ─────────────────────
+   Um só, cruzando o alto. Ver o porquê no comentário de dcPlaneCross: a
+   arte da tarde já é feita de nuvens, e nuvem falsa ao lado de nuvem
+   pintada vira borrão. */
+const AVIAO: Particula = { x: 0, y: 4, delay: 0, size: 17 };
 
-/* ── Golden hour (16–18): poeira dourada nas laterais ───────────── */
+/* ── Golden hour (16–18): poeira dourada nas laterais ─────────────
+   Menores e mais suaves que na primeira versão: com o miolo branco opaco
+   e a borda definida eles liam como bolhinhas luminosas, e poeira em
+   contraluz é justamente o contrário — desfocada e de baixo contraste. */
 const MOTES: Particula[] = [
-  { x: 7, y: 44, delay: 0, size: 5 },
-  { x: 92, y: 36, delay: 3.5, size: 4 },
-  { x: 11, y: 55, delay: 7, size: 6 },
-  { x: 88, y: 50, delay: 10.5, size: 4 },
-  { x: 5, y: 33, delay: 14, size: 5 },
+  { x: 7, y: 44, delay: 0, size: 4 },
+  { x: 92, y: 36, delay: 3.5, size: 3 },
+  { x: 9, y: 50, delay: 7, size: 5 },
+  { x: 88, y: 50, delay: 10.5, size: 3 },
+  { x: 5, y: 33, delay: 14, size: 4 },
 ];
 
-/* ── Entardecer (18–19): o bando voltando, em V ─────────────────── */
+/* ── Entardecer (18–19): o bando voltando, em V ──────────────────
+   O bando viaja para a ESQUERDA, então o líder é quem tem dx 0 e as duas
+   linhas ficam atrás dele, abrindo para a direita. A primeira versão era
+   simétrica nos dois lados com o pássaro central embaixo: um V apontando
+   para BAIXO, atravessado à direção do voo. Lia como cinco pingos num
+   sorriso, não como formação. */
 const BANDO: { dx: number; dy: number; size: number }[] = [
-  { dx: 0, dy: 0, size: 12 },
-  { dx: -14, dy: -7, size: 11 },
-  { dx: 14, dy: -7, size: 11 },
-  { dx: -27, dy: -14, size: 9 },
-  { dx: 27, dy: -14, size: 9 },
+  { dx: 0, dy: 0, size: 12 }, // o líder, na ponta
+  { dx: 15, dy: -8, size: 11 },
+  { dx: 15, dy: 8, size: 10 },
+  { dx: 30, dy: -16, size: 9 },
+  { dx: 30, dy: 16, size: 9 },
 ];
 
-/** A silhueta de um pássaro distante: um "v" aberto, nada mais. Desenho com
- *  mais detalhe que isso, no tamanho que cabe aqui, vira mancha. */
+/**
+ * A silhueta de um pássaro distante: um "v" aberto, nada mais. Desenho com
+ * mais detalhe que isso, no tamanho que cabe aqui, vira mancha.
+ *
+ * CUIDADO COM O SENTIDO DO Y. Em SVG o y cresce para BAIXO, então o path
+ * antigo — que ia de y 9 (pontas) para y 1.5 (meio) — desenhava um "^", de
+ * cabeça para baixo: pontas das asas embaixo e corpo em cima. Ao lado do
+ * título aquilo lia como acento circunflexo, não como bicho. O certo é o
+ * oposto: pontas das asas EM CIMA (y 3) e o corpo no vale (y 9).
+ */
 function Passaro({ size, cor }: { size: number; cor: string }) {
   return (
     <svg width={size} height={size * 0.55} viewBox="0 0 20 11" fill="none">
       <path
-        d="M1 9C4.5 9 7 1.5 10 1.5C13 1.5 15.5 9 19 9"
+        d="M1 3C4 3 6.5 9 10 9C13.5 9 16 3 19 3"
         stroke={cor}
         strokeWidth="1.8"
         strokeLinecap="round"
       />
+    </svg>
+  );
+}
+
+/**
+ * Uma sementinha de dente-de-leão: leque de filamentos, haste e o grão.
+ * Era um círculo com gradiente radial — sem forma, sem assimetria, e com o
+ * miolo comido pelo próprio gradiente (3px visíveis de 6 declarados). Um
+ * ponto de luz redondo no céu não lê como semente, lê como poeira na lente.
+ */
+function Sementinha({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size * 1.35}
+      viewBox="0 0 12 16"
+      fill="none"
+      // A sombra deslocada vira CONTORNO; centrada em 0 0 ela só dilui. É o
+      // que dá o contraste contra o creme do céu da manhã.
+      style={{ filter: "drop-shadow(0 1px 1.5px rgba(110,74,116,0.8))" }}
+    >
+      <g stroke="rgba(255,255,255,0.97)" strokeWidth="1.1" strokeLinecap="round">
+        <path d="M6 6.5 1.6 1.4M6 6.5 4 0.8M6 6.5 6.4 0.6M6 6.5 8.6 1M6 6.5 10.6 1.8" />
+        <path d="M6 6.5V13" strokeWidth="0.9" />
+      </g>
+      <circle cx="6" cy="14" r="1.35" fill="rgba(255,255,255,0.97)" />
     </svg>
   );
 }
@@ -248,11 +302,11 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
             className="dc-mist absolute left-0 w-full"
             style={{
               top: `${n.y}%`,
-              height: "8%",
+              height: "5%",
               animationDelay: `${n.delay}s`,
               background:
-                "linear-gradient(180deg, transparent, rgba(214,222,244,0.34) 50%, transparent)",
-              filter: "blur(10px)",
+                "linear-gradient(180deg, transparent, rgba(214,222,244,0.42) 50%, transparent)",
+              filter: "blur(7px)",
             }}
           />
         ))}
@@ -294,7 +348,10 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
               animationDelay: `${v.delay}s`,
               background:
                 "radial-gradient(circle, #fff6c2 0%, #fbe08a 55%, rgba(251,224,138,0) 100%)",
-              boxShadow: "0 0 10px 3px rgba(253,224,120,0.45)",
+              // Halo forte: a arte das 21–24h não é noite fechada, é um
+              // crepúsculo lavanda com nuvens acesas. O lampejo precisa
+              // vencer um fundo claro nas calhas.
+              boxShadow: "0 0 14px 5px rgba(253,224,120,0.75)",
             }}
           />
         ))}
@@ -331,21 +388,11 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
         {SEMENTINHAS.map((e, i) => (
           <span
             key={i}
-            className="dc-seed absolute rounded-full"
-            style={{
-              left: `${e.x}%`,
-              top: `${e.y}%`,
-              width: `${e.size}px`,
-              height: `${e.size}px`,
-              animationDelay: `${e.delay}s`,
-              background:
-                "radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.6) 32%, rgba(255,255,255,0) 74%)",
-              // Semente branca em céu creme é branco no branco: sumia. A
-              // sombra segue o alfa (drop-shadow, não box-shadow, que faria
-              // um círculo duro) e dá o contorno que separa do fundo claro.
-              filter: "drop-shadow(0 0 3px rgba(120,92,132,0.45))",
-            }}
-          />
+            className="dc-seed absolute"
+            style={{ left: `${e.x}%`, top: `${e.y}%`, animationDelay: `${e.delay}s` }}
+          >
+            <Sementinha size={e.size ?? 8} />
+          </span>
         ))}
       </div>
     );
@@ -354,18 +401,23 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
   if (slot === "meio-dia") {
     return (
       <div aria-hidden className={camada}>
-        {/* Halo achatado, colado no topo: o sol a pino respirando. A altura
-            (13vh) é o que o mantém acima da tinta do bebê. */}
+        {/* O sol a pino respirando: metade do halo fica FORA do quadro, o que
+            faz a luz parecer entrar pelo topo. Antes ele tinha 74vw e
+            começava em y 0.5%, ou seja, era uma elipse larga centrada
+            exatamente sobre "Acompanhando / Clovis" — lia como scrim de
+            texto, não como sol, e ainda por cima com o miolo tão fraco
+            (0.16 de opacidade) que na prática não se via nada. Menor,
+            mais alto e mais forte. */}
         <span
           className="dc-ray absolute rounded-full"
           style={{
             left: "50%",
-            top: "0.5%",
-            width: "74vw",
-            height: "13vh",
-            marginLeft: "-37vw",
+            top: "-3%",
+            width: "56vw",
+            height: "9vh",
+            marginLeft: "-28vw",
             background:
-              "radial-gradient(ellipse at center, rgba(255,255,255,0.55) 0%, rgba(255,247,214,0.24) 42%, rgba(255,255,255,0) 72%)",
+              "radial-gradient(ellipse at center, rgba(255,255,255,0.72) 0%, rgba(255,247,214,0.26) 42%, rgba(255,255,255,0) 72%)",
           }}
         />
         {ESTALOS.map((e, i) => (
@@ -382,21 +434,27 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
   if (slot === "tarde") {
     return (
       <div aria-hidden className={camada}>
-        {NUVENS.map((n, i) => (
-          <span
-            key={i}
-            className="dc-cloud absolute rounded-full"
-            style={{
-              left: `${n.x}%`,
-              top: `${n.y}%`,
-              width: `${n.size}px`,
-              height: `${(n.size ?? 80) * 0.34}px`,
-              animationDelay: `${n.delay}s`,
-              background: "rgba(255,255,255,0.72)",
-              filter: "blur(9px)",
-            }}
-          />
-        ))}
+        <span className="dc-aviao absolute" style={{ left: `${AVIAO.x}%`, top: `${AVIAO.y}%` }}>
+          <svg
+            width={AVIAO.size}
+            height={(AVIAO.size ?? 13) * 0.62}
+            viewBox="0 0 26 16"
+            fill="none"
+          >
+            {/* O rastro sai da cauda e se desfaz — é ele que dá a escala de
+                "10 km de altura". Sem o rastro o avião vira um risco. */}
+            <path
+              d="M6 8H0"
+              stroke="rgba(255,255,255,0.55)"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+            <path
+              d="M23.4 8 15 9.6h-3.1l-3.4 4H7l1.9-4H6.4l-1.3 1.5H3.9l1-2.5-1-2.5h1.2l1.3 1.5h2.5L7 2.4h1.5l3.4 4H15L23.4 8Z"
+              fill="rgba(72,86,116,0.72)"
+            />
+          </svg>
+        </span>
       </div>
     );
   }
@@ -415,11 +473,12 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
               height: `${m.size}px`,
               animationDelay: `${m.delay}s`,
               background:
-                "radial-gradient(circle, rgba(255,252,236,1) 0%, rgba(252,205,104,0.7) 48%, rgba(252,211,120,0) 100%)",
-              // Mesmo motivo das sementinhas: dourado sobre nuvem dourada
-              // desaparece. O miolo vira quase branco e a sombra âmbar
-              // escura destaca o grão contra a luz.
-              filter: "drop-shadow(0 0 3px rgba(146,84,26,0.5))",
+                "radial-gradient(circle, rgba(255,246,220,0.85) 0%, rgba(250,196,92,0.55) 48%, rgba(252,211,120,0) 100%)",
+              // Poeira em contraluz é DESFOCADA e de baixo contraste. Com o
+              // miolo branco opaco e a borda definida, o grão lia como
+              // bolhinha luminosa. O blur de meio pixel tira a borda; a
+              // sombra âmbar é o que ainda o separa da nuvem dourada.
+              filter: "blur(0.5px) drop-shadow(0 0 3px rgba(146,84,26,0.5))",
             }}
           />
         ))}
@@ -433,7 +492,12 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
         {/* O bando inteiro é UM elemento que atravessa; os pássaros são
             posições relativas dentro dele, para a formação em V não se
             desmanchar no meio do caminho. */}
-        <span className="dc-flock absolute" style={{ left: "0%", top: "9%" }}>
+        {/* y 5% e não 9%: com 9 o bando voava dentro da faixa da assinatura
+            (6–17%) e o primeiro terço da travessia acontecia POR TRÁS de
+            "Acompanhando / Clovis". Em 5% ele passa atrás do botão de menu e
+            do chip de clima, que são opacos — oclusão limpa, sem piscar nos
+            vãos das letras. */}
+        <span className="dc-flock absolute" style={{ left: "0%", top: "5%" }}>
           {BANDO.map((p, i) => (
             <span key={i} className="absolute" style={{ left: `${p.dx}px`, top: `${p.dy}px` }}>
               <Passaro size={p.size} cor="rgba(52,30,52,0.88)" />

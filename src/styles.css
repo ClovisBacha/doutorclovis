@@ -1264,11 +1264,14 @@ button:active > .duo3d {
     transform: translate3d(-7vw, 22vh, 0) rotate(100deg) scaleX(0.4);
   }
 }
+/* 64s, não 42: com duas riscas defasadas, 42s dava um meteoro a cada 21
+   segundos — três por minuto, chuva de Perseidas. Numa tela que diz "tente
+   descansar um pouco", isso é o oposto de descansar. */
 .dc-shooting-star {
-  animation: dcShootingStar 42s linear infinite;
+  animation: dcShootingStar 64s linear infinite;
 }
 .dc-shooting-star-l {
-  animation: dcShootingStarL 42s linear infinite;
+  animation: dcShootingStarL 64s linear infinite;
 }
 
 /* ── Pré-amanhecer: as últimas estrelas se apagando ───────────────
@@ -1305,16 +1308,20 @@ button:active > .duo3d {
     transform: translate3d(0, 0, 0);
   }
   10%,
-  85% {
+  55% {
     opacity: 0.85;
   }
+  /* Some em 62% e fica parado até o fim: ~25s de travessia e ~25s de céu
+     vazio. Antes ficava aceso em 96% do ciclo e reiniciava na hora, o que
+     denuncia o laço e contraria a regra do RITMO lá no cabeçalho. */
+  62%,
   100% {
     opacity: 0;
     transform: translate3d(48vw, -4vh, 0);
   }
 }
 .dc-satellite {
-  animation: dcSatellite 34s linear infinite;
+  animation: dcSatellite 55s linear infinite;
 }
 
 /* ── Pré-amanhecer: névoa baixa subindo e se dissolvendo ─────────── */
@@ -1332,7 +1339,7 @@ button:active > .duo3d {
   }
   99% {
     opacity: 0;
-    transform: translate3d(0, -22%, 0);
+    transform: translate3d(0, -18%, 0);
   }
 }
 .dc-mist {
@@ -1340,6 +1347,10 @@ button:active > .duo3d {
 }
 
 /* ── Anoitecer: as estrelas acendem UMA A UMA ────────────────────── */
+/* O laço FECHA em zero. Antes terminava em 0.55 e recomeçava em 0: um
+   degrau de meia opacidade num único quadro, ou seja, cada estrela apagava
+   de estalo a cada 14s. Com seis defasadas, isso era um piscar seco na
+   periferia umas 26 vezes por minuto — e nenhum print mostra isso. */
 @keyframes dcStarWake {
   0%,
   8% {
@@ -1347,13 +1358,14 @@ button:active > .duo3d {
     transform: scale(0.5);
   }
   22%,
-  88% {
+  80% {
     opacity: 0.95;
     transform: scale(1);
   }
+  96%,
   100% {
-    opacity: 0.55;
-    transform: scale(0.9);
+    opacity: 0;
+    transform: scale(0.5);
   }
 }
 .dc-star-wake {
@@ -1361,30 +1373,56 @@ button:active > .duo3d {
 }
 
 /* ── Noite: vaga-lumes subindo devagar ───────────────────────────── */
+/* ── Noite: vaga-lumes ───────────────────────────────────────────
+   A primeira versão era uma rampa contínua de opacidade: o bicho ficava
+   ACESO em 90% do ciclo, subindo a 12px/s. Isso não é vaga-lume, é brasa
+   subindo de fogueira. A assinatura do vaga-lume é o contrário — apagado
+   quase o tempo todo, com três lampejos curtos e secos ao longo da subida.
+   Os quadros que só declaram opacidade deixam o transform interpolando
+   sozinho, então a trilha continua contínua enquanto a luz pisca. */
 @keyframes dcFirefly {
   0%,
   100% {
     opacity: 0;
     transform: translate3d(0, 0, 0);
   }
-  15% {
-    opacity: 0.85;
+  12% {
+    opacity: 0;
+    transform: translate3d(0.6vw, -1.6vh, 0);
   }
-  50% {
-    opacity: 0.35;
-    transform: translate3d(3vw, -7vh, 0);
+  14% {
+    opacity: 0.95;
   }
-  80% {
-    opacity: 0.75;
-    transform: translate3d(-2vw, -13vh, 0);
+  16% {
+    opacity: 0;
+  }
+  43% {
+    opacity: 0;
+    transform: translate3d(2vw, -5.5vh, 0);
+  }
+  45% {
+    opacity: 0.95;
+  }
+  47% {
+    opacity: 0;
+  }
+  74% {
+    opacity: 0;
+    transform: translate3d(-1vw, -9vh, 0);
+  }
+  76% {
+    opacity: 0.95;
+  }
+  78% {
+    opacity: 0;
   }
   99% {
     opacity: 0;
-    transform: translate3d(1vw, -18vh, 0);
+    transform: translate3d(0.5vw, -12vh, 0);
   }
 }
 .dc-firefly {
-  animation: dcFirefly 17s ease-in-out infinite;
+  animation: dcFirefly 22s ease-in-out infinite;
 }
 
 /* ── Amanhecer: passarinhos cruzando ao longe ────────────────────
@@ -1402,26 +1440,32 @@ button:active > .duo3d {
   }
   100% {
     opacity: 0;
-    /* Só 1.5vh de subida. Com os 5vh de antes, o pássaro que começava a 2%
-       da altura saía pela borda de cima no meio da travessia e a cena ficava
-       com dois pássaros em vez de três. */
-    transform: translate3d(58vw, -1.5vh, 0);
+    /* Só 1.5vh de subida: com os 5vh de antes, o pássaro que começava a 2%
+       da altura saía pela borda de CIMA no meio da travessia.
+       E 112vw de percurso porque com 58vw ele se apagava em x ~64% — no meio
+       do céu. Pássaro distante não evapora, ele sai pela borda. */
+    transform: translate3d(112vw, -1.5vh, 0);
   }
 }
+/* A asa fecha até 70%, não 45%: a tinta do pássaro tem ~4px de altura, e
+   comprimir à metade produzia um traço horizontal de 2px — o quadro em que
+   ele mais parecia arranhão na tela. A origem embaixo faz as PONTAS
+   descerem e o corpo ficar, que é o gesto certo da asa. */
 @keyframes dcBirdFlap {
   0%,
   100% {
     transform: scaleY(1);
   }
   50% {
-    transform: scaleY(0.45);
+    transform: scaleY(0.7);
   }
 }
 .dc-bird {
-  animation: dcBirdCross 34s linear infinite;
+  animation: dcBirdCross 46s linear infinite;
 }
 .dc-bird > span {
   animation: dcBirdFlap 0.9s ease-in-out infinite;
+  transform-origin: 50% 100%;
   display: block;
 }
 
@@ -1434,7 +1478,7 @@ button:active > .duo3d {
   }
   12%,
   80% {
-    opacity: 0.7;
+    opacity: 0.9;
   }
   50% {
     transform: translate3d(4vw, -8vh, 0);
@@ -1455,11 +1499,11 @@ button:active > .duo3d {
 @keyframes dcSunRays {
   0%,
   100% {
-    opacity: 0.16;
+    opacity: 0.22;
     transform: scale(1);
   }
   50% {
-    opacity: 0.3;
+    opacity: 0.45;
     transform: scale(1.05);
   }
 }
@@ -1469,12 +1513,12 @@ button:active > .duo3d {
 
 /* ── Meio-dia: estalos de luz de quatro pontas ───────────────────
    Duas barras cruzadas nos pseudo-elementos: a caixa do elemento continua
-   sendo a barra horizontal, então ele mede 18×2px e não invade nada — o
+   sendo a barra horizontal, então ele mede 22×2px e não invade nada — o
    `rotate` do `::after` não entra no getBoundingClientRect do pai. */
 .dc-glint {
-  width: 18px;
+  width: 22px;
   height: 2px;
-  animation: dcGlint 13s ease-in-out infinite;
+  animation: dcGlint 18s ease-in-out infinite;
 }
 .dc-glint::before,
 .dc-glint::after {
@@ -1484,8 +1528,16 @@ button:active > .duo3d {
   border-radius: 9999px;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 50%, transparent);
 }
+/* Braço vertical com METADE do comprimento do horizontal. Com os dois
+   iguais o desenho era um "+" perfeito e lia como ícone de interface, não
+   como brilho de sol. Estrela de luz real tem um eixo dominante. */
 .dc-glint::after {
-  transform: rotate(90deg);
+  transform: rotate(90deg) scaleX(0.5);
+}
+/* O núcleo: sem ele são duas barras se cruzando, com ele é um ponto de luz
+   com raios saindo. */
+.dc-glint::before {
+  box-shadow: 0 0 5px 1px rgba(255, 255, 255, 0.6);
 }
 @keyframes dcGlint {
   0%,
@@ -1503,23 +1555,37 @@ button:active > .duo3d {
   }
 }
 
-/* ── Tarde: nuvens à deriva ──────────────────────────────────────── */
-@keyframes dcCloudDrift {
-  0% {
+/* ── Tarde: o aviãozinho lá em cima ──────────────────────────────
+   A primeira versão punha duas nuvens borradas à deriva. Não funcionou, e o
+   motivo é de princípio: a arte da tarde JÁ é feita de cúmulos pintados com
+   borda de couve-flor e sombreado interno. Uma elipse com blur ao lado
+   deles não vira nuvem distante, vira dedo na tela — nuvem longe é pequena
+   e NÍTIDA; pequena e borrada não existe na natureza. Uma delas ainda por
+   cima passava a vida inteira atrás das pílulas.
+   O que a arte não tem é uma coisa nítida se movendo. Daí o avião a 10km,
+   com o rastro se desfazendo atrás: é o detalhe que faz alguém olhar pra
+   cima numa tarde de céu limpo. Ciclo longo — ele cruza uma vez a cada
+   1min40, não fica em cartaz. */
+@keyframes dcPlaneCross {
+  /* Fica parado e invisível fora do quadro na primeira metade: ~45s de céu
+     vazio, depois uma travessia de ~42s. Sem essa pausa ele estaria sempre
+     na tela atravessando devagarinho, que é o oposto de "olha, um avião". */
+  0%,
+  45% {
     opacity: 0;
-    transform: translate3d(-14vw, 0, 0);
+    transform: translate3d(-16vw, 0, 0);
   }
-  10%,
-  85% {
-    opacity: 0.5;
+  50%,
+  92% {
+    opacity: 0.85;
   }
   100% {
     opacity: 0;
-    transform: translate3d(30vw, -2vh, 0);
+    transform: translate3d(118vw, -1vh, 0);
   }
 }
-.dc-cloud {
-  animation: dcCloudDrift 58s linear infinite;
+.dc-aviao {
+  animation: dcPlaneCross 100s linear infinite;
 }
 
 /* ── Golden hour: poeira dourada suspensa ────────────────────────
@@ -1532,14 +1598,14 @@ button:active > .duo3d {
     transform: translate3d(0, 0, 0);
   }
   20% {
-    opacity: 0.85;
+    opacity: 0.6;
   }
   55% {
-    opacity: 0.5;
+    opacity: 0.42;
     transform: translate3d(2vw, -4vh, 0);
   }
   85% {
-    opacity: 0.7;
+    opacity: 0.5;
     transform: translate3d(-1vw, -8vh, 0);
   }
 }
@@ -1548,23 +1614,29 @@ button:active > .duo3d {
 }
 
 /* ── Entardecer: o bando voltando, em V ──────────────────────────
-   O contraponto do amanhecer: de manhã saem, à tarde voltam. */
+   O contraponto do amanhecer: de manhã saem, à tarde voltam.
+   O bando ENTRA pela borda e SAI pela outra. Antes começava em 52vw, ou
+   seja, materializava no meio do céu, e terminava em -16vw ainda dentro do
+   quadro. E ficava visível 100% do ciclo: bando permanente não é bando, é
+   adesivo. Agora fica parado e invisível na primeira metade — uma travessia
+   a cada 96s, que é o que faz dele um acontecimento. */
 @keyframes dcFlockHome {
-  0% {
+  0%,
+  52% {
     opacity: 0;
-    transform: translate3d(52vw, 0, 0);
+    transform: translate3d(108vw, 0, 0);
   }
-  10%,
-  86% {
-    opacity: 0.72;
+  57%,
+  94% {
+    opacity: 0.55;
   }
   100% {
     opacity: 0;
-    transform: translate3d(-16vw, -6vh, 0);
+    transform: translate3d(-30vw, -1.5vh, 0);
   }
 }
 .dc-flock {
-  animation: dcFlockHome 40s linear infinite;
+  animation: dcFlockHome 96s linear infinite;
 }
 
 /* Todo elemento daqui tem `animation-delay` para escalonar a cena. Sem
@@ -1584,40 +1656,23 @@ button:active > .duo3d {
 .dc-seed,
 .dc-ray,
 .dc-glint,
-.dc-cloud,
+.dc-aviao,
 .dc-mote,
 .dc-flock {
   animation-fill-mode: both;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .dc-ray,
-  .dc-glint,
-  .dc-cloud,
-  .dc-mote,
-  .dc-flock {
-    animation: none;
-  }
-  .dc-glint,
-  .dc-cloud,
-  .dc-mote,
-  .dc-flock {
-    opacity: 0;
-  }
-}
+/* ── prefers-reduced-motion ─────────────────────────────────────────
+   Desligar a animação NÃO basta: sem ela o elemento volta ao estilo base,
+   que é opacidade 1. O halo do sol ficava assim com o miolo a 0.55 de alfa
+   — cerca de três vezes o pico animado, um borrão branco atrás do título
+   justamente para quem pediu menos ruído visual. Então cada efeito precisa
+   dizer explicitamente o que é o seu estado parado.
 
-@media (prefers-reduced-motion: reduce) {
-  .dc-bird,
-  .dc-bird > span,
-  .dc-seed {
-    animation: none;
-  }
-  .dc-bird,
-  .dc-seed {
-    opacity: 0;
-  }
-}
-
+   A régua: o que só existe em movimento (meteoro, pássaro, satélite,
+   vaga-lume, semente, bando, estalo, mote, avião) some. O que é atmosfera
+   (halo do sol, névoa, estrelas) fica, estático, na intensidade média que
+   a animação teria. Céu parado ainda é céu. */
 @media (prefers-reduced-motion: reduce) {
   .dc-shooting-star,
   .dc-shooting-star-l,
@@ -1625,14 +1680,42 @@ button:active > .duo3d {
   .dc-star-wake,
   .dc-star-fade,
   .dc-satellite,
-  .dc-firefly {
+  .dc-firefly,
+  .dc-bird,
+  .dc-bird > span,
+  .dc-seed,
+  .dc-ray,
+  .dc-glint,
+  .dc-aviao,
+  .dc-mote,
+  .dc-flock {
     animation: none;
   }
+
+  /* Só faz sentido em movimento — some. */
   .dc-shooting-star,
   .dc-shooting-star-l,
   .dc-satellite,
-  .dc-firefly {
+  .dc-firefly,
+  .dc-bird,
+  .dc-seed,
+  .dc-glint,
+  .dc-aviao,
+  .dc-mote,
+  .dc-flock {
     opacity: 0;
+  }
+
+  /* Atmosfera: fica parada, na média do ciclo. */
+  .dc-ray {
+    opacity: 0.22; /* o ciclo vai de 0.22 a 0.45 */
+  }
+  .dc-mist {
+    opacity: 0.4; /* o ciclo chega a 0.5 */
+  }
+  .dc-star-wake,
+  .dc-star-fade {
+    opacity: 0.8; /* estrela que não pisca ainda é estrela */
   }
 }
 

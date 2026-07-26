@@ -17,19 +17,18 @@
  */
 import { chromium } from "playwright";
 const OUT = process.env.SKY_OUT ?? "/tmp/sky-ambience";
-// hora -> [nome, momento do ciclo (ms) em que o efeito está no pico]
 // [hora, nome, instante do ciclo (ms) em que a cena está no pico]
 const PADRAO = [
-  [2, "madrugada", 39100],
-  [5, "pre-amanhecer", 11700],
-  [7, "amanhecer", 17000],
+  [2, "madrugada", 59650],
+  [5, "pre-amanhecer", 16500],
+  [7, "amanhecer", 23000],
   [9, "manha", 10000],
-  [12, "meio-dia", 780],
-  [15, "tarde", 20000],
-  [17, "golden-hour", 3800],
-  [18, "entardecer", 16000],
-  [20, "anoitecer", 12000],
-  [22, "noite", 14000],
+  [12, "meio-dia", 1080],
+  [15, "tarde", 70000],
+  [17, "golden-hour", 4750],
+  [18, "entardecer", 72000],
+  [20, "anoitecer", 7000],
+  [22, "noite", 3080],
 ];
 const CENAS = process.argv[2] ? JSON.parse(process.argv[2]) : PADRAO;
 let falhas = 0;
@@ -66,7 +65,7 @@ for (const [hora, nome, seek] of CENAS) {
       "dc-seed",
       "dc-ray",
       "dc-glint",
-      "dc-cloud",
+      "dc-aviao",
       "dc-mote",
       "dc-flock",
     ];
