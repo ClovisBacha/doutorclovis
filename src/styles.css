@@ -1203,6 +1203,439 @@ button:active > .duo3d {
   }
 }
 
+/* ══════════════ Ambiente do céu — vida de FUNDO na home ══════════════
+   Regras que valem para TODOS os efeitos daqui:
+
+   1. O bebê é o protagonista. Tudo vive nas bordas e no alto, atrás da
+      bolha — um pássaro cruzando na frente do bebê estraga a cena.
+   2. Só `transform` e `opacity`: é o que a GPU faz de graça. Qualquer
+      coisa que mexa em layout trava o scroll no celular.
+   3. Ciclos LONGOS com o efeito visível numa fração pequena. Uma estrela
+      cadente que cai a cada 3s vira chuva de meteoro e perde a graça.
+   4. Posições e atrasos são CONSTANTES, nunca aleatórios: `Math.random()`
+      no render quebraria a hidratação (servidor e cliente sorteariam
+      valores diferentes).
+   5. Tudo desliga em `prefers-reduced-motion` e no Modo Cuidado. */
+
+/* ── Madrugada: estrela cadente rara ───────────────────────────────
+   A rotação mora AQUI, e não no style inline do elemento: `transform` é uma
+   propriedade só, então a animação sobrescreve qualquer `rotate` de fora. Foi
+   exatamente o que aconteceu na primeira versão — a risca ficava horizontal
+   enquanto o percurso descia na diagonal, e parecia um traço quebrado ao lado
+   do título. Cada quadro repete o `rotate` junto do deslocamento.
+   O ângulo (80°) acompanha o percurso: 7vw para o lado contra 22vh para
+   baixo dá quase uma vertical, que é como meteoro cai mesmo. */
+@keyframes dcShootingStar {
+  0%,
+  92% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(80deg) scaleX(0.4);
+  }
+  93% {
+    opacity: 0.9;
+    transform: translate3d(0.5vw, 1.6vh, 0) rotate(80deg) scaleX(1);
+  }
+  99% {
+    opacity: 0;
+    transform: translate3d(7vw, 22vh, 0) rotate(80deg) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(7vw, 22vh, 0) rotate(80deg) scaleX(0.4);
+  }
+}
+/* A gêmea, descendo pela calha da direita: mesmo movimento espelhado. */
+@keyframes dcShootingStarL {
+  0%,
+  92% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(100deg) scaleX(0.4);
+  }
+  93% {
+    opacity: 0.9;
+    transform: translate3d(-0.5vw, 1.6vh, 0) rotate(100deg) scaleX(1);
+  }
+  99% {
+    opacity: 0;
+    transform: translate3d(-7vw, 22vh, 0) rotate(100deg) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-7vw, 22vh, 0) rotate(100deg) scaleX(0.4);
+  }
+}
+.dc-shooting-star {
+  animation: dcShootingStar 42s linear infinite;
+}
+.dc-shooting-star-l {
+  animation: dcShootingStarL 42s linear infinite;
+}
+
+/* ── Pré-amanhecer: as últimas estrelas se apagando ───────────────
+   O contrário do anoitecer: acendem fracas e somem quando o dia chega. */
+@keyframes dcStarFade {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  18% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  55% {
+    opacity: 0.35;
+  }
+  85%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.dc-star-fade {
+  animation: dcStarFade 24s ease-in-out infinite;
+}
+
+/* ── Pré-amanhecer: o satélite atravessando ──────────────────────
+   48vw em 34s dá ~6px por segundo: lento demais para ser estrela cadente,
+   rápido o bastante para se perceber que anda. O percurso todo cabe na
+   faixa livre entre o botão do menu e o chip de clima. */
+@keyframes dcSatellite {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  10%,
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(48vw, -4vh, 0);
+  }
+}
+.dc-satellite {
+  animation: dcSatellite 34s linear infinite;
+}
+
+/* ── Pré-amanhecer: névoa baixa subindo e se dissolvendo ─────────── */
+@keyframes dcMistRise {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 12%, 0);
+  }
+  45% {
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0.22;
+  }
+  99% {
+    opacity: 0;
+    transform: translate3d(0, -22%, 0);
+  }
+}
+.dc-mist {
+  animation: dcMistRise 26s ease-in-out infinite;
+}
+
+/* ── Anoitecer: as estrelas acendem UMA A UMA ────────────────────── */
+@keyframes dcStarWake {
+  0%,
+  8% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  22%,
+  88% {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+}
+.dc-star-wake {
+  animation: dcStarWake 14s ease-in-out infinite;
+}
+
+/* ── Noite: vaga-lumes subindo devagar ───────────────────────────── */
+@keyframes dcFirefly {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  15% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.35;
+    transform: translate3d(3vw, -7vh, 0);
+  }
+  80% {
+    opacity: 0.75;
+    transform: translate3d(-2vw, -13vh, 0);
+  }
+  99% {
+    opacity: 0;
+    transform: translate3d(1vw, -18vh, 0);
+  }
+}
+.dc-firefly {
+  animation: dcFirefly 17s ease-in-out infinite;
+}
+
+/* ── Amanhecer: passarinhos cruzando ao longe ────────────────────
+   `scaleY` alternando é o bater de asas. A silhueta é pequena (eles estão
+   longe) mas não translúcida: a 0.55 de opacidade eles sumiam no lilás do
+   amanhecer e viravam sujeira de tela. */
+@keyframes dcBirdCross {
+  0% {
+    opacity: 0;
+    transform: translate3d(-8vw, 0, 0);
+  }
+  8%,
+  88% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+    /* Só 1.5vh de subida. Com os 5vh de antes, o pássaro que começava a 2%
+       da altura saía pela borda de cima no meio da travessia e a cena ficava
+       com dois pássaros em vez de três. */
+    transform: translate3d(58vw, -1.5vh, 0);
+  }
+}
+@keyframes dcBirdFlap {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.45);
+  }
+}
+.dc-bird {
+  animation: dcBirdCross 34s linear infinite;
+}
+.dc-bird > span {
+  animation: dcBirdFlap 0.9s ease-in-out infinite;
+  display: block;
+}
+
+/* ── Manhã: sementinhas de dente-de-leão ─────────────────────────
+   Sobem devagar com uma gingada lateral — amarra com a moeda do app. */
+@keyframes dcSeedFloat {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6vh, 0);
+  }
+  12%,
+  80% {
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(4vw, -8vh, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-2vw, -22vh, 0);
+  }
+}
+.dc-seed {
+  animation: dcSeedFloat 23s ease-in-out infinite;
+}
+
+/* ── Meio-dia: o sol a pino respirando ───────────────────────────
+   A arte já tem o sol desenhado; a animação só faz o halo pulsar. Sem
+   rotação: o halo é achatado (para caber acima do bebê) e girar um oval
+   deixa a inclinação visível — vira ventilador, não sol. */
+@keyframes dcSunRays {
+  0%,
+  100% {
+    opacity: 0.16;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(1.05);
+  }
+}
+.dc-ray {
+  animation: dcSunRays 22s ease-in-out infinite;
+}
+
+/* ── Meio-dia: estalos de luz de quatro pontas ───────────────────
+   Duas barras cruzadas nos pseudo-elementos: a caixa do elemento continua
+   sendo a barra horizontal, então ele mede 18×2px e não invade nada — o
+   `rotate` do `::after` não entra no getBoundingClientRect do pai. */
+.dc-glint {
+  width: 18px;
+  height: 2px;
+  animation: dcGlint 13s ease-in-out infinite;
+}
+.dc-glint::before,
+.dc-glint::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 50%, transparent);
+}
+.dc-glint::after {
+  transform: rotate(90deg);
+}
+@keyframes dcGlint {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  6% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  16% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+/* ── Tarde: nuvens à deriva ──────────────────────────────────────── */
+@keyframes dcCloudDrift {
+  0% {
+    opacity: 0;
+    transform: translate3d(-14vw, 0, 0);
+  }
+  10%,
+  85% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(30vw, -2vh, 0);
+  }
+}
+.dc-cloud {
+  animation: dcCloudDrift 58s linear infinite;
+}
+
+/* ── Golden hour: poeira dourada suspensa ────────────────────────
+   Motes que só existem contra luz baixa — é o que define a hora dourada
+   na fotografia. Deriva mínima: eles pairam, não voam. */
+@keyframes dcMote {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  20% {
+    opacity: 0.85;
+  }
+  55% {
+    opacity: 0.5;
+    transform: translate3d(2vw, -4vh, 0);
+  }
+  85% {
+    opacity: 0.7;
+    transform: translate3d(-1vw, -8vh, 0);
+  }
+}
+.dc-mote {
+  animation: dcMote 19s ease-in-out infinite;
+}
+
+/* ── Entardecer: o bando voltando, em V ──────────────────────────
+   O contraponto do amanhecer: de manhã saem, à tarde voltam. */
+@keyframes dcFlockHome {
+  0% {
+    opacity: 0;
+    transform: translate3d(52vw, 0, 0);
+  }
+  10%,
+  86% {
+    opacity: 0.72;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-16vw, -6vh, 0);
+  }
+}
+.dc-flock {
+  animation: dcFlockHome 40s linear infinite;
+}
+
+/* Todo elemento daqui tem `animation-delay` para escalonar a cena. Sem
+   `fill-mode: both` o navegador NÃO aplica o quadro 0% durante a espera: até
+   a animação começar o elemento fica com o estilo base, ou seja, opacidade 1.
+   Na prática, ao abrir o app as seis estrelas do anoitecer apareciam todas
+   acesas de uma vez, piscavam e só então acendiam uma a uma. Com `both` a
+   espera já usa o quadro 0% (invisível) e a entrada fica limpa. */
+.dc-shooting-star,
+.dc-shooting-star-l,
+.dc-mist,
+.dc-star-wake,
+.dc-star-fade,
+.dc-satellite,
+.dc-firefly,
+.dc-bird,
+.dc-seed,
+.dc-ray,
+.dc-glint,
+.dc-cloud,
+.dc-mote,
+.dc-flock {
+  animation-fill-mode: both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-ray,
+  .dc-glint,
+  .dc-cloud,
+  .dc-mote,
+  .dc-flock {
+    animation: none;
+  }
+  .dc-glint,
+  .dc-cloud,
+  .dc-mote,
+  .dc-flock {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-bird,
+  .dc-bird > span,
+  .dc-seed {
+    animation: none;
+  }
+  .dc-bird,
+  .dc-seed {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-shooting-star,
+  .dc-shooting-star-l,
+  .dc-mist,
+  .dc-star-wake,
+  .dc-star-fade,
+  .dc-satellite,
+  .dc-firefly {
+    animation: none;
+  }
+  .dc-shooting-star,
+  .dc-shooting-star-l,
+  .dc-satellite,
+  .dc-firefly {
+    opacity: 0;
+  }
+}
+
 /* ══════════════ Liquid Glass — material dos cards de jogo ══════════════
    Vidro de verdade, não plástico colorido: o fundo da tela atravessa
    (backdrop-filter), a luz bate na quina de cima (rim claro), escorre e

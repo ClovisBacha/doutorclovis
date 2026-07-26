@@ -25,6 +25,7 @@ import {
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
+import { SkyAmbience } from "@/components/sky-ambience";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
 import skyManha from "@/assets/sky/manha.webp";
 import skyMeioDia from "@/assets/sky/meio-dia.webp";
@@ -700,8 +701,10 @@ export function AppHomeScreen({
   // Cores de texto adaptadas ao céu do momento
   const heroText = darkSky ? "text-white/95" : "text-foreground";
   const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
-  // Roxo no céu claro (o rosé da marca sumia sobre o pêssego do entardecer).
-  const heroLabel = darkSky ? "text-white/60" : "text-violet-600";
+  // No céu escuro o rótulo é branco a 60%; no claro tem que ser o espelho
+  // disso — preto a 60%. Estava `text-violet-600`, roxo sobre lilás do
+  // amanhecer, uns 2,5:1 de contraste: sumia de dia e reaparecia de noite.
+  const heroLabel = darkSky ? "text-white/60" : "text-slate-900/60";
 
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
      o céu escurece e o mesmo branco cegaria — então o vidro inverte e o texto
@@ -755,6 +758,9 @@ export function AppHomeScreen({
             style={{ backgroundImage: `url(${slot.src})` }}
           />
         )}
+
+        {/* Vida de fundo do momento do dia — detalhe, nunca protagonista. */}
+        {artTheme && <SkyAmbience slot={slot.nome} careMode={careMode} />}
 
         {/* Céu vivo (sol/lua, estrelas, nuvens, chuva) só no tema V1: sobre a
             arte ele brigaria com as nuvens já pintadas nela. */}

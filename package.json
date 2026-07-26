@@ -12,6 +12,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "audit:conteudo": "node scripts/audit-conteudo.mjs",
+    "sky:check": "node scripts/sky-ambience-check.mjs",
+    "sky:geo": "node scripts/sky-geo.mjs",
     "prepare": "husky"
   },
   "dependencies": {
