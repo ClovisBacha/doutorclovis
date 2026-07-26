@@ -745,6 +745,21 @@ function posMeta(week: number) {
 
 // Lábios bem mais escuros que o corpo: a moeda 3D precisa ler como moeda mesmo cinza
 const LOCKED = { main: "#dde5ee", lip: "#9fb0c4" };
+
+/**
+ * Dia que ainda não chegou: a cor DA SEMANA dele, bem clara.
+ *
+ * Antes todo dia futuro era o mesmo cinza, e a trilha à frente virava uma fila
+ * cinzenta sem informação. Com a cor da semana em versão pálida, a paciente vê
+ * as cores da jornada inteira pela frente — e o cinza fica reservado para o
+ * que ela PERDEU, que é a única coisa que precisa dessa leitura.
+ */
+function futureTint(meta: { main: string; lip: string }) {
+  return {
+    main: `color-mix(in oklab, ${meta.main} 22%, white)`,
+    lip: `color-mix(in oklab, ${meta.lip} 30%, white)`,
+  };
+}
 const MISSED = { main: "#fbd3e8", lip: "#ef9fca" };
 
 const CONFETTI_COLORS = ["#ec4899", "#f59e0b", "#8b5cf6", "#38bdf8", "#34d399", "#fbbf24"];
@@ -820,7 +835,12 @@ function buildPhaseNodes(phase: Phase): { nodes: PathNode[]; height: number } {
 
 /* ── Caminho contínuo estilo Duolingo: todas as fases numa página só ── */
 
-const IDAY_ROW = 104;
+// 78 e não 104: com o passo antigo a semana não cabia numa tela e sobrava
+// muito céu morto entre as bolinhas. Em 78 os 7 dias entram quase juntos, o
+// que dá a leitura de "estou perto de fechar a semana".
+const IDAY_ROW = 78;
+/** Espaço extra antes do dia de HOJE, onde mora o balão "Desafio de hoje". */
+const TODAY_BUBBLE_ROOM = 64;
 const IWEEK_HEADER = 112; // folga para o balão "Desafio de hoje" não cobrir a barra da semana
 const IBANNER_ROW = 120;
 const ILESSON_ROW = 116;
@@ -837,7 +857,15 @@ type JourneyNode =
 const MASCOTS = ["🧸", "🦢", "🌷", "🍼", "🐘", "🌈", "🐥", "🧦"];
 
 /** Uma página só: banners de seção entre as fases, dias grandes, mascotes ao lado. */
-function buildFullJourney(phases: Phase[]): { nodes: JourneyNode[]; height: number } {
+/**
+ * `todayD` só existe para dar FOLGA EXTRA na linha de hoje: o balão "Desafio de
+ * hoje" fica acima da bolinha, e com o passo apertado (78px) ele cobria a
+ * bolinha da linha de cima. O resto do caminho segue o passo normal.
+ */
+function buildFullJourney(
+  phases: Phase[],
+  todayD: number,
+): { nodes: JourneyNode[]; height: number } {
   const nodes: JourneyNode[] = [];
   let y = 8;
   let row = 0;
@@ -863,6 +891,8 @@ function buildFullJourney(phases: Phase[]): { nodes: JourneyNode[]; height: numb
       y += IWEEK_HEADER;
       for (let D = w * 7; D <= w * 7 + 6; D++) {
         const x = xOf(row);
+        // Altura do balão de hoje + respiro, para ele não cobrir a linha acima.
+        if (D === todayD) y += TODAY_BUBBLE_ROOM;
         nodes.push({ kind: "day", D, week: w, y: y + IDAY_ROW / 2, x, row });
         maybeMascot(x, y, IDAY_ROW);
         y += IDAY_ROW;
@@ -1269,7 +1299,7 @@ export function GestacaoPath({
   }, [doneDays, todayD, hasGest]);
 
   // Caminho contínuo: todas as fases numa página só, como o Duolingo
-  const { nodes, height } = useMemo(() => buildFullJourney(phases), [phases]);
+  const { nodes, height } = useMemo(() => buildFullJourney(phases, todayD), [phases, todayD]);
 
   const pathRef = useRef<HTMLDivElement>(null);
 
@@ -2441,7 +2471,7 @@ export function GestacaoPath({
           const isPast = D < todayD;
           const isFuture = D > todayD;
           const tm = trimMeta(week);
-          const palette = done || isToday ? tm : isPast ? MISSED : LOCKED;
+          const palette = done || isToday ? tm : isPast ? MISSED : futureTint(tm);
           const dia = isToday ? 84 : 64;
           const dayOfWeek = (D % 7) + 1;
           // Progresso de hoje em MEIAS estrelas (0–6): aula + 5 jogos de bem-estar.
@@ -2523,9 +2553,11 @@ export function GestacaoPath({
                     <span className="dc-coin-shine" aria-hidden />
                   </div>
                 </div>
-                {/* 3 estrelas do dia em MEIAS (6 jogos) — enchem conforme joga;
-                    some no Modo Cuidado e nos dias futuros (bloqueados). */}
-                {!isFuture && !careMode && (
+                {/* 3 estrelas do dia em MEIAS (6 jogos). Só em HOJE e nos dias
+                    FEITOS: num dia passado que ela não jogou, três estrelas
+                    apagadas não informam nada — repetidas ao longo da trilha
+                    viram ruído, e ainda por cima parecem cobrança. */}
+                {(isToday || done) && !careMode && (
                   <div className="mt-1.5 drop-shadow-sm">
                     <StarMeter halves={done ? 6 : halvesToday} size="text-sm" />
                   </div>
@@ -5929,7 +5961,7 @@ function PosPartoJourney({
             const isPast = D < todayD;
             const isFuture = D > todayD;
             const pm = posMeta(week);
-            const palette = done || isToday ? pm : isPast ? MISSED : LOCKED;
+            const palette = done || isToday ? pm : isPast ? MISSED : futureTint(pm);
             const dia = isToday ? 72 : 52;
 
             return (
