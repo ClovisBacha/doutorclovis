@@ -694,20 +694,35 @@ type Birth = { date: string };
 
 /* ══════════════════════ Cores por trimestre/fase ══════════════════════ */
 
+/**
+ * Cor da SEMANA — cada uma tem a sua, não uma por trimestre.
+ *
+ * O matiz percorre a roda de cor ao longo das 42 semanas (rosé → violeta →
+ * azul → verde → âmbar): semanas vizinhas ficam distinguíveis e a jornada
+ * inteira lê como progressão. Luminosidade e croma são fixos, então nenhuma
+ * semana fica mais berrante que outra — o que muda é só o matiz.
+ *
+ * `banner` e `softText` continuam por trimestre porque são classes utilitárias
+ * do Tailwind (não dá para gerar classe dinâmica) e são usadas em faixas
+ * grandes, onde a cor do trimestre é a leitura certa.
+ */
+const WEEK_HUE_START = 348; // rosé da marca
+const WEEK_HUE_SWEEP = 300; // quanto a roda gira até a semana 42
+
+function weekHue(week: number): number {
+  const w = Math.max(1, Math.min(42, week));
+  return (WEEK_HUE_START - ((w - 1) / 41) * WEEK_HUE_SWEEP + 360) % 360;
+}
+
 function trimMeta(week: number) {
-  if (week <= 13)
-    return { main: "#ec4899", lip: "#be185d", banner: "bg-pink-500", softText: "text-pink-400" };
-  if (week <= 27)
-    return { main: "#f59e0b", lip: "#b45309", banner: "bg-amber-500", softText: "text-amber-500" };
-  if (week <= 40)
-    return {
-      main: "#8b5cf6",
-      lip: "#6d28d9",
-      banner: "bg-violet-500",
-      softText: "text-violet-400",
-    };
+  const h = weekHue(week);
+  const main = `oklch(0.64 0.163 ${h.toFixed(1)})`;
+  const lip = `oklch(0.47 0.142 ${h.toFixed(1)})`;
+  if (week <= 13) return { main, lip, banner: "bg-pink-500", softText: "text-pink-400" };
+  if (week <= 27) return { main, lip, banner: "bg-amber-500", softText: "text-amber-500" };
+  if (week <= 40) return { main, lip, banner: "bg-violet-500", softText: "text-violet-400" };
   // Pós-data: tom âmbar quente, sem alarme
-  return { main: "#f59e0b", lip: "#b45309", banner: "bg-amber-500", softText: "text-amber-500" };
+  return { main, lip, banner: "bg-amber-500", softText: "text-amber-500" };
 }
 
 function posMeta(week: number) {
@@ -2040,30 +2055,39 @@ export function GestacaoPath({
           `}</style>
           <div className="fixed bottom-24 right-4 z-40 flex items-center gap-2 md:bottom-8">
             {trayItems.length > 0 && (
-              <button
-                onClick={() => setArranging(true)}
-                aria-label="Arrumar os enfeites da trilha"
-                className="press flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-3 text-slate-700 shadow-[0_6px_18px_rgba(0,0,0,0.14)] ring-1 ring-slate-200 backdrop-blur"
-              >
-                <span className="text-lg leading-none">✏️</span>
-                <span className="text-sm font-extrabold leading-none">Arrumar</span>
-              </button>
+              <div className="flex flex-col items-center gap-1">
+                <button
+                  onClick={() => setArranging(true)}
+                  aria-label="Arrumar os enfeites da trilha"
+                  className="press flex h-14 w-14 items-center justify-center rounded-full bg-white/95 text-2xl shadow-[0_6px_18px_rgba(0,0,0,0.14)] ring-1 ring-slate-200 backdrop-blur"
+                >
+                  ✏️
+                </button>
+                {/* Rótulo FORA do círculo: dentro ele não cabia e cobria o ícone. */}
+                <span className="rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm">
+                  Arrumar
+                </span>
+              </div>
             )}
             {onOpenShop && (
-              <button
-                onClick={onOpenShop}
-                aria-label="Abrir o Cantinho"
-                className="dc-shop-fab press flex items-center gap-2 rounded-full bg-gradient-to-br from-emerald-400 via-lime-400 to-emerald-500 px-4 py-3 text-white ring-2 ring-white/70"
-                style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
-              >
-                <span className="text-xl leading-none">🛍️</span>
-                <span className="text-sm font-extrabold leading-none">Cantinho</span>
-                {saldo != null && (
-                  <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-bold leading-none">
-                    🌱 {saldo}
-                  </span>
-                )}
-              </button>
+              <div className="flex flex-col items-center gap-1">
+                <button
+                  onClick={onOpenShop}
+                  aria-label="Abrir o Cantinho"
+                  className="dc-shop-fab press relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-2xl ring-2 ring-white/80"
+                  style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
+                >
+                  🛍️
+                  {saldo != null && (
+                    <span className="absolute -right-1.5 -top-1.5 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-black leading-none text-emerald-600 shadow-sm">
+                      {saldo}
+                    </span>
+                  )}
+                </button>
+                <span className="rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-sm">
+                  Cantinho
+                </span>
+              </div>
             )}
           </div>
         </>
@@ -2372,12 +2396,12 @@ export function GestacaoPath({
                   {/* Lição disponível e não feita: halo dourado convida o toque */}
                   {unlocked && !done && (
                     <span
-                      className="dc-halo pointer-events-none absolute inset-0 rounded-2xl"
+                      className="dc-halo pointer-events-none absolute inset-0 rounded-full"
                       style={{ boxShadow: "0 0 26px 5px rgba(245,158,11,0.4)" }}
                     />
                   )}
                   <div
-                    className="duo3d relative flex h-[68px] w-[68px] items-center justify-center rounded-2xl"
+                    className="duo3d relative flex h-[68px] w-[68px] items-center justify-center rounded-full"
                     style={
                       {
                         background: !unlocked
