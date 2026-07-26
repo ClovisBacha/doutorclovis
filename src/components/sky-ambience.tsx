@@ -170,11 +170,11 @@ const MOTES: Particula[] = [
    para BAIXO, atravessado à direção do voo. Lia como cinco pingos num
    sorriso, não como formação. */
 const BANDO: { dx: number; dy: number; size: number }[] = [
-  { dx: 0, dy: 0, size: 12 }, // o líder, na ponta
-  { dx: 15, dy: -8, size: 11 },
-  { dx: 15, dy: 8, size: 10 },
-  { dx: 30, dy: -16, size: 9 },
-  { dx: 30, dy: 16, size: 9 },
+  { dx: 0, dy: 16, size: 12 }, // o líder, na ponta
+  { dx: 15, dy: 8, size: 11 },
+  { dx: 15, dy: 24, size: 10 },
+  { dx: 30, dy: 0, size: 9 },
+  { dx: 30, dy: 32, size: 9 },
 ];
 
 /**
@@ -497,7 +497,17 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
             "Acompanhando / Clovis". Em 5% ele passa atrás do botão de menu e
             do chip de clima, que são opacos — oclusão limpa, sem piscar nos
             vãos das letras. */}
-        <span className="dc-flock absolute" style={{ left: "0%", top: "5%" }}>
+        {/* O invólucro tem tamanho EXPLÍCITO. Sem isso ele media 0×0 (todos os
+            filhos são `absolute`), e a régua de `sky:check` aprovava o
+            entardecer sem medir NADA: um ponto sem área nunca sobrepõe o bebê
+            nem some atrás de um cartão. Por isso os `dy` são todos positivos —
+            assim o topo do bando é o topo da caixa.
+            Com a caixa medindo de verdade apareceu o defeito que ela escondia:
+            a 5% de altura a ave de baixo encostava no "Acompanhando". Daí 2.2%. */}
+        <span
+          className="dc-flock absolute"
+          style={{ left: "0%", top: "2.2%", width: "42px", height: "38px" }}
+        >
           {BANDO.map((p, i) => (
             <span key={i} className="absolute" style={{ left: `${p.dx}px`, top: `${p.dy}px` }}>
               <Passaro size={p.size} cor="rgba(52,30,52,0.88)" />
