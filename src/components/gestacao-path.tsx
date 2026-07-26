@@ -157,12 +157,14 @@ function DecorSprite({ p, still = false }: { p: PlacedDecor; still?: boolean }) 
   const h = hashStr(p.k);
   const delay = `${(h % 24) * 0.22}s`;
   const especial = item.type === "especial";
+  // Ciclos LONGOS. Com 4s a nuvem subia e descia oito vezes por minuto e
+  // parecia solta no ar; o enfeite tem que parecer POSTO ali, respirando.
   const anim =
     item.type === "bicho"
-      ? "dcWander 7s ease-in-out infinite"
+      ? "dcWander 11s ease-in-out infinite"
       : item.type === "planta"
-        ? "dcSway 5.5s ease-in-out infinite"
-        : "dcHover 4s ease-in-out infinite";
+        ? "dcSway 8s ease-in-out infinite"
+        : "dcHover 7s ease-in-out infinite";
   return (
     <>
       {especial && (
@@ -2296,7 +2298,10 @@ export function GestacaoPath({
                   aria-hidden
                 />
               )}
-              <DecorSprite p={p} still={sel} />
+              {/* Nada se mexe enquanto ela arruma. Antes só o item SELECIONADO
+                  ficava parado, então os outros continuavam andando debaixo do
+                  dedo na hora de pegar — alvo móvel de 32px no celular. */}
+              <DecorSprite p={p} still={sel || arranging} />
               {sel && (
                 <>
                   <button

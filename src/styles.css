@@ -1826,40 +1826,50 @@ button:active > .duo3d {
   }
 }
 
-/* ── Decorações do Caminho (itens do Cantinho) — vida por TIPO ──
-   Céu deriva no alto, plantas balançam, bichinhos passeiam, objetos flutuam
-   e especiais pulsam com brilho. Transform/opacity apenas (zero repaint). */
+/* ── Respiro dos enfeites da trilha (itens do Cantinho) ───────────
+   Vida por TIPO: plantas balançam, bichinhos passeiam, o resto flutua e os
+   especiais pulsam com brilho. Só transform/opacity — zero repaint.
+
+   Mas RESPIRO, não voo. O enfeite é uma coisa que a paciente PÔS ali: tem
+   que parecer posto. A primeira versão subia 8px e girava 5° a cada 4s num
+   emoji de ~39px, e o bicho atravessava 28px — quase um quarto da própria
+   altura, oito vezes por minuto. Lia como ícone voando pela tela, e foi
+   exatamente essa a reclamação. Medido agora: 1,8px no objeto, 1,2px na
+   planta, 8px no bicho. Percebe-se que está vivo, não que está indo embora. */
 @keyframes dcHover {
   0%,
   100% {
-    transform: translateY(0) rotate(-2deg);
+    transform: translateY(0) rotate(-1deg);
   }
   50% {
-    transform: translateY(-8px) rotate(3deg);
+    transform: translateY(-2px) rotate(1deg);
   }
 }
+/* A planta balança na base, como se o vento pegasse a copa. */
 @keyframes dcSway {
   0%,
   100% {
-    transform: rotate(-5deg);
+    transform: rotate(-2deg);
   }
   50% {
-    transform: rotate(6deg);
+    transform: rotate(2deg);
   }
 }
+/* O bicho é o único que anda de fato — bicho parado não é bicho. Mas 4px
+   para cada lado, não 14: ele passeia no lugar, não atravessa a trilha. */
 @keyframes dcWander {
   0%,
   100% {
-    transform: translateX(-14px);
+    transform: translateX(-4px);
   }
   25% {
-    transform: translateX(-4px) translateY(-9px) rotate(6deg);
+    transform: translateX(-1px) translateY(-2px) rotate(3deg);
   }
   50% {
-    transform: translateX(14px);
+    transform: translateX(4px);
   }
   75% {
-    transform: translateX(4px) translateY(-7px) rotate(-6deg);
+    transform: translateX(1px) translateY(-2px) rotate(-3deg);
   }
 }
 @keyframes dcGlow {
