@@ -747,17 +747,27 @@ function posMeta(week: number) {
 const LOCKED = { main: "#dde5ee", lip: "#9fb0c4" };
 
 /**
- * Dia que ainda não chegou: a cor DA SEMANA dele, bem clara.
+ * Os três estados de um dia usam a MESMA cor da semana, em intensidades
+ * diferentes — é o que faz a trilha inteira mostrar a progressão de cores:
  *
- * Antes todo dia futuro era o mesmo cinza, e a trilha à frente virava uma fila
- * cinzenta sem informação. Com a cor da semana em versão pálida, a paciente vê
- * as cores da jornada inteira pela frente — e o cinza fica reservado para o
- * que ela PERDEU, que é a única coisa que precisa dessa leitura.
+ *   feito/hoje  cor cheia, viva
+ *   futuro      pálida e arejada ("tem caminho pela frente")
+ *   perdido     acinzentada ("passou")
+ *
+ * Antes o dia perdido era um rosa FIXO: quem tinha muitos dias sem jogar via a
+ * trilha inteira rosa, sem nenhuma leitura de semana.
  */
 function futureTint(meta: { main: string; lip: string }) {
   return {
-    main: `color-mix(in oklab, ${meta.main} 22%, white)`,
-    lip: `color-mix(in oklab, ${meta.lip} 30%, white)`,
+    main: `color-mix(in oklab, ${meta.main} 20%, white)`,
+    lip: `color-mix(in oklab, ${meta.lip} 28%, white)`,
+  };
+}
+
+function missedTint(meta: { main: string; lip: string }) {
+  return {
+    main: `color-mix(in oklab, ${meta.main} 42%, #ded7dc)`,
+    lip: `color-mix(in oklab, ${meta.lip} 46%, #c3bcc2)`,
   };
 }
 const MISSED = { main: "#fbd3e8", lip: "#ef9fca" };
@@ -918,7 +928,6 @@ function buildFullJourney(
 function WeekBar({
   title,
   sub,
-  emoji,
   main,
   lip,
   days,
@@ -928,7 +937,6 @@ function WeekBar({
 }: {
   title: string;
   sub?: string;
-  emoji: string;
   main: string;
   lip: string;
   /** Um item por dia da semana, na ordem. */
@@ -975,7 +983,9 @@ function WeekBar({
               } as React.CSSProperties
             }
           >
-            <span className="relative z-10 text-xl">{emoji}</span>
+            {/* Sem emoji: a moeda virou a PASTILHA DE COR da semana — é ela
+                que mostra em que ponto da jornada a faixa está. Continua
+                clicável para abrir o álbum. */}
             <span className="dc-coin-shine" aria-hidden />
           </Moeda>
           {/* Fora da moeda: o `overflow-hidden` que arredonda o brilho cortaria o selo */}
@@ -2078,48 +2088,40 @@ export function GestacaoPath({
         <>
           <style>{`
             @keyframes dc-shop-glow {
-              0%, 100% { box-shadow: 0 8px 22px rgba(16,185,129,0.42); }
-              50% { box-shadow: 0 10px 34px rgba(16,185,129,0.78), 0 0 0 5px rgba(163,230,53,0.30); }
+              0%, 100% { box-shadow: 0 6px 16px rgba(16,185,129,0.28); }
+              50% { box-shadow: 0 8px 24px rgba(16,185,129,0.45), 0 0 0 4px rgba(167,243,208,0.55); }
             }
             @media (prefers-reduced-motion: reduce) { .dc-shop-fab { animation: none !important; } }
           `}</style>
-          <div className="fixed bottom-24 right-4 z-40 flex items-center gap-2 md:bottom-8">
-            {trayItems.length > 0 && (
-              <div className="flex flex-col items-center gap-1">
-                <button
-                  onClick={() => setArranging(true)}
-                  aria-label="Arrumar os enfeites da trilha"
-                  className="press flex h-14 w-14 items-center justify-center rounded-full bg-white/95 text-2xl shadow-[0_6px_18px_rgba(0,0,0,0.14)] ring-1 ring-slate-200 backdrop-blur"
-                >
-                  ✏️
-                </button>
-                {/* Rótulo FORA do círculo: dentro ele não cabia e cobria o ícone. */}
-                <span className="rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-bold text-slate-600 shadow-sm">
-                  Arrumar
+          {/* Um de cada lado, como o cliente pediu: Arrumar à esquerda,
+              Cantinho à direita. Só o ícone — o rótulo apertava o círculo e
+              disputava atenção com a trilha, que é a estrela da tela. */}
+          {trayItems.length > 0 && (
+            <button
+              onClick={() => setArranging(true)}
+              aria-label="Arrumar os enfeites da trilha"
+              title="Arrumar"
+              className="press fixed bottom-24 left-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-white/95 text-xl shadow-[0_6px_18px_rgba(0,0,0,0.14)] ring-1 ring-slate-200 backdrop-blur md:bottom-8"
+            >
+              ✏️
+            </button>
+          )}
+          {onOpenShop && (
+            <button
+              onClick={onOpenShop}
+              aria-label="Abrir o Cantinho"
+              title="Cantinho"
+              className="dc-shop-fab press fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-xl ring-1 ring-emerald-300 md:bottom-8"
+              style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
+            >
+              🛍️
+              {saldo != null && (
+                <span className="absolute -right-1.5 -top-1.5 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-black leading-none text-emerald-700 shadow-sm ring-1 ring-emerald-200">
+                  {saldo}
                 </span>
-              </div>
-            )}
-            {onOpenShop && (
-              <div className="flex flex-col items-center gap-1">
-                <button
-                  onClick={onOpenShop}
-                  aria-label="Abrir o Cantinho"
-                  className="dc-shop-fab press relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-2xl ring-2 ring-white/80"
-                  style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
-                >
-                  🛍️
-                  {saldo != null && (
-                    <span className="absolute -right-1.5 -top-1.5 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-black leading-none text-emerald-600 shadow-sm">
-                      {saldo}
-                    </span>
-                  )}
-                </button>
-                <span className="rounded-full bg-white/85 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-sm">
-                  Cantinho
-                </span>
-              </div>
-            )}
-          </div>
+              )}
+            </button>
+          )}
         </>
       )}
 
@@ -2393,8 +2395,7 @@ export function GestacaoPath({
               >
                 <WeekBar
                   title={`Semana ${node.week}`}
-                  sub={ms ? `${ms.emoji} ${ms.label}` : undefined}
-                  emoji={FRUIT_EMOJI[node.week] ?? "🍼"}
+                  sub={ms?.label}
                   main={tm.main}
                   lip={tm.lip}
                   days={dias}
@@ -2471,7 +2472,7 @@ export function GestacaoPath({
           const isPast = D < todayD;
           const isFuture = D > todayD;
           const tm = trimMeta(week);
-          const palette = done || isToday ? tm : isPast ? MISSED : futureTint(tm);
+          const palette = done || isToday ? tm : isPast ? missedTint(tm) : futureTint(tm);
           const dia = isToday ? 84 : 64;
           const dayOfWeek = (D % 7) + 1;
           // Progresso de hoje em MEIAS estrelas (0–6): aula + 5 jogos de bem-estar.
@@ -5945,7 +5946,6 @@ function PosPartoJourney({
                 >
                   <WeekBar
                     title={`Semana ${node.week} de vida`}
-                    emoji={POS_EMOJI[node.week] ?? "🍼"}
                     main={pm.main}
                     lip={pm.lip}
                     days={dias}
@@ -5961,7 +5961,7 @@ function PosPartoJourney({
             const isPast = D < todayD;
             const isFuture = D > todayD;
             const pm = posMeta(week);
-            const palette = done || isToday ? pm : isPast ? MISSED : futureTint(pm);
+            const palette = done || isToday ? pm : isPast ? missedTint(pm) : futureTint(pm);
             const dia = isToday ? 72 : 52;
 
             return (
