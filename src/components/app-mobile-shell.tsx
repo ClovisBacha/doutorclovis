@@ -259,6 +259,49 @@ const NAV_ITEMS: {
   { id: "chat", Icon: MessageCircle, label: "Chat", color: "text-sky-500", pill: "bg-sky-500/15" },
 ];
 
+/** Item comum da barra: ícone de contorno na cor do site + rótulo embaixo. */
+function NavItem({
+  label,
+  color,
+  compact,
+  active = false,
+  onClick,
+  Icon,
+}: {
+  label: string;
+  color: string;
+  compact: boolean;
+  active?: boolean;
+  onClick: () => void;
+  Icon: LucideIcon;
+}) {
+  return (
+    <button
+      onClick={() => {
+        hapticTap();
+        onClick();
+      }}
+      aria-current={active ? "page" : undefined}
+      aria-label={label}
+      className="flex min-w-0 flex-1 flex-col items-center py-1"
+    >
+      <Icon
+        className={`${color} transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+          compact ? "h-5 w-5" : "h-[22px] w-[22px]"
+        } ${active ? "scale-110" : "scale-100"}`}
+        strokeWidth={active ? 2.4 : 1.9}
+      />
+      <span
+        className={`overflow-hidden text-[10px] transition-all duration-300 ${
+          compact ? "max-h-0 opacity-0" : "mt-1 max-h-4 opacity-100"
+        } ${active ? `${color} font-semibold` : "font-medium text-muted-foreground"}`}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
 export function AppBottomNav({
   activeSection,
   onSelect,
@@ -306,71 +349,64 @@ export function AppBottomNav({
           compact ? "w-[64%] px-1.5 py-1" : "w-[92%] max-w-md px-2 py-1.5"
         }`}
       >
-        {/* SOS no extremo ESQUERDO (pedido do usuário) — vermelho, sempre visível. */}
+        {/* SOS no extremo ESQUERDO — vermelho, sempre visível. */}
         {onEmergency && (
-          <button
-            onClick={() => {
-              hapticTap();
-              onEmergency();
-            }}
-            aria-label="Emergência"
-            className="flex min-w-0 flex-1 flex-col items-center py-1 transition-colors duration-200"
-          >
-            <div
-              className={`flex items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-                compact ? "h-9 w-9" : "h-9 w-12"
-              }`}
-            >
-              <LifeBuoy className="h-5 w-5 text-rose-500" strokeWidth={1.9} />
-            </div>
-            <span
-              className={`overflow-hidden text-[10px] font-medium text-rose-500 transition-all duration-300 ${
-                compact ? "max-h-0 opacity-0" : "mt-0.5 max-h-4 opacity-100"
-              }`}
-            >
-              SOS
-            </span>
-          </button>
+          <NavItem
+            label="SOS"
+            color="text-rose-500"
+            compact={compact}
+            onClick={onEmergency}
+            Icon={LifeBuoy}
+          />
         )}
 
-        {NAV_ITEMS.map(({ id, Icon, label, color, pill }) => {
-          const active = activeSection === id;
-          return (
+        {NAV_ITEMS.map(({ id, Icon, label, color }) =>
+          id === "home" ? (
+            /* ── Botão CENTRAL: o Bebê é o destino principal, então vira
+               um círculo grande CENTRADO NA BORDA de cima da barra — metade
+               dentro, metade fora, como no desenho de referência. O espaçador
+               invisível reserva a mesma altura de um item comum para a barra
+               não crescer por causa dele. */
             <button
               key={id}
               onClick={() => {
                 hapticTap();
                 onSelect(id);
               }}
-              aria-current={active ? "page" : undefined}
+              aria-current={activeSection === id ? "page" : undefined}
               aria-label={label}
-              className="flex min-w-0 flex-1 flex-col items-center py-1 transition-colors duration-200"
+              className="relative flex min-w-0 flex-1 flex-col items-center py-1"
             >
-              {/* Pill de fundo — na cor do ícone, expande com mola quando ativa */}
-              <div
-                key={active ? "on" : "off"}
-                className={`flex items-center justify-center rounded-full transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-                  compact ? "h-9 w-9" : "h-9 w-12"
-                } ${active ? `pop-in ${pill} scale-105` : "scale-100"}`}
-              >
-                {/* Ícone SEMPRE colorido (mais divertido); cresce um tico quando ativo */}
-                <Icon
-                  className={`h-5 w-5 transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${color} ${
-                    active ? "scale-110" : "scale-100"
-                  }`}
-                  strokeWidth={active ? 2.6 : 2.1}
-                />
-              </div>
+              <span aria-hidden className={compact ? "h-5 w-5" : "h-[22px] w-[22px]"} />
               <span
-                className={`overflow-hidden text-[10px] transition-all duration-300 ${
-                  compact ? "max-h-0 opacity-0" : "mt-0.5 max-h-4 opacity-100"
-                } ${active ? `${color} font-bold` : "font-medium text-muted-foreground"}`}
+                aria-hidden
+                className={`overflow-hidden text-[10px] ${compact ? "max-h-0" : "mt-1 max-h-4"}`}
+              />
+              <span
+                data-nav-center
+                className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-pink-500 text-white transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                  compact ? "h-11 w-11" : "h-14 w-14"
+                } ${activeSection === id ? "scale-105" : "scale-100"}`}
+                style={{
+                  boxShadow:
+                    "0 10px 22px -6px rgba(236,72,153,0.55), 0 0 0 5px rgba(255,255,255,0.96)",
+                }}
               >
-                {label}
+                <Icon className={compact ? "h-5 w-5" : "h-7 w-7"} strokeWidth={2.1} />
               </span>
             </button>
-          );
-        })}
+          ) : (
+            <NavItem
+              key={id}
+              label={label}
+              color={color}
+              compact={compact}
+              active={activeSection === id}
+              onClick={() => onSelect(id)}
+              Icon={Icon}
+            />
+          ),
+        )}
       </div>
     </nav>
   );
@@ -649,7 +685,7 @@ export function AppHomeScreen({
       ? "rgba(22,20,36,0.56)"
       : "rgba(255,255,255,0.13)"
     : artTheme
-      ? "rgba(255,255,255,0.72)"
+      ? "rgba(255,253,252,0.88)"
       : "rgba(255,255,255,0.66)";
   const glass: React.CSSProperties = {
     background: glassBg,
@@ -658,7 +694,7 @@ export function AppHomeScreen({
     border: `1px solid ${darkSky ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.85)"}`,
     boxShadow: darkSky
       ? "inset 0 1px 0 rgba(255,255,255,0.25), 0 10px 30px -14px rgba(0,0,0,0.5)"
-      : "inset 0 1px 0 rgba(255,255,255,0.95), 0 12px 32px -16px rgba(120,80,90,0.45)",
+      : "inset 0 1px 0 rgba(255,255,255,0.95), 0 14px 34px -18px rgba(120,80,90,0.34)",
   };
   const cardText = darkSky ? "text-white" : "text-foreground";
   const cardMuted = darkSky ? "text-white/60" : "text-muted-foreground";
@@ -858,18 +894,18 @@ export function AppHomeScreen({
                     {!careMode && (
                       <>
                         {/* Divisor com coração — o mesmo traço do conceito */}
-                        <div className="mt-1 flex items-center gap-2" aria-hidden>
+                        <div className="mt-1 flex items-center justify-center gap-2.5" aria-hidden>
                           <span
-                            className="h-px flex-1"
+                            className="h-px w-16"
                             style={{
-                              background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"})`,
+                              background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.34)" : "rgba(186,150,170,0.55)"})`,
                             }}
                           />
                           <span className="text-sm">💗</span>
                           <span
-                            className="h-px flex-1"
+                            className="h-px w-16"
                             style={{
-                              background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.3)" : "rgba(180,140,150,0.4)"}, transparent)`,
+                              background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.34)" : "rgba(186,150,170,0.55)"}, transparent)`,
                             }}
                           />
                         </div>
