@@ -31,6 +31,9 @@ import skyDia from "@/assets/sky/dia.webp";
 import skyEntardecer from "@/assets/sky/entardecer.webp";
 import skyNoite from "@/assets/sky/noite.webp";
 import skyMadrugada from "@/assets/sky/madrugada.webp";
+import skyPreAmanhecer from "@/assets/sky/pre-amanhecer.webp";
+import skyAmanhecer from "@/assets/sky/amanhecer.webp";
+import skyAnoitecer from "@/assets/sky/anoitecer.webp";
 import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 
@@ -597,14 +600,33 @@ function BabyOrb() {
 /** Tema do céu da home. V2 = arte por período; V1 = o gradiente original. */
 export type SkyThemeId = "v2" | "v1";
 
-/** Arte de fundo de cada momento do dia (tema V2). */
-const SKY_ART: Record<ReturnType<typeof periodFor>, string> = {
-  madrugada: skyMadrugada,
-  manha: skyManha,
-  dia: skyDia,
-  entardecer: skyEntardecer,
-  noite: skyNoite,
-};
+/**
+ * Arte de fundo por FAIXA DE HORA (tema V2).
+ *
+ * Escala própria, mais fina que a do gradiente V1 (`periodFor`, 5 períodos):
+ * com 5 faixas sobravam saltos de 5 a 7 horas em que o céu não mudava nada. As
+ * oito faixas cobrem as transições que a paciente realmente percebe — o
+ * primeiro clarão, o sol nascendo, o céu virando depois do pôr do sol.
+ *
+ * `dark` acompanha a ARTE, não o relógio: o amanhecer é claro apesar de cedo, e
+ * o anoitecer é escuro apesar de ainda não ser noite fechada. É esse campo que
+ * decide se os cartões usam vidro claro ou escuro.
+ */
+const SKY_SLOTS: { from: number; to: number; nome: string; src: string; dark: boolean }[] = [
+  { from: 0, to: 4, nome: "madrugada", src: skyMadrugada, dark: true },
+  { from: 4, to: 6, nome: "pré-amanhecer", src: skyPreAmanhecer, dark: true },
+  { from: 6, to: 8, nome: "amanhecer", src: skyAmanhecer, dark: false },
+  { from: 8, to: 11, nome: "manhã", src: skyManha, dark: false },
+  { from: 11, to: 17, nome: "dia", src: skyDia, dark: false },
+  { from: 17, to: 19, nome: "entardecer", src: skyEntardecer, dark: false },
+  { from: 19, to: 21, nome: "anoitecer", src: skyAnoitecer, dark: true },
+  { from: 21, to: 24, nome: "noite", src: skyNoite, dark: true },
+];
+
+function skySlotFor(hour: number) {
+  const h = Math.max(0, Math.min(23, hour));
+  return SKY_SLOTS.find((s) => h >= s.from && h < s.to) ?? SKY_SLOTS[SKY_SLOTS.length - 1];
+}
 
 export function AppHomeScreen({
   firstName,
@@ -663,15 +685,19 @@ export function AppHomeScreen({
   // Céu escuro (noite/madrugada) pede texto claro. O entardecer TERMINA claro
   // na base do card (oklch ~0.8) — texto branco ali ficava ilegível, então ele
   // conta como céu claro para o texto (auditoria de contraste).
-  const darkSky = period === "madrugada" || period === "noite";
+  const artTheme = skyTheme !== "v1";
+  // Com a arte quem manda no claro/escuro é a FAIXA da arte (8 faixas), não o
+  // período do gradiente (5): às 7h o gradiente ainda diz "manhã" enquanto o
+  // amanhecer já está claro, e às 20h diz "noite" enquanto o anoitecer é
+  // escuro. Sem arte, vale o período do gradiente.
+  const slot = skySlotFor(h);
+  const darkSky = artTheme ? slot.dark : period === "madrugada" || period === "noite";
 
   // Cores de texto adaptadas ao céu do momento
   const heroText = darkSky ? "text-white/95" : "text-foreground";
   const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
   // Roxo no céu claro (o rosé da marca sumia sobre o pêssego do entardecer).
   const heroLabel = darkSky ? "text-white/60" : "text-violet-600";
-
-  const artTheme = skyTheme !== "v1";
 
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
      o céu escurece e o mesmo branco cegaria — então o vidro inverte e o texto
@@ -722,7 +748,7 @@ export function AppHomeScreen({
           <div
             aria-hidden
             className="dc-sky-breathe pointer-events-none absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${SKY_ART[period]})` }}
+            style={{ backgroundImage: `url(${slot.src})` }}
           />
         )}
 
