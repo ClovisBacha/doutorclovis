@@ -110,12 +110,19 @@ type WeatherState = {
   overlay: string;
   tip: string;
   tipEmoji: string;
+  /* Nascer e pôr do sol NA LOCALIZAÇÃO da pessoa — é o que permite o céu do
+     app seguir o céu de verdade em vez do relógio. `null` quando a API não
+     respondeu, ou nos polos, onde o sol pode não nascer no dia. */
+  sunrise: Date | null;
+  sunset: Date | null;
 };
 
-function wmoToInfo(code: number): { condition: string; emoji: string } {
-  if (code === 0) return { condition: "Céu limpo", emoji: "☀️" };
-  if (code === 1) return { condition: "Predominante claro", emoji: "🌤️" };
-  if (code === 2) return { condition: "Parcialmente nublado", emoji: "⛅" };
+function wmoToInfo(code: number, isDay = true): { condition: string; emoji: string } {
+  // Céu limpo e pouca nuvem mudam de cara à noite. Um ☀️ às 19h29 — que foi
+  // o que a paciente viu na tela — é simplesmente errado.
+  if (code === 0) return { condition: "Céu limpo", emoji: isDay ? "☀️" : "🌙" };
+  if (code === 1) return { condition: "Predominante claro", emoji: isDay ? "🌤️" : "🌙" };
+  if (code === 2) return { condition: "Parcialmente nublado", emoji: isDay ? "⛅" : "☁️" };
   if (code === 3) return { condition: "Nublado", emoji: "☁️" };
   if (code >= 45 && code <= 48) return { condition: "Névoa", emoji: "🌫️" };
   if (code >= 51 && code <= 55) return { condition: "Garoa", emoji: "🌦️" };
@@ -195,19 +202,36 @@ function useWeather(): WeatherState | null {
           `https://api.open-meteo.com/v1/forecast` +
             `?latitude=${lat.toFixed(4)}` +
             `&longitude=${lon.toFixed(4)}` +
-            `&current=temperature_2m,weather_code` +
+            // `is_day` conserta o sol às 19h; `daily=sunrise,sunset` é o que
+            // deixa o céu do app seguir o céu de verdade. Os dois vêm na MESMA
+            // requisição que já existia — sem chamada extra, sem permissão nova.
+            `&current=temperature_2m,weather_code,is_day` +
+            `&daily=sunrise,sunset` +
             `&timezone=auto&forecast_days=1`,
         );
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as {
-          current: { temperature_2m: number; weather_code: number };
+          current: { temperature_2m: number; weather_code: number; is_day?: number };
+          daily?: { sunrise?: (string | null)[]; sunset?: (string | null)[] };
         };
         const temp = Math.round(data.current.temperature_2m);
         const code = data.current.weather_code;
-        const { condition, emoji } = wmoToInfo(code);
+        const isDay = data.current.is_day !== 0;
+        const { condition, emoji } = wmoToInfo(code, isDay);
         const overlay = weatherOverlay(code, temp);
         const { tip, tipEmoji } = weatherTip(code, temp);
-        if (!cancelled) setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji });
+        // Com `timezone=auto` a API devolve "2026-07-26T17:38" SEM fuso, e o
+        // JS lê isso como hora local do aparelho. É exatamente o que queremos:
+        // quem está em São Paulo tem o aparelho no fuso de São Paulo.
+        const parseHora = (t?: string | null) => {
+          if (!t) return null;
+          const d = new Date(t);
+          return Number.isNaN(d.getTime()) ? null : d;
+        };
+        const sunrise = parseHora(data.daily?.sunrise?.[0]);
+        const sunset = parseHora(data.daily?.sunset?.[0]);
+        if (!cancelled)
+          setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji, sunrise, sunset });
       } catch {
         /* clima é enhancement — falha silenciosa */
       }
@@ -628,9 +652,61 @@ const SKY_SLOTS: { from: number; to: number; nome: string; src: string; dark: bo
   { from: 21, to: 24, nome: "noite", src: skyNoite, dark: true },
 ];
 
+/** Só o relógio — o plano B de quando não se sabe onde a pessoa está. */
 function skySlotFor(hour: number) {
   const h = Math.max(0, Math.min(23, hour));
   return SKY_SLOTS.find((s) => h >= s.from && h < s.to) ?? SKY_SLOTS[SKY_SLOTS.length - 1];
+}
+
+const porNome = (nome: string) => SKY_SLOTS.find((s) => s.nome === nome)!;
+
+/**
+ * O céu do app seguindo o CÉU DE VERDADE, ancorado no nascer e no pôr do sol
+ * da localização da paciente.
+ *
+ * O relógio sozinho mente. Às 19h30 de julho, no Brasil, o sol se pôs há
+ * quase duas horas e está escuro — mas a tabela de horas fixas mostrava o
+ * entardecer alaranjado. Em dezembro, no mesmo 19h30, ainda é dia claro e ela
+ * mostraria exatamente a mesma imagem. Uma das duas está sempre errada, e a
+ * distância entre elas só cresce quanto mais longe do equador.
+ *
+ * As janelas do dia são FRAÇÕES da duração do dia, não minutos fixos: num dia
+ * de 14h a manhã é mais longa que num de 10h, e é assim que se sente. Já os
+ * crepúsculos são minutos fixos, porque a passagem do sol pelo horizonte dura
+ * mais ou menos o mesmo tempo em qualquer estação (fora dos polos).
+ *
+ * "Madrugada" continua sendo a única faixa definida pelo relógio, e de
+ * propósito: em português madrugada é a hora pequena da noite, não uma posição
+ * do sol. Às 2h da manhã é madrugada mesmo no verão da Noruega.
+ */
+function skySlotForSun(agora: Date, sunrise: Date | null, sunset: Date | null) {
+  if (!sunrise || !sunset) return skySlotFor(agora.getHours());
+  const SR = sunrise.getTime();
+  const SS = sunset.getTime();
+  const t = agora.getTime();
+  const dia = SS - SR;
+  // Dia degenerado (sol da meia-noite, noite polar, resposta estranha):
+  // o relógio erra menos que uma conta em cima de dado ruim.
+  if (!(dia > 0) || dia > 22 * 3600_000) return skySlotFor(agora.getHours());
+
+  const min = 60_000;
+  const meioDia = SR + dia / 2;
+  const bloco = dia * 0.14; // ~1h40 num dia de 12h
+
+  // Antes do primeiro sinal de luz o céu é o mesmo o tempo todo — escuro. Quem
+  // separa "noite" de "madrugada" aqui é o relógio, não o sol: às 23h de um dia
+  // curto ainda é noite, e às 2h já é madrugada.
+  if (t < SR - 90 * min) return porNome(agora.getHours() >= 21 ? "noite" : "madrugada");
+  if (t < SR - 25 * min) return porNome("pré-amanhecer");
+  if (t < SR + 50 * min) return porNome("amanhecer");
+  if (t < meioDia - bloco) return porNome("manhã");
+  if (t < meioDia + bloco) return porNome("meio-dia");
+  if (t < SS - 90 * min) return porNome("tarde");
+  if (t < SS - 25 * min) return porNome("golden hour");
+  if (t < SS + 20 * min) return porNome("entardecer");
+  if (t < SS + 80 * min) return porNome("anoitecer");
+  // Depois disso é noite até o relógio virar para a madrugada.
+  return porNome(agora.getHours() < 4 ? "madrugada" : "noite");
 }
 
 export function AppHomeScreen({
@@ -678,13 +754,16 @@ export function AppHomeScreen({
   // do céu ficava presa no período do servidor: quem abria o app às 8h podia
   // ver o céu da noite. Renderiza "dia" (neutro) e corrige ao montar; o
   // interval acompanha a virada de período com o app aberto.
-  const [h, setH] = useState(12);
+  // Guarda o INSTANTE, não só a hora: a escolha da arte agora compara com o
+  // nascer e o pôr do sol, e 19h05 e 19h55 podem cair em céus diferentes.
+  const [agora, setAgora] = useState<Date | null>(null);
   useEffect(() => {
-    const tick = () => setH(new Date().getHours());
+    const tick = () => setAgora(new Date());
     tick();
     const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
   }, []);
+  const h = agora ? agora.getHours() : 12;
   const isMadrugada = h < 5;
   const period = periodFor(h);
   // Céu escuro (noite/madrugada) pede texto claro. O entardecer TERMINA claro
@@ -695,7 +774,11 @@ export function AppHomeScreen({
   // período do gradiente (5): às 7h o gradiente ainda diz "manhã" enquanto o
   // amanhecer já está claro, e às 20h diz "noite" enquanto o anoitecer é
   // escuro. Sem arte, vale o período do gradiente.
-  const slot = skySlotFor(h);
+  // Enquanto o clima não chegou (ou a pessoa negou a localização), vale o
+  // relógio. Assim que o sol da cidade dela chega, a arte se corrige sozinha.
+  const slot = agora
+    ? skySlotForSun(agora, weather?.sunrise ?? null, weather?.sunset ?? null)
+    : skySlotFor(12);
   const darkSky = artTheme ? slot.dark : period === "madrugada" || period === "noite";
 
   // Cores de texto adaptadas ao céu do momento
