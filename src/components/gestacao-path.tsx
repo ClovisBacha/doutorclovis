@@ -2220,44 +2220,15 @@ export function GestacaoPath({
             aria-hidden
           />
         )}
-        {/* Céu: itens do tipo "céu" continuam automáticos — grudam no topo
-            da tela enquanto rola e derivam devagar (não entram no Arrumar). */}
-        {(() => {
-          const sky = decor.map((id) => CANTINHO_BY_ID[id]).filter((i) => i && i.type === "ceu");
-          if (sky.length === 0) return null;
-          return (
-            <div className="dc-decor pointer-events-none sticky top-14 z-0 h-0 select-none">
-              {sky.map((item) => {
-                const h = hashStr(item.id);
-                // Duração própria + atraso NEGATIVO proporcional a ela: cada
-                // item nasce num ponto diferente da travessia (0–100%), em
-                // vez de todos amontoados no começo do céu.
-                const dur = 55 + (h % 5) * 12;
-                const offset = ((h % 97) / 97) * dur;
-                return (
-                  <span
-                    key={item.id}
-                    className="absolute inline-block drop-shadow-sm"
-                    style={{
-                      top: `${2 + (h % 5) * 16}px`,
-                      left: 0,
-                      // 5 faixas de altura + tamanho/opacidade variando dão
-                      // profundidade (o que está "mais longe" é menor e mais claro).
-                      fontSize: `${1.35 + ((h >>> 3) % 4) * 0.22}rem`,
-                      opacity: 0.55 + ((h >>> 5) % 4) * 0.12,
-                      animation: `dcSkyDrift ${dur}s linear infinite`,
-                      animationDelay: `-${offset.toFixed(1)}s`,
-                    }}
-                    aria-hidden
-                    title={item.name}
-                  >
-                    {item.emoji}
-                  </span>
-                );
-              })}
-            </div>
-          );
-        })()}
+        {/* Os itens do tipo "céu" (nuvem, estrelinhas, sol, arco-íris, lua)
+            NÃO têm mais faixa automática. Existia aqui um bloco `sticky` que
+            os fazia derivar no alto da tela com `pointer-events-none`: a
+            paciente comprava uma nuvem e ela saía voando pelo cenário, sem
+            poder ser tocada, selecionada nem movida. Era resquício de uma
+            versão anterior ao modo Arrumar, e convivia mal com ele — o mesmo
+            item podia estar parado onde ela pôs E voando por cima.
+            Agora céu é item como qualquer outro: vai para a bandeja e ela
+            escolhe o lugar e o tamanho. */}
 
         {/* Escudo do modo Arrumar: cobre as lições pra um toque na trilha não
             abrir o dia por engano. As lições em si ficam intactas. */}

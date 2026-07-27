@@ -1883,14 +1883,6 @@ button:active > .duo3d {
     transform: scale(1.3);
   }
 }
-@keyframes dcSkyDrift {
-  0% {
-    transform: translateX(-15vw);
-  }
-  100% {
-    transform: translateX(110vw);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .dc-decor,
   .dc-decor * {

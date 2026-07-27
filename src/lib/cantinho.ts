@@ -65,7 +65,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "tema-ceu-v1",
     name: "Céu Clássico",
     emoji: "🌅",
-    price: 90,
+    price: 150,
     type: "tema",
     premium: false,
   },
