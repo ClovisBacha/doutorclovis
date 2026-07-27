@@ -114,6 +114,7 @@ import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import { useWeatherSky } from "@/components/weather-sky";
+import { Camera, FileText, Image as ImageIcon, Mic, Plus, Send, X } from "lucide-react";
 import {
   searchDoctors,
   requestDoctor,
@@ -5513,11 +5514,11 @@ function aiNameFrom(displayName: string | null | undefined): string {
 /** As perguntas que o campo de mensagem digita sozinho quando está vazio. */
 const CHAT_SUGESTOES = [
   "Posso tomar dipirona?",
-  "O que significa esse resultado de exame?",
-  "Quantos chutes por dia é normal?",
-  "Estou com azia — o que ajuda?",
-  "Posso viajar de avião agora?",
-  "Quando devo ir para a maternidade?",
+  "Esse exame está normal?",
+  "Quantos chutes por dia?",
+  "O que ajuda na azia?",
+  "Posso viajar de avião?",
+  "Quando ir para a maternidade?",
 ];
 
 /**
@@ -6217,14 +6218,14 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         >
           {[
             {
-              emoji: "🖼️",
+              Icon: ImageIcon,
               label: "Galeria",
               grad: "#8b5cf6, #6366f1",
               on: () => fileImageRef.current?.click(),
             },
-            { emoji: "📄", label: "Documento", grad: "#ec4899, #f97316", on: handleDocSoon },
+            { Icon: FileText, label: "Documento", grad: "#ec4899, #f97316", on: handleDocSoon },
             {
-              emoji: "✕",
+              Icon: X,
               label: "Fechar",
               grad: "#64748b, #334155",
               on: () => setShowAttach(false),
@@ -6236,7 +6237,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
               className="flex flex-col items-center gap-1.5 transition-transform active:scale-95"
             >
               <span
-                className="flex h-12 w-12 items-center justify-center rounded-full text-2xl text-white"
+                className="flex h-12 w-12 items-center justify-center rounded-full text-white"
                 style={{
                   background: `linear-gradient(140deg, ${a.grad})`,
                   border: "1px solid rgba(255,255,255,0.4)",
@@ -6244,7 +6245,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
                     "inset 0 1px 1px rgba(255,255,255,0.5), 0 8px 20px -8px rgba(60,40,120,0.6)",
                 }}
               >
-                {a.emoji}
+                <a.Icon className="h-[22px] w-[22px]" strokeWidth={1.9} />
               </span>
               <span className="text-[11px] font-medium" style={{ color: headInkSoft }}>
                 {a.label}
@@ -6271,16 +6272,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 ${showAttach ? "rotate-45" : ""}`}
           style={{ color: headInkSoft, transitionProperty: "transform" }}
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            className="h-5 w-5"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+          <Plus className="h-[22px] w-[22px]" strokeWidth={1.9} />
         </button>
 
         {/* Campo de texto */}
@@ -6303,11 +6295,11 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           {!input && !focado && (
             <span
               aria-hidden
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 truncate pr-10 text-[15px]"
+              className="pointer-events-none absolute inset-y-0 left-4 right-11 flex items-center text-[15px]"
               style={{ color: headInkSoft }}
             >
-              {typed}
-              <span className="dc-caret ml-px inline-block align-middle" style={{ opacity: 0.8 }}>
+              <span className="truncate">{typed}</span>
+              <span className="dc-caret ml-px shrink-0" style={{ opacity: 0.8 }}>
                 |
               </span>
             </span>
@@ -6338,9 +6330,10 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
             <button
               onClick={() => fileImageRef.current?.click()}
               aria-label="Enviar foto"
-              className="ml-1 shrink-0 self-end text-xl"
+              className="ml-1 shrink-0 self-end p-0.5 transition-transform active:scale-90"
+              style={{ color: headInkSoft }}
             >
-              📷
+              <Camera className="h-[22px] w-[22px]" strokeWidth={1.9} />
             </button>
           )}
         </div>
@@ -6359,9 +6352,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
                 "0 8px 22px -6px rgba(180,60,190,0.65), inset 0 1px 1px rgba(255,255,255,0.5)",
             }}
           >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 translate-x-0.5">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-            </svg>
+            <Send className="h-[21px] w-[21px] -translate-x-px translate-y-px" strokeWidth={1.9} />
           </button>
         ) : (
           <button
@@ -6375,9 +6366,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
                 "0 8px 22px -6px rgba(110,80,220,0.6), inset 0 1px 1px rgba(255,255,255,0.5)",
             }}
           >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-              <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 3.49-3.44 6.19-6.91 6.19S5.58 15.49 5.09 12H3.07c.53 4.21 3.98 7.5 8.16 7.94V23h2.54v-3.06C17.95 19.5 21.4 16.21 21.93 12h-2.02z" />
-            </svg>
+            <Mic className="h-[21px] w-[21px]" strokeWidth={1.9} />
           </button>
         )}
       </div>
