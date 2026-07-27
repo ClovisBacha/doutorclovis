@@ -1791,6 +1791,28 @@ button:active > .duo3d {
     filter: drop-shadow(0 1px 1px rgba(24, 34, 62, 0.34))
       drop-shadow(0 4px 12px rgba(24, 34, 62, 0.5));
   }
+  /* ── Vidro em RELEVO, para o texto pequeno ──────────────────────
+     O mesmo material, na única forma que sobrevive a 10px. Corpo translúcido
+     apaga a forma da letra nesse tamanho — testado —, então aqui o vidro
+     aparece pela ESPESSURA: um fio de luz branco embaixo do glifo e um
+     segundo, mais fraco, em cima. É a parede do vidro pegando luz, igual ao
+     contorno das letras grandes, só que sem esvaziar o miolo.
+     Ganho colateral: o fio branco separa a letra do céu, então o contraste
+     sobe em vez de cair. */
+  .dc-glass-emboss {
+    text-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.9),
+      0 2px 3px rgba(255, 255, 255, 0.45),
+      0 -0.5px 0 rgba(255, 255, 255, 0.28);
+  }
+  /* No céu escuro o texto já é branco: quem marca a espessura é a sombra. */
+  .dc-glass-emboss-dark {
+    text-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.42),
+      0 2px 6px rgba(0, 0, 0, 0.5),
+      0 -0.5px 0 rgba(255, 255, 255, 0.32);
+  }
+
   /* O recorte vale para TODO glifo, inclusive emoji — e emoji recortado perde
      a cor: o 💜 saía cinza. Isto devolve a pintura normal a quem não é letra. */
   .dc-glass-text .dc-sem-vidro {

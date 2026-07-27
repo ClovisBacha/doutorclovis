@@ -922,6 +922,8 @@ export function AppHomeScreen({
      Uma classe só: vidro não troca de cor conforme o céu — ver o comentário
      de `.dc-glass-text` no styles.css. */
   const glassText = "dc-glass-text";
+  /* Versão relevo, para tudo que é pequeno demais para ficar translúcido. */
+  const glassEmboss = darkSky ? "dc-glass-emboss-dark" : "dc-glass-emboss";
   /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
      nasce de baixo contraste por ser secundário, e agora o céu passa por trás
      dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
@@ -1035,10 +1037,7 @@ export function AppHomeScreen({
                   aria-label={`${weather.temp} graus, ${weather.condition}`}
                 >
                   <span
-                    className={`text-[15px] font-extrabold leading-none ${cardText}`}
-                    style={{
-                      filter: `drop-shadow(0 1px 2px ${darkSky ? "rgba(0,0,0,0.5)" : "rgba(120,90,100,0.35)"})`,
-                    }}
+                    className={`text-[15px] font-extrabold leading-none ${cardText} ${glassEmboss}`}
                   >
                     {weather.temp}°
                   </span>
@@ -1121,7 +1120,7 @@ export function AppHomeScreen({
                          atrás para existir. Sobre a chapa clara do cartão não
                          há o que atravessar — o "20" quase sumia. O material
                          só vale para texto que se apoia direto no céu. */
-                      className={`leading-none ${cardText}`}
+                      className={`leading-none ${cardText} ${glassEmboss}`}
                       style={{
                         // `var(--font-serif)` e não "Nunito" fixo: preso assim,
                         // o maior número da tela era o único texto que NÃO
@@ -1135,7 +1134,7 @@ export function AppHomeScreen({
                     >
                       {gest.weeks}
                     </p>
-                    <p className={`mt-0.5 text-[13px] font-normal ${cardMuted}`}>
+                    <p className={`mt-0.5 text-[13px] font-normal ${cardMuted} ${glassEmboss}`}>
                       {gest.weeks === 1 ? "semana" : "semanas"}
                       {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
                     </p>
@@ -1186,7 +1185,7 @@ export function AppHomeScreen({
                             >
                               <span className="text-xl short:text-lg leading-none">{s.emoji}</span>
                               <p
-                                className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText}`}
+                                className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText} ${glassEmboss}`}
                               >
                                 {s.value}
                               </p>
@@ -1194,7 +1193,9 @@ export function AppHomeScreen({
                                   atenuada, e as duas camadas se multiplicavam —
                                   70% de opacidade dentro de um bloco a 80% dá
                                   56% na tela, e a medida caía para 2,8:1. */}
-                              <p className={`text-[9px] font-normal ${cardMuted}`}>{s.label}</p>
+                              <p className={`text-[9px] font-normal ${cardMuted} ${glassEmboss}`}>
+                                {s.label}
+                              </p>
                             </div>
                           ))}
                         </div>
