@@ -190,9 +190,19 @@ function weatherTip(code: number, temp: number): { tip: string; tipEmoji: string
 }
 
 /** De onde saiu a localização usada — o app conta isso para a paciente. */
-export type OrigemLocal = { tipo: "gps" | "aprox" | "padrao"; cidade: string | null };
+export type OrigemLocal = {
+  /** gps = onde ela está agora · cadastro = onde ela mora · aprox = IP · padrao = clínica */
+  tipo: "gps" | "cadastro" | "aprox" | "padrao";
+  cidade: string | null;
+};
 
-function useWeather(): { weather: WeatherState | null; origem: OrigemLocal | null } {
+function useWeather(
+  cidadeCadastro?: {
+    nome: string;
+    lat: number;
+    lon: number;
+  } | null,
+): { weather: WeatherState | null; origem: OrigemLocal | null } {
   const [weather, setWeather] = useState<WeatherState | null>(null);
   const [origemLocal, setOrigemLocal] = useState<OrigemLocal | null>(null);
   useEffect(() => {
@@ -265,6 +275,14 @@ function useWeather(): { weather: WeatherState | null; origem: OrigemLocal | nul
     let temGps = false;
 
     async function pisoAproximado() {
+      // A cidade do cadastro ganha do IP: o IP erra em VPN, em viagem e quando
+      // a operadora roteia por outro estado — e nesses casos a paciente
+      // continua morando onde sempre morou. Também poupa a ida ao servidor.
+      if (cidadeCadastro) {
+        setOrigemLocal({ tipo: "cadastro", cidade: cidadeCadastro.nome });
+        void load(cidadeCadastro.lat, cidadeCadastro.lon);
+        return;
+      }
       try {
         const aprox = await getApproxLocation();
         if (cancelled || temGps) return;
@@ -297,7 +315,7 @@ function useWeather(): { weather: WeatherState | null; origem: OrigemLocal | nul
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [cidadeCadastro?.lat, cidadeCadastro?.lon, cidadeCadastro?.nome]);
   return { weather, origem: origemLocal };
 }
 
@@ -764,6 +782,7 @@ export function AppHomeScreen({
   babyTone = 0,
   careMode = false,
   skyTheme = "v2",
+  homeCity = null,
 }: {
   firstName: string;
   babyName: string | null;
@@ -779,6 +798,8 @@ export function AppHomeScreen({
   careMode?: boolean;
   /** Tema do céu: "v2" (arte, padrão) ou "v1" (gradiente, comprado na Loja). */
   skyTheme?: SkyThemeId;
+  /** Cidade do cadastro, quando preenchida — degrau entre o GPS e o IP. */
+  homeCity?: { nome: string; lat: number; lon: number } | null;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
@@ -792,7 +813,7 @@ export function AppHomeScreen({
         ? "2º trimestre"
         : "3º trimestre"
     : null;
-  const { weather, origem: origemLocal } = useWeather();
+  const { weather, origem: origemLocal } = useWeather(homeCity);
   // Recusou o convite da localização? Não insiste na mesma sessão.
   const [localDispensado, setLocalDispensado] = useState(false);
 
@@ -1227,37 +1248,39 @@ export function AppHomeScreen({
                   sol às 22h e não tinha como saber que a causa era a
                   localização. Dizer QUAL cidade o app está usando é o que
                   transforma um defeito aparente numa escolha informada. */}
-              {origemLocal && origemLocal.tipo !== "gps" && !localDispensado && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    hapticTap();
-                    // Repedir a permissão: no navegador, quem já negou não vê
-                    // a caixa de novo — daí o texto do botão falar em "ativar",
-                    // que é o que ela faz nos ajustes do site.
-                    navigator.geolocation?.getCurrentPosition(
-                      () => window.location.reload(),
-                      () => setLocalDispensado(true),
-                      { timeout: 8000 },
-                    );
-                  }}
-                  className="mt-2.5 short:mt-2 flex w-full items-start gap-3 rounded-[22px] px-4 py-3 text-left short:py-2"
-                  style={glass}
-                >
-                  <span className="mt-0.5 text-xl leading-none">📍</span>
-                  <span className="min-w-0">
-                    <span className={`block text-[14px] font-extrabold ${cardText}`}>
-                      {origemLocal.cidade
-                        ? `Mostrando o tempo de ${origemLocal.cidade}`
-                        : "Mostrando o tempo de uma cidade aproximada"}
+              {origemLocal &&
+                (origemLocal.tipo === "aprox" || origemLocal.tipo === "padrao") &&
+                !localDispensado && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      hapticTap();
+                      // Repedir a permissão: no navegador, quem já negou não vê
+                      // a caixa de novo — daí o texto do botão falar em "ativar",
+                      // que é o que ela faz nos ajustes do site.
+                      navigator.geolocation?.getCurrentPosition(
+                        () => window.location.reload(),
+                        () => setLocalDispensado(true),
+                        { timeout: 8000 },
+                      );
+                    }}
+                    className="mt-2.5 short:mt-2 flex w-full items-start gap-3 rounded-[22px] px-4 py-3 text-left short:py-2"
+                    style={glass}
+                  >
+                    <span className="mt-0.5 text-xl leading-none">📍</span>
+                    <span className="min-w-0">
+                      <span className={`block text-[14px] font-extrabold ${cardText}`}>
+                        {origemLocal.cidade
+                          ? `Mostrando o tempo de ${origemLocal.cidade}`
+                          : "Mostrando o tempo de uma cidade aproximada"}
+                      </span>
+                      <span className={`mt-0.5 block text-[12px] leading-snug ${cardMuted}`}>
+                        Com a sua localização, o céu e a chuva do app ficam iguais aos da sua
+                        janela. Toque para ativar.
+                      </span>
                     </span>
-                    <span className={`mt-0.5 block text-[12px] leading-snug ${cardMuted}`}>
-                      Com a sua localização, o céu e a chuva do app ficam iguais aos da sua janela.
-                      Toque para ativar.
-                    </span>
-                  </span>
-                </button>
-              )}
+                  </button>
+                )}
 
               {/* ── Saudação do dia e o conselho ──────────────────────
                   O clima aparece UMA vez na tela, no chip lá em cima: é lá

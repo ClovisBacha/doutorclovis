@@ -2794,3 +2794,26 @@ ALTER TABLE public.patient_profiles
 
 COMMENT ON COLUMN public.patient_profiles.sky_theme IS
   'Tema do céu da home: NULL/v2 = arte por período; v1 = gradiente original (item tema-ceu-v1 da Loja).';
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260727120000_home_city.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Cidade onde a paciente mora — entra na cadeia de localização entre o GPS e
+-- o IP da borda. O IP erra em VPN, em viagem e quando a operadora roteia por
+-- outro estado; nesses casos a cidade do cadastro acerta. O GPS continua
+-- mandando quando existe, porque é o único que sabe onde ela está AGORA.
+-- As coordenadas ficam guardadas junto do nome para a busca de cidade ser
+-- resolvida uma vez só, ao salvar, em vez de a cada abertura do app.
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS home_city text,
+  ADD COLUMN IF NOT EXISTS home_lat double precision,
+  ADD COLUMN IF NOT EXISTS home_lon double precision;
+
+COMMENT ON COLUMN public.patient_profiles.home_city IS
+  'Cidade informada no cadastro (ex.: "Belo Horizonte, MG"). Só rótulo — quem manda no clima são home_lat/home_lon.';
+COMMENT ON COLUMN public.patient_profiles.home_lat IS
+  'Latitude da cidade, resolvida na busca ao salvar. Usada quando não há GPS.';
+COMMENT ON COLUMN public.patient_profiles.home_lon IS
+  'Longitude da cidade, resolvida na busca ao salvar. Usada quando não há GPS.';

@@ -190,6 +190,10 @@ type Profile = {
   reference_days: number | null;
   blood_type?: string | null;
   allergies?: string | null;
+  /* Cidade do cadastro — o degrau entre o GPS e o IP na cadeia de localização. */
+  home_city?: string | null;
+  home_lat?: number | null;
+  home_lon?: number | null;
   emergency_contact?: string | null;
   emergency_phone?: string | null;
   height_cm?: number | null;
@@ -987,6 +991,13 @@ function MinhaContaPage() {
                 babyTone={profile?.baby_skin_tone ?? 0}
                 careMode={careMode}
                 skyTheme={profile?.sky_theme === "v1" ? "v1" : "v2"}
+                /* Só entra na cadeia se as TRÊS partes existirem: nome sem
+                   coordenada não serve para consultar clima nenhum. */
+                homeCity={
+                  profile?.home_city && profile.home_lat != null && profile.home_lon != null
+                    ? { nome: profile.home_city, lat: profile.home_lat, lon: profile.home_lon }
+                    : null
+                }
               />
 
               {/* Menu do ☰: as ações que viviam na barra de topo da home
@@ -3218,6 +3229,9 @@ function ProfileTab({
     reference_days: profile?.reference_days?.toString() ?? "",
     blood_type: profile?.blood_type ?? "",
     allergies: profile?.allergies ?? "",
+    home_city: profile?.home_city ?? "",
+    home_lat: profile?.home_lat ?? null,
+    home_lon: profile?.home_lon ?? null,
     emergency_contact: profile?.emergency_contact ?? "",
     emergency_phone: profile?.emergency_phone ?? "",
     height_cm: profile?.height_cm?.toString() ?? "",
@@ -3284,6 +3298,9 @@ function ProfileTab({
         reference_days: form.reference_days ? Number(form.reference_days) : null,
         blood_type: form.blood_type || null,
         allergies: form.allergies || null,
+        home_city: form.home_city || null,
+        home_lat: form.home_lat,
+        home_lon: form.home_lon,
         emergency_contact: form.emergency_contact || null,
         emergency_phone: form.emergency_phone || null,
         height_cm: form.height_cm ? Number(form.height_cm) : null,
@@ -3533,6 +3550,13 @@ function ProfileTab({
             value={form.medications}
             onChange={(v) => setForm({ ...form, medications: v })}
             placeholder="Ex: sulfato ferroso, ácido fólico..."
+          />
+          <CampoCidade
+            cidade={form.home_city}
+            onEscolher={(c) =>
+              setForm({ ...form, home_city: c.nome, home_lat: c.lat, home_lon: c.lon })
+            }
+            onLimpar={() => setForm({ ...form, home_city: "", home_lat: null, home_lon: null })}
           />
           <Field
             label="Contato de emergência"
@@ -3836,6 +3860,143 @@ function ProfileTab({
           gestante com a hipótese de uma perda toda vez que ela vinha só trocar
           a foto; aqui embaixo continua fácil de achar para quem precisa. */}
       <CareModeToggle careMode={careMode} onToggle={onToggleCare} />
+    </div>
+  );
+}
+
+/**
+ * Onde a paciente mora — o degrau do meio da cadeia de localização.
+ *
+ * A ordem é GPS → esta cidade → IP da borda → clínica. O IP acerta quase
+ * sempre, mas erra em VPN, em viagem e quando a operadora roteia o tráfego
+ * por outro estado; nesses casos é aqui que o app descobre a cidade certa.
+ * O GPS continua ganhando quando existe, porque é o único que sabe onde ela
+ * está AGORA — este campo diz onde ela MORA, que não é a mesma pergunta.
+ *
+ * A busca resolve as coordenadas UMA vez, ao escolher, e guarda junto do
+ * nome. Sem isso, toda abertura do app pagaria uma geocodificação para
+ * redescobrir a mesma cidade.
+ *
+ * Mostra estado e país na lista de propósito: "Santa Cruz" devolve quatro
+ * resultados em quatro países, e "Belo Horizonte" existe em Angola também.
+ */
+function CampoCidade({
+  cidade,
+  onEscolher,
+  onLimpar,
+}: {
+  cidade: string;
+  onEscolher: (c: { nome: string; lat: number; lon: number }) => void;
+  onLimpar: () => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const [itens, setItens] = useState<
+    { id: number; nome: string; lat: number; lon: number }[] | null
+  >(null);
+  const [carregando, setCarregando] = useState(false);
+
+  useEffect(() => {
+    const termo = busca.trim();
+    if (termo.length < 3) {
+      setItens(null);
+      return;
+    }
+    // Espera a digitação parar: sem isto seria uma requisição por tecla.
+    let vivo = true;
+    setCarregando(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(
+          "https://geocoding-api.open-meteo.com/v1/search?count=6&language=pt&format=json&name=" +
+            encodeURIComponent(termo),
+        );
+        const j = (await r.json()) as {
+          results?: {
+            id: number;
+            name: string;
+            admin1?: string;
+            country?: string;
+            latitude: number;
+            longitude: number;
+          }[];
+        };
+        if (!vivo) return;
+        setItens(
+          (j.results ?? []).map((x) => ({
+            id: x.id,
+            nome: [x.name, x.admin1, x.country].filter(Boolean).join(", "),
+            lat: x.latitude,
+            lon: x.longitude,
+          })),
+        );
+      } catch {
+        if (vivo) setItens([]);
+      } finally {
+        if (vivo) setCarregando(false);
+      }
+    }, 450);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [busca]);
+
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium">Onde você mora</label>
+      {cidade ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/40 px-3 py-2.5">
+          <span className="min-w-0 truncate text-sm">📍 {cidade}</span>
+          <button
+            type="button"
+            onClick={() => {
+              onLimpar();
+              setBusca("");
+              setItens(null);
+            }}
+            className="press shrink-0 text-xs font-semibold text-muted-foreground underline"
+          >
+            trocar
+          </button>
+        </div>
+      ) : (
+        <>
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Digite sua cidade..."
+            className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+          />
+          {carregando && <p className="mt-1.5 text-xs text-muted-foreground">Procurando...</p>}
+          {itens && itens.length === 0 && !carregando && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Nenhuma cidade encontrada com esse nome.
+            </p>
+          )}
+          {itens && itens.length > 0 && (
+            <ul className="mt-1.5 overflow-hidden rounded-xl border border-border">
+              {itens.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onEscolher(c);
+                      setBusca("");
+                      setItens(null);
+                    }}
+                    className="press block w-full px-3 py-2 text-left text-sm hover:bg-secondary/60"
+                  >
+                    {c.nome}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        Usada para o clima e o céu do app quando a localização do aparelho não está disponível.
+      </p>
     </div>
   );
 }
