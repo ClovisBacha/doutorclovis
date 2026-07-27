@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { babyForWeek } from "@/lib/gestacao";
+import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
 import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
 import {
@@ -255,52 +255,6 @@ const MILESTONES: Record<number, { emoji: string; label: string }> = {
   40: { emoji: "🎊", label: "Data prevista do parto!" },
   41: { emoji: "⏳", label: "Pós-data — monitoramento próximo" },
   42: { emoji: "🏥", label: "Avaliação para indução" },
-};
-
-/** Figurinha (emoji da fruta) de cada semana gestacional — colecionável no álbum. */
-const FRUIT_EMOJI: Record<number, string> = {
-  1: "✨",
-  2: "✨",
-  3: "✨",
-  4: "🌾",
-  5: "🌱",
-  6: "🫘",
-  7: "🫐",
-  8: "🍓",
-  9: "🍇",
-  10: "🍓",
-  11: "🍐",
-  12: "🍋",
-  13: "🫛",
-  14: "🍋",
-  15: "🍎",
-  16: "🥑",
-  17: "🧅",
-  18: "🫑",
-  19: "🍅",
-  20: "🍌",
-  21: "🥕",
-  22: "🌽",
-  23: "🥭",
-  24: "🌽",
-  25: "🥦",
-  26: "🥬",
-  27: "🍆",
-  28: "🎃",
-  29: "🥬",
-  30: "🥒",
-  31: "🥥",
-  32: "🥬",
-  33: "🍍",
-  34: "🍈",
-  35: "🍈",
-  36: "🍈",
-  37: "🥬",
-  38: "🧅",
-  39: "🍉",
-  40: "🎃",
-  41: "🍈",
-  42: "🎃",
 };
 
 /** Figurinhas do 4º trimestre (semanas de vida do bebê). */
@@ -1567,7 +1521,7 @@ export function GestacaoPath({
       setRevealing(true);
       setTimeout(() => setRevealing(false), 1800);
     }
-    toast.success(`${FRUIT_EMOJI[week] ?? "🍼"} Figurinha coletada: ${baby.fruit}!`);
+    toast.success(`${fruitEmojiForWeek(week)} Figurinha coletada: ${baby.fruit}!`);
   }
 
   // Intro imersiva (Duolingo) antes do sheet da aula
@@ -1677,7 +1631,7 @@ export function GestacaoPath({
   async function share(week: number) {
     const baby = babyForWeek(week);
     const name = profile?.baby_name || "Meu bebê";
-    const text = `🤰 Semana ${week}: ${name} está do tamanho de ${baby.fruit.toLowerCase()}! ${FRUIT_EMOJI[week] ?? ""}\n📏 ${baby.size} · ⚖️ ${baby.weight}\n\nAcompanhando cada semana no app Obstétrica 💜`;
+    const text = `🤰 Semana ${week}: ${name} está do tamanho de ${baby.fruit.toLowerCase()}! ${fruitEmojiForWeek(week)}\n📏 ${baby.size} · ⚖️ ${baby.weight}\n\nAcompanhando cada semana no app Obstétrica 💜`;
     try {
       if (navigator.share) await navigator.share({ text });
       else {
@@ -2788,7 +2742,7 @@ function AlbumSheet({
             className={`duo3d flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-3xl ${revealing ? "dc-sticker-pop" : ""}`}
             style={{ background: tm.main, "--lip": tm.lip } as React.CSSProperties}
           >
-            {FRUIT_EMOJI[week] ?? "🍼"}
+            {fruitEmojiForWeek(week)}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -5787,7 +5741,7 @@ function PosPartoJourney({
                   }`}
                   aria-label={`Semana ${w}`}
                 >
-                  {FRUIT_EMOJI[w] ?? "🍼"}
+                  {fruitEmojiForWeek(w)}
                 </button>
               );
             })}

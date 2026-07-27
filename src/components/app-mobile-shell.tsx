@@ -37,7 +37,7 @@ import skyMadrugada from "@/assets/sky/madrugada.webp";
 import skyPreAmanhecer from "@/assets/sky/pre-amanhecer.webp";
 import skyAmanhecer from "@/assets/sky/amanhecer.webp";
 import skyAnoitecer from "@/assets/sky/anoitecer.webp";
-import { babyForWeek, retaFinalMensagem } from "@/lib/gestacao";
+import { babyForWeek, fruitEmojiForWeek, retaFinalMensagem } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 
 /* ================================================================
@@ -1033,7 +1033,11 @@ export function AppHomeScreen({
                           {[
                             { emoji: "📏", value: baby.size, label: "Comprimento" },
                             { emoji: "⚖️", value: baby.weight, label: "Peso" },
-                            { emoji: "🍅", value: baby.fruit, label: "Tamanho" },
+                            {
+                              emoji: fruitEmojiForWeek(gest.weeks),
+                              value: baby.fruit,
+                              label: "Tamanho",
+                            },
                           ].map((s, i) => (
                             <div
                               key={s.label}

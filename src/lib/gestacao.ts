@@ -161,6 +161,68 @@ export const BABY_BY_WEEK: Record<
 export const WEEK_MIN = 4;
 export const WEEK_MAX = 42;
 
+/**
+ * Emoji da fruta de cada semana — a figurinha colecionável do álbum E o ícone
+ * do cartão de medidas da home.
+ *
+ * Mora AQUI, ao lado do nome da fruta, de propósito. Quando esta tabela vivia
+ * no arquivo do jogo, a home não a enxergava e tinha um emoji fixo no código:
+ * mostrava 🍅 em todas as semanas, então na semana 20 aparecia um tomate ao
+ * lado da palavra "Banana". Nome e emoji separados sempre acabam divergindo.
+ *
+ * Algumas semanas usam o parente mais próximo porque o emoji exato não existe
+ * no Unicode: lentilha→🫘, aipo→🥬, mamão→🍈, alho-poró→🧅, jaca→🍈.
+ */
+const FRUIT_EMOJI: Record<number, string> = {
+  1: "✨",
+  2: "✨",
+  3: "✨",
+  4: "🌾",
+  5: "🌱",
+  6: "🫘",
+  7: "🫐",
+  8: "🍓",
+  9: "🍇",
+  10: "🍓",
+  11: "🍐",
+  12: "🍋",
+  13: "🫛",
+  14: "🍋",
+  15: "🍎",
+  16: "🥑",
+  17: "🧅",
+  18: "🫑",
+  19: "🍅",
+  20: "🍌",
+  21: "🥕",
+  22: "🌽",
+  23: "🥭",
+  24: "🌽",
+  25: "🥦",
+  26: "🥬",
+  27: "🍆",
+  28: "🎃",
+  29: "🥬",
+  30: "🥒",
+  31: "🥥",
+  32: "🥬",
+  33: "🍍",
+  34: "🍈",
+  35: "🍈",
+  36: "🍈",
+  37: "🥬",
+  38: "🧅",
+  39: "🍉",
+  40: "🎃",
+  41: "🍈",
+  42: "🎃",
+};
+
+/** Emoji da fruta da semana; 🍼 quando a semana está fora da tabela. */
+export function fruitEmojiForWeek(week: number): string {
+  return FRUIT_EMOJI[Math.max(WEEK_MIN, Math.min(WEEK_MAX, week))] ?? "🍼";
+}
+
 export function babyForWeek(week: number) {
   const clamped = Math.max(WEEK_MIN, Math.min(WEEK_MAX, week));
   return BABY_BY_WEEK[clamped] ?? BABY_BY_WEEK[40];

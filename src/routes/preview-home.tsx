@@ -3,7 +3,8 @@ import { AppBottomNav, AppHomeScreen } from "@/components/app-mobile-shell";
 
 /**
  * Bancada de design da HOME — renderiza o AppHomeScreen REAL com dados fixos
- * (semana 19 e 6 dias, os mesmos da referência aprovada), sem exigir login.
+ * (semana 19 e 6 dias, os mesmos da referência aprovada; `?w=20` troca a
+ * semana), sem exigir login.
  *
  * Existe porque a home de verdade vive atrás do Supabase Auth: sem esta rota,
  * cada conferência visual dependia de uma reprodução manual do layout, e as
@@ -15,6 +16,9 @@ import { AppBottomNav, AppHomeScreen } from "@/components/app-mobile-shell";
  * o shell público (header/rodapé) que o __root sempre desenha.
  */
 export const Route = createFileRoute("/preview-home")({
+  // `?w=20` troca a semana: o cartão de medidas muda de fruta, tamanho e peso a
+  // cada semana, e conferir só a 19 deixaria os outros 39 casos sem prova.
+  validateSearch: (s: Record<string, unknown>) => ({ w: Number(s.w) || 19 }),
   head: () => ({
     meta: [{ title: "Bancada da home" }, { name: "robots", content: "noindex" }],
   }),
@@ -22,13 +26,14 @@ export const Route = createFileRoute("/preview-home")({
 });
 
 function PreviewHome() {
+  const { w } = Route.useSearch();
   return (
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
       <div className="mx-auto max-w-md px-5 pt-2">
         <AppHomeScreen
           firstName="Clovis"
           babyName="Clovis"
-          gest={{ weeks: 19, days: 6, totalDays: 139 }}
+          gest={{ weeks: w, days: 6, totalDays: w * 7 + 6 }}
           onNavigate={() => {}}
           onOpenMenu={() => {}}
           nextAppointment={null}
