@@ -15,6 +15,7 @@ import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
+import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewHomeRouteImport } from './routes/preview-home'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
@@ -90,6 +91,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const PrimeiraConsultaRoute = PrimeiraConsultaRouteImport.update({
   id: '/primeira-consulta',
   path: '/primeira-consulta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewNotificacoesRoute = PreviewNotificacoesRouteImport.update({
+  id: '/preview-notificacoes',
+  path: '/preview-notificacoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewJogoRoute = PreviewJogoRouteImport.update({
@@ -348,6 +354,7 @@ export interface FileRoutesByFullPath {
   '/preview-chat': typeof PreviewChatRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
+  '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -401,6 +408,7 @@ export interface FileRoutesByTo {
   '/preview-chat': typeof PreviewChatRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
+  '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -456,6 +464,7 @@ export interface FileRoutesById {
   '/preview-chat': typeof PreviewChatRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
+  '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -511,6 +520,7 @@ export interface FileRouteTypes {
     | '/preview-chat'
     | '/preview-home'
     | '/preview-jogo'
+    | '/preview-notificacoes'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -564,6 +574,7 @@ export interface FileRouteTypes {
     | '/preview-chat'
     | '/preview-home'
     | '/preview-jogo'
+    | '/preview-notificacoes'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -618,6 +629,7 @@ export interface FileRouteTypes {
     | '/preview-chat'
     | '/preview-home'
     | '/preview-jogo'
+    | '/preview-notificacoes'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -673,6 +685,7 @@ export interface RootRouteChildren {
   PreviewChatRoute: typeof PreviewChatRoute
   PreviewHomeRoute: typeof PreviewHomeRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
+  PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
   PrimeiraConsultaRoute: typeof PrimeiraConsultaRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -740,6 +753,13 @@ declare module '@tanstack/react-router' {
       path: '/primeira-consulta'
       fullPath: '/primeira-consulta'
       preLoaderRoute: typeof PrimeiraConsultaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-notificacoes': {
+      id: '/preview-notificacoes'
+      path: '/preview-notificacoes'
+      fullPath: '/preview-notificacoes'
+      preLoaderRoute: typeof PreviewNotificacoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-jogo': {
@@ -1109,6 +1129,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewChatRoute: PreviewChatRoute,
   PreviewHomeRoute: PreviewHomeRoute,
   PreviewJogoRoute: PreviewJogoRoute,
+  PreviewNotificacoesRoute: PreviewNotificacoesRoute,
   PrimeiraConsultaRoute: PrimeiraConsultaRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

@@ -817,6 +817,8 @@ export function AppHomeScreen({
   careMode = false,
   skyTheme = "v2",
   homeCity = null,
+  temNaoLidas = false,
+  onOrigemLocal,
 }: {
   firstName: string;
   babyName: string | null;
@@ -834,6 +836,16 @@ export function AppHomeScreen({
   skyTheme?: SkyThemeId;
   /** Cidade do cadastro, quando preenchida — degrau entre o GPS e o IP. */
   homeCity?: { nome: string; lat: number; lon: number } | null;
+  /** Acende o ponto vermelho no ☰ — há notificação por abrir. */
+  temNaoLidas?: boolean;
+  /**
+   * Conta para fora DE ONDE veio a localização.
+   *
+   * Existe porque o convite de ativar o GPS deixou de ser um cartão na home e
+   * virou notificação, e quem monta a lista de notificações é a página, não
+   * esta tela. O dado nasce aqui dentro (`useWeather`), então precisa subir.
+   */
+  onOrigemLocal?: (origem: OrigemLocal | null) => void;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
@@ -846,8 +858,23 @@ export function AppHomeScreen({
         : "3º trimestre"
     : null;
   const { weather, origem: origemLocal } = useWeather(homeCity);
-  // Recusou o convite da localização? Não insiste na mesma sessão.
-  const [localDispensado, setLocalDispensado] = useState(false);
+  /* Repassa para a página. Depende do CONTEÚDO e não do objeto: `useWeather`
+     devolve um objeto novo a cada render, e comparar por referência dispararia
+     o efeito para sempre. */
+  const origemChave = origemLocal ? `${origemLocal.tipo}|${origemLocal.cidade ?? ""}` : "";
+  useEffect(() => {
+    onOrigemLocal?.(
+      origemChave
+        ? {
+            tipo: origemChave.split("|")[0] as OrigemLocal["tipo"],
+            cidade: origemChave.split("|")[1] || null,
+          }
+        : null,
+    );
+    // `onOrigemLocal` fica fora: a página passa uma função nova a cada render
+    // e incluí-la aqui recriaria o laço que a chave acima veio evitar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origemChave]);
 
   // Hora calculada NO CLIENTE. No SSR o relógio é o do servidor (UTC na
   // Vercel), e o React não corrige atributo divergente na hidratação — a arte
@@ -1043,10 +1070,19 @@ export function AppHomeScreen({
                   hapticTap();
                   onOpenMenu?.();
                 }}
-                aria-label="Menu"
-                className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                aria-label={temNaoLidas ? "Menu — há notificações novas" : "Menu"}
+                className="press relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                 style={glassLeve}
               >
+                {/* O ponto fica FORA do círculo de vidro, encostado na borda:
+                    dentro ele competiria com o ☰ num botão de 40px e sumiria
+                    contra nuvem clara. O anel branco o descola do céu. */}
+                {temNaoLidas && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-rose-500 ring-2 ring-white/85"
+                  />
+                )}
                 {/* O ☰ é irmão do número de graus, e ícone não aceita
                     `background-clip: text`. O material vira traço: barra
                     branca translúcida com as MESMAS sombras deslocadas do
@@ -1321,49 +1357,13 @@ export function AppHomeScreen({
                 </div>
               </div>
 
-              {/* ── Convite para usar a localização real ───────────────
-                  Só aparece quando o app NÃO está no GPS, e some sozinho
-                  quando a permissão é dada. É convite, não alerta: sem cor de
-                  erro, sem ícone de aviso, e dispensável — a paciente que
-                  prefere não compartilhar continua com um app que funciona,
-                  só com a cidade aproximada.
-                  Existe porque a degradação era silenciosa: ela via um pôr do
-                  sol às 22h e não tinha como saber que a causa era a
-                  localização. Dizer QUAL cidade o app está usando é o que
-                  transforma um defeito aparente numa escolha informada. */}
-              {origemLocal &&
-                (origemLocal.tipo === "aprox" || origemLocal.tipo === "padrao") &&
-                !localDispensado && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      hapticTap();
-                      // Repedir a permissão: no navegador, quem já negou não vê
-                      // a caixa de novo — daí o texto do botão falar em "ativar",
-                      // que é o que ela faz nos ajustes do site.
-                      navigator.geolocation?.getCurrentPosition(
-                        () => window.location.reload(),
-                        () => setLocalDispensado(true),
-                        { timeout: 8000 },
-                      );
-                    }}
-                    className="mt-2.5 short:mt-2 flex w-full items-start gap-3 rounded-[22px] px-4 py-3 text-left short:py-2"
-                    style={glass}
-                  >
-                    <span className="mt-0.5 text-xl leading-none">📍</span>
-                    <span className="min-w-0">
-                      <span className={`block text-[14px] font-extrabold ${cardText}`}>
-                        {origemLocal.cidade
-                          ? `Mostrando o tempo de ${origemLocal.cidade}`
-                          : "Mostrando o tempo de uma cidade aproximada"}
-                      </span>
-                      <span className={`mt-0.5 block text-[12px] leading-snug ${cardMuted}`}>
-                        Com a sua localização, o céu e a chuva do app ficam iguais aos da sua
-                        janela. Toque para ativar.
-                      </span>
-                    </span>
-                  </button>
-                )}
+              {/* O convite de ativar a localização saiu daqui.
+                  Ele era o terceiro cartão empilhado no alto desta tela, e
+                  três avisos ao mesmo tempo empurravam o bebê para fora da
+                  primeira dobra. Agora vive na central de notificações, atrás
+                  do ☰ — com a vantagem de não sumir para sempre quando ela
+                  recusa: dá para voltar lá e ativar depois. A origem da
+                  localização sobe pela `onOrigemLocal`. */}
 
               {/* ── Saudação do dia e o conselho ──────────────────────
                   O clima aparece UMA vez na tela, no chip lá em cima: é lá

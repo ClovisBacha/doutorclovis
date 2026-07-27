@@ -11,7 +11,6 @@ import {
 } from "@/components/app-mobile-shell";
 import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
-import { InviteDoctorCTA } from "@/components/invite-doctor-cta";
 import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
@@ -113,6 +112,15 @@ import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import { useWeatherSky } from "@/components/weather-sky";
+import { NotificacoesSheet } from "@/components/notificacoes-sheet";
+import {
+  contarNaoLidas,
+  lerLidas,
+  marcarLidas,
+  ordenar,
+  type Notificacao,
+} from "@/lib/notificacoes";
+import type { OrigemLocal } from "@/components/app-mobile-shell";
 import {
   Camera,
   ChevronLeft,
@@ -478,6 +486,96 @@ function MinhaContaPage() {
 
   /** Menu do ☰ da home — guarda as ações que ficavam na barra de topo. */
   const [homeMenu, setHomeMenu] = useState(false);
+  /* ── Central de notificações ──────────────────────────────────────────
+     `lidas` começa VAZIA e só é preenchida ao montar. Ler o localStorage
+     durante o render faria o servidor (que não tem storage) e o navegador
+     produzirem marcações diferentes, e a hidratação do React não corrige
+     isso — a bolinha piscaria em quem já leu tudo. */
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [lidas, setLidas] = useState<Set<string>>(() => new Set());
+  const [origemLocal, setOrigemLocal] = useState<OrigemLocal | null>(null);
+
+  useEffect(() => {
+    setLidas(lerLidas(profile?.id ?? null));
+  }, [profile?.id]);
+
+  /* As notificações DERIVADAS: nascem do estado da conta, não de uma tabela.
+     Cada uma some sozinha quando a situação que a criou se resolve — vincular
+     um médico apaga as duas primeiras, dar a permissão apaga a terceira.
+     `enviadas` está vazia porque a tabela de recados do médico ainda não
+     existe; `ordenar` já a recebe para o dia em que existir. */
+  const notificacoes: Notificacao[] = useMemo(() => {
+    const derivadas: Notificacao[] = [];
+    const semMedico = !!profile && !profile.doctor_id && !isDoctor && !isAdmin;
+
+    if (semMedico) {
+      derivadas.push({
+        id: "medico-ausente",
+        icone: "👩‍⚕️",
+        titulo: "Você ainda não tem um médico no app",
+        corpo:
+          "Encontre um obstetra por experiência, formação e cidade — ele passa a te acompanhar por aqui.",
+        acao: {
+          rotulo: "Encontrar um obstetra",
+          executar: () => navigate({ to: "/encontrar-medico" }),
+        },
+      });
+      derivadas.push({
+        id: "convide-medico",
+        icone: "🎁",
+        titulo: "Convide o seu médico e ganhe 1 ano de Premium",
+        corpo:
+          "Pelo seu link ele ganha 15% de desconto extra em qualquer plano — e, quando assinar, você ganha 1 ano de Premium grátis.",
+        /* Leva à mesma página, onde o convite com WhatsApp e "copiar" já vive
+           em destaque. Duplicar aquela lógica aqui só criaria um segundo lugar
+           para o link do convite quebrar. */
+        acao: { rotulo: "Pegar meu link", executar: () => navigate({ to: "/encontrar-medico" }) },
+      });
+    }
+
+    if (origemLocal && (origemLocal.tipo === "aprox" || origemLocal.tipo === "padrao")) {
+      derivadas.push({
+        /* O id carrega a CIDADE: quando o app passa a errar outra cidade, é
+           um aviso novo e a bolinha volta — que é o comportamento certo, já
+           que a informação mudou. */
+        id: `local:${origemLocal.cidade ?? "aprox"}`,
+        icone: "📍",
+        titulo: origemLocal.cidade
+          ? `Mostrando o tempo de ${origemLocal.cidade}`
+          : "Mostrando o tempo de uma cidade aproximada",
+        corpo:
+          "Com a sua localização, o céu e a chuva do app ficam iguais aos da sua janela. Toque para ativar.",
+        acao: {
+          rotulo: "Ativar localização",
+          executar: () => {
+            navigator.geolocation?.getCurrentPosition(
+              () => window.location.reload(),
+              () => toast("Ative a localização nos ajustes do navegador para este site."),
+              { timeout: 8000 },
+            );
+          },
+        },
+      });
+    }
+
+    return ordenar([], derivadas);
+  }, [profile, isDoctor, isAdmin, origemLocal, navigate]);
+
+  const naoLidas = contarNaoLidas(notificacoes, lidas);
+
+  /* Abrir a gaveta É ler. Marca tudo o que está na lista NAQUELE instante —
+     não a lista inteira de sempre —, então um aviso que chegue com a gaveta
+     aberta continua contando como novo. */
+  function abrirNotificacoes() {
+    setHomeMenu(false);
+    setNotifOpen(true);
+    setLidas(
+      marcarLidas(
+        profile?.id ?? null,
+        notificacoes.map((n) => n.id),
+      ),
+    );
+  }
   // Jornada do Bebê (toque na foto do bebê) + popup do Premium (gatilho)
   const [journeyOpen, setJourneyOpen] = useState(false);
   const [premiumOpen, setPremiumOpen] = useState(false);
@@ -963,34 +1061,14 @@ function MinhaContaPage() {
             </div>
           </div>
 
-          {/* ── Sem médico vinculado? Convida a encontrar um ──
-            Some quando a paciente já escolheu um médico (doctor_id) e nunca
-            aparece para contas de médico/admin — elas são o próprio médico. */}
-          {!loading && profile && !profile.doctor_id && !isDoctor && !isAdmin && (
-            <Link
-              to="/encontrar-medico"
-              className="mb-4 flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 transition-colors hover:border-primary/60"
-            >
-              <span className="text-2xl">👩‍⚕️</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">
-                  Você ainda não tem um médico no app
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Encontre um obstetra por experiência, formação e cidade — ele passa a te
-                  acompanhar por aqui.
-                </p>
-              </div>
-              <span className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
-                Encontrar
-              </span>
-            </Link>
-          )}
-
-          {/* ── Convide o SEU médico: ele ganha +15% e você ganha o Premium ── */}
-          {!loading && profile && !profile.doctor_id && !isDoctor && !isAdmin && (
-            <InviteDoctorCTA variant="card" />
-          )}
+          {/* Os dois cartões que ficavam aqui — "você ainda não tem um médico"
+              e "convide o seu médico" — viraram notificações.
+              Eles apareciam SEMPRE JUNTOS (a condição dos dois é a mesma:
+              sem `doctor_id`) e, com o convite da localização, davam três
+              avisos empilhados acima do bebê. A primeira coisa que a paciente
+              via ao abrir o app eram três pedidos, nenhum deles o filho dela.
+              Continuam existindo, e agora com uma vantagem: dispensar não
+              apaga mais para sempre — estão na central, atrás do ☰. */}
 
           {/* ── Mobile: home screen ──────────────────────────────── */}
           {mobileHome && (
@@ -1006,6 +1084,8 @@ function MinhaContaPage() {
                 gest={gest}
                 onNavigate={mobileNavigate}
                 onOpenMenu={() => setHomeMenu(true)}
+                temNaoLidas={naoLidas > 0}
+                onOrigemLocal={setOrigemLocal}
                 nextAppointment={nextAppt}
                 babyTone={profile?.baby_skin_tone ?? 0}
                 careMode={careMode}
@@ -1036,6 +1116,29 @@ function MinhaContaPage() {
                       {dayGreeting()}, {firstName} 💛
                     </p>
                     <div className="mt-1 space-y-0.5">
+                      {/* Primeiro item da lista: é o que muda de um dia para o
+                          outro. Painel, ajustes e sair estão sempre lá; só
+                          este tem novidade. */}
+                      <button
+                        onClick={abrirNotificacoes}
+                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/8"
+                      >
+                        <span className="relative text-lg leading-none">
+                          ✉️
+                          {naoLidas > 0 && (
+                            <span
+                              aria-hidden
+                              className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card"
+                            />
+                          )}
+                        </span>
+                        <span className="flex-1">Notificações</span>
+                        {naoLidas > 0 && (
+                          <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                            {naoLidas}
+                          </span>
+                        )}
+                      </button>
                       {(isAdmin || isDoctor) && (
                         <Link
                           to="/painel"
@@ -1067,6 +1170,14 @@ function MinhaContaPage() {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {notifOpen && (
+                <NotificacoesSheet
+                  lista={notificacoes}
+                  lidas={lidas}
+                  onFechar={() => setNotifOpen(false)}
+                />
               )}
             </div>
           )}
