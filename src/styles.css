@@ -1728,6 +1728,106 @@ button:active > .duo3d {
   }
 }
 
+/* ══════════════ Chuva na home ══════════════════════════════════════
+   Duas camadas: riscos caindo ao fundo e gotas na vidraça. A regra de peso é
+   a mesma do resto do ambiente — só `transform` e `opacity`, porque isso a
+   GPU compõe sem repintar. Chuva bonita que trava o scroll é pior que chuva
+   nenhuma, e este efeito roda sobre uma foto em tela cheia, num celular,
+   durante rolagem. */
+
+/* O risco cai e some antes de encostar embaixo: chuva de verdade não
+   "aterrissa" no meio da tela, ela sai do enquadramento. A leve inclinação
+   evita que pareça listra de interface. */
+@keyframes dcRainLinha {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -12vh, 0) rotate(6deg);
+  }
+  12%,
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(6vh, 112vh, 0) rotate(6deg);
+  }
+}
+.dc-rain-linha {
+  animation-name: dcRainLinha;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+/* A gota do vidro NÃO cai — ela junta água. O ciclo é longo e o que muda é
+   a opacidade e um leve inchar; parada demais viraria sujeira na lente,
+   animada demais viraria bolha subindo. */
+@keyframes dcRainGota {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  14%,
+  76% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  90% {
+    opacity: 0.5;
+    transform: scale(1.06);
+  }
+}
+/* Longhand de propósito: a duração fica aqui e o atraso vem inline, e o React
+   avisa quando se mistura o atalho `animation` com uma propriedade solta do
+   mesmo grupo — a que chegar depois apaga a outra. */
+.dc-rain-gota {
+  animation-name: dcRainGota;
+  animation-duration: 9s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+/* A escorrida: a gota desce puxando o rastro. Devagar (6–13s) porque água
+   em vidro escorre devagar mesmo — acelerar isso é o erro mais comum e o que
+   faz o efeito parecer videogame. */
+@keyframes dcRainEscorre {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  8%,
+  84% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 62vh, 0);
+  }
+}
+.dc-rain-escorre {
+  animation-name: dcRainEscorre;
+  animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.35);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Os riscos e as escorridas SÓ existem em movimento — somem. As gotas
+     paradas no vidro continuam: vidro molhado parado ainda é vidro molhado,
+     e é o que sobra de chuva para quem pediu menos movimento. */
+  .dc-rain-linha,
+  .dc-rain-escorre {
+    animation: none;
+    opacity: 0;
+  }
+  .dc-rain-gota {
+    animation: none;
+    opacity: 0.75;
+  }
+}
+
 /* ══════════════ Liquid Glass — material dos cards de jogo ══════════════
    Vidro de verdade, não plástico colorido: o fundo da tela atravessa
    (backdrop-filter), a luz bate na quina de cima (rim claro), escorre e

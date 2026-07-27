@@ -26,6 +26,7 @@ import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyAmbience } from "@/components/sky-ambience";
+import { SkyRain, forcaDaChuva } from "@/components/sky-rain";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
 import skyManha from "@/assets/sky/manha.webp";
 import skyMeioDia from "@/assets/sky/meio-dia.webp";
@@ -111,6 +112,8 @@ type WeatherState = {
   overlay: string;
   tip: string;
   tipEmoji: string;
+  /** Chuva da hora anterior, em mm. Só desempata a trovoada (ver forcaDaChuva). */
+  mm: number;
   /* Nascer e pôr do sol NA LOCALIZAÇÃO da pessoa — é o que permite o céu do
      app seguir o céu de verdade em vez do relógio. `null` quando a API não
      respondeu, ou nos polos, onde o sol pode não nascer no dia. */
@@ -205,18 +208,24 @@ function useWeather(): { weather: WeatherState | null; origem: OrigemLocal | nul
             // `is_day` conserta o sol às 19h; `daily=sunrise,sunset` é o que
             // deixa o céu do app seguir o céu de verdade. Os dois vêm na MESMA
             // requisição que já existia — sem chamada extra, sem permissão nova.
-            `&current=temperature_2m,weather_code,is_day` +
+            `&current=temperature_2m,weather_code,is_day,precipitation` +
             `&daily=sunrise,sunset` +
             `&timezone=auto&forecast_days=1`,
         );
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as {
-          current: { temperature_2m: number; weather_code: number; is_day?: number };
+          current: {
+            temperature_2m: number;
+            weather_code: number;
+            is_day?: number;
+            precipitation?: number;
+          };
           daily?: { sunrise?: (string | null)[]; sunset?: (string | null)[] };
         };
         const temp = Math.round(data.current.temperature_2m);
         const code = data.current.weather_code;
         const isDay = data.current.is_day !== 0;
+        const mm = Number(data.current.precipitation) || 0;
         const { condition, emoji } = wmoToInfo(code, isDay);
         const overlay = weatherOverlay(code, temp);
         const { tip, tipEmoji } = weatherTip(code, temp);
@@ -231,7 +240,7 @@ function useWeather(): { weather: WeatherState | null; origem: OrigemLocal | nul
         const sunrise = parseHora(data.daily?.sunrise?.[0]);
         const sunset = parseHora(data.daily?.sunset?.[0]);
         if (!cancelled)
-          setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji, sunrise, sunset });
+          setWeather({ temp, code, condition, emoji, overlay, tip, tipEmoji, mm, sunrise, sunset });
       } catch {
         /* clima é enhancement — falha silenciosa */
       }
@@ -893,6 +902,18 @@ export function AppHomeScreen({
 
         {/* Vida de fundo do momento do dia — detalhe, nunca protagonista. */}
         {artTheme && <SkyAmbience slot={slot.nome} careMode={careMode} />}
+
+        {/* Chuva: entra DEPOIS do ambiente porque molha o cenário inteiro,
+            inclusive os pássaros e as sementinhas. Continua abaixo do
+            conteúdo — a chuva não pinga em cima do texto.
+            Só no tema com arte: o Céu Clássico (V1) já desenha os próprios
+            fios de chuva no SkyLayers, e as duas juntas dariam chuva dupla. */}
+        {artTheme && (
+          <SkyRain
+            forca={weather ? forcaDaChuva(weather.code, weather.mm) : null}
+            careMode={careMode}
+          />
+        )}
 
         {/* Céu vivo (sol/lua, estrelas, nuvens, chuva) só no tema V1: sobre a
             arte ele brigaria com as nuvens já pintadas nela. */}
