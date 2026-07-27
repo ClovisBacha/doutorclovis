@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppBottomNav,
   AppHomeScreen,
-  SectionHeader,
   tabToSection,
   tabsForSection,
   type AppTab,
@@ -114,7 +113,17 @@ import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import { useWeatherSky } from "@/components/weather-sky";
-import { Camera, FileText, Image as ImageIcon, Mic, Plus, Send, X } from "lucide-react";
+import {
+  Camera,
+  ChevronLeft,
+  FileText,
+  Image as ImageIcon,
+  Mic,
+  Plus,
+  Send,
+  Settings,
+  X,
+} from "lucide-react";
 import {
   searchDoctors,
   requestDoctor,
@@ -906,12 +915,26 @@ function MinhaContaPage() {
               Na home ela some: o herói imersivo tem a própria barra flutuante
               sobre o céu (☰ + clima), e estas mesmas ações moram no ☰. */}
           <div
-            className={`${mobileHome ? "hidden" : "flex"} md:hidden items-center justify-between mb-4`}
+            className={`${mobileHome ? "hidden" : "flex"} md:hidden items-center justify-between gap-2 mb-4`}
           >
-            <p className="font-serif text-xl leading-tight text-foreground">
-              {mobileHome ? `${dayGreeting()}, ${firstName} 💛` : tab}
-            </p>
-            <div className="flex items-center gap-2">
+            {/* Voltar + nome da aba, juntos. O nome aparecia DUAS vezes em toda
+                tela — aqui e de novo logo abaixo, num cabeçalho próprio com a
+                seta ("Caminho" / "Caminho"). Sobrou uma vez só, e a seta subiu
+                para junto dele: a linha que se repetia era espaço morto no alto
+                de cada tela do app.
+                O ternário do título também saiu: esta barra é `hidden` quando
+                `mobileHome`, então o ramo da saudação nunca renderizava. */}
+            <div className="flex min-w-0 items-center gap-2.5">
+              <button
+                onClick={() => setMobileHome(true)}
+                aria-label="Voltar ao início"
+                className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-colors hover:bg-primary/15"
+              >
+                <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2} />
+              </button>
+              <p className="truncate font-serif text-xl leading-tight text-foreground">{tab}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
               {(isAdmin || isDoctor) && (
                 <Link
                   to="/painel"
@@ -927,9 +950,9 @@ function MinhaContaPage() {
                   setMobileHome(false);
                 }}
                 aria-label="Perfil e ajustes"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-base text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
               >
-                ⚙️
+                <Settings className="h-[18px] w-[18px]" strokeWidth={1.9} />
               </button>
               <button
                 onClick={signOut}
@@ -1050,9 +1073,6 @@ function MinhaContaPage() {
 
           {/* ── Desktop & mobile (when tab selected): category nav + tabs ── */}
           <div className={mobileHome ? "hidden md:block" : "block"}>
-            {/* Section back-button on mobile */}
-            {!mobileHome && <SectionHeader title={tab} onHome={() => setMobileHome(true)} />}
-
             {/* Celular: UMA barra só — as abas da seção do menu de baixo (o menu
               de baixo já faz o papel de categoria; corta um seletor empilhado).
               Jogo/Chat têm 1 aba só → escondemos a fileira (abrem limpos). */}

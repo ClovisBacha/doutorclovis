@@ -3,7 +3,6 @@
  *   - AppBottomNav   – barra inferior com 5 abas e indicador pill ativo (#5)
  *   - AppHomeScreen  – dashboard com clima em tempo real, semana Apple Fitness,
  *                      modo madrugada, próxima consulta e coração pulsante (#6–10)
- *   - SectionHeader  – cabeçalho de categoria com botão voltar
  *
  * Clima via Open-Meteo (gratuito, sem API key) com recomendações para gestantes.
  */
@@ -11,7 +10,6 @@ import { useState, useEffect } from "react";
 import {
   Baby,
   CalendarDays,
-  ChevronLeft,
   ChevronRight,
   Gamepad2,
   HelpCircle,
@@ -1522,36 +1520,6 @@ export function AppHomeScreen({
         <HelpCircle className="h-3.5 w-3.5" />
         Dúvidas frequentes
       </button>
-    </div>
-  );
-}
-
-/* ================================================================
-   SectionHeader
-   ================================================================ */
-
-export function SectionHeader({
-  title,
-  subtitle,
-  onHome,
-}: {
-  title: string;
-  subtitle?: string;
-  onHome: () => void;
-}) {
-  return (
-    <div className="mb-5 flex items-center gap-3 md:hidden">
-      <button
-        onClick={onHome}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-all duration-200 hover:bg-primary/15 active:scale-95"
-        aria-label="Voltar ao início"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </button>
-      <div>
-        <p className="font-serif text-xl leading-tight text-foreground">{title}</p>
-        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-      </div>
     </div>
   );
 }
