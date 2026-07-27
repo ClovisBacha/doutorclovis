@@ -1811,41 +1811,40 @@ button:active > .duo3d {
      nos dois casos. No relógio da Apple é assim em qualquer papel de parede. */
   .dc-glass-text {
     /* ── 1. O CORPO ────────────────────────────────────────────────
-       Translúcido de ponta a ponta: o fundo atravessa a letra, e é por isso
-       que ela fica azul sobre céu azul e lilás sobre céu lilás, como no
-       relógio da Apple. O gradiente é fraco de propósito — ele só insinua
-       que a face de cima pega mais luz que o miolo. */
+       Translúcido de ponta a ponta, e BEM aberto no miolo (0.20): o fundo
+       atravessa a letra, e é por isso que ela fica azul sobre céu azul e
+       lilás sobre céu lilás. O gradiente só insinua que a face de cima pega
+       mais luz que o meio. */
     background-image: linear-gradient(
       177deg,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(255, 255, 255, 0.52) 20%,
-      rgba(255, 255, 255, 0.34) 50%,
-      rgba(255, 255, 255, 0.44) 76%,
-      rgba(255, 255, 255, 0.9) 100%
+      rgba(255, 255, 255, 0.86) 0%,
+      rgba(255, 255, 255, 0.4) 24%,
+      rgba(255, 255, 255, 0.2) 54%,
+      rgba(255, 255, 255, 0.3) 80%,
+      rgba(255, 255, 255, 0.78) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    /* ── 2. A ESPESSURA ───────────────────────────────────────────
-       Aqui morava o erro da versão anterior: um `-webkit-text-stroke` branco
-       fechado em volta do glifo, mais uma sombra `0 0` escura. Contorno de
-       espessura IGUAL em toda a volta é traço de caneta, não vidro — e a
-       sombra sem deslocamento vira sujeira em vez de volume.
-       Vidro tem lado: a quina virada para a luz acende, a parede oposta cai
-       na sombra. Então as sombras são todas DESLOCADAS, nenhuma centrada —
-       duas claras para cima e à esquerda, duas escuras para baixo e à
-       direita. Como o corpo é translúcido, elas aparecem por trás do glifo e
-       o resultado é um bisel que segue cada contorno, inclusive o miolo do
-       "o" e do "e", coisa que um gradiente sozinho não alcança. */
+    /* ── 2. A ESPESSURA: DOIS FIOS, NENHUM DESFOCADO ──────────────
+       Duas versões erradas antes desta, e cada uma ensinou uma regra.
+       A primeira usou `-webkit-text-stroke` branco: contorno de espessura
+       igual em toda a volta é traço de caneta, não vidro. Vidro tem lado.
+       A segunda acertou o lado mas errou a forma — pôs DESFOQUE nos fios
+       (`1.6px 3px 3.5px`). Sombra borrada atrás de um glifo translúcido
+       aparece POR DENTRO dele: vira véu cinza no miolo da letra, e no
+       aparelho isso lê como imagem fora de foco. Era o "blur" reclamado.
+       Sobraram dois fios de sub-pixel, os dois com raio ZERO — a quina
+       acesa em cima/à esquerda, a parede na sombra embaixo/à direita. Fio
+       duro mantém a letra nítida e ainda assim dá volume, porque segue cada
+       contorno, inclusive o miolo do "o". */
     text-shadow:
-      -0.8px -1px 0 rgba(255, 255, 255, 1),
-      -1.6px -2px 1.6px rgba(255, 255, 255, 0.45),
-      0.8px 1.5px 0 rgba(26, 40, 76, 0.48),
-      1.6px 3px 3.5px rgba(26, 40, 76, 0.3),
+      -0.4px -0.4px 0 rgba(255, 255, 255, 1),
+      0.4px 0.7px 0 rgba(20, 34, 70, 0.58),
       /* ── 3. O AR ─────────────────────────────────────────────────
-         Larga, fraca e bem abaixo: é o que faz a letra pairar acima do
-         cenário em vez de estar colada nele. */
-        0 11px 24px rgba(18, 30, 62, 0.34);
+         Esta pode ser larga porque cai a 9px de distância — longe demais
+         para lavar o glifo, perto o bastante para descolá-lo do cenário. */
+        0 9px 20px rgba(16, 28, 60, 0.3);
   }
 
   /* O recorte vale para TODO glifo, inclusive emoji — e emoji recortado perde

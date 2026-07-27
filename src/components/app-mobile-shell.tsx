@@ -1076,9 +1076,7 @@ export function AppHomeScreen({
                   style={glassLeve}
                   aria-label={`${weather.temp} graus, ${weather.condition}`}
                 >
-                  <span
-                    className={`text-[15px] font-extrabold leading-none ${cardText} ${glassSmall}`}
-                  >
+                  <span className={`text-[15px] font-bold leading-none ${cardText} ${glassSmall}`}>
                     {weather.temp}°
                   </span>
                 </div>
@@ -1171,7 +1169,7 @@ export function AppHomeScreen({
                         // o maior número da tela era o único texto que NÃO
                         // seguia a fonte do sistema.
                         fontFamily: "var(--font-serif)",
-                        fontSize: "clamp(2rem, 8.4vw, 2.6rem)",
+                        fontSize: "clamp(2.5rem, 10.5vw, 3.2rem)",
                         fontWeight: 400,
                         letterSpacing: "-0.01em",
                         fontVariantNumeric: "tabular-nums lining-nums",
@@ -1179,7 +1177,7 @@ export function AppHomeScreen({
                     >
                       {gest.weeks}
                     </p>
-                    <p className={`mt-0.5 text-[13px] font-normal ${cardMuted} ${glassSmall}`}>
+                    <p className={`mt-0.5 text-[15px] font-normal ${cardMuted} ${glassSmall}`}>
                       {gest.weeks === 1 ? "semana" : "semanas"}
                       {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
                     </p>
@@ -1232,7 +1230,7 @@ export function AppHomeScreen({
                                 {s.emoji}
                               </span>
                               <p
-                                className={`mt-1 text-[14px] font-extrabold leading-tight ${cardText} ${glassSmall}`}
+                                className={`mt-1 text-[14px] font-semibold leading-tight ${cardText} ${glassSmall}`}
                               >
                                 {s.value}
                               </p>
