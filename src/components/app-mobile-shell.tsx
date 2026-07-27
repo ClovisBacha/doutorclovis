@@ -38,7 +38,7 @@ import skyMadrugada from "@/assets/sky/madrugada.webp";
 import skyPreAmanhecer from "@/assets/sky/pre-amanhecer.webp";
 import skyAmanhecer from "@/assets/sky/amanhecer.webp";
 import skyAnoitecer from "@/assets/sky/anoitecer.webp";
-import { babyForWeek, fruitEmojiForWeek, retaFinalMensagem } from "@/lib/gestacao";
+import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 import { getApproxLocation } from "@/lib/local.functions";
 
@@ -815,8 +815,6 @@ export function AppHomeScreen({
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
   const daysLeft = gest ? Math.max(0, 280 - gest.totalDays) : null;
-  // Reta final (40s+): substitui "É hoje!/Parto em 0 dias" perpétuo por acolhimento.
-  const reta = gest ? retaFinalMensagem(gest.weeks) : null;
   const trimestre = gest
     ? gest.weeks < 14
       ? "1º trimestre"
@@ -863,10 +861,6 @@ export function AppHomeScreen({
   // Cores de texto adaptadas ao céu do momento
   const heroText = darkSky ? "text-white/95" : "text-foreground";
   const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
-  // No céu escuro o rótulo é branco a 60%; no claro tem que ser o espelho
-  // disso — preto a 60%. Estava `text-violet-600`, roxo sobre lilás do
-  // amanhecer, uns 2,5:1 de contraste: sumia de dia e reaparecia de noite.
-  const heroLabel = darkSky ? "text-white/60" : "text-slate-900/60";
 
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
      o céu escurece e o mesmo branco cegaria — então o vidro inverte e o texto
@@ -1025,22 +1019,25 @@ export function AppHomeScreen({
                 />
               </button>
 
+              {/* Só o número. O ícone do tempo desceu para o cartão de
+                  saudação, onde ele tem espaço para ser o ícone REAL da
+                  condição em vez de um genérico — e o topo fica com dois
+                  círculos do mesmo tamanho, um de cada lado, em vez de um
+                  botão e uma pílula comprida. */}
               {weather && (
                 <div
-                  className="flex items-center gap-2.5 rounded-3xl px-3.5 py-2"
-                  style={glass}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                  style={glassLeve}
                   aria-label={`${weather.temp} graus, ${weather.condition}`}
                 >
-                  <span className="text-2xl leading-none">{weather.emoji}</span>
-                  <div className="leading-tight">
-                    <p className={`text-[15px] font-extrabold ${cardText}`}>{weather.temp}°C</p>
-                    {/* `font-semibold` e não `font-medium`: com 10px sobre
-                        vidro translúcido, medido, a condição ficava em 4,14:1
-                        no meio-dia. Engrossar o traço recupera o contraste sem
-                        escurecer a cor — o rótulo continua secundário ao lado
-                        da temperatura. */}
-                    <p className={`text-[10px] font-semibold ${cardMuted}`}>{weather.condition}</p>
-                  </div>
+                  <span
+                    className={`text-[15px] font-extrabold leading-none ${cardText}`}
+                    style={{
+                      filter: `drop-shadow(0 1px 2px ${darkSky ? "rgba(0,0,0,0.5)" : "rgba(120,90,100,0.35)"})`,
+                    }}
+                  >
+                    {weather.temp}°
+                  </span>
                 </div>
               )}
             </div>
@@ -1053,49 +1050,29 @@ export function AppHomeScreen({
 
             {gest && baby ? (
               <>
-                {/* Nome do bebê. Menor e mais próximo da barra de cima do que
-                    era: em clamp(1.9rem, 8.6vw, 2.5rem) ele disputava atenção
-                    com o próprio bebê e empurrava as pílulas para baixo. O
-                    respiro que sobra é o que deixa o topo arejado. */}
+                {/* Só o nome. O rótulo "Acompanhando" saiu: ele ocupava uma
+                    linha inteira para dizer o óbvio, e era o texto de menor
+                    contraste da tela. Sem ele — e sem as pílulas — o nome pode
+                    crescer e respirar, que é o que faz alguém LER em vez de só
+                    reconhecer. */}
                 {babyName && (
-                  <div className="mt-1 short:mt-0.5 text-center" style={overArt}>
-                    <p className={`text-[12px] font-medium tracking-[0.04em] ${heroLabel}`}>
-                      Acompanhando
-                    </p>
+                  <div className="mt-5 short:mt-3 text-center" style={overArt}>
                     <p
-                      className={`mt-0.5 font-serif text-[clamp(1.6rem,7.2vw,2.05rem)] font-normal leading-none ${heroText}`}
+                      className={`font-serif text-[clamp(2rem,9vw,2.6rem)] font-normal leading-none ${heroText}`}
                     >
-                      {babyName} <span className="align-middle text-[0.55em]">💜</span>
+                      {babyName} <span className="align-middle text-[0.5em]">💜</span>
                     </p>
                   </div>
                 )}
 
-                {/* Pílulas: trimestre + contagem regressiva, centralizadas */}
-                <div className="mt-2.5 short:mt-2 flex flex-wrap items-center justify-center gap-2">
-                  <span
-                    className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${cardText}`}
-                    style={glass}
-                  >
-                    🤰 {trimestre}
-                  </span>
-                  {careMode ? null : reta ? (
-                    <span
-                      className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
-                      style={glass}
-                    >
-                      💛 {reta.eyebrow}
-                    </span>
-                  ) : (
-                    daysLeft != null && (
-                      <span
-                        className={`rounded-full px-3.5 py-1.5 short:py-1 text-[10px] font-bold uppercase tracking-[0.1em] ${cardText}`}
-                        style={glass}
-                      >
-                        {daysLeft === 0 ? "🎉 É hoje!" : `📅 Parto em ${daysLeft} dias`}
-                      </span>
-                    )
-                  )}
-                </div>
+                {/* As pílulas de trimestre e de contagem regressiva saíram.
+                    A data prevista do parto já aparece por extenso no cartão de
+                    progresso, logo abaixo, e o trimestre é dedutível da semana
+                    que está em letras garrafais no meio da tela. Duas pílulas
+                    para repetir o que a tela já diz é justamente o que tirava
+                    o ar do topo.
+                    A mensagem de reta final (40s+) não se perde: título, corpo
+                    e dica continuam na aba do Bebê — aqui só existia o rótulo. */}
 
                 {/* Bebê protagonista dentro da bolha (o "ventre").
                   Toque abre a aba do Bebê com a semana detalhada. */}
@@ -1341,7 +1318,9 @@ export function AppHomeScreen({
                   className="mt-2.5 short:mt-2 flex items-start gap-3 rounded-[22px] px-4 py-3 short:py-2"
                   style={glass}
                 >
-                  <span className="mt-0.5 text-xl leading-none">{weather.tipEmoji}</span>
+                  {/* O ícone REAL da condição, que antes vivia no chip lá em cima.
+                      Aqui ele tem espaço, e o chip fica só com o número. */}
+                  <span className="mt-0.5 text-xl leading-none">{weather.emoji}</span>
                   <div className="min-w-0">
                     <p className={`text-[14px] font-extrabold ${cardText}`}>
                       {dayGreetingLabel()}
