@@ -437,10 +437,31 @@ export function AppBottomNav({
       className="pointer-events-none fixed inset-x-0 z-40 flex justify-center md:hidden print:hidden"
       style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
     >
+      {/* Mesma receita de vidro dos cartões da home (`glass` em AppHomeScreen):
+          verniz diagonal por cima de uma base clara, desfoque com saturação
+          alta atrás, fio de luz na aresta de cima e sombra funda embaixo.
+          A base fica em 0,58 e não mais baixa de propósito: esta barra vive
+          em TODA tela do app, inclusive as de conteúdo claro e a home de
+          madrugada. Vidro fino demais some no branco e escurece na noite —
+          e aí o rótulo cinza de "Saúde" perde a leitura. Como no iOS, a
+          barra é vidro CLARO: quem diz que é vidro é o desfoque e o fio de
+          luz, não a falta de corpo. */}
       <div
-        className={`pointer-events-auto flex items-center justify-around rounded-full border border-white/70 bg-white/95 shadow-[0_10px_36px_rgba(0,0,0,0.14)] backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
+        className={`pointer-events-auto flex items-center justify-around rounded-full transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
           compact ? "w-[64%] px-1.5 py-1" : "w-[92%] max-w-md px-2 py-1.5"
         }`}
+        style={{
+          background:
+            "linear-gradient(158deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.18) 48%)," +
+            " rgba(255,253,252,0.58)",
+          backdropFilter: "blur(22px) saturate(185%)",
+          WebkitBackdropFilter: "blur(22px) saturate(185%)",
+          border: "1px solid rgba(255,255,255,0.72)",
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,0.95)," +
+            " inset 0 -14px 30px -20px rgba(120,92,110,0.26)," +
+            " 0 12px 34px -14px rgba(48,40,60,0.32)",
+        }}
       >
         {/* SOS no extremo ESQUERDO — vermelho, sempre visível. */}
         {onEmergency && (
@@ -481,8 +502,12 @@ export function AppBottomNav({
                   compact ? "h-11 w-11" : "h-14 w-14"
                 } ${activeSection === id ? "scale-105" : "scale-100"}`}
                 style={{
+                  /* O aro branco existe para o círculo não encostar na barra.
+                     Sólido ele virava um disco opaco pousado sobre vidro —
+                     lia como adesivo. Translúcido, ele continua separando e
+                     deixa o cenário passar, como o resto da barra. */
                   boxShadow:
-                    "0 10px 22px -6px rgba(236,72,153,0.55), 0 0 0 5px rgba(255,255,255,0.96)",
+                    "0 10px 22px -6px rgba(236,72,153,0.55), 0 0 0 5px rgba(255,255,255,0.62)",
                 }}
               >
                 <Icon className={compact ? "h-5 w-5" : "h-7 w-7"} strokeWidth={2.1} />
