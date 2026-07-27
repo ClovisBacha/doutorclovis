@@ -2086,3 +2086,94 @@ button:active > .duo3d {
     animation: none !important;
   }
 }
+
+/* ══════════════ Chat da IA — atmosfera ═══════════════════════════════
+   Esta é a aba que mais fala "tecnologia" no app, e o desafio dela é fazer
+   isso sem virar ficção científica: a paciente está aqui para perguntar se
+   pode tomar dipirona, não para admirar efeito.
+
+   A regra é a mesma do ambiente do céu: só `transform` e `opacity`, ciclos
+   longos, poucos elementos. Três manchas de luz derivando devagar atrás do
+   gradiente do céu — o bastante para a tela respirar e nunca o bastante para
+   competir com o texto. */
+@keyframes dcAuroraA {
+  0%,
+  100% {
+    transform: translate3d(-8%, -6%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6%, 8%, 0) scale(1.18);
+  }
+}
+@keyframes dcAuroraB {
+  0%,
+  100% {
+    transform: translate3d(10%, 6%, 0) scale(1.1);
+  }
+  50% {
+    transform: translate3d(-6%, -8%, 0) scale(0.92);
+  }
+}
+@keyframes dcAuroraC {
+  0%,
+  100% {
+    transform: translate3d(0, 10%, 0) scale(0.95);
+  }
+  50% {
+    transform: translate3d(-10%, -4%, 0) scale(1.22);
+  }
+}
+.dc-aurora-a {
+  animation: dcAuroraA 34s ease-in-out infinite;
+}
+.dc-aurora-b {
+  animation: dcAuroraB 46s ease-in-out infinite;
+}
+.dc-aurora-c {
+  animation: dcAuroraC 40s ease-in-out infinite;
+}
+
+/* O cursor do texto que se digita sozinho no campo de mensagem. */
+@keyframes dcCaret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+.dc-caret {
+  animation: dcCaret 1.1s steps(1, end) infinite;
+}
+
+/* Brilho que atravessa a bolha enquanto a IA pensa — sinal de que a máquina
+   está trabalhando, no lugar dos três pontinhos de sempre. */
+@keyframes dcThinkSweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+.dc-think-sweep {
+  animation: dcThinkSweep 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* As auroras ficam PARADAS, não invisíveis: elas são cor de fundo, e some
+     a cor a tela fica chapada. O que sai é o movimento. */
+  .dc-aurora-a,
+  .dc-aurora-b,
+  .dc-aurora-c,
+  .dc-caret,
+  .dc-think-sweep {
+    animation: none;
+  }
+  /* Sem varredura, o sinal de "pensando" tem que existir de outro jeito. */
+  .dc-think-sweep {
+    opacity: 0.5;
+  }
+}

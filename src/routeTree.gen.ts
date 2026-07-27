@@ -17,6 +17,7 @@ import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewHomeRouteImport } from './routes/preview-home'
+import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
 import { Route as MitosRouteImport } from './routes/mitos'
@@ -99,6 +100,11 @@ const PreviewJogoRoute = PreviewJogoRouteImport.update({
 const PreviewHomeRoute = PreviewHomeRouteImport.update({
   id: '/preview-home',
   path: '/preview-home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewChatRoute = PreviewChatRouteImport.update({
+  id: '/preview-chat',
+  path: '/preview-chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MuralRoute = MuralRouteImport.update({
@@ -339,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-chat': typeof PreviewChatRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
@@ -391,6 +398,7 @@ export interface FileRoutesByTo {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-chat': typeof PreviewChatRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
@@ -445,6 +453,7 @@ export interface FileRoutesById {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-chat': typeof PreviewChatRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
@@ -499,6 +508,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-chat'
     | '/preview-home'
     | '/preview-jogo'
     | '/primeira-consulta'
@@ -551,6 +561,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-chat'
     | '/preview-home'
     | '/preview-jogo'
     | '/primeira-consulta'
@@ -604,6 +615,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-chat'
     | '/preview-home'
     | '/preview-jogo'
     | '/primeira-consulta'
@@ -658,6 +670,7 @@ export interface RootRouteChildren {
   MitosRoute: typeof MitosRoute
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
+  PreviewChatRoute: typeof PreviewChatRoute
   PreviewHomeRoute: typeof PreviewHomeRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PrimeiraConsultaRoute: typeof PrimeiraConsultaRoute
@@ -741,6 +754,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-home'
       fullPath: '/preview-home'
       preLoaderRoute: typeof PreviewHomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-chat': {
+      id: '/preview-chat'
+      path: '/preview-chat'
+      fullPath: '/preview-chat'
+      preLoaderRoute: typeof PreviewChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mural': {
@@ -1086,6 +1106,7 @@ const rootRouteChildren: RootRouteChildren = {
   MitosRoute: MitosRoute,
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
+  PreviewChatRoute: PreviewChatRoute,
   PreviewHomeRoute: PreviewHomeRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PrimeiraConsultaRoute: PrimeiraConsultaRoute,
