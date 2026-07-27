@@ -919,9 +919,9 @@ export function AppHomeScreen({
   };
   const cardText = darkSky ? "text-white" : "text-foreground";
   /* Material de vidro para os DOIS textos grandes da tela (nome e semana).
-     Ver o bloco `.dc-glass-text` no styles.css para o porquê de não valer
-     para texto pequeno. */
-  const glassText = `dc-glass-text ${darkSky ? "dc-glass-text-light" : "dc-glass-text-dark"}`;
+     Uma classe só: vidro não troca de cor conforme o céu — ver o comentário
+     de `.dc-glass-text` no styles.css. */
+  const glassText = "dc-glass-text";
   /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
      nasce de baixo contraste por ser secundário, e agora o céu passa por trás
      dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
@@ -1116,7 +1116,12 @@ export function AppHomeScreen({
                     style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                   >
                     <p
-                      className={`leading-none ${cardText} ${glassText}`}
+                      /* Sem vidro aqui, e o motivo é físico: este número fica
+                         DENTRO de um cartão de vidro, e vidro precisa de cena
+                         atrás para existir. Sobre a chapa clara do cartão não
+                         há o que atravessar — o "20" quase sumia. O material
+                         só vale para texto que se apoia direto no céu. */
+                      className={`leading-none ${cardText}`}
                       style={{
                         // `var(--font-serif)` e não "Nunito" fixo: preso assim,
                         // o maior número da tela era o único texto que NÃO

@@ -1765,44 +1765,41 @@ button:active > .duo3d {
    O `@supports` existe porque `color: transparent` sem `background-clip: text`
    deixaria o texto INVISÍVEL, não sem efeito. */
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  /* A letra é UM VIDRO: corpo translúcido que deixa o céu passar, contorno
+     branco marcando a espessura, e uma sombra que descola do fundo.
+     A primeira versão errou ao fazer duas variantes — vidro escuro no céu
+     claro, vidro claro no escuro. Vidro não muda de cor conforme o fundo: ele
+     é sempre a mesma parede transparente, e é o CONTORNO que garante a leitura
+     nos dois casos. No relógio da Apple é assim em qualquer papel de parede. */
   .dc-glass-text {
+    /* corpo: mais aberto no meio (onde a luz atravessa), fechando nas pontas */
+    background-image: linear-gradient(
+      178deg,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.42) 46%,
+      rgba(255, 255, 255, 0.74) 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+    /* o contorno: a espessura do vidro pegando luz */
+    -webkit-text-stroke: 0.7px rgba(255, 255, 255, 0.92);
+    /* traço ATRÁS do preenchimento, senão ele come a forma da letra */
+    paint-order: stroke fill;
+    /* a sombra é o que faz vidro branco funcionar sobre céu claro; sem ela a
+       letra some no azul do meio-dia */
+    filter: drop-shadow(0 1px 1px rgba(24, 34, 62, 0.34))
+      drop-shadow(0 4px 12px rgba(24, 34, 62, 0.5));
   }
-  /* O recorte vale para TODO glifo dentro do elemento, inclusive emoji — e
-     emoji recortado perde a própria cor: o 💜 do nome saía cinza no céu
-     escuro e marrom no claro. Esta saída devolve a pintura normal a quem
-     não é letra. */
+  /* O recorte vale para TODO glifo, inclusive emoji — e emoji recortado perde
+     a cor: o 💜 saía cinza. Isto devolve a pintura normal a quem não é letra. */
   .dc-glass-text .dc-sem-vidro {
     -webkit-background-clip: border-box;
     background-clip: border-box;
     background-image: none;
+    -webkit-text-stroke: 0;
     color: initial;
     filter: none;
-  }
-  /* Céu claro: vidro fumê. O preenchimento parte do tom de texto do app, e
-     quem devolve a leitura é a densidade — não dá para clarear muito aqui. */
-  .dc-glass-text-dark {
-    background-image: linear-gradient(
-      178deg,
-      oklch(0.22 0.035 22 / 0.98) 0%,
-      oklch(0.28 0.04 22 / 0.82) 46%,
-      oklch(0.2 0.035 22 / 0.95) 100%
-    );
-    filter: drop-shadow(0 1.5px 0 rgba(255, 255, 255, 0.72))
-      drop-shadow(0 6px 14px rgba(90, 60, 75, 0.26));
-  }
-  /* Céu escuro: vidro claro, como no relógio da referência. */
-  .dc-glass-text-light {
-    background-image: linear-gradient(
-      178deg,
-      rgba(255, 255, 255, 0.98) 0%,
-      rgba(255, 255, 255, 0.7) 46%,
-      rgba(255, 255, 255, 0.92) 100%
-    );
-    filter: drop-shadow(0 1.5px 0 rgba(255, 255, 255, 0.35))
-      drop-shadow(0 6px 16px rgba(0, 0, 0, 0.42));
   }
 }
 
