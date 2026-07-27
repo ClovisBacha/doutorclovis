@@ -1511,48 +1511,55 @@ button:active > .duo3d {
   animation: dcSunRays 22s ease-in-out infinite;
 }
 
-/* ── Meio-dia: estalos de luz de quatro pontas ───────────────────
-   Duas barras cruzadas nos pseudo-elementos: a caixa do elemento continua
-   sendo a barra horizontal, então ele mede 22×2px e não invade nada — o
-   `rotate` do `::after` não entra no getBoundingClientRect do pai. */
-.dc-glint {
-  width: 22px;
-  height: 2px;
-  animation: dcGlint 18s ease-in-out infinite;
-}
-.dc-glint::before,
-.dc-glint::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 50%, transparent);
-}
-/* Braço vertical com METADE do comprimento do horizontal. Com os dois
-   iguais o desenho era um "+" perfeito e lia como ícone de interface, não
-   como brilho de sol. Estrela de luz real tem um eixo dominante. */
-.dc-glint::after {
-  transform: rotate(90deg) scaleX(0.5);
-}
-/* O núcleo: sem ele são duas barras se cruzando, com ele é um ponto de luz
-   com raios saindo. */
-.dc-glint::before {
-  box-shadow: 0 0 5px 1px rgba(255, 255, 255, 0.6);
-}
-@keyframes dcGlint {
-  0%,
+/* ── Meio-dia: as borboletas ─────────────────────────────────────
+   Substituíram os "estalos" de quatro pontas, que liam como ícone de
+   interface e sumiam quando caíam sobre uma nuvem pintada.
+
+   Voo de borboleta não é uma curva: é uma sequência de decisões. Por isso o
+   percurso tem quatro pontos de quebra em vez de um trajeto suave, e a
+   inclinação muda em cada um — ela sobe, hesita, cai um pouco, sobe de novo.
+   Um `translate` linear pareceria uma folha ao vento, não um bicho. */
+@keyframes dcBorboleta {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(-8deg);
+  }
+  8%,
+  88% {
+    opacity: 0.9;
+  }
+  24% {
+    transform: translate3d(3.5vw, -5vh, 0) rotate(12deg);
+  }
+  46% {
+    transform: translate3d(0.5vw, -9vh, 0) rotate(-14deg);
+  }
+  68% {
+    transform: translate3d(4vw, -14vh, 0) rotate(9deg);
+  }
   100% {
     opacity: 0;
-    transform: scale(0.3);
+    transform: translate3d(1vw, -20vh, 0) rotate(-6deg);
   }
-  6% {
-    opacity: 0.9;
-    transform: scale(1);
+}
+/* O bater: cada asa encolhe na horizontal em torno do corpo. Rápido (0.42s)
+   porque borboleta bate asa muito mais depressa que pássaro. */
+@keyframes dcAsaEsq {
+  0%,
+  100% {
+    transform: scaleX(1);
   }
-  16% {
-    opacity: 0;
-    transform: scale(0.4);
+  50% {
+    transform: scaleX(0.25);
   }
+}
+.dc-borboleta {
+  animation: dcBorboleta 26s ease-in-out infinite;
+}
+.dc-borboleta .dc-asa-e,
+.dc-borboleta .dc-asa-d {
+  animation: dcAsaEsq 0.42s ease-in-out infinite;
+  transform-origin: 11px 9px; /* o corpo, no centro do viewBox */
 }
 
 /* ── Tarde: o aviãozinho lá em cima ──────────────────────────────
@@ -1655,7 +1662,7 @@ button:active > .duo3d {
 .dc-bird,
 .dc-seed,
 .dc-ray,
-.dc-glint,
+.dc-borboleta,
 .dc-aviao,
 .dc-mote,
 .dc-flock {
@@ -1685,7 +1692,9 @@ button:active > .duo3d {
   .dc-bird > span,
   .dc-seed,
   .dc-ray,
-  .dc-glint,
+  .dc-borboleta,
+  .dc-borboleta .dc-asa-e,
+  .dc-borboleta .dc-asa-d,
   .dc-aviao,
   .dc-mote,
   .dc-flock {
@@ -1699,7 +1708,7 @@ button:active > .duo3d {
   .dc-firefly,
   .dc-bird,
   .dc-seed,
-  .dc-glint,
+  .dc-borboleta,
   .dc-aviao,
   .dc-mote,
   .dc-flock {
@@ -1826,50 +1835,46 @@ button:active > .duo3d {
   }
 }
 
-/* ── Respiro dos enfeites da trilha (itens do Cantinho) ───────────
+/* ── Vida dos enfeites da trilha (itens do Cantinho) ──────────────
    Vida por TIPO: plantas balançam, bichinhos passeiam, o resto flutua e os
    especiais pulsam com brilho. Só transform/opacity — zero repaint.
 
-   Mas RESPIRO, não voo. O enfeite é uma coisa que a paciente PÔS ali: tem
-   que parecer posto. A primeira versão subia 8px e girava 5° a cada 4s num
-   emoji de ~39px, e o bicho atravessava 28px — quase um quarto da própria
-   altura, oito vezes por minuto. Lia como ícone voando pela tela, e foi
-   exatamente essa a reclamação. Medido agora: 1,8px no objeto, 1,2px na
-   planta, 8px no bicho. Percebe-se que está vivo, não que está indo embora. */
+   Estas amplitudes já foram reduzidas uma vez, quando se achou que ELAS
+   causavam a queixa de "ícones voando pela tela". Não causavam: o que voava
+   era uma faixa `sticky` separada, que pegava os itens do tipo céu e os
+   arrastava pelo cenário sem deixar tocar. Essa faixa foi removida, e os
+   valores originais voltaram — o enfeite posicionado sempre esteve certo. */
 @keyframes dcHover {
   0%,
   100% {
-    transform: translateY(0) rotate(-1deg);
+    transform: translateY(0) rotate(-2deg);
   }
   50% {
-    transform: translateY(-2px) rotate(1deg);
+    transform: translateY(-8px) rotate(3deg);
   }
 }
-/* A planta balança na base, como se o vento pegasse a copa. */
 @keyframes dcSway {
   0%,
   100% {
-    transform: rotate(-2deg);
+    transform: rotate(-5deg);
   }
   50% {
-    transform: rotate(2deg);
+    transform: rotate(6deg);
   }
 }
-/* O bicho é o único que anda de fato — bicho parado não é bicho. Mas 4px
-   para cada lado, não 14: ele passeia no lugar, não atravessa a trilha. */
 @keyframes dcWander {
   0%,
   100% {
-    transform: translateX(-4px);
+    transform: translateX(-14px);
   }
   25% {
-    transform: translateX(-1px) translateY(-2px) rotate(3deg);
+    transform: translateX(-4px) translateY(-9px) rotate(6deg);
   }
   50% {
-    transform: translateX(4px);
+    transform: translateX(14px);
   }
   75% {
-    transform: translateX(1px) translateY(-2px) rotate(-3deg);
+    transform: translateX(4px) translateY(-7px) rotate(-6deg);
   }
 }
 @keyframes dcGlow {

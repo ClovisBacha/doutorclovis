@@ -132,17 +132,21 @@ const SEMENTINHAS: Particula[] = [
   { x: 87, y: 52, delay: 17, size: 9 },
 ];
 
-/* ── Meio-dia (11–14): o sol a pino ─────────────────────────────────
-   Dois registros da mesma ideia: o halo quente entrando pelo topo do quadro
-   e os estalos de luz nas calhas, aquele brilho de quatro pontas que só
-   aparece com sol forte. */
-const ESTALOS: Particula[] = [
-  // Atrasos de 6 em 6 num ciclo de 18s: um estalo a cada 6s, espaçados por
-  // igual. Com 0/3.2/6.4 os três piscavam nos primeiros 6s e depois vinham
-  // 12s de silêncio — a mesma armadilha da "chuva de meteoro".
-  { x: 5, y: 26, delay: 0 },
-  { x: 90, y: 41, delay: 6 }, // sobre a borda da nuvem pintada da calha direita
-  { x: 8, y: 45, delay: 12 },
+/* ── Meio-dia (11–14): o sol a pino e as borboletas ─────────────────
+   O halo quente entra pelo topo do quadro; a vida vem das borboletas nas
+   calhas.
+   A versão anterior usava "estalos" de luz de quatro pontas. Não funcionava
+   por dois motivos. Visual: um deles caía em cima de uma nuvem pintada e
+   sumia, branco no branco. E conceitual: brilho de quatro pontas é REFLEXO,
+   precisa de algo refletindo — solto no céu azul ele não representa nada, e
+   lia como ícone de interface.
+   Borboleta é o contrário: meio-dia é exatamente quando ela sai, e ela fecha
+   o par com o vaga-lume das 21h — o inseto do dia e o inseto da noite, nas
+   mesmas calhas. Também evita o terceiro pássaro do dia (já há passarinhos
+   no amanhecer e o bando no entardecer). */
+const BORBOLETAS: Particula[] = [
+  { x: 6, y: 30, delay: 0, size: 15 },
+  { x: 88, y: 44, delay: 13, size: 13 },
 ];
 
 /* ── Tarde (14–16): o aviãozinho lá em cima ─────────────────────
@@ -194,6 +198,42 @@ function Passaro({ size, cor }: { size: number; cor: string }) {
         d="M1 3C4 3 6.5 9 10 9C13.5 9 16 3 19 3"
         stroke={cor}
         strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * Uma borboleta vista de cima: dois pares de asas e um corpinho fino.
+ *
+ * As asas são DOIS grupos separados justamente para poderem bater: cada lado
+ * encolhe na horizontal em torno do corpo (`scaleX` com origem no meio), que é
+ * como um bater de asa se lê a distância. Um desenho só, com as duas asas no
+ * mesmo path, só poderia piscar de tamanho — e aí vira palpitação, não voo.
+ */
+function Borboleta({ size, cor, corClara }: { size: number; cor: string; corClara: string }) {
+  return (
+    <svg width={size} height={size * 0.82} viewBox="0 0 22 18" fill="none">
+      <g className="dc-asa-e">
+        <path
+          d="M10.6 9C8.4 3.2 5.2 1 2.9 2.2 0.6 3.4 0.6 7 2.6 9.2c1.4 1.6 4 2.6 8 2.4Z"
+          fill={cor}
+        />
+        <path d="M9.4 10.4C7.2 12.6 4.4 13.8 2.8 12.9 1.2 12 1.6 9.9 3.4 8.8Z" fill={corClara} />
+      </g>
+      <g className="dc-asa-d">
+        <path
+          d="M11.4 9c2.2-5.8 5.4-8 7.7-6.8 2.3 1.2 2.3 4.8.3 7-1.4 1.6-4 2.6-8 2.4Z"
+          fill={cor}
+        />
+        <path d="M12.6 10.4c2.2 2.2 5 3.4 6.6 2.5 1.6-.9 1.2-3-.6-4.1Z" fill={corClara} />
+      </g>
+      {/* Corpo e antenas: finos de propósito, senão viram mancha no meio. */}
+      <path
+        d="M11 5.4v7.4M11 5.4 9.6 3.4M11 5.4l1.4-2"
+        stroke={cor}
+        strokeWidth="0.9"
         strokeLinecap="round"
       />
     </svg>
@@ -420,12 +460,18 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
               "radial-gradient(ellipse at center, rgba(255,255,255,0.72) 0%, rgba(255,247,214,0.26) 42%, rgba(255,255,255,0) 72%)",
           }}
         />
-        {ESTALOS.map((e, i) => (
+        {BORBOLETAS.map((b, i) => (
           <span
             key={i}
-            className="dc-glint absolute"
-            style={{ left: `${e.x}%`, top: `${e.y}%`, animationDelay: `${e.delay}s` }}
-          />
+            className="dc-borboleta absolute"
+            style={{ left: `${b.x}%`, top: `${b.y}%`, animationDelay: `${b.delay}s` }}
+          >
+            <Borboleta
+              size={b.size ?? 14}
+              cor={i % 2 === 0 ? "rgba(232,122,58,0.88)" : "rgba(214,86,120,0.85)"}
+              corClara={i % 2 === 0 ? "rgba(252,196,120,0.9)" : "rgba(248,168,190,0.88)"}
+            />
+          </span>
         ))}
       </div>
     );

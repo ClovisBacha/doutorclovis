@@ -451,22 +451,19 @@ function MinhaContaPage() {
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
 
-  /* Toda navegação DENTRO do app volta ao topo.
+  /* Toda navegação DENTRO do app volta ao topo — inclusive entrar no app.
      `tab` é estado do React, não rota: trocar de aba não muda a URL, então o
      reset de scroll do __root — que depende de `location.pathname` — nunca
      disparava aqui. A rolagem da tela anterior simplesmente sobrevivia: quem
      estava no fim da trilha do jogo tocava em "Saúde" e caía no rodapé de uma
      tela que nunca tinha visto, tendo que subir na mão. Valia para toda aba.
+     Sem guarda de primeira renderização, de propósito: chegar por link ou por
+     "voltar" também tem que abrir no começo, porque a posição guardada é de
+     outra aba qualquer. Quem garante que ninguém disputa é o `router.tsx`,
+     que desliga a restauração nesta rota.
      `instant` de propósito: o CSS global usa `scroll-behavior: smooth`, e
      animar a subida de dez mil pixels é pior que o próprio defeito. */
-  const primeiraTela = useRef(true);
   useEffect(() => {
-    // Deep link (?tab=…) já abre na tela certa — mexer no scroll aqui atrapalha
-    // a restauração do navegador em quem chegou por link ou por "voltar".
-    if (primeiraTela.current) {
-      primeiraTela.current = false;
-      return;
-    }
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [tab, mobileHome]);
 
