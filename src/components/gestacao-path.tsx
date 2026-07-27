@@ -89,9 +89,6 @@ function clampN(n: number, a: number, b: number): number {
    qualquer celular/navegador onde ela entrar (mesma sincronização da jornada). */
 const DECOR_KEY = "dc-path-decor";
 
-/** Handoff do Cantinho → Caminho: abre o jogo já no modo "Arrumar". */
-export const ARRANGE_FLAG = "caminho:arrumar";
-
 type DecorSave = { v: 1; items: PlacedDecor[]; seen: string[] };
 
 function loadDecor(): DecorSave | null {
@@ -1317,17 +1314,11 @@ export function GestacaoPath({
     setHistLen(0);
   }, [arranging]);
 
-  // Chegou do Cantinho pedindo pra arrumar? Abre já no modo de edição.
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem(ARRANGE_FLAG) === "1") {
-        sessionStorage.removeItem(ARRANGE_FLAG);
-        setArranging(true);
-      }
-    } catch {
-      /* sem sessionStorage: ela entra pelo botão Arrumar mesmo */
-    }
-  }, []);
+  /* Havia aqui um atalho que abria o modo Arrumar automaticamente quando a
+     paciente vinha do Cantinho. Ele morreu junto com a vitrine do Cantinho:
+     ninguém mais pede pra chegar arrumando, e entrar em modo de edição sem
+     ter pedido é justamente o tipo de tela que assusta. O botão Arrumar da
+     própria trilha continua sendo a porta. */
 
   useEffect(() => {
     if (!decorReady || height <= 0) return;

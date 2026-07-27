@@ -112,13 +112,7 @@ import {
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
 import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
-import {
-  GestacaoPath,
-  ensureInitialJourneyPull,
-  lsGet,
-  lsSet,
-  ARRANGE_FLAG,
-} from "@/components/gestacao-path";
+import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import {
   searchDoctors,
   requestDoctor,
@@ -13971,10 +13965,6 @@ function CantinhoTab({
   // As formas de ganhar Sementinhas ficam num bloco só, recolhido por padrão,
   // pra não empilhar 4 cards e poluir a tela (fica "Ganhe mais 🌱 ›").
   const [showEarn, setShowEarn] = useState(false);
-  // Vitrine do cantinho: mostra o que ela tem. ARRUMAR (posição + tamanho) é
-  // na trilha do jogo, que é a tela grande de verdade — aqui só o resumo.
-  const [uid, setUid] = useState<string | null>(null);
-  const [layout, setLayout] = useState<Record<string, { x: number; y: number }>>({});
 
   useEffect(() => {
     (async () => {
@@ -13982,14 +13972,6 @@ function CantinhoTab({
       if (!s.session?.access_token) {
         setLoading(false);
         return;
-      }
-      const userId = s.session.user.id;
-      setUid(userId);
-      try {
-        const raw = localStorage.getItem(`cantinho:layout:${userId}`);
-        if (raw) setLayout(JSON.parse(raw) as Record<string, { x: number; y: number }>);
-      } catch {
-        /* layout corrompido: ignora e usa posições padrão */
       }
       const res = await getCantinho({ data: { accessToken: s.session.access_token } });
       if (res.ok) {
@@ -14036,25 +14018,6 @@ function CantinhoTab({
     } else {
       toast(id ? "Cenário aplicado! 🌄" : "Cenário removido");
     }
-  }
-
-  // Posição-padrão espalhada (por índice) pra item recém-comprado que ainda
-  // não foi arrumado — nunca empilha tudo no mesmo ponto.
-  function defaultPos(idx: number) {
-    const cols = 4;
-    const col = idx % cols;
-    const row = Math.floor(idx / cols);
-    return { x: 18 + col * 21, y: 30 + row * 24 };
-  }
-  // Manda pra trilha do jogo já no modo Arrumar (é lá que ela posiciona e
-  // redimensiona cada enfeite, na tela grande).
-  function arrumarNaTrilha() {
-    try {
-      sessionStorage.setItem(ARRANGE_FLAG, "1");
-    } catch {
-      /* sem sessionStorage: ela abre o Arrumar pelo botão da trilha */
-    }
-    onNavigate?.("Caminho");
   }
 
   if (loading) return <TabSkeleton />;
@@ -14137,57 +14100,20 @@ function CantinhoTab({
         </div>
       </div>
 
-      {/* A cena do cantinho — quadro onde a paciente arruma os itens à vontade */}
-      <div
-        className="relative overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-b from-sky-100 via-emerald-50 to-lime-100"
-        style={{ height: 300 }}
-      >
-        {/* chãozinho no rodapé pra dar sensação de "cantinho" */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-emerald-200/70 to-transparent" />
-
-        {ownedItems.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-            <p className="text-4xl">🌱</p>
-            <p className="mt-2 font-serif text-lg text-foreground">Seu cantinho está começando</p>
-            <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-              Ganhe Sementinhas cuidando de você e traga vida pra ele — uma plantinha de cada vez.
-              💛
-            </p>
-          </div>
-        ) : (
-          <>
-            {ownedItems.map((i, idx) => {
-              const pos = layout[i.id] ?? defaultPos(idx);
-              return (
-                <div
-                  key={i.id}
-                  title={i.name}
-                  className="pointer-events-none absolute select-none text-5xl drop-shadow-sm"
-                  style={{
-                    left: `${pos.x}%`,
-                    top: `${pos.y}%`,
-                    transform: "translate(-50%, -50%)",
-                  }}
-                >
-                  {i.emoji}
-                </div>
-              );
-            })}
-
-            {/* Arrumar é na trilha do jogo — aqui é só a vitrine */}
-            <button
-              onClick={arrumarNaTrilha}
-              className="press absolute right-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-bold text-emerald-700 shadow-sm"
-            >
-              Arrumar na trilha ✏️
-            </button>
-
-            <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-[11px] font-medium text-emerald-800/80">
-              Coloque cada enfeite onde quiser — e do tamanho que quiser — no seu Caminho 💛
-            </p>
-          </>
-        )}
-      </div>
+      {/* A VITRINE SAIU.
+          Ela era um quadro de 300px que mostrava os enfeites espalhados e um
+          botão "Arrumar na trilha". Mas arrumar já acontece no Caminho, na
+          tela grande, com posição e tamanho — e é lá que os enfeites vivem.
+          O quadro era, então, uma segunda cópia do Caminho: mais pobre (sem
+          escala, sem arrastar) e desencontrada dele, porque as posições daqui
+          nunca foram as de lá. Esta aba volta a ser o que ela é: saldo, como
+          ganhar mais e a loja. O cantinho em si mora no Caminho. */}
+      {ownedItems.length === 0 && (
+        <p className="px-1 text-sm text-muted-foreground">
+          Ganhe Sementinhas cuidando de você e traga vida pro seu Caminho — uma plantinha de cada
+          vez. 💛
+        </p>
+      )}
 
       {/* Ganhe mais Sementinhas — um bloco só, recolhido, no lugar de 4 cards
           soltos empilhados (Instagram, avaliar, depoimento, indicar). */}
