@@ -14217,9 +14217,19 @@ function CantinhoTab({
                     </span>
                   )
                 ) : trophyLocked ? (
-                  <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
-                    🔒 {collection.owned}/{collection.total} da coleção
-                  </span>
+                  <>
+                    <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
+                      🔒 {collection.owned}/{collection.total} da coleção
+                    </span>
+                    {/* A conta inclui os itens Premium, então sem assinatura ela
+                        nunca fecha. Dizer isso aqui evita a paciente juntar
+                        Sementinhas por semanas mirando um alvo inalcançável. */}
+                    {!premium && (
+                      <span className="mt-1 text-[9px] font-medium text-amber-700/70">
+                        Inclui os itens Premium 💎
+                      </span>
+                    )}
+                  </>
                 ) : locked ? (
                   <span className="mt-2 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-600">
                     🌱 {i.price}

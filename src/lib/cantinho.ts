@@ -274,17 +274,21 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
 export const CANTINHO_COMPLETIONIST_ID = "especial-colecao";
 
 /**
- * Itens exigidos pra desbloquear o troféu: os da loja COMUM (preço > 0, não
- * premium). Reachable por qualquer paciente dedicada — o troféu premia
- * dedicação, não assinatura. Os premium seguem sendo extras opcionais.
- */
-/*
- * `tema` fica FORA da coleção: o troféu é por decorar o Cantinho, e o céu da
- * home não decora nada aqui. Incluí-lo tiraria o troféu de quem já completou
- * a coleção — a exigência passaria a ter um item que ela nunca comprou.
+ * Itens exigidos pra desbloquear o troféu: TODOS os que se compram — premium
+ * incluído, tema incluído. Coleção completa é coleção completa; com os premium
+ * de fora a coroa aparecia "Conquistado! 👑" ao lado de seis vitrines ainda
+ * cinzentas, e um troféu que convive com item faltando não é troféu.
+ *
+ * A consequência é intencional: como item premium só se compra com assinatura
+ * (o portão fica no servidor, em `buyCantinhoItem`), a coroa passa a ser
+ * alcançável só por quem tem Premium.
+ *
+ * Ficam de fora apenas os itens de preço 0 — grátis, já são de todo mundo
+ * desde o primeiro acesso, então exigi-los não pediria esforço nenhum — e a
+ * própria coroa.
  */
 export const CANTINHO_COMPLETION_REQUIRED: string[] = CANTINHO_ITEMS.filter(
-  (i) => i.price > 0 && !i.premium && i.type !== "tema" && i.id !== CANTINHO_COMPLETIONIST_ID,
+  (i) => i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID,
 ).map((i) => i.id);
 
 /** True quando a paciente possui todos os itens exigidos pra coleção. */
