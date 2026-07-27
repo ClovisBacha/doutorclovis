@@ -120,9 +120,22 @@
   --shadow-float:
     0 20px 60px -20px oklch(0.3 0.02 35 / 0.14), 0 8px 24px -8px oklch(0.3 0.02 35 / 0.08);
 
-  /* Headlines na mesma família arredondada da logo (Nunito) — o corpo segue
-     em DM Sans. Isso amarra a tipografia do site à identidade da marca. */
-  --font-serif: "Nunito", "DM Sans", system-ui, sans-serif;
+  /* ── Tipografia: a fonte do SISTEMA primeiro ──────────────────────
+     `ui-rounded` é a palavra-chave do CSS que resolve para a face
+     arredondada nativa da plataforma — no iPhone e no Mac, a SF Pro Rounded,
+     que é exatamente a tipografia do Liquid Glass da Apple.
+     Isso ganha de qualquer webfont por três motivos, nesta ordem:
+       1. É a MESMA fonte do relógio e dos widgets do sistema, então o app
+          deixa de parecer um site dentro do celular.
+       2. Não baixa nada. Nunito e DM Sans vinham do Google Fonts, e com elas
+          o primeiro parágrafo aparecia numa fonte e trocava depois.
+       3. Vem com o ajuste óptico do sistema — o mesmo texto fica mais legível
+          em corpo pequeno sem precisar de tabela de tamanhos.
+     Nunito e DM Sans continuam como plano B para quem não está no ecossistema
+     Apple: lá o desenho arredondado se mantém, só não é o nativo. */
+  --font-serif:
+    ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Nunito", "DM Sans", system-ui,
+    sans-serif;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -206,7 +219,10 @@
         );
     background-attachment: fixed;
     color: var(--color-foreground);
-    font-family: "DM Sans", system-ui, sans-serif;
+    /* Corpo na face de texto do sistema (SF Pro no Apple), com DM Sans de
+       reserva. Casa com os títulos arredondados do mesmo jeito que a Apple
+       casa SF Pro Rounded no relógio com SF Pro na data logo acima. */
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", system-ui, sans-serif;
     font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
