@@ -325,6 +325,16 @@ function SiteShell() {
   useAffiliateCapture();
   useReferralCapture();
   useScrollToTop();
+  const { location } = useRouterState();
+  /* O app da paciente e o painel do médico têm cabeçalho, navegação e rodapé
+     próprios. O shell público por cima disso empilhava duas marcas e dois ☰:
+     a paciente via a faixa "Obstetrica" com o menu do SITE logo acima do menu
+     do APP, dentro da própria tela do bebê.
+     A barra pública, o chatbot e o WhatsApp já se escondiam sozinhos aqui —
+     cabeçalho e rodapé eram os dois que faltavam. A regra passa a morar num
+     lugar só, em vez de repetida dentro de cada componente. */
+  const semChromePublico =
+    location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel");
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <a
@@ -334,16 +344,20 @@ function SiteShell() {
         Pular para o conteúdo principal
       </a>
       <CanonicalLink />
-      <div className="print:hidden">
-        <ScrollProgress />
-        <SiteHeader />
-      </div>
+      {!semChromePublico && (
+        <div className="print:hidden">
+          <ScrollProgress />
+          <SiteHeader />
+        </div>
+      )}
       <main id="main-content" className="flex-1 pb-[72px] md:pb-0">
         <Outlet />
       </main>
-      <div className="print:hidden">
-        <SiteFooter />
-      </div>
+      {!semChromePublico && (
+        <div className="print:hidden">
+          <SiteFooter />
+        </div>
+      )}
       <div className="print:hidden">
         <ChatbotWidget />
       </div>

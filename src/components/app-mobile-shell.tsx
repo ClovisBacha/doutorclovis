@@ -157,37 +157,32 @@ function weatherOverlay(code: number, temp: number): string {
 /** Dica contextual de bem-estar para gestantes baseada no clima atual. */
 function weatherTip(code: number, temp: number): { tip: string; tipEmoji: string } {
   if (code >= 95)
-    return { tipEmoji: "⛈️", tip: "Fique em casa — ótimo para ouvir os batimentos do bebê." };
+    return { tipEmoji: "⛈️", tip: "Fique em casa hoje — bom momento para ouvir os batimentos." };
   if (code >= 80)
     return {
       tipEmoji: "🌧️",
-      tip: "Pancadas — relaxe com música calma para vocês duas.",
+      tip: "Relaxe com música calma para vocês duas.",
     };
-  if (code >= 61)
-    return { tipEmoji: "🌧️", tip: "Dia de chuva — chá quentinho e descanso fazem muito bem." };
+  if (code >= 61) return { tipEmoji: "🌧️", tip: "Chá quentinho e descanso fazem muito bem." };
   if (code >= 51)
     return {
       tipEmoji: "🌦️",
-      tip: "Garoa hoje. Um bom livro sobre maternidade combina perfeitamente.",
+      tip: "Um bom livro sobre maternidade combina com o dia.",
     };
   if (code >= 45)
-    return { tipEmoji: "🌫️", tip: "Névoa — prefira indoor. Meditação guiada é ótima opção." };
-  if (temp > 35)
-    return { tipEmoji: "🥵", tip: "Calor extremo! Ambiente climatizado e água a cada 30 min." };
+    return { tipEmoji: "🌫️", tip: "Prefira ficar dentro de casa; meditação guiada cai bem." };
+  if (temp > 35) return { tipEmoji: "🥵", tip: "Ambiente climatizado e água a cada 30 minutos." };
   if (temp > 30)
-    return { tipEmoji: "☀️", tip: "Calor forte — hidrate-se bastante! Protetor FPS 50+ se sair." };
-  if (code === 3)
-    return { tipEmoji: "☁️", tip: "Nublado e fresco — ótimo para uma caminhada leve de 20 min." };
-  if (code === 2)
-    return { tipEmoji: "⛅", tip: "Parcialmente nublado — clima agradável para uma saída curta." };
+    return { tipEmoji: "☀️", tip: "Hidrate-se bastante e use protetor FPS 50+ se sair." };
+  if (code === 3) return { tipEmoji: "☁️", tip: "Ótimo para uma caminhada leve de 20 minutos." };
+  if (code === 2) return { tipEmoji: "⛅", tip: "Clima agradável para uma saída curta." };
   if (code <= 1 && temp > 22)
     return { tipEmoji: "☀️", tip: "Dia lindo! Caminhada de manhã com protetor FPS 50+ e chapéu." };
-  if (code <= 1)
-    return { tipEmoji: "🌤️", tip: "Céu aberto — perfeito para respirar ar fresco. Beba água!" };
+  if (code <= 1) return { tipEmoji: "🌤️", tip: "Perfeito para respirar ar fresco. Beba água!" };
   if (temp < 10)
-    return { tipEmoji: "🧣", tip: "Frio intenso — agasalhe bem a barriga e prefira indoor." };
-  if (temp < 15) return { tipEmoji: "🧥", tip: "Frio hoje — vista camadas e cuide da barriga." };
-  return { tipEmoji: "🌸", tip: "Clima tranquilo — momento perfeito para descansar com o bebê." };
+    return { tipEmoji: "🧣", tip: "Agasalhe bem a barriga e prefira ficar dentro de casa." };
+  if (temp < 15) return { tipEmoji: "🧥", tip: "Vista camadas e cuide da barriga." };
+  return { tipEmoji: "🌸", tip: "Momento perfeito para descansar com o bebê." };
 }
 
 function useWeather(): WeatherState | null {
@@ -803,6 +798,17 @@ export function AppHomeScreen({
     : artTheme
       ? "rgba(255,253,252,0.88)"
       : "rgba(255,255,255,0.66)";
+  /* O ☰ não é conteúdo, é ferramenta: ele precisa ser alcançável, não
+     notado. Com o mesmo vidro do chip de clima ele virava um disco branco
+     sólido competindo com a arte. Aqui o fundo é bem mais transparente, a
+     borda quase some e a sombra sai — o cenário atravessa o botão, e o que
+     garante o toque legível é o ícone, não a chapa atrás dele. */
+  const glassLeve: React.CSSProperties = {
+    background: darkSky ? "rgba(20,18,32,0.22)" : "rgba(255,255,255,0.28)",
+    backdropFilter: "blur(14px) saturate(150%)",
+    WebkitBackdropFilter: "blur(14px) saturate(150%)",
+    border: `1px solid ${darkSky ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.5)"}`,
+  };
   const glass: React.CSSProperties = {
     background: glassBg,
     backdropFilter: "blur(22px) saturate(170%)",
@@ -881,9 +887,17 @@ export function AppHomeScreen({
                 }}
                 aria-label="Menu"
                 className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-                style={glass}
+                style={glassLeve}
               >
-                <Menu className={`h-5 w-5 ${cardText}`} strokeWidth={2.2} />
+                <Menu
+                  className={`h-5 w-5 ${cardText}`}
+                  strokeWidth={2.2}
+                  // Com a chapa mais transparente, a sombra no traço é o que
+                  // mantém o ícone legível sobre nuvem clara ou céu escuro.
+                  style={{
+                    filter: `drop-shadow(0 1px 2px ${darkSky ? "rgba(0,0,0,0.5)" : "rgba(120,90,100,0.35)"})`,
+                  }}
+                />
               </button>
 
               {weather && (
@@ -909,14 +923,17 @@ export function AppHomeScreen({
 
             {gest && baby ? (
               <>
-                {/* Nome do bebê — protagonista, logo abaixo da barra */}
+                {/* Nome do bebê. Menor e mais próximo da barra de cima do que
+                    era: em clamp(1.9rem, 8.6vw, 2.5rem) ele disputava atenção
+                    com o próprio bebê e empurrava as pílulas para baixo. O
+                    respiro que sobra é o que deixa o topo arejado. */}
                 {babyName && (
-                  <div className="mt-2 short:mt-1 text-center" style={overArt}>
-                    <p className={`text-[13px] font-medium tracking-[0.02em] ${heroLabel}`}>
+                  <div className="mt-1 short:mt-0.5 text-center" style={overArt}>
+                    <p className={`text-[12px] font-medium tracking-[0.04em] ${heroLabel}`}>
                       Acompanhando
                     </p>
                     <p
-                      className={`mt-0.5 font-serif text-[clamp(1.9rem,8.6vw,2.5rem)] font-normal leading-none ${heroText}`}
+                      className={`mt-0.5 font-serif text-[clamp(1.6rem,7.2vw,2.05rem)] font-normal leading-none ${heroText}`}
                     >
                       {babyName} <span className="align-middle text-[0.55em]">💜</span>
                     </p>
@@ -1136,7 +1153,13 @@ export function AppHomeScreen({
                 </div>
               </div>
 
-              {/* ── Saudação do dia com a dica do clima ─────────────── */}
+              {/* ── Saudação do dia e o conselho ──────────────────────
+                  O clima aparece UMA vez na tela, no chip lá em cima: é lá
+                  que mora o dado (temperatura e condição), colado na arte do
+                  céu que ele explica. Aqui fica só o conselho.
+                  Antes havia repetição em três camadas: o chip dizia "Céu
+                  limpo", esta linha trazia DOIS emojis de sol (um de cada
+                  lado do nome) e a dica ainda abria com "Céu aberto —". */}
               {weather && (
                 <div
                   className="mt-2.5 short:mt-2 flex items-start gap-3 rounded-[22px] px-4 py-3 short:py-2"
@@ -1146,7 +1169,7 @@ export function AppHomeScreen({
                   <div className="min-w-0">
                     <p className={`text-[14px] font-extrabold ${cardText}`}>
                       {dayGreetingLabel()}
-                      {babyName ? `, ${babyName}!` : "!"} {weather.emoji}
+                      {babyName ? `, ${babyName}!` : "!"}
                     </p>
                     <p className={`mt-0.5 text-[12px] leading-snug ${cardMuted}`}>{weather.tip}</p>
                   </div>
