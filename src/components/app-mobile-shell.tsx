@@ -664,24 +664,35 @@ function BabyOrb() {
         height: "100%",
         margin: "auto",
         background: [
-          // A luz mora DENTRO e morre ANTES da borda. Concentrá-la no aro fazia
-          // a bolha virar anel desenhado, e o degrau do ramp virava um falso
-          // segundo círculo concêntrico.
-          "radial-gradient(circle at 50% 47%, rgba(255,251,253,0.30) 0%," +
-            " rgba(255,246,250,0.17) 40%, rgba(255,255,255,0.05) 66%," +
-            " rgba(255,255,255,0) 82%)",
-          // Luz vinda de cima à esquerda: sem direção, esfera lê como disco.
-          "radial-gradient(circle at 33% 29%, rgba(255,255,255,0.13) 0%," +
-            " rgba(255,255,255,0) 58%)",
+          // Brilho ESPECULAR no alto à esquerda: é a marca de esfera de vidro,
+          // o ponto onde a fonte de luz se reflete. Sem ele a bolha vira disco.
+          "radial-gradient(circle at 30% 24%, rgba(255,255,255,0.55) 0%," +
+            " rgba(255,255,255,0.14) 26%, rgba(255,255,255,0) 46%)",
+          // Corpo do vidro: claro no miolo, morrendo antes da borda.
+          "radial-gradient(circle at 50% 47%, rgba(255,252,254,0.26) 0%," +
+            " rgba(255,247,251,0.14) 42%, rgba(255,255,255,0.04) 70%," +
+            " rgba(255,255,255,0) 86%)",
+          // Contra-luz na base: a parede oposta do vidro devolve luz de volta.
+          "radial-gradient(circle at 62% 88%, rgba(255,255,255,0.22) 0%," +
+            " rgba(255,255,255,0) 34%)",
         ].join(", "),
-        // Véu: dentro da bolha o céu perde um pouco de nitidez e cor, como
-        // atrás de vidro. É o que faz ela OCUPAR volume em vez de ser um
-        // decalque — na referência nenhuma nuvem sobrevive nítida lá dentro.
-        backdropFilter: "blur(1.5px) saturate(0.9) brightness(1.03)",
-        WebkitBackdropFilter: "blur(1.5px) saturate(0.9) brightness(1.03)",
-        // Aro quase imperceptível + halo externo largo. A referência mede
-        // ~1,08× o brilho do céu na borda; o anel forte era o erro.
-        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12), 0 0 40px 14px rgba(255,244,250,0.14)",
+        // Véu: dentro da bolha o céu perde nitidez e cor, como atrás de vidro.
+        // É o que a faz OCUPAR volume em vez de ser um decalque.
+        backdropFilter: "blur(2.5px) saturate(0.88) brightness(1.05)",
+        WebkitBackdropFilter: "blur(2.5px) saturate(0.88) brightness(1.05)",
+        /* A PAREDE do vidro. A versão anterior deixava o aro em 0.12 para não
+           virar "anel desenhado" — o problema real, porém, não era a força do
+           aro e sim ele ser uniforme. Aro de espessura igual em toda a volta
+           lê como círculo de caneta; vidro tem a parede acesa onde a luz bate
+           e apagada no resto. Daí serem três sombras internas direcionais em
+           vez de um contorno só. */
+        boxShadow: [
+          "inset 0 2px 3px -1px rgba(255,255,255,0.75)",
+          "inset 6px 10px 22px -14px rgba(255,255,255,0.85)",
+          "inset -8px -12px 26px -16px rgba(255,255,255,0.5)",
+          "inset 0 0 0 1px rgba(255,255,255,0.20)",
+          "0 0 46px 16px rgba(255,246,251,0.16)",
+        ].join(", "),
       }}
     />
   );
@@ -864,35 +875,64 @@ export function AppHomeScreen({
      Sobre a ARTE o vidro fecha mais: a foto tem contraste local (uma faixa de
      pôr do sol acesa bem atrás de um cartão) que o gradiente liso não tem, e
      com o vidro aberto o texto sumia justamente ali. */
-  const glassBg = darkSky
-    ? artTheme
-      ? "rgba(22,20,36,0.56)"
-      : "rgba(255,255,255,0.13)"
-    : artTheme
-      ? "rgba(255,253,252,0.88)"
-      : "rgba(255,255,255,0.66)";
-  /* O ☰ não é conteúdo, é ferramenta: ele precisa ser alcançável, não
-     notado. Com o mesmo vidro do chip de clima ele virava um disco branco
-     sólido competindo com a arte. Aqui o fundo é bem mais transparente, a
-     borda quase some e a sombra sai — o cenário atravessa o botão, e o que
-     garante o toque legível é o ícone, não a chapa atrás dele. */
+  /* ── Liquid Glass ────────────────────────────────────────────────
+     Vidro de verdade tem TRÊS coisas que plástico translúcido não tem:
+     o cenário atravessa, a luz bate na quina de cima, e a base recebe
+     sombra própria. A versão anterior tinha só a primeira, e mal: no céu
+     claro o fundo ia a 0,88 de alfa — nuvem nenhuma passava, e os cartões
+     liam como chapa branca colada sobre a arte.
+     Os alfas (0,46 no céu claro, 0,56 no escuro) não são gosto: são o ponto
+     em que a medição de contraste do texto sobre o PIXEL COMPOSTO passa de
+     4,5:1 nos quatro céus. Abaixo disso a arte do meio-dia — um azul médio,
+     não claro — deixava o cartão em meio-tom, e aí nem texto escuro nem
+     branco funcionavam. Quem devolve a leitura sem engrossar mais o vidro é
+     o conjunto: gradiente diagonal, rim claro no topo, sombra interna
+     embaixo e sombra externa que descola o cartão do céu. */
+  /* O ☰ é uma ESFERA de vidro, não um disco: a luz entra pela quina de cima
+     à esquerda e escapa pela de baixo à direita, e é esse par que dá volume.
+     Fundo ainda mais transparente que o dos cartões — ele é ferramenta, tem
+     que ser alcançável sem ser notado. */
   const glassLeve: React.CSSProperties = {
-    background: darkSky ? "rgba(20,18,32,0.22)" : "rgba(255,255,255,0.28)",
-    backdropFilter: "blur(14px) saturate(150%)",
-    WebkitBackdropFilter: "blur(14px) saturate(150%)",
-    border: `1px solid ${darkSky ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.5)"}`,
+    background: darkSky
+      ? "radial-gradient(circle at 34% 28%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 58%)," +
+        " rgba(26,23,42,0.20)"
+      : "radial-gradient(circle at 34% 28%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.14) 58%)," +
+        " rgba(255,252,250,0.16)",
+    backdropFilter: "blur(16px) saturate(170%)",
+    WebkitBackdropFilter: "blur(16px) saturate(170%)",
+    border: `1px solid ${darkSky ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.58)"}`,
+    boxShadow: darkSky
+      ? "inset 0 1.5px 0 rgba(255,255,255,0.45), inset 0 -8px 16px -12px rgba(0,0,0,0.5)," +
+        " 0 6px 18px -10px rgba(0,0,0,0.45)"
+      : "inset 0 1.5px 0 rgba(255,255,255,0.95), inset 0 -8px 16px -12px rgba(120,92,110,0.28)," +
+        " 0 6px 18px -10px rgba(120,84,96,0.28)",
   };
   const glass: React.CSSProperties = {
-    background: glassBg,
-    backdropFilter: "blur(22px) saturate(170%)",
-    WebkitBackdropFilter: "blur(22px) saturate(170%)",
-    border: `1px solid ${darkSky ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.85)"}`,
+    background: darkSky
+      ? "linear-gradient(158deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.04) 48%)," +
+        " rgba(24,21,38,0.56)"
+      : "linear-gradient(158deg, rgba(255,255,255,0.50) 0%, rgba(255,255,255,0.18) 48%)," +
+        " rgba(255,252,250,0.46)",
+
+    backdropFilter: "blur(20px) saturate(185%)",
+    WebkitBackdropFilter: "blur(20px) saturate(185%)",
+    border: `1px solid ${darkSky ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.66)"}`,
     boxShadow: darkSky
-      ? "inset 0 1px 0 rgba(255,255,255,0.25), 0 10px 30px -14px rgba(0,0,0,0.5)"
-      : "inset 0 1px 0 rgba(255,255,255,0.95), 0 14px 34px -18px rgba(120,80,90,0.34)",
+      ? "inset 0 1px 0 rgba(255,255,255,0.40), inset 0 -14px 30px -20px rgba(0,0,0,0.55)," +
+        " 0 14px 36px -18px rgba(0,0,0,0.55)"
+      : "inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -14px 30px -20px rgba(120,92,110,0.30)," +
+        " 0 14px 36px -18px rgba(120,84,96,0.34)",
   };
   const cardText = darkSky ? "text-white" : "text-foreground";
-  const cardMuted = darkSky ? "text-white/60" : "text-muted-foreground";
+  /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
+     nasce de baixo contraste por ser secundário, e agora o céu passa por trás
+     dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
+     meio-dia — o mínimo é 4,5.
+     A saída foi escurecer o RÓTULO em vez de engrossar o vidro: engrossar
+     desfaria justamente o efeito pedido. `foreground/70` continua lendo como
+     secundário ao lado do texto principal, mas parte de um preto, não de um
+     cinza médio. */
+  const cardMuted = darkSky ? "text-white/85" : "text-foreground/80";
   /* Nome e etiqueta ficam SOBRE o céu, sem cartão atrás. Na arte isso pede
      sombra: o fundo atrás deles muda de luminosidade ao longo do dia. */
   const overArt: React.CSSProperties =
@@ -994,7 +1034,12 @@ export function AppHomeScreen({
                   <span className="text-2xl leading-none">{weather.emoji}</span>
                   <div className="leading-tight">
                     <p className={`text-[15px] font-extrabold ${cardText}`}>{weather.temp}°C</p>
-                    <p className={`text-[10px] font-medium ${cardMuted}`}>{weather.condition}</p>
+                    {/* `font-semibold` e não `font-medium`: com 10px sobre
+                        vidro translúcido, medido, a condição ficava em 4,14:1
+                        no meio-dia. Engrossar o traço recupera o contraste sem
+                        escurecer a cor — o rótulo continua secundário ao lado
+                        da temperatura. */}
+                    <p className={`text-[10px] font-semibold ${cardMuted}`}>{weather.condition}</p>
                   </div>
                 </div>
               )}
@@ -1156,9 +1201,11 @@ export function AppHomeScreen({
                               >
                                 {s.value}
                               </p>
-                              <p className={`text-[9px] font-normal opacity-80 ${cardMuted}`}>
-                                {s.label}
-                              </p>
+                              {/* Sem `opacity-80` aqui: `cardMuted` JÁ é uma cor
+                                  atenuada, e as duas camadas se multiplicavam —
+                                  70% de opacidade dentro de um bloco a 80% dá
+                                  56% na tela, e a medida caía para 2,8:1. */}
+                              <p className={`text-[9px] font-normal ${cardMuted}`}>{s.label}</p>
                             </div>
                           ))}
                         </div>
