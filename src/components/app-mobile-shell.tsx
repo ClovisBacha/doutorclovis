@@ -918,6 +918,10 @@ export function AppHomeScreen({
         " 0 14px 36px -18px rgba(120,84,96,0.34)",
   };
   const cardText = darkSky ? "text-white" : "text-foreground";
+  /* Material de vidro para os DOIS textos grandes da tela (nome e semana).
+     Ver o bloco `.dc-glass-text` no styles.css para o porquê de não valer
+     para texto pequeno. */
+  const glassText = `dc-glass-text ${darkSky ? "dc-glass-text-light" : "dc-glass-text-dark"}`;
   /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
      nasce de baixo contraste por ser secundário, e agora o céu passa por trás
      dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
@@ -1058,9 +1062,9 @@ export function AppHomeScreen({
                 {babyName && (
                   <div className="mt-5 short:mt-3 text-center" style={overArt}>
                     <p
-                      className={`font-serif text-[clamp(2rem,9vw,2.6rem)] font-normal leading-none ${heroText}`}
+                      className={`font-serif text-[clamp(2rem,9vw,2.6rem)] font-normal leading-none ${heroText} ${glassText}`}
                     >
-                      {babyName} <span className="align-middle text-[0.5em]">💜</span>
+                      {babyName} <span className="dc-sem-vidro align-middle text-[0.5em]">💜</span>
                     </p>
                   </div>
                 )}
@@ -1112,9 +1116,12 @@ export function AppHomeScreen({
                     style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                   >
                     <p
-                      className={`leading-none ${cardText}`}
+                      className={`leading-none ${cardText} ${glassText}`}
                       style={{
-                        fontFamily: "'Nunito', system-ui, sans-serif",
+                        // `var(--font-serif)` e não "Nunito" fixo: preso assim,
+                        // o maior número da tela era o único texto que NÃO
+                        // seguia a fonte do sistema.
+                        fontFamily: "var(--font-serif)",
                         fontSize: "clamp(2.1rem, 9vw, 2.8rem)",
                         fontWeight: 400,
                         letterSpacing: "-0.01em",

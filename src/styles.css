@@ -1744,6 +1744,68 @@ button:active > .duo3d {
   }
 }
 
+/* ══════════════ Texto de vidro (Liquid Glass) ══════════════════════
+   O relógio da tela bloqueada do iOS 26 não usa uma fonte especial: usa a
+   fonte do sistema com um MATERIAL por cima. "Liquid Glass" é o material,
+   não a tipografia — foi essa a descoberta que orientou este bloco.
+
+   O material tem três partes, e é a soma que faz ler como vidro:
+     1. preenchimento TRANSLÚCIDO, com degradê vertical — vidro é mais claro
+        onde a luz atravessa e mais denso na barriga da letra;
+     2. um fio de luz na quina de baixo, que é a espessura do vidro pegando
+        luz refletida;
+     3. sombra difusa, que descola a letra do fundo e dá o volume.
+
+   SÓ PARA TEXTO GRANDE, e isso não é preguiça. O relógio da Apple tem uns
+   100px; a esta escala o olho reconstrói a letra mesmo translúcida. Num
+   rótulo de 13px o mesmo tratamento apaga a forma — e este app acabou de ter
+   32 medições de contraste calibradas para 4,5:1. Vidro em texto pequeno
+   desfaria isso.
+
+   O `@supports` existe porque `color: transparent` sem `background-clip: text`
+   deixaria o texto INVISÍVEL, não sem efeito. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .dc-glass-text {
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  /* O recorte vale para TODO glifo dentro do elemento, inclusive emoji — e
+     emoji recortado perde a própria cor: o 💜 do nome saía cinza no céu
+     escuro e marrom no claro. Esta saída devolve a pintura normal a quem
+     não é letra. */
+  .dc-glass-text .dc-sem-vidro {
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    background-image: none;
+    color: initial;
+    filter: none;
+  }
+  /* Céu claro: vidro fumê. O preenchimento parte do tom de texto do app, e
+     quem devolve a leitura é a densidade — não dá para clarear muito aqui. */
+  .dc-glass-text-dark {
+    background-image: linear-gradient(
+      178deg,
+      oklch(0.22 0.035 22 / 0.98) 0%,
+      oklch(0.28 0.04 22 / 0.82) 46%,
+      oklch(0.2 0.035 22 / 0.95) 100%
+    );
+    filter: drop-shadow(0 1.5px 0 rgba(255, 255, 255, 0.72))
+      drop-shadow(0 6px 14px rgba(90, 60, 75, 0.26));
+  }
+  /* Céu escuro: vidro claro, como no relógio da referência. */
+  .dc-glass-text-light {
+    background-image: linear-gradient(
+      178deg,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(255, 255, 255, 0.7) 46%,
+      rgba(255, 255, 255, 0.92) 100%
+    );
+    filter: drop-shadow(0 1.5px 0 rgba(255, 255, 255, 0.35))
+      drop-shadow(0 6px 16px rgba(0, 0, 0, 0.42));
+  }
+}
+
 /* ══════════════ Chuva na home ══════════════════════════════════════
    Duas camadas: riscos caindo ao fundo e gotas na vidraça. A regra de peso é
    a mesma do resto do ambiente — só `transform` e `opacity`, porque isso a
