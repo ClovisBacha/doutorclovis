@@ -1810,37 +1810,42 @@ button:active > .duo3d {
      é sempre a mesma parede transparente, e é o CONTORNO que garante a leitura
      nos dois casos. No relógio da Apple é assim em qualquer papel de parede. */
   .dc-glass-text {
-    /* corpo: mais aberto no meio (onde a luz atravessa), fechando nas pontas */
+    /* ── 1. O CORPO ────────────────────────────────────────────────
+       Translúcido de ponta a ponta: o fundo atravessa a letra, e é por isso
+       que ela fica azul sobre céu azul e lilás sobre céu lilás, como no
+       relógio da Apple. O gradiente é fraco de propósito — ele só insinua
+       que a face de cima pega mais luz que o miolo. */
     background-image: linear-gradient(
-      178deg,
-      rgba(255, 255, 255, 0.82) 0%,
-      rgba(255, 255, 255, 0.42) 46%,
-      rgba(255, 255, 255, 0.74) 100%
+      177deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.52) 20%,
+      rgba(255, 255, 255, 0.34) 50%,
+      rgba(255, 255, 255, 0.44) 76%,
+      rgba(255, 255, 255, 0.9) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    /* o contorno: a espessura do vidro pegando luz */
-    -webkit-text-stroke: 0.7px rgba(255, 255, 255, 0.92);
-    /* traço ATRÁS do preenchimento, senão ele come a forma da letra */
-    paint-order: stroke fill;
-    /* a sombra é o que faz vidro branco funcionar sobre céu claro; sem ela a
-       letra some no azul do meio-dia */
-    filter: drop-shadow(0 1px 1px rgba(24, 34, 62, 0.34))
-      drop-shadow(0 4px 12px rgba(24, 34, 62, 0.5));
-  }
-  /* ── O apoio do vidro no texto pequeno ────────────────────────────
-     Companheiro de `.dc-glass-text` em tamanho miúdo. O relevo BRANCO da
-     versão anterior servia a texto escuro; agora o texto é branco translúcido,
-     e branco sobre chapa clara com halo branco em volta some.
-     Então o apoio inverte: um anel escuro FINO, colado por fora do contorno
-     branco. Ele não invade o miolo — a letra continua deixando o céu passar —
-     mas recorta a silhueta contra o que estiver atrás, claro ou escuro. */
-  .dc-glass-lift {
+    /* ── 2. A ESPESSURA ───────────────────────────────────────────
+       Aqui morava o erro da versão anterior: um `-webkit-text-stroke` branco
+       fechado em volta do glifo, mais uma sombra `0 0` escura. Contorno de
+       espessura IGUAL em toda a volta é traço de caneta, não vidro — e a
+       sombra sem deslocamento vira sujeira em vez de volume.
+       Vidro tem lado: a quina virada para a luz acende, a parede oposta cai
+       na sombra. Então as sombras são todas DESLOCADAS, nenhuma centrada —
+       duas claras para cima e à esquerda, duas escuras para baixo e à
+       direita. Como o corpo é translúcido, elas aparecem por trás do glifo e
+       o resultado é um bisel que segue cada contorno, inclusive o miolo do
+       "o" e do "e", coisa que um gradiente sozinho não alcança. */
     text-shadow:
-      0 0 1.2px rgba(26, 32, 58, 0.62),
-      0 1px 2px rgba(26, 32, 58, 0.45),
-      0 2px 7px rgba(26, 32, 58, 0.3);
+      -0.8px -1px 0 rgba(255, 255, 255, 1),
+      -1.6px -2px 1.6px rgba(255, 255, 255, 0.45),
+      0.8px 1.5px 0 rgba(26, 40, 76, 0.48),
+      1.6px 3px 3.5px rgba(26, 40, 76, 0.3),
+      /* ── 3. O AR ─────────────────────────────────────────────────
+         Larga, fraca e bem abaixo: é o que faz a letra pairar acima do
+         cenário em vez de estar colada nele. */
+        0 11px 24px rgba(18, 30, 62, 0.34);
   }
 
   /* O recorte vale para TODO glifo, inclusive emoji — e emoji recortado perde
@@ -1849,9 +1854,8 @@ button:active > .duo3d {
     -webkit-background-clip: border-box;
     background-clip: border-box;
     background-image: none;
-    -webkit-text-stroke: 0;
     color: initial;
-    filter: none;
+    text-shadow: none;
   }
 }
 

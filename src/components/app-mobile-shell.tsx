@@ -918,14 +918,12 @@ export function AppHomeScreen({
         " 0 14px 36px -18px rgba(120,84,96,0.34)",
   };
   const cardText = darkSky ? "text-white" : "text-foreground";
-  /* Material de vidro para os DOIS textos grandes da tela (nome e semana).
-     Uma classe só: vidro não troca de cor conforme o céu — ver o comentário
-     de `.dc-glass-text` no styles.css. */
+  /* UMA classe de vidro para toda a tela, grande e pequeno. Ela não troca de
+     cor conforme o céu: vidro é sempre a mesma parede translúcida, e quem
+     garante a leitura nos dois casos é o bisel — ver `.dc-glass-text` no
+     styles.css. */
   const glassText = "dc-glass-text";
-  /* Vidro + apoio: a combinação usada em tudo que antes era preto. Uma classe
-     só nos dois céus — o anel é escuro e fino, e funciona tanto sobre a chapa
-     clara do cartão de dia quanto sobre a escura da noite. */
-  const glassSmall = `${glassText} dc-glass-lift`;
+  const glassSmall = glassText;
   /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
      nasce de baixo contraste por ser secundário, e agora o céu passa por trás
      dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
@@ -1048,20 +1046,21 @@ export function AppHomeScreen({
                 className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                 style={glassLeve}
               >
-                {/* O ☰ é irmão do número de graus — ficar preto sólido ao lado
-                    de um número de vidro denunciava os dois. Ícone não aceita
-                    `background-clip: text`, então o material é traduzido para
-                    traço: branco translúcido (o contorno) com o mesmo anel
-                    escuro fino do `dc-glass-lift` por fora (o apoio). */}
+                {/* O ☰ é irmão do número de graus, e ícone não aceita
+                    `background-clip: text`. O material vira traço: barra
+                    branca translúcida com as MESMAS sombras deslocadas do
+                    vidro — claras para cima e à esquerda, escuras para baixo
+                    e à direita. É o mesmo bisel, escrito em `drop-shadow`. */}
                 <Menu
                   className="h-5 w-5"
                   strokeWidth={2.2}
                   style={{
-                    stroke: "rgba(255,255,255,0.88)",
+                    stroke: "rgba(255,255,255,0.9)",
                     filter:
-                      "drop-shadow(0 0 1px rgba(26,32,58,0.55))" +
-                      " drop-shadow(0 1px 2px rgba(26,32,58,0.45))" +
-                      " drop-shadow(0 2px 7px rgba(26,32,58,0.3))",
+                      "drop-shadow(-0.8px -1px 0 rgba(255,255,255,0.85))" +
+                      " drop-shadow(0.8px 1.5px 0 rgba(26,40,76,0.44))" +
+                      " drop-shadow(1.6px 3px 3px rgba(26,40,76,0.28))" +
+                      " drop-shadow(0 8px 18px rgba(18,30,62,0.32))",
                   }}
                 />
               </button>
@@ -1078,7 +1077,7 @@ export function AppHomeScreen({
                   aria-label={`${weather.temp} graus, ${weather.condition}`}
                 >
                   <span
-                    className={`text-[14px] font-extrabold leading-none ${cardText} ${glassSmall}`}
+                    className={`text-[15px] font-extrabold leading-none ${cardText} ${glassSmall}`}
                   >
                     {weather.temp}°
                   </span>
@@ -1102,7 +1101,7 @@ export function AppHomeScreen({
                 {babyName && (
                   <div className="mt-5 short:mt-3 text-center" style={overArt}>
                     <p
-                      className={`font-serif text-[clamp(1.65rem,7.2vw,2.1rem)] font-normal leading-none ${heroText} ${glassText}`}
+                      className={`font-serif text-[clamp(1.8rem,8vw,2.35rem)] font-normal leading-none ${heroText} ${glassText}`}
                     >
                       {babyName} <span className="dc-sem-vidro align-middle text-[0.5em]">💜</span>
                     </p>
@@ -1172,7 +1171,7 @@ export function AppHomeScreen({
                         // o maior número da tela era o único texto que NÃO
                         // seguia a fonte do sistema.
                         fontFamily: "var(--font-serif)",
-                        fontSize: "clamp(1.7rem, 7.2vw, 2.25rem)",
+                        fontSize: "clamp(2rem, 8.4vw, 2.6rem)",
                         fontWeight: 400,
                         letterSpacing: "-0.01em",
                         fontVariantNumeric: "tabular-nums lining-nums",
@@ -1180,7 +1179,7 @@ export function AppHomeScreen({
                     >
                       {gest.weeks}
                     </p>
-                    <p className={`mt-0.5 text-[12px] font-normal ${cardMuted} ${glassSmall}`}>
+                    <p className={`mt-0.5 text-[13px] font-normal ${cardMuted} ${glassSmall}`}>
                       {gest.weeks === 1 ? "semana" : "semanas"}
                       {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
                     </p>
@@ -1233,7 +1232,7 @@ export function AppHomeScreen({
                                 {s.emoji}
                               </span>
                               <p
-                                className={`mt-1 text-[12px] font-extrabold leading-tight ${cardText} ${glassSmall}`}
+                                className={`mt-1 text-[14px] font-extrabold leading-tight ${cardText} ${glassSmall}`}
                               >
                                 {s.value}
                               </p>
@@ -1241,7 +1240,7 @@ export function AppHomeScreen({
                                   atenuada, e as duas camadas se multiplicavam —
                                   70% de opacidade dentro de um bloco a 80% dá
                                   56% na tela, e a medida caía para 2,8:1. */}
-                              <p className={`text-[9px] font-normal ${cardMuted} ${glassSmall}`}>
+                              <p className={`text-[11px] font-normal ${cardMuted} ${glassSmall}`}>
                                 {s.label}
                               </p>
                             </div>
