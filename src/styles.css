@@ -1193,38 +1193,6 @@ button:active > .duo3d {
   will-change: transform;
 }
 
-/* ── A arte recuada: a camada da frente, em largura cheia ──────────────
-   A respiração aqui parte de 1 e não de 1.04: a graça desta camada é
-   justamente NÃO ter zoom, e 4% de folga devolveria parte do corte que
-   ela veio desfazer. Não precisa de folga porque a borda não é borda —
-   ela derrete na camada desfocada de trás, pela máscara.
-   A máscara é dupla e cruzada (`intersect`): a vertical é larga, porque é
-   lá que mora a sobra de verdade; a horizontal é um fio, só para o retângulo
-   não ter quina viva quando a arte encosta nas laterais em tela larga. */
-@keyframes dcSkyFar {
-  0%,
-  100% {
-    transform: translateY(-50%) scale(1);
-  }
-  50% {
-    transform: translateY(-50.5%) scale(1.025);
-  }
-}
-.dc-sky-far {
-  animation: dcSkyFar 16s ease-in-out infinite;
-  will-change: transform;
-  max-height: 100%;
-  object-fit: cover;
-  -webkit-mask-image:
-    linear-gradient(180deg, transparent 0, #000 9%, #000 91%, transparent 100%),
-    linear-gradient(90deg, transparent 0, #000 3%, #000 97%, transparent 100%);
-  mask-image:
-    linear-gradient(180deg, transparent 0, #000 9%, #000 91%, transparent 100%),
-    linear-gradient(90deg, transparent 0, #000 3%, #000 97%, transparent 100%);
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
-}
-
 /* A bolha desenhada pelo app (quando a arte vier sem esfera): mesma
    respiração, aplicada ao elemento em vez do céu inteiro. */
 @keyframes dcOrbBreathe {
@@ -1245,12 +1213,6 @@ button:active > .duo3d {
   .dc-sky-breathe {
     animation: none;
     transform: scale(1.04);
-  }
-  /* Sem a keyframe, o `translateY(-50%)` que centra a arte se perde e ela
-     desce meia altura. Aqui ele precisa ser escrito à mão. */
-  .dc-sky-far {
-    animation: none;
-    transform: translateY(-50%);
   }
   .dc-orb {
     animation: none;

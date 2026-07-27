@@ -953,44 +953,22 @@ export function AppHomeScreen({
             assim nunca há um flash branco. `cover` recorta as sobras: a arte
             é vertical, então em telas largas sobra em cima e embaixo, e é lá
             que mora só céu. */}
+        {/* UMA camada, em `cover`. Houve uma tentativa de recuar o fundo
+            mostrando a arte em largura cheia sobre uma cópia desfocada dela
+            mesma, com a emenda derretida por uma máscara de duas camadas
+            (`mask-composite`). Funcionava no Chromium do teste e FALHAVA no
+            Safari do iPhone: a máscara zerava, a arte nítida sumia inteira e
+            sobrava só o borrão. Voltou para `cover`, que é suportado em toda
+            parte. Se um dia valer a pena recuar o fundo de novo, tem que ser
+            por um caminho sem `mask-composite` — e testado em iOS de verdade,
+            não em Chromium. O recuo da CENA continua de pé: quem o dá é a
+            bolha menor, não o enquadramento do céu. */}
         {artTheme && (
-          <>
-            {/* CAMADA DE TRÁS — a mesma arte em `cover`, fora de foco.
-                Ela existe só para não haver buraco: a arte é 760×1350+ (mais
-                larga em proporção que um celular), então mostrá-la INTEIRA
-                deixa sobra em cima e embaixo. Em vez de tapar a sobra com
-                cor chapada, ela é tapada com o próprio céu desfocado — o que
-                o olho lê como distância, não como emenda. */}
-            <div
-              aria-hidden
-              className="dc-sky-breathe pointer-events-none absolute inset-0 bg-cover bg-center"
-              style={{
-                backgroundImage: `url(${slot.src})`,
-                filter: "blur(22px) saturate(0.86) brightness(0.98)",
-                transformOrigin: "center",
-              }}
-            />
-            {/* CAMADA DA FRENTE — a arte em largura CHEIA.
-                Antes ela vinha em `cover`: a 430px de tela isso ampliava a
-                imagem até 624px e cortava 31% da largura. Ou seja, o céu
-                estava com zoom — as nuvens das pontas ficavam fora do quadro
-                e o que sobrava vinha ampliado. Em largura cheia a cena volta
-                inteira, o que equivale a recuar o fundo ~30%.
-                É <img> e não `background`: assim a caixa do elemento É a
-                caixa da imagem, e a máscara de borda cai exatamente na
-                emenda com a camada desfocada, em qualquer altura de arte. */}
-            <img
-              aria-hidden
-              alt=""
-              src={slot.src}
-              /* A centragem vertical mora inteira no `.dc-sky-far`. Nada de
-                 `-translate-y-1/2` aqui: no Tailwind 4 essa classe escreve a
-                 propriedade `translate`, que SOMA com o `transform` da
-                 animação — a arte subia meia altura e o terço de baixo virava
-                 só desfoque. */
-              className="dc-sky-far pointer-events-none absolute left-0 top-1/2 w-full"
-            />
-          </>
+          <div
+            aria-hidden
+            className="dc-sky-breathe pointer-events-none absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${slot.src})` }}
+          />
         )}
 
         {/* Vida de fundo do momento do dia — detalhe, nunca protagonista. */}
