@@ -922,8 +922,10 @@ export function AppHomeScreen({
      Uma classe só: vidro não troca de cor conforme o céu — ver o comentário
      de `.dc-glass-text` no styles.css. */
   const glassText = "dc-glass-text";
-  /* Versão relevo, para tudo que é pequeno demais para ficar translúcido. */
-  const glassEmboss = darkSky ? "dc-glass-emboss-dark" : "dc-glass-emboss";
+  /* Vidro + apoio: a combinação usada em tudo que antes era preto. Uma classe
+     só nos dois céus — o anel é escuro e fino, e funciona tanto sobre a chapa
+     clara do cartão de dia quanto sobre a escura da noite. */
+  const glassSmall = `${glassText} dc-glass-lift`;
   /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
      nasce de baixo contraste por ser secundário, e agora o céu passa por trás
      dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
@@ -954,11 +956,43 @@ export function AppHomeScreen({
             é vertical, então em telas largas sobra em cima e embaixo, e é lá
             que mora só céu. */}
         {artTheme && (
-          <div
-            aria-hidden
-            className="dc-sky-breathe pointer-events-none absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${slot.src})` }}
-          />
+          <>
+            {/* CAMADA DE TRÁS — a mesma arte em `cover`, fora de foco.
+                Ela existe só para não haver buraco: a arte é 760×1350+ (mais
+                larga em proporção que um celular), então mostrá-la INTEIRA
+                deixa sobra em cima e embaixo. Em vez de tapar a sobra com
+                cor chapada, ela é tapada com o próprio céu desfocado — o que
+                o olho lê como distância, não como emenda. */}
+            <div
+              aria-hidden
+              className="dc-sky-breathe pointer-events-none absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${slot.src})`,
+                filter: "blur(22px) saturate(0.86) brightness(0.98)",
+                transformOrigin: "center",
+              }}
+            />
+            {/* CAMADA DA FRENTE — a arte em largura CHEIA.
+                Antes ela vinha em `cover`: a 430px de tela isso ampliava a
+                imagem até 624px e cortava 31% da largura. Ou seja, o céu
+                estava com zoom — as nuvens das pontas ficavam fora do quadro
+                e o que sobrava vinha ampliado. Em largura cheia a cena volta
+                inteira, o que equivale a recuar o fundo ~30%.
+                É <img> e não `background`: assim a caixa do elemento É a
+                caixa da imagem, e a máscara de borda cai exatamente na
+                emenda com a camada desfocada, em qualquer altura de arte. */}
+            <img
+              aria-hidden
+              alt=""
+              src={slot.src}
+              /* A centragem vertical mora inteira no `.dc-sky-far`. Nada de
+                 `-translate-y-1/2` aqui: no Tailwind 4 essa classe escreve a
+                 propriedade `translate`, que SOMA com o `transform` da
+                 animação — a arte subia meia altura e o terço de baixo virava
+                 só desfoque. */
+              className="dc-sky-far pointer-events-none absolute left-0 top-1/2 w-full"
+            />
+          </>
         )}
 
         {/* Vida de fundo do momento do dia — detalhe, nunca protagonista. */}
@@ -1011,16 +1045,23 @@ export function AppHomeScreen({
                   onOpenMenu?.();
                 }}
                 aria-label="Menu"
-                className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                 style={glassLeve}
               >
+                {/* O ☰ é irmão do número de graus — ficar preto sólido ao lado
+                    de um número de vidro denunciava os dois. Ícone não aceita
+                    `background-clip: text`, então o material é traduzido para
+                    traço: branco translúcido (o contorno) com o mesmo anel
+                    escuro fino do `dc-glass-lift` por fora (o apoio). */}
                 <Menu
-                  className={`h-5 w-5 ${cardText}`}
+                  className="h-5 w-5"
                   strokeWidth={2.2}
-                  // Com a chapa mais transparente, a sombra no traço é o que
-                  // mantém o ícone legível sobre nuvem clara ou céu escuro.
                   style={{
-                    filter: `drop-shadow(0 1px 2px ${darkSky ? "rgba(0,0,0,0.5)" : "rgba(120,90,100,0.35)"})`,
+                    stroke: "rgba(255,255,255,0.88)",
+                    filter:
+                      "drop-shadow(0 0 1px rgba(26,32,58,0.55))" +
+                      " drop-shadow(0 1px 2px rgba(26,32,58,0.45))" +
+                      " drop-shadow(0 2px 7px rgba(26,32,58,0.3))",
                   }}
                 />
               </button>
@@ -1032,12 +1073,12 @@ export function AppHomeScreen({
                   botão e uma pílula comprida. */}
               {weather && (
                 <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                   style={glassLeve}
                   aria-label={`${weather.temp} graus, ${weather.condition}`}
                 >
                   <span
-                    className={`text-[15px] font-extrabold leading-none ${cardText} ${glassEmboss}`}
+                    className={`text-[14px] font-extrabold leading-none ${cardText} ${glassSmall}`}
                   >
                     {weather.temp}°
                   </span>
@@ -1061,7 +1102,7 @@ export function AppHomeScreen({
                 {babyName && (
                   <div className="mt-5 short:mt-3 text-center" style={overArt}>
                     <p
-                      className={`font-serif text-[clamp(2rem,9vw,2.6rem)] font-normal leading-none ${heroText} ${glassText}`}
+                      className={`font-serif text-[clamp(1.65rem,7.2vw,2.1rem)] font-normal leading-none ${heroText} ${glassText}`}
                     >
                       {babyName} <span className="dc-sem-vidro align-middle text-[0.5em]">💜</span>
                     </p>
@@ -1088,7 +1129,12 @@ export function AppHomeScreen({
                     medida e em tela curta um escapava do outro. Ela cabe na
                     faixa (`h-full`), na largura (`76vw`) e tem teto — nessa
                     ordem, o que for menor vence. */}
-                  <div className="relative aspect-square h-full max-h-[min(76vw,26rem)]">
+                  {/* Recuada de ~25%: a bolha vinha ocupando 76vw — em 430px
+                    são 327 de 430, quase a largura toda, e o que se sente é
+                    lente colada no rosto. Em 57vw ela volta a ser um objeto
+                    DENTRO de uma cena, com céu em volta para o objeto estar
+                    dentro de quê. O céu que sobra não é vazio: é a distância. */}
+                  <div className="relative aspect-square h-full max-h-[min(57vw,19.5rem)]">
                     {ART_HAS_ORB ? null : <BabyOrb />}
                     {/* `scale` porque o SVG tem margem interna larga: a tinta do
                       bebê é ~55% da caixa, e 1.43 leva ela a ~80% da bolha — a
@@ -1111,7 +1157,7 @@ export function AppHomeScreen({
                   dobraria a opacidade e deixaria a emenda escura. */}
                 <div className="mt-1 flex flex-col items-center">
                   <div
-                    className="px-6 pb-1 pt-2 short:pt-1.5 text-center"
+                    className="px-5 pb-1 pt-1.5 short:pt-1 text-center"
                     style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
                   >
                     <p
@@ -1120,13 +1166,13 @@ export function AppHomeScreen({
                          atrás para existir. Sobre a chapa clara do cartão não
                          há o que atravessar — o "20" quase sumia. O material
                          só vale para texto que se apoia direto no céu. */
-                      className={`leading-none ${cardText} ${glassEmboss}`}
+                      className={`leading-none ${cardText} ${glassSmall}`}
                       style={{
                         // `var(--font-serif)` e não "Nunito" fixo: preso assim,
                         // o maior número da tela era o único texto que NÃO
                         // seguia a fonte do sistema.
                         fontFamily: "var(--font-serif)",
-                        fontSize: "clamp(2.1rem, 9vw, 2.8rem)",
+                        fontSize: "clamp(1.7rem, 7.2vw, 2.25rem)",
                         fontWeight: 400,
                         letterSpacing: "-0.01em",
                         fontVariantNumeric: "tabular-nums lining-nums",
@@ -1134,14 +1180,14 @@ export function AppHomeScreen({
                     >
                       {gest.weeks}
                     </p>
-                    <p className={`mt-0.5 text-[13px] font-normal ${cardMuted} ${glassEmboss}`}>
+                    <p className={`mt-0.5 text-[12px] font-normal ${cardMuted} ${glassSmall}`}>
                       {gest.weeks === 1 ? "semana" : "semanas"}
                       {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
                     </p>
                   </div>
 
                   <div
-                    className="w-full rounded-[26px] px-4 pb-4 pt-3 short:pb-3 short:pt-2"
+                    className="w-full rounded-[24px] px-3.5 pb-3 pt-2.5 short:pb-2.5 short:pt-2"
                     style={glass}
                   >
                     {/* Medidas da semana (silenciadas no Modo Cuidado) */}
@@ -1183,9 +1229,11 @@ export function AppHomeScreen({
                                   : "rgba(150,110,120,0.16)",
                               }}
                             >
-                              <span className="text-xl short:text-lg leading-none">{s.emoji}</span>
+                              <span className="text-lg short:text-base leading-none">
+                                {s.emoji}
+                              </span>
                               <p
-                                className={`mt-1 text-[13px] font-extrabold leading-tight ${cardText} ${glassEmboss}`}
+                                className={`mt-1 text-[12px] font-extrabold leading-tight ${cardText} ${glassSmall}`}
                               >
                                 {s.value}
                               </p>
@@ -1193,7 +1241,7 @@ export function AppHomeScreen({
                                   atenuada, e as duas camadas se multiplicavam —
                                   70% de opacidade dentro de um bloco a 80% dá
                                   56% na tela, e a medida caía para 2,8:1. */}
-                              <p className={`text-[9px] font-normal ${cardMuted} ${glassEmboss}`}>
+                              <p className={`text-[9px] font-normal ${cardMuted} ${glassSmall}`}>
                                 {s.label}
                               </p>
                             </div>
