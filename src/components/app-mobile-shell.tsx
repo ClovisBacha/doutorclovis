@@ -39,6 +39,7 @@ import skyAmanhecer from "@/assets/sky/amanhecer.webp";
 import skyAnoitecer from "@/assets/sky/anoitecer.webp";
 import { babyForWeek, fruitEmojiForWeek, retaFinalMensagem } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
+import { getApproxLocation } from "@/lib/local.functions";
 
 /* ================================================================
    Tipos
@@ -185,8 +186,12 @@ function weatherTip(code: number, temp: number): { tip: string; tipEmoji: string
   return { tipEmoji: "🌸", tip: "Momento perfeito para descansar com o bebê." };
 }
 
-function useWeather(): WeatherState | null {
+/** De onde saiu a localização usada — o app conta isso para a paciente. */
+export type OrigemLocal = { tipo: "gps" | "aprox" | "padrao"; cidade: string | null };
+
+function useWeather(): { weather: WeatherState | null; origem: OrigemLocal | null } {
   const [weather, setWeather] = useState<WeatherState | null>(null);
+  const [origemLocal, setOrigemLocal] = useState<OrigemLocal | null>(null);
   useEffect(() => {
     if (typeof window === "undefined") return;
     let cancelled = false;
@@ -232,23 +237,59 @@ function useWeather(): WeatherState | null {
       }
     }
 
-    // Fallback: Belo Horizonte. Sem ele, quem nega a localização perdia o
-    // strip de clima inteiro (dado "sumido" relatado na auditoria de design).
-    const FALLBACK = { lat: -19.9167, lon: -43.9345 };
+    /* ── De onde vem a localização, em ordem de prioridade ──────────
+       O céu, o clima e a chuva do app são a janela da paciente. Se o lugar
+       estiver errado, TUDO mente junto: sol às 19h, entardecer em plena
+       noite, chuva na tela num dia seco.
+
+       1. GPS          — o dado real. Sempre vence, e assume assim que chega.
+       2. IP da borda  — aproximado por cidade, de graça e instantâneo.
+       3. Clínica (BH) — último recurso, para a tela nunca ficar vazia.
+
+       A ordem de EXECUÇÃO é o contrário da de prioridade, e é isso que
+       conserta o buraco: começa pelo aproximado, que responde na hora, e
+       troca pelo GPS quando (e se) ele chegar. Antes o app pedia o GPS e
+       ficava parado esperando — quem apenas IGNORA a caixa de permissão não
+       dispara callback nenhum, então a tela passava até 8s sem clima e com o
+       céu na faixa errada. */
+    const CLINICA = { lat: -19.9167, lon: -43.9345 };
+    let temGps = false;
+
+    async function pisoAproximado() {
+      try {
+        const aprox = await getApproxLocation();
+        if (cancelled || temGps) return;
+        if (aprox) {
+          setOrigemLocal({ tipo: "aprox", cidade: aprox.cidade });
+          void load(aprox.lat, aprox.lon);
+          return;
+        }
+      } catch {
+        /* sem borda (dev, ou provedor sem geo): cai na clínica */
+      }
+      if (cancelled || temGps) return;
+      setOrigemLocal({ tipo: "padrao", cidade: null });
+      void load(CLINICA.lat, CLINICA.lon);
+    }
+    void pisoAproximado();
+
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        ({ coords }) => load(coords.latitude, coords.longitude),
-        () => load(FALLBACK.lat, FALLBACK.lon),
+        ({ coords }) => {
+          temGps = true;
+          setOrigemLocal({ tipo: "gps", cidade: null });
+          void load(coords.latitude, coords.longitude);
+        },
+        // Erro/negação/timeout: o piso já está na tela, não há o que fazer.
+        () => {},
         { timeout: 8000, maximumAge: 300_000 },
       );
-    } else {
-      load(FALLBACK.lat, FALLBACK.lon);
     }
     return () => {
       cancelled = true;
     };
   }, []);
-  return weather;
+  return { weather, origem: origemLocal };
 }
 
 /* ================================================================
@@ -742,7 +783,9 @@ export function AppHomeScreen({
         ? "2º trimestre"
         : "3º trimestre"
     : null;
-  const weather = useWeather();
+  const { weather, origem: origemLocal } = useWeather();
+  // Recusou o convite da localização? Não insiste na mesma sessão.
+  const [localDispensado, setLocalDispensado] = useState(false);
 
   // Hora calculada NO CLIENTE. No SSR o relógio é o do servidor (UTC na
   // Vercel), e o React não corrige atributo divergente na hidratação — a arte
@@ -1152,6 +1195,48 @@ export function AppHomeScreen({
                   </div>
                 </div>
               </div>
+
+              {/* ── Convite para usar a localização real ───────────────
+                  Só aparece quando o app NÃO está no GPS, e some sozinho
+                  quando a permissão é dada. É convite, não alerta: sem cor de
+                  erro, sem ícone de aviso, e dispensável — a paciente que
+                  prefere não compartilhar continua com um app que funciona,
+                  só com a cidade aproximada.
+                  Existe porque a degradação era silenciosa: ela via um pôr do
+                  sol às 22h e não tinha como saber que a causa era a
+                  localização. Dizer QUAL cidade o app está usando é o que
+                  transforma um defeito aparente numa escolha informada. */}
+              {origemLocal && origemLocal.tipo !== "gps" && !localDispensado && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    hapticTap();
+                    // Repedir a permissão: no navegador, quem já negou não vê
+                    // a caixa de novo — daí o texto do botão falar em "ativar",
+                    // que é o que ela faz nos ajustes do site.
+                    navigator.geolocation?.getCurrentPosition(
+                      () => window.location.reload(),
+                      () => setLocalDispensado(true),
+                      { timeout: 8000 },
+                    );
+                  }}
+                  className="mt-2.5 short:mt-2 flex w-full items-start gap-3 rounded-[22px] px-4 py-3 text-left short:py-2"
+                  style={glass}
+                >
+                  <span className="mt-0.5 text-xl leading-none">📍</span>
+                  <span className="min-w-0">
+                    <span className={`block text-[14px] font-extrabold ${cardText}`}>
+                      {origemLocal.cidade
+                        ? `Mostrando o tempo de ${origemLocal.cidade}`
+                        : "Mostrando o tempo de uma cidade aproximada"}
+                    </span>
+                    <span className={`mt-0.5 block text-[12px] leading-snug ${cardMuted}`}>
+                      Com a sua localização, o céu e a chuva do app ficam iguais aos da sua janela.
+                      Toque para ativar.
+                    </span>
+                  </span>
+                </button>
+              )}
 
               {/* ── Saudação do dia e o conselho ──────────────────────
                   O clima aparece UMA vez na tela, no chip lá em cima: é lá
