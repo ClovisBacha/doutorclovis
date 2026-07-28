@@ -5314,7 +5314,12 @@ function WellnessScreen({
             .split(/(?<=[.!?])\s/)[0]
             .replace(/[.!?]+$/, "")
             .trim();
-          return frase.length > 46 ? `${frase.slice(0, 44).trimEnd()}…` : frase;
+          if (frase.length <= 46) return frase;
+          /* Corta no último espaço, não no 44º caractere: "METADE da jornada,
+             que conq…" lê como erro; "METADE da jornada…" lê como resumo. */
+          const corte = frase.slice(0, 44);
+          const espaco = corte.lastIndexOf(" ");
+          return `${(espaco > 24 ? corte.slice(0, espaco) : corte).trimEnd()}…`;
         })()
       : lesson.label || "O desafio de hoje";
   const minutosAula =
@@ -5566,7 +5571,19 @@ function WellnessScreen({
                 {/* A bolha sangra para fora do cartão à direita e embaixo, como
                     no desenho: é o que a faz parecer um objeto POUSADO no
                     cartão em vez de uma figurinha colada dentro dele. */}
-                <span className="pointer-events-none absolute -right-6 top-1/2 h-[188px] w-[188px] -translate-y-1/2">
+                <span
+                  className="pointer-events-none absolute -right-6 top-1/2 h-[188px] w-[188px] -translate-y-1/2"
+                  style={{
+                    /* O cartão tem `overflow-hidden` (precisa, pelos cantos), e
+                       a bolha é mais alta que ele: nos céus escuros as bordas
+                       cortadas viravam duas linhas retas dentro do cartão. A
+                       máscara apaga a bolha antes de ela chegar no corte. */
+                    maskImage:
+                      "radial-gradient(circle at 50% 50%, #000 62%, rgba(0,0,0,0.35) 78%, transparent 92%)",
+                    WebkitMaskImage:
+                      "radial-gradient(circle at 50% 50%, #000 62%, rgba(0,0,0,0.35) 78%, transparent 92%)",
+                  }}
+                >
                   {/* A bolha é ARTE, não CSS. Gradiente e sombra dão volume,
                       mas não dão iridescência nem as faíscas em volta — e era
                       justamente isso que faltava para a tela bater com o
@@ -5622,7 +5639,11 @@ function WellnessScreen({
             {/* ── Atividades de hoje ─────────────────────────────────── */}
             <div className="mt-3.5 flex items-center justify-between gap-3">
               <p className="font-serif text-[16px]" style={{ fontWeight: 600, color: tinta }}>
-                Atividades de hoje <span className="text-violet-300">✦</span>
+                Atividades de hoje{" "}
+                {/* `currentColor` a 55%: o brilho segue a tinta do título em
+                    vez de um lilás fixo. Fixo, ele media 1,02:1 sobre o céu do
+                    meio-dia — mesma família de matiz do fundo, sumia. */}
+                <span style={{ opacity: 0.55 }}>✦</span>
               </p>
               <button
                 onClick={() => setVerTodas((v) => !v)}
