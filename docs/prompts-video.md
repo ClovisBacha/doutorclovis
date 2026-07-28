@@ -55,6 +55,40 @@ condensa parece o app acordando.
 Eu corto ali, congelo o quadro final e faço a transição para a home. Se o
 vídeo terminar em movimento, a emenda pula.
 
+### Mais dois conceitos para a abertura
+
+Gere os três e escolha — custa o mesmo e você compara com os olhos em vez de
+imaginar. Os três terminam parados, que é a única exigência inegociável.
+
+**B · A bolha que revela** — amarra a abertura ao símbolo do app (o bebê na
+bolha aparece em todas as telas):
+
+```
+A single translucent iridescent bubble floats up slowly from the bottom of a
+soft pastel sky, lavender fading to peach. As it reaches the centre of the
+frame it stops, and its surface catches the light: the attached logo appears
+inside the bubble as a reflection settling into focus. The bubble holds
+perfectly still, centred, with the logo sharp inside it, for the final 1.5
+seconds. Tiny sparkles drift slowly around it. Dreamy, calm, premium.
+Duration 4 seconds.
+```
+
+**C · O nascer do dia** — amarra a abertura ao céu que muda com a hora, que é
+a ideia central do app:
+
+```
+A dark starry pastel night sky. A warm glow rises slowly from the bottom of
+the frame, like a sunrise, and as the light climbs it washes the sky from deep
+lavender through pink into soft peach. When the light reaches the centre, the
+attached logo emerges from within the glow, settling into sharp focus. The
+logo then holds perfectly still, centred, for the final 1.5 seconds while the
+sky settles into a calm dawn. No sun disc, no horizon line. Duration 5 seconds.
+```
+
+**Qual eu escolheria:** a **C**. A logo nascendo do amanhecer diz numa imagem o
+que o app inteiro faz — o céu dela acompanha o dia real. A **A** é a mais
+segura e a **B** é a mais bonita, mas nenhuma das duas _conta_ nada.
+
 ---
 
 ## 2. A estrela do dia (celebração)
