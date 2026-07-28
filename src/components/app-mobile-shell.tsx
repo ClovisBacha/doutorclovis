@@ -31,7 +31,8 @@ import skyMeioDia from "@/assets/sky/meio-dia.webp";
 import skyTarde from "@/assets/sky/tarde.webp";
 import skyGolden from "@/assets/sky/golden-hour.webp";
 import skyEntardecer from "@/assets/sky/entardecer.webp";
-import skyNoite from "@/assets/sky/noite.webp";
+/* `noite.webp` sai do bundle: a arte dele é crepúsculo, não noite — ver o
+   comentário na tabela SKY_SLOTS. O arquivo continua no repositório. */
 import skyMadrugada from "@/assets/sky/madrugada.webp";
 import skyPreAmanhecer from "@/assets/sky/pre-amanhecer.webp";
 import skyAmanhecer from "@/assets/sky/amanhecer.webp";
@@ -746,7 +747,20 @@ const SKY_SLOTS: { from: number; to: number; nome: string; src: string; dark: bo
   { from: 16, to: 18, nome: "golden hour", src: skyGolden, dark: false },
   { from: 18, to: 19, nome: "entardecer", src: skyEntardecer, dark: false },
   { from: 19, to: 21, nome: "anoitecer", src: skyAnoitecer, dark: true },
-  { from: 21, to: 24, nome: "noite", src: skyNoite, dark: true },
+  /* NOITE usa a arte de madrugada, e isso é intencional.
+     O arquivo `noite.webp` é, na verdade, uma foto de CREPÚSCULO: tem o brilho
+     alaranjado do sol ainda no horizonte. Ele servia enquanto o céu vinha de
+     uma tabela de horas, mas a janela da "noite" começa 80 minutos depois do
+     pôr do sol e vai até as 4h — às 22h fazia mais de quatro horas que
+     escurecera, e o app mostrava o sol se pondo. Era o oposto do que o céu
+     ancorado no sol veio prometer.
+     Das dez artes, só duas são noite de verdade: `madrugada` (lua alta, via
+     láctea) e `pre-amanhecer` (a mesma noite com o primeiro clarão frio no
+     horizonte). A segunda não serve às 22h — aquele clarão é o dia chegando.
+     Sobra a de madrugada, e ela está certa: entre as 21h e as 4h o céu
+     realmente não muda. `noite.webp` fica no repositório como matéria-prima
+     caso um dia entre uma arte própria para o começo da noite. */
+  { from: 21, to: 24, nome: "noite", src: skyMadrugada, dark: true },
 ];
 
 /** Só o relógio — o plano B de quando não se sabe onde a pessoa está. */
