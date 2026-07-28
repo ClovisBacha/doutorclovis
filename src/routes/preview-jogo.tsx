@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GestacaoPath } from "@/components/gestacao-path";
+import { useEffect } from "react";
+import { GestacaoPath, lsSet } from "@/components/gestacao-path";
+import { SKIN_KEY } from "@/lib/trilha-skins";
 
 /**
  * Bancada de design do JOGO (Caminho) — irmã da /preview-home.
@@ -18,9 +20,12 @@ export const Route = createFileRoute("/preview-jogo")({
   // serializar, e só entender "jogos" apagaria o parâmetro no segundo passe.
   // `?bebe=Helena` troca o nome. Existe para PROVAR que a saudação lê o nome
   // do bebê do perfil e não tem "Clovis" preso em lugar nenhum da tela.
+  // `?pele=trilha-jardim` equipa uma pele de bolinha — a única forma de
+  // fotografar a trilha com pele sem ter comprado o item numa conta real.
   validateSearch: (q: Record<string, unknown>) => ({
     tela: String(q.tela ?? ""),
     bebe: String(q.bebe ?? "Clovis"),
+    pele: String(q.pele ?? ""),
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -29,7 +34,15 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
-  const { tela, bebe } = Route.useSearch();
+  const { tela, bebe, pele } = Route.useSearch();
+  useEffect(() => {
+    if (!pele) return;
+    lsSet(SKIN_KEY, pele);
+    /* O efeito do filho roda ANTES do do pai (filhos montam primeiro), então
+       o `GestacaoPath` já leu o storage vazio quando esta linha grava. O
+       evento é o que faz ele reler — o mesmo caminho que a loja usa. */
+    window.dispatchEvent(new CustomEvent("dc-skin-trocada", { detail: pele }));
+  }, [pele]);
   /* z-50 e não z-75: a tela de atividades vai por portal para o <body> em
      z-60, e um invólucro de bancada em z-75 a cobria — o teste escondendo
      justamente o que ele deveria fotografar. 50 ainda cobre o cabeçalho

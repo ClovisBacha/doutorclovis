@@ -14,6 +14,7 @@ import {
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
+import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { createBreathAudio, vibratePhase } from "@/lib/breath-audio";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 
@@ -1087,6 +1088,30 @@ export function GestacaoPath({
   const [saldo, setSaldo] = useState<number | null>(null);
   // Itens do Cantinho que decoram o Caminho (não-fundo) + o fundo ativo.
   const [decor, setDecor] = useState<string[]>([]);
+  /* Pele das bolinhas. Mora no `journey_state` (chave `dc-path-`), não numa
+     coluna nova: assim ela sincroniza entre aparelhos junto com o resto da
+     jornada e não exige migração de banco. */
+  const [skin, setSkin] = useState<string | null>(null);
+  useEffect(() => {
+    const guardada = lsGet<string | null>(SKIN_KEY, null);
+    if (guardada && TRILHA_SKINS[guardada]) setSkin(guardada);
+  }, []);
+  /* Comprou e depois a pele saiu do catálogo? Cai para a bolinha de sempre em
+     vez de sumir com o nó. */
+  const peleAtiva = skin && TRILHA_SKINS[skin] ? TRILHA_SKINS[skin] : null;
+
+  /* A loja vive noutra aba, então a troca chega por um evento na janela em vez
+     de por prop: o Caminho pode nem estar montado quando ela equipa. Ao voltar
+     para cá, o `lsGet` do efeito acima já pegou o valor — o evento serve para
+     o caso de as duas telas estarem vivas ao mesmo tempo. */
+  useEffect(() => {
+    const ouvir = (e: Event) => {
+      const id = (e as CustomEvent<string | null>).detail;
+      setSkin(id && TRILHA_SKINS[id] ? id : null);
+    };
+    window.addEventListener("dc-skin-trocada", ouvir);
+    return () => window.removeEventListener("dc-skin-trocada", ouvir);
+  }, []);
   const [fundoBg, setFundoBg] = useState<string | null>(null);
   // Decoração PERSONALIZADA da trilha: a paciente define posição e tamanho de
   // cada enfeite direto aqui no jogo (modo "Arrumar"). Fica no aparelho, por
@@ -1296,7 +1321,15 @@ export function GestacaoPath({
   // emoji). Céu entra aqui também — se ela quiser uma nuvem parada na trilha,
   // pode; a faixa que passeia lá no alto continua existindo do mesmo jeito.
   const trayItems = useMemo(
-    () => decor.filter((id) => CANTINHO_BY_ID[id] && CANTINHO_BY_ID[id].type !== "fundo"),
+    () =>
+      decor.filter(
+        (id) =>
+          CANTINHO_BY_ID[id] &&
+          CANTINHO_BY_ID[id].type !== "fundo" &&
+          /* Pele veste a bolinha; se entrasse aqui, o 🌱 dela também sairia
+             boiando pela trilha como se fosse uma plantinha comprada. */
+          CANTINHO_BY_ID[id].type !== "trilha",
+      ),
     [decor],
   );
   // Espalhados sozinhos: só os de chão (o céu já se vira sozinho lá em cima).
@@ -2483,32 +2516,56 @@ export function GestacaoPath({
                   )}
                   {/* Anel segmentado: 3 segmentos = as 3 tarefas de hoje */}
                   {isToday && <TaskRing done={done ? 6 : halvesToday} total={6} color={tm.main} />}
-                  <div
-                    className={`duo3d relative flex items-center justify-center overflow-hidden rounded-full ${
-                      isToday && !done ? "dc-chest" : ""
-                    }`}
-                    style={
-                      {
-                        width: `${dia}px`,
-                        height: `${dia}px`,
-                        background: `radial-gradient(120% 120% at 32% 24%, color-mix(in oklab, ${palette.main} 55%, white) 0%, ${palette.main} 58%, color-mix(in oklab, ${palette.main} 82%, black) 100%)`,
-                        "--lip": palette.lip,
-                        boxShadow: `0 ${isToday ? 8 : 6}px 0 ${palette.lip}, 0 12px 24px -10px ${palette.main}99`,
-                      } as React.CSSProperties
-                    }
-                  >
-                    {/* Sem números: as bolinhas falam pela cor e pelo brilho (estilo da logo) */}
-                    {isToday && !done ? (
-                      <span className="relative z-10 text-3xl">🎁</span>
-                    ) : done ? (
-                      <span
-                        className={`relative z-10 font-black text-white ${isToday ? "text-3xl" : "text-2xl"}`}
-                      >
-                        ✓
-                      </span>
-                    ) : null}
-                    <span className="dc-coin-shine" aria-hidden />
-                  </div>
+                  {peleAtiva ? (
+                    /* COM PELE: a arte substitui a bolinha inteira, sem o
+                       relevo 3D nem o brilho — a imagem já traz o próprio
+                       volume, e empilhar os dois daria um objeto dentro de um
+                       botão. O ✓ e o 🎁 também saem: quem diz o estado agora é
+                       o desenho (semente / broto / flor), que é exatamente o
+                       que a pele veio fazer. */
+                    <img
+                      src={peleAtiva.arte[estadoDoNo(done, isToday)]}
+                      alt=""
+                      aria-hidden
+                      className={`relative select-none ${isToday && !done ? "dc-chest" : ""}`}
+                      style={{
+                        width: `${dia * 1.42}px`,
+                        height: `${dia * 1.42}px`,
+                        /* 42% maior que a bolinha, medido comparando as duas
+                           trilhas lado a lado: a arte tem ar em volta do
+                           objeto, então na medida exata o nó com pele parece
+                           menor que o sem, e a trilha fica irregular. */
+                        filter: `drop-shadow(0 6px 10px ${palette.main}55)`,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className={`duo3d relative flex items-center justify-center overflow-hidden rounded-full ${
+                        isToday && !done ? "dc-chest" : ""
+                      }`}
+                      style={
+                        {
+                          width: `${dia}px`,
+                          height: `${dia}px`,
+                          background: `radial-gradient(120% 120% at 32% 24%, color-mix(in oklab, ${palette.main} 55%, white) 0%, ${palette.main} 58%, color-mix(in oklab, ${palette.main} 82%, black) 100%)`,
+                          "--lip": palette.lip,
+                          boxShadow: `0 ${isToday ? 8 : 6}px 0 ${palette.lip}, 0 12px 24px -10px ${palette.main}99`,
+                        } as React.CSSProperties
+                      }
+                    >
+                      {/* Sem números: as bolinhas falam pela cor e pelo brilho (estilo da logo) */}
+                      {isToday && !done ? (
+                        <span className="relative z-10 text-3xl">🎁</span>
+                      ) : done ? (
+                        <span
+                          className={`relative z-10 font-black text-white ${isToday ? "text-3xl" : "text-2xl"}`}
+                        >
+                          ✓
+                        </span>
+                      ) : null}
+                      <span className="dc-coin-shine" aria-hidden />
+                    </div>
+                  )}
                 </div>
                 {/* 3 estrelas do dia em MEIAS (6 jogos). Só em HOJE e nos dias
                     FEITOS: num dia passado que ela não jogou, três estrelas

@@ -23,7 +23,16 @@
  * Vive aqui porque a loja, a carteira e a RPC de compra são as mesmas — o que
  * muda é só onde o item é aplicado.
  */
-export type CantinhoType = "fundo" | "ceu" | "planta" | "objeto" | "bicho" | "especial" | "tema";
+export type CantinhoType =
+  | "fundo"
+  | "ceu"
+  | "planta"
+  | "objeto"
+  | "bicho"
+  | "especial"
+  | "tema"
+  /** Pele das bolinhas do Caminho — três estados, ver `trilha-skins.ts`. */
+  | "trilha";
 
 export type CantinhoItem = {
   id: string;
@@ -35,6 +44,8 @@ export type CantinhoItem = {
 };
 
 export const CANTINHO_CATEGORIES: { key: CantinhoType; label: string }[] = [
+  /* Primeira da lista: é a categoria que muda a tela que ela mais olha. */
+  { key: "trilha", label: "Bolinhas" },
   { key: "tema", label: "Céu do app" },
   { key: "fundo", label: "Cenários" },
   { key: "ceu", label: "Céu" },
@@ -45,6 +56,20 @@ export const CANTINHO_CATEGORIES: { key: CantinhoType; label: string }[] = [
 ];
 
 export const CANTINHO_ITEMS: CantinhoItem[] = [
+  /* ── Peles do Caminho ──────────────────────────────────────────────
+     Preço alto (280) porque ela troca a tela inteira do jogo, não um canto
+     dela — e porque é o tipo de item que a paciente vê a cada dia da jornada,
+     não uma vez. Não é premium: quem junta Sementinhas alcança.
+     Por enquanto só o Jardim tem arte; as outras sete entram uma linha por
+     vez conforme as imagens ficarem prontas (ver `trilha-skins.ts`). */
+  {
+    id: "trilha-jardim",
+    name: "Bolinhas Jardim",
+    emoji: "🌱",
+    price: 280,
+    type: "trilha",
+    premium: false,
+  },
   // ── Grátis (1) — cenário inicial, já vem com a paciente ─────────────
   // "Sem graça de propósito": um fundo liso que só troca de cor com as
   // semanas. Serve de ponto de partida pra dar gostinho de personalizar antes

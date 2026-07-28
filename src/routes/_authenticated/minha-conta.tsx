@@ -112,6 +112,7 @@ import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import { useWeatherSky } from "@/components/weather-sky";
+import { SKIN_KEY } from "@/lib/trilha-skins";
 import { NotificacoesSheet } from "@/components/notificacoes-sheet";
 import {
   contarNaoLidas,
@@ -14354,6 +14355,12 @@ function CantinhoTab({
   const [cat, setCat] = useState<CantinhoType | "all">("all");
   const [buying, setBuying] = useState<string | null>(null);
   const [collection, setCollection] = useState({ owned: 0, total: 0, complete: false });
+  /* Pele equipada das bolinhas do Caminho. Lida no cliente (localStorage
+     dentro do blob da jornada), então começa nula e se corrige ao montar. */
+  const [skinAtiva, setSkinAtiva] = useState<string | null>(null);
+  useEffect(() => {
+    setSkinAtiva(lsGet<string | null>(SKIN_KEY, null));
+  }, []);
   // As formas de ganhar Sementinhas ficam num bloco só, recolhido por padrão,
   // pra não empilhar 4 cards e poluir a tela (fica "Ganhe mais 🌱 ›").
   const [showEarn, setShowEarn] = useState(false);
@@ -14394,6 +14401,20 @@ function CantinhoTab({
       toast(theme === "v1" ? "Céu Clássico aplicado 🌅" : "De volta ao céu novo ✨");
       onSkyChange?.(theme);
     }
+  }
+
+  /* A pele das bolinhas NÃO vai para o servidor.
+     Ela mora no `journey_state` — o mesmo blob que já guarda o progresso da
+     jornada e as posições dos enfeites, e que já sincroniza entre aparelhos.
+     Uma coluna nova em `patient_profiles` daria o mesmo resultado ao custo de
+     uma migração que precisa ser rodada à mão no Supabase, e este projeto já
+     tem migrações pendentes esperando isso. */
+  function equipSkin(id: string | null) {
+    setSkinAtiva(id);
+    lsSet(SKIN_KEY, id);
+    /* Avisa o Caminho, que pode estar montado noutra aba ao mesmo tempo. */
+    window.dispatchEvent(new CustomEvent("dc-skin-trocada", { detail: id }));
+    toast(id ? "Bolinhas trocadas! 🌱" : "Bolinhas de volta ao normal");
   }
 
   async function equipFundo(id: string | null) {
@@ -14580,7 +14601,18 @@ function CantinhoTab({
                 </span>
                 <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
                 {has ? (
-                  i.type === "tema" ? (
+                  i.type === "trilha" ? (
+                    <button
+                      onClick={() => equipSkin(skinAtiva === i.id ? null : i.id)}
+                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
+                        skinAtiva === i.id
+                          ? "bg-emerald-500 text-white"
+                          : "border border-emerald-300 text-emerald-700"
+                      }`}
+                    >
+                      {skinAtiva === i.id ? "Em uso ✓" : "Usar"}
+                    </button>
+                  ) : i.type === "tema" ? (
                     // Tema veste a HOME, não o cantinho: alterna V1 ⇄ V2.
                     <button
                       onClick={() => equipSkyTheme(sky === "v1" ? "v2" : "v1")}
