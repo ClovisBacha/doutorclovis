@@ -113,6 +113,7 @@ import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
 import { useWeatherSky } from "@/components/weather-sky";
 import { SKIN_KEY } from "@/lib/trilha-skins";
+import { useSkyNow } from "@/components/app-mobile-shell";
 import { NotificacoesSheet } from "@/components/notificacoes-sheet";
 import {
   contarNaoLidas,
@@ -495,6 +496,16 @@ function MinhaContaPage() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [lidas, setLidas] = useState<Set<string>>(() => new Set());
   const [origemLocal, setOrigemLocal] = useState<OrigemLocal | null>(null);
+  /* A barra de baixo escurece SÓ na home com céu de noite. Nas outras abas o
+     conteúdo é claro e uma barra escura destoaria — e a tela do jogo é uma
+     sobreposição em portal, com a barra atrás dela, então nem aparece.
+     O mesmo hook da home: uma fonte só decide o que é noite. */
+  const { slot: ceuAgora } = useSkyNow(
+    profile?.home_city && profile.home_lat != null && profile.home_lon != null
+      ? { nome: profile.home_city, lat: profile.home_lat, lon: profile.home_lon }
+      : null,
+  );
+  const barraEscura = mobileHome && profile?.sky_theme !== "v1" && ceuAgora.dark;
 
   useEffect(() => {
     setLidas(lerLidas(profile?.id ?? null));
@@ -939,6 +950,7 @@ function MinhaContaPage() {
         activeSection={activeSection}
         onSelect={handleBottomNav}
         onEmergency={careMode ? undefined : () => setEmergencyOpen(true)}
+        escura={barraEscura}
       />
 
       {/* ── Jornada do Bebê (toque na foto) + popup Premium ─────── */}

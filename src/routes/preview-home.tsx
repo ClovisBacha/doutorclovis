@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AppBottomNav, AppHomeScreen } from "@/components/app-mobile-shell";
+import { AppBottomNav, AppHomeScreen, useSkyNow } from "@/components/app-mobile-shell";
 
 /**
  * Bancada de design da HOME — renderiza o AppHomeScreen REAL com dados fixos
@@ -36,6 +36,8 @@ export const Route = createFileRoute("/preview-home")({
 
 function PreviewHome() {
   const { w, notif } = Route.useSearch();
+  const { slot } = useSkyNow(null);
+  const escuro = slot.dark;
   return (
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
       <div className="mx-auto max-w-md px-5 pt-2">
@@ -52,7 +54,14 @@ function PreviewHome() {
           temNaoLidas={notif}
         />
       </div>
-      <AppBottomNav activeSection="home" onSelect={() => {}} onEmergency={() => {}} />
+      <AppBottomNav
+        activeSection="home"
+        onSelect={() => {}}
+        onEmergency={() => {}}
+        /* A bancada não tem o estado da página: aqui o escuro vem da mesma
+           faixa de céu que a home usa, para a foto sair igual à do app. */
+        escura={escuro}
+      />
     </div>
   );
 }

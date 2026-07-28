@@ -385,6 +385,7 @@ function NavItem({
   color,
   compact,
   active = false,
+  escura = false,
   onClick,
   Icon,
 }: {
@@ -392,6 +393,9 @@ function NavItem({
   color: string;
   compact: boolean;
   active?: boolean;
+  /** Barra escura: o rótulo inverte. O ÍCONE não — a cor dele é significado
+      (vermelho = SOS), e os cinco tons já leem sobre o vidro escuro. */
+  escura?: boolean;
   onClick: () => void;
   Icon: LucideIcon;
 }) {
@@ -414,7 +418,13 @@ function NavItem({
       <span
         className={`overflow-hidden text-[10px] transition-all duration-300 ${
           compact ? "max-h-0 opacity-0" : "mt-1 max-h-4 opacity-100"
-        } ${active ? `${color} font-semibold` : "font-medium text-muted-foreground"}`}
+        } ${
+          active
+            ? `${color} font-semibold`
+            : escura
+              ? "font-medium text-white/70"
+              : "font-medium text-muted-foreground"
+        }`}
       >
         {label}
       </span>
@@ -426,10 +436,21 @@ export function AppBottomNav({
   activeSection,
   onSelect,
   onEmergency,
+  escura = false,
 }: {
   activeSection: BottomSection | null;
   onSelect: (s: BottomSection) => void;
   onEmergency?: () => void;
+  /**
+   * Vidro ESCURO. Verdadeiro só na home com céu de noite/madrugada.
+   *
+   * A barra vive em toda tela do app, e quase todas têm conteúdo claro — por
+   * isso o padrão é vidro claro. A exceção é a home à noite: ali o céu é
+   * escuro e uma barra clara vira a única coisa acesa da tela, com a foto
+   * inteira atrás dela no escuro. Vidro é o que está atrás; quando o que está
+   * atrás é noite, o vidro é noite.
+   */
+  escura?: boolean;
 }) {
   // Estilo Instagram: rolando para BAIXO (lendo conteúdo) a barra encolhe e
   // some com os rótulos; rolando para CIMA (procurando navegação) ela volta ao
@@ -478,16 +499,25 @@ export function AppBottomNav({
           compact ? "w-[64%] px-1.5 py-1" : "w-[92%] max-w-md px-2 py-1.5"
         }`}
         style={{
-          background:
-            "linear-gradient(158deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.18) 48%)," +
-            " rgba(255,253,252,0.58)",
+          /* Mesma receita nos dois, só que a base inverte: verniz diagonal,
+             desfoque com saturação alta, fio de luz na aresta de cima e sombra
+             funda embaixo. No escuro o fio de luz enfraquece — numa barra
+             escura ele viraria um risco branco em vez de uma quina acesa. */
+          background: escura
+            ? "linear-gradient(158deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 48%)," +
+              " rgba(26,22,44,0.62)"
+            : "linear-gradient(158deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.18) 48%)," +
+              " rgba(255,253,252,0.58)",
           backdropFilter: "blur(22px) saturate(185%)",
           WebkitBackdropFilter: "blur(22px) saturate(185%)",
-          border: "1px solid rgba(255,255,255,0.72)",
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.95)," +
-            " inset 0 -14px 30px -20px rgba(120,92,110,0.26)," +
-            " 0 12px 34px -14px rgba(48,40,60,0.32)",
+          border: `1px solid ${escura ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.72)"}`,
+          boxShadow: escura
+            ? "inset 0 1px 0 rgba(255,255,255,0.34)," +
+              " inset 0 -14px 30px -20px rgba(0,0,0,0.5)," +
+              " 0 12px 34px -14px rgba(0,0,0,0.5)"
+            : "inset 0 1px 0 rgba(255,255,255,0.95)," +
+              " inset 0 -14px 30px -20px rgba(120,92,110,0.26)," +
+              " 0 12px 34px -14px rgba(48,40,60,0.32)",
         }}
       >
         {/* SOS no extremo ESQUERDO — vermelho, sempre visível. */}
@@ -496,6 +526,7 @@ export function AppBottomNav({
             label="SOS"
             color="text-rose-500"
             compact={compact}
+            escura={escura}
             onClick={onEmergency}
             Icon={LifeBuoy}
           />
@@ -533,8 +564,12 @@ export function AppBottomNav({
                      Sólido ele virava um disco opaco pousado sobre vidro —
                      lia como adesivo. Translúcido, ele continua separando e
                      deixa o cenário passar, como o resto da barra. */
-                  boxShadow:
-                    "0 10px 22px -6px rgba(236,72,153,0.55), 0 0 0 5px rgba(255,255,255,0.62)",
+                  boxShadow: `0 10px 22px -6px rgba(236,72,153,0.55), 0 0 0 5px ${
+                    /* O aro separa o círculo da barra. Branco a 62% sobre
+                       vidro escuro vira um anel aceso em volta do rosa; no
+                       escuro ele precisa ser escuro. */
+                    escura ? "rgba(26,22,44,0.55)" : "rgba(255,255,255,0.62)"
+                  }`,
                 }}
               >
                 <Icon className={compact ? "h-5 w-5" : "h-7 w-7"} strokeWidth={2.1} />
@@ -547,6 +582,7 @@ export function AppBottomNav({
               color={color}
               compact={compact}
               active={activeSection === id}
+              escura={escura}
               onClick={() => onSelect(id)}
               Icon={Icon}
             />
