@@ -3426,14 +3426,26 @@ function BreathingBlock({
   careMode = false,
   alreadyDone,
   onEarn,
+  aoSair,
 }: {
   day: number;
   canEarn: boolean;
   careMode?: boolean;
   alreadyDone: boolean;
   onEarn: () => void;
+  /**
+   * Presente quando o exercício foi aberto pela lista de atividades — que é
+   * como a paciente chega aqui de verdade.
+   *
+   * Muda duas coisas: o exercício abre JÁ na tela cheia (sem o cartão
+   * "Começar a meditar", que só repetia o nome do exercício que ela acabou
+   * de tocar), e fechar volta para a lista em vez de voltar para o cartão.
+   * Sem isto, sair do exercício caía numa tela intermediária que ninguém
+   * pediu para ver.
+   */
+  aoSair?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!aoSair);
   const [phase, setPhase] = useState<"intro" | "in" | "hold" | "out" | "done">("intro");
   const [cycle, setCycle] = useState(0);
   const [tick, setTick] = useState(0); // segundos restantes da fase (contagem viva)
@@ -3531,6 +3543,7 @@ function BreathingBlock({
   function close() {
     audioRef.current?.stop();
     audioRef.current = null;
+    if (aoSair) return aoSair();
     setOpen(false);
     setPhase("intro");
   }
@@ -3789,15 +3802,27 @@ function MovementBlock({
   careMode = false,
   alreadyDone,
   onEarn,
+  aoSair,
 }: {
   day: number;
   canEarn: boolean;
   careMode?: boolean;
   alreadyDone: boolean;
   onEarn: () => void;
+  /**
+   * Presente quando o exercício foi aberto pela lista de atividades — que é
+   * como a paciente chega aqui de verdade.
+   *
+   * Muda duas coisas: o exercício abre JÁ na tela cheia (sem o cartão
+   * "Começar a meditar", que só repetia o nome do exercício que ela acabou
+   * de tocar), e fechar volta para a lista em vez de voltar para o cartão.
+   * Sem isto, sair do exercício caía numa tela intermediária que ninguém
+   * pediu para ver.
+   */
+  aoSair?: () => void;
 }) {
   const seq = useMemo(() => movimentosForDay(day), [day]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!aoSair);
   const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
   const [idx, setIdx] = useState(0);
   const [secs, setSecs] = useState(0);
@@ -3854,6 +3879,7 @@ function MovementBlock({
     buzz();
   }
   function close() {
+    if (aoSair) return aoSair();
     setOpen(false);
     setPhase("intro");
   }
@@ -4109,15 +4135,27 @@ function MeditationBlock({
   careMode = false,
   alreadyDone,
   onEarn,
+  aoSair,
 }: {
   day: number;
   canEarn: boolean;
   careMode?: boolean;
   alreadyDone: boolean;
   onEarn: () => void;
+  /**
+   * Presente quando o exercício foi aberto pela lista de atividades — que é
+   * como a paciente chega aqui de verdade.
+   *
+   * Muda duas coisas: o exercício abre JÁ na tela cheia (sem o cartão
+   * "Começar a meditar", que só repetia o nome do exercício que ela acabou
+   * de tocar), e fechar volta para a lista em vez de voltar para o cartão.
+   * Sem isto, sair do exercício caía numa tela intermediária que ninguém
+   * pediu para ver.
+   */
+  aoSair?: () => void;
 }) {
   const med = useMemo(() => MEDITACOES[day % MEDITACOES.length], [day]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!aoSair);
   const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
   const [idx, setIdx] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
@@ -4179,6 +4217,7 @@ function MeditationBlock({
   function close() {
     audioRef.current?.stop();
     audioRef.current = null;
+    if (aoSair) return aoSair();
     setOpen(false);
     setPhase("intro");
   }
@@ -4477,15 +4516,27 @@ function BondingBlock({
   careMode = false,
   alreadyDone,
   onEarn,
+  aoSair,
 }: {
   day: number;
   canEarn: boolean;
   careMode?: boolean;
   alreadyDone: boolean;
   onEarn: () => void;
+  /**
+   * Presente quando o exercício foi aberto pela lista de atividades — que é
+   * como a paciente chega aqui de verdade.
+   *
+   * Muda duas coisas: o exercício abre JÁ na tela cheia (sem o cartão
+   * "Começar a meditar", que só repetia o nome do exercício que ela acabou
+   * de tocar), e fechar volta para a lista em vez de voltar para o cartão.
+   * Sem isto, sair do exercício caía numa tela intermediária que ninguém
+   * pediu para ver.
+   */
+  aoSair?: () => void;
 }) {
   const carta = useMemo(() => BONDING_LETTERS[day % BONDING_LETTERS.length], [day]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!aoSair);
   const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
   const [idx, setIdx] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
@@ -4544,6 +4595,7 @@ function BondingBlock({
   function close() {
     audioRef.current?.stop();
     audioRef.current = null;
+    if (aoSair) return aoSair();
     setOpen(false);
     setPhase("intro");
   }
@@ -4735,14 +4787,26 @@ function GratitudeBlock({
   careMode = false,
   alreadyDone,
   onEarn,
+  aoSair,
 }: {
   day: number;
   canEarn: boolean;
   careMode?: boolean;
   alreadyDone: boolean;
   onEarn: () => void;
+  /**
+   * Presente quando o exercício foi aberto pela lista de atividades — que é
+   * como a paciente chega aqui de verdade.
+   *
+   * Muda duas coisas: o exercício abre JÁ na tela cheia (sem o cartão
+   * "Começar a meditar", que só repetia o nome do exercício que ela acabou
+   * de tocar), e fechar volta para a lista em vez de voltar para o cartão.
+   * Sem isto, sair do exercício caía numa tela intermediária que ninguém
+   * pediu para ver.
+   */
+  aoSair?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!aoSair);
   const [phase, setPhase] = useState<"write" | "done">("write");
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -4791,6 +4855,7 @@ function GratitudeBlock({
   }
 
   function close() {
+    if (aoSair) return aoSair();
     setOpen(false);
     setPhase("write");
     setText("");
@@ -5503,6 +5568,7 @@ function WellnessScreen({
               careMode={careMode}
               alreadyDone={done.has(activity.key)}
               onEarn={() => handleEarn(activity.key)}
+              aoSair={() => setOpenKey(null)}
             />
           </div>
         ) : (
