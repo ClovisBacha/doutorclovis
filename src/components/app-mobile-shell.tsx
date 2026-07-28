@@ -195,6 +195,34 @@ export type OrigemLocal = {
   cidade: string | null;
 };
 
+/**
+ * O CÉU DE AGORA — uma fonte só para o app inteiro.
+ *
+ * Existe porque a tela do jogo precisa mostrar exatamente o mesmo céu da home,
+ * e "exatamente" só se garante compartilhando a decisão, não copiando-a: duas
+ * cópias da mesma regra divergem no primeiro ajuste que alguém fizer numa
+ * delas. Aqui as duas telas leem o MESMO slot, do MESMO arquivo, escolhido
+ * pela MESMA conta de nascer/pôr do sol.
+ *
+ * Devolve `agora` como null até montar: no SSR o relógio é o do servidor (UTC
+ * na Vercel) e a hidratação não corrige isso, então quem abrisse às 8h podia
+ * ver o céu da noite.
+ */
+export function useSkyNow(homeCity?: { nome: string; lat: number; lon: number } | null) {
+  const { weather, origem } = useWeather(homeCity);
+  const [agora, setAgora] = useState<Date | null>(null);
+  useEffect(() => {
+    const tick = () => setAgora(new Date());
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const slot = agora
+    ? skySlotForSun(agora, weather?.sunrise ?? null, weather?.sunset ?? null)
+    : skySlotFor(12);
+  return { agora, weather, origem, slot, darkSky: slot.dark };
+}
+
 function useWeather(
   cidadeCadastro?: {
     nome: string;
@@ -871,7 +899,10 @@ export function AppHomeScreen({
         ? "2º trimestre"
         : "3º trimestre"
     : null;
-  const { weather, origem: origemLocal } = useWeather(homeCity);
+  /* A home lê o céu pelo MESMO hook que a tela do jogo. Antes ela tinha a
+     conta própria aqui dentro; agora existe uma só, e as duas telas não têm
+     como divergir. */
+  const { agora, weather, origem: origemLocal, slot } = useSkyNow(homeCity);
   /* Repassa para a página. Depende do CONTEÚDO e não do objeto: `useWeather`
      devolve um objeto novo a cada render, e comparar por referência dispararia
      o efeito para sempre. */
@@ -890,20 +921,6 @@ export function AppHomeScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origemChave]);
 
-  // Hora calculada NO CLIENTE. No SSR o relógio é o do servidor (UTC na
-  // Vercel), e o React não corrige atributo divergente na hidratação — a arte
-  // do céu ficava presa no período do servidor: quem abria o app às 8h podia
-  // ver o céu da noite. Renderiza "dia" (neutro) e corrige ao montar; o
-  // interval acompanha a virada de período com o app aberto.
-  // Guarda o INSTANTE, não só a hora: a escolha da arte agora compara com o
-  // nascer e o pôr do sol, e 19h05 e 19h55 podem cair em céus diferentes.
-  const [agora, setAgora] = useState<Date | null>(null);
-  useEffect(() => {
-    const tick = () => setAgora(new Date());
-    tick();
-    const id = setInterval(tick, 60_000);
-    return () => clearInterval(id);
-  }, []);
   const h = agora ? agora.getHours() : 12;
   const isMadrugada = h < 5;
   const period = periodFor(h);
@@ -917,9 +934,7 @@ export function AppHomeScreen({
   // escuro. Sem arte, vale o período do gradiente.
   // Enquanto o clima não chegou (ou a pessoa negou a localização), vale o
   // relógio. Assim que o sol da cidade dela chega, a arte se corrige sozinha.
-  const slot = agora
-    ? skySlotForSun(agora, weather?.sunrise ?? null, weather?.sunset ?? null)
-    : skySlotFor(12);
+  // `slot` vem do `useSkyNow` lá em cima — o mesmo que a tela do jogo lê.
   const darkSky = artTheme ? slot.dark : period === "madrugada" || period === "noite";
 
   // Cores de texto adaptadas ao céu do momento

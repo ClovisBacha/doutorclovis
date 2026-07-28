@@ -1281,6 +1281,11 @@ function MinhaContaPage() {
                     quizPremium={!!profile?.quiz_premium}
                     careMode={careMode}
                     onOpenShop={() => goToTab("Recompensas")}
+                    homeCity={
+                      profile?.home_city && profile.home_lat != null && profile.home_lon != null
+                        ? { nome: profile.home_city, lat: profile.home_lat, lon: profile.home_lon }
+                        : null
+                    }
                   />
                 )}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}

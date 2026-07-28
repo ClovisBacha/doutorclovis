@@ -201,7 +201,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 /* Arte própria desta tela, feita a partir do desenho de referência. Ela mora
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
    cenário fixo da tela de atividades. */
-import jogoNuvens from "@/assets/jogo/nuvens.webp";
+import { useSkyNow } from "@/components/app-mobile-shell";
 import jogoBolha from "@/assets/jogo/bolha.webp";
 import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
@@ -217,6 +217,8 @@ interface GestacaoPathProps {
   careMode?: boolean;
   /** Abre o Cantinho (lojinha das Sementinhas). */
   onOpenShop?: () => void;
+  /** Cidade do cadastro — chega até o céu da tela de atividades. */
+  homeCity?: { nome: string; lat: number; lon: number } | null;
   /**
    * SÓ a bancada de design `/preview-jogo` usa.
    *
@@ -1056,6 +1058,7 @@ export function GestacaoPath({
   quizPremium = false,
   careMode = false,
   onOpenShop,
+  homeCity = null,
   bancada,
 }: GestacaoPathProps) {
   const hasGest = !!gest;
@@ -2533,6 +2536,7 @@ export function GestacaoPath({
               halves={bancada?.halves ?? (doneDays.includes(D) ? 6 : halvesFromState(st))}
               babyName={profile?.baby_name ?? null}
               saldo={bancada?.saldo ?? saldo}
+              homeCity={homeCity ?? null}
               lesson={
                 q
                   ? {
@@ -4937,6 +4941,9 @@ const WELLNESS_META: Record<
     /** Cor do título e do glifo na lista — separada de `a`/`b`, que ainda
         pintam o material de vidro das telas de dentro. */
     ink?: string;
+    /** A mesma cor levantada para o céu escuro: #2d7ff9 sobre madrugada é um
+        borrão. Cada uma foi clareada até ler sobre o vidro noturno. */
+    inkDark?: string;
   }
 > = {
   aula: {
@@ -4946,7 +4953,8 @@ const WELLNESS_META: Record<
     desc: "A lição da professora + o quiz da semana.",
   },
   breathing: {
-    ink: "#2d7ff9",
+    inkDark: "#8cc4ff",
+    ink: "#1c5fd0",
     tile: "#d6e8fb",
     tileB: "#bcd9f7",
     title: "Respirar",
@@ -4955,7 +4963,8 @@ const WELLNESS_META: Record<
     desc: "Respiração guiada com som e vibração pra acalmar.",
   },
   movement: {
-    ink: "#f07c1e",
+    inkDark: "#ffbe7a",
+    ink: "#b2560c",
     tile: "#fde6bd",
     tileB: "#fbd79b",
     title: "Movimento",
@@ -4964,7 +4973,8 @@ const WELLNESS_META: Record<
     desc: "3 movimentos leves com cronômetro pra soltar o corpo.",
   },
   meditation: {
-    ink: "#9a5cf0",
+    inkDark: "#d2b2ff",
+    ink: "#7434d4",
     tile: "#e9dcfa",
     tileB: "#dcc8f6",
     title: "Meditar",
@@ -4973,7 +4983,8 @@ const WELLNESS_META: Record<
     desc: "Meditação guiada curtinha, com som ambiente.",
   },
   bonding: {
-    ink: "#ee4d8e",
+    inkDark: "#ff9ec4",
+    ink: "#c11a63",
     tile: "#fbd6e0",
     tileB: "#f8c2d2",
     title: "Momento com o bebê",
@@ -4982,7 +4993,8 @@ const WELLNESS_META: Record<
     desc: "Uma carta de 1 minuto pra ler em voz alta pro bebê.",
   },
   gratitude: {
-    ink: "#16a34a",
+    inkDark: "#84e6ab",
+    ink: "#0f7538",
     tile: "#d3ecdb",
     tileB: "#bce2c8",
     title: "Gratidão",
@@ -5049,6 +5061,10 @@ function ChallengeBlock({
 /** "Bom dia" / "Boa tarde" / "Boa noite" — a tela abre falando com ela. */
 function saudacaoDoDia(): string {
   const h = new Date().getHours();
+  /* A madrugada pertence à NOITE anterior. Sem esta primeira linha, quem
+     abrisse o app às 2h30 — que é exatamente quem não está dormindo — era
+     recebida com "Bom dia". */
+  if (h < 5) return "Boa noite";
   if (h < 12) return "Bom dia";
   if (h < 18) return "Boa tarde";
   return "Boa noite";
@@ -5061,7 +5077,15 @@ function saudacaoDoDia(): string {
  * ponta do arco só existe se houver arco: em 0/6 ela ficaria pousada no topo
  * sem nada atrás, parecendo enfeite solto.
  */
-function AnelDoDia({ feitos, total }: { feitos: number; total: number }) {
+function AnelDoDia({
+  feitos,
+  total,
+  escuro = false,
+}: {
+  feitos: number;
+  total: number;
+  escuro?: boolean;
+}) {
   const R = 39;
   const C = 2 * Math.PI * R;
   const frac = Math.max(0, Math.min(1, total > 0 ? feitos / total : 0));
@@ -5071,7 +5095,7 @@ function AnelDoDia({ feitos, total }: { feitos: number; total: number }) {
   return (
     <span className="relative flex h-[92px] w-[92px] shrink-0 items-center justify-center">
       <span
-        className="absolute inset-0 rounded-full bg-white/38 backdrop-blur-xl"
+        className={`absolute inset-0 rounded-full backdrop-blur-xl ${escuro ? "bg-white/12" : "bg-white/38"}`}
         style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)" }}
       />
       <svg viewBox="0 0 92 92" className="absolute inset-0 h-full w-full -rotate-90">
@@ -5103,10 +5127,18 @@ function AnelDoDia({ feitos, total }: { feitos: number; total: number }) {
         </span>
       )}
       <span className="relative text-center leading-tight">
-        <span className="block text-[19px] font-semibold" style={{ color: "#33264a" }}>
+        <span
+          className="block text-[19px] font-semibold"
+          style={{ color: escuro ? "#f6f2ff" : "#33264a" }}
+        >
           {feitos}/{total}
         </span>
-        <span className="block text-[10.5px] text-slate-500">concluídos</span>
+        <span
+          className="block text-[10.5px]"
+          style={{ color: escuro ? "rgba(255,255,255,0.7)" : "rgba(100,116,139,1)" }}
+        >
+          concluídos
+        </span>
       </span>
     </span>
   );
@@ -5182,6 +5214,7 @@ function WellnessScreen({
   lesson,
   babyName,
   saldo,
+  homeCity,
   onEarn,
   onEarnLesson,
   onSyncWellness,
@@ -5197,11 +5230,38 @@ function WellnessScreen({
   babyName?: string | null;
   /** Sementinhas na carteira, para a pílula do topo. */
   saldo?: number | null;
+  /** Cidade do cadastro — o degrau entre o GPS e o IP, igual ao da home. */
+  homeCity?: { nome: string; lat: number; lon: number } | null;
   onEarn: (key: string) => void;
   onEarnLesson: () => void;
   onSyncWellness?: (keys: string[]) => void;
   onClose: () => void;
 }) {
+  /* O MESMO céu da aba do bebê — mesmo hook, mesmo slot, mesmo arquivo.
+     Não é uma cópia parecida: é a mesma decisão lida duas vezes, então as
+     duas telas não têm como divergir nem quando a regra mudar. */
+  const { slot: ceu } = useSkyNow(homeCity ?? null);
+  const ceuEscuro = ceu.dark;
+  /* Toda a tela lê destas quatro. Espalhar `text-slate-500` pelo JSX faria
+     metade dela ficar ilegível na madrugada e a outra metade não — que é
+     exatamente o defeito que a home já teve. */
+  const tinta = ceuEscuro ? "#f6f2ff" : "#4b3a55";
+  /* No céu claro a secundária é AMEIXA a 82%, não o cinza-ardósia do Tailwind.
+     Medido nas dez horas: slate-500 sobre céu dava 1,8 a 2,6:1 — ilegível. A
+     ameixa parte de um escuro, então continua lendo como secundária ao lado
+     do título sem cair abaixo de 3:1 em nenhuma arte. */
+  const tintaSec = ceuEscuro ? "rgba(255,255,255,0.74)" : "rgba(66,48,78,0.84)";
+  /* Base bem mais opaca que a primeira versão (0,42 → 0,66 no escuro,
+     0,50 → 0,72 no claro). Medido: no anoitecer e no pré-amanhecer o céu
+     quente atravessava o cartão e o título "Momento com o bebê" caía a
+     1,3:1 — o cartão deixava de existir como superfície. Vidro fino é
+     bonito num fundo calmo; estas duas artes não são calmas. */
+  const vidro = ceuEscuro
+    ? "linear-gradient(150deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 60%), rgba(24,17,42,0.8)"
+    : "linear-gradient(150deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.3) 52%), rgba(255,252,253,0.82)";
+  const vidroBorda = ceuEscuro ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.7)";
+  const vidroLuz = ceuEscuro ? "rgba(255,255,255,0.34)" : "rgba(255,255,255,0.95)";
+
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
   /* A referência mostra "Ver todas" recolhido, com cinco linhas. São cinco
@@ -5278,7 +5338,11 @@ function WellnessScreen({
            ATRÁS como cor de espera — sem ele há um flash branco enquanto a
            arte carrega. `fixed` no anexo para o fundo não rolar junto com a
            lista, que é o que dá a sensação de janela. */
-        background: "linear-gradient(180deg,#d9c2e8 0%,#f0d5d8 40%,#f7dcc8 100%)",
+        /* Cor de espera enquanto a arte carrega. Escura quando o céu é
+           escuro, senão há um flash claro antes da noite entrar. */
+        background: ceuEscuro
+          ? "linear-gradient(180deg,#221a3a 0%,#33264d 55%,#4a3358 100%)"
+          : "linear-gradient(180deg,#d9c2e8 0%,#f0d5d8 40%,#f7dcc8 100%)",
       }}
     >
       <div
@@ -5287,15 +5351,35 @@ function WellnessScreen({
         /* Sem `filter` agora. O céu de amanhecer emprestado precisava de
             +30% de brilho para não puxar cinza; esta arte já nasce na
             temperatura certa, então mexer nela só a afastaria. */
-        style={{ backgroundImage: `url(${jogoNuvens})` }}
+        style={{ backgroundImage: `url(${ceu.src})` }}
       />
-      {/* Véu: a arte sozinha tem contraste demais para texto cinza por cima. */}
+      {/* VÉU DO TOPO — o que salva a saudação.
+          Metade das artes tem o alto escuro (golden hour, entardecer, tarde:
+          azul profundo em cima, nuvens acesas embaixo) mesmo contando como
+          "céu claro" pela faixa. Sem este degradê curto, o "Boa tarde, Clovis"
+          em ameixa caía num azul-marinho e sumia — medido às 16h55. Ele morre
+          em 34% da altura, então não lava o resto da tela. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 h-[34%]"
+        style={{
+          background: ceuEscuro
+            ? "linear-gradient(180deg, rgba(18,12,34,0.62) 0%, rgba(18,12,34,0.28) 46%, rgba(18,12,34,0) 100%)"
+            : "linear-gradient(180deg, rgba(255,250,252,0.72) 0%, rgba(255,250,252,0.34) 46%, rgba(255,250,252,0) 100%)",
+        }}
+      />
+      {/* Véu geral: a arte sozinha tem contraste demais para texto por cima. */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0"
         style={{
           background:
-            "linear-gradient(180deg, rgba(255,250,252,0.12) 0%, rgba(255,248,250,0.1) 50%, rgba(255,246,248,0.14) 100%)",
+            /* No céu claro o véu clareia (o texto é escuro); no escuro ele
+               ESCURECE, senão o branco das nuvens do anoitecer come o texto
+               claro. A força é a mesma nos dois — o que muda é o sentido. */
+            ceuEscuro
+              ? "linear-gradient(180deg, rgba(24,18,42,0.42) 0%, rgba(28,20,46,0.34) 50%, rgba(30,22,48,0.4) 100%)"
+              : "linear-gradient(180deg, rgba(255,250,252,0.12) 0%, rgba(255,248,250,0.1) 50%, rgba(255,246,248,0.14) 100%)",
         }}
       />
       {/* O ✕ do canto só existe DENTRO de uma atividade. Na lista, quem fecha é
@@ -5373,7 +5457,7 @@ function WellnessScreen({
               <button
                 onClick={onClose}
                 aria-label="Voltar ao Caminho"
-                className="press flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-slate-500 backdrop-blur-xl"
+                className={`press flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-xl ${ceuEscuro ? "bg-white/16 text-white/80" : "bg-white/70 text-slate-500"}`}
                 style={{
                   boxShadow:
                     "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.55), 0 8px 20px -10px rgba(90,60,80,0.4)",
@@ -5397,14 +5481,14 @@ function WellnessScreen({
                   gasta na loja. */}
               {saldo != null && !careMode && (
                 <span
-                  className="flex items-center gap-1.5 rounded-full bg-white/70 px-3.5 py-2 backdrop-blur-xl"
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 backdrop-blur-xl ${ceuEscuro ? "bg-white/16" : "bg-white/70"}`}
                   style={{
                     boxShadow:
                       "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.55), 0 8px 20px -10px rgba(90,60,80,0.4)",
                   }}
                 >
                   <span className="text-lg leading-none">🌱</span>
-                  <span className="tabular-nums text-[15px] font-semibold text-slate-600">
+                  <span className="tabular-nums text-[15px] font-semibold" style={{ color: tinta }}>
                     {saldo}
                   </span>
                 </span>
@@ -5416,16 +5500,19 @@ function WellnessScreen({
               <div className="min-w-0 flex-1">
                 <h2
                   className="font-serif text-[21px] leading-tight"
-                  style={{ fontWeight: 500, color: "#4b3a55" }}
+                  style={{ fontWeight: 500, color: tinta }}
                 >
                   {saudacaoDoDia()}
                   {babyName ? `, ${babyName}` : ""} 💜
                 </h2>
-                <p className="mt-1.5 max-w-[220px] text-[12px] leading-snug text-slate-500">
+                <p
+                  className="mt-1.5 max-w-[220px] text-[12px] leading-snug"
+                  style={{ color: tintaSec }}
+                >
                   6 momentos especiais para você e seu bebê hoje.
                 </p>
               </div>
-              <AnelDoDia feitos={halves} total={6} />
+              <AnelDoDia feitos={halves} total={6} escuro={ceuEscuro} />
             </div>
 
             {/* ── A aula em destaque ─────────────────────────────────── */}
@@ -5433,28 +5520,33 @@ function WellnessScreen({
               onClick={() => setOpenKey("aula")}
               className="press relative mt-3.5 block w-full overflow-hidden rounded-[24px] px-5 py-4 text-left"
               style={{
-                background:
-                  "linear-gradient(150deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.42) 55%)",
+                background: vidro,
                 backdropFilter: "blur(22px) saturate(175%)",
                 WebkitBackdropFilter: "blur(22px) saturate(175%)",
-                border: "1px solid rgba(255,255,255,0.75)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.95), 0 18px 40px -22px rgba(90,60,90,0.5)",
+                border: `1px solid ${vidroBorda}`,
+                boxShadow: `inset 0 1px 0 ${vidroLuz}, 0 18px 40px -22px rgba(60,40,70,0.5)`,
               }}
             >
               <div className="relative">
                 <div className="relative z-10" style={{ maxWidth: "56%" }}>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/85 px-2 py-[3px] text-[9.5px] font-medium text-violet-700">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-[3px] text-[9.5px] font-medium ${ceuEscuro ? "bg-violet-400/25 text-violet-100" : "bg-violet-100/85 text-violet-700"}`}
+                  >
                     <span className="text-[10px] leading-none">⭐</span> Recomendada
                   </span>
                   <p
                     className="mt-2 line-clamp-2 font-serif text-[17px] leading-[1.18]"
-                    style={{ fontWeight: 600, color: "#4b3a55" }}
+                    style={{ fontWeight: 600, color: tinta }}
                   >
                     {tituloAula}
                   </p>
-                  <p className="mt-1.5 text-[11.5px] text-slate-500">Aula da semana + quiz</p>
-                  <p className="mt-2 flex items-center gap-1.5 text-[11.5px] text-slate-500">
+                  <p className="mt-1.5 text-[11.5px]" style={{ color: tintaSec }}>
+                    Aula da semana + quiz
+                  </p>
+                  <p
+                    className="mt-2 flex items-center gap-1.5 text-[11.5px]"
+                    style={{ color: tintaSec }}
+                  >
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -5510,7 +5602,9 @@ function WellnessScreen({
               </span>
 
               <div className="relative z-10 mt-3 flex items-center gap-2.5">
-                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/60">
+                <span
+                  className={`h-1.5 flex-1 overflow-hidden rounded-full ${ceuEscuro ? "bg-white/20" : "bg-white/60"}`}
+                >
                   <span
                     className="block h-full rounded-full"
                     style={{
@@ -5519,18 +5613,20 @@ function WellnessScreen({
                     }}
                   />
                 </span>
-                <span className="shrink-0 text-[11.5px] text-slate-500">{pctAula}% concluído</span>
+                <span className="shrink-0 text-[11.5px]" style={{ color: tintaSec }}>
+                  {pctAula}% concluído
+                </span>
               </div>
             </button>
 
             {/* ── Atividades de hoje ─────────────────────────────────── */}
             <div className="mt-3.5 flex items-center justify-between gap-3">
-              <p className="font-serif text-[16px]" style={{ fontWeight: 600, color: "#4b3a55" }}>
+              <p className="font-serif text-[16px]" style={{ fontWeight: 600, color: tinta }}>
                 Atividades de hoje <span className="text-violet-300">✦</span>
               </p>
               <button
                 onClick={() => setVerTodas((v) => !v)}
-                className="press flex shrink-0 items-center gap-1.5 rounded-full bg-white/65 px-3 py-1.5 text-[11px] text-slate-500 backdrop-blur-xl"
+                className={`press flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] backdrop-blur-xl ${ceuEscuro ? "bg-white/14 text-white/75" : "bg-white/65 text-slate-500"}`}
                 style={{
                   boxShadow:
                     "inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 16px -10px rgba(90,60,80,0.4)",
@@ -5559,13 +5655,11 @@ function WellnessScreen({
                     onClick={() => setOpenKey(a.key)}
                     className="press flex w-full items-center gap-2.5 rounded-[18px] px-3 py-1.5 text-left"
                     style={{
-                      background:
-                        "linear-gradient(150deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.34) 60%)",
+                      background: vidro,
                       backdropFilter: "blur(18px) saturate(170%)",
                       WebkitBackdropFilter: "blur(18px) saturate(170%)",
-                      border: "1px solid rgba(255,255,255,0.68)",
-                      boxShadow:
-                        "inset 0 1px 0 rgba(255,255,255,0.9), 0 12px 28px -18px rgba(90,60,90,0.45)",
+                      border: `1px solid ${vidroBorda}`,
+                      boxShadow: `inset 0 1px 0 ${vidroLuz}, 0 12px 28px -18px rgba(60,40,70,0.45)`,
                     }}
                   >
                     {/* Tile PASTEL com o glifo na cor cheia — não o inverso.
@@ -5586,11 +5680,19 @@ function WellnessScreen({
                     <span className="min-w-0 flex-1">
                       <span
                         className="block text-[13px] leading-tight"
-                        style={{ color: meta.ink ?? meta.b, fontWeight: 600 }}
+                        style={{
+                          color: ceuEscuro
+                            ? (meta.inkDark ?? meta.ink ?? meta.b)
+                            : (meta.ink ?? meta.b),
+                          fontWeight: 600,
+                        }}
                       >
                         {meta.title}
                       </span>
-                      <span className="mt-px block text-[10.5px] leading-[1.35] text-slate-500">
+                      <span
+                        className="mt-px block text-[10.5px] leading-[1.35]"
+                        style={{ color: tintaSec }}
+                      >
                         {meta.desc}
                       </span>
                     </span>
@@ -5601,21 +5703,27 @@ function WellnessScreen({
                             isDone ? "bg-emerald-400 text-white" : ""
                           }`}
                           style={
-                            isDone ? undefined : { border: "1.5px dashed rgba(160,130,160,0.4)" }
+                            isDone
+                              ? undefined
+                              : {
+                                  border: `1.5px dashed ${ceuEscuro ? "rgba(255,255,255,0.34)" : "rgba(160,130,160,0.4)"}`,
+                                }
                           }
                         >
                           {isDone ? "✓" : ""}
                         </span>
-                        <span className="tabular-nums text-[12.5px] text-slate-500">
+                        <span className="tabular-nums text-[12.5px]" style={{ color: tintaSec }}>
                           {isDone ? "1/1" : "0/1"}
                         </span>
                         {/* A seta mora num botão de vidro, como no desenho —
                             solta ela lê como enfeite, não como "isto abre". */}
                         <span
-                          className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-slate-400"
+                          className={`flex h-[30px] w-[30px] items-center justify-center rounded-full ${ceuEscuro ? "text-white/70" : "text-slate-400"}`}
                           style={{
-                            background: "rgba(255,255,255,0.55)",
-                            border: "1px solid rgba(255,255,255,0.72)",
+                            background: ceuEscuro
+                              ? "rgba(255,255,255,0.14)"
+                              : "rgba(255,255,255,0.55)",
+                            border: `1px solid ${vidroBorda}`,
                             backdropFilter: "blur(8px)",
                             WebkitBackdropFilter: "blur(8px)",
                           }}
@@ -5642,13 +5750,11 @@ function WellnessScreen({
               <div
                 className="mt-2 flex items-center gap-2.5 rounded-[18px] px-3 py-2"
                 style={{
-                  background:
-                    "linear-gradient(150deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.34) 60%)",
+                  background: vidro,
                   backdropFilter: "blur(18px) saturate(170%)",
                   WebkitBackdropFilter: "blur(18px) saturate(170%)",
-                  border: "1px solid rgba(255,255,255,0.68)",
-                  boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,0.9), 0 12px 28px -18px rgba(90,60,90,0.45)",
+                  border: `1px solid ${vidroBorda}`,
+                  boxShadow: `inset 0 1px 0 ${vidroLuz}, 0 12px 28px -18px rgba(60,40,70,0.45)`,
                 }}
               >
                 {/* O 🎁 do sistema é vermelho e amarelo — as duas cores que
@@ -5657,30 +5763,43 @@ function WellnessScreen({
                 <span className="min-w-0 flex-1">
                   <span
                     className="block font-serif text-[15px]"
-                    style={{ fontWeight: 600, color: "#4b3a55" }}
+                    style={{ fontWeight: 600, color: tinta }}
                   >
                     Recompensa do dia
                   </span>
-                  <span className="mt-0.5 block text-[11.5px] leading-snug text-slate-500">
+                  <span
+                    className="mt-0.5 block text-[11.5px] leading-snug"
+                    style={{ color: tintaSec }}
+                  >
                     {halves >= 6 ? (
                       "Dia completo! As 3 estrelas são suas 🌟"
                     ) : (
                       <>
                         Complete todas as atividades e ganhe{" "}
-                        <span className="font-semibold text-violet-600">3 estrelas</span> ✨
+                        <span
+                          className="font-semibold"
+                          style={{ color: ceuEscuro ? "#c9b0ff" : "#7c3aed" }}
+                        >
+                          3 estrelas
+                        </span>{" "}
+                        ✨
                       </>
                     )}
                   </span>
                 </span>
                 <span
-                  className="flex shrink-0 flex-col items-center rounded-[18px] bg-white/65 px-5 py-2.5"
+                  className={`flex shrink-0 flex-col items-center rounded-[18px] px-5 py-2.5 ${ceuEscuro ? "bg-white/14" : "bg-white/65"}`}
                   style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)" }}
                 >
                   <span className="flex items-center gap-1.5">
                     <span className="text-[17px] leading-none">⭐</span>
-                    <span className="text-[19px] font-bold leading-none text-slate-700">3</span>
+                    <span className="text-[19px] font-bold leading-none" style={{ color: tinta }}>
+                      3
+                    </span>
                   </span>
-                  <span className="mt-0.5 text-[11px] text-slate-500">estrelas</span>
+                  <span className="mt-0.5 text-[11px]" style={{ color: tintaSec }}>
+                    estrelas
+                  </span>
                 </span>
               </div>
             )}
