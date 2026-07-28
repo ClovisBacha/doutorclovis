@@ -5061,12 +5061,26 @@ function ChallengeBlock({
 /** "Bom dia" / "Boa tarde" / "Boa noite" — a tela abre falando com ela. */
 function saudacaoDoDia(): string {
   const h = new Date().getHours();
-  /* A madrugada pertence à NOITE anterior. Sem esta primeira linha, quem
-     abrisse o app às 2h30 — que é exatamente quem não está dormindo — era
-     recebida com "Bom dia". */
-  if (h < 5) return "Boa noite";
+  /* Seis faixas, todas ancoradas no RELÓGIO — e não no momento do céu, de
+     propósito. "Bom dia" e "boa tarde" são convenção de relógio em português;
+     o céu é o sol. O céu chamado "meio-dia" começa às 10h42 em Belo Horizonte
+     no inverno: amarrar a saudação a ele faria o app dizer "boa tarde" às dez
+     e quarenta da manhã.
+
+     A madrugada ganha frase própria porque quem abre o app às 3h quase sempre
+     está com desconforto ou insônia — não é o mesmo lugar de quem abre às 22h,
+     e "boa noite" nas duas horas trata igual o que não é igual.
+
+     05h–07h é o buraco que existia: o céu ainda é noite fechada e a tela dizia
+     "Bom dia". "Amanhecendo" não afirma que o dia chegou nem trata como noite.
+
+     18h–20h: "boa noite" às 18h soa cedo e "boa tarde" às 19h30 soa errado.
+     "Boa noitinha" é o que se fala de verdade nessa faixa. */
+  if (h < 5) return "Boa madrugada";
+  if (h < 7) return "Amanhecendo";
   if (h < 12) return "Bom dia";
   if (h < 18) return "Boa tarde";
+  if (h < 20) return "Boa noitinha";
   return "Boa noite";
 }
 

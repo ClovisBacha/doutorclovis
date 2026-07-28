@@ -16,7 +16,12 @@ export const Route = createFileRoute("/preview-jogo")({
   // conta real só se alcança tocando num nó da trilha — impossível de
   // fotografar sem isso. Aceita 1 e true: o router revalida depois de
   // serializar, e só entender "jogos" apagaria o parâmetro no segundo passe.
-  validateSearch: (q: Record<string, unknown>) => ({ tela: String(q.tela ?? "") }),
+  // `?bebe=Helena` troca o nome. Existe para PROVAR que a saudação lê o nome
+  // do bebê do perfil e não tem "Clovis" preso em lugar nenhum da tela.
+  validateSearch: (q: Record<string, unknown>) => ({
+    tela: String(q.tela ?? ""),
+    bebe: String(q.bebe ?? "Clovis"),
+  }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
   }),
@@ -24,11 +29,11 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
-  const { tela } = Route.useSearch();
+  const { tela, bebe } = Route.useSearch();
   return (
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
       <GestacaoPath
-        profile={{ baby_name: "Clovis" }}
+        profile={{ baby_name: bebe }}
         gest={{ weeks: 19, days: 6, totalDays: 139 }}
         quizPremium
         careMode={false}
