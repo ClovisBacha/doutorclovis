@@ -1070,6 +1070,9 @@ export function GestacaoPath({
   const isBeyond42 = hasGest && rawD > 300; // passou da semana 42
 
   const [sheet, setSheet] = useState<
+    /* O pós-parto ainda usa a folha de dia e compartilha este estado, então o
+       tipo continua largo. No CAMINHO ela não existe mais: o nó abre as
+       atividades direto (ver `reallyOpenDay`). */
     { kind: "day"; D: number } | { kind: "album"; week: number } | null
   >(null);
   const [revealing, setRevealing] = useState(false);
@@ -1486,7 +1489,7 @@ export function GestacaoPath({
   function markDayTask(D: number, id: string, value: boolean) {
     const state = { ...dayTaskState(D), [id]: value };
     lsSet(LS.dayTasks(D), state);
-    if (sheet?.kind === "day" && sheet.D === D) setDayTasks(state);
+    if (wellnessDay === D) setDayTasks(state);
     if (D === todayD) setTodayTasks(state);
     // As 3 estrelas do dia agora são 6 MEIAS: aula + os 5 jogos de bem-estar.
     const allDone = halvesFromState(state) >= 6;
@@ -1549,7 +1552,14 @@ export function GestacaoPath({
 
   function reallyOpenDay(D: number) {
     setDayTasks(dayTaskState(D));
-    setSheet({ kind: "day", D });
+    /* Vai DIRETO para as atividades do dia.
+       Antes havia uma folha no meio do caminho — cabeçalho "Desafio de hoje",
+       um cartão roxo "Jogos do dia · 0 de 6" e um botão "Jogar ›" — e o único
+       destino dela era esta tela. Um toque a mais para chegar num lugar que a
+       folha nem descrevia melhor do que a própria tela descreve. O aviso de
+       "amanhã tem aula nova" que morava lá desceu para o rodapé das
+       atividades, onde continua sendo lido no fim da sessão. */
+    setWellnessDay(D);
   }
 
   function openDay(D: number) {
@@ -2525,7 +2535,7 @@ export function GestacaoPath({
           const isT = D === todayD;
           const wk = Math.max(1, Math.min(42, Math.floor(D / 7)));
           const q = quizForDay(D);
-          const st = sheet?.kind === "day" && sheet.D === D ? dayTasks : dayTaskState(D);
+          const st = wellnessDay === D ? dayTasks : dayTaskState(D);
           const chD = challengeForDay(D);
           const lessonDone = !!st.desafio || doneDays.includes(D);
           return (
@@ -2537,6 +2547,18 @@ export function GestacaoPath({
               babyName={profile?.baby_name ?? null}
               saldo={bancada?.saldo ?? saldo}
               homeCity={homeCity ?? null}
+              avisoAmanha={
+                isT
+                  ? {
+                      emoji: quizForDay(D + 1)
+                        ? quizEmojiForDay(D + 1)
+                        : challengeForDay(D + 1).emoji,
+                      texto: `Amanhã tem ${quizForDay(D + 1) ? "aula nova" : "desafio novo"} — volte para manter a chama 🔥${
+                        streak > 0 ? ` (${streak} ${streak === 1 ? "dia" : "dias"})` : ""
+                      }`,
+                    }
+                  : null
+              }
               lesson={
                 q
                   ? {
@@ -2585,118 +2607,9 @@ export function GestacaoPath({
         />
       )}
 
-      {/* Sheet de DIA */}
-      {sheet?.kind === "day" &&
-        (() => {
-          const D = sheet.D;
-          const week = Math.max(1, Math.min(42, Math.floor(D / 7)));
-          const ch = challengeForDay(D);
-          const isToday = D === todayD;
-          const state = isToday ? dayTasks : dayTaskState(D);
-          const done = doneDays.includes(D);
-          const tm = trimMeta(week);
-          // Placar do dia em MEIAS estrelas: aula + 5 jogos de bem-estar.
-          const halves = done ? 6 : halvesFromState(state);
-          return (
-            <div
-              className="fixed inset-0 z-50 flex items-end"
-              style={{ background: "rgba(0,0,0,0.2)", backdropFilter: "blur(2px)" }}
-              onClick={() => setSheet(null)}
-            >
-              <div
-                className="relative max-h-[88vh] w-full overflow-y-auto rounded-t-3xl bg-white p-6 pb-10 shadow-2xl"
-                style={{ animation: "slideUp 300ms cubic-bezier(0.34,1.56,0.64,1) both" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {revealing && !careMode && <ConfettiBurst />}
-                <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-slate-200" />
-
-                <div className="mb-4 flex items-center gap-3">
-                  <div
-                    className={`duo3d flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-3xl ${revealing ? "dc-sticker-pop" : ""}`}
-                    style={{ background: tm.main, "--lip": tm.lip } as React.CSSProperties}
-                  >
-                    {done ? "⭐" : ch.emoji}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Semana {week} · dia {(D % 7) + 1}
-                      {isToday && (
-                        <span className="ml-2 rounded-full bg-pink-100 px-2 py-0.5 text-pink-600">
-                          hoje
-                        </span>
-                      )}
-                    </p>
-                    <h3 className="mt-0.5 text-xl font-extrabold">
-                      {done ? "Desafio completo!" : isToday ? "Desafio de hoje" : "Desafio do dia"}
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => share(week)}
-                    className="press shrink-0 rounded-full bg-pink-50 px-3 py-2 text-sm font-bold text-pink-600"
-                  >
-                    💌
-                  </button>
-                </div>
-
-                {/* HERÓI: os 6 jogos do dia (aula + bem-estar) — abre a tela cheia.
-                    Cada jogo vale MEIA estrela; as 3 fecham o dia com bônus. */}
-                <button
-                  onClick={() => setWellnessDay(D)}
-                  className="press relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-pink-500 via-fuchsia-500 to-violet-500 p-5 text-left text-white shadow-[0_14px_30px_-10px_rgba(192,38,211,0.55)]"
-                >
-                  <span className="pointer-events-none absolute -right-6 -top-8 text-[110px] opacity-15">
-                    🎮
-                  </span>
-                  <span className="relative block">
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold uppercase tracking-[0.18em] text-white/85">
-                        Jogos do dia
-                      </span>
-                      {!careMode && <StarMeter halves={halves} size="text-2xl" />}
-                    </span>
-                    <span className="mt-2 block text-xl font-extrabold leading-tight">
-                      {halves >= 6
-                        ? "3 estrelas! Dia completo 🌟"
-                        : `${halves} de 6 jogos · cada um vale meia ⭐`}
-                    </span>
-                    <span className="mt-1.5 flex items-center gap-1.5 text-2xl">
-                      <span>📚</span>
-                      <span>🌬️</span>
-                      <span>🤸</span>
-                      <span>🧘</span>
-                      <span>💛</span>
-                      <span>✨</span>
-                    </span>
-                    <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-extrabold text-fuchsia-600 shadow-md">
-                      {halves >= 6 ? "Rejogar" : "Jogar"} ›
-                    </span>
-                  </span>
-                </button>
-                {!isToday && !done && (
-                  <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                    As estrelas valem no dia — a leitura e as figurinhas ficam pra sempre 💜
-                  </p>
-                )}
-
-                {isToday && (
-                  <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      🔒 Amanhã: {quizForDay(D + 1) ? "nova aula da professora" : "novo desafio"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {quizForDay(D + 1)
-                        ? `${quizEmojiForDay(D + 1)} `
-                        : `${challengeForDay(D + 1).emoji} `}
-                      Volte amanhã para manter a chama 🔥
-                      {streak > 0 ? ` (${streak} ${streak === 1 ? "dia" : "dias"})` : ""}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
+      {/* A folha do dia saiu daqui. O nó da trilha abre as atividades direto —
+          ver `reallyOpenDay`. Ela só embrulhava um botão "Jogar ›" cujo único
+          destino era a tela que já existe. */}
 
       {/* Sheet de ÁLBUM */}
       {sheet?.kind === "album" && (
@@ -5058,6 +4971,35 @@ function ChallengeBlock({
   );
 }
 
+/**
+ * ONDE cada arte de céu é mais calma.
+ *
+ * A tela do jogo usa a MESMA arte da home, mas não pode usar o mesmo
+ * enquadramento: na home o céu é o cenário e o detalhe das nuvens é o que dá
+ * vida; aqui ele briga com seis cartões e um anel de progresso, e o assunto da
+ * tela deixa de ser o jogo.
+ *
+ * Estes números não foram escolhidos no olho. Cada arte foi dividida em dez
+ * faixas horizontais e medido o desvio padrão da luminância de cada uma — a
+ * "agitação" da imagem ali. A tabela guarda o centro da janela de 40% mais
+ * calma. Em nove artes é o alto (as nuvens se acumulam embaixo); o meio-dia é
+ * a exceção, porque naquela arte as nuvens fortes estão no topo.
+ *
+ * Medido: agitação média cai de 24 (enquadramento cheio) para 13.
+ */
+const FOCO_CALMO: Record<string, string> = {
+  madrugada: "20%",
+  "pré-amanhecer": "20%",
+  amanhecer: "20%",
+  manhã: "50%",
+  "meio-dia": "50%",
+  tarde: "20%",
+  "golden hour": "30%",
+  entardecer: "20%",
+  anoitecer: "20%",
+  noite: "20%",
+};
+
 /** "Bom dia" / "Boa tarde" / "Boa noite" — a tela abre falando com ela. */
 function saudacaoDoDia(): string {
   const h = new Date().getHours();
@@ -5229,6 +5171,7 @@ function WellnessScreen({
   babyName,
   saldo,
   homeCity,
+  avisoAmanha,
   onEarn,
   onEarnLesson,
   onSyncWellness,
@@ -5246,6 +5189,8 @@ function WellnessScreen({
   saldo?: number | null;
   /** Cidade do cadastro — o degrau entre o GPS e o IP, igual ao da home. */
   homeCity?: { nome: string; lat: number; lon: number } | null;
+  /** O gancho de amanhã, que morava na folha removida. Null fora de hoje. */
+  avisoAmanha?: { emoji: string; texto: string } | null;
   onEarn: (key: string) => void;
   onEarnLesson: () => void;
   onSyncWellness?: (keys: string[]) => void;
@@ -5366,11 +5311,15 @@ function WellnessScreen({
     >
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0 bg-cover bg-center"
-        /* Sem `filter` agora. O céu de amanhecer emprestado precisava de
-            +30% de brilho para não puxar cinza; esta arte já nasce na
-            temperatura certa, então mexer nela só a afastaria. */
-        style={{ backgroundImage: `url(${ceu.src})` }}
+        className="pointer-events-none fixed inset-0"
+        style={{
+          backgroundImage: `url(${ceu.src})`,
+          /* 165% da altura mostra ~60% da arte, em vez dos 100% do `cover`.
+             É o zoom que faz caber só a faixa calma; abaixo disso a região
+             agitada volta a entrar no quadro. */
+          backgroundSize: "auto 165%",
+          backgroundPosition: `50% ${FOCO_CALMO[ceu.nome] ?? "25%"}`,
+        }}
       />
       {/* VÉU DO TOPO — o que salva a saudação.
           Metade das artes tem o alto escuro (golden hour, entardecer, tarde:
@@ -5779,6 +5728,17 @@ function WellnessScreen({
                 );
               })}
             </div>
+
+            {/* ── O gancho de amanhã ─────────────────────────────────
+                Vinha da folha que foi removida. Fica no PÉ e não no topo: no
+                topo ele competia com o que ela veio fazer hoje; aqui é a
+                última coisa que ela lê, que é quando um "volte amanhã"
+                funciona. */}
+            {avisoAmanha && !careMode && (
+              <p className="mt-4 text-center text-[11.5px]" style={{ color: tintaSec }}>
+                {avisoAmanha.emoji} {avisoAmanha.texto}
+              </p>
+            )}
 
             {/* ── Recompensa do dia ──────────────────────────────────── */}
             {!careMode && (
