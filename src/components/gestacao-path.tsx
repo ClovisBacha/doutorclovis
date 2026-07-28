@@ -198,6 +198,8 @@ import {
 } from "@/lib/daily-quizzes";
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
+import skyAmanhecer from "@/assets/sky/amanhecer.webp";
+import { BabyIllustration } from "@/components/baby-illustration";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -210,6 +212,16 @@ interface GestacaoPathProps {
   careMode?: boolean;
   /** Abre o Cantinho (lojinha das Sementinhas). */
   onOpenShop?: () => void;
+  /**
+   * SÓ a bancada de design `/preview-jogo` usa.
+   *
+   * Um objeto e não três props soltas: assim fica óbvio no chamador que isto
+   * é andaime de conferência, e o dia em que sair, sai inteiro. `jogos` abre
+   * as atividades do dia (que na conta real só se alcança tocando num nó da
+   * trilha) e os outros dois fingem um estado com progresso, porque a tela
+   * vazia esconde justamente o anel e o ✓ das linhas.
+   */
+  bancada?: { jogos?: boolean; saldo?: number; halves?: number };
 }
 
 /* ══════════════════════════ FASES (7 semanas cada) ══════════════════════════ */
@@ -1039,6 +1051,7 @@ export function GestacaoPath({
   quizPremium = false,
   careMode = false,
   onOpenShop,
+  bancada,
 }: GestacaoPathProps) {
   const hasGest = !!gest;
   // Dia gestacional de hoje (0-based desde a DUM), até a semana 42 (D=300)
@@ -1519,6 +1532,12 @@ export function GestacaoPath({
   const [intro, setIntro] = useState<number | null>(null);
   // Tela cheia de bem-estar (aberta pelo card do dia). Guarda o dia (D).
   const [wellnessDay, setWellnessDay] = useState<number | null>(null);
+  /* Atalho SÓ da bancada de design: sem ele a tela das atividades só se
+     alcança tocando num nó da trilha, e não haveria como fotografá-la. */
+  useEffect(() => {
+    if (bancada?.jogos) setWellnessDay(todayD);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bancada?.jogos]);
 
   function reallyOpenDay(D: number) {
     setDayTasks(dayTaskState(D));
@@ -2506,7 +2525,9 @@ export function GestacaoPath({
               day={D}
               canEarn={isT}
               careMode={careMode}
-              halves={doneDays.includes(D) ? 6 : halvesFromState(st)}
+              halves={bancada?.halves ?? (doneDays.includes(D) ? 6 : halvesFromState(st))}
+              babyName={profile?.baby_name ?? null}
+              saldo={bancada?.saldo ?? saldo}
               lesson={
                 q
                   ? {
@@ -4899,7 +4920,20 @@ const WELLNESS_TYPES = [
  * material precisa da cor como valor: mistura com transparência, sombra
  * colorida e rim entram por `color-mix`, não por utilitário.
  */
-const WELLNESS_META: Record<string, { title: string; a: string; b: string; desc: string }> = {
+const WELLNESS_META: Record<
+  string,
+  {
+    title: string;
+    a: string;
+    b: string;
+    desc: string;
+    tile?: string;
+    tileB?: string;
+    /** Cor do título e do glifo na lista — separada de `a`/`b`, que ainda
+        pintam o material de vidro das telas de dentro. */
+    ink?: string;
+  }
+> = {
   aula: {
     title: "Aula de hoje",
     a: "#818cf8",
@@ -4907,30 +4941,45 @@ const WELLNESS_META: Record<string, { title: string; a: string; b: string; desc:
     desc: "A lição da professora + o quiz da semana.",
   },
   breathing: {
+    ink: "#2d7ff9",
+    tile: "#d6e8fb",
+    tileB: "#bcd9f7",
     title: "Respirar",
     a: "#38bdf8",
     b: "#06b6d4",
     desc: "Respiração guiada com som e vibração pra acalmar.",
   },
   movement: {
+    ink: "#f07c1e",
+    tile: "#fde6bd",
+    tileB: "#fbd79b",
     title: "Movimento",
     a: "#fbbf24",
     b: "#f97316",
     desc: "3 movimentos leves com cronômetro pra soltar o corpo.",
   },
   meditation: {
+    ink: "#9a5cf0",
+    tile: "#e9dcfa",
+    tileB: "#dcc8f6",
     title: "Meditar",
     a: "#a78bfa",
     b: "#a855f7",
     desc: "Meditação guiada curtinha, com som ambiente.",
   },
   bonding: {
+    ink: "#ee4d8e",
+    tile: "#fbd6e0",
+    tileB: "#f8c2d2",
     title: "Momento com o bebê",
     a: "#fb7185",
     b: "#ec4899",
     desc: "Uma carta de 1 minuto pra ler em voz alta pro bebê.",
   },
   gratitude: {
+    ink: "#16a34a",
+    tile: "#d3ecdb",
+    tileB: "#bce2c8",
     title: "Gratidão",
     a: "#34d399",
     b: "#16a34a",
@@ -4992,6 +5041,128 @@ function ChallengeBlock({
   );
 }
 
+/** "Bom dia" / "Boa tarde" / "Boa noite" — a tela abre falando com ela. */
+function saudacaoDoDia(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+/**
+ * O anel do dia: quantos dos 6 momentos já foram feitos.
+ *
+ * É SVG e não uma barra porque o número mora no meio dele — e a estrela na
+ * ponta do arco só existe se houver arco: em 0/6 ela ficaria pousada no topo
+ * sem nada atrás, parecendo enfeite solto.
+ */
+function AnelDoDia({ feitos, total }: { feitos: number; total: number }) {
+  const R = 39;
+  const C = 2 * Math.PI * R;
+  const frac = Math.max(0, Math.min(1, total > 0 ? feitos / total : 0));
+  /* Começa no topo e anda no sentido do relógio: o -90° do grupo. */
+  const ang = -90 + frac * 360;
+  const rad = (ang * Math.PI) / 180;
+  return (
+    <span className="relative flex h-[92px] w-[92px] shrink-0 items-center justify-center">
+      <span
+        className="absolute inset-0 rounded-full bg-white/38 backdrop-blur-xl"
+        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)" }}
+      />
+      <svg viewBox="0 0 92 92" className="absolute inset-0 h-full w-full -rotate-90">
+        <circle cx="46" cy="46" r={R} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={5} />
+        {frac > 0 && (
+          <circle
+            cx="52"
+            cy="52"
+            r={R}
+            fill="none"
+            stroke="#a78bfa"
+            strokeWidth={7}
+            strokeLinecap="round"
+            strokeDasharray={`${C * frac} ${C}`}
+          />
+        )}
+      </svg>
+      {frac > 0 && (
+        <span
+          aria-hidden
+          className="absolute text-[15px] leading-none"
+          style={{
+            left: `${46 + R * Math.cos(rad)}px`,
+            top: `${46 + R * Math.sin(rad)}px`,
+            transform: "translate(-50%,-50%)",
+          }}
+        >
+          ⭐
+        </span>
+      )}
+      <span className="relative text-center leading-tight">
+        <span className="block text-[19px] font-semibold" style={{ color: "#33264a" }}>
+          {feitos}/{total}
+        </span>
+        <span className="block text-[10.5px] text-slate-500">concluídos</span>
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Os desenhinhos das atividades.
+ *
+ * São traços feitos à mão e não emoji: emoji muda de arte conforme o aparelho
+ * e nenhum deles existe para "pulmão" ou "lótus" no mesmo peso dos outros.
+ * Traço próprio mantém as cinco linhas com a mesma espessura.
+ */
+function AtividadeIcone({ chave }: { chave: string }) {
+  /* Preenchido, não de traço. Num tile de 38px o contorno fino some, e a
+     referência usa massa sólida — é o que dá o peso de "adesivo" a cada
+     linha. `fill="currentColor"` deixa a cor vir do tile. */
+  const comum = {
+    viewBox: "0 0 24 24",
+    fill: "currentColor",
+    className: "h-[22px] w-[22px]",
+  };
+  switch (chave) {
+    case "breathing": // pulmões
+      return (
+        <svg {...comum}>
+          <path d="M11.2 3.4h1.6v8.2h-1.6z" />
+          <path d="M10.6 10.2c0-2-1.5-3.4-3.3-3.4-2 0-3.4 1.7-3.8 3.7-.4 2-.6 3.9-.6 5.6 0 1.6 1.3 2.9 2.9 2.9h1.4c2 0 3.4-1.7 3.4-3.6v-5.2z" />
+          <path d="M13.4 10.2c0-2 1.5-3.4 3.3-3.4 2 0 3.4 1.7 3.8 3.7.4 2 .6 3.9.6 5.6 0 1.6-1.3 2.9-2.9 2.9h-1.4c-2 0-3.4-1.7-3.4-3.6v-5.2z" />
+        </svg>
+      );
+    case "movement": // pessoa de braços abertos
+      return (
+        <svg {...comum}>
+          <circle cx="12" cy="4.3" r="2.4" />
+          <path d="M12 7.3c-.5 0-.9.3-1.1.7L6.6 12l1.5 1.5 2.4-2.3v2.3l-2.8 5.6 1.8.9L12 15.2l2.5 4.8 1.8-.9-2.8-5.6v-2.3l2.4 2.3 1.5-1.5-4.3-4c-.2-.4-.6-.7-1.1-.7z" />
+        </svg>
+      );
+    case "meditation": // lótus
+      return (
+        <svg {...comum}>
+          <circle cx="12" cy="4.6" r="2.4" />
+          <path d="M12 8c-1.9 0-3.4 1.5-3.4 3.4v2.2h6.8v-2.2C15.4 9.5 13.9 8 12 8z" />
+          <path d="M8.3 13.9C5.6 14.6 3.4 16 2.4 17.6c2 1.8 5.5 2.9 9.6 2.9s7.6-1.1 9.6-2.9c-1-1.6-3.2-3-5.9-3.7l-.5 1.9H8.8l-.5-1.9z" />
+        </svg>
+      );
+    case "bonding": // coração
+      return (
+        <svg {...comum}>
+          <path d="M12 20.4s-7.8-4.8-7.8-10.1A4.7 4.7 0 0 1 12 7.2a4.7 4.7 0 0 1 7.8 3.1c0 5.3-7.8 10.1-7.8 10.1z" />
+        </svg>
+      );
+    default: // gratidão — faíscas
+      return (
+        <svg {...comum}>
+          <path d="M11 2.6l1.8 5 5 1.8-5 1.8-1.8 5-1.8-5-5-1.8 5-1.8 1.8-5z" />
+          <path d="M18.2 13.8l.95 2.6 2.6.95-2.6.95-.95 2.6-.95-2.6-2.6-.95 2.6-.95.95-2.6z" />
+        </svg>
+      );
+  }
+}
+
 /**
  * Tela CHEIA de bem-estar: cards coloridos com as atividades. Abre instantâneo
  * (cards são estáticos; o ✓ de progresso carrega em segundo plano). Faça 1 pra
@@ -5004,6 +5175,8 @@ function WellnessScreen({
   careMode,
   halves,
   lesson,
+  babyName,
+  saldo,
   onEarn,
   onEarnLesson,
   onSyncWellness,
@@ -5015,6 +5188,10 @@ function WellnessScreen({
   /** Meias estrelas do dia (0–6): aula + 5 jogos de bem-estar. */
   halves: number;
   lesson: WellnessLesson;
+  /** Nome do bebê — a tela cumprimenta por ele. */
+  babyName?: string | null;
+  /** Sementinhas na carteira, para a pílula do topo. */
+  saldo?: number | null;
   onEarn: (key: string) => void;
   onEarnLesson: () => void;
   onSyncWellness?: (keys: string[]) => void;
@@ -5022,6 +5199,10 @@ function WellnessScreen({
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
+  /* A referência mostra "Ver todas" recolhido, com cinco linhas. São cinco
+     mesmo — a sexta atividade é a AULA, que já está no cartão de cima. O botão
+     existe para o dia em que entrarem mais. */
+  const [verTodas, setVerTodas] = useState(false);
 
   async function refresh() {
     try {
@@ -5053,6 +5234,31 @@ function WellnessScreen({
   const openMeta = openKey ? WELLNESS_META[openKey] : null;
   const lessonEmoji = lesson.emoji;
 
+  /* O cartão da aula fala do conteúdo de HOJE. Título e duração saem do
+     próprio quiz: um exercício de 5 perguntas não leva o mesmo tempo que um
+     de 3, e escrever "8 min" fixo seria número de enfeite. */
+  const aulaFeita = lesson.alreadyDone;
+  /* O quiz não tem campo de título — tem `teach`, a lição. A primeira frase
+     dela É o assunto do dia, então ela vira o título, cortada no ponto. Sem
+     isso o cartão precisaria de um título inventado, e inventar aqui daria um
+     nome que não corresponde ao que a paciente vai ler dentro. */
+  const tituloAula =
+    lesson.kind === "quiz"
+      ? (() => {
+          const frase = lesson.quiz.teach
+            .split(/(?<=[.!?])\s/)[0]
+            .replace(/[.!?]+$/, "")
+            .trim();
+          return frase.length > 46 ? `${frase.slice(0, 44).trimEnd()}…` : frase;
+        })()
+      : lesson.label || "O desafio de hoje";
+  const minutosAula =
+    lesson.kind === "quiz" ? Math.max(3, Math.round(lesson.quiz.questions.length * 1.6)) : 2;
+  /* 100% quando a aula está feita; senão o quanto do DIA já andou — é o que a
+     barra do desenho comunica, e inventar uma porcentagem por dentro do quiz
+     exigiria rastrear pergunta a pergunta fora dele. */
+  const pctAula = aulaFeita ? 100 : Math.round((halves / 6) * 100);
+
   // Os 6 cards: aula primeiro (o conteúdo do dia), depois os 5 de bem-estar.
   const cards: { key: string; emoji: string; done: boolean }[] = [
     { key: "aula", emoji: lessonEmoji || "📚", done: lesson.alreadyDone },
@@ -5062,21 +5268,56 @@ function WellnessScreen({
   return (
     <div
       className="fixed inset-0 z-[60] overflow-y-auto"
-      style={{ background: "linear-gradient(180deg,#fdf3ec 0%,#f7e2d8 100%)" }}
+      style={{
+        /* Céu de amanhecer: lilás em cima, pêssego embaixo. O gradiente fica
+           ATRÁS como cor de espera — sem ele há um flash branco enquanto a
+           arte carrega. `fixed` no anexo para o fundo não rolar junto com a
+           lista, que é o que dá a sensação de janela. */
+        background: "linear-gradient(180deg,#d9c2e8 0%,#f0d5d8 40%,#f7dcc8 100%)",
+      }}
     >
-      <button
-        onClick={openKey ? () => setOpenKey(null) : onClose}
-        aria-label={openKey ? "Voltar" : "Fechar"}
-        className="press fixed right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-lg text-slate-600 backdrop-blur-xl"
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 bg-cover bg-center"
         style={{
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.5), 0 8px 20px -8px rgba(80,50,40,0.45)",
+          backgroundImage: `url(${skyAmanhecer})`,
+          /* A arte sozinha puxa para o azulado e fica escura no alto, que é
+             onde mora o texto. Medido contra a referência: sem isto o topo
+             saía 37 a 73 níveis RGB mais escuro. */
+          filter: "saturate(1.18) brightness(1.3)",
         }}
-      >
-        ✕
-      </button>
+      />
+      {/* Véu: a arte sozinha tem contraste demais para texto cinza por cima. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(255,242,238,0.52) 0%, rgba(255,232,236,0.22) 45%, rgba(255,240,234,0.44) 100%)",
+        }}
+      />
+      {/* O ✕ do canto só existe DENTRO de uma atividade. Na lista, quem fecha é
+          a seta ‹ do topo, que faz parte do desenho — dois botões de sair na
+          mesma tela é o tipo de coisa que faz alguém tocar no errado. */}
+      {openKey && (
+        <button
+          onClick={() => setOpenKey(null)}
+          aria-label="Voltar às atividades"
+          className="press fixed right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-lg text-slate-600 backdrop-blur-xl"
+          style={{
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.5), 0 8px 20px -8px rgba(80,50,40,0.45)",
+          }}
+        >
+          ✕
+        </button>
+      )}
 
-      <div className="mx-auto max-w-md px-5 pb-16 pt-[calc(3.5rem+env(safe-area-inset-top))]">
+      {/* `pb-8` e não mais 24: esta tela é uma sobreposição em z-60 e a barra de
+          navegação do app fica ATRÁS dela (z-40). A folga de 96px que havia
+          aqui era para uma barra que nunca aparece — e era ela que empurrava
+          o cartão de recompensa para fora da primeira tela. */}
+      <div className="relative mx-auto max-w-md px-8 pb-8 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         {openKey === "aula" ? (
           <div>
             <p className="mb-3 text-center text-sm font-bold text-foreground/60">
@@ -5125,84 +5366,276 @@ function WellnessScreen({
           </div>
         ) : (
           <>
-            <h2 className="font-serif text-2xl text-foreground">Jogos do dia 🎮</h2>
-            {!careMode && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Cada jogo vale <strong>meia estrela</strong> — complete os 6 pra fechar as 3 ⭐ do
-                dia e ganhar o bônus 🌱.
-              </p>
-            )}
-
-            {/* Placar do dia: 3 estrelas que enchem em metades */}
-            {!careMode && (
-              <div
-                className="mt-4 flex items-center justify-between rounded-[26px] bg-white/55 px-4 py-3 backdrop-blur-xl"
+            {/* ── Topo: voltar + carteira ───────────────────────────── */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={onClose}
+                aria-label="Voltar ao Caminho"
+                className="press flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-slate-500 backdrop-blur-xl"
                 style={{
                   boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(255,255,255,0.5), 0 10px 26px -14px rgba(80,50,40,0.45)",
+                    "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.55), 0 8px 20px -10px rgba(90,60,80,0.4)",
                 }}
               >
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-600">
-                    Estrelas do dia
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.1}
+                  className="h-5 w-5"
+                >
+                  <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {/* A moeda REAL do app. O desenho de referência traz uma estrela
+                  aqui, mas estrela no app é o placar do DIA (3, zeradas toda
+                  meia-noite) — um total acumulado ao lado dela seria uma moeda
+                  que não existe. Sementinha é o que de fato se junta e se
+                  gasta na loja. */}
+              {saldo != null && !careMode && (
+                <span
+                  className="flex items-center gap-1.5 rounded-full bg-white/70 px-3.5 py-2 backdrop-blur-xl"
+                  style={{
+                    boxShadow:
+                      "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.55), 0 8px 20px -10px rgba(90,60,80,0.4)",
+                  }}
+                >
+                  <span className="text-lg leading-none">🌱</span>
+                  <span className="tabular-nums text-[15px] font-semibold text-slate-600">
+                    {saldo}
+                  </span>
+                </span>
+              )}
+            </div>
+
+            {/* ── Saudação + anel de progresso ──────────────────────── */}
+            <div className="mt-3.5 flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <h2
+                  className="font-serif text-[21px] leading-tight"
+                  style={{ fontWeight: 500, color: "#4b3a55" }}
+                >
+                  {saudacaoDoDia()}
+                  {babyName ? `, ${babyName}` : ""} 💜
+                </h2>
+                <p className="mt-1.5 max-w-[220px] text-[12px] leading-snug text-slate-500">
+                  6 momentos especiais para você e seu bebê hoje.
+                </p>
+              </div>
+              <AnelDoDia feitos={halves} total={6} />
+            </div>
+
+            {/* ── A aula em destaque ─────────────────────────────────── */}
+            <button
+              onClick={() => setOpenKey("aula")}
+              className="press relative mt-3.5 block w-full overflow-hidden rounded-[24px] px-5 py-4 text-left"
+              style={{
+                background:
+                  "linear-gradient(150deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.42) 55%)",
+                backdropFilter: "blur(22px) saturate(175%)",
+                WebkitBackdropFilter: "blur(22px) saturate(175%)",
+                border: "1px solid rgba(255,255,255,0.75)",
+                boxShadow:
+                  "inset 0 1px 0 rgba(255,255,255,0.95), 0 18px 40px -22px rgba(90,60,90,0.5)",
+              }}
+            >
+              <div className="relative">
+                <div className="relative z-10" style={{ maxWidth: "56%" }}>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/85 px-2 py-[3px] text-[9.5px] font-medium text-violet-700">
+                    <span className="text-[10px] leading-none">⭐</span> Recomendada
+                  </span>
+                  <p
+                    className="mt-2 line-clamp-2 font-serif text-[17px] leading-[1.18]"
+                    style={{ fontWeight: 600, color: "#4b3a55" }}
+                  >
+                    {tituloAula}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {halves >= 6 ? "Dia completo! 🌟" : `${halves} de 6 jogos`}
+                  <p className="mt-1.5 text-[11.5px] text-slate-500">Aula da semana + quiz</p>
+                  <p className="mt-2 flex items-center gap-1.5 text-[11.5px] text-slate-500">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.7}
+                      className="h-3.5 w-3.5"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 7v5l3 2" strokeLinecap="round" />
+                    </svg>
+                    {minutosAula} min
+                    <span className="text-slate-300">|</span>
+                    <span>⭐ ½</span>
                   </p>
                 </div>
-                <StarMeter halves={halves} size="text-3xl" />
+                {/* O bebê da semana, o mesmo desenho da home. */}
+                {/* A bolha sangra para fora do cartão à direita e embaixo, como
+                    no desenho: é o que a faz parecer um objeto POUSADO no
+                    cartão em vez de uma figurinha colada dentro dele. */}
+                <span className="pointer-events-none absolute -right-6 top-1/2 h-[188px] w-[188px] -translate-y-1/2">
+                  {/* Bolha DE VIDRO, não um brilho: parede com reflexo no alto
+                      à esquerda e contra-luz na base — o mesmo material da
+                      esfera da home. Sem a parede o bebê boiava num borrão. */}
+                  <span
+                    className="absolute inset-[9%] rounded-full"
+                    style={{
+                      background: [
+                        "radial-gradient(circle at 31% 25%, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.2) 30%, rgba(255,255,255,0) 52%)",
+                        "radial-gradient(circle at 50% 50%, rgba(240,228,255,0.44) 0%, rgba(255,214,238,0.22) 58%, rgba(255,255,255,0.04) 82%)",
+                      ].join(", "),
+                      boxShadow: [
+                        "inset 0 2px 3px -1px rgba(255,255,255,0.85)",
+                        "inset 6px 10px 22px -14px rgba(255,255,255,0.9)",
+                        "inset -8px -12px 26px -16px rgba(255,255,255,0.55)",
+                        "inset 0 0 0 1px rgba(255,255,255,0.3)",
+                        "0 0 34px 10px rgba(255,238,250,0.32)",
+                      ].join(", "),
+                    }}
+                  />
+                  <BabyIllustration
+                    week={Math.max(1, Math.min(42, Math.floor(day / 7)))}
+                    tone={0}
+                    showSac={false}
+                    showInfo={false}
+                    className="absolute inset-0 h-full w-full origin-center scale-[1.26]"
+                  />
+                </span>
               </div>
-            )}
 
-            <div className="mt-5 flex flex-col gap-3">
-              {cards.map((c, i) => {
-                const meta = WELLNESS_META[c.key];
-                const isDone = !careMode && c.done;
+              <span
+                className="press relative z-10 mt-3 flex w-fit items-center gap-1.5 rounded-full px-5 py-2.5 text-[13px] font-semibold text-white"
+                style={{
+                  background: "linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)",
+                  boxShadow: "0 10px 24px -10px rgba(139,92,246,0.75)",
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-[15px] w-[15px]">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                {aulaFeita ? "Rever aula" : "Continuar aula"}
+              </span>
+
+              <div className="relative z-10 mt-3 flex items-center gap-2.5">
+                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/60">
+                  <span
+                    className="block h-full rounded-full"
+                    style={{
+                      width: `${pctAula}%`,
+                      background: "linear-gradient(90deg, #8b5cf6, #a78bfa)",
+                    }}
+                  />
+                </span>
+                <span className="shrink-0 text-[11.5px] text-slate-500">{pctAula}% concluído</span>
+              </div>
+            </button>
+
+            {/* ── Atividades de hoje ─────────────────────────────────── */}
+            <div className="mt-3.5 flex items-center justify-between gap-3">
+              <p className="font-serif text-[16px]" style={{ fontWeight: 600, color: "#4b3a55" }}>
+                Atividades de hoje <span className="text-violet-300">✦</span>
+              </p>
+              <button
+                onClick={() => setVerTodas((v) => !v)}
+                className="press flex shrink-0 items-center gap-1.5 rounded-full bg-white/65 px-3 py-1.5 text-[11px] text-slate-500 backdrop-blur-xl"
+                style={{
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 16px -10px rgba(90,60,80,0.4)",
+                }}
+              >
+                {verTodas ? "Ver menos" : "Ver todas"}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  className={`h-3.5 w-3.5 transition-transform ${verTodas ? "rotate-180" : ""}`}
+                >
+                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mt-2.5 flex flex-col gap-1">
+              {(verTodas ? WELLNESS_TYPES : WELLNESS_TYPES.slice(0, 5)).map((a) => {
+                const meta = WELLNESS_META[a.key];
+                const isDone = !careMode && done.has(a.key);
                 return (
                   <button
-                    key={c.key}
-                    onClick={() => setOpenKey(c.key)}
-                    style={
-                      {
-                        animationDelay: `${i * 55}ms`,
-                        "--lg-a": meta.a,
-                        "--lg-b": meta.b,
-                        // O reflexo entra em cascata, um card atrás do outro.
-                        "--lg-delay": `${i * 0.5}s`,
-                        // Vidro deixa passar o creme do fundo: a sombrinha no
-                        // texto garante o contraste nos tons mais claros.
-                        textShadow: "0 1px 2px rgba(0,0,0,0.22)",
-                      } as React.CSSProperties
-                    }
-                    className="press fade-slide-up liquid-glass flex items-center gap-3.5 overflow-hidden rounded-[26px] p-3.5 text-left text-white"
+                    key={a.key}
+                    onClick={() => setOpenKey(a.key)}
+                    className="press flex w-full items-center gap-2.5 rounded-[18px] px-3 py-1.5 text-left"
+                    style={{
+                      background:
+                        "linear-gradient(150deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.34) 60%)",
+                      backdropFilter: "blur(18px) saturate(170%)",
+                      WebkitBackdropFilter: "blur(18px) saturate(170%)",
+                      border: "1px solid rgba(255,255,255,0.68)",
+                      boxShadow:
+                        "inset 0 1px 0 rgba(255,255,255,0.9), 0 12px 28px -18px rgba(90,60,90,0.45)",
+                    }}
                   >
-                    {/* A lente segura o emoji no centro — antes ele era um span
-                        solto e a animação o empurrava pra fora do card. */}
-                    <span className="liquid-lens relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px]">
+                    {/* Tile PASTEL com o glifo na cor cheia — não o inverso.
+                        Gradiente saturado com traço branco fino, que era o que
+                        estava aqui, grita ao lado de uma tela toda em pó-de-
+                        arroz: os cinco tiles viravam o elemento mais forte da
+                        página, acima até do bebê. */}
+                    <span
+                      className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[13px]"
+                      style={{
+                        background: `linear-gradient(150deg, ${meta.tile ?? meta.a} 0%, ${meta.tileB ?? meta.b} 100%)`,
+                        color: meta.ink ?? meta.b,
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75)",
+                      }}
+                    >
+                      <AtividadeIcone chave={a.key} />
+                    </span>
+                    <span className="min-w-0 flex-1">
                       <span
-                        className="text-[26px] leading-none drop-shadow-sm"
-                        style={{
-                          animation: "dc-float 3.2s ease-in-out infinite",
-                          animationDelay: `${i * 350}ms`,
-                        }}
+                        className="block text-[13px] leading-tight"
+                        style={{ color: meta.ink ?? meta.b, fontWeight: 600 }}
                       >
-                        {c.emoji}
+                        {meta.title}
+                      </span>
+                      <span className="mt-px block text-[10.5px] leading-[1.35] text-slate-500">
+                        {meta.desc}
                       </span>
                     </span>
-                    <span className="relative z-10 min-w-0 flex-1">
-                      <span className="block text-base font-extrabold">{meta.title}</span>
-                      <span className="block text-xs text-white/90">{meta.desc}</span>
-                    </span>
-                    {/* Meia estrela do jogo: apagada → acesa quando completa */}
                     {!careMode && (
-                      <span
-                        className={`relative z-10 shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold backdrop-blur-sm ${
-                          isDone
-                            ? "bg-white/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
-                            : "bg-black/15 text-white/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
-                        }`}
-                      >
-                        {isDone ? "⭐ ½ ✓" : "☆ ½"}
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <span
+                          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
+                            isDone ? "bg-emerald-400 text-white" : ""
+                          }`}
+                          style={
+                            isDone ? undefined : { border: "1.5px dashed rgba(160,130,160,0.4)" }
+                          }
+                        >
+                          {isDone ? "✓" : ""}
+                        </span>
+                        <span className="tabular-nums text-[12.5px] text-slate-500">
+                          {isDone ? "1/1" : "0/1"}
+                        </span>
+                        {/* A seta mora num botão de vidro, como no desenho —
+                            solta ela lê como enfeite, não como "isto abre". */}
+                        <span
+                          className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-slate-400"
+                          style={{
+                            background: "rgba(255,255,255,0.55)",
+                            border: "1px solid rgba(255,255,255,0.72)",
+                            backdropFilter: "blur(8px)",
+                            WebkitBackdropFilter: "blur(8px)",
+                          }}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            className="h-3.5 w-3.5"
+                          >
+                            <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
                       </span>
                     )}
                   </button>
@@ -5210,10 +5643,80 @@ function WellnessScreen({
               })}
             </div>
 
-            {!careMode && halves >= 6 && (
-              <p className="mt-5 text-center text-sm font-bold text-fuchsia-700">
-                ⭐⭐⭐ Todas as estrelas de hoje! Volte amanhã pra manter a chama 🔥
-              </p>
+            {/* ── Recompensa do dia ──────────────────────────────────── */}
+            {!careMode && (
+              <div
+                className="mt-2 flex items-center gap-2.5 rounded-[18px] px-3 py-2"
+                style={{
+                  background:
+                    "linear-gradient(150deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.34) 60%)",
+                  backdropFilter: "blur(18px) saturate(170%)",
+                  WebkitBackdropFilter: "blur(18px) saturate(170%)",
+                  border: "1px solid rgba(255,255,255,0.68)",
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.9), 0 12px 28px -18px rgba(90,60,90,0.45)",
+                }}
+              >
+                {/* O 🎁 do sistema é vermelho e amarelo — as duas cores que
+                    esta tela não tem. Desenhado, o presente entra na paleta. */}
+                <span aria-hidden className="shrink-0">
+                  <svg viewBox="0 0 48 48" className="h-[60px] w-[60px]">
+                    <rect
+                      x="6"
+                      y="20"
+                      width="36"
+                      height="22"
+                      rx="4"
+                      fill="#fdfbff"
+                      stroke="#e3d6f5"
+                      strokeWidth="1.4"
+                    />
+                    <rect
+                      x="4"
+                      y="15"
+                      width="40"
+                      height="8"
+                      rx="3"
+                      fill="#f7f1ff"
+                      stroke="#e3d6f5"
+                      strokeWidth="1.4"
+                    />
+                    <rect x="21" y="15" width="6" height="27" fill="#c9aef0" />
+                    <path
+                      d="M24 15c-3-5-9-7-11-4s2 4 11 4zM24 15c3-5 9-7 11-4s-2 4-11 4z"
+                      fill="#b795ea"
+                    />
+                  </svg>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span
+                    className="block font-serif text-[15px]"
+                    style={{ fontWeight: 600, color: "#4b3a55" }}
+                  >
+                    Recompensa do dia
+                  </span>
+                  <span className="mt-0.5 block text-[11.5px] leading-snug text-slate-500">
+                    {halves >= 6 ? (
+                      "Dia completo! As 3 estrelas são suas 🌟"
+                    ) : (
+                      <>
+                        Complete todas as atividades e ganhe{" "}
+                        <span className="font-semibold text-violet-600">3 estrelas</span> ✨
+                      </>
+                    )}
+                  </span>
+                </span>
+                <span
+                  className="flex shrink-0 flex-col items-center rounded-[18px] bg-white/65 px-5 py-2.5"
+                  style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)" }}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[17px] leading-none">⭐</span>
+                    <span className="text-[19px] font-bold leading-none text-slate-700">3</span>
+                  </span>
+                  <span className="mt-0.5 text-[11px] text-slate-500">estrelas</span>
+                </span>
+              </div>
             )}
           </>
         )}

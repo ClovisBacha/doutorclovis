@@ -12,6 +12,11 @@ import { GestacaoPath } from "@/components/gestacao-path";
  * Não expõe nada: `profile` e `gest` são constantes de exemplo.
  */
 export const Route = createFileRoute("/preview-jogo")({
+  // `?tela=jogos` abre direto a tela das atividades do dia (o "game"), que na
+  // conta real só se alcança tocando num nó da trilha — impossível de
+  // fotografar sem isso. Aceita 1 e true: o router revalida depois de
+  // serializar, e só entender "jogos" apagaria o parâmetro no segundo passe.
+  validateSearch: (q: Record<string, unknown>) => ({ tela: String(q.tela ?? "") }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
   }),
@@ -19,6 +24,7 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
+  const { tela } = Route.useSearch();
   return (
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
       <GestacaoPath
@@ -27,6 +33,7 @@ function PreviewJogo() {
         quizPremium
         careMode={false}
         onOpenShop={() => {}}
+        bancada={tela === "jogos" ? { jogos: true, saldo: 125, halves: 1 } : undefined}
       />
     </div>
   );
