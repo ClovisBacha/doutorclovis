@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
@@ -201,7 +202,6 @@ import { DOCTOR } from "@/lib/doctor.config";
 /* Arte própria desta tela, feita a partir do desenho de referência. Ela mora
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
    cenário fixo da tela de atividades. */
-import { useSkyNow } from "@/components/app-mobile-shell";
 import jogoBolha from "@/assets/jogo/bolha.webp";
 import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
@@ -228,7 +228,7 @@ interface GestacaoPathProps {
    * trilha) e os outros dois fingem um estado com progresso, porque a tela
    * vazia esconde justamente o anel e o ✓ das linhas.
    */
-  bancada?: { jogos?: boolean; saldo?: number; halves?: number };
+  bancada?: { jogos?: boolean; saldo?: number; halves?: number; enfeites?: string[] };
 }
 
 /* ══════════════════════════ FASES (7 semanas cada) ══════════════════════════ */
@@ -2529,70 +2529,86 @@ export function GestacaoPath({
       <div className="h-16" />
 
       {/* Intro imersiva da aula (Duolingo): moeda salta, depois o sheet abre */}
+      {/* PORTAL para o <body>, e não uma div aqui dentro.
+          `position: fixed` se resolve contra o ancestral mais próximo que
+          tenha `transform`, `filter`, `backdrop-filter`, `contain` ou
+          `perspective` — e esta tela vive lá no fundo da árvore da aba, atrás
+          de vários cartões de vidro. Bastava um deles para a "tela cheia"
+          virar uma caixa do tamanho do cartão, deixando a trilha aparecendo
+          em cima e embaixo. No body não há ancestral nenhum: ela cobre a
+          janela, ponto. */}
       {wellnessDay !== null &&
-        (() => {
-          const D = wellnessDay;
-          const isT = D === todayD;
-          const wk = Math.max(1, Math.min(42, Math.floor(D / 7)));
-          const q = quizForDay(D);
-          const st = wellnessDay === D ? dayTasks : dayTaskState(D);
-          const chD = challengeForDay(D);
-          const lessonDone = !!st.desafio || doneDays.includes(D);
-          return (
-            <WellnessScreen
-              day={D}
-              canEarn={isT}
-              careMode={careMode}
-              halves={bancada?.halves ?? (doneDays.includes(D) ? 6 : halvesFromState(st))}
-              babyName={profile?.baby_name ?? null}
-              saldo={bancada?.saldo ?? saldo}
-              homeCity={homeCity ?? null}
-              avisoAmanha={
-                isT
-                  ? {
-                      emoji: quizForDay(D + 1)
-                        ? quizEmojiForDay(D + 1)
-                        : challengeForDay(D + 1).emoji,
-                      texto: `Amanhã tem ${quizForDay(D + 1) ? "aula nova" : "desafio novo"} — volte para manter a chama 🔥${
-                        streak > 0 ? ` (${streak} ${streak === 1 ? "dia" : "dias"})` : ""
-                      }`,
-                    }
-                  : null
-              }
-              lesson={
-                q
-                  ? {
-                      kind: "quiz" as const,
-                      quiz: q,
-                      emoji: quizEmojiForDay(D),
-                      week: wk,
-                      alreadyDone: lessonDone,
-                      locked: !isT && !quizPremium,
-                      showAd: isT && !quizPremium,
-                    }
-                  : {
-                      kind: "challenge" as const,
-                      label: chD.label,
-                      emoji: chD.emoji,
-                      alreadyDone: lessonDone,
-                    }
-              }
-              onEarn={(key) => {
-                markDayTask(D, `w_${key}`, true);
-                markDayTask(D, "bemestar", true); // legado: ≥1 atividade feita
-              }}
-              onEarnLesson={() => markDayTask(D, "desafio", true)}
-              onSyncWellness={(keys) => {
-                // Espelha o progresso do servidor (outro aparelho) nas meias locais.
-                const cur = dayTaskState(D);
-                keys.forEach((k) => {
-                  if (!cur[`w_${k}`]) markDayTask(D, `w_${k}`, true);
-                });
-              }}
-              onClose={() => setWellnessDay(null)}
-            />
-          );
-        })()}
+        typeof document !== "undefined" &&
+        createPortal(
+          (() => {
+            const D = wellnessDay;
+            const isT = D === todayD;
+            const wk = Math.max(1, Math.min(42, Math.floor(D / 7)));
+            const q = quizForDay(D);
+            const st = wellnessDay === D ? dayTasks : dayTaskState(D);
+            const chD = challengeForDay(D);
+            const lessonDone = !!st.desafio || doneDays.includes(D);
+            return (
+              <WellnessScreen
+                day={D}
+                canEarn={isT}
+                careMode={careMode}
+                halves={bancada?.halves ?? (doneDays.includes(D) ? 6 : halvesFromState(st))}
+                babyName={profile?.baby_name ?? null}
+                saldo={bancada?.saldo ?? saldo}
+                homeCity={homeCity ?? null}
+                enfeites={
+                  bancada?.enfeites ??
+                  trayItems.map((id) => CANTINHO_BY_ID[id]?.emoji).filter((e): e is string => !!e)
+                }
+                avisoAmanha={
+                  isT
+                    ? {
+                        emoji: quizForDay(D + 1)
+                          ? quizEmojiForDay(D + 1)
+                          : challengeForDay(D + 1).emoji,
+                        texto: `Amanhã tem ${quizForDay(D + 1) ? "aula nova" : "desafio novo"} — volte para manter a chama 🔥${
+                          streak > 0 ? ` (${streak} ${streak === 1 ? "dia" : "dias"})` : ""
+                        }`,
+                      }
+                    : null
+                }
+                lesson={
+                  q
+                    ? {
+                        kind: "quiz" as const,
+                        quiz: q,
+                        emoji: quizEmojiForDay(D),
+                        week: wk,
+                        alreadyDone: lessonDone,
+                        locked: !isT && !quizPremium,
+                        showAd: isT && !quizPremium,
+                      }
+                    : {
+                        kind: "challenge" as const,
+                        label: chD.label,
+                        emoji: chD.emoji,
+                        alreadyDone: lessonDone,
+                      }
+                }
+                onEarn={(key) => {
+                  markDayTask(D, `w_${key}`, true);
+                  markDayTask(D, "bemestar", true); // legado: ≥1 atividade feita
+                }}
+                onEarnLesson={() => markDayTask(D, "desafio", true)}
+                onSyncWellness={(keys) => {
+                  // Espelha o progresso do servidor (outro aparelho) nas meias locais.
+                  const cur = dayTaskState(D);
+                  keys.forEach((k) => {
+                    if (!cur[`w_${k}`]) markDayTask(D, `w_${k}`, true);
+                  });
+                }}
+                onClose={() => setWellnessDay(null)}
+              />
+            );
+          })(),
+          document.body,
+        )}
 
       {intro !== null && (
         <QuizIntro
@@ -4972,33 +4988,27 @@ function ChallengeBlock({
 }
 
 /**
- * ONDE cada arte de céu é mais calma.
+ * Onde cada enfeite boia, e de que tamanho.
  *
- * A tela do jogo usa a MESMA arte da home, mas não pode usar o mesmo
- * enquadramento: na home o céu é o cenário e o detalhe das nuvens é o que dá
- * vida; aqui ele briga com seis cartões e um anel de progresso, e o assunto da
- * tela deixa de ser o jogo.
+ * Posições fixas e escolhidas à mão, não sorteadas: nas laterais e nos cantos,
+ * fora da coluna central onde moram o título, os cartões e os botões. Sorteio
+ * puro põe um enfeite bem atrás do "Continuar aula" mais cedo ou mais tarde, e
+ * aí não é mais cenário, é ruído.
  *
- * Estes números não foram escolhidos no olho. Cada arte foi dividida em dez
- * faixas horizontais e medido o desvio padrão da luminância de cada uma — a
- * "agitação" da imagem ali. A tabela guarda o centro da janela de 40% mais
- * calma. Em nove artes é o alto (as nuvens se acumulam embaixo); o meio-dia é
- * a exceção, porque naquela arte as nuvens fortes estão no topo.
- *
- * Medido: agitação média cai de 24 (enquadramento cheio) para 13.
+ * Os tamanhos variam de propósito — três planos de profundidade. Todos iguais
+ * viram papel de parede repetido.
  */
-const FOCO_CALMO: Record<string, string> = {
-  madrugada: "20%",
-  "pré-amanhecer": "20%",
-  amanhecer: "20%",
-  manhã: "50%",
-  "meio-dia": "50%",
-  tarde: "20%",
-  "golden hour": "30%",
-  entardecer: "20%",
-  anoitecer: "20%",
-  noite: "20%",
-};
+const POS_ENFEITE = [
+  { x: -6, y: 12, tam: 132 },
+  { x: 74, y: 4, tam: 96 },
+  { x: 80, y: 44, tam: 120 },
+  { x: -8, y: 46, tam: 108 },
+  { x: 68, y: 76, tam: 140 },
+  { x: -4, y: 80, tam: 100 },
+  { x: 38, y: 92, tam: 88 },
+  { x: 84, y: 24, tam: 76 },
+  { x: 6, y: 64, tam: 84 },
+];
 
 /** "Bom dia" / "Boa tarde" / "Boa noite" — a tela abre falando com ela. */
 function saudacaoDoDia(): string {
@@ -5172,6 +5182,7 @@ function WellnessScreen({
   saldo,
   homeCity,
   avisoAmanha,
+  enfeites = [],
   onEarn,
   onEarnLesson,
   onSyncWellness,
@@ -5191,6 +5202,8 @@ function WellnessScreen({
   homeCity?: { nome: string; lat: number; lon: number } | null;
   /** O gancho de amanhã, que morava na folha removida. Null fora de hoje. */
   avisoAmanha?: { emoji: string; texto: string } | null;
+  /** Emojis dos itens comprados na loja — boiam atrás do conteúdo. */
+  enfeites?: string[];
   onEarn: (key: string) => void;
   onEarnLesson: () => void;
   onSyncWellness?: (keys: string[]) => void;
@@ -5199,8 +5212,10 @@ function WellnessScreen({
   /* O MESMO céu da aba do bebê — mesmo hook, mesmo slot, mesmo arquivo.
      Não é uma cópia parecida: é a mesma decisão lida duas vezes, então as
      duas telas não têm como divergir nem quando a regra mudar. */
-  const { slot: ceu } = useSkyNow(homeCity ?? null);
-  const ceuEscuro = ceu.dark;
+  /* Esta tela deixou de usar o céu da home, de propósito — ver o comentário
+     do fundo logo abaixo. `ceuEscuro` fica falso para sempre: a tela tem uma
+     cor só, então a tinta não precisa mais trocar com a hora. */
+  const ceuEscuro = false;
   /* Toda a tela lê destas quatro. Espalhar `text-slate-500` pelo JSX faria
      metade dela ficar ilegível na madrugada e a outra metade não — que é
      exatamente o defeito que a home já teve. */
@@ -5298,29 +5313,44 @@ function WellnessScreen({
     <div
       className="fixed inset-0 z-[60] overflow-y-auto"
       style={{
-        /* Céu de amanhecer: lilás em cima, pêssego embaixo. O gradiente fica
-           ATRÁS como cor de espera — sem ele há um flash branco enquanto a
-           arte carrega. `fixed` no anexo para o fundo não rolar junto com a
-           lista, que é o que dá a sensação de janela. */
-        /* Cor de espera enquanto a arte carrega. Escura quando o céu é
-           escuro, senão há um flash claro antes da noite entrar. */
-        background: ceuEscuro
-          ? "linear-gradient(180deg,#221a3a 0%,#33264d 55%,#4a3358 100%)"
-          : "linear-gradient(180deg,#d9c2e8 0%,#f0d5d8 40%,#f7dcc8 100%)",
+        /* Rosa muito claro no alto descendo para salmão. Sem imagem nenhuma:
+           cor chapada carrega instantâneo, não tem nuvem disputando atenção
+           com seis cartões e não muda de humor conforme a hora — esta tela
+           fica sempre a mesma, que é o que se quer de um lugar onde ela vem
+           TRABALHAR. O céu continua na aba do bebê, onde ele é o assunto. */
+        background: "linear-gradient(180deg,#fff5f4 0%,#ffeae7 34%,#ffdfd8 68%,#ffd4c9 100%)",
       }}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0"
-        style={{
-          backgroundImage: `url(${ceu.src})`,
-          /* 165% da altura mostra ~60% da arte, em vez dos 100% do `cover`.
-             É o zoom que faz caber só a faixa calma; abaixo disso a região
-             agitada volta a entrar no quadro. */
-          backgroundSize: "auto 165%",
-          backgroundPosition: `50% ${FOCO_CALMO[ceu.nome] ?? "25%"}`,
-        }}
-      />
+      {/* ── Os enfeites dela, boiando ───────────────────────────────────
+          São os itens que ela comprou na loja — os mesmos que decoram o
+          Caminho. Aqui NÃO são arrumáveis nem tocáveis: sem modo de edição e
+          com `pointer-events` desligado. É cenário, não inventário.
+          Ficam grandes e bem apagados, atrás de tudo: nesse tamanho o desenho
+          vira mancha macia e sai da leitura; pequenos e nítidos virariam
+          confete no meio do texto. Quem não comprou nada não vê nada, e a
+          tela continua de pé — o gradiente já se basta. */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        {enfeites.slice(0, 9).map((e, i) => {
+          const pos = POS_ENFEITE[i % POS_ENFEITE.length];
+          return (
+            <span
+              key={`${e}-${i}`}
+              className="dc-flutua absolute select-none leading-none"
+              style={{
+                left: `${pos.x}%`,
+                top: `${pos.y}%`,
+                fontSize: `${pos.tam}px`,
+                opacity: 0.09,
+                animationDelay: `${i * 1.7}s`,
+                animationDuration: `${14 + (i % 4) * 3}s`,
+              }}
+            >
+              {e}
+            </span>
+          );
+        })}
+      </div>
+
       {/* VÉU DO TOPO — o que salva a saudação.
           Metade das artes tem o alto escuro (golden hour, entardecer, tarde:
           azul profundo em cima, nuvens acesas embaixo) mesmo contando como

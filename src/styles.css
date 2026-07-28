@@ -2177,3 +2177,32 @@ button:active > .duo3d {
     opacity: 0.5;
   }
 }
+
+/* ══════════════ Enfeites boiando na tela das atividades ══════════════
+   Os itens que a paciente comprou na loja, atrás do conteúdo. O movimento é
+   propositalmente lento e curto — 14 a 23 segundos por ciclo, 10px de sobe e
+   desce, 3 graus de giro. Num emoji de 130px isso é quase imperceptível, que
+   é o ponto: a tela precisa parecer viva sem que nada peça atenção.
+   Só `transform`, para não custar layout. */
+@keyframes dcFlutua {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translate3d(4px, -10px, 0) rotate(1.5deg);
+  }
+}
+.dc-flutua {
+  animation-name: dcFlutua;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Param, não somem: eles são cor de fundo. O que sai é o movimento. */
+  .dc-flutua {
+    animation: none;
+  }
+}

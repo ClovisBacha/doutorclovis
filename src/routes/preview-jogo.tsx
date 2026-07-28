@@ -30,15 +30,28 @@ export const Route = createFileRoute("/preview-jogo")({
 
 function PreviewJogo() {
   const { tela, bebe } = Route.useSearch();
+  /* z-50 e não z-75: a tela de atividades vai por portal para o <body> em
+     z-60, e um invólucro de bancada em z-75 a cobria — o teste escondendo
+     justamente o que ele deveria fotografar. 50 ainda cobre o cabeçalho
+     público, que é para o que este invólucro existe. */
   return (
-    <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
+    <div className="fixed inset-0 z-[50] overflow-y-auto bg-background">
       <GestacaoPath
         profile={{ baby_name: bebe }}
         gest={{ weeks: 19, days: 6, totalDays: 139 }}
         quizPremium
         careMode={false}
         onOpenShop={() => {}}
-        bancada={tela === "jogos" ? { jogos: true, saldo: 125, halves: 1 } : undefined}
+        bancada={
+          tela === "jogos"
+            ? {
+                jogos: true,
+                saldo: 125,
+                halves: 1,
+                enfeites: ["🌻", "🧸", "🌙", "🦋", "🌿", "⭐", "🐣", "🌸", "🕯️"],
+              }
+            : undefined
+        }
       />
     </div>
   );
