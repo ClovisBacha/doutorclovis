@@ -198,7 +198,12 @@ import {
 } from "@/lib/daily-quizzes";
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
-import skyAmanhecer from "@/assets/sky/amanhecer.webp";
+/* Arte própria desta tela, feita a partir do desenho de referência. Ela mora
+   em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
+   cenário fixo da tela de atividades. */
+import jogoNuvens from "@/assets/jogo/nuvens.webp";
+import jogoBolha from "@/assets/jogo/bolha.webp";
+import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
@@ -5279,13 +5284,10 @@ function WellnessScreen({
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage: `url(${skyAmanhecer})`,
-          /* A arte sozinha puxa para o azulado e fica escura no alto, que é
-             onde mora o texto. Medido contra a referência: sem isto o topo
-             saía 37 a 73 níveis RGB mais escuro. */
-          filter: "saturate(1.18) brightness(1.3)",
-        }}
+        /* Sem `filter` agora. O céu de amanhecer emprestado precisava de
+            +30% de brilho para não puxar cinza; esta arte já nasce na
+            temperatura certa, então mexer nela só a afastaria. */
+        style={{ backgroundImage: `url(${jogoNuvens})` }}
       />
       {/* Véu: a arte sozinha tem contraste demais para texto cinza por cima. */}
       <div
@@ -5293,7 +5295,7 @@ function WellnessScreen({
         className="pointer-events-none fixed inset-0"
         style={{
           background:
-            "linear-gradient(180deg, rgba(255,242,238,0.52) 0%, rgba(255,232,236,0.22) 45%, rgba(255,240,234,0.44) 100%)",
+            "linear-gradient(180deg, rgba(255,250,252,0.12) 0%, rgba(255,248,250,0.1) 50%, rgba(255,246,248,0.14) 100%)",
         }}
       />
       {/* O ✕ do canto só existe DENTRO de uma atividade. Na lista, quem fecha é
@@ -5473,24 +5475,16 @@ function WellnessScreen({
                     no desenho: é o que a faz parecer um objeto POUSADO no
                     cartão em vez de uma figurinha colada dentro dele. */}
                 <span className="pointer-events-none absolute -right-6 top-1/2 h-[188px] w-[188px] -translate-y-1/2">
-                  {/* Bolha DE VIDRO, não um brilho: parede com reflexo no alto
-                      à esquerda e contra-luz na base — o mesmo material da
-                      esfera da home. Sem a parede o bebê boiava num borrão. */}
-                  <span
-                    className="absolute inset-[9%] rounded-full"
-                    style={{
-                      background: [
-                        "radial-gradient(circle at 31% 25%, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.2) 30%, rgba(255,255,255,0) 52%)",
-                        "radial-gradient(circle at 50% 50%, rgba(240,228,255,0.44) 0%, rgba(255,214,238,0.22) 58%, rgba(255,255,255,0.04) 82%)",
-                      ].join(", "),
-                      boxShadow: [
-                        "inset 0 2px 3px -1px rgba(255,255,255,0.85)",
-                        "inset 6px 10px 22px -14px rgba(255,255,255,0.9)",
-                        "inset -8px -12px 26px -16px rgba(255,255,255,0.55)",
-                        "inset 0 0 0 1px rgba(255,255,255,0.3)",
-                        "0 0 34px 10px rgba(255,238,250,0.32)",
-                      ].join(", "),
-                    }}
+                  {/* A bolha é ARTE, não CSS. Gradiente e sombra dão volume,
+                      mas não dão iridescência nem as faíscas em volta — e era
+                      justamente isso que faltava para a tela bater com o
+                      desenho. O miolo do arquivo é transparente, então o bebê
+                      aparece por dentro dela. */}
+                  <img
+                    src={jogoBolha}
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 h-full w-full"
                   />
                   <BabyIllustration
                     week={Math.max(1, Math.min(42, Math.floor(day / 7)))}
@@ -5658,36 +5652,8 @@ function WellnessScreen({
                 }}
               >
                 {/* O 🎁 do sistema é vermelho e amarelo — as duas cores que
-                    esta tela não tem. Desenhado, o presente entra na paleta. */}
-                <span aria-hidden className="shrink-0">
-                  <svg viewBox="0 0 48 48" className="h-[60px] w-[60px]">
-                    <rect
-                      x="6"
-                      y="20"
-                      width="36"
-                      height="22"
-                      rx="4"
-                      fill="#fdfbff"
-                      stroke="#e3d6f5"
-                      strokeWidth="1.4"
-                    />
-                    <rect
-                      x="4"
-                      y="15"
-                      width="40"
-                      height="8"
-                      rx="3"
-                      fill="#f7f1ff"
-                      stroke="#e3d6f5"
-                      strokeWidth="1.4"
-                    />
-                    <rect x="21" y="15" width="6" height="27" fill="#c9aef0" />
-                    <path
-                      d="M24 15c-3-5-9-7-11-4s2 4 11 4zM24 15c3-5 9-7 11-4s-2 4-11 4z"
-                      fill="#b795ea"
-                    />
-                  </svg>
-                </span>
+                    esta tela não tem. Esta arte nasceu na paleta dela. */}
+                <img src={jogoPresente} alt="" aria-hidden className="h-[62px] w-[62px] shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span
                     className="block font-serif text-[15px]"
