@@ -979,7 +979,11 @@ export function AppHomeScreen({
     artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
 
   return (
-    <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)]">
+    /* Sem `pb` aqui: a página que renderiza esta tela (minha-conta) já reserva
+       `7rem + safe-area` no rodapé para a barra flutuante, e as duas folgas
+       somavam ~216px. Com quatro cartões embaixo do bebê isso não aparecia;
+       agora que sobrou só o médico, virou meia tela em branco. */
+    <div className="space-y-4">
       {/* ── Hero imersivo: céu real do momento + bebê + clima ────────
           Full-bleed nas laterais (-mx-5 cancela o px-5 da página) e puxado
           para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
@@ -1383,7 +1387,12 @@ export function AppHomeScreen({
                       {dayGreetingLabel()}
                       {babyName ? `, ${babyName}!` : "!"}
                     </p>
-                    <p className={`mt-0.5 text-[12px] leading-snug ${cardMuted}`}>{weather.tip}</p>
+                    {/* Mesma cor do cartão de cima. `cardMuted` a 12px e peso
+                        normal lia bem mais claro que o mesmo `cardMuted` a
+                        11px em negrito do "% concluído" logo acima — mesma
+                        cor no código, dois cinzas diferentes no olho. Aqui o
+                        que separa título de dica é o PESO, não a cor. */}
+                    <p className={`mt-0.5 text-[12px] leading-snug ${cardText}`}>{weather.tip}</p>
                   </div>
                 </div>
               )}

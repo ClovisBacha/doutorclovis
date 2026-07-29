@@ -27,6 +27,10 @@ export const Route = createFileRoute("/preview-home")({
   validateSearch: (s: Record<string, unknown>) => ({
     w: Number(s.w) || 19,
     notif: s.notif === true || String(s.notif ?? "") === "1",
+    // `?clima=1` liga a consulta real de clima (Belo Horizonte) — é a única
+    // forma de fotografar o cartão de saudação, que só existe quando há
+    // clima. Sem o parâmetro a bancada continua offline.
+    clima: s.clima === true || String(s.clima ?? "") === "1",
   }),
   head: () => ({
     meta: [{ title: "Bancada da home" }, { name: "robots", content: "noindex" }],
@@ -35,12 +39,14 @@ export const Route = createFileRoute("/preview-home")({
 });
 
 function PreviewHome() {
-  const { w, notif } = Route.useSearch();
+  const { w, notif, clima } = Route.useSearch();
   const { slot } = useSkyNow(null);
   const escuro = slot.dark;
   return (
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
-      <div className="mx-auto max-w-md px-5 pt-2">
+      {/* Repete a folga de rodapé que a página real aplica (a barra
+          flutuante fica por cima), para a bancada medir o mesmo espaço. */}
+      <div className="mx-auto max-w-md px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-2">
         <AppHomeScreen
           firstName="Clovis"
           babyName="Clovis"
@@ -51,6 +57,7 @@ function PreviewHome() {
           careMode={false}
           skyTheme="v2"
           temNaoLidas={notif}
+          homeCity={clima ? { nome: "Belo Horizonte", lat: -19.92, lon: -43.94 } : null}
         />
       </div>
       <AppBottomNav
