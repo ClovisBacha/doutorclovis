@@ -47,7 +47,6 @@ function PreviewHome() {
           gest={{ weeks: w, days: 6, totalDays: w * 7 + 6 }}
           onNavigate={() => {}}
           onOpenMenu={() => {}}
-          nextAppointment={null}
           babyTone={0}
           careMode={false}
           skyTheme="v2"

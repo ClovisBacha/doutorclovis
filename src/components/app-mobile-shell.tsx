@@ -9,15 +9,12 @@
 import { useState, useEffect } from "react";
 import {
   Baby,
-  CalendarDays,
   ChevronRight,
   Gamepad2,
-  HelpCircle,
   LifeBuoy,
   Heart,
   UserRound,
   MessageCircle,
-  NotebookPen,
   type LucideIcon,
 } from "lucide-react";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
@@ -594,100 +591,11 @@ export function AppBottomNav({
 
 type GestInfo = { weeks: number; days: number; totalDays: number } | null;
 
-/**
- * Marcos proativos por semana: o app INICIA o cuidado ("você entrou na semana
- * 28 — hora de contar os movimentos") em vez de esperar a paciente procurar.
- * Faixas em ordem; a primeira que contém a semana atual vence.
- */
-const WEEK_MILESTONES: {
-  min: number;
-  max: number;
-  icon: string;
-  title: string;
-  text: string;
-  tab: AppTab;
-  /** Sub-aba do hub de Consultas em que o marco deve abrir (ex.: "parto"). */
-  sub?: string;
-}[] = [
-  {
-    min: 6,
-    max: 10,
-    icon: "🩺",
-    title: "Hora do primeiro ultrassom",
-    text: "O exame inicial (6–9 semanas) data a gestação. Já agendou a primeira consulta?",
-    tab: "Consultas",
-  },
-  {
-    min: 11,
-    max: 13,
-    icon: "🔬",
-    title: "Janela do morfológico do 1º trimestre",
-    text: "Entre 11 e 14 semanas — guarde o resultado na aba Exames.",
-    tab: "Exames",
-  },
-  {
-    min: 16,
-    max: 19,
-    icon: "🦶",
-    title: "Os primeiros chutes estão chegando",
-    text: "Entre 18 e 22 semanas você deve começar a sentir — registre os movimentos.",
-    tab: "Registros",
-  },
-  {
-    min: 20,
-    max: 23,
-    icon: "🔬",
-    title: "Janela do morfológico do 2º trimestre",
-    text: "Entre 20 e 24 semanas — o ultrassom mais detalhado do bebê.",
-    tab: "Exames",
-  },
-  {
-    min: 24,
-    max: 27,
-    icon: "🍬",
-    title: "Época do teste de glicose (TOTG)",
-    text: "Entre 24 e 28 semanas — rastreio de diabetes gestacional. Combine com seu médico.",
-    tab: "Exames",
-  },
-  {
-    min: 28,
-    max: 30,
-    icon: "👶",
-    title: "Comece a contagem de movimentos",
-    text: "No 3º trimestre, o padrão diário dos chutes é o melhor sinal de bem-estar do bebê.",
-    tab: "Registros",
-  },
-  {
-    min: 31,
-    max: 33,
-    icon: "📋",
-    title: "Hora de montar o plano de parto",
-    text: "Registre suas preferências e converse com seu médico na próxima consulta.",
-    tab: "Consultas",
-    sub: "parto",
-  },
-  {
-    min: 34,
-    max: 36,
-    icon: "🧳",
-    title: "Prepare a mala da maternidade",
-    text: "O checklist completo te guia peça por peça — deixe pronta até a semana 36.",
-    tab: "Consultas",
-    sub: "checklist",
-  },
-  {
-    min: 37,
-    max: 42,
-    icon: "⏱️",
-    title: "Reta final: conheça os sinais do trabalho de parto",
-    text: "Registre as contrações — padrão 5-1-1 é hora de ir para a maternidade.",
-    tab: "Registros",
-  },
-];
-
-function milestoneForWeek(weeks: number) {
-  return WEEK_MILESTONES.find((m) => weeks >= m.min && weeks <= m.max) ?? null;
-}
+/* A tabela de MARCOS POR SEMANA morava aqui e alimentava a faixa
+   "SEMANA 20 · Janela do morfológico" no alto da home. A faixa saiu — o mesmo
+   conteúdo já é a linha do tempo do pré-natal dentro do Calendário
+   (`PRENATAL_MILESTONES`, em minha-conta), com data calculada e tudo, e manter
+   duas listas do mesmo assunto significava mantê-las iguais para sempre. */
 
 export type NextAppointment = { dateLabel: string; typeLabel: string };
 
@@ -908,7 +816,6 @@ export function AppHomeScreen({
   gest,
   onNavigate,
   onOpenMenu,
-  nextAppointment,
   babyTone = 0,
   careMode = false,
   skyTheme = "v2",
@@ -923,7 +830,6 @@ export function AppHomeScreen({
   onNavigate: (tab: AppTab, sub?: string) => void;
   /** Abre o menu da conta (silhueta no topo): notificações, perfil, painel e sair. */
   onOpenMenu?: () => void;
-  nextAppointment?: NextAppointment | null;
   /** Tom de pele do bebê (índice na paleta BABY_TONES). */
   babyTone?: number;
   /** Modo Cuidado: silencia contagem, tamanho do bebê, streak e desafio. */
@@ -1071,11 +977,6 @@ export function AppHomeScreen({
      sombra: o fundo atrás deles muda de luminosidade ao longo do dia. */
   const overArt: React.CSSProperties =
     artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
-
-  /* O marco da semana — mora dentro do cartão do calendário. Continua mudo no
-     Modo Cuidado: ele é um lembrete de exame, e o Modo Cuidado existe para
-     calar exatamente esse tipo de cobrança. */
-  const marcoDaSemana = gest && !careMode ? milestoneForWeek(gest.weeks) : null;
 
   return (
     <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)]">
@@ -1489,107 +1390,20 @@ export function AppHomeScreen({
         </div>
       </div>
 
-      {/* ── Meu calendário — agora com o marco da semana dentro ─────────
-          A barra "SEMANA 20 · Janela do morfológico" era um cartão à parte,
-          logo acima deste. Ela dizia o que a linha do tempo do Calendário já
-          diz (e o Exames também), e ainda ficava ANTES do cartão que de fato
-          leva a algum lugar — dois blocos disputando o mesmo assunto, com o
-          menos útil na frente.
+      {/* Aqui moravam quatro blocos: Meu calendário (com o marco da semana
+          dentro), Registros, Pós-parto e o link de Dúvidas frequentes. Todos
+          foram para o menu da conta, atrás da silhueta do topo.
 
-          O marco virou a segunda linha do calendário: a informação continua
-          (e continua clicável, indo para a aba dela), o cartão ganha corpo e
-          vira o bloco mais pesado da home depois do bebê, e a tela perde uma
-          faixa inteira. `divide` no lugar de dois cartões porque as duas
-          linhas falam da MESMA coisa — o que está por vir. */}
-      <div className="shine overflow-hidden rounded-3xl border border-primary/25 bg-primary/8 shadow-[var(--shadow-card)]">
-        <button
-          onClick={() => onNavigate("Calendário")}
-          className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-300 hover:bg-primary/10"
-        >
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/14 ring-1 ring-primary/20 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-105 group-hover:-rotate-3">
-            <CalendarDays className="h-[22px] w-[22px] text-primary" strokeWidth={1.8} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
-              Meu calendário
-            </p>
-            {nextAppointment ? (
-              <>
-                <p className="mt-0.5 text-[15px] font-semibold leading-tight text-foreground">
-                  Próxima consulta · {nextAppointment.dateLabel}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{nextAppointment.typeLabel}</p>
-              </>
-            ) : (
-              <p className="mt-0.5 text-[15px] font-semibold leading-tight text-foreground">
-                Consultas, exames e marcos — tudo aqui
-              </p>
-            )}
-          </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-primary/50 transition-transform duration-300 group-hover:translate-x-1" />
-        </button>
+          A razão é o que esta segunda dobra virou: uma lista de portas. Quem
+          rolava a home passava por quatro cartões cinza-rosa parecidos entre
+          si para chegar no único que tem rosto. Agora a rolagem tem um destino
+          só — o médico — e as portas ficam onde se procura por portas.
 
-        {/* Marco da semana — silenciado no Modo Cuidado, como antes. O ícone
-            fica na MESMA coluna do calendário (w-11) e sem fundo: assim a
-            linha lê como continuação do cartão, e não como outro cartão. */}
-        {marcoDaSemana && gest && (
-          <button
-            onClick={() => onNavigate(marcoDaSemana.tab, marcoDaSemana.sub)}
-            className="group flex w-full items-center gap-3 border-t border-primary/15 px-4 py-2.5 text-left transition-colors duration-300 hover:bg-primary/10"
-          >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center text-xl">
-              {marcoDaSemana.icon}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary/80">
-                Semana {gest.weeks}
-              </p>
-              <p className="truncate text-[13px] font-semibold leading-tight text-foreground">
-                {marcoDaSemana.title}
-              </p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-primary/50 transition-transform duration-300 group-hover:translate-x-0.5" />
-          </button>
-        )}
-      </div>
-
-      {/* ── Registros (uso diário: diário, chutes, contrações) ── */}
-      <button
-        onClick={() => onNavigate("Registros")}
-        className="shine group w-full rounded-3xl border border-primary/15 bg-primary/5 text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/30 hover:bg-primary/8"
-      >
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 ring-1 ring-orange-200">
-            <NotebookPen className="h-5 w-5" strokeWidth={1.8} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground">Registros</p>
-            <p className="text-xs text-muted-foreground">Diário, chutes e contrações</p>
-          </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-primary/40 transition-transform duration-300 group-hover:translate-x-1" />
-        </div>
-      </button>
-
-      {/* ── Pós-parto: aparece só na reta final (a partir da semana 36) ── */}
-      {gest && gest.weeks >= 36 && !careMode && (
-        <button
-          onClick={() => onNavigate("Pós-parto")}
-          className="shine group w-full rounded-3xl border border-rose-200 bg-rose-50/60 text-left transition-all duration-300 active:scale-[0.98] hover:bg-rose-50"
-        >
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 ring-1 ring-rose-200">
-              <Heart className="h-5 w-5" strokeWidth={1.8} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">Pós-parto</p>
-              <p className="text-xs text-muted-foreground">
-                Cuidados com você e o bebê depois do parto
-              </p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-rose-400 transition-transform duration-300 group-hover:translate-x-1" />
-          </div>
-        </button>
-      )}
+          Nada se perdeu de caminho: Consultas e Registros são as duas
+          primeiras linhas do menu depois dos seus dados, a próxima consulta
+          virou o subtítulo da linha de Consultas, Pós-parto continua
+          aparecendo só a partir da semana 36, e o marco da semana já era
+          repetição da linha do tempo do Calendário. */}
 
       {/* ── Card do médico ──────────────────────────────────────────── */}
       <button
@@ -1612,15 +1426,6 @@ export function AppHomeScreen({
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
         </div>
-      </button>
-
-      {/* ── Rodapé discreto: Ajuda/FAQ (baixa frequência, fora da grade) ── */}
-      <button
-        onClick={() => onNavigate("FAQ")}
-        className="mx-auto flex items-center gap-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <HelpCircle className="h-3.5 w-3.5" />
-        Dúvidas frequentes
       </button>
     </div>
   );

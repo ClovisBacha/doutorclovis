@@ -14,6 +14,9 @@ export const Route = createFileRoute("/preview-conta")({
   validateSearch: (q: Record<string, unknown>) => ({
     painel: q.painel === true || String(q.painel ?? "") === "1",
     lidas: Number(q.lidas ?? 3),
+    // `?semana=37` liga a linha de Pós-parto, que só existe da 36 em diante —
+    // sem isto o caso mais alto da folha (nove linhas) nunca seria medido.
+    semana: Number(q.semana ?? 20),
   }),
   head: () => ({
     meta: [{ title: "Bancada do menu da conta" }, { name: "robots", content: "noindex" }],
@@ -22,13 +25,14 @@ export const Route = createFileRoute("/preview-conta")({
 });
 
 function PreviewConta() {
-  const { painel, lidas } = Route.useSearch();
+  const { painel, lidas, semana } = Route.useSearch();
   return (
     <div className="fixed inset-0 z-[50] bg-gradient-to-b from-sky-200 to-rose-100">
       <MenuDaConta
         nome="Clovis"
         saudacao="Boa noite"
-        gest={{ weeks: 20, days: 6 }}
+        gest={{ weeks: semana, days: 6 }}
+        proximaConsulta="Próxima: 12/08 · Pré-natal"
         naoLidas={lidas}
         mostrarPainel={painel}
         onNotificacoes={() => {}}

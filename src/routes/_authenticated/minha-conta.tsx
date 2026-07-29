@@ -1266,7 +1266,6 @@ function MinhaContaPage() {
                 onOpenMenu={() => setHomeMenu(true)}
                 temNaoLidas={naoLidas > 0}
                 onOrigemLocal={setOrigemLocal}
-                nextAppointment={nextAppt}
                 babyTone={profile?.baby_skin_tone ?? 0}
                 careMode={careMode}
                 skyTheme={profile?.sky_theme === "v1" ? "v1" : "v2"}
@@ -1286,6 +1285,9 @@ function MinhaContaPage() {
                   nome={firstName}
                   saudacao={dayGreeting()}
                   gest={gest ? { weeks: gest.weeks, days: gest.days } : null}
+                  proximaConsulta={
+                    nextAppt ? `Próxima: ${nextAppt.dateLabel} · ${nextAppt.typeLabel}` : null
+                  }
                   naoLidas={naoLidas}
                   mostrarPainel={isAdmin || isDoctor}
                   onNotificacoes={abrirNotificacoes}

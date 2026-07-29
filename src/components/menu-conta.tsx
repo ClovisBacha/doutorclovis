@@ -1,10 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import {
+  CalendarDays,
+  CircleHelp,
   Gift,
-  IdCard,
+  Heart,
   Inbox,
   LayoutDashboard,
   LogOut,
+  NotebookPen,
   Stethoscope,
   UserRound,
   Users,
@@ -34,9 +37,20 @@ import type { AppTab } from "@/components/app-mobile-shell";
  * RÓTULOS, que é a única coisa que importa numa lista de navegação.
  */
 
-/* A ordem é de dentro para fora: primeiro você, depois quem cuida de você,
-   depois quem te acompanha, depois os papéis. Sair fica por último, sozinho
-   embaixo de uma linha, para ninguém acertar de raspão. */
+/* A ordem é de dentro para fora: primeiro você, depois a sua agenda e o que
+   você anota nela, depois quem cuida de você, depois quem te acompanha, e por
+   fim o que dá para aprender aqui. Sair fica sozinho embaixo de uma linha,
+   para ninguém acertar de raspão.
+
+   A CARTEIRINHA saiu: ela vive inteira dentro do SOS — QR, sangue, alergias,
+   semana, DPP, medicamentos, contato, médico — com um "abrir carteirinha
+   completa" que leva à aba. Repetir aqui era um segundo caminho para a mesma
+   tela, e o do SOS é o que importa: é lá que ela vai procurar com a mão
+   tremendo.
+
+   CONSULTAS e REGISTROS vieram da home, onde eram dois cartões grandes acima
+   do médico. A home ficou com o bebê e o médico; o que é agenda e caderno
+   mora aqui, junto do resto que é dela. */
 const MENU_CONTA: { tab: AppTab; label: string; sub: string; Icon: LucideIcon }[] = [
   {
     tab: "Perfil",
@@ -44,14 +58,31 @@ const MENU_CONTA: { tab: AppTab; label: string; sub: string; Icon: LucideIcon }[
     sub: "Nome, DUM, cidade e notificações",
     Icon: UserRound,
   },
+  {
+    tab: "Consultas",
+    label: "Consultas",
+    sub: "Calendário, exames e marcos",
+    Icon: CalendarDays,
+  },
+  {
+    tab: "Registros",
+    label: "Registros",
+    sub: "Diário, chutes e contrações",
+    Icon: NotebookPen,
+  },
   { tab: "Médico", label: "Meu médico", sub: "Quem acompanha a sua gestação", Icon: Stethoscope },
   { tab: "Acompanhante", label: "Acompanhante", sub: "Convide quem acompanha você", Icon: Users },
-  { tab: "Carteirinha", label: "Carteirinha", sub: "Seus dados para levar na bolsa", Icon: IdCard },
   {
     tab: "Recompensas",
     label: "Recompensas",
     sub: "Sementinhas, conquistas e premium",
     Icon: Gift,
+  },
+  {
+    tab: "FAQ",
+    label: "Dúvidas frequentes",
+    sub: "As perguntas que todo mundo faz",
+    Icon: CircleHelp,
   },
 ];
 
@@ -59,6 +90,7 @@ export function MenuDaConta({
   nome,
   saudacao,
   gest,
+  proximaConsulta,
   naoLidas,
   mostrarPainel,
   onNotificacoes,
@@ -69,6 +101,10 @@ export function MenuDaConta({
   nome: string;
   saudacao: string;
   gest: { weeks: number; days: number } | null;
+  /** Vem da home: a linha "Próxima consulta · 12/08" morava no cartão do
+      calendário. O cartão saiu da home; a informação não podia sair junto,
+      então ela vira o subtítulo da linha de Consultas. */
+  proximaConsulta?: string | null;
   naoLidas: number;
   mostrarPainel: boolean;
   onNotificacoes: () => void;
@@ -144,11 +180,31 @@ export function MenuDaConta({
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-foreground">{label}</span>
                 <span className="block text-[11.5px] leading-snug text-muted-foreground">
-                  {sub}
+                  {tab === "Consultas" && proximaConsulta ? proximaConsulta : sub}
                 </span>
               </span>
             </button>
           ))}
+
+          {/* Pós-parto só existe na reta final. Era um cartão da home que
+              aparecia a partir da semana 36; a home ficou com o médico, e sem
+              esta linha ele viraria uma aba sem porta no celular. */}
+          {gest && gest.weeks >= 36 && (
+            <button
+              onClick={() => onNavegar("Pós-parto")}
+              className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left transition-colors hover:bg-primary/8"
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                <Heart className="h-[19px] w-[19px] text-rose-500" strokeWidth={1.9} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">Pós-parto</span>
+                <span className="block text-[11.5px] leading-snug text-muted-foreground">
+                  Cuidados com você e o bebê depois do parto
+                </span>
+              </span>
+            </button>
+          )}
 
           <div className="mx-4 my-1 h-px bg-border/60" />
 
