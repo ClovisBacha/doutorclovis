@@ -125,6 +125,7 @@ import { useWeatherSky } from "@/components/weather-sky";
 import { SKIN_KEY } from "@/lib/trilha-skins";
 import { useSkyNow } from "@/components/app-mobile-shell";
 import { NotificacoesSheet } from "@/components/notificacoes-sheet";
+import { MenuDaConta } from "@/components/menu-conta";
 import {
   contarNaoLidas,
   lerLidas,
@@ -139,15 +140,23 @@ import {
   FileText,
   FlaskConical,
   Flower2,
+  Gift,
   HeartPulse,
+  IdCard,
   Image as ImageIcon,
+  Inbox,
+  LayoutDashboard,
+  LogOut,
   Mic,
   Plus,
   Ribbon,
   Salad,
   Send,
   Settings,
+  Stethoscope,
   TriangleAlert,
+  UserRound,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -1273,74 +1282,23 @@ function MinhaContaPage() {
               {/* Menu do ☰: as ações que viviam na barra de topo da home
                   (saudação, Painel, Perfil e Sair) continuam todas aqui. */}
               {homeMenu && (
-                <div
-                  className="fixed inset-0 z-[70] flex items-start justify-center bg-black/30 backdrop-blur-sm"
-                  onClick={() => setHomeMenu(false)}
-                >
-                  <div
-                    role="dialog"
-                    aria-label="Menu"
-                    onClick={(e) => e.stopPropagation()}
-                    className="mt-[calc(3.5rem+env(safe-area-inset-top))] w-[86%] max-w-sm rounded-3xl border border-white/70 bg-card/95 p-2 shadow-[var(--shadow-float)] backdrop-blur-xl"
-                  >
-                    <p className="px-4 pb-1 pt-3 font-serif text-lg leading-tight text-foreground">
-                      {dayGreeting()}, {firstName} 💛
-                    </p>
-                    <div className="mt-1 space-y-0.5">
-                      {/* Primeiro item da lista: é o que muda de um dia para o
-                          outro. Painel, ajustes e sair estão sempre lá; só
-                          este tem novidade. */}
-                      <button
-                        onClick={abrirNotificacoes}
-                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/8"
-                      >
-                        <span className="relative text-lg leading-none">
-                          ✉️
-                          {naoLidas > 0 && (
-                            <span
-                              aria-hidden
-                              className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card"
-                            />
-                          )}
-                        </span>
-                        <span className="flex-1">Notificações</span>
-                        {naoLidas > 0 && (
-                          <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[11px] font-bold text-white">
-                            {naoLidas}
-                          </span>
-                        )}
-                      </button>
-                      {(isAdmin || isDoctor) && (
-                        <Link
-                          to="/painel"
-                          onClick={() => setHomeMenu(false)}
-                          className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-primary/8"
-                        >
-                          <span className="text-lg">🩺</span> Painel do médico
-                        </Link>
-                      )}
-                      <button
-                        onClick={() => {
-                          setHomeMenu(false);
-                          setTab("Perfil");
-                          setMobileHome(false);
-                        }}
-                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/8"
-                      >
-                        <span className="text-lg">⚙️</span> Perfil e ajustes
-                      </button>
-                      <button
-                        onClick={() => {
-                          setHomeMenu(false);
-                          signOut();
-                        }}
-                        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-muted-foreground transition-colors hover:bg-primary/8"
-                      >
-                        <span className="text-lg">🚪</span> Sair
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <MenuDaConta
+                  nome={firstName}
+                  saudacao={dayGreeting()}
+                  gest={gest ? { weeks: gest.weeks, days: gest.days } : null}
+                  naoLidas={naoLidas}
+                  mostrarPainel={isAdmin || isDoctor}
+                  onNotificacoes={abrirNotificacoes}
+                  onNavegar={(t) => {
+                    setHomeMenu(false);
+                    goToTab(t);
+                  }}
+                  onSair={() => {
+                    setHomeMenu(false);
+                    signOut();
+                  }}
+                  onFechar={() => setHomeMenu(false)}
+                />
               )}
 
               {notifOpen && (

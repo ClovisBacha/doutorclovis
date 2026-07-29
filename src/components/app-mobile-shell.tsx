@@ -15,7 +15,7 @@ import {
   HelpCircle,
   LifeBuoy,
   Heart,
-  Menu,
+  UserRound,
   MessageCircle,
   NotebookPen,
   type LucideIcon,
@@ -921,7 +921,7 @@ export function AppHomeScreen({
   gest: GestInfo;
   /** `sub` abre direto numa sub-aba do destino (ex.: Consultas → "parto"). */
   onNavigate: (tab: AppTab, sub?: string) => void;
-  /** Abre o menu (☰ do topo): perfil, painel e sair. */
+  /** Abre o menu da conta (silhueta no topo): notificações, perfil, painel e sair. */
   onOpenMenu?: () => void;
   nextAppointment?: NextAppointment | null;
   /** Tom de pele do bebê (índice na paleta BABY_TONES). */
@@ -932,7 +932,7 @@ export function AppHomeScreen({
   skyTheme?: SkyThemeId;
   /** Cidade do cadastro, quando preenchida — degrau entre o GPS e o IP. */
   homeCity?: { nome: string; lat: number; lon: number } | null;
-  /** Acende o ponto vermelho no ☰ — há notificação por abrir. */
+  /** Acende o ponto vermelho na silhueta — há notificação por abrir. */
   temNaoLidas?: boolean;
   /**
    * Conta para fora DE ONDE veio a localização.
@@ -1015,8 +1015,9 @@ export function AppHomeScreen({
      branco funcionavam. Quem devolve a leitura sem engrossar mais o vidro é
      o conjunto: gradiente diagonal, rim claro no topo, sombra interna
      embaixo e sombra externa que descola o cartão do céu. */
-  /* O ☰ é uma ESFERA de vidro, não um disco: a luz entra pela quina de cima
-     à esquerda e escapa pela de baixo à direita, e é esse par que dá volume.
+  /* O botão da conta é uma ESFERA de vidro, não um disco: a luz entra pela
+     quina de cima à esquerda e escapa pela de baixo à direita, e é esse par
+     que dá volume.
      Fundo ainda mais transparente que o dos cartões — ele é ferramenta, tem
      que ser alcançável sem ser notado. */
   const glassLeve: React.CSSProperties = {
@@ -1158,27 +1159,33 @@ export function AppHomeScreen({
                   hapticTap();
                   onOpenMenu?.();
                 }}
-                aria-label={temNaoLidas ? "Menu — há notificações novas" : "Menu"}
+                aria-label={temNaoLidas ? "Perfil — há notificações novas" : "Perfil"}
                 className="press relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                 style={glassLeve}
               >
                 {/* O ponto fica FORA do círculo de vidro, encostado na borda:
-                    dentro ele competiria com o ☰ num botão de 40px e sumiria
-                    contra nuvem clara. O anel branco o descola do céu. */}
+                    dentro ele competiria com a silhueta num botão de 40px e
+                    sumiria contra nuvem clara. O anel branco o descola do céu. */}
                 {temNaoLidas && (
                   <span
                     aria-hidden
                     className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-rose-500 ring-2 ring-white/85"
                   />
                 )}
-                {/* O ☰ é irmão do número de graus, e ícone não aceita
-                    `background-clip: text`. O material vira traço: barra
+                {/* Silhueta de perfil no lugar do ☰. Três barras não dizem o
+                    que há atrás delas — cabem notificações, ajustes, sair,
+                    qualquer coisa. A silhueta diz: isto é a SUA conta. E é
+                    o mesmo desenho que todo app usa para esse canto, então
+                    ninguém precisa aprender nada.
+
+                    O botão é irmão do número de graus, e ícone não aceita
+                    `background-clip: text`. O material vira traço: linha
                     branca translúcida com as MESMAS sombras deslocadas do
                     vidro — claras para cima e à esquerda, escuras para baixo
                     e à direita. É o mesmo bisel, escrito em `drop-shadow`. */}
-                <Menu
+                <UserRound
                   className="h-5 w-5"
-                  strokeWidth={2.2}
+                  strokeWidth={2.1}
                   style={{
                     stroke: "rgba(255,255,255,0.9)",
                     filter:

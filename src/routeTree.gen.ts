@@ -19,6 +19,7 @@ import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewHomeRouteImport } from './routes/preview-home'
+import { Route as PreviewContaRouteImport } from './routes/preview-conta'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
@@ -112,6 +113,11 @@ const PreviewJogoRoute = PreviewJogoRouteImport.update({
 const PreviewHomeRoute = PreviewHomeRouteImport.update({
   id: '/preview-home',
   path: '/preview-home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewContaRoute = PreviewContaRouteImport.update({
+  id: '/preview-conta',
+  path: '/preview-conta',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewChatRoute = PreviewChatRouteImport.update({
@@ -358,6 +364,7 @@ export interface FileRoutesByFullPath {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-conta': typeof PreviewContaRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -413,6 +420,7 @@ export interface FileRoutesByTo {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-conta': typeof PreviewContaRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -470,6 +478,7 @@ export interface FileRoutesById {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-conta': typeof PreviewContaRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -527,6 +536,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/preview-chat'
+    | '/preview-conta'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -582,6 +592,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/preview-chat'
+    | '/preview-conta'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -638,6 +649,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/preview-chat'
+    | '/preview-conta'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -695,6 +707,7 @@ export interface RootRouteChildren {
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
   PreviewChatRoute: typeof PreviewChatRoute
+  PreviewContaRoute: typeof PreviewContaRoute
   PreviewHomeRoute: typeof PreviewHomeRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
@@ -794,6 +807,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-home'
       fullPath: '/preview-home'
       preLoaderRoute: typeof PreviewHomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-conta': {
+      id: '/preview-conta'
+      path: '/preview-conta'
+      fullPath: '/preview-conta'
+      preLoaderRoute: typeof PreviewContaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-chat': {
@@ -1147,6 +1167,7 @@ const rootRouteChildren: RootRouteChildren = {
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
   PreviewChatRoute: PreviewChatRoute,
+  PreviewContaRoute: PreviewContaRoute,
   PreviewHomeRoute: PreviewHomeRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
