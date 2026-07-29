@@ -94,11 +94,6 @@ export function tabToSection(t: AppTab): BottomSection | null {
   return null;
 }
 
-/** Abas de uma seção do menu de baixo (uma barra só no celular). */
-export function tabsForSection(section: BottomSection | null): readonly AppTab[] {
-  return section ? SECTION_TABS[section] : [];
-}
-
 /* ================================================================
    Clima em tempo real — Open-Meteo (gratuito, sem API key)
    ================================================================ */

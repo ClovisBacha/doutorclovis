@@ -15,6 +15,7 @@ import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
+import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewHomeRouteImport } from './routes/preview-home'
@@ -91,6 +92,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const PrimeiraConsultaRoute = PrimeiraConsultaRouteImport.update({
   id: '/primeira-consulta',
   path: '/primeira-consulta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
+  id: '/preview-saude',
+  path: '/preview-saude',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewNotificacoesRoute = PreviewNotificacoesRouteImport.update({
@@ -355,6 +361,7 @@ export interface FileRoutesByFullPath {
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-saude': typeof PreviewSaudeRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -409,6 +416,7 @@ export interface FileRoutesByTo {
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-saude': typeof PreviewSaudeRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -465,6 +473,7 @@ export interface FileRoutesById {
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-saude': typeof PreviewSaudeRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -521,6 +530,7 @@ export interface FileRouteTypes {
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
+    | '/preview-saude'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -575,6 +585,7 @@ export interface FileRouteTypes {
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
+    | '/preview-saude'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -630,6 +641,7 @@ export interface FileRouteTypes {
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
+    | '/preview-saude'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -686,6 +698,7 @@ export interface RootRouteChildren {
   PreviewHomeRoute: typeof PreviewHomeRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
+  PreviewSaudeRoute: typeof PreviewSaudeRoute
   PrimeiraConsultaRoute: typeof PrimeiraConsultaRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -753,6 +766,13 @@ declare module '@tanstack/react-router' {
       path: '/primeira-consulta'
       fullPath: '/primeira-consulta'
       preLoaderRoute: typeof PrimeiraConsultaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude': {
+      id: '/preview-saude'
+      path: '/preview-saude'
+      fullPath: '/preview-saude'
+      preLoaderRoute: typeof PreviewSaudeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-notificacoes': {
@@ -1130,6 +1150,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewHomeRoute: PreviewHomeRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
+  PreviewSaudeRoute: PreviewSaudeRoute,
   PrimeiraConsultaRoute: PrimeiraConsultaRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

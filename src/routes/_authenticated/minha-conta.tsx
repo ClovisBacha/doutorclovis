@@ -15,7 +15,6 @@ import {
   AppBottomNav,
   AppHomeScreen,
   tabToSection,
-  tabsForSection,
   type AppTab,
   type BottomSection,
   type NextAppointment,
@@ -138,12 +137,19 @@ import {
   Camera,
   ChevronLeft,
   FileText,
+  FlaskConical,
+  Flower2,
+  HeartPulse,
   Image as ImageIcon,
   Mic,
   Plus,
+  Ribbon,
+  Salad,
   Send,
   Settings,
+  TriangleAlert,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import {
   searchDoctors,
@@ -367,6 +373,99 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
 ];
 
+/* ══════════════════ Hub da Saúde (celular) ══════════════════
+   A seção Saúde tem seis abas e elas moravam numa fileira de pílulas que
+   rolava na horizontal. Numa tela de 390px cabiam quatro: "Alertas" e "Saúde
+   da mulher" ficavam além da borda, sem nenhum sinal de que existiam — e as
+   quatro visíveis eram alvos de 36px de altura espremidos entre o título e o
+   conteúdo.
+
+   Viraram seis quadrados grandes, dois por linha. É a mesma navegação, mas
+   cada destino ganha nome, uma linha dizendo o que tem dentro, um ícone e um
+   alvo do tamanho do polegar — e, principalmente, todos aparecem de uma vez.
+
+   `aspect-square` de propósito: é o que garante "dois quadrados grandes por
+   linha" em qualquer largura, de um iPhone SE a um tablet em retrato. */
+const HUB_SAUDE: {
+  tab: Tab;
+  sub: string;
+  Icon: LucideIcon;
+  caixa: string;
+  tinta: string;
+}[] = [
+  {
+    tab: "Saúde",
+    sub: "Peso, pressão e glicemia",
+    Icon: HeartPulse,
+    caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
+    tinta: "text-emerald-600",
+  },
+  {
+    tab: "Exames",
+    sub: "Resultados e laudos",
+    Icon: FlaskConical,
+    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
+    tinta: "text-sky-600",
+  },
+  {
+    tab: "Nutrição",
+    sub: "O que comer hoje",
+    Icon: Salad,
+    caixa: "border-lime-200/70 from-lime-50 to-amber-50/60",
+    tinta: "text-lime-600",
+  },
+  {
+    tab: "Bem-estar",
+    sub: "Meditar, sons e humor",
+    Icon: Flower2,
+    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
+    tinta: "text-violet-600",
+  },
+  {
+    tab: "Alertas",
+    sub: "Sinais de atenção",
+    Icon: TriangleAlert,
+    caixa: "border-rose-200/70 from-rose-50 to-orange-50/60",
+    tinta: "text-rose-600",
+  },
+  {
+    tab: "Saúde da mulher",
+    sub: "Ciclo, mamas e colo",
+    Icon: Ribbon,
+    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
+    tinta: "text-pink-600",
+  },
+];
+
+export function HubSaude({ onAbrir }: { onAbrir: (t: Tab) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {HUB_SAUDE.map(({ tab, sub, Icon, caixa, tinta }) => (
+        <button
+          key={tab}
+          onClick={() => onAbrir(tab)}
+          className={`press flex aspect-square flex-col justify-between overflow-hidden rounded-[26px] border bg-gradient-to-br p-3.5 text-left ${caixa}`}
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+            <Icon className={`h-[22px] w-[22px] ${tinta}`} strokeWidth={1.7} />
+          </span>
+          {/* `overflow-hidden` + `line-clamp` mantêm o QUADRADO quadrado: em
+              telas de 320px "Saúde da mulher" quebra em duas linhas e, sem
+              isto, esticava só aquele bloco e desalinhava a grade toda. */}
+          <span className="min-w-0">
+            <span className="block font-serif text-[16px] leading-tight text-foreground">
+              {tab}
+            </span>
+            <span className="mt-1 line-clamp-2 block text-[11.5px] leading-snug text-muted-foreground">
+              {sub}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const CAT_STYLE: Record<string, { pill: string; glass: string; accent: string; emoji: string }> = {
   Gestação: {
     pill: "bg-pink-100/90 text-pink-700 shadow-[0_0_0_1px_rgba(244,114,182,0.25)]",
@@ -480,6 +579,13 @@ function MinhaContaPage() {
   }
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
+  /* Hub da seção Saúde (só no celular). A seção tem SEIS abas e elas viviam
+     numa fileira de pílulas que rolava na horizontal: cabiam quatro, então
+     "Alertas" e "Saúde da mulher" ficavam fora da tela — existiam sem que
+     nada na tela dissesse que existiam. Viraram uma grade de seis quadrados
+     grandes, dois por linha, que é a tela de entrada da seção. Nulo = está
+     dentro de uma das abas. */
+  const [hubAberto, setHubAberto] = useState<BottomSection | null>(null);
 
   /* Toda navegação DENTRO do app volta ao topo — inclusive entrar no app.
      `tab` é estado do React, não rota: trocar de aba não muda a URL, então o
@@ -502,7 +608,7 @@ function MinhaContaPage() {
      ninguém vê o estado intermediário. */
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
-  }, [tab, mobileHome]);
+  }, [tab, mobileHome, hubAberto]);
 
   /** Menu do ☰ da home — guarda as ações que ficavam na barra de topo. */
   const [homeMenu, setHomeMenu] = useState(false);
@@ -618,6 +724,7 @@ function MinhaContaPage() {
   const goToTab = (t: string, sub?: string) => {
     setTab(t as Tab);
     setMobileHome(false);
+    setHubAberto(null);
     setConsultasSub(sub ?? null);
   };
 
@@ -888,13 +995,26 @@ function MinhaContaPage() {
       return;
     }
     setMobileHome(false);
-    // Jogo/Chat abrem DIRETO no tab; Saúde na saúde. (Bebê = home, tratado acima.)
+    // Jogo/Chat têm uma aba só e abrem DIRETO nela. Saúde tem seis: abre no
+    // hub, a grade de quadrados. (Bebê = home, tratado acima.)
     const sectionMap: Record<Exclude<BottomSection, "home">, Tab> = {
       jogo: "Caminho",
       chat: "Chat IA",
       saude: "Saúde",
     };
     setTab(sectionMap[section]);
+    setHubAberto(section === "saude" ? "saude" : null);
+  }
+
+  /* A seta da barra de cima. Dentro de uma aba da Saúde ela volta para o hub
+     da seção — antes pulava dois níveis de uma vez e caía na home. */
+  function voltarDaBarra() {
+    if (!hubAberto && tabToSection(tab as AppTab) === "saude") {
+      setHubAberto("saude");
+      return;
+    }
+    setHubAberto(null);
+    setMobileHome(true);
   }
 
   // Médico (não-admin) NÃO usa o app da gestante: bebê, diário, jogo e afins
@@ -1073,13 +1193,15 @@ function MinhaContaPage() {
                 `mobileHome`, então o ramo da saudação nunca renderizava. */}
             <div className="flex min-w-0 items-center gap-2.5">
               <button
-                onClick={() => setMobileHome(true)}
-                aria-label="Voltar ao início"
+                onClick={voltarDaBarra}
+                aria-label="Voltar"
                 className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-colors hover:bg-primary/15"
               >
                 <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2} />
               </button>
-              <p className="truncate font-serif text-xl leading-tight text-foreground">{tab}</p>
+              <p className="truncate font-serif text-xl leading-tight text-foreground">
+                {hubAberto ? "Sua saúde" : tab}
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {(isAdmin || isDoctor) && (
@@ -1233,31 +1355,10 @@ function MinhaContaPage() {
 
           {/* ── Desktop & mobile (when tab selected): category nav + tabs ── */}
           <div className={mobileHome ? "hidden md:block" : "block"}>
-            {/* Celular: UMA barra só — as abas da seção do menu de baixo (o menu
-              de baixo já faz o papel de categoria; corta um seletor empilhado).
-              Jogo/Chat têm 1 aba só → escondemos a fileira (abrem limpos). */}
-            <div
-              className={`print:hidden mt-2 ${
-                tabsForSection(activeSection).length > 1 ? "flex" : "hidden"
-              } gap-1 overflow-x-auto pb-1 md:hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]`}
-            >
-              {tabsForSection(activeSection).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => {
-                    setTab(t as Tab);
-                    setMobileHome(false);
-                  }}
-                  className={`press flex-shrink-0 rounded-full px-3.5 py-2 text-sm transition-colors ${
-                    tab === t
-                      ? "bg-primary text-primary-foreground font-semibold"
-                      : "text-foreground/60 hover:text-foreground/80"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+            {/* A fileira de pílulas que ficava aqui saiu. Ela só existia para a
+              seção Saúde (Jogo e Chat têm uma aba só), rolava na horizontal e
+              escondia duas das seis abas fora da borda da tela. O hub abaixo
+              faz o mesmo trabalho mostrando as seis de uma vez. */}
 
             {/* Desktop: seletor de categorias (tem espaço de sobra) */}
             <div className="print:hidden mt-6 hidden gap-1.5 overflow-x-auto pb-1 md:flex [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -1312,7 +1413,25 @@ function MinhaContaPage() {
             {careMode && (
               <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />
             )}
-            <div key={`${tab}-${refreshKey}`} className="mt-6 tab-enter">
+            {/* ── Celular: hub da Saúde — seis quadrados, dois por linha ──── */}
+            {hubAberto === "saude" && (
+              <div className="mt-5 md:hidden">
+                <HubSaude
+                  onAbrir={(t) => {
+                    setHubAberto(null);
+                    setTab(t);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Com o hub aberto o conteúdo da aba fica escondido NO CELULAR e
+                continua no desktop, que tem as duas fileiras de abas e nunca
+                viu o hub. */}
+            <div
+              key={`${tab}-${refreshKey}`}
+              className={`mt-6 tab-enter ${hubAberto ? "hidden md:block" : ""}`}
+            >
               <TabErrorBoundary tabName={tab}>
                 {tab === "Bebê" && (
                   <BebeHub
