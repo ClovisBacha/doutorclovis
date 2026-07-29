@@ -3,6 +3,8 @@ import QRCode from "qrcode";
 import { toast } from "sonner";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { DOCTOR } from "@/lib/doctor.config";
+import { linkTel, linkWhatsApp } from "@/lib/telefone";
+import type { DoctorContato } from "@/lib/patientlink.functions";
 import { savePanicEvent } from "@/lib/escola.functions";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,29 +21,6 @@ type Info = {
   medications?: string | null;
 };
 
-// Número do médico em formato tel: a partir do link do WhatsApp (wa.me/<num>).
-function doctorTel(): string {
-  const m = DOCTOR.whatsappUrl.match(/(\d{8,})/);
-  return m ? `tel:+${m[1]}` : "";
-}
-
-/**
- * Link de WhatsApp a partir do telefone que a paciente digitou no perfil.
- *
- * O campo é texto livre — chega como "(31) 98634-2903", "31986342903" ou
- * "+55 31 98634 2903". Aqui só sobram os dígitos; 10 ou 11 (DDD + número)
- * ganham o 55 do Brasil, 12 ou 13 já vêm com DDI. Qualquer outra coisa
- * devolve vazio, e a tela cai no compartilhamento do sistema em vez de abrir
- * um link quebrado — numa emergência, um link que não abre é pior que um
- * caminho a mais.
- */
-function whatsappDe(tel?: string | null): string | null {
-  const d = (tel ?? "").replace(/\D/g, "");
-  if (d.length === 10 || d.length === 11) return `https://wa.me/55${d}`;
-  if (d.length === 12 || d.length === 13) return `https://wa.me/${d}`;
-  return null;
-}
-
 /**
  * Central de Emergência (aberta pelo botão SOS da barra de baixo). Junta tudo
  * num lugar só: ligar 192, falar com o médico, os sinais de alerta e uma
@@ -50,14 +29,29 @@ function whatsappDe(tel?: string | null): string | null {
  */
 export function EmergencySheet({
   info,
+  medico,
   onClose,
   onOpenCard,
 }: {
   info: Info;
+  /**
+   * O médico DA PACIENTE, lido do cadastro dele (`getMyDoctorContact`).
+   * `null` = ela ainda não tem médico vinculado, ou ele não preencheu o
+   * WhatsApp: aí vale o `doctor.config`, que é o dono da instalação.
+   *
+   * Isto não é preciosismo de multi-tenant: um SOS que liga para o médico
+   * errado é pior que um SOS que não liga para ninguém, porque ela vai
+   * esperar do outro lado uma resposta que não vem.
+   */
+  medico?: DoctorContato | null;
   onClose: () => void;
   /** Abre a carteirinha completa (QR grande, copiar, imprimir) fora do SOS. */
   onOpenCard?: () => void;
 }) {
+  const medNome = medico?.nome?.trim() || DOCTOR.name;
+  const medCrm = medico?.crm?.trim() || DOCTOR.crm;
+  const medZap = linkWhatsApp(medico?.whatsapp) ?? DOCTOR.whatsappUrl;
+  const medTel = linkTel(medico?.whatsapp) ?? linkTel(DOCTOR.whatsappUrl) ?? "";
   const [qr, setQr] = useState<string | null>(null);
   const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
   // Carteirinha recolhida por padrão; toca pra ver tudo (fica dentro do SOS).
@@ -140,7 +134,7 @@ export function EmergencySheet({
         .filter(Boolean)
         .join("\n");
 
-      const zap = whatsappDe(info.emergencyPhone);
+      const zap = linkWhatsApp(info.emergencyPhone);
       if (zap) {
         window.open(`${zap}?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
         setPanic("sent");
@@ -173,18 +167,21 @@ export function EmergencySheet({
     `Alergias: ${info.allergies || "nenhuma informada"}`,
     `Medicamentos: ${info.medications || "nenhum"}`,
     `Contato emergencia: ${info.emergencyContact || "-"} ${info.emergencyPhone || ""}`.trim(),
-    `Medico: ${DOCTOR.name} - ${DOCTOR.whatsappDisplay}`,
+    `Medico: ${medNome} - ${medCrm}`,
   ]
     .filter(Boolean)
     .join("\n");
 
+  /* O QR é REFEITO sempre que o texto da ficha muda — e `card` é uma string,
+     então a comparação do efeito é por conteúdo, não por referência. Mudou o
+     tipo sanguíneo, a alergia, o medicamento, a semana, o médico? Sai um QR
+     novo no mesmo instante, sem recarregar a página. E é gerado no próprio
+     aparelho: cada paciente tem o seu, e nenhum dado de saúde sai daqui. */
   useEffect(() => {
     QRCode.toDataURL(card, { margin: 1, width: 260, errorCorrectionLevel: "M" })
       .then(setQr)
       .catch(() => setQr(null));
   }, [card]);
-
-  const tel = doctorTel();
 
   return (
     <div
@@ -218,7 +215,7 @@ export function EmergencySheet({
             Ligar 192 (SAMU)
           </a>
           <a
-            href={DOCTOR.whatsappUrl}
+            href={medZap}
             target="_blank"
             rel="noopener noreferrer"
             className="flex flex-col items-center gap-1 rounded-2xl bg-primary px-4 py-4 text-center text-sm font-semibold text-primary-foreground"
@@ -227,12 +224,12 @@ export function EmergencySheet({
             WhatsApp do médico
           </a>
         </div>
-        {tel && (
+        {medTel && (
           <a
-            href={tel}
+            href={medTel}
             className="mt-2 flex items-center justify-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-foreground"
           >
-            📞 Ligar para {DOCTOR.name.split(" ").slice(0, 2).join(" ")}
+            📞 Ligar para {medNome.split(" ").slice(0, 2).join(" ")}
           </a>
         )}
 
@@ -293,7 +290,7 @@ export function EmergencySheet({
                 <Row label="DPP" value={info.dpp} />
                 <Row label="Medicamentos" value={info.medications || "nenhum"} />
                 <Row label="Tel. emergência" value={info.emergencyPhone} />
-                <Row label="Médico" value={`${DOCTOR.name} · ${DOCTOR.crm}`} />
+                <Row label="Médico" value={`${medNome} · ${medCrm}`} />
               </dl>
               <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
                 {[

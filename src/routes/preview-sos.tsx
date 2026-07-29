@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { EmergencySheet } from "@/components/emergency-sheet";
 
 /**
@@ -15,6 +16,10 @@ import { EmergencySheet } from "@/components/emergency-sheet";
 export const Route = createFileRoute("/preview-sos")({
   validateSearch: (q: Record<string, unknown>) => ({
     vazio: q.vazio === true || String(q.vazio ?? "") === "1",
+    // `?outro=1` simula uma paciente vinculada a OUTRO médico: e o teste que
+    // prova que o SOS liga para o medico dela, e nao para o dono da
+    // instalacao.
+    outro: q.outro === true || String(q.outro ?? "") === "1",
   }),
   head: () => ({
     meta: [{ title: "Bancada do SOS" }, { name: "robots", content: "noindex" }],
@@ -23,9 +28,19 @@ export const Route = createFileRoute("/preview-sos")({
 });
 
 function PreviewSos() {
-  const { vazio } = Route.useSearch();
+  const { vazio, outro } = Route.useSearch();
+  /* Troca o tipo sanguíneo SEM remontar a tela: é assim que se prova que o QR
+     acompanha a edição do perfil, e não só o primeiro desenho. */
+  const [sangue, setSangue] = useState("O+");
   return (
     <div className="fixed inset-0 z-[50] bg-background">
+      <button
+        data-testid="trocar-sangue"
+        onClick={() => setSangue((v) => (v === "O+" ? "AB−" : "O+"))}
+        className="fixed left-2 top-2 z-[200] rounded bg-black/70 px-2 py-1 text-[10px] text-white"
+      >
+        trocar sangue
+      </button>
       <EmergencySheet
         info={
           vazio
@@ -33,7 +48,7 @@ function PreviewSos() {
             : {
                 name: "Ana",
                 weekLabel: "20s 6d",
-                bloodType: "O+",
+                bloodType: sangue,
                 allergies: "Dipirona",
                 emergencyContact: "Marcos Silva",
                 emergencyPhone: "(31) 98888-7777",
@@ -41,6 +56,17 @@ function PreviewSos() {
                 dpp: "10/12/2026",
                 medications: "Ácido fólico",
               }
+        }
+        medico={
+          outro
+            ? {
+                nome: "Dra. Marina Prado",
+                title: "Ginecologista e Obstetra",
+                specialty: "Gestação de alto risco",
+                crm: "CRM-SP 98.765",
+                whatsapp: "(11) 97777-1234",
+              }
+            : null
         }
         onClose={() => {}}
         onOpenCard={() => {}}

@@ -516,6 +516,67 @@ export const getMyDoctorPix = createServerFn({ method: "POST" })
     };
   });
 
+/**
+ * Contato do médico DA PACIENTE — o que a Central de Emergência e a
+ * carteirinha precisam saber.
+ *
+ * Existe porque `doctor.config.ts` é um arquivo fixo com o telefone do
+ * Dr. Clóvis, e o app é multi-médico: uma paciente vinculada a outro médico
+ * via com um SOS que liga para o médico errado, e sai do hospital com uma
+ * carteirinha nomeando um profissional que não a acompanha. Numa emergência
+ * isso não é um detalhe de cadastro.
+ *
+ * Devolve `null` — e quem chama cai no `doctor.config` — em três casos, todos
+ * legítimos: a paciente ainda não tem médico vinculado, o médico não
+ * preencheu o WhatsApp, ou a tabela `doctors` ainda não existe no banco (as
+ * migrations multi-tenant são posteriores à instalação atual). Nenhum deles
+ * pode derrubar a tela.
+ */
+export type DoctorContato = {
+  nome: string;
+  title: string;
+  specialty: string;
+  crm: string;
+  /** Como o médico digitou. Quem exibe/normaliza é `lib/telefone`. */
+  whatsapp: string;
+};
+
+export const getMyDoctorContact = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const vazio = { ok: true as const, doctor: null as DoctorContato | null };
+    try {
+      const user = await requireUser(data.accessToken);
+      if (!user) return vazio;
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: prof } = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("doctor_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!prof?.doctor_id) return vazio;
+      const { data: d } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("display_name,title,specialty,crm,whatsapp")
+        .eq("id", prof.doctor_id)
+        .maybeSingle();
+      if (!d?.display_name) return vazio;
+      return {
+        ok: true as const,
+        doctor: {
+          nome: d.display_name as string,
+          title: (d.title as string) ?? "",
+          specialty: (d.specialty as string) ?? "",
+          crm: (d.crm as string) ?? "",
+          whatsapp: (d.whatsapp as string) ?? "",
+        } satisfies DoctorContato,
+      };
+    } catch {
+      // Tabela ausente, rede caída, token vencido: a tela usa o padrão.
+      return vazio;
+    }
+  });
+
 /* ══════════════════════════════════════════════════════════════════════
    Convite do médico pela PACIENTE: ela gera um link pessoal; o médico que
    se cadastrar por ele ganha +15% de desconto em qualquer plano (mostrado

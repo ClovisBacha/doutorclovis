@@ -185,6 +185,8 @@ import {
   searchDoctors,
   requestDoctor,
   getMyDoctorLink,
+  getMyDoctorContact,
+  type DoctorContato,
   cancelDoctorRequest,
   getMyDoctorPix,
   type DoctorPublic,
@@ -758,6 +760,27 @@ function MinhaContaPage() {
   // Próxima consulta confirmada → card na home mobile (fecha o ciclo
   // médico→paciente também na primeira tela do app).
   const [nextAppt, setNextAppt] = useState<NextAppointment | null>(null);
+  /* O médico DA PACIENTE, lido do cadastro dele. Alimenta a Central de
+     Emergência e a carteirinha — as duas telas que dizem para quem ligar. Sem
+     vínculo (ou sem a tabela `doctors` no banco), fica `null` e as telas usam
+     o `doctor.config`, que é o dono da instalação. */
+  const [meuMedico, setMeuMedico] = useState<DoctorContato | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return;
+        const r = await getMyDoctorContact({ data: { accessToken: s.session.access_token } });
+        if (vivo && r.ok) setMeuMedico(r.doctor);
+      } catch {
+        /* fica no padrão */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [profile?.id]);
   async function loadNextAppt(force = false) {
     try {
       const appointments = await fetchAppointmentsCached(force);
@@ -1111,6 +1134,7 @@ function MinhaContaPage() {
             })(),
             medications: profile?.medications ?? null,
           }}
+          medico={meuMedico}
           onClose={() => setEmergencyOpen(false)}
           onOpenCard={() => {
             setEmergencyOpen(false);
@@ -1451,7 +1475,7 @@ function MinhaContaPage() {
                 {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
                 {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
                 {tab === "Carteirinha" && (
-                  <CardTab profile={profile} gest={gest} onNavigate={goToTab} />
+                  <CardTab profile={profile} gest={gest} onNavigate={goToTab} medico={meuMedico} />
                 )}
                 {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
                 {tab === "Recompensas" && (
@@ -5683,11 +5707,17 @@ function CardTab({
   profile,
   gest,
   onNavigate,
+  medico,
 }: {
   profile: Profile | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
+  /** Médico da paciente; `null` = usa o dono da instalação. */
+  medico?: DoctorContato | null;
 }) {
+  const medNome = medico?.nome?.trim() || DOCTOR.name;
+  const medCrm = medico?.crm?.trim() || DOCTOR.crm;
+  const medEspec = medico?.specialty?.trim() || DOCTOR.specialty;
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
@@ -5707,7 +5737,7 @@ function CardTab({
         `Alergias: ${profile.allergies ?? "Nenhuma"}`,
         `Medicamentos: ${profile.medications ?? "Nenhum"}`,
         `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
-        `Médico: ${DOCTOR.name} | ${DOCTOR.crm}`,
+        `Médico: ${medNome} | ${medCrm}`,
         `Atualizado: ${updatedAt}`,
       ].join("\n")
     : "";
@@ -5770,7 +5800,7 @@ function CardTab({
           {profile.emergency_phone && (
             <Info label="Tel. emergência" value={profile.emergency_phone} />
           )}
-          <Info label="Médico" value={DOCTOR.name} />
+          <Info label="Médico" value={`${medNome} · ${medCrm}`} />
         </div>
 
         <div className="mt-5 rounded-xl bg-card/60 p-3 text-xs text-muted-foreground">
@@ -5791,7 +5821,7 @@ function CardTab({
             Escaneie para ver todos os dados em caso de emergência
           </p>
           <p className="mt-2 text-xs font-medium text-primary">
-            {DOCTOR.name} — Ginecologia & Obstetrícia
+            {medNome} — {medEspec}
           </p>
         </div>
       </div>
