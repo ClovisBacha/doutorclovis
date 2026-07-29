@@ -134,6 +134,7 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
       /* ── 1 e 2. O médico dela ─────────────────────────────────────────── */
       let medicoNome = DOCTOR.name;
       let medicoUserId: string | null = null;
+      let medicoEmail: string | null = null;
       if (prof?.doctor_id) {
         const { data: d } = await sb
           .from("doctors")
@@ -142,23 +143,48 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
           .maybeSingle();
         if (d?.display_name) medicoNome = d.display_name as string;
         medicoUserId = prof.doctor_id as string;
+      } else {
+        /* Sem vínculo — que é o caso de TODAS as pacientes de hoje — quem
+           atende é o dono da instalação. Sem este trecho o acionamento não
+           avisava médico nenhum: a única saída seria o e-mail do contato de
+           emergência, e o SOS ficaria mudo para quem ainda não cadastrou um.
+           `ADMIN_EMAILS` é a mesma lista que recebe aviso de novo agendamento;
+           o primeiro da lista é o médico responsável. */
+        const admin = (process.env.ADMIN_EMAILS || "")
+          .split(",")
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean)[0];
+        if (admin) {
+          medicoEmail = admin;
+          try {
+            const { data: uid } = await sb.rpc("get_user_id_by_email", { p_email: admin });
+            if (uid) medicoUserId = uid as string;
+          } catch {
+            /* sem push para ele; o e-mail abaixo continua valendo */
+          }
+        }
       }
 
-      if (medicoUserId) {
-        try {
-          const { sendPushToUser } = await import("@/lib/push.server");
-          const r = await sendPushToUser(medicoUserId, {
-            title: `🆘 ${nome} acionou o SOS`,
-            body: texto.split("\n").slice(1, 3).join(" "),
-            url: "/painel",
-          });
-          canais.medicoPush = r.sent;
-        } catch {
-          /* melhor esforço */
+      if (medicoUserId || medicoEmail) {
+        if (medicoUserId) {
+          try {
+            const { sendPushToUser } = await import("@/lib/push.server");
+            const r = await sendPushToUser(medicoUserId, {
+              title: `🆘 ${nome} acionou o SOS`,
+              body: texto.split("\n").slice(1, 3).join(" "),
+              url: "/painel",
+            });
+            canais.medicoPush = r.sent;
+          } catch {
+            /* melhor esforço */
+          }
         }
         try {
-          const { data: dUser } = await supabaseAdmin.auth.admin.getUserById(medicoUserId);
-          const email = dUser?.user?.email;
+          if (!medicoEmail && medicoUserId) {
+            const { data: dUser } = await supabaseAdmin.auth.admin.getUserById(medicoUserId);
+            medicoEmail = dUser?.user?.email ?? null;
+          }
+          const email = medicoEmail;
           if (email) {
             const { sendEmail } = await import("@/lib/email.server");
             canais.medicoEmail = await sendEmail({
