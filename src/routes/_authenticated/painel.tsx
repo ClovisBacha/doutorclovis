@@ -6707,9 +6707,22 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* Os três obrigatórios existem por causa do SOS, não por burocracia: sem
+     nome, CRM e WhatsApp, a Central de Emergência das pacientes deste médico
+     fica sem para quem ligar — e o app é obrigado a esconder os botões dele.
+     Barrar o salvamento é o único momento em que dá para cobrar isso antes de
+     a falta virar um problema às 3h da manhã. */
   async function save() {
     if (form.display_name.trim().length < 2) {
       toast.error("Informe seu nome.");
+      return;
+    }
+    if (!form.crm.trim()) {
+      toast.error("Informe o CRM — ele vai na carteirinha de emergência da paciente.");
+      return;
+    }
+    if (form.whatsapp.replace(/\D/g, "").length < 10) {
+      toast.error("Informe o WhatsApp de emergência — é o número que o SOS das pacientes usa.");
       return;
     }
     setSaving(true);
@@ -6744,8 +6757,27 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     "mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary";
   const label = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
+  const faltaEmergencia = !form.crm.trim() || form.whatsapp.replace(/\D/g, "").length < 10;
+
   return (
     <div className="max-w-2xl space-y-4">
+      {/* O aviso fica no TOPO da seção, acima até da cobrança: enquanto ele
+          estiver aqui, as pacientes deste médico abrem o SOS e não encontram
+          nenhum caminho até ele. */}
+      {!loading && faltaEmergencia && (
+        <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:bg-rose-500/10">
+          <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
+            Suas pacientes estão sem você no botão de emergência
+          </p>
+          <p className="mt-1 text-[13px] leading-snug text-rose-900/85 dark:text-rose-200/85">
+            Falta {!form.crm.trim() ? "o CRM" : ""}
+            {!form.crm.trim() && form.whatsapp.replace(/\D/g, "").length < 10 ? " e " : ""}
+            {form.whatsapp.replace(/\D/g, "").length < 10 ? "o WhatsApp de emergência" : ""}. Sem
+            eles, a Central de Emergência esconde os seus botões e sobra o 192 para a paciente — o
+            app não coloca o telefone de outro médico no lugar do seu.
+          </p>
+        </div>
+      )}
       <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
       <DoctorInviteCard tokenFn={tokenFn} />
       <ReferralCard tokenFn={tokenFn} />
@@ -6777,20 +6809,33 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             />
           </div>
           <div>
-            <label className={label}>CRM</label>
+            <label className={label}>CRM *</label>
             <input
               value={form.crm}
               onChange={(e) => setForm((f) => ({ ...f, crm: e.target.value }))}
               className={input}
+              placeholder="CRM-MG 12.345"
             />
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              Vai impresso na carteirinha de emergência que a paciente mostra no hospital.
+            </p>
           </div>
           <div>
-            <label className={label}>WhatsApp</label>
+            <label className={label}>WhatsApp de emergência *</label>
             <input
               value={form.whatsapp}
               onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.value }))}
               className={input}
+              placeholder="(31) 98634-2903"
             />
+            {/* O médico costuma ter dois números. Este campo precisa dizer, sem
+                rodeio, qual dos dois ele está cadastrando — é o que toca às
+                3h da manhã quando uma paciente aperta o SOS. */}
+            <p className="mt-1 text-[11px] leading-snug text-amber-700 dark:text-amber-400">
+              <strong>Atenção:</strong> este é o número que aparece no botão SOS das suas pacientes.
+              Elas vão ligar e chamar no WhatsApp por aqui em uma emergência, a qualquer hora.
+              Cadastre o número em que você quer ser encontrado nessa situação.
+            </p>
           </div>
           <div>
             <label className={label}>Título</label>

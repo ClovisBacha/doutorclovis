@@ -5,7 +5,7 @@ import { RED_SYMPTOMS } from "@/lib/triage";
 import { DOCTOR } from "@/lib/doctor.config";
 import { linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
-import { savePanicEvent } from "@/lib/escola.functions";
+import { dispararEmergencia, type CanaisAviso } from "@/lib/emergencia.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 type Info = {
@@ -65,29 +65,30 @@ export function EmergencySheet({
   const medTel = temVinculo ? linkTel(medico!.whatsapp) : linkTel(DOCTOR.whatsappUrl);
   const [qr, setQr] = useState<string | null>(null);
   const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
+  /** O que DE FATO saiu, devolvido pelo servidor. A tela só diz o que houve. */
+  const [canais, setCanais] = useState<CanaisAviso | null>(null);
+  /** Contato que ficou sem canal automático — vira um WhatsApp de um toque. */
+  const [pendente, setPendente] = useState<{ nome: string; texto: string } | null>(null);
   // Carteirinha recolhida por padrão; toca pra ver tudo (fica dentro do SOS).
   const [cardOpen, setCardOpen] = useState(false);
 
   /**
-   * Avisar o contato de emergência.
+   * Pedir socorro — o servidor avisa, não ela.
    *
-   * O que este botão fazia antes: gravava uma linha em `panic_events` e dizia
-   * "Alerta com sua localização enviado 💛". Ninguém era avisado. Não havia
-   * push, e-mail, SMS nem WhatsApp em lugar nenhum do caminho — a linha só
-   * seria vista se o acompanhante ABRISSE o painel dele nos 30 minutos
-   * seguintes, por conta própria. Numa tela de emergência, dizer "enviado"
-   * para algo que não foi enviado é o pior defeito possível: ela pode parar
-   * de procurar ajuda achando que já pediu.
+   * Duas versões atrás este botão montava uma mensagem e abria o WhatsApp:
+   * quem apertava enviar era a paciente. Quem está com a visão embaçada,
+   * sozinha ou prestes a desmaiar pode não concluir — e o app dizia "enviado"
+   * do mesmo jeito.
    *
-   * O que ele faz agora: pega a localização e ABRE O WHATSAPP do contato de
-   * emergência com a mensagem pronta — nome, semana, tipo sanguíneo e o link
-   * do mapa. Quem envia é ela, num toque, e a mensagem chega de verdade. Sem
-   * contato cadastrado, cai no compartilhamento do sistema (ou na cópia do
-   * texto), que também chega em alguém.
+   * Agora um toque dispara `dispararEmergencia`, que envia do servidor por
+   * todos os canais que existirem: push e e-mail para o médico dela, e-mail e
+   * SMS para o contato de emergência. A resposta diz QUAIS saíram, e a tela
+   * mostra nome por nome. Se sobrou alguém sem aviso, aí sim aparece o
+   * WhatsApp — como o que FALTA, não como o que foi feito.
    *
-   * O registro em `panic_events` continua, best-effort e em silêncio: ele
-   * alimenta o painel do acompanhante. Mas ele não é mais o que a tela
-   * promete, porque nunca foi o que a tela entregava.
+   * A localização é tentada primeiro, com teto de 10s: numa emergência não dá
+   * para esperar um GPS que não pega. Sem ela o aviso sai assim mesmo, dizendo
+   * que não foi possível localizar.
    */
   async function sendLocation() {
     if (panic !== "idle") return;
@@ -119,49 +120,39 @@ export function EmergencySheet({
         }
       }
 
-      // Registro para o painel do acompanhante. Em silêncio de propósito: se
-      // falhar (tabela ainda não aplicada, sessão vencida, sem rede), o aviso
-      // pelo WhatsApp continua valendo e é ele que importa.
-      try {
-        const { data: s } = await supabase.auth.getSession();
-        if (s.session) {
-          await savePanicEvent({
-            data: { accessToken: s.session.access_token, latitude: lat, longitude: lng, address },
-          });
-        }
-      } catch {
-        /* melhor esforço */
-      }
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) throw new Error("sem sessão");
+      const r = await dispararEmergencia({
+        data: { accessToken: s.session.access_token, latitude: lat, longitude: lng, address },
+      });
+      if (!r.ok) throw new Error("falhou");
 
-      const mapa = lat != null && lng != null ? `https://maps.google.com/?q=${lat},${lng}` : null;
-      const texto = [
-        `${info.name || "Ela"} precisa de ajuda agora.`,
-        info.weekLabel ? `Gestante de ${info.weekLabel}.` : null,
-        info.bloodType ? `Tipo sanguíneo: ${info.bloodType}.` : null,
-        info.allergies ? `Alergias: ${info.allergies}.` : null,
-        address ? `Local: ${address}` : null,
-        mapa ?? "Não consegui pegar a localização — me ligue.",
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      const zap = linkWhatsApp(info.emergencyPhone);
-      if (zap) {
-        window.open(`${zap}?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
-        setPanic("sent");
-        toast.success(`WhatsApp aberto para ${info.emergencyContact || "seu contato"} 💛`);
-        return;
-      }
-      // Sem contato de emergência cadastrado: entrega para o compartilhamento
-      // do sistema, e se nem isso existir, copia para ela colar onde quiser.
-      if (navigator.share) {
-        await navigator.share({ text: texto });
-        setPanic("sent");
-        return;
-      }
-      await navigator.clipboard.writeText(texto);
+      setCanais(r.canais);
       setPanic("sent");
-      toast.success("Texto copiado — cole no WhatsApp de quem você quer avisar.");
+      if (r.canais.avisados.length) {
+        toast.success(`Avisei ${r.canais.avisados.join(" e ")} 💛`);
+      } else {
+        toast.error("Não consegui avisar ninguém automaticamente — ligue 192.");
+      }
+      // Sobrou um contato sem canal automático: o WhatsApp dele fica pronto.
+      setPendente(
+        r.canais.faltou
+          ? {
+              nome: r.canais.faltou,
+              texto: [
+                `${info.name || "Ela"} precisa de ajuda agora.`,
+                info.weekLabel ? `Gestante de ${info.weekLabel}.` : null,
+                info.bloodType ? `Tipo sanguíneo: ${info.bloodType}.` : null,
+                address ? `Local: ${address}` : null,
+                lat != null && lng != null
+                  ? `https://maps.google.com/?q=${lat},${lng}`
+                  : "Não consegui pegar a localização — me ligue.",
+              ]
+                .filter(Boolean)
+                .join("\n"),
+            }
+          : null,
+      );
     } catch {
       setPanic("idle");
       toast.error("Não consegui avisar por aqui — ligue 192 imediatamente.");
@@ -261,20 +252,85 @@ export function EmergencySheet({
           </a>
         )}
 
-        {/* Botão de pânico: registra a localização pro contato de emergência */}
+        {/* Pedir socorro: um toque, o servidor avisa. */}
         <button
           onClick={sendLocation}
           disabled={panic !== "idle"}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-600 disabled:opacity-60 dark:text-rose-300"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-rose-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-70"
         >
           {panic === "sending"
-            ? "📍 Pegando sua localização…"
+            ? "📍 Localizando e avisando…"
             : panic === "sent"
-              ? "✓ Mensagem pronta"
-              : info.emergencyContact
-                ? `🆘 Avisar ${info.emergencyContact.split(" ")[0]}`
-                : "🆘 Avisar alguém com minha localização"}
+              ? "✓ Aviso enviado"
+              : "🆘 Pedir socorro agora"}
         </button>
+        {panic === "idle" && (
+          <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+            Avisa {medNome.split(" ").slice(0, 2).join(" ")}
+            {info.emergencyContact ? ` e ${info.emergencyContact.split(" ")[0]}` : ""} com a sua
+            localização, sem você precisar escrever nada.
+          </p>
+        )}
+
+        {/* O que REALMENTE saiu. A tela nunca diz "enviado" no genérico: quem
+            foi avisado aparece pelo nome, e quem não foi também. */}
+        {panic === "sent" && canais && (
+          <div className="mt-2 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-[12px] leading-snug text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
+            {canais.avisados.length ? (
+              <p>
+                <span className="font-bold">Avisado agora:</span> {canais.avisados.join(", ")}
+                {canais.medicoPush > 0 ? " · push entregue" : ""}
+              </p>
+            ) : (
+              <p className="font-bold">Ninguém foi avisado automaticamente. Ligue 192.</p>
+            )}
+          </div>
+        )}
+
+        {/* Contato sem canal automático: um toque abre o WhatsApp com tudo
+            pronto. Fica DEPOIS do aviso automático de propósito — é o que
+            falta, não o que a tela fez. */}
+        {pendente && (
+          <a
+            href={`${linkWhatsApp(info.emergencyPhone) ?? ""}?text=${encodeURIComponent(pendente.texto)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-600 dark:text-rose-300"
+          >
+            💬 Falta avisar {pendente.nome.split(" ")[0]} — abrir WhatsApp
+          </a>
+        )}
+
+        {/* Terceira camada de urgência: sempre visível, nunca competindo.
+            193 e 188 estavam dentro da carteirinha RECOLHIDA — três toques até
+            um número de socorro. Agora ficam na primeira dobra, mas com metade
+            da altura, sem cor de fundo e com o número em segundo plano: quem
+            varre a tela em pânico continua batendo o olho primeiro no 192
+            vermelho e no botão de socorro. */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <a
+            href="tel:193"
+            className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-foreground"
+          >
+            <span aria-hidden>🚒</span>
+            <span className="font-semibold">193</span>
+            <span className="text-muted-foreground">Bombeiros</span>
+          </a>
+          <a
+            href="tel:188"
+            className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-foreground"
+          >
+            <span aria-hidden>💚</span>
+            <span className="font-semibold">188</span>
+            <span className="text-muted-foreground">CVV</span>
+          </a>
+        </div>
+        {/* Quase ninguém sabe o que é "CVV" — e um número que a pessoa não
+            entende é um número que ela não liga. */}
+        <p className="mt-1.5 text-center text-[10.5px] leading-snug text-muted-foreground">
+          CVV: Centro de Valorização da Vida — apoio emocional gratuito, 24h, sigiloso. Para quando
+          a angústia é o que está doendo.
+        </p>
 
         {/* Carteirinha de emergência (QR gerado no aparelho) — toca pra ver tudo */}
         <div className="mt-5 rounded-2xl border border-border bg-secondary/40 p-4">
@@ -320,21 +376,6 @@ export function EmergencySheet({
                 <Row label="Tel. emergência" value={info.emergencyPhone} />
                 <Row label="Médico" value={medCrm ? `${medNome} · ${medCrm}` : medNome} />
               </dl>
-              <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
-                {[
-                  { label: "Bombeiros", number: "193" },
-                  { label: "CVV (apoio)", number: "188" },
-                ].map(({ label, number }) => (
-                  <a
-                    key={number}
-                    href={`tel:${number}`}
-                    className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-xs"
-                  >
-                    <span className="text-muted-foreground">{label}</span>
-                    <span className="font-bold text-foreground">{number}</span>
-                  </a>
-                ))}
-              </div>
             </>
           )}
 

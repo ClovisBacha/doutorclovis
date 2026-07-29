@@ -259,6 +259,7 @@ type Profile = {
   home_lat?: number | null;
   home_lon?: number | null;
   emergency_contact?: string | null;
+  emergency_email?: string | null;
   emergency_phone?: string | null;
   height_cm?: number | null;
   pre_pregnancy_weight_kg?: number | null;
@@ -3635,6 +3636,7 @@ function ProfileTab({
     home_lat: profile?.home_lat ?? null,
     home_lon: profile?.home_lon ?? null,
     emergency_contact: profile?.emergency_contact ?? "",
+    emergency_email: profile?.emergency_email ?? "",
     emergency_phone: profile?.emergency_phone ?? "",
     height_cm: profile?.height_cm?.toString() ?? "",
     pre_pregnancy_weight_kg: profile?.pre_pregnancy_weight_kg?.toString() ?? "",
@@ -3671,6 +3673,7 @@ function ProfileTab({
     form.lmp_date || form.reference_date,
     form.blood_type,
     form.emergency_contact,
+    form.emergency_email,
     form.emergency_phone,
     form.height_cm,
     form.pre_pregnancy_weight_kg,
@@ -3704,6 +3707,7 @@ function ProfileTab({
         home_lat: form.home_lat,
         home_lon: form.home_lon,
         emergency_contact: form.emergency_contact || null,
+        emergency_email: form.emergency_email || null,
         emergency_phone: form.emergency_phone || null,
         height_cm: form.height_cm ? Number(form.height_cm) : null,
         pre_pregnancy_weight_kg: form.pre_pregnancy_weight_kg
@@ -3970,6 +3974,22 @@ function ProfileTab({
             value={form.emergency_phone}
             onChange={(v) => setForm({ ...form, emergency_phone: v })}
           />
+          <div className="md:col-span-2">
+            <Field
+              label="E-mail do contato de emergência"
+              type="email"
+              value={form.emergency_email}
+              onChange={(v) => setForm({ ...form, emergency_email: v })}
+            />
+            {/* É o único canal que o app consegue disparar SOZINHO até alguém
+                de fora: o telefone só vira aviso automático com um provedor de
+                SMS contratado. Sem este e-mail, o SOS avisa o médico na hora e
+                ela ainda precisa terminar o aviso à família pela mão. */}
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              Com o e-mail preenchido, o botão SOS avisa esta pessoa automaticamente, com a sua
+              localização — sem você precisar escrever nada.
+            </p>
+          </div>
         </div>
       </div>
 
