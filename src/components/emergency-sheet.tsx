@@ -48,10 +48,21 @@ export function EmergencySheet({
   /** Abre a carteirinha completa (QR grande, copiar, imprimir) fora do SOS. */
   onOpenCard?: () => void;
 }) {
-  const medNome = medico?.nome?.trim() || DOCTOR.name;
-  const medCrm = medico?.crm?.trim() || DOCTOR.crm;
-  const medZap = linkWhatsApp(medico?.whatsapp) ?? DOCTOR.whatsappUrl;
-  const medTel = linkTel(medico?.whatsapp) ?? linkTel(DOCTOR.whatsappUrl) ?? "";
+  /* Quem é "o médico" desta tela — tudo ou nada, nunca uma mistura.
+     
+     Se a paciente TEM médico vinculado, valem só os dados dele. Se ele não
+     cadastrou telefone, os botões de ligar e WhatsApp somem e a tela diz isso
+     — cair no número do dono da instalação seria o pior defeito imaginável:
+     o botão diria "Ligar para Dra. Marina" e chamaria outra pessoa, e ela
+     ficaria esperando do outro lado uma resposta que nunca vem.
+
+     Sem vínculo (a maioria hoje), vale o `doctor.config` — o médico dono da
+     instalação, que é de fato quem a atende. */
+  const temVinculo = !!medico?.nome?.trim();
+  const medNome = temVinculo ? medico!.nome.trim() : DOCTOR.name;
+  const medCrm = (temVinculo ? medico!.crm?.trim() : DOCTOR.crm) || "";
+  const medZap = temVinculo ? linkWhatsApp(medico!.whatsapp) : DOCTOR.whatsappUrl;
+  const medTel = temVinculo ? linkTel(medico!.whatsapp) : linkTel(DOCTOR.whatsappUrl);
   const [qr, setQr] = useState<string | null>(null);
   const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
   // Carteirinha recolhida por padrão; toca pra ver tudo (fica dentro do SOS).
@@ -167,7 +178,7 @@ export function EmergencySheet({
     `Alergias: ${info.allergies || "nenhuma informada"}`,
     `Medicamentos: ${info.medications || "nenhum"}`,
     `Contato emergencia: ${info.emergencyContact || "-"} ${info.emergencyPhone || ""}`.trim(),
-    `Medico: ${medNome} - ${medCrm}`,
+    medCrm ? `Medico: ${medNome} - ${medCrm}` : `Medico: ${medNome}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -214,16 +225,33 @@ export function EmergencySheet({
             <span className="text-2xl">🚑</span>
             Ligar 192 (SAMU)
           </a>
-          <a
-            href={medZap}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex flex-col items-center gap-1 rounded-2xl bg-primary px-4 py-4 text-center text-sm font-semibold text-primary-foreground"
-          >
-            <span className="text-2xl">💬</span>
-            WhatsApp do médico
-          </a>
+          {medZap ? (
+            <a
+              href={medZap}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center gap-1 rounded-2xl bg-primary px-4 py-4 text-center text-sm font-semibold text-primary-foreground"
+            >
+              <span className="text-2xl">💬</span>
+              WhatsApp do médico
+            </a>
+          ) : (
+            /* Médico vinculado sem telefone cadastrado. O lugar não fica
+               vazio: 193 é um número que atende sempre, em qualquer estado. */
+            <a
+              href="tel:193"
+              className="flex flex-col items-center gap-1 rounded-2xl bg-primary px-4 py-4 text-center text-sm font-semibold text-primary-foreground"
+            >
+              <span className="text-2xl">🚒</span>
+              Ligar 193 (Bombeiros)
+            </a>
+          )}
         </div>
+        {!medZap && !medTel && (
+          <p className="mt-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-center text-[12px] leading-snug text-amber-900">
+            {medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.
+          </p>
+        )}
         {medTel && (
           <a
             href={medTel}
@@ -290,7 +318,7 @@ export function EmergencySheet({
                 <Row label="DPP" value={info.dpp} />
                 <Row label="Medicamentos" value={info.medications || "nenhum"} />
                 <Row label="Tel. emergência" value={info.emergencyPhone} />
-                <Row label="Médico" value={`${medNome} · ${medCrm}`} />
+                <Row label="Médico" value={medCrm ? `${medNome} · ${medCrm}` : medNome} />
               </dl>
               <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
                 {[

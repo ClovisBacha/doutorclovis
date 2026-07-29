@@ -20,6 +20,9 @@ export const Route = createFileRoute("/preview-sos")({
     // prova que o SOS liga para o medico dela, e nao para o dono da
     // instalacao.
     outro: q.outro === true || String(q.outro ?? "") === "1",
+    // `?semtel=1`: medica vinculada que NAO cadastrou telefone. E o caso em
+    // que a tela nao pode, de jeito nenhum, cair no numero de outro medico.
+    semtel: q.semtel === true || String(q.semtel ?? "") === "1",
   }),
   head: () => ({
     meta: [{ title: "Bancada do SOS" }, { name: "robots", content: "noindex" }],
@@ -28,7 +31,7 @@ export const Route = createFileRoute("/preview-sos")({
 });
 
 function PreviewSos() {
-  const { vazio, outro } = Route.useSearch();
+  const { vazio, outro, semtel } = Route.useSearch();
   /* Troca o tipo sanguíneo SEM remontar a tela: é assim que se prova que o QR
      acompanha a edição do perfil, e não só o primeiro desenho. */
   const [sangue, setSangue] = useState("O+");
@@ -58,13 +61,13 @@ function PreviewSos() {
               }
         }
         medico={
-          outro
+          outro || semtel
             ? {
                 nome: "Dra. Marina Prado",
                 title: "Ginecologista e Obstetra",
                 specialty: "Gestação de alto risco",
                 crm: "CRM-SP 98.765",
-                whatsapp: "(11) 97777-1234",
+                whatsapp: semtel ? "" : "(11) 97777-1234",
               }
             : null
         }
