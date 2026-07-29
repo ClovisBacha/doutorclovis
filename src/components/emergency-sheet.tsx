@@ -129,8 +129,8 @@ export function EmergencySheet({
 
       setCanais(r.canais);
       setPanic("sent");
-      if (r.canais.avisados.length) {
-        toast.success(`Avisei ${r.canais.avisados.join(" e ")} 💛`);
+      if (r.canais.destinos.length) {
+        toast.success(`Avisei ${r.canais.destinos.map((d) => d.nome).join(" e ")} 💛`);
       } else {
         toast.error("Não consegui avisar ninguém automaticamente — ligue 192.");
       }
@@ -275,22 +275,29 @@ export function EmergencySheet({
         {/* O que REALMENTE saiu. A tela nunca diz "enviado" no genérico: quem
             foi avisado aparece pelo nome, e quem não foi também. */}
         {panic === "sent" && canais && (
-          <div className="mt-2 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-[12px] leading-snug text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
-            {canais.avisados.length ? (
-              <p>
-                <span className="font-bold">Avisado agora:</span> {canais.avisados.join(", ")}
-                {canais.medicoPush > 0 ? " · push entregue" : ""}
-              </p>
+          <div className="mt-2 rounded-2xl bg-emerald-50 px-3.5 py-3 text-[12px] leading-snug text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
+            {canais.destinos.length ? (
+              <>
+                <p className="font-bold">SOS enviado para:</p>
+                <ul className="mt-1 space-y-1">
+                  {canais.destinos.map((d) => (
+                    <li key={d.nome + d.via}>
+                      {/* O endereço aparece junto do nome de propósito: é o que
+                          deixa ela conferir, na hora, que o aviso foi para quem
+                          ela cadastrou — e perceber um cadastro errado antes da
+                          próxima vez, em vez de descobrir na emergência. */}
+                      <span className="font-semibold">{d.nome}</span>
+                      <span className="opacity-80"> — {d.via}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             ) : (
+              /* Não dizemos POR QUE ninguém recebeu (sem médico vinculado, sem
+                 contato cadastrado): ela já sabe o que preencheu, e explicar
+                 cadastro no meio de uma emergência gasta a atenção que ela
+                 precisa ter para ligar. Uma frase, uma ação. */
               <p className="font-bold">Ninguém foi avisado automaticamente. Ligue 192.</p>
-            )}
-            {/* Sem médico vinculado não há a quem avisar do lado clínico — e
-                ela precisa saber disso AGORA, não descobrir esperando. */}
-            {canais.semMedico && (
-              <p className="mt-1.5 text-amber-800 dark:text-amber-300">
-                Você ainda não tem um médico vinculado no app, então nenhum médico foi avisado.
-                Ligue 192 e vincule o seu médico depois, em Perfil.
-              </p>
             )}
           </div>
         )}

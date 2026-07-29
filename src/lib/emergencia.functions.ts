@@ -37,12 +37,17 @@ export type CanaisAviso = {
   medicoEmail: boolean;
   contatoEmail: boolean;
   sms: boolean;
-  /** Nome de quem foi avisado, para a tela dizer sem inventar. */
-  avisados: string[];
+  /**
+   * Quem recebeu, e ONDE. A tela lista isto tal como voltou.
+   *
+   * O `via` existe porque "SOS enviado" sozinho não prova nada: ver o próprio
+   * e-mail do marido escrito na confirmação é o que diz à paciente que o aviso
+   * saiu para a pessoa certa — e, se estiver errado, que ela precisa corrigir
+   * o cadastro antes da próxima vez.
+   */
+  destinos: { nome: string; via: string }[];
   /** Nome do contato que NÃO recebeu nada — a tela oferece o WhatsApp dele. */
   faltou: string | null;
-  /** A paciente não tem médico vinculado: ninguém do lado clínico foi avisado. */
-  semMedico: boolean;
 };
 
 function textoDoAviso(p: {
@@ -82,9 +87,8 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
       medicoEmail: false,
       contatoEmail: false,
       sms: false,
-      avisados: [],
+      destinos: [],
       faltou: null,
-      semMedico: false,
     };
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -184,12 +188,15 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         } catch {
           /* melhor esforço */
         }
-      } else {
-        canais.semMedico = true;
       }
 
-      if ((canais.medicoPush > 0 || canais.medicoEmail) && medicoNome)
-        canais.avisados.push(medicoNome);
+      if ((canais.medicoPush > 0 || canais.medicoEmail) && medicoNome) {
+        const vias = [
+          canais.medicoPush > 0 ? "notificação no celular" : null,
+          canais.medicoEmail ? "e-mail" : null,
+        ].filter(Boolean);
+        canais.destinos.push({ nome: medicoNome, via: vias.join(" e ") });
+      }
 
       /* ── 3. O contato de emergência, por e-mail ───────────────────────── */
       const contatoNome = ((prof?.emergency_contact as string) || "").trim();
@@ -258,10 +265,20 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         }
       }
 
-      if ((canais.contatoEmail || canais.sms) && contatoNome) canais.avisados.push(contatoNome);
+      /* O contato aparece com o endereço/número de verdade: é a única forma de
+         ela conferir, na hora, que o aviso foi para quem ela cadastrou. */
+      if (canais.contatoEmail || canais.sms) {
+        const vias = [
+          canais.contatoEmail ? contatoEmail : null,
+          canais.sms ? formatarTelefone(contatoE164) : null,
+        ].filter(Boolean);
+        canais.destinos.push({
+          nome: contatoNome || "seu contato de emergência",
+          via: vias.join(" · "),
+        });
+      }
       // Só é "faltou" quando existe um contato cadastrado e nada chegou nele.
       if (contatoNome && !canais.contatoEmail && !canais.sms) canais.faltou = contatoNome;
-
       /* ── Registro, com o que saiu ─────────────────────────────────────── */
       try {
         await sb.from("panic_events").insert({
@@ -310,6 +327,17 @@ function emailHtml(nome: string, texto: string, prof: Record<string, unknown> | 
         Em caso de risco de vida, ligue 192.
       </p>
     </div>`;
+}
+
+/** "(31) 98888-7777" a partir do E.164 sem o +. */
+function formatarTelefone(e164: string): string {
+  const local = e164.startsWith("55") ? e164.slice(2) : e164;
+  const ddd = local.slice(0, 2);
+  const resto = local.slice(2);
+  if (resto.length < 8) return `+${e164}`;
+  const meio = resto.length === 9 ? resto.slice(0, 5) : resto.slice(0, 4);
+  const fim = resto.length === 9 ? resto.slice(5) : resto.slice(4);
+  return `(${ddd}) ${meio}-${fim}`;
 }
 
 function escapar(s: string): string {
