@@ -133,14 +133,26 @@ export function EmergencySheet({
       if (navigator?.geolocation) {
         try {
           const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-            /* 6s, não 10, e aceitando uma posição de até 2 minutos atrás:
-               numa emergência quatro segundos a mais de precisão não valem
-               quatro segundos a mais de espera, e o aparelho quase sempre tem
-               uma leitura recente na memória. */
+            /* Três escolhas, e nenhuma é sobre "ser rápido por ser rápido":
+               
+               `enableHighAccuracy: false` — alta precisão espera o GPS travar
+               nos satélites, o que leva 10s ou mais e FALHA dentro de casa,
+               que é onde a maioria das emergências acontece. Sem ela, a
+               posição vem da rede em ~1s, com erro de algumas dezenas de
+               metros. Para uma ambulância te achar, 50m é o mesmo que 5m; a
+               diferença entre 1s e 12s não é.
+               
+               `maximumAge: 120000` — aceita uma leitura de até 2 minutos
+               atrás. O aparelho quase sempre tem uma, e ela é boa: em dois
+               minutos ninguém foi longe.
+               
+               `timeout: 8000` — o limite para desistir, não uma pressa. Vale
+               esperar oito segundos por uma coordenada; passou disso, o aviso
+               sai sem ela em vez de não sair. */
             navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 6000,
+              timeout: 8000,
               maximumAge: 120000,
-              enableHighAccuracy: true,
+              enableHighAccuracy: false,
             }),
           );
           lat = pos.coords.latitude;
@@ -373,6 +385,27 @@ export function EmergencySheet({
           <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
             A mensagem já está escrita no WhatsApp — é só apertar enviar.
           </p>
+        )}
+
+        {/* Localização em tempo real.
+
+            O WhatsApp NÃO permite que um link ou uma API ligue isso — é uma
+            ação que só a pessoa faz, dentro do aplicativo, de propósito (seria
+            grave se um link conseguisse rastrear alguém). O que dá para fazer
+            é o que está aqui: dizer os três toques, na ordem, na tela em que
+            ela já está. Enviada a mensagem, o aviso é o que vale mais: uma
+            coordenada de um instante vira um trajeto de oito horas. */}
+        {panic === "sent" && zapAbriu && (
+          <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+            <p className="text-[12.5px] font-bold text-emerald-800 dark:text-emerald-300">
+              Se você estiver a caminho do hospital, compartilhe onde você está
+            </p>
+            <p className="mt-1 text-[12px] leading-snug text-foreground/75">
+              Dentro da conversa do WhatsApp: toque em <b>📎</b> → <b>Localização</b> →{" "}
+              <b>Localização em tempo real</b> → <b>8 horas</b>. Quem estiver te procurando passa a
+              ver você se movendo.
+            </p>
+          </div>
         )}
 
         {/* Terceira camada de urgência: sempre visível, nunca competindo.
