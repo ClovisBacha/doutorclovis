@@ -4468,6 +4468,10 @@ function MeditationBlock({
   const [fase, setFase] = useState<"in" | "hold" | "out">("in");
   const [tick, setTick] = useState<number>(RESPIRO.in);
   const [humor, setHumor] = useState<string | null>(null);
+  /* Quantos minutos ela DE FATO ficou. Igual a `minutos` quando a sessão vai
+     até o fim, menor quando ela encerra antes — a tela de fim não pode dizer
+     "10 minutos só seus" para quem ficou quatro. */
+  const [minutosFeitos, setMinutosFeitos] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
   const grantedRef = useRef(false);
   const audioRef = useRef<Soundscape | null>(null);
@@ -4569,6 +4573,7 @@ function MeditationBlock({
 
   function begin() {
     setCiclo(0);
+    setMinutosFeitos(minutos);
     setFase("in");
     setHumor(null);
     setReward(null);
@@ -4856,6 +4861,33 @@ function MeditationBlock({
                 {med.theme} · {Math.max(0, Math.ceil(((totalCiclos - ciclo) * CICLO_SEGS) / 60))}{" "}
                 min restantes
               </p>
+
+              {/* Encerrar antes da hora — a saída que a versão de sete frases
+                  tinha no "Continuar →" e que o ritmo da respiração tirou:
+                  lá ela podia adiantar as frases e chegar ao fim; aqui o
+                  relógio manda.
+
+                  Só aparece depois de cinco respirações completas — um minuto
+                  redondo, porque o ciclo é de 12s — e de propósito:
+                  antes disso não houve sessão para encerrar, e um botão de
+                  encerrar visível desde o primeiro segundo convida a sair de
+                  uma tela que ainda nem começou. Passado o minuto, a sessão
+                  conta — quem parou aos 4 de 10 minutos meditou, e o app não
+                  tem por que fingir que não. */}
+              {ciclo >= 5 && (
+                <button
+                  onClick={() => {
+                    const feitos = Math.max(1, Math.round(((ciclo + 1) * CICLO_SEGS) / 60));
+                    setMinutosFeitos(feitos);
+                    setEtapa("reflexo");
+                    registrarMeditacao(feitos, null);
+                    finish();
+                  }}
+                  className="press mt-8 rounded-full border border-violet-200 bg-white/70 px-6 py-2 text-xs font-bold text-violet-500 backdrop-blur"
+                >
+                  Encerrar por aqui
+                </button>
+              )}
             </div>
           )}
 
@@ -4899,7 +4931,11 @@ function MeditationBlock({
               {!careMode && <ConfettiBurst />}
               <span className="dc-result-in text-6xl">🧘</span>
               <h3 className="mt-3 font-serif text-[26px] font-semibold text-violet-900">
-                {minutos} minutos só seus 💜
+                {(() => {
+                  const m = minutosFeitos || minutos;
+                  return `${m} ${m === 1 ? "minuto" : "minutos"} só seus`;
+                })()}{" "}
+                💜
               </h3>
               <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-violet-800/80">
                 {(humor && FECHAMENTO[humor]) ||
