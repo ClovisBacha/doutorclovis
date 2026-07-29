@@ -19,6 +19,7 @@ import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewHomeRouteImport } from './routes/preview-home'
+import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as MuralRouteImport } from './routes/mural'
@@ -113,6 +114,11 @@ const PreviewJogoRoute = PreviewJogoRouteImport.update({
 const PreviewHomeRoute = PreviewHomeRouteImport.update({
   id: '/preview-home',
   path: '/preview-home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewGradesRoute = PreviewGradesRouteImport.update({
+  id: '/preview-grades',
+  path: '/preview-grades',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewContaRoute = PreviewContaRouteImport.update({
@@ -365,6 +371,7 @@ export interface FileRoutesByFullPath {
   '/mural': typeof MuralRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-grades': typeof PreviewGradesRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -421,6 +428,7 @@ export interface FileRoutesByTo {
   '/mural': typeof MuralRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-grades': typeof PreviewGradesRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -479,6 +487,7 @@ export interface FileRoutesById {
   '/mural': typeof MuralRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-grades': typeof PreviewGradesRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -537,6 +546,7 @@ export interface FileRouteTypes {
     | '/mural'
     | '/preview-chat'
     | '/preview-conta'
+    | '/preview-grades'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -593,6 +603,7 @@ export interface FileRouteTypes {
     | '/mural'
     | '/preview-chat'
     | '/preview-conta'
+    | '/preview-grades'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -650,6 +661,7 @@ export interface FileRouteTypes {
     | '/mural'
     | '/preview-chat'
     | '/preview-conta'
+    | '/preview-grades'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -708,6 +720,7 @@ export interface RootRouteChildren {
   MuralRoute: typeof MuralRoute
   PreviewChatRoute: typeof PreviewChatRoute
   PreviewContaRoute: typeof PreviewContaRoute
+  PreviewGradesRoute: typeof PreviewGradesRoute
   PreviewHomeRoute: typeof PreviewHomeRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
@@ -807,6 +820,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-home'
       fullPath: '/preview-home'
       preLoaderRoute: typeof PreviewHomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-grades': {
+      id: '/preview-grades'
+      path: '/preview-grades'
+      fullPath: '/preview-grades'
+      preLoaderRoute: typeof PreviewGradesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-conta': {
@@ -1168,6 +1188,7 @@ const rootRouteChildren: RootRouteChildren = {
   MuralRoute: MuralRoute,
   PreviewChatRoute: PreviewChatRoute,
   PreviewContaRoute: PreviewContaRoute,
+  PreviewGradesRoute: PreviewGradesRoute,
   PreviewHomeRoute: PreviewHomeRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,

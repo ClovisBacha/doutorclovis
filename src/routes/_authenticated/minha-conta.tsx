@@ -126,6 +126,7 @@ import { SKIN_KEY } from "@/lib/trilha-skins";
 import { useSkyNow } from "@/components/app-mobile-shell";
 import { NotificacoesSheet } from "@/components/notificacoes-sheet";
 import { MenuDaConta } from "@/components/menu-conta";
+import { GradeHub, VoltarDaGrade } from "@/components/grade-hub";
 import {
   contarNaoLidas,
   lerLidas,
@@ -135,28 +136,48 @@ import {
 } from "@/lib/notificacoes";
 import type { OrigemLocal } from "@/components/app-mobile-shell";
 import {
+  AudioLines,
+  Baby,
+  CalendarCheck,
   Camera,
   ChevronLeft,
+  ClipboardList,
   FileText,
   FlaskConical,
   Flower2,
   Gift,
   HeartPulse,
   IdCard,
+  Footprints,
+  HeartHandshake,
+  History,
   Image as ImageIcon,
+  Images,
   Inbox,
   LayoutDashboard,
+  ListChecks,
   LogOut,
+  Mail,
+  MessageCircleQuestion,
   Mic,
+  NotebookPen,
+  PersonStanding,
   Plus,
   Ribbon,
   Salad,
+  Scroll,
   Send,
   Settings,
+  ShoppingBag,
+  Smile,
+  Sparkles,
   Stethoscope,
+  Timer,
   TriangleAlert,
   UserRound,
   Users,
+  Video,
+  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -396,49 +417,56 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
    `aspect-square` de propósito: é o que garante "dois quadrados grandes por
    linha" em qualquer largura, de um iPhone SE a um tablet em retrato. */
 const HUB_SAUDE: {
-  tab: Tab;
+  key: Tab;
+  label: Tab;
   sub: string;
   Icon: LucideIcon;
   caixa: string;
   tinta: string;
 }[] = [
   {
-    tab: "Saúde",
+    key: "Saúde",
+    label: "Saúde",
     sub: "Peso, pressão e glicemia",
     Icon: HeartPulse,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
   },
   {
-    tab: "Exames",
+    key: "Exames",
+    label: "Exames",
     sub: "Resultados e laudos",
     Icon: FlaskConical,
     caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
     tinta: "text-sky-600",
   },
   {
-    tab: "Nutrição",
+    key: "Nutrição",
+    label: "Nutrição",
     sub: "O que comer hoje",
     Icon: Salad,
     caixa: "border-lime-200/70 from-lime-50 to-amber-50/60",
     tinta: "text-lime-600",
   },
   {
-    tab: "Bem-estar",
+    key: "Bem-estar",
+    label: "Bem-estar",
     sub: "Meditar, sons e humor",
     Icon: Flower2,
     caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
     tinta: "text-violet-600",
   },
   {
-    tab: "Alertas",
+    key: "Alertas",
+    label: "Alertas",
     sub: "Sinais de atenção",
     Icon: TriangleAlert,
     caixa: "border-rose-200/70 from-rose-50 to-orange-50/60",
     tinta: "text-rose-600",
   },
   {
-    tab: "Saúde da mulher",
+    key: "Saúde da mulher",
+    label: "Saúde da mulher",
     sub: "Ciclo, mamas e colo",
     Icon: Ribbon,
     caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
@@ -447,32 +475,10 @@ const HUB_SAUDE: {
 ];
 
 export function HubSaude({ onAbrir }: { onAbrir: (t: Tab) => void }) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      {HUB_SAUDE.map(({ tab, sub, Icon, caixa, tinta }) => (
-        <button
-          key={tab}
-          onClick={() => onAbrir(tab)}
-          className={`press flex aspect-square flex-col justify-between overflow-hidden rounded-[26px] border bg-gradient-to-br p-3.5 text-left ${caixa}`}
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-            <Icon className={`h-[22px] w-[22px] ${tinta}`} strokeWidth={1.7} />
-          </span>
-          {/* `overflow-hidden` + `line-clamp` mantêm o QUADRADO quadrado: em
-              telas de 320px "Saúde da mulher" quebra em duas linhas e, sem
-              isto, esticava só aquele bloco e desalinhava a grade toda. */}
-          <span className="min-w-0">
-            <span className="block font-serif text-[16px] leading-tight text-foreground">
-              {tab}
-            </span>
-            <span className="mt-1 line-clamp-2 block text-[11.5px] leading-snug text-muted-foreground">
-              {sub}
-            </span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
+  /* Usa a MESMA grade das sub-abas (`GradeHub`). Antes esta tela tinha uma
+     cópia do desenho; duas cópias do mesmo quadrado significam duas chances de
+     elas divergirem no próximo ajuste. */
+  return <GradeHub itens={HUB_SAUDE} onAbrir={(k) => onAbrir(k as Tab)} />;
 }
 
 const CAT_STYLE: Record<string, { pill: string; glass: string; accent: string; emoji: string }> = {
@@ -729,6 +735,9 @@ function MinhaContaPage() {
   // Sub-aba pedida no destino (hoje só o hub de Consultas usa): o marco da
   // semana "plano de parto" abre direto em Plano de parto, e "mala da
   // maternidade" direto no Checklist, em vez de cair sempre na Agenda.
+  /* Sub-aba pedida por quem navegou até aqui (o toque no bebê pede "semana",
+     um marco pede "checklist"). Vale para QUALQUER hub com grade — antes era
+     só das Consultas. */
   const [consultasSub, setConsultasSub] = useState<string | null>(null);
   const goToTab = (t: string, sub?: string) => {
     setTab(t as Tab);
@@ -1400,6 +1409,7 @@ function MinhaContaPage() {
                     onNavigate={goToTab}
                     onBabyTap={() => setJourneyOpen(true)}
                     careMode={careMode}
+                    initialSub={consultasSub}
                   />
                 )}
                 {tab === "Caminho" && (
@@ -1950,33 +1960,63 @@ function WeekMilestoneModal({
  * Hub "Bem-estar": autocuidado numa tela só (sub-abas) — Meditações, Sons,
  * Exercícios, Humor e Apoio Emocional. Antes eram 5 abas.
  */
-const BEMESTAR_SUBTABS = [
-  { key: "meditacoes", label: "Meditações" },
-  { key: "sons", label: "Sons" },
-  { key: "exercicios", label: "Exercícios" },
-  { key: "humor", label: "Humor" },
-  { key: "apoio", label: "Apoio emocional" },
+export const BEMESTAR_SUBTABS = [
+  {
+    key: "meditacoes",
+    label: "Meditações",
+    sub: "Meditar com voz e som",
+    Icon: Flower2,
+    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
+    tinta: "text-violet-600",
+  },
+  {
+    key: "sons",
+    label: "Sons",
+    sub: "Relaxar e dormir",
+    Icon: AudioLines,
+    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
+    tinta: "text-sky-600",
+  },
+  {
+    key: "exercicios",
+    label: "Exercícios",
+    sub: "Movimentos leves",
+    Icon: PersonStanding,
+    caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
+    tinta: "text-emerald-600",
+  },
+  {
+    key: "humor",
+    label: "Humor",
+    sub: "Como você está hoje",
+    Icon: Smile,
+    caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
+    tinta: "text-amber-600",
+  },
+  {
+    key: "apoio",
+    label: "Apoio emocional",
+    sub: "Quando o peso é grande",
+    Icon: HeartHandshake,
+    caixa: "border-rose-200/70 from-rose-50 to-pink-50/60",
+    tinta: "text-rose-600",
+  },
 ] as const;
 
 function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) => void }) {
-  const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"]>("meditacoes");
+  const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"] | null>(null);
+  const atual = BEMESTAR_SUBTABS.find((s) => s.key === sub);
+  if (!sub || !atual) {
+    return (
+      <GradeHub
+        itens={BEMESTAR_SUBTABS}
+        onAbrir={(k) => setSub(k as (typeof BEMESTAR_SUBTABS)[number]["key"])}
+      />
+    );
+  }
   return (
     <div className="space-y-5">
-      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
-        {BEMESTAR_SUBTABS.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setSub(s.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-              sub === s.key
-                ? "bg-primary text-primary-foreground"
-                : "border border-border text-foreground/55 hover:text-foreground/80"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "meditacoes" && <MeditacoesTab gest={gest} />}
         {sub === "sons" && <SonsBebêTab gest={gest} />}
@@ -1992,32 +2032,55 @@ function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: strin
  * Hub "Registros": tudo que a paciente registra numa tela só (sub-abas) —
  * Diário, Chutes, Contrações e Linha do Tempo. Antes eram 4 abas.
  */
-const REGISTROS_SUBTABS = [
-  { key: "diario", label: "Diário" },
-  { key: "chutes", label: "Chutes" },
-  { key: "contracoes", label: "Contrações" },
-  { key: "timeline", label: "Linha do tempo" },
+export const REGISTROS_SUBTABS = [
+  {
+    key: "diario",
+    label: "Diário",
+    sub: "Escrever sobre o dia",
+    Icon: NotebookPen,
+    caixa: "border-amber-200/70 from-amber-50 to-orange-50/60",
+    tinta: "text-amber-600",
+  },
+  {
+    key: "chutes",
+    label: "Chutes",
+    sub: "Contar os movimentos",
+    Icon: Footprints,
+    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
+    tinta: "text-pink-600",
+  },
+  {
+    key: "contracoes",
+    label: "Contrações",
+    sub: "Cronometrar e ver",
+    Icon: Timer,
+    caixa: "border-violet-200/70 from-violet-50 to-purple-50/60",
+    tinta: "text-violet-600",
+  },
+  {
+    key: "timeline",
+    label: "Linha do tempo",
+    sub: "Tudo que já aconteceu",
+    Icon: History,
+    caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
+    tinta: "text-sky-600",
+  },
 ] as const;
 
 function RegistrosHub({ profile, gest }: { profile: Profile | null; gest: Gest }) {
-  const [sub, setSub] = useState<(typeof REGISTROS_SUBTABS)[number]["key"]>("diario");
+  const [sub, setSub] = useState<(typeof REGISTROS_SUBTABS)[number]["key"] | null>(null);
+  const atual = REGISTROS_SUBTABS.find((s) => s.key === sub);
+  if (!sub || !atual) {
+    return (
+      <GradeHub
+        itens={REGISTROS_SUBTABS}
+        onAbrir={(k) => setSub(k as (typeof REGISTROS_SUBTABS)[number]["key"])}
+      />
+    );
+  }
   return (
     <div className="space-y-5">
-      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
-        {REGISTROS_SUBTABS.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setSub(s.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-              sub === s.key
-                ? "bg-primary text-primary-foreground"
-                : "border border-border text-foreground/55 hover:text-foreground/80"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "diario" && <JournalTab profile={profile} gest={gest} />}
         {sub === "chutes" && (
@@ -2035,13 +2098,55 @@ function RegistrosHub({ profile, gest }: { profile: Profile | null; gest: Gest }
  * a semana, a contagem regressiva, o álbum, os nomes, a carta e o enxoval.
  * Antes eram 6 abas separadas; agora é 1 (menos poluição visual).
  */
-const BEBE_SUBTABS = [
-  { key: "semana", label: "Semana" },
-  { key: "contagem", label: "Contagem" },
-  { key: "album", label: "Álbum" },
-  { key: "nome", label: "Nomes" },
-  { key: "carta", label: "Carta" },
-  { key: "quartinho", label: "Enxoval" },
+export const BEBE_SUBTABS = [
+  {
+    key: "semana",
+    label: "Semana",
+    sub: "O que mudou agora",
+    Icon: Baby,
+    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
+    tinta: "text-pink-600",
+  },
+  {
+    key: "contagem",
+    label: "Contagem",
+    sub: "Quanto falta",
+    Icon: Timer,
+    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
+    tinta: "text-violet-600",
+  },
+  {
+    key: "album",
+    label: "Álbum",
+    sub: "As fotos da barriga",
+    Icon: Images,
+    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
+    tinta: "text-sky-600",
+  },
+  {
+    key: "nome",
+    label: "Nomes",
+    sub: "Escolher e votar",
+    Icon: Sparkles,
+    caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
+    tinta: "text-amber-600",
+  },
+  {
+    key: "carta",
+    label: "Carta",
+    sub: "Escrever para o bebê",
+    Icon: Mail,
+    caixa: "border-rose-200/70 from-rose-50 to-orange-50/60",
+    tinta: "text-rose-600",
+  },
+  {
+    key: "quartinho",
+    label: "Enxoval",
+    sub: "A lista do quartinho",
+    Icon: ShoppingBag,
+    caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
+    tinta: "text-emerald-600",
+  },
 ] as const;
 
 function BebeHub({
@@ -2050,31 +2155,37 @@ function BebeHub({
   onNavigate,
   onBabyTap,
   careMode,
+  initialSub = null,
 }: {
   profile: Profile | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
   onBabyTap: () => void;
   careMode: boolean;
+  /* O toque no bebê da home promete "a semana detalhada" — então ele pede
+     `semana` e cai direto lá, sem passar pela grade. Quem chega pela barra de
+     baixo continua vendo a grade. */
+  initialSub?: string | null;
 }) {
-  const [sub, setSub] = useState<(typeof BEBE_SUBTABS)[number]["key"]>("semana");
+  type SubBebe = (typeof BEBE_SUBTABS)[number]["key"];
+  const [sub, setSub] = useState<SubBebe | null>(
+    BEBE_SUBTABS.some((x) => x.key === initialSub) ? (initialSub as SubBebe) : null,
+  );
+  useEffect(() => {
+    if (BEBE_SUBTABS.some((x) => x.key === initialSub)) setSub(initialSub as SubBebe);
+  }, [initialSub]);
+  const atual = BEBE_SUBTABS.find((s) => s.key === sub);
+  if (!sub || !atual) {
+    return (
+      <GradeHub
+        itens={BEBE_SUBTABS}
+        onAbrir={(k) => setSub(k as (typeof BEBE_SUBTABS)[number]["key"])}
+      />
+    );
+  }
   return (
     <div className="space-y-5">
-      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
-        {BEBE_SUBTABS.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setSub(s.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-              sub === s.key
-                ? "bg-primary text-primary-foreground"
-                : "border border-border text-foreground/55 hover:text-foreground/80"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "semana" && (
           <BabyTab
@@ -8145,14 +8256,63 @@ function formatApptDate(ymd: string): string {
  * sub-abas. Antes: Consultas, Pré-consulta, Perguntas, Checklist, Plano de
  * Parto, Teleconsulta (6 abas). Agora: 1.
  */
-const CONSULTAS_SUBTABS = [
-  { key: "agenda", label: "Agenda" },
-  { key: "preparo", label: "Preparar" },
-  { key: "perguntas", label: "Perguntas" },
-  { key: "checklist", label: "Checklist" },
-  { key: "parto", label: "Plano de parto" },
-  { key: "tele", label: "Teleconsulta" },
-  { key: "particular", label: "Particular" },
+export const CONSULTAS_SUBTABS = [
+  {
+    key: "agenda",
+    label: "Agenda",
+    sub: "Marcar e remarcar",
+    Icon: CalendarCheck,
+    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
+    tinta: "text-sky-600",
+  },
+  {
+    key: "preparo",
+    label: "Preparar",
+    sub: "O que levar e contar",
+    Icon: ClipboardList,
+    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
+    tinta: "text-violet-600",
+  },
+  {
+    key: "perguntas",
+    label: "Perguntas",
+    sub: "Anote para a consulta",
+    Icon: MessageCircleQuestion,
+    caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
+    tinta: "text-amber-600",
+  },
+  {
+    key: "checklist",
+    label: "Checklist",
+    sub: "A mala da maternidade",
+    Icon: ListChecks,
+    caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
+    tinta: "text-emerald-600",
+  },
+  {
+    key: "parto",
+    label: "Plano de parto",
+    sub: "Suas preferências",
+    Icon: Scroll,
+    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
+    tinta: "text-pink-600",
+  },
+  {
+    key: "tele",
+    label: "Teleconsulta",
+    sub: "Consulta por vídeo",
+    Icon: Video,
+    caixa: "border-indigo-200/70 from-indigo-50 to-violet-50/60",
+    tinta: "text-indigo-600",
+  },
+  {
+    key: "particular",
+    label: "Particular",
+    sub: "Particular e pagamento",
+    Icon: Wallet,
+    caixa: "border-teal-200/70 from-teal-50 to-emerald-50/60",
+    tinta: "text-teal-600",
+  },
 ] as const;
 
 type ConsultasSub = (typeof CONSULTAS_SUBTABS)[number]["key"];
@@ -8170,7 +8330,13 @@ function ConsultasHub({
   gest: Gest;
   initialSub?: string | null;
 }) {
-  const [sub, setSub] = useState<ConsultasSub>(isConsultasSub(initialSub) ? initialSub : "agenda");
+  /* Começa NA GRADE, e não na Agenda: o calendário logo acima já mostra o que
+     a Agenda mostraria, e abrir direto nela escondia as outras seis telas
+     exatamente como a fileira de pílulas escondia. Deep link continua abrindo
+     na sub-aba pedida. */
+  const [sub, setSub] = useState<ConsultasSub | null>(
+    isConsultasSub(initialSub) ? initialSub : null,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
   // Deep link (marco da semana → "Plano de parto"/"Checklist"): troca a sub-aba
   // e rola até o hub, senão a paciente abre o calendário e não vê que mudou.
@@ -8183,23 +8349,17 @@ function ConsultasHub({
     );
     return () => clearTimeout(t);
   }, [initialSub]);
+  const atual = CONSULTAS_SUBTABS.find((s) => s.key === sub);
+  if (!sub || !atual) {
+    return (
+      <div ref={rootRef}>
+        <GradeHub itens={CONSULTAS_SUBTABS} onAbrir={(k) => setSub(k as ConsultasSub)} />
+      </div>
+    );
+  }
   return (
     <div ref={rootRef} className="space-y-5">
-      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
-        {CONSULTAS_SUBTABS.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setSub(s.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-              sub === s.key
-                ? "bg-primary text-primary-foreground"
-                : "border border-border text-foreground/55 hover:text-foreground/80"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "agenda" && <ConsultasTab />}
         {sub === "preparo" && <PreConsultaTab profile={profile} gest={gest} />}

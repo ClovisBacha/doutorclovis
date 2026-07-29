@@ -1149,9 +1149,11 @@ export function AppHomeScreen({
                     e dica continuam na aba do Bebê — aqui só existia o rótulo. */}
 
                 {/* Bebê protagonista dentro da bolha (o "ventre").
-                  Toque abre a aba do Bebê com a semana detalhada. */}
+                  Toque abre a aba do Bebê com a semana detalhada — e pede a
+                  sub-aba "semana" de propósito: a aba do Bebê agora abre numa
+                  grade de seis, e este toque promete a semana, não um menu. */}
                 <button
-                  onClick={() => onNavigate("Bebê")}
+                  onClick={() => onNavigate("Bebê", "semana")}
                   aria-label="Ver a semana do bebê"
                   className="relative flex min-h-0 flex-1 items-center justify-center py-1.5 transition-transform active:scale-[0.97]"
                 >
