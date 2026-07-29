@@ -105,6 +105,7 @@ export function MenuDaConta({
   gest,
   proximaConsulta,
   naoLidas,
+  perfilPendente = false,
   mostrarPainel,
   onNotificacoes,
   onNavegar,
@@ -119,6 +120,11 @@ export function MenuDaConta({
       então ela vira o subtítulo da linha de Consultas. */
   proximaConsulta?: string | null;
   naoLidas: number;
+  /** Há algo obrigatório por preencher no Perfil (hoje: contato de
+      emergência). Acende um ponto vermelho na linha, igual ao das
+      notificações — é o mesmo sinal, e ele quer dizer a mesma coisa: isto
+      aqui precisa de você. */
+  perfilPendente?: boolean;
   mostrarPainel: boolean;
   onNotificacoes: () => void;
   onNavegar: (t: AppTab, subAba?: string) => void;
@@ -187,11 +193,24 @@ export function MenuDaConta({
               onClick={() => onNavegar(tab, subAba)}
               className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left transition-colors hover:bg-primary/8"
             >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+              <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
                 <Icon className="h-[19px] w-[19px] text-primary" strokeWidth={1.9} />
+                {perfilPendente && tab === "Perfil" && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card"
+                  />
+                )}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-foreground">{label}</span>
+                <span className="block text-sm font-semibold text-foreground">
+                  {label}
+                  {perfilPendente && tab === "Perfil" && (
+                    <span className="ml-1.5 align-middle text-[10.5px] font-bold text-rose-600">
+                      • contato de emergência
+                    </span>
+                  )}
+                </span>
                 <span className="block text-[11.5px] leading-snug text-muted-foreground">
                   {tab === "Consultas" && proximaConsulta ? proximaConsulta : sub}
                 </span>

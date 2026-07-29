@@ -712,8 +712,42 @@ function MinhaContaPage() {
       });
     }
 
+    /* Contato de emergência incompleto.
+       
+       Fica no TOPO da lista (data futura força a primeira posição) porque é a
+       única notificação daqui cuja falta só aparece na hora em que já é tarde:
+       ela aciona o SOS achando que a família vai ser avisada e nada sai. As
+       outras — médico, localização — se resolvem no dia seguinte sem custo.
+       
+       O e-mail é o que pesa: sem ele o app não tem NENHUM canal automático
+       até a família. Nome e telefone sozinhos ainda deixam o WhatsApp pronto,
+       mas dependem de ela conseguir apertar enviar. */
+    const emergenciaIncompleta =
+      !!profile && (!profile.emergency_email?.trim() || !profile.emergency_contact?.trim());
+    if (emergenciaIncompleta) {
+      const soFaltaEmail = !!profile?.emergency_contact?.trim();
+      derivadas.push({
+        id: "emergencia-incompleta",
+        icone: "🆘",
+        titulo: soFaltaEmail
+          ? "Falta o e-mail do seu contato de emergência"
+          : "Complete o seu contato de emergência",
+        corpo:
+          "É para quem o app manda socorro, com a sua localização e a sua ficha, no segundo em que você aperta o SOS. Sem o e-mail, ninguém da sua família é avisado automaticamente.",
+        acao: {
+          rotulo: "Preencher agora",
+          executar: () => goToTab("Perfil"),
+        },
+        data: new Date(Date.now() + 60_000).toISOString(),
+      });
+    }
+
     return ordenar([], derivadas);
   }, [profile, isDoctor, isAdmin, origemLocal, navigate]);
+
+  /** Some quando ela preenche — é o que apaga o ponto vermelho do Perfil. */
+  const perfilPendente =
+    !!profile && (!profile.emergency_email?.trim() || !profile.emergency_contact?.trim());
 
   const naoLidas = contarNaoLidas(notificacoes, lidas);
 
@@ -1329,6 +1363,7 @@ function MinhaContaPage() {
                     nextAppt ? `Próxima: ${nextAppt.dateLabel} · ${nextAppt.typeLabel}` : null
                   }
                   naoLidas={naoLidas}
+                  perfilPendente={perfilPendente}
                   mostrarPainel={isAdmin || isDoctor}
                   onNotificacoes={abrirNotificacoes}
                   onNavegar={(t, subAba) => {
@@ -3652,6 +3687,9 @@ function ProfileTab({
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  /* O bloco de emergência muda de moldura por causa disto: vermelho quando
+     falta, verde quando está pronto. */
+  const faltaEmergencia = !form.emergency_email.trim() || !form.emergency_contact.trim();
   const [notifPermission, setNotifPermission] = useState<string>("default");
   const [corporateCode, setCorporateCode] = useState("");
   const [corporateMsg, setCorporateMsg] = useState<string | null>(null);
@@ -3964,31 +4002,74 @@ function ProfileTab({
             }
             onLimpar={() => setForm({ ...form, home_city: "", home_lat: null, home_lon: null })}
           />
-          <Field
-            label="Contato de emergência"
-            value={form.emergency_contact}
-            onChange={(v) => setForm({ ...form, emergency_contact: v })}
-          />
-          <Field
-            label="Telefone de emergência"
-            value={form.emergency_phone}
-            onChange={(v) => setForm({ ...form, emergency_phone: v })}
-          />
-          <div className="md:col-span-2">
+        </div>
+
+        {/* ── Quem o SOS avisa ───────────────────────────────────────────
+            Este bloco saiu do meio dos "dados clínicos" e virou uma caixa
+            própria, com moldura vermelha enquanto estiver incompleto.
+
+            A razão do destaque: é o único campo do perfil cuja falta só
+            aparece na hora em que já é tarde. Tipo sanguíneo em branco se
+            resolve na consulta; contato de emergência em branco se descobre
+            com ela apertando o SOS e ninguém sendo avisado. */}
+        <div
+          className={`mt-5 rounded-2xl border p-4 ${
+            faltaEmergencia
+              ? "border-rose-300 bg-rose-50/70 dark:bg-rose-500/10"
+              : "border-emerald-200 bg-emerald-50/60 dark:bg-emerald-500/10"
+          }`}
+        >
+          <div className="flex items-start gap-2.5">
+            <span className="text-lg leading-none">{faltaEmergencia ? "🆘" : "✅"}</span>
+            <div className="min-w-0">
+              <p
+                className={`text-sm font-bold ${
+                  faltaEmergencia
+                    ? "text-rose-700 dark:text-rose-300"
+                    : "text-emerald-800 dark:text-emerald-300"
+                }`}
+              >
+                {faltaEmergencia
+                  ? "Quem o SOS vai avisar por você"
+                  : "Seu contato de emergência está pronto"}
+              </p>
+              <p className="mt-1 text-[12.5px] leading-snug text-foreground/75">
+                No segundo em que você apertar o SOS, esta pessoa recebe a sua localização e a sua
+                ficha — tipo sanguíneo, alergias, medicamentos — sem você precisar escrever nada.
+                {faltaEmergencia ? " Sem o e-mail, esse aviso não sai." : ""}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
             <Field
-              label="E-mail do contato de emergência"
-              type="email"
-              value={form.emergency_email}
-              onChange={(v) => setForm({ ...form, emergency_email: v })}
+              label="Nome do contato de emergência"
+              value={form.emergency_contact}
+              onChange={(v) => setForm({ ...form, emergency_contact: v })}
+              placeholder="Ex: Marcos (marido)"
             />
-            {/* É o único canal que o app consegue disparar SOZINHO até alguém
-                de fora: o telefone só vira aviso automático com um provedor de
-                SMS contratado. Sem este e-mail, o SOS avisa o médico na hora e
-                ela ainda precisa terminar o aviso à família pela mão. */}
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              Com o e-mail preenchido, o botão SOS avisa esta pessoa automaticamente, com a sua
-              localização — sem você precisar escrever nada.
-            </p>
+            <Field
+              label="Telefone (WhatsApp)"
+              value={form.emergency_phone}
+              onChange={(v) => setForm({ ...form, emergency_phone: v })}
+              placeholder="(31) 98888-7777"
+            />
+            <div className="md:col-span-2">
+              <Field
+                label="E-mail do contato de emergência"
+                type="email"
+                value={form.emergency_email}
+                onChange={(v) => setForm({ ...form, emergency_email: v })}
+                placeholder="marcos@email.com"
+              />
+              {/* É o único canal que o app dispara SOZINHO até alguém de fora.
+                  O WhatsApp abre com a mensagem escrita, mas ainda depende de
+                  ela conseguir apertar enviar — e quem aperta o SOS nem sempre
+                  consegue. */}
+              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                É o único aviso que sai sozinho, mesmo que você não consiga mexer no celular depois.
+              </p>
+            </div>
           </div>
         </div>
       </div>
