@@ -215,12 +215,41 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         }
       }
 
-      /* ── 4. SMS/WhatsApp pelo webhook, se configurado ─────────────────── */
+      /* ── 4a. WhatsApp Cloud API, que a instalação já usa ──────────────── */
       const contatoTel = ((prof?.emergency_phone as string) || "").replace(/\D/g, "");
-      const hook = process.env.SOS_SMS_WEBHOOK_URL;
-      if (hook && contatoTel.length >= 10) {
+      const contatoE164 = contatoTel.length <= 11 ? `55${contatoTel}` : contatoTel;
+      if (contatoTel.length >= 10) {
         try {
-          const ddi = contatoTel.length <= 11 ? `55${contatoTel}` : contatoTel;
+          const { waConfigured, waSendText, waSendTemplate } =
+            await import("@/lib/whatsapp.server");
+          if (waConfigured()) {
+            /* MODELO aprovado quando houver: texto livre só chega se a pessoa
+               tiver escrito para o número nas últimas 24h, e o contato de
+               emergência nunca escreveu. Sem modelo configurado tentamos o
+               texto assim mesmo — em alguns casos (ela já conversou com a
+               clínica) ele passa, e falhar aqui não custa nada. */
+            const modelo = process.env.SOS_WA_TEMPLATE;
+            if (modelo) {
+              await waSendTemplate(
+                contatoE164,
+                modelo,
+                process.env.SOS_WA_TEMPLATE_LANG || "pt_BR",
+                [nome, semana ?? "—", mapa ?? "localização indisponível"],
+              );
+            } else {
+              await waSendText(contatoE164, texto);
+            }
+            canais.sms = true;
+          }
+        } catch {
+          /* cai no webhook genérico abaixo */
+        }
+      }
+
+      /* ── 4b. SMS/WhatsApp pelo webhook genérico, se configurado ───────── */
+      const hook = process.env.SOS_SMS_WEBHOOK_URL;
+      if (!canais.sms && hook && contatoTel.length >= 10) {
+        try {
           const res = await fetch(hook, {
             method: "POST",
             headers: {
@@ -229,7 +258,7 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
                 ? { authorization: `Bearer ${process.env.SOS_SMS_WEBHOOK_TOKEN}` }
                 : {}),
             },
-            body: JSON.stringify({ to: `+${ddi}`, text: texto }),
+            body: JSON.stringify({ to: `+${contatoE164}`, text: texto }),
           });
           canais.sms = res.ok;
         } catch {
