@@ -50,24 +50,53 @@ export type CanaisAviso = {
   faltou: string | null;
 };
 
-function textoDoAviso(p: {
+/**
+ * A ficha que vai junto do pedido de socorro.
+ *
+ * É a MESMA carteirinha de emergência que ela mostraria no hospital, só que em
+ * texto: quem chega para ajudar precisa saber tipo sanguíneo e alergia antes
+ * de chamar o resgate, e o resgate precisa disso antes de medicar. Mandar só
+ * "preciso de ajuda" com um mapa desperdiça o único momento em que esses
+ * dados valem mais do que em qualquer outro.
+ */
+export type Ficha = {
   nome: string;
+  bebe: string | null;
   semana: string | null;
+  dpp: string | null;
   sangue: string | null;
   alergias: string | null;
+  medicamentos: string | null;
+  medico: string | null;
   endereco: string | null;
   mapa: string | null;
-}): string {
+};
+
+function linhasDaFicha(f: Ficha): [string, string][] {
+  const todas: [string, string | null][] = [
+    ["Gestante", f.nome],
+    ["Bebê", f.bebe],
+    ["Idade gestacional", f.semana],
+    ["DPP", f.dpp],
+    ["Tipo sanguíneo", f.sangue],
+    ["Alergias", f.alergias || "nenhuma informada"],
+    ["Medicamentos", f.medicamentos || "nenhum informado"],
+    ["Médico", f.medico],
+    ["Local", f.endereco],
+  ];
+  return todas.filter((l): l is [string, string] => !!l[1]);
+}
+
+export function textoDoAviso(f: Ficha): string {
   return [
-    `${p.nome} acionou o botão de emergência do app Obstétrica.`,
-    p.semana ? `Gestante de ${p.semana}.` : null,
-    p.sangue ? `Tipo sanguíneo: ${p.sangue}.` : null,
-    p.alergias ? `Alergias: ${p.alergias}.` : null,
-    p.endereco ? `Local: ${p.endereco}` : null,
-    p.mapa ?? "Não foi possível obter a localização.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+    `🆘 ${f.nome} acionou o botão de emergência do app Obstétrica.`,
+    "",
+    ...linhasDaFicha(f).map(([k, v]) => `${k}: ${v}`),
+    "",
+    f.mapa ?? "Não foi possível obter a localização.",
+    "",
+    "Em caso de risco de vida, ligue 192.",
+  ].join("\n");
 }
 
 export const dispararEmergencia = createServerFn({ method: "POST" })
@@ -93,13 +122,13 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
-      if (!u.user) return { ok: false as const, canais: vazio };
+      if (!u.user) return { ok: false as const, canais: vazio, mensagem: "" };
 
       const sb = supabaseAdmin as any;
       const { data: prof } = await sb
         .from("patient_profiles")
         .select(
-          "display_name, blood_type, allergies, emergency_contact, emergency_phone, emergency_email, doctor_id, lmp_date, reference_date, reference_weeks, reference_days",
+          "display_name, baby_name, blood_type, allergies, medications, emergency_contact, emergency_phone, emergency_email, doctor_id, due_date, lmp_date, reference_date, reference_weeks, reference_days",
         )
         .eq("id", u.user.id)
         .maybeSingle();
@@ -126,14 +155,29 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         /* opcional */
       }
 
-      const texto = textoDoAviso({
+      let dpp: string | null = null;
+      try {
+        const { dueDateFromLmp } = await import("@/lib/gestacao");
+        const due =
+          (prof?.due_date as string) ??
+          (prof?.lmp_date ? dueDateFromLmp(prof.lmp_date as string) : null);
+        dpp = due ? new Date(`${due}T00:00:00`).toLocaleDateString("pt-BR") : null;
+      } catch {
+        /* opcional */
+      }
+
+      const ficha: Ficha = {
         nome,
+        bebe: (prof?.baby_name as string) ?? null,
         semana,
+        dpp,
         sangue: (prof?.blood_type as string) ?? null,
         alergias: (prof?.allergies as string) ?? null,
+        medicamentos: (prof?.medications as string) ?? null,
+        medico: null, // preenchido logo abaixo, quando houver vínculo
         endereco: data.address,
         mapa,
-      });
+      };
 
       const canais: CanaisAviso = { ...vazio };
 
@@ -155,12 +199,15 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
       if (prof?.doctor_id) {
         const { data: d } = await sb
           .from("doctors")
-          .select("display_name")
+          .select("display_name, crm, whatsapp")
           .eq("id", prof.doctor_id)
           .maybeSingle();
         medicoNome = (d?.display_name as string) || "seu médico";
         medicoUserId = prof.doctor_id as string;
+        ficha.medico = [d?.display_name, d?.crm, d?.whatsapp].filter(Boolean).join(" · ") || null;
       }
+      /* Só agora: a linha do médico faz parte da ficha que vai no aviso. */
+      const texto = textoDoAviso(ficha);
 
       if (medicoUserId) {
         try {
@@ -182,7 +229,7 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
             canais.medicoEmail = await sendEmail({
               to: email,
               subject: `🆘 EMERGÊNCIA — ${nome} acionou o SOS`,
-              html: emailHtml(nome, texto, prof),
+              html: emailHtml(nome, ficha),
             });
           }
         } catch {
@@ -207,7 +254,7 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
           canais.contatoEmail = await sendEmail({
             to: contatoEmail,
             subject: `🆘 ${nome} precisa de ajuda agora`,
-            html: emailHtml(nome, texto, prof),
+            html: emailHtml(nome, ficha),
           });
         } catch {
           /* melhor esforço */
@@ -302,29 +349,46 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         }
       }
 
-      return { ok: true as const, canais };
+      return { ok: true as const, canais, mensagem: texto };
     } catch {
-      return { ok: false as const, canais: vazio };
+      return { ok: false as const, canais: vazio, mensagem: "" };
     }
   });
 
-function emailHtml(nome: string, texto: string, prof: Record<string, unknown> | null): string {
-  const linhas = texto
-    .split("\n")
-    .map((l) => `<p style="margin:0 0 6px;font-size:15px;line-height:1.5">${escapar(l)}</p>`)
+function emailHtml(nome: string, ficha: Ficha): string {
+  const linhas = linhasDaFicha(ficha)
+    .map(
+      ([k, v]) => `<tr>
+        <td style="padding:6px 12px 6px 0;font-size:13px;color:#6b7280;white-space:nowrap;vertical-align:top">${escapar(k)}</td>
+        <td style="padding:6px 0;font-size:15px;color:#111827;font-weight:600">${escapar(v)}</td>
+      </tr>`,
+    )
     .join("");
-  const contato = [prof?.emergency_contact, prof?.emergency_phone].filter(Boolean).join(" · ");
   return `
-    <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px">
-      <p style="margin:0 0 4px;font-size:12px;letter-spacing:.18em;color:#be123c;font-weight:700">
-        ALERTA DE EMERGÊNCIA
+    <div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+      <p style="margin:0 0 4px;font-size:12px;letter-spacing:.18em;color:#be123c;font-weight:800">
+        ALERTA DE EMERGENCIA
       </p>
-      <h1 style="margin:0 0 16px;font-size:22px">${escapar(nome)} acionou o SOS</h1>
-      ${linhas}
-      ${contato ? `<p style="margin:14px 0 0;font-size:13px;color:#555">Contato de emergência: ${escapar(contato)}</p>` : ""}
-      <p style="margin:18px 0 0;font-size:12px;color:#777">
-        Enviado automaticamente pelo app Obstétrica no momento do acionamento.
-        Em caso de risco de vida, ligue 192.
+      <h1 style="margin:0 0 6px;font-size:24px;line-height:1.2;color:#111827">
+        ${escapar(nome)} acionou o SOS
+      </h1>
+      <p style="margin:0 0 18px;font-size:14px;color:#6b7280">
+        Enviado automaticamente no momento do acionamento.
+      </p>
+      ${
+        ficha.mapa
+          ? `<a href="${ficha.mapa}" style="display:inline-block;background:#be123c;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:15px;margin-bottom:18px">Ver a localizacao no mapa</a>`
+          : `<p style="margin:0 0 18px;padding:10px 14px;background:#fef3c7;border-radius:10px;font-size:14px;color:#92400e">Nao foi possivel obter a localizacao.</p>`
+      }
+      <p style="margin:0 0 6px;font-size:12px;letter-spacing:.14em;color:#6b7280;font-weight:700">
+        FICHA DE EMERGENCIA
+      </p>
+      <table style="border-collapse:collapse;width:100%;border-top:1px solid #e5e7eb">${linhas}</table>
+      <p style="margin:20px 0 0;padding:12px 14px;background:#fef2f2;border-radius:10px;font-size:14px;color:#991b1b;font-weight:600">
+        Em caso de risco de vida, ligue 192 (SAMU).
+      </p>
+      <p style="margin:14px 0 0;font-size:11px;color:#9ca3af">
+        Mensagem automatica do app Obstetrica.
       </p>
     </div>`;
 }

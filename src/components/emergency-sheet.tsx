@@ -67,8 +67,8 @@ export function EmergencySheet({
   const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
   /** O que DE FATO saiu, devolvido pelo servidor. A tela só diz o que houve. */
   const [canais, setCanais] = useState<CanaisAviso | null>(null);
-  /** Contato que ficou sem canal automático — vira um WhatsApp de um toque. */
-  const [pendente, setPendente] = useState<{ nome: string; texto: string } | null>(null);
+  /** Mensagem pronta para o WhatsApp do contato principal, vinda do servidor. */
+  const [zap, setZap] = useState<string | null>(null);
   // Carteirinha recolhida por padrão; toca pra ver tudo (fica dentro do SOS).
   const [cardOpen, setCardOpen] = useState(false);
 
@@ -129,30 +129,16 @@ export function EmergencySheet({
 
       setCanais(r.canais);
       setPanic("sent");
+      /* A mensagem do WhatsApp é a MESMA que saiu por e-mail e SMS — vem
+         pronta do servidor em vez de ser remontada aqui, senão o parente que
+         receber pelos dois canais leria duas versões diferentes do mesmo
+         socorro. */
+      setZap(r.mensagem || null);
       if (r.canais.destinos.length) {
         toast.success(`Avisei ${r.canais.destinos.map((d) => d.nome).join(" e ")} 💛`);
       } else {
         toast.error("Não consegui avisar ninguém automaticamente — ligue 192.");
       }
-      // Sobrou um contato sem canal automático: o WhatsApp dele fica pronto.
-      setPendente(
-        r.canais.faltou
-          ? {
-              nome: r.canais.faltou,
-              texto: [
-                `${info.name || "Ela"} precisa de ajuda agora.`,
-                info.weekLabel ? `Gestante de ${info.weekLabel}.` : null,
-                info.bloodType ? `Tipo sanguíneo: ${info.bloodType}.` : null,
-                address ? `Local: ${address}` : null,
-                lat != null && lng != null
-                  ? `https://maps.google.com/?q=${lat},${lng}`
-                  : "Não consegui pegar a localização — me ligue.",
-              ]
-                .filter(Boolean)
-                .join("\n"),
-            }
-          : null,
-      );
     } catch {
       setPanic("idle");
       toast.error("Não consegui avisar por aqui — ligue 192 imediatamente.");
@@ -302,17 +288,25 @@ export function EmergencySheet({
           </div>
         )}
 
-        {/* Contato sem canal automático: um toque abre o WhatsApp com tudo
-            pronto. Fica DEPOIS do aviso automático de propósito — é o que
-            falta, não o que a tela fez. */}
-        {pendente && (
+        {/* Terceiro passo, sempre: o WhatsApp do contato principal com a
+            mensagem inteira já escrita.
+
+            É um TOQUE e não uma abertura automática de propósito. Abrir o
+            WhatsApp sozinho tiraria ela desta tela — que é onde estão o 192, o
+            193 e o telefone do médico — e no iPhone o navegador bloqueia a
+            abertura depois de uma espera assíncrona, então metade das vezes
+            nem aconteceria. Um botão verde do tamanho do polegar, logo abaixo
+            da confirmação, chega no mesmo lugar sem tirar o socorro da mão
+            dela. */}
+        {panic === "sent" && zap && linkWhatsApp(info.emergencyPhone) && (
           <a
-            href={`${linkWhatsApp(info.emergencyPhone) ?? ""}?text=${encodeURIComponent(pendente.texto)}`}
+            href={`${linkWhatsApp(info.emergencyPhone)}?text=${encodeURIComponent(zap)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-600 dark:text-rose-300"
+            className="press mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white"
           >
-            💬 Falta avisar {pendente.nome.split(" ")[0]} — abrir WhatsApp
+            💬 Mandar no WhatsApp
+            {info.emergencyContact ? ` de ${info.emergencyContact.split(" ")[0]}` : ""}
           </a>
         )}
 
