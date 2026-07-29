@@ -1123,7 +1123,13 @@ function MinhaContaPage() {
       <AppBottomNav
         activeSection={activeSection}
         onSelect={handleBottomNav}
-        onEmergency={careMode ? undefined : () => setEmergencyOpen(true)}
+        /* O SOS NÃO é gated por Modo Cuidado — e isto é uma correção, não um
+           esquecimento. O Modo Cuidado existe para calar gamificação,
+           comemoração e cobrança; esconder o botão de emergência era o
+           contrário de cuidado, ainda mais porque quem está em Modo Cuidado
+           costuma estar num momento em que precisa MAIS dele. Era, também, a
+           única porta de entrada do SOS no app inteiro. */
+        onEmergency={() => setEmergencyOpen(true)}
         escura={barraEscura}
       />
 

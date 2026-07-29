@@ -26,6 +26,23 @@ function doctorTel(): string {
 }
 
 /**
+ * Link de WhatsApp a partir do telefone que a paciente digitou no perfil.
+ *
+ * O campo é texto livre — chega como "(31) 98634-2903", "31986342903" ou
+ * "+55 31 98634 2903". Aqui só sobram os dígitos; 10 ou 11 (DDD + número)
+ * ganham o 55 do Brasil, 12 ou 13 já vêm com DDI. Qualquer outra coisa
+ * devolve vazio, e a tela cai no compartilhamento do sistema em vez de abrir
+ * um link quebrado — numa emergência, um link que não abre é pior que um
+ * caminho a mais.
+ */
+function whatsappDe(tel?: string | null): string | null {
+  const d = (tel ?? "").replace(/\D/g, "");
+  if (d.length === 10 || d.length === 11) return `https://wa.me/55${d}`;
+  if (d.length === 12 || d.length === 13) return `https://wa.me/${d}`;
+  return null;
+}
+
+/**
  * Central de Emergência (aberta pelo botão SOS da barra de baixo). Junta tudo
  * num lugar só: ligar 192, falar com o médico, os sinais de alerta e uma
  * carteirinha com QR (gerado no próprio aparelho — LGPD, sem serviço externo)
@@ -46,19 +63,41 @@ export function EmergencySheet({
   // Carteirinha recolhida por padrão; toca pra ver tudo (fica dentro do SOS).
   const [cardOpen, setCardOpen] = useState(false);
 
-  // "Botão de pânico": pega a localização e registra o alerta pro contato de
-  // emergência/médico (mesma função que era a aba Pânico). Best-effort.
+  /**
+   * Avisar o contato de emergência.
+   *
+   * O que este botão fazia antes: gravava uma linha em `panic_events` e dizia
+   * "Alerta com sua localização enviado 💛". Ninguém era avisado. Não havia
+   * push, e-mail, SMS nem WhatsApp em lugar nenhum do caminho — a linha só
+   * seria vista se o acompanhante ABRISSE o painel dele nos 30 minutos
+   * seguintes, por conta própria. Numa tela de emergência, dizer "enviado"
+   * para algo que não foi enviado é o pior defeito possível: ela pode parar
+   * de procurar ajuda achando que já pediu.
+   *
+   * O que ele faz agora: pega a localização e ABRE O WHATSAPP do contato de
+   * emergência com a mensagem pronta — nome, semana, tipo sanguíneo e o link
+   * do mapa. Quem envia é ela, num toque, e a mensagem chega de verdade. Sem
+   * contato cadastrado, cai no compartilhamento do sistema (ou na cópia do
+   * texto), que também chega em alguém.
+   *
+   * O registro em `panic_events` continua, best-effort e em silêncio: ele
+   * alimenta o painel do acompanhante. Mas ele não é mais o que a tela
+   * promete, porque nunca foi o que a tela entregava.
+   */
   async function sendLocation() {
     if (panic !== "idle") return;
     setPanic("sending");
+    let lat: number | null = null;
+    let lng: number | null = null;
+    let address: string | null = null;
     try {
-      let lat: number | null = null;
-      let lng: number | null = null;
-      let address: string | null = null;
       if (navigator?.geolocation) {
         try {
           const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 }),
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              timeout: 10000,
+              enableHighAccuracy: true,
+            }),
           );
           lat = pos.coords.latitude;
           lng = pos.coords.longitude;
@@ -68,28 +107,59 @@ export function EmergencySheet({
             );
             address = (await resp.json()).display_name ?? null;
           } catch {
-            /* nome do local é opcional */
+            /* nome do local é opcional — o link do mapa já resolve */
           }
         } catch {
-          /* sem permissão de localização: registra sem coordenadas */
+          /* sem permissão ou sem sinal: segue sem coordenadas */
         }
       }
-      const { data: s } = await supabase.auth.getSession();
-      const res = s.session
-        ? await savePanicEvent({
+
+      // Registro para o painel do acompanhante. Em silêncio de propósito: se
+      // falhar (tabela ainda não aplicada, sessão vencida, sem rede), o aviso
+      // pelo WhatsApp continua valendo e é ele que importa.
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (s.session) {
+          await savePanicEvent({
             data: { accessToken: s.session.access_token, latitude: lat, longitude: lng, address },
-          })
-        : { ok: false as const };
-      if (!res.ok) {
-        setPanic("idle");
-        toast.error("Não consegui registrar o alerta — ligue 192 imediatamente.");
+          });
+        }
+      } catch {
+        /* melhor esforço */
+      }
+
+      const mapa = lat != null && lng != null ? `https://maps.google.com/?q=${lat},${lng}` : null;
+      const texto = [
+        `${info.name || "Ela"} precisa de ajuda agora.`,
+        info.weekLabel ? `Gestante de ${info.weekLabel}.` : null,
+        info.bloodType ? `Tipo sanguíneo: ${info.bloodType}.` : null,
+        info.allergies ? `Alergias: ${info.allergies}.` : null,
+        address ? `Local: ${address}` : null,
+        mapa ?? "Não consegui pegar a localização — me ligue.",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const zap = whatsappDe(info.emergencyPhone);
+      if (zap) {
+        window.open(`${zap}?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
+        setPanic("sent");
+        toast.success(`WhatsApp aberto para ${info.emergencyContact || "seu contato"} 💛`);
         return;
       }
+      // Sem contato de emergência cadastrado: entrega para o compartilhamento
+      // do sistema, e se nem isso existir, copia para ela colar onde quiser.
+      if (navigator.share) {
+        await navigator.share({ text: texto });
+        setPanic("sent");
+        return;
+      }
+      await navigator.clipboard.writeText(texto);
       setPanic("sent");
-      toast.success("Alerta com sua localização enviado 💛");
+      toast.success("Texto copiado — cole no WhatsApp de quem você quer avisar.");
     } catch {
       setPanic("idle");
-      toast.error("Não consegui registrar o alerta — ligue 192 imediatamente.");
+      toast.error("Não consegui avisar por aqui — ligue 192 imediatamente.");
     }
   }
 
@@ -173,10 +243,12 @@ export function EmergencySheet({
           className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-600 disabled:opacity-60 dark:text-rose-300"
         >
           {panic === "sending"
-            ? "📍 Enviando sua localização…"
+            ? "📍 Pegando sua localização…"
             : panic === "sent"
-              ? "✓ Localização enviada"
-              : "🆘 Enviar minha localização"}
+              ? "✓ Mensagem pronta"
+              : info.emergencyContact
+                ? `🆘 Avisar ${info.emergencyContact.split(" ")[0]}`
+                : "🆘 Avisar alguém com minha localização"}
         </button>
 
         {/* Carteirinha de emergência (QR gerado no aparelho) — toca pra ver tudo */}
