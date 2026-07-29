@@ -69,6 +69,8 @@ export function EmergencySheet({
   const [canais, setCanais] = useState<CanaisAviso | null>(null);
   /** Mensagem pronta para o WhatsApp do contato principal, vinda do servidor. */
   const [zap, setZap] = useState<string | null>(null);
+  /** O WhatsApp abriu sozinho? Quando não, o botão verde muda de tom. */
+  const [zapAbriu, setZapAbriu] = useState(false);
   // Carteirinha recolhida por padrão; toca pra ver tudo (fica dentro do SOS).
   const [cardOpen, setCardOpen] = useState(false);
 
@@ -134,6 +136,26 @@ export function EmergencySheet({
          receber pelos dois canais leria duas versões diferentes do mesmo
          socorro. */
       setZap(r.mensagem || null);
+
+      /* ── O WhatsApp abre sozinho, e só DEPOIS ────────────────────────────
+         A ordem importa e é esta de propósito: e-mail e SMS já saíram (a
+         chamada acima terminou), então abrir o WhatsApp agora não atrasa nem
+         atrapalha nenhum deles. Ele é o último passo, não o primeiro.
+
+         O app vai viver dentro da App Store e da Play Store, onde a abertura
+         de um link externo a partir de um toque é permitida sem bloqueio —
+         então lá isto acontece sempre. No navegador de hoje o Safari pode
+         barrar por causa da espera do GPS; quando barrar, `window.open`
+         devolve `null` e o botão verde abaixo continua ali, a um toque.
+
+         Ela ainda aperta ENVIAR dentro do WhatsApp: a mensagem chega escrita,
+         mas quem manda de dentro do aplicativo é sempre a pessoa. */
+      const alvo = linkWhatsApp(info.emergencyPhone);
+      if (alvo && r.mensagem) {
+        const url = `${alvo}?text=${encodeURIComponent(r.mensagem)}`;
+        const janela = window.open(url, "_blank", "noopener,noreferrer");
+        setZapAbriu(!!janela);
+      }
       if (r.canais.destinos.length) {
         toast.success(`Avisei ${r.canais.destinos.map((d) => d.nome).join(" e ")} 💛`);
       } else {
@@ -288,16 +310,9 @@ export function EmergencySheet({
           </div>
         )}
 
-        {/* Terceiro passo, sempre: o WhatsApp do contato principal com a
-            mensagem inteira já escrita.
-
-            É um TOQUE e não uma abertura automática de propósito. Abrir o
-            WhatsApp sozinho tiraria ela desta tela — que é onde estão o 192, o
-            193 e o telefone do médico — e no iPhone o navegador bloqueia a
-            abertura depois de uma espera assíncrona, então metade das vezes
-            nem aconteceria. Um botão verde do tamanho do polegar, logo abaixo
-            da confirmação, chega no mesmo lugar sem tirar o socorro da mão
-            dela. */}
+        {/* O botão fica MESMO quando o WhatsApp abriu sozinho: ela pode ter
+            fechado sem enviar, ou voltado para cá para ligar 192 antes. Sem
+            ele, refazer o caminho exigiria acionar o SOS de novo. */}
         {panic === "sent" && zap && linkWhatsApp(info.emergencyPhone) && (
           <a
             href={`${linkWhatsApp(info.emergencyPhone)}?text=${encodeURIComponent(zap)}`}
@@ -305,9 +320,14 @@ export function EmergencySheet({
             rel="noopener noreferrer"
             className="press mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white"
           >
-            💬 Mandar no WhatsApp
-            {info.emergencyContact ? ` de ${info.emergencyContact.split(" ")[0]}` : ""}
+            💬 {zapAbriu ? "Abrir o WhatsApp de novo" : "Mandar no WhatsApp"}
+            {!zapAbriu && info.emergencyContact ? ` de ${info.emergencyContact.split(" ")[0]}` : ""}
           </a>
+        )}
+        {panic === "sent" && zapAbriu && (
+          <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+            A mensagem já está escrita no WhatsApp — é só apertar enviar.
+          </p>
         )}
 
         {/* Terceira camada de urgência: sempre visível, nunca competindo.
