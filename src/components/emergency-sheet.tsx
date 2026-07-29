@@ -110,15 +110,19 @@ export function EmergencySheet({
     if (linkWhatsApp(info.emergencyPhone)) {
       janela = window.open("", "_blank");
       try {
+        /* Esta tela dura o tempo de pegar a coordenada e chamar o servidor —
+           cerca de um segundo quando a localização está liberada. Ela existe
+           porque a alternativa é uma aba `about:blank` cinza, e porque sem a
+           aba aberta AQUI, dentro do toque, o iPhone bloqueia a abertura do
+           WhatsApp e ela teria que apertar um segundo botão. Um segundo de
+           tela de passagem custa menos que um toque a mais numa emergência. */
         janela?.document.write(
           `<!doctype html><meta charset="utf-8">
            <meta name="viewport" content="width=device-width,initial-scale=1">
-           <title>Pedido de socorro</title>
+           <title>Abrindo o WhatsApp…</title>
            <body style="margin:0;display:grid;place-items:center;height:100vh;
-             font-family:system-ui,sans-serif;background:#fff1f2;color:#9f1239;text-align:center">
-             <div><div style="font-size:44px">🆘</div>
-             <p style="font-size:17px;font-weight:700;margin:12px 0 4px">Preparando o pedido de socorro…</p>
-             <p style="font-size:13px;opacity:.8;margin:0">O WhatsApp abre em instantes.</p></div>
+             font-family:system-ui,sans-serif;background:#25D366;color:#fff;text-align:center">
+             <p style="font-size:16px;font-weight:600;margin:0">Abrindo o WhatsApp…</p>
            </body>`,
         );
       } catch {
@@ -146,11 +150,12 @@ export function EmergencySheet({
                atrás. O aparelho quase sempre tem uma, e ela é boa: em dois
                minutos ninguém foi longe.
                
-               `timeout: 8000` — o limite para desistir, não uma pressa. Vale
-               esperar oito segundos por uma coordenada; passou disso, o aviso
-               sai sem ela em vez de não sair. */
+               `timeout: 5000` — o limite para desistir. Cinco segundos e o
+               ponto em que esperar mais custa mais do que a coordenada vale:
+               depois disso a tela de espera do WhatsApp começa a incomodar e o
+               socorro atrasa. Passou, o aviso sai sem ela em vez de não sair. */
             navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 8000,
+              timeout: 5000,
               maximumAge: 120000,
               enableHighAccuracy: false,
             }),
@@ -165,8 +170,19 @@ export function EmergencySheet({
           } catch {
             /* nome do local é opcional — o link do mapa já resolve */
           }
-        } catch {
-          /* sem permissão ou sem sinal: segue sem coordenadas */
+        } catch (e) {
+          /* Antes esta falha era engolida em silêncio e o aviso saía dizendo
+             "não foi possível obter a localização" sem que ninguém soubesse
+             POR QUÊ. Numa emergência a coordenada é o dado mais útil da
+             mensagem inteira: se ela não vai, a pessoa precisa saber na hora
+             que precisa liberar — e não descobrir depois, lendo o WhatsApp. */
+          const cod = (e as GeolocationPositionError | undefined)?.code;
+          toast.error(
+            cod === 1
+              ? "Sem permissão de localização — o aviso vai sem ela. Libere nos ajustes do navegador."
+              : "Não consegui pegar a sua localização a tempo — o aviso vai sem ela.",
+            { duration: 6000 },
+          );
         }
       }
 
