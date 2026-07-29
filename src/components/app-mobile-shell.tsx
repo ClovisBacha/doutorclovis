@@ -1071,6 +1071,11 @@ export function AppHomeScreen({
   const overArt: React.CSSProperties =
     artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
 
+  /* O marco da semana — mora dentro do cartão do calendário. Continua mudo no
+     Modo Cuidado: ele é um lembrete de exame, e o Modo Cuidado existe para
+     calar exatamente esse tipo de cobrança. */
+  const marcoDaSemana = gest && !careMode ? milestoneForWeek(gest.weeks) : null;
+
   return (
     <div className="space-y-4 pb-[calc(env(safe-area-inset-bottom,0px)+6.5rem)]">
       {/* ── Hero imersivo: céu real do momento + bebê + clima ────────
@@ -1477,41 +1482,25 @@ export function AppHomeScreen({
         </div>
       </div>
 
-      {/* ── Marco da semana (silenciado no Modo Cuidado) ──── */}
-      {gest &&
-        !careMode &&
-        (() => {
-          const m = milestoneForWeek(gest.weeks);
-          if (!m) return null;
-          return (
-            <button
-              onClick={() => onNavigate(m.tab, m.sub)}
-              className="group flex w-full items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-3.5 py-2.5 text-left transition-colors duration-300 active:scale-[0.99] hover:border-primary/35 hover:bg-primary/10"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-lg ring-1 ring-primary/15">
-                {m.icon}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary/80">
-                  Semana {gest.weeks}
-                </p>
-                <p className="truncate text-[13px] font-semibold leading-tight text-foreground">
-                  {m.title}
-                </p>
-              </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-primary/60 transition-transform duration-300 group-hover:translate-x-0.5" />
-            </button>
-          );
-        })()}
+      {/* ── Meu calendário — agora com o marco da semana dentro ─────────
+          A barra "SEMANA 20 · Janela do morfológico" era um cartão à parte,
+          logo acima deste. Ela dizia o que a linha do tempo do Calendário já
+          diz (e o Exames também), e ainda ficava ANTES do cartão que de fato
+          leva a algum lugar — dois blocos disputando o mesmo assunto, com o
+          menos útil na frente.
 
-      {/* ── Meu calendário (consultas + marcos, tudo integrado dentro) ── */}
-      <button
-        onClick={() => onNavigate("Calendário")}
-        className="shine group w-full rounded-3xl border border-primary/20 bg-primary/6 text-left shadow-[var(--shadow-card)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98] hover:border-primary/35 hover:bg-primary/10"
-      >
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-105 group-hover:-rotate-3">
-            <CalendarDays className="h-5 w-5 text-primary" strokeWidth={1.8} />
+          O marco virou a segunda linha do calendário: a informação continua
+          (e continua clicável, indo para a aba dela), o cartão ganha corpo e
+          vira o bloco mais pesado da home depois do bebê, e a tela perde uma
+          faixa inteira. `divide` no lugar de dois cartões porque as duas
+          linhas falam da MESMA coisa — o que está por vir. */}
+      <div className="shine overflow-hidden rounded-3xl border border-primary/25 bg-primary/8 shadow-[var(--shadow-card)]">
+        <button
+          onClick={() => onNavigate("Calendário")}
+          className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-300 hover:bg-primary/10"
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/14 ring-1 ring-primary/20 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-105 group-hover:-rotate-3">
+            <CalendarDays className="h-[22px] w-[22px] text-primary" strokeWidth={1.8} />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
@@ -1519,20 +1508,43 @@ export function AppHomeScreen({
             </p>
             {nextAppointment ? (
               <>
-                <p className="mt-0.5 text-sm font-medium text-foreground">
+                <p className="mt-0.5 text-[15px] font-semibold leading-tight text-foreground">
                   Próxima consulta · {nextAppointment.dateLabel}
                 </p>
-                <p className="text-xs text-muted-foreground">{nextAppointment.typeLabel}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{nextAppointment.typeLabel}</p>
               </>
             ) : (
-              <p className="mt-0.5 text-sm font-medium text-foreground">
+              <p className="mt-0.5 text-[15px] font-semibold leading-tight text-foreground">
                 Consultas, exames e marcos — tudo aqui
               </p>
             )}
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-primary/50 transition-transform duration-300 group-hover:translate-x-1" />
-        </div>
-      </button>
+        </button>
+
+        {/* Marco da semana — silenciado no Modo Cuidado, como antes. O ícone
+            fica na MESMA coluna do calendário (w-11) e sem fundo: assim a
+            linha lê como continuação do cartão, e não como outro cartão. */}
+        {marcoDaSemana && gest && (
+          <button
+            onClick={() => onNavigate(marcoDaSemana.tab, marcoDaSemana.sub)}
+            className="group flex w-full items-center gap-3 border-t border-primary/15 px-4 py-2.5 text-left transition-colors duration-300 hover:bg-primary/10"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center text-xl">
+              {marcoDaSemana.icon}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary/80">
+                Semana {gest.weeks}
+              </p>
+              <p className="truncate text-[13px] font-semibold leading-tight text-foreground">
+                {marcoDaSemana.title}
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-primary/50 transition-transform duration-300 group-hover:translate-x-0.5" />
+          </button>
+        )}
+      </div>
 
       {/* ── Registros (uso diário: diário, chutes, contrações) ── */}
       <button
