@@ -284,6 +284,14 @@ export function EmergencySheet({
             ) : (
               <p className="font-bold">Ninguém foi avisado automaticamente. Ligue 192.</p>
             )}
+            {/* Sem médico vinculado não há a quem avisar do lado clínico — e
+                ela precisa saber disso AGORA, não descobrir esperando. */}
+            {canais.semMedico && (
+              <p className="mt-1.5 text-amber-800 dark:text-amber-300">
+                Você ainda não tem um médico vinculado no app, então nenhum médico foi avisado.
+                Ligue 192 e vincule o seu médico depois, em Perfil.
+              </p>
+            )}
           </div>
         )}
 

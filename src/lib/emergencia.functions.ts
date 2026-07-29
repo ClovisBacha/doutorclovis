@@ -30,7 +30,6 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { DOCTOR } from "@/lib/doctor.config";
 
 export type CanaisAviso = {
   /** Quantos aparelhos do médico receberam o push. */
@@ -42,6 +41,8 @@ export type CanaisAviso = {
   avisados: string[];
   /** Nome do contato que NÃO recebeu nada — a tela oferece o WhatsApp dele. */
   faltou: string | null;
+  /** A paciente não tem médico vinculado: ninguém do lado clínico foi avisado. */
+  semMedico: boolean;
 };
 
 function textoDoAviso(p: {
@@ -83,6 +84,7 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
       sms: false,
       avisados: [],
       faltou: null,
+      semMedico: false,
     };
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -131,60 +133,46 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
 
       const canais: CanaisAviso = { ...vazio };
 
-      /* ── 1 e 2. O médico dela ─────────────────────────────────────────── */
-      let medicoNome = DOCTOR.name;
+      /* ── 1 e 2. O MÉDICO DELA ─────────────────────────────────────────
+         Quem recebe o alerta é o médico que acompanha aquela gestação, lido de
+         `patient_profiles.doctor_id`. Mais ninguém.
+
+         Não existe cair no dono da instalação: a Obstétrica é a PLATAFORMA, e
+         quem atende uma emergência obstétrica é o obstetra daquela paciente.
+         Mandar o alerta para o e-mail administrativo criaria a pior das
+         ilusões — alguém "avisado" que não tem como agir, e a paciente
+         achando que o médico dela já sabe.
+
+         Sem vínculo, o campo fica vazio e a tela DIZ que nenhum médico foi
+         avisado. É informação, não falha silenciosa: é o que faz ela procurar
+         o 192 em vez de esperar. */
+      let medicoNome: string | null = null;
       let medicoUserId: string | null = null;
-      let medicoEmail: string | null = null;
       if (prof?.doctor_id) {
         const { data: d } = await sb
           .from("doctors")
           .select("display_name")
           .eq("id", prof.doctor_id)
           .maybeSingle();
-        if (d?.display_name) medicoNome = d.display_name as string;
+        medicoNome = (d?.display_name as string) || "seu médico";
         medicoUserId = prof.doctor_id as string;
-      } else {
-        /* Sem vínculo — que é o caso de TODAS as pacientes de hoje — quem
-           atende é o dono da instalação. Sem este trecho o acionamento não
-           avisava médico nenhum: a única saída seria o e-mail do contato de
-           emergência, e o SOS ficaria mudo para quem ainda não cadastrou um.
-           `ADMIN_EMAILS` é a mesma lista que recebe aviso de novo agendamento;
-           o primeiro da lista é o médico responsável. */
-        const admin = (process.env.ADMIN_EMAILS || "")
-          .split(",")
-          .map((e) => e.trim().toLowerCase())
-          .filter(Boolean)[0];
-        if (admin) {
-          medicoEmail = admin;
-          try {
-            const { data: uid } = await sb.rpc("get_user_id_by_email", { p_email: admin });
-            if (uid) medicoUserId = uid as string;
-          } catch {
-            /* sem push para ele; o e-mail abaixo continua valendo */
-          }
-        }
       }
 
-      if (medicoUserId || medicoEmail) {
-        if (medicoUserId) {
-          try {
-            const { sendPushToUser } = await import("@/lib/push.server");
-            const r = await sendPushToUser(medicoUserId, {
-              title: `🆘 ${nome} acionou o SOS`,
-              body: texto.split("\n").slice(1, 3).join(" "),
-              url: "/painel",
-            });
-            canais.medicoPush = r.sent;
-          } catch {
-            /* melhor esforço */
-          }
+      if (medicoUserId) {
+        try {
+          const { sendPushToUser } = await import("@/lib/push.server");
+          const r = await sendPushToUser(medicoUserId, {
+            title: `🆘 ${nome} acionou o SOS`,
+            body: texto.split("\n").slice(1, 3).join(" "),
+            url: "/painel",
+          });
+          canais.medicoPush = r.sent;
+        } catch {
+          /* melhor esforço */
         }
         try {
-          if (!medicoEmail && medicoUserId) {
-            const { data: dUser } = await supabaseAdmin.auth.admin.getUserById(medicoUserId);
-            medicoEmail = dUser?.user?.email ?? null;
-          }
-          const email = medicoEmail;
+          const { data: dUser } = await supabaseAdmin.auth.admin.getUserById(medicoUserId);
+          const email = dUser?.user?.email;
           if (email) {
             const { sendEmail } = await import("@/lib/email.server");
             canais.medicoEmail = await sendEmail({
@@ -196,8 +184,12 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         } catch {
           /* melhor esforço */
         }
+      } else {
+        canais.semMedico = true;
       }
-      if (canais.medicoPush > 0 || canais.medicoEmail) canais.avisados.push(medicoNome);
+
+      if ((canais.medicoPush > 0 || canais.medicoEmail) && medicoNome)
+        canais.avisados.push(medicoNome);
 
       /* ── 3. O contato de emergência, por e-mail ───────────────────────── */
       const contatoNome = ((prof?.emergency_contact as string) || "").trim();
