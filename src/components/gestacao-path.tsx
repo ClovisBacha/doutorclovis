@@ -16,6 +16,14 @@ import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
 import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { createBreathAudio, vibratePhase } from "@/lib/breath-audio";
+import {
+  createSoundscape,
+  SOUNDSCAPES,
+  type Soundscape,
+  type SoundscapeKey,
+} from "@/lib/soundscapes";
+import { falar, calar, prepararVoz, temVozPt } from "@/lib/fala";
+import { FiguraMovimento, type PoseKey } from "@/components/figura-movimento";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 
 /**
@@ -2612,7 +2620,6 @@ export function GestacaoPath({
                 careMode={careMode}
                 halves={bancada?.halves ?? (doneDays.includes(D) ? 6 : halvesFromState(st))}
                 babyName={profile?.baby_name ?? null}
-                saldo={bancada?.saldo ?? saldo}
                 homeCity={homeCity ?? null}
                 enfeites={
                   bancada?.enfeites ??
@@ -3731,61 +3738,180 @@ function BreathingBlock({
    de costas). Sequência curta com cronômetro. Sempre com aviso de confirmar
    com o médico. Recompensa fixa por concluir (nunca punitiva). */
 
-type Movimento = { emoji: string; name: string; cue: string; secs: number };
+/**
+ * Um movimento agora carrega COMO fazer, e não só o nome.
+ *
+ * A versão anterior dizia "gato-camelo suave: de quatro apoios, alterne
+ * arredondar e relaxar a coluna" e ligava um cronômetro de 40 segundos. Quem
+ * nunca fez ficava 40 segundos olhando pro emoji do gato. Faltavam as três
+ * coisas que uma aula presencial dá de graça:
+ *
+ *  · `passos` — como MONTAR a posição, numerada, na ordem em que o corpo entra
+ *    nela. É o que um vídeo mostraria, dito em palavras;
+ *  · `sentir` — onde ela deve sentir. Sem isso não dá pra saber se está certo;
+ *  · `parar` — o sinal específico de PARAR daquele movimento. Um aviso genérico
+ *    ("pare se sentir desconforto") todo mundo pula; "se a panturrilha doer só
+ *    de um lado e estiver quente, avise o médico" ninguém pula.
+ *
+ * `pose` + `id` escolhem qual desenho de linha animado demonstra o movimento
+ * (`figura-movimento.tsx`).
+ */
+type Movimento = {
+  id: string;
+  pose: PoseKey;
+  emoji: string;
+  name: string;
+  cue: string;
+  passos: string[];
+  sentir: string;
+  parar: string;
+  secs: number;
+};
 
 const MOVIMENTOS: Movimento[] = [
   {
+    id: "ombros",
+    pose: "pe",
     emoji: "💆",
     name: "Rolar os ombros",
     cue: "Gire os ombros para trás, devagar e amplo.",
+    passos: [
+      "Fique em pé ou sentada, pés afastados na largura do quadril.",
+      "Solte os braços ao lado do corpo, sem travar os cotovelos.",
+      "Suba os ombros na direção das orelhas, leve-os para trás e desça.",
+      "Cada volta deve levar uns 4 segundos — quanto mais lento, melhor.",
+    ],
+    sentir: "Um alívio entre o pescoço e as escápulas.",
+    parar: "Se der pontada no ombro ou formigar o braço.",
     secs: 30,
   },
   {
+    id: "pescoco",
+    pose: "sentada",
     emoji: "🙆",
     name: "Alongar o pescoço",
     cue: "Incline a orelha em direção ao ombro; troque de lado sem forçar.",
+    passos: [
+      "Sente-se com as costas apoiadas e os dois pés no chão.",
+      "Deixe o ombro direito pesado, como se ele puxasse o chão.",
+      "Incline a orelha esquerda ao ombro esquerdo, sem girar o rosto.",
+      "Fique 15 segundos respirando e troque de lado.",
+    ],
+    sentir: "Um estica suave na lateral do pescoço, nunca na garganta.",
+    parar: "Se der tontura ou formigamento nas mãos.",
     secs: 30,
   },
   {
+    id: "gatocamelo",
+    pose: "quatro",
     emoji: "🐈",
     name: "Gato-camelo suave",
-    cue: "De quatro apoios, alterne arredondar e relaxar a coluna com a respiração.",
+    cue: "De quatro apoios, arredonde a coluna e volte ao neutro com a respiração.",
+    passos: [
+      "De quatro apoios: mãos abaixo dos ombros, joelhos abaixo do quadril.",
+      "Se o joelho incomodar, dobre uma toalha embaixo dele.",
+      "Ao SOLTAR o ar, arredonde as costas e leve o queixo ao peito.",
+      "Ao PUXAR o ar, volte a coluna ao neutro — sem afundar a lombar.",
+      "Uma ida e volta por respiração.",
+    ],
+    sentir: "A lombar abrindo e aliviando.",
+    parar: "Se doer o punho — apoie nos punhos fechados ou pare.",
     secs: 40,
   },
   {
+    id: "quadril",
+    pose: "borboleta",
     emoji: "🦋",
     name: "Abertura de quadril",
     cue: "Sentada, solas dos pés juntas, deixe os joelhos caírem suaves.",
+    passos: [
+      "Sente-se no chão ou na cama com as solas dos pés encostadas.",
+      "Apoie as costas numa parede se for mais confortável.",
+      "Segure os tornozelos e deixe os joelhos caírem pelo próprio peso.",
+      "Não empurre os joelhos para baixo com as mãos.",
+    ],
+    sentir: "Um alongamento na parte interna das coxas.",
+    parar: "Se doer a virilha ou o osso da frente do púbis.",
     secs: 30,
   },
   {
+    id: "tornozelo",
+    pose: "sentada",
     emoji: "🦶",
     name: "Círculos de tornozelo",
-    cue: "Pés no ar, desenhe círculos lentos — ajuda a circulação e o inchaço.",
+    cue: "Desenhe círculos lentos com o pé — ajuda a circulação e o inchaço.",
+    passos: [
+      "Sentada, estenda uma perna e apoie o calcanhar no chão ou num banquinho.",
+      "Desenhe círculos lentos com o pé: 10 para cada lado.",
+      "Troque de pé e repita.",
+      "Termine puxando a ponta do pé na direção do joelho por 5 segundos.",
+    ],
+    sentir: "A panturrilha trabalhando e o pé mais leve.",
+    parar: "Se uma panturrilha doer sozinha, quente ou muito inchada — avise o médico.",
     secs: 30,
   },
   {
+    id: "pelve",
+    pose: "pe",
     emoji: "🧍",
     name: "Inclinação pélvica em pé",
-    cue: "Em pé, incline a bacia para frente e para trás, bem devagar.",
+    cue: "Em pé, gire a bacia para frente e para trás, bem devagar.",
+    passos: [
+      "Em pé, encoste as costas numa parede com os pés a um palmo dela.",
+      "Puxe o ar e relaxe o corpo.",
+      "Ao soltar o ar, gire a bacia para cima e cole a lombar na parede.",
+      "Solte devagar e repita no ritmo da respiração.",
+    ],
+    sentir: "A lombar se soltando e o abdômen ativando de leve.",
+    parar: "Se sentir contração ou dor que não passa ao parar.",
     secs: 30,
   },
   {
+    id: "bracos",
+    pose: "pe",
     emoji: "🙌",
     name: "Alongar os braços pro alto",
     cue: "Entrelace os dedos, vire as palmas pra cima e estique — respira fundo.",
+    passos: [
+      "Em pé ou sentada, entrelace os dedos à frente do peito.",
+      "Vire as palmas para fora e estenda os braços.",
+      "Suba os braços acima da cabeça enquanto puxa o ar.",
+      "Desça devagar soltando o ar. Repita 5 vezes.",
+    ],
+    sentir: "As costelas e as laterais do tronco abrindo — alívio pra azia.",
+    parar: "Se ficar tonta ao levantar os braços: desça e sente-se.",
     secs: 30,
   },
   {
+    id: "torcao",
+    pose: "sentada",
     emoji: "🪑",
     name: "Torção suave sentada",
     cue: "Sentada, gire o tronco devagar pra um lado, depois pro outro.",
+    passos: [
+      "Sente-se na beira da cadeira com os pés apoiados no chão.",
+      "Mão direita no encosto, mão esquerda na coxa direita.",
+      "Gire a partir do meio das costas, mantendo a barriga apontada pra frente.",
+      "Fique 15 segundos respirando e troque de lado.",
+    ],
+    sentir: "A coluna girando — nunca um aperto na barriga.",
+    parar: "Se a barriga apertar ou a respiração embolar.",
     secs: 30,
   },
   {
+    id: "balanco",
+    pose: "quatro",
     emoji: "🐾",
-    name: "Balanço na quatro apoios",
-    cue: "De quatro apoios, balance o quadril pra frente e pra trás — alivia as costas.",
+    name: "Balanço em quatro apoios",
+    cue: "Leve o quadril pra trás e volte — alivia as costas e ajuda o encaixe.",
+    passos: [
+      "De quatro apoios, mãos abaixo dos ombros.",
+      "Leve o quadril pra trás, na direção dos calcanhares, até onde for confortável.",
+      "Volte devagar à posição inicial.",
+      "Vá e volte no ritmo da respiração.",
+    ],
+    sentir: "A lombar descomprimindo.",
+    parar: "Se o punho ou o joelho doerem.",
     secs: 40,
   },
 ];
@@ -3823,11 +3949,35 @@ function MovementBlock({
 }) {
   const seq = useMemo(() => movimentosForDay(day), [day]);
   const [open, setOpen] = useState(!!aoSair);
-  const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
+  // Aberto pela lista, o exercício começa NO exercício. A telinha "Movimento
+  // do dia / Começar" só repetia o nome do card que ela acabou de tocar; o
+  // aviso médico que morava nela virou uma linha fixa no topo da tela.
+  const [phase, setPhase] = useState<"intro" | "active" | "done">(aoSair ? "active" : "intro");
   const [idx, setIdx] = useState(0);
-  const [secs, setSecs] = useState(0);
+  const [secs, setSecs] = useState(aoSair ? seq[0].secs : 0);
+  const [voz, setVoz] = useState(true);
+  const [vozDisponivel, setVozDisponivel] = useState(false);
   const [reward, setReward] = useState<number | null>(null);
   const grantedRef = useRef(false);
+
+  useEffect(() => {
+    prepararVoz();
+    setVozDisponivel(temVozPt());
+    const t = setTimeout(() => setVozDisponivel(temVozPt()), 600);
+    return () => {
+      clearTimeout(t);
+      calar();
+    };
+  }, []);
+
+  // A voz lê o nome e a dica ao ENTRAR em cada movimento — assim ela pode
+  // olhar para o próprio corpo em vez de para o celular, que é justamente o
+  // que um exercício pede e um texto na tela impede.
+  useEffect(() => {
+    if (phase !== "active" || !voz || !seq[idx]) return;
+    falar(`${seq[idx].name}. ${seq[idx].cue}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, idx, voz]);
 
   useEffect(() => {
     if (phase !== "active") return;
@@ -3879,9 +4029,16 @@ function MovementBlock({
     buzz();
   }
   function close() {
+    calar();
     if (aoSair) return aoSair();
     setOpen(false);
     setPhase("intro");
+  }
+  function alternarVoz() {
+    setVoz((v) => {
+      if (v) calar();
+      return !v;
+    });
   }
 
   const cur = seq[idx];
@@ -3922,13 +4079,33 @@ function MovementBlock({
             >
               ✕
             </button>
-            {phase === "active" && (
+            {phase === "active" ? (
               <p className="flex-1 text-center text-xs font-bold uppercase tracking-wider text-emerald-500">
                 {idx + 1} de {seq.length}
               </p>
+            ) : (
+              <span className="flex-1" />
             )}
-            <span className="w-6" />
+            {phase === "active" && vozDisponivel ? (
+              <button
+                onClick={alternarVoz}
+                aria-label={voz ? "Desligar voz" : "Ligar voz"}
+                className={`press text-lg leading-none ${voz ? "" : "opacity-40 grayscale"}`}
+              >
+                🗣️
+              </button>
+            ) : (
+              <span className="w-6" />
+            )}
           </div>
+
+          {/* O aviso médico morava na telinha intermediária que saiu. Ele não
+              podia sair junto: fica fixo, discreto, na tela do exercício. */}
+          {phase === "active" && (
+            <p className="px-6 pb-1 text-center text-[10.5px] leading-snug text-emerald-700/70">
+              Vá no seu ritmo. Confirme com seu médico se algum movimento não é indicado pra você.
+            </p>
+          )}
 
           {phase === "intro" && (
             <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
@@ -3951,9 +4128,11 @@ function MovementBlock({
           )}
 
           {phase === "active" && cur && (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-              {/* Anel de contagem ao redor do movimento (esvazia com o tempo) */}
-              <div className="relative flex h-52 w-52 items-center justify-center">
+            <div className="flex flex-1 flex-col overflow-y-auto px-6 pb-8">
+              {/* A figura DEMONSTRANDO, dentro do anel que conta o tempo.
+                  Antes havia um emoji flutuando aqui: bonito, mas ele não
+                  ensina nada — e ensinar era o que faltava nesta tela. */}
+              <div className="relative mx-auto flex h-52 w-52 shrink-0 items-center justify-center">
                 <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
                   <circle cx="50" cy="50" r="45" fill="none" stroke="#a7f3d0" strokeWidth="6" />
                   <circle
@@ -3969,22 +4148,44 @@ function MovementBlock({
                     style={{ transition: "stroke-dashoffset 1s linear" }}
                   />
                 </svg>
-                <div className="flex flex-col items-center">
-                  <span
-                    className="text-6xl"
-                    style={{ animation: "dc-float 2.6s ease-in-out infinite" }}
-                  >
-                    {cur.emoji}
-                  </span>
-                  <span className="mt-1 tabular-nums text-3xl font-extrabold text-emerald-600">
-                    {secs}s
-                  </span>
-                </div>
+                <FiguraMovimento pose={cur.pose} anim={cur.id} className="text-emerald-700" />
+                {/* O relógio fica no TOPO do anel. Embaixo ele cobria os pés —
+                    e o pé é justamente a parte que se mexe em metade dos
+                    exercícios. */}
+                <span className="absolute -top-1 rounded-full bg-emerald-500 px-2.5 py-0.5 text-sm font-extrabold tabular-nums text-white">
+                  {secs}s
+                </span>
               </div>
-              <h3 className="mt-5 text-2xl font-extrabold text-emerald-900">{cur.name}</h3>
-              <p className="mt-2 max-w-xs text-sm leading-relaxed text-emerald-800/80">{cur.cue}</p>
-              {/* Passos da sequência */}
-              <div className="mt-4 flex gap-1.5">
+
+              <h3 className="mt-4 text-center text-2xl font-extrabold text-emerald-900">
+                {cur.name}
+              </h3>
+              <p className="mx-auto mt-1 max-w-xs text-center text-sm leading-relaxed text-emerald-800/80">
+                {cur.cue}
+              </p>
+
+              {/* Como montar a posição, na ordem em que o corpo entra nela. */}
+              <ol className="mx-auto mt-4 w-full max-w-sm space-y-2">
+                {cur.passos.map((p, i) => (
+                  <li key={i} className="flex gap-2.5 text-left">
+                    <span className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-extrabold text-emerald-700">
+                      {i + 1}
+                    </span>
+                    <span className="text-[13px] leading-snug text-emerald-900/90">{p}</span>
+                  </li>
+                ))}
+              </ol>
+
+              <div className="mx-auto mt-4 grid w-full max-w-sm gap-2">
+                <p className="rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-left text-[12px] leading-snug text-emerald-800">
+                  <span className="font-extrabold">Você deve sentir:</span> {cur.sentir}
+                </p>
+                <p className="rounded-2xl bg-amber-50 px-3.5 py-2.5 text-left text-[12px] leading-snug text-amber-900">
+                  <span className="font-extrabold">Pare se:</span> {cur.parar}
+                </p>
+              </div>
+
+              <div className="mt-5 flex justify-center gap-1.5">
                 {seq.map((_, i) => (
                   <span
                     key={i}
@@ -4000,13 +4201,12 @@ function MovementBlock({
               </div>
               <button
                 onClick={() => setSecs(0)}
-                className="press mt-6 rounded-full border border-emerald-300 bg-white/70 px-6 py-2 text-xs font-bold text-emerald-700 backdrop-blur"
+                className="press mx-auto mt-4 rounded-full border border-emerald-300 bg-white/70 px-6 py-2 text-xs font-bold text-emerald-700 backdrop-blur"
               >
                 Próximo →
               </button>
             </div>
           )}
-
           {phase === "done" && (
             <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
               {!careMode && <ConfettiBurst />}
@@ -4038,9 +4238,10 @@ function MovementBlock({
    Meditação guiada curta (~1,5 min): frases calmas que avançam sozinhas, tema
    do dia. Recompensa fixa por concluir (nunca punitiva). */
 
-const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
+const MEDITACOES: { theme: string; need: string; emoji: string; lines: string[] }[] = [
   {
     theme: "Calma",
+    need: "Estou tensa",
     emoji: "🌊",
     lines: [
       "Feche os olhos e solte os ombros.",
@@ -4054,6 +4255,7 @@ const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
   },
   {
     theme: "Conexão com o bebê",
+    need: "Quero sentir o bebê",
     emoji: "💛",
     lines: [
       "Leve uma das mãos até a barriga, sem apertar.",
@@ -4067,6 +4269,7 @@ const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
   },
   {
     theme: "Descanso",
+    need: "Preciso descansar",
     emoji: "🌙",
     lines: [
       "Acomode-se do jeito mais confortável possível.",
@@ -4080,6 +4283,7 @@ const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
   },
   {
     theme: "Gratidão",
+    need: "Quero um respiro bom",
     emoji: "✨",
     lines: [
       "Respire fundo uma vez, bem devagar.",
@@ -4093,6 +4297,7 @@ const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
   },
   {
     theme: "Sono tranquilo",
+    need: "Não consigo dormir",
     emoji: "😴",
     lines: [
       "Deite-se de lado, com um travesseiro apoiando a barriga.",
@@ -4105,6 +4310,7 @@ const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
   },
   {
     theme: "Coragem pro parto",
+    need: "Estou com medo do parto",
     emoji: "🦁",
     lines: [
       "Respire fundo e sinta a força que já existe em você.",
@@ -4117,6 +4323,7 @@ const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
   },
   {
     theme: "Aqui e agora",
+    need: "Minha cabeça não para",
     emoji: "🍃",
     lines: [
       "Sinta os pontos do corpo que tocam o chão ou a cadeira.",
@@ -4128,6 +4335,102 @@ const MEDITACOES: { theme: string; emoji: string; lines: string[] }[] = [
     ],
   },
 ];
+
+/* ── Registro de meditação (sequência + minutos) ───────────────────────────
+   Chave com prefixo `dc-path-`, então entra no blob de `journey_state` e a
+   sequência acompanha a paciente de aparelho pra aparelho. É o mesmo gancho
+   que todo app de meditação usa pra fazer a pessoa voltar amanhã — e aqui ele
+   é barato porque o transporte já existia. */
+
+const MED_LOG_KEY = "dc-path-med-log";
+type MedLog = { dias: string[]; minutos: number; humores: string[] };
+const MED_LOG_VAZIO: MedLog = { dias: [], minutos: 0, humores: [] };
+
+function diaISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Dias seguidos com meditação.
+ *
+ * Detalhe que separa "gancho gentil" de "gancho punitivo": se ela AINDA não
+ * meditou hoje, a sequência de ontem continua contando. Ela só quebra quando
+ * um dia inteiro passa em branco. Zerar o número às 00h01 de um dia que mal
+ * começou é o tipo de pressão que não cabe numa tela de gestante.
+ */
+function sequenciaDeDias(dias: string[]): number {
+  const set = new Set(dias);
+  const d = new Date();
+  if (!set.has(diaISO(d))) d.setDate(d.getDate() - 1);
+  let n = 0;
+  while (set.has(diaISO(d))) {
+    n++;
+    d.setDate(d.getDate() - 1);
+  }
+  return n;
+}
+
+function registrarMeditacao(minutos: number, humor: string | null) {
+  const log = lsGet<MedLog>(MED_LOG_KEY, MED_LOG_VAZIO);
+  const hoje = diaISO(new Date());
+  lsSet(MED_LOG_KEY, {
+    dias: log.dias.includes(hoje) ? log.dias : [...log.dias, hoje].slice(-400),
+    minutos: (log.minutos ?? 0) + minutos,
+    humores: humor ? [...(log.humores ?? []), humor].slice(-30) : (log.humores ?? []),
+  } satisfies MedLog);
+}
+
+/* ══════════════════ Meditação guiada ══════════════════
+   Reescrita para o que os apps de meditação de mercado provaram que funciona,
+   com o que dá pra fazer sem estúdio nem biblioteca de áudio:
+
+   1. ELA ESCOLHE. Duração (2/5/10 min), o que está precisando agora e o som de
+      fundo. A versão anterior servia um tema fixo por rotação de dia — se o que
+      ela precisava era dormir e o dia calhava de ser "coragem pro parto", não
+      havia o que fazer.
+   2. UM RITMO PRA SEGUIR. O centro da tela virou o círculo de respiração
+      (4s inspira · 2s segura · 6s solta). É o elemento mais copiado do gênero
+      porque resolve o problema real de quem nunca meditou: "eu não sei o que
+      fazer com o silêncio". Aqui tem o que fazer.
+   3. VOZ. `speechSynthesis` em pt-BR lê as frases — e com voz ela pode fechar
+      os olhos, que é o pedido da primeira linha de toda meditação.
+   4. GUIA E DEPOIS SILÊNCIO. As frases do tema abrem a sessão; passadas todas,
+      a sessão continua só com a respiração e uma frase esparsa. É assim que
+      uma sessão de 10 min não vira 10 min de tagarelice.
+   5. SEQUÊNCIA E MINUTOS. O número que faz voltar amanhã.
+   6. FECHAMENTO COM UMA PERGUNTA. "Como você está agora?" — devolve pra ela a
+      diferença que os 5 minutos fizeram, que é a única prova que importa. */
+
+const RESPIRO = { in: 4, hold: 2, out: 6 } as const; // 12s por ciclo
+const CICLO_SEGS = RESPIRO.in + RESPIRO.hold + RESPIRO.out;
+
+const DURACOES = [2, 5, 10] as const;
+
+/** Frases esparsas do trecho silencioso — nunca instruem, só reancoram. */
+const RECHAMADAS = [
+  "Se a cabeça foi embora, tudo bem. Volte pra respiração.",
+  "Nada pra resolver agora. Só o ar entrando e saindo.",
+  "Solte os ombros de novo.",
+  "Você e o bebê, respirando juntos.",
+  "Deixe a expiração ser mais longa que a inspiração.",
+];
+
+const COMO_ESTOU = [
+  { emoji: "😌", label: "Mais calma" },
+  { emoji: "🥱", label: "Com sono" },
+  { emoji: "💛", label: "Conectada" },
+  { emoji: "😐", label: "Igual" },
+  { emoji: "😟", label: "Ainda ansiosa" },
+] as const;
+
+const FECHAMENTO: Record<string, string> = {
+  "Mais calma": "É isso mesmo. Guarde esse ritmo pro resto do dia.",
+  "Com sono": "Sono depois de meditar é o corpo aceitando descansar. Vá deitar.",
+  Conectada: "Esse instante também é cuidado com ele. Vocês dois sentiram.",
+  Igual: "Nem toda sessão muda o dia — e mesmo assim ela contou. Volte amanhã.",
+  "Ainda ansiosa":
+    "Ansiedade que não passa em 5 minutos merece ser falada. Leve isso pra consulta.",
+};
 
 function MeditationBlock({
   day,
@@ -4154,31 +4457,92 @@ function MeditationBlock({
    */
   aoSair?: () => void;
 }) {
-  const med = useMemo(() => MEDITACOES[day % MEDITACOES.length], [day]);
+  const sugerida = day % MEDITACOES.length;
   const [open, setOpen] = useState(!!aoSair);
-  const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
-  const [idx, setIdx] = useState(0);
+  const [etapa, setEtapa] = useState<"escolha" | "sessao" | "reflexo" | "fim">("escolha");
+  const [temaIdx, setTemaIdx] = useState(sugerida);
+  const [minutos, setMinutos] = useState<(typeof DURACOES)[number]>(5);
+  const [som, setSom] = useState<SoundscapeKey>("pad");
+  const [voz, setVoz] = useState(true);
+  const [ciclo, setCiclo] = useState(0);
+  const [fase, setFase] = useState<"in" | "hold" | "out">("in");
+  const [tick, setTick] = useState<number>(RESPIRO.in);
+  const [humor, setHumor] = useState<string | null>(null);
   const [reward, setReward] = useState<number | null>(null);
-  const [sound, setSound] = useState(true);
   const grantedRef = useRef(false);
-  const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
-  const SECS_PER_LINE = 12;
+  const audioRef = useRef<Soundscape | null>(null);
 
-  useEffect(() => () => audioRef.current?.stop(), []);
+  const med = MEDITACOES[temaIdx];
+  const totalCiclos = Math.round((minutos * 60) / CICLO_SEGS);
+  // Relido a cada troca de etapa de propósito: quando a sessão termina ela
+  // acabou de gravar o dia de hoje, e a tela de fim precisa mostrar a sequência
+  // JÁ contando com a sessão que a paciente terminou agora.
+  const [log, setLog] = useState<MedLog>(MED_LOG_VAZIO);
+  useEffect(() => {
+    if (open) setLog(lsGet<MedLog>(MED_LOG_KEY, MED_LOG_VAZIO));
+  }, [open, etapa]);
+  const seq = sequenciaDeDias(log.dias ?? []);
+  const [vozDisponivel, setVozDisponivel] = useState(false);
 
   useEffect(() => {
-    if (phase !== "active") return;
+    prepararVoz();
+    // A lista de vozes do Chrome chega assíncrona: uma segunda olhada logo
+    // depois evita esconder o botão de voz em quem tem voz instalada.
+    setVozDisponivel(temVozPt());
+    const t = setTimeout(() => setVozDisponivel(temVozPt()), 600);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(
+    () => () => {
+      audioRef.current?.stop();
+      calar();
+    },
+    [],
+  );
+
+  /** Frase da vez: as do tema abrem a sessão; depois, silêncio com rechamadas. */
+  const frase = useMemo(() => {
+    if (ciclo < med.lines.length) return med.lines[ciclo];
+    const desde = ciclo - med.lines.length;
+    if (desde > 0 && desde % 5 === 0) return RECHAMADAS[(desde / 5 - 1) % RECHAMADAS.length];
+    return null;
+  }, [ciclo, med]);
+
+  // Relógio da respiração: cada fase agenda a próxima. O ciclo fecha na
+  // expiração — inspirar é o começo natural, expirar é o fim natural.
+  useEffect(() => {
+    if (etapa !== "sessao") return;
+    const dur = RESPIRO[fase];
+    setTick(dur);
+    const iv = setInterval(() => setTick((t) => Math.max(1, t - 1)), 1000);
     const t = setTimeout(() => {
-      if (idx + 1 >= med.lines.length) {
-        setPhase("done");
+      if (fase === "in") setFase("hold");
+      else if (fase === "hold") setFase("out");
+      else if (ciclo + 1 >= totalCiclos) {
+        setEtapa("reflexo");
+        registrarMeditacao(minutos, null);
         finish();
       } else {
-        setIdx(idx + 1);
+        setCiclo((c) => c + 1);
+        setFase("in");
       }
-    }, SECS_PER_LINE * 1000);
-    return () => clearTimeout(t);
+    }, dur * 1000);
+    vibratePhase(fase);
+    return () => {
+      clearInterval(iv);
+      clearTimeout(t);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, idx]);
+  }, [etapa, fase, ciclo]);
+
+  // A voz fala a frase do ciclo — uma vez, na virada. Falar a cada fase
+  // atropelaria a própria frase no meio.
+  useEffect(() => {
+    if (etapa !== "sessao" || !voz || !frase) return;
+    falar(frase);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa, ciclo, voz]);
 
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
@@ -4204,37 +4568,47 @@ function MeditationBlock({
   }
 
   function begin() {
-    setIdx(0);
+    setCiclo(0);
+    setFase("in");
+    setHumor(null);
     setReward(null);
     grantedRef.current = false;
-    if (sound) {
-      audioRef.current = createBreathAudio();
-      audioRef.current.start();
-      audioRef.current.ambient();
-    }
-    setPhase("active");
+    audioRef.current?.stop();
+    audioRef.current = createSoundscape(som);
+    audioRef.current.start();
+    setEtapa("sessao");
   }
+
   function close() {
     audioRef.current?.stop();
     audioRef.current = null;
+    calar();
     if (aoSair) return aoSair();
     setOpen(false);
-    setPhase("intro");
+    setEtapa("escolha");
   }
-  function toggleSound() {
-    setSound((on) => {
-      const next = !on;
-      if (!next) {
-        audioRef.current?.stop();
-        audioRef.current = null;
-      } else if (phase === "active") {
-        audioRef.current = createBreathAudio();
-        audioRef.current.start();
-        audioRef.current.ambient();
-      }
-      return next;
+
+  function trocarSom(k: SoundscapeKey) {
+    setSom(k);
+    if (etapa === "sessao") {
+      audioRef.current?.stop();
+      audioRef.current = createSoundscape(k);
+      audioRef.current.start();
+    }
+  }
+
+  function alternarVoz() {
+    setVoz((v) => {
+      if (v) calar();
+      return !v;
     });
   }
+
+  const faseLabel = fase === "in" ? "Inspire" : fase === "hold" ? "Segure" : "Solte";
+  // O círculo cresce na inspiração e volta na expiração; na pausa ele fica
+  // parado, cheio. A transição dura exatamente a fase, então o desenho e o
+  // pulmão andam juntos.
+  const escala = fase === "out" ? 1 : 1.34;
 
   return (
     <>
@@ -4244,14 +4618,14 @@ function MeditationBlock({
           <div className="flex-1">
             <p className="text-sm font-extrabold text-violet-800">Meditação do dia</p>
             <p className="text-xs text-violet-700/80">
-              {med.theme} · ~1,5 min {alreadyDone ? "· feito hoje ✓" : ""}
+              {med.theme} · você escolhe o tempo {alreadyDone ? "· feito hoje ✓" : ""}
             </p>
           </div>
         </div>
         <button
           onClick={() => {
             setOpen(true);
-            setPhase("intro");
+            setEtapa("escolha");
           }}
           className="press mt-3 w-full rounded-full bg-violet-500 py-2.5 text-sm font-extrabold text-white"
         >
@@ -4272,87 +4646,270 @@ function MeditationBlock({
             >
               ✕
             </button>
-            {phase === "active" ? (
+            {etapa === "sessao" ? (
               <div className="mx-3 h-1.5 flex-1 overflow-hidden rounded-full bg-violet-200">
                 <div
-                  className="h-full rounded-full bg-violet-500 transition-all duration-1000"
-                  style={{ width: `${((idx + 1) / med.lines.length) * 100}%` }}
+                  className="h-full rounded-full bg-violet-500"
+                  style={{
+                    width: `${((ciclo + 1) / totalCiclos) * 100}%`,
+                    transition: `width ${CICLO_SEGS}s linear`,
+                  }}
                 />
               </div>
             ) : (
               <span className="flex-1" />
             )}
-            <button
-              onClick={toggleSound}
-              aria-label={sound ? "Desligar som" : "Ligar som"}
-              className="press text-xl leading-none"
-            >
-              {sound ? "🔊" : "🔇"}
-            </button>
+            {etapa === "sessao" && (
+              <div className="flex items-center gap-3">
+                {vozDisponivel && (
+                  <button
+                    onClick={alternarVoz}
+                    aria-label={voz ? "Desligar voz" : "Ligar voz"}
+                    className={`press text-lg leading-none ${voz ? "" : "opacity-40 grayscale"}`}
+                  >
+                    🗣️
+                  </button>
+                )}
+                <button
+                  onClick={() => trocarSom(som === "silencio" ? "pad" : "silencio")}
+                  aria-label={som === "silencio" ? "Ligar som" : "Desligar som"}
+                  className="press text-xl leading-none"
+                >
+                  {som === "silencio" ? "🔇" : "🔊"}
+                </button>
+              </div>
+            )}
           </div>
 
-          {phase === "intro" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-              <span className="text-6xl">{med.emoji}</span>
-              <h3 className="mt-4 text-2xl font-extrabold text-violet-900">{med.theme}</h3>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-violet-800/80">
-                Uma meditação curtinha. Deixe as frases te guiarem, sem esforço. Encontre uma
-                posição confortável. 💜
+          {/* ── 1. Escolha: tempo, necessidade, som ───────────────────────── */}
+          {etapa === "escolha" && (
+            <div className="flex-1 overflow-y-auto px-6 pb-10">
+              <h3 className="font-serif text-[26px] font-semibold text-violet-900">Meditar</h3>
+              <p className="mt-1 text-[13px] text-violet-800/70">
+                {seq > 0 ? (
+                  <>
+                    🔥 {seq} {seq === 1 ? "dia seguido" : "dias seguidos"}
+                    {log.minutos > 0 ? ` · ${log.minutos} min no total` : ""}
+                  </>
+                ) : (
+                  "Alguns minutos só seus. Comece por onde der."
+                )}
               </p>
+
+              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                De quanto tempo você tem?
+              </p>
+              <div className="mt-2 flex gap-2">
+                {DURACOES.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMinutos(m)}
+                    className={`press flex-1 rounded-2xl py-3 text-sm font-extrabold transition-colors ${
+                      minutos === m
+                        ? "bg-violet-500 text-white"
+                        : "border border-violet-200 bg-white/70 text-violet-700"
+                    }`}
+                  >
+                    {m} min
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                O que você precisa agora?
+              </p>
+              <div className="mt-2 grid gap-2">
+                {MEDITACOES.map((m, i) => (
+                  <button
+                    key={m.theme}
+                    onClick={() => setTemaIdx(i)}
+                    className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                      temaIdx === i
+                        ? "bg-violet-500 text-white"
+                        : "border border-violet-200 bg-white/70 text-violet-900"
+                    }`}
+                  >
+                    <span className="text-2xl leading-none">{m.emoji}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-extrabold">{m.need}</span>
+                      <span
+                        className={`block text-[11px] ${temaIdx === i ? "text-white/75" : "text-violet-700/70"}`}
+                      >
+                        {m.theme}
+                      </span>
+                    </span>
+                    {i === sugerida && (
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-[3px] text-[9.5px] font-bold ${
+                          temaIdx === i ? "bg-white/25 text-white" : "bg-violet-100 text-violet-700"
+                        }`}
+                      >
+                        Do dia
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                Som de fundo
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {SOUNDSCAPES.map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => trocarSom(s.key)}
+                    className={`press rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
+                      som === s.key
+                        ? "bg-violet-500 text-white"
+                        : "border border-violet-200 bg-white/70 text-violet-700"
+                    }`}
+                  >
+                    {s.emoji} {s.label}
+                  </button>
+                ))}
+              </div>
+
+              {vozDisponivel && (
+                <button
+                  onClick={alternarVoz}
+                  className={`press mt-4 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                    voz ? "bg-violet-500 text-white" : "border border-violet-200 bg-white/70"
+                  }`}
+                >
+                  <span className="text-xl leading-none">🗣️</span>
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={`block text-sm font-extrabold ${voz ? "" : "text-violet-900"}`}
+                    >
+                      Voz guiada {voz ? "ligada" : "desligada"}
+                    </span>
+                    <span
+                      className={`block text-[11px] ${voz ? "text-white/75" : "text-violet-700/70"}`}
+                    >
+                      Com a voz você pode fechar os olhos.
+                    </span>
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* O botão fica FIXO no rodapé: a lista de necessidades tem sete
+              itens e empurrava o "Começar" para fora da tela — quem escolhia o
+              primeiro tema tinha que rolar até o fim pra poder começar. */}
+          {etapa === "escolha" && (
+            <div
+              className="border-t border-violet-200/60 bg-white/70 px-6 pb-5 pt-3 backdrop-blur"
+              style={{ paddingBottom: "calc(1.25rem + var(--safe-bottom, 0px))" }}
+            >
               <button
                 onClick={begin}
-                className="press mt-8 rounded-full bg-violet-500 px-8 py-3 text-sm font-extrabold text-white"
+                className="press w-full rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white"
               >
-                Começar
+                Começar · {minutos} min
               </button>
             </div>
           )}
 
-          {phase === "active" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-10 text-center">
-              {/* Halo que "respira" devagar atrás do tema — âncora visual da calma */}
-              <div className="relative flex h-28 w-28 items-center justify-center">
+          {/* ── 2. Sessão: o círculo que respira ──────────────────────────── */}
+          {etapa === "sessao" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <div className="relative flex h-56 w-56 items-center justify-center">
                 <div
-                  className="absolute inset-0 rounded-full bg-violet-300/40 blur-xl"
-                  style={{ animation: "haloBreathe 7s ease-in-out infinite" }}
+                  className="absolute h-40 w-40 rounded-full bg-fuchsia-200/40 blur-2xl"
+                  style={{
+                    transform: `scale(${escala})`,
+                    transition: `transform ${RESPIRO[fase]}s cubic-bezier(.37,0,.2,1)`,
+                  }}
                   aria-hidden
                 />
                 <div
-                  className="absolute -inset-4 rounded-full bg-fuchsia-200/30 blur-2xl"
-                  style={{ animation: "haloBreathe 9s ease-in-out infinite reverse" }}
+                  className="absolute h-40 w-40 rounded-full border-2 border-violet-400/50 bg-gradient-to-br from-white/95 to-violet-300/70"
+                  style={{
+                    transform: `scale(${escala})`,
+                    transition: `transform ${RESPIRO[fase]}s cubic-bezier(.37,0,.2,1)`,
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)",
+                  }}
                   aria-hidden
                 />
-                <span className="relative text-5xl">{med.emoji}</span>
+                <div className="relative flex flex-col items-center">
+                  <span className="text-[13px] font-bold uppercase tracking-[0.18em] text-violet-500">
+                    {faseLabel}
+                  </span>
+                  <span className="tabular-nums text-5xl font-extrabold text-violet-800">
+                    {tick}
+                  </span>
+                </div>
               </div>
+
               <p
-                key={idx}
-                className="dc-q-slide mt-8 max-w-sm font-serif text-[26px] font-semibold leading-relaxed text-violet-900"
+                key={ciclo}
+                className={`dc-q-slide mt-10 min-h-[84px] max-w-sm font-serif text-[22px] leading-relaxed ${
+                  frase ? "text-violet-900" : "text-violet-500/60"
+                }`}
               >
-                {med.lines[idx]}
+                {frase ?? "Só respire."}
               </p>
+
+              <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-violet-400">
+                {med.theme} · {Math.max(0, Math.ceil(((totalCiclos - ciclo) * CICLO_SEGS) / 60))}{" "}
+                min restantes
+              </p>
+            </div>
+          )}
+
+          {/* ── 3. Fechamento: a pergunta que devolve a sessão pra ela ─────── */}
+          {etapa === "reflexo" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <span className="text-5xl">🧘</span>
+              <h3 className="mt-4 font-serif text-[26px] font-semibold text-violet-900">
+                Como você está agora?
+              </h3>
+              <p className="mt-1.5 text-[13px] text-violet-800/70">
+                Sem resposta certa — é só pra você notar a diferença.
+              </p>
+              <div className="mt-6 grid w-full max-w-xs grid-cols-1 gap-2">
+                {COMO_ESTOU.map((c) => (
+                  <button
+                    key={c.label}
+                    onClick={() => {
+                      setHumor(c.label);
+                      registrarMeditacao(0, c.label);
+                      setEtapa("fim");
+                    }}
+                    className="press flex items-center gap-3 rounded-2xl border border-violet-200 bg-white/75 px-4 py-3 text-left text-sm font-bold text-violet-900"
+                  >
+                    <span className="text-xl leading-none">{c.emoji}</span>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
               <button
-                onClick={() => {
-                  buzz(16);
-                  if (idx + 1 >= med.lines.length) {
-                    setPhase("done");
-                    finish();
-                  } else setIdx(idx + 1);
-                }}
-                className="press mt-10 rounded-full border border-violet-200 bg-white/70 px-6 py-2 text-xs font-bold text-violet-500 backdrop-blur"
+                onClick={() => setEtapa("fim")}
+                className="press mt-5 text-xs font-bold text-violet-500"
               >
-                Continuar →
+                Pular
               </button>
             </div>
           )}
 
-          {phase === "done" && (
+          {etapa === "fim" && (
             <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
               {!careMode && <ConfettiBurst />}
               <span className="dc-result-in text-6xl">🧘</span>
-              <h3 className="mt-3 text-2xl font-extrabold text-violet-900">Que paz 💜</h3>
-              <p className="mt-1 text-sm text-violet-800/80">
-                Você tirou um tempinho só pra você. Leve essa calma com você.
+              <h3 className="mt-3 font-serif text-[26px] font-semibold text-violet-900">
+                {minutos} minutos só seus 💜
+              </h3>
+              <p className="mt-1.5 max-w-xs text-sm leading-relaxed text-violet-800/80">
+                {(humor && FECHAMENTO[humor]) ||
+                  "Você tirou um tempinho só pra você. Leve essa calma com você."}
               </p>
+              {seq > 0 && (
+                <p className="mt-3 text-[13px] font-bold text-violet-600">
+                  🔥 {seq} {seq === 1 ? "dia seguido" : "dias seguidos"}
+                </p>
+              )}
               {!careMode && reward != null && reward > 0 && (
                 <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
                   +{reward} 🌱 Sementinhas!
@@ -5021,7 +5578,7 @@ const WELLNESS_META: Record<
     title: "Movimento",
     a: "#fbbf24",
     b: "#f97316",
-    desc: "3 movimentos leves com cronômetro pra soltar o corpo.",
+    desc: "3 movimentos leves, com a figura mostrando como fazer cada um.",
   },
   meditation: {
     inkDark: "#d2b2ff",
@@ -5031,7 +5588,7 @@ const WELLNESS_META: Record<
     title: "Meditar",
     a: "#a78bfa",
     b: "#a855f7",
-    desc: "Meditação guiada curtinha, com som ambiente.",
+    desc: "Você escolhe o tempo, o que precisa e o som de fundo.",
   },
   bonding: {
     inkDark: "#ff9ec4",
@@ -5132,31 +5689,12 @@ const POS_ENFEITE = [
   { x: 6, y: 64, tam: 84 },
 ];
 
-/** "Bom dia" / "Boa tarde" / "Boa noite" — a tela abre falando com ela. */
-function saudacaoDoDia(): string {
-  const h = new Date().getHours();
-  /* Seis faixas, todas ancoradas no RELÓGIO — e não no momento do céu, de
-     propósito. "Bom dia" e "boa tarde" são convenção de relógio em português;
-     o céu é o sol. O céu chamado "meio-dia" começa às 10h42 em Belo Horizonte
-     no inverno: amarrar a saudação a ele faria o app dizer "boa tarde" às dez
-     e quarenta da manhã.
-
-     A madrugada ganha frase própria porque quem abre o app às 3h quase sempre
-     está com desconforto ou insônia — não é o mesmo lugar de quem abre às 22h,
-     e "boa noite" nas duas horas trata igual o que não é igual.
-
-     05h–07h é o buraco que existia: o céu ainda é noite fechada e a tela dizia
-     "Bom dia". "Amanhecendo" não afirma que o dia chegou nem trata como noite.
-
-     18h–20h: "boa noite" às 18h soa cedo e "boa tarde" às 19h30 soa errado.
-     "Boa noitinha" é o que se fala de verdade nessa faixa. */
-  if (h < 5) return "Boa madrugada";
-  if (h < 7) return "Amanhecendo";
-  if (h < 12) return "Bom dia";
-  if (h < 18) return "Boa tarde";
-  if (h < 20) return "Boa noitinha";
-  return "Boa noite";
-}
+/* A saudação por hora do dia saiu daqui: a hero da tela do Bebê já dá bom-dia
+   com o nome do bebê, e repetir "Boa noite, {bebê}" na tela seguinte só gastava
+   a linha mais nobre da tela com uma frase que a paciente acabou de ler. As
+   seis faixas de horário que moravam aqui foram para `dayGreetingLabel` em
+   `app-mobile-shell.tsx`, onde a saudação acontece uma vez só. Esta tela usa a
+   linha para dizer onde ela está: "Hoje com {bebê}". */
 
 /**
  * O anel do dia: quantos dos 6 momentos já foram feitos.
@@ -5301,7 +5839,6 @@ function WellnessScreen({
   halves,
   lesson,
   babyName,
-  saldo,
   homeCity,
   avisoAmanha,
   enfeites = [],
@@ -5318,8 +5855,6 @@ function WellnessScreen({
   lesson: WellnessLesson;
   /** Nome do bebê — a tela cumprimenta por ele. */
   babyName?: string | null;
-  /** Sementinhas na carteira, para a pílula do topo. */
-  saldo?: number | null;
   /** Cidade do cadastro — o degrau entre o GPS e o IP, igual ao da home. */
   homeCity?: { nome: string; lat: number; lon: number } | null;
   /** O gancho de amanhã, que morava na folha removida. Null fora de hoje. */
@@ -5360,10 +5895,6 @@ function WellnessScreen({
 
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
-  /* A referência mostra "Ver todas" recolhido, com cinco linhas. São cinco
-     mesmo — a sexta atividade é a AULA, que já está no cartão de cima. O botão
-     existe para o dia em que entrarem mais. */
-  const [verTodas, setVerTodas] = useState(false);
 
   async function refresh() {
     try {
@@ -5595,25 +6126,10 @@ function WellnessScreen({
                 </svg>
               </button>
 
-              {/* A moeda REAL do app. O desenho de referência traz uma estrela
-                  aqui, mas estrela no app é o placar do DIA (3, zeradas toda
-                  meia-noite) — um total acumulado ao lado dela seria uma moeda
-                  que não existe. Sementinha é o que de fato se junta e se
-                  gasta na loja. */}
-              {saldo != null && !careMode && (
-                <span
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 backdrop-blur-xl ${ceuEscuro ? "bg-white/16" : "bg-white/70"}`}
-                  style={{
-                    boxShadow:
-                      "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.55), 0 8px 20px -10px rgba(90,60,80,0.4)",
-                  }}
-                >
-                  <span className="text-lg leading-none">🌱</span>
-                  <span className="tabular-nums text-[15px] font-semibold" style={{ color: tinta }}>
-                    {saldo}
-                  </span>
-                </span>
-              )}
+              {/* A carteira saiu daqui. O saldo de Sementinhas já aparece na aba
+                  de onde ela veio, e repetido aqui ele só disputava o canto de
+                  cima com o anel de progresso — que é o número que importa
+                  NESTA tela. Um número por canto. */}
             </div>
 
             {/* ── Saudação + anel de progresso ──────────────────────── */}
@@ -5623,14 +6139,13 @@ function WellnessScreen({
                   className="font-serif text-[21px] leading-tight"
                   style={{ fontWeight: 500, color: tinta }}
                 >
-                  {saudacaoDoDia()}
-                  {babyName ? `, ${babyName}` : ""} 💜
+                  {babyName ? `Hoje com ${babyName}` : "O seu dia"} 💜
                 </h2>
                 <p
                   className="mt-1.5 max-w-[220px] text-[12px] leading-snug"
                   style={{ color: tintaSec }}
                 >
-                  6 momentos especiais para você e seu bebê hoje.
+                  6 momentos especiais esperando por vocês.
                 </p>
               </div>
               <AnelDoDia feitos={halves} total={6} escuro={ceuEscuro} />
@@ -5761,29 +6276,13 @@ function WellnessScreen({
                     meio-dia — mesma família de matiz do fundo, sumia. */}
                 <span style={{ opacity: 0.55 }}>✦</span>
               </p>
-              <button
-                onClick={() => setVerTodas((v) => !v)}
-                className={`press flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] backdrop-blur-xl ${ceuEscuro ? "bg-white/14 text-white/75" : "bg-white/65 text-slate-500"}`}
-                style={{
-                  boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,0.9), 0 6px 16px -10px rgba(90,60,80,0.4)",
-                }}
-              >
-                {verTodas ? "Ver menos" : "Ver todas"}
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  className={`h-3.5 w-3.5 transition-transform ${verTodas ? "rotate-180" : ""}`}
-                >
-                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
+              {/* O "Ver todas" saiu. Ele nunca teve o que revelar: as atividades
+                  são cinco, todas já visíveis. Um filtro que não filtra ensina
+                  que os controles desta tela podem não fazer nada. */}
             </div>
 
             <div className="mt-2.5 flex flex-col gap-1">
-              {(verTodas ? WELLNESS_TYPES : WELLNESS_TYPES.slice(0, 5)).map((a) => {
+              {WELLNESS_TYPES.map((a) => {
                 const meta = WELLNESS_META[a.key];
                 const isDone = !careMode && done.has(a.key);
                 return (

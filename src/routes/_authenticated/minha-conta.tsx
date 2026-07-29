@@ -1,5 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect as useLayoutEffectReact,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+/* `useLayoutEffect` avisa no servidor, onde não existe layout para medir. No
+   servidor ele vira `useEffect` (que também não roda), e no navegador é o de
+   verdade — é o padrão isomórfico usual. */
+const useLayoutEffect = typeof window !== "undefined" ? useLayoutEffectReact : useEffect;
 import {
   AppBottomNav,
   AppHomeScreen,
@@ -481,8 +492,15 @@ function MinhaContaPage() {
      outra aba qualquer. Quem garante que ninguém disputa é o `router.tsx`,
      que desliga a restauração nesta rota.
      `instant` de propósito: o CSS global usa `scroll-behavior: smooth`, e
-     animar a subida de dez mil pixels é pior que o próprio defeito. */
-  useEffect(() => {
+     animar a subida de dez mil pixels é pior que o próprio defeito.
+
+     E `useLayoutEffect`, não `useEffect`: este é o "pisca" que ela via ao
+     trocar de tela. `useEffect` roda DEPOIS que o navegador pinta, então a
+     tela nova aparecia por um quadro na rolagem da tela ANTERIOR e só então
+     saltava para o topo — que é exatamente a impressão de "voltou para a
+     tela de trás e depois carregou". `useLayoutEffect` roda antes da pintura:
+     ninguém vê o estado intermediário. */
+  useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [tab, mobileHome]);
 
@@ -812,16 +830,34 @@ function MinhaContaPage() {
 
   if (loading)
     return (
-      <div className="mx-auto max-w-5xl px-5 py-8 space-y-4">
-        <div className="skeleton h-52 rounded-3xl" />
-        <div className="grid grid-cols-4 gap-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="skeleton h-[72px] rounded-2xl" />
-          ))}
+      <>
+        {/* ESQUELETO NO FORMATO DA HOME DO CELULAR.
+            O anterior era uma grade de oito quadradinhos com 5 colunas — o
+            desenho da versão de computador. No celular a tela trocava de
+            SILHUETA ao carregar: primeiro uma grade cinza, depois um céu de
+            borda a borda com o bebê no meio. Era metade do "pisca" que ela
+            relatava; a outra metade era a rolagem.
+            Agora o vulto é o mesmo: bloco alto sangrando nas laterais (o céu),
+            cartão da semana em degrau e a fileira de medidas. O conteúdo
+            aparece DENTRO do lugar onde já estava, em vez de empurrar tudo. */}
+        <div className="md:hidden">
+          <div className="skeleton -mx-5 -mt-2 h-[62vh] rounded-none" />
+          <div className="mx-auto -mt-10 w-[86%] space-y-2">
+            <div className="skeleton mx-auto h-16 w-32 rounded-t-3xl" />
+            <div className="skeleton h-28 rounded-[26px]" />
+          </div>
         </div>
-        <div className="skeleton h-16 rounded-3xl" />
-        <div className="skeleton h-24 rounded-3xl" />
-      </div>
+        <div className="mx-auto hidden max-w-5xl px-5 py-8 space-y-4 md:block">
+          <div className="skeleton h-52 rounded-3xl" />
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="skeleton h-[72px] rounded-2xl" />
+            ))}
+          </div>
+          <div className="skeleton h-16 rounded-3xl" />
+          <div className="skeleton h-24 rounded-3xl" />
+        </div>
+      </>
     );
 
   const gest = profile

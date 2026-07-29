@@ -698,11 +698,34 @@ export type NextAppointment = { dateLabel: string; typeLabel: string };
 
 // Grade de atalhos na tela do Bebê — o hub central. Cobre tudo que NÃO está na
 // barra de baixo (Saúde/Exames/Nutrição etc. já são alcançados pelo ícone Saúde).
-/** "Bom dia" / "Boa tarde" / "Boa noite" pela hora local. */
+/**
+ * A saudação da hero — agora a ÚNICA do app. A tela do jogo tinha uma cópia
+ * dela; saiu de lá (era o mesmo "Boa noite, {bebê}" duas telas seguidas) e as
+ * seis faixas que moravam naquela cópia vieram para cá, onde a saudação de
+ * fato acontece uma vez só.
+ *
+ * Todas as faixas são ancoradas no RELÓGIO, e não no momento do céu, de
+ * propósito: "bom dia" e "boa tarde" são convenção de relógio em português. O
+ * céu chamado "meio-dia" começa às 10h42 em Belo Horizonte no inverno, e
+ * amarrar a saudação a ele faria o app dizer "boa tarde" às dez e quarenta.
+ *
+ * A madrugada ganha frase própria porque quem abre o app às 3h quase sempre
+ * está com desconforto ou insônia — não é o mesmo lugar de quem abre às 22h, e
+ * "boa noite" nas duas horas trata igual o que não é igual.
+ *
+ * 05h–07h era um buraco: o céu ainda é noite fechada e a tela dizia "Bom dia".
+ * "Amanhecendo" não afirma que o dia chegou nem trata como noite.
+ *
+ * 18h–20h: "boa noite" às 18h soa cedo e "boa tarde" às 19h30 soa errado.
+ * "Boa noitinha" é o que se fala de verdade nessa faixa.
+ */
 function dayGreetingLabel(): string {
   const h = new Date().getHours();
+  if (h < 5) return "Boa madrugada";
+  if (h < 7) return "Amanhecendo";
   if (h < 12) return "Bom dia";
   if (h < 18) return "Boa tarde";
+  if (h < 20) return "Boa noitinha";
   return "Boa noite";
 }
 

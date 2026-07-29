@@ -2206,3 +2206,152 @@ button:active > .duo3d {
     animation: none;
   }
 }
+
+/* ── Figura do Movimento do dia ────────────────────────────────────────────
+   Animações do desenho de linha que demonstra cada exercício
+   (`src/components/figura-movimento.tsx`). Cada uma anima UM grupo do SVG.
+
+   Duas famílias:
+   · transformações (girar/transladar) para o que muda de ângulo;
+   · `dc-mv-gato1/2`, um par de opacidades cruzadas, para o que muda de POSE
+     — interpolar o `d` de um <path> entre duas formas não é confiável entre
+     navegadores, e cruzar dois desenhos o olho lê como a mesma figura se
+     movendo.
+
+   Todas param em `prefers-reduced-motion`: a figura congela na primeira pose,
+   que continua sendo um desenho correto do exercício. */
+
+@keyframes dc-mv-ombros {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(0, -4px);
+  }
+  50% {
+    transform: translate(-3px, -1px);
+  }
+  75% {
+    transform: translate(0, 3px);
+  }
+}
+
+@keyframes dc-mv-pescoco {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-19deg);
+  }
+  50% {
+    transform: rotate(0deg);
+  }
+  75% {
+    transform: rotate(19deg);
+  }
+}
+
+@keyframes dc-mv-pelve {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  30% {
+    transform: rotate(-7deg) translateY(-2px);
+  }
+  70% {
+    transform: rotate(7deg) translateY(2px);
+  }
+}
+
+@keyframes dc-mv-torcao {
+  0%,
+  100% {
+    transform: rotate(0deg) scaleX(1);
+  }
+  25% {
+    transform: rotate(-11deg) scaleX(0.86);
+  }
+  50% {
+    transform: rotate(0deg) scaleX(1);
+  }
+  75% {
+    transform: rotate(11deg) scaleX(0.86);
+  }
+}
+
+@keyframes dc-mv-tornozelo {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dc-mv-joelhoE {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-11deg);
+  }
+}
+
+@keyframes dc-mv-joelhoD {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(11deg);
+  }
+}
+
+@keyframes dc-mv-balanco {
+  0%,
+  100% {
+    transform: translateX(-7px);
+  }
+  50% {
+    transform: translateX(7px);
+  }
+}
+
+/* Par de opacidades cruzadas: a pose A ocupa a primeira metade do ciclo, a
+   pose B a segunda, com uma passagem suave no meio. */
+@keyframes dc-mv-gato1 {
+  0%,
+  38% {
+    opacity: 1;
+  }
+  50%,
+  88% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes dc-mv-gato2 {
+  0%,
+  38% {
+    opacity: 0;
+  }
+  50%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A figura para na primeira pose — que já é um desenho correto do
+     exercício, então nada de informação se perde. */
+  [style*="dc-mv-"] {
+    animation: none !important;
+  }
+}

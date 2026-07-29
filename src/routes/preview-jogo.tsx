@@ -26,6 +26,11 @@ export const Route = createFileRoute("/preview-jogo")({
     tela: String(q.tela ?? ""),
     bebe: String(q.bebe ?? "Clovis"),
     pele: String(q.pele ?? ""),
+    // `?dia=142` move a jornada de dia. Os três movimentos do dia giram por
+    // `dia % 9`, então sem isto metade das poses da figura nunca aparece numa
+    // foto — e é justamente a metade (quatro apoios, borboleta) que o desenho
+    // precisa provar que desenha certo.
+    dia: Number(q.dia ?? 139),
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -34,7 +39,7 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
-  const { tela, bebe, pele } = Route.useSearch();
+  const { tela, bebe, pele, dia } = Route.useSearch();
   useEffect(() => {
     if (!pele) return;
     lsSet(SKIN_KEY, pele);
@@ -51,7 +56,7 @@ function PreviewJogo() {
     <div className="fixed inset-0 z-[50] overflow-y-auto bg-background">
       <GestacaoPath
         profile={{ baby_name: bebe }}
-        gest={{ weeks: 19, days: 6, totalDays: 139 }}
+        gest={{ weeks: Math.floor(dia / 7), days: dia % 7, totalDays: dia }}
         quizPremium
         careMode={false}
         onOpenShop={() => {}}
