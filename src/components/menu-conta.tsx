@@ -2,12 +2,12 @@ import { Link } from "@tanstack/react-router";
 import {
   CalendarDays,
   CircleHelp,
-  Gift,
   Heart,
   Inbox,
   LayoutDashboard,
   LogOut,
   NotebookPen,
+  ShoppingBag,
   Stethoscope,
   UserRound,
   Users,
@@ -51,7 +51,14 @@ import type { AppTab } from "@/components/app-mobile-shell";
    CONSULTAS e REGISTROS vieram da home, onde eram dois cartões grandes acima
    do médico. A home ficou com o bebê e o médico; o que é agenda e caderno
    mora aqui, junto do resto que é dela. */
-const MENU_CONTA: { tab: AppTab; label: string; sub: string; Icon: LucideIcon }[] = [
+const MENU_CONTA: {
+  tab: AppTab;
+  /** Sub-aba em que a linha deve cair — quando a aba tem várias telas. */
+  subAba?: string;
+  label: string;
+  sub: string;
+  Icon: LucideIcon;
+}[] = [
   {
     tab: "Perfil",
     label: "Meus dados e ajustes",
@@ -73,10 +80,16 @@ const MENU_CONTA: { tab: AppTab; label: string; sub: string; Icon: LucideIcon }[
   { tab: "Médico", label: "Meu médico", sub: "Quem acompanha a sua gestação", Icon: Stethoscope },
   { tab: "Acompanhante", label: "Acompanhante", sub: "Convide quem acompanha você", Icon: Users },
   {
+    /* Era "Recompensas", e a linha prometia três coisas das quais duas já
+       moram em outro lugar: as Sementinhas aparecem no Cantinho (dentro do
+       jogo) e as conquistas vão para lá também. Sobra a LOJA — e é o que a
+       linha passa a dizer, caindo direto nela em vez de na primeira sub-aba
+       do hub. */
     tab: "Recompensas",
-    label: "Recompensas",
-    sub: "Sementinhas, conquistas e premium",
-    Icon: Gift,
+    subAba: "loja",
+    label: "Loja",
+    sub: "Suplementos, conforto e enxoval",
+    Icon: ShoppingBag,
   },
   {
     tab: "FAQ",
@@ -108,7 +121,7 @@ export function MenuDaConta({
   naoLidas: number;
   mostrarPainel: boolean;
   onNotificacoes: () => void;
-  onNavegar: (t: AppTab) => void;
+  onNavegar: (t: AppTab, subAba?: string) => void;
   onSair: () => void;
   onFechar: () => void;
 }) {
@@ -168,10 +181,10 @@ export function MenuDaConta({
 
           <div className="mx-4 my-1 h-px bg-border/60" />
 
-          {MENU_CONTA.map(({ tab, label, sub, Icon }) => (
+          {MENU_CONTA.map(({ tab, subAba, label, sub, Icon }) => (
             <button
               key={tab}
-              onClick={() => onNavegar(tab)}
+              onClick={() => onNavegar(tab, subAba)}
               className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left transition-colors hover:bg-primary/8"
             >
               <span className="flex h-6 w-6 shrink-0 items-center justify-center">

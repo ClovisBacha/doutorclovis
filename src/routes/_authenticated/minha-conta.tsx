@@ -1300,9 +1300,9 @@ function MinhaContaPage() {
                   naoLidas={naoLidas}
                   mostrarPainel={isAdmin || isDoctor}
                   onNotificacoes={abrirNotificacoes}
-                  onNavegar={(t) => {
+                  onNavegar={(t, subAba) => {
                     setHomeMenu(false);
-                    goToTab(t);
+                    goToTab(t, subAba);
                   }}
                   onSair={() => {
                     setHomeMenu(false);
@@ -1455,6 +1455,7 @@ function MinhaContaPage() {
                     onNavigate={goToTab}
                     skyTheme={profile?.sky_theme === "v1" ? "v1" : "v2"}
                     onSkyChange={(t) => setProfile((p) => (p ? { ...p, sky_theme: t } : p))}
+                    initialSub={consultasSub}
                   />
                 )}
                 {tab === "Saúde da mulher" && <SaudeMulherHub />}
@@ -13566,14 +13567,24 @@ function RecompensasHub({
   onNavigate,
   skyTheme,
   onSkyChange,
+  initialSub = null,
 }: {
   careMode: boolean;
   gest: Gest;
   onNavigate?: (t: string) => void;
   skyTheme?: "v2" | "v1";
   onSkyChange?: (t: "v2" | "v1") => void;
+  /** O menu da conta entra por "Loja"; quem chega por outro caminho cai no
+      Cantinho, como antes. */
+  initialSub?: string | null;
 }) {
-  const [sub, setSub] = useState<(typeof RECOMPENSAS_SUBTABS)[number]["key"]>("cantinho");
+  type SubRec = (typeof RECOMPENSAS_SUBTABS)[number]["key"];
+  const eSub = (v: unknown): v is SubRec => RECOMPENSAS_SUBTABS.some((x) => x.key === v);
+  const [sub, setSub] = useState<SubRec>(eSub(initialSub) ? initialSub : "cantinho");
+  useEffect(() => {
+    if (eSub(initialSub)) setSub(initialSub);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSub]);
   return (
     <div className="space-y-5">
       <div className="scrollbar-hide flex gap-2 overflow-x-auto">
