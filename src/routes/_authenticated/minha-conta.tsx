@@ -258,6 +258,7 @@ type Profile = {
   home_city?: string | null;
   home_lat?: number | null;
   home_lon?: number | null;
+  phone?: string | null;
   emergency_contact?: string | null;
   emergency_email?: string | null;
   emergency_phone?: string | null;
@@ -3670,6 +3671,7 @@ function ProfileTab({
     home_city: profile?.home_city ?? "",
     home_lat: profile?.home_lat ?? null,
     home_lon: profile?.home_lon ?? null,
+    phone: profile?.phone ?? "",
     emergency_contact: profile?.emergency_contact ?? "",
     emergency_email: profile?.emergency_email ?? "",
     emergency_phone: profile?.emergency_phone ?? "",
@@ -3710,6 +3712,7 @@ function ProfileTab({
     form.display_name,
     form.lmp_date || form.reference_date,
     form.blood_type,
+    form.phone,
     form.emergency_contact,
     form.emergency_email,
     form.emergency_phone,
@@ -3744,6 +3747,7 @@ function ProfileTab({
         home_city: form.home_city || null,
         home_lat: form.home_lat,
         home_lon: form.home_lon,
+        phone: form.phone || null,
         emergency_contact: form.emergency_contact || null,
         emergency_email: form.emergency_email || null,
         emergency_phone: form.emergency_phone || null,
@@ -4042,6 +4046,20 @@ function ProfileTab({
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <Field
+                label="Seu telefone (WhatsApp)"
+                value={form.phone}
+                onChange={(v) => setForm({ ...form, phone: v })}
+                placeholder="(31) 98888-1111"
+              />
+              {/* Vai no aviso do SOS. É o primeiro número que quem recebe o
+                  socorro tenta — antes de sair de casa, antes de ligar para o
+                  hospital, a pessoa liga para ela para saber se atende. */}
+              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                Quem receber o pedido de socorro liga para cá primeiro.
+              </p>
+            </div>
             <Field
               label="Nome do contato de emergência"
               value={form.emergency_contact}

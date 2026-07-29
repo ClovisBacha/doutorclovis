@@ -95,6 +95,37 @@ export function EmergencySheet({
   async function sendLocation() {
     if (panic !== "idle") return;
     setPanic("sending");
+
+    /* ── A janela do WhatsApp é aberta AGORA, dentro do toque ──────────────
+       Isto parece estranho e é o único jeito de funcionar. iOS e Android só
+       permitem abrir uma janela dentro do gesto que a pessoa fez; qualquer
+       `window.open` depois de um `await` — e nós esperamos o GPS e o servidor
+       — é bloqueado silenciosamente. Foi por isso que, no primeiro teste, o
+       WhatsApp só abriu quando ele tocou no botão verde.
+
+       Então abrimos uma aba em branco no toque, escrevemos nela um "preparando
+       o pedido de socorro" para ela não olhar para um vazio, e no fim
+       apontamos essa mesma aba para o WhatsApp com a mensagem pronta. */
+    let janela: Window | null = null;
+    if (linkWhatsApp(info.emergencyPhone)) {
+      janela = window.open("", "_blank");
+      try {
+        janela?.document.write(
+          `<!doctype html><meta charset="utf-8">
+           <meta name="viewport" content="width=device-width,initial-scale=1">
+           <title>Pedido de socorro</title>
+           <body style="margin:0;display:grid;place-items:center;height:100vh;
+             font-family:system-ui,sans-serif;background:#fff1f2;color:#9f1239;text-align:center">
+             <div><div style="font-size:44px">🆘</div>
+             <p style="font-size:17px;font-weight:700;margin:12px 0 4px">Preparando o pedido de socorro…</p>
+             <p style="font-size:13px;opacity:.8;margin:0">O WhatsApp abre em instantes.</p></div>
+           </body>`,
+        );
+      } catch {
+        /* algumas WebViews não deixam escrever; a aba em branco resolve igual */
+      }
+    }
+
     let lat: number | null = null;
     let lng: number | null = null;
     let address: string | null = null;
@@ -102,8 +133,13 @@ export function EmergencySheet({
       if (navigator?.geolocation) {
         try {
           const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+            /* 6s, não 10, e aceitando uma posição de até 2 minutos atrás:
+               numa emergência quatro segundos a mais de precisão não valem
+               quatro segundos a mais de espera, e o aparelho quase sempre tem
+               uma leitura recente na memória. */
             navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 10000,
+              timeout: 6000,
+              maximumAge: 120000,
               enableHighAccuracy: true,
             }),
           );
@@ -153,8 +189,16 @@ export function EmergencySheet({
       const alvo = linkWhatsApp(info.emergencyPhone);
       if (alvo && r.mensagem) {
         const url = `${alvo}?text=${encodeURIComponent(r.mensagem)}`;
-        const janela = window.open(url, "_blank", "noopener,noreferrer");
-        setZapAbriu(!!janela);
+        if (janela && !janela.closed) {
+          janela.location.href = url;
+          setZapAbriu(true);
+        } else {
+          // A aba do toque não sobreviveu (ela fechou, ou a WebView recusou):
+          // tenta agora e, se falhar, o botão verde continua a um toque.
+          setZapAbriu(!!window.open(url, "_blank", "noopener,noreferrer"));
+        }
+      } else {
+        janela?.close();
       }
       if (r.canais.destinos.length) {
         toast.success(`Avisei ${r.canais.destinos.map((d) => d.nome).join(" e ")} 💛`);
@@ -162,6 +206,7 @@ export function EmergencySheet({
         toast.error("Não consegui avisar ninguém automaticamente — ligue 192.");
       }
     } catch {
+      janela?.close();
       setPanic("idle");
       toast.error("Não consegui avisar por aqui — ligue 192 imediatamente.");
     }

@@ -61,20 +61,30 @@ export type CanaisAviso = {
  */
 export type Ficha = {
   nome: string;
+  /** O telefone DELA — o primeiro número que quem recebe o socorro tenta. */
+  telefone: string | null;
   bebe: string | null;
   semana: string | null;
   dpp: string | null;
   sangue: string | null;
   alergias: string | null;
   medicamentos: string | null;
+  /** Nome + CRM. O telefone vai em `medicoTel`, separado, para virar link. */
   medico: string | null;
+  /** Em +55 31 98634-2903: e assim que o WhatsApp reconhece e vira "ligar". */
+  medicoTel: string | null;
+  /** Hospitais onde o médico atende, como ele cadastrou. */
+  hospitais: string | null;
   endereco: string | null;
   mapa: string | null;
+  /** Busca de hospitais no mapa a partir da coordenada dela. */
+  hospitaisPerto: string | null;
 };
 
 function linhasDaFicha(f: Ficha): [string, string][] {
   const todas: [string, string | null][] = [
     ["Gestante", f.nome],
+    ["Telefone dela", f.telefone],
     ["Bebê", f.bebe],
     ["Idade gestacional", f.semana],
     ["DPP", f.dpp],
@@ -82,6 +92,8 @@ function linhasDaFicha(f: Ficha): [string, string][] {
     ["Alergias", f.alergias || "nenhuma informada"],
     ["Medicamentos", f.medicamentos || "nenhum informado"],
     ["Médico", f.medico],
+    ["Telefone do médico", f.medicoTel],
+    ["Onde o médico atende", f.hospitais],
     ["Local", f.endereco],
   ];
   return todas.filter((l): l is [string, string] => !!l[1]);
@@ -93,10 +105,13 @@ export function textoDoAviso(f: Ficha): string {
     "",
     ...linhasDaFicha(f).map(([k, v]) => `${k}: ${v}`),
     "",
-    f.mapa ?? "Não foi possível obter a localização.",
+    f.mapa ? `Onde ela está: ${f.mapa}` : "Não foi possível obter a localização.",
+    f.hospitaisPerto ? `Hospitais perto dela: ${f.hospitaisPerto}` : null,
     "",
     "Em caso de risco de vida, ligue 192.",
-  ].join("\n");
+  ]
+    .filter((l) => l !== null)
+    .join("\n");
 }
 
 export const dispararEmergencia = createServerFn({ method: "POST" })
@@ -128,7 +143,7 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
       const { data: prof } = await sb
         .from("patient_profiles")
         .select(
-          "display_name, baby_name, blood_type, allergies, medications, emergency_contact, emergency_phone, emergency_email, doctor_id, due_date, lmp_date, reference_date, reference_weeks, reference_days",
+          "display_name, phone, baby_name, blood_type, allergies, medications, emergency_contact, emergency_phone, emergency_email, doctor_id, due_date, lmp_date, reference_date, reference_weeks, reference_days",
         )
         .eq("id", u.user.id)
         .maybeSingle();
@@ -168,15 +183,26 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
 
       const ficha: Ficha = {
         nome,
+        telefone: paraExibir(prof?.phone as string | null),
         bebe: (prof?.baby_name as string) ?? null,
         semana,
         dpp,
         sangue: (prof?.blood_type as string) ?? null,
         alergias: (prof?.allergies as string) ?? null,
         medicamentos: (prof?.medications as string) ?? null,
-        medico: null, // preenchido logo abaixo, quando houver vínculo
+        medico: null, // preenchidos logo abaixo, quando houver vínculo
+        medicoTel: null,
+        hospitais: null,
         endereco: data.address,
         mapa,
+        /* Link de BUSCA no mapa, e não uma lista vinda de uma API: uma
+           chamada a mais no caminho do socorro é uma chance a mais de ele
+           demorar ou falhar, e o Google já sabe achar hospital perto de uma
+           coordenada melhor do que qualquer lista que a gente mantenha. */
+        hospitaisPerto:
+          data.latitude != null && data.longitude != null
+            ? `https://www.google.com/maps/search/hospital/@${data.latitude},${data.longitude},14z`
+            : null,
       };
 
       const canais: CanaisAviso = { ...vazio };
@@ -199,12 +225,15 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
       if (prof?.doctor_id) {
         const { data: d } = await sb
           .from("doctors")
-          .select("display_name, crm, whatsapp")
+          .select("display_name, crm, whatsapp, hospitals")
           .eq("id", prof.doctor_id)
           .maybeSingle();
         medicoNome = (d?.display_name as string) || "seu médico";
         medicoUserId = prof.doctor_id as string;
-        ficha.medico = [d?.display_name, d?.crm, d?.whatsapp].filter(Boolean).join(" · ") || null;
+        ficha.medico =
+          [d?.display_name, d?.crm ? `(${d.crm})` : null].filter(Boolean).join(" ") || null;
+        ficha.medicoTel = paraExibir(d?.whatsapp as string | null);
+        ficha.hospitais = ((d?.hospitals as string) || "").trim() || null;
       }
       /* Só agora: a linha do médico faz parte da ficha que vai no aviso. */
       const texto = textoDoAviso(ficha);
@@ -377,8 +406,13 @@ function emailHtml(nome: string, ficha: Ficha): string {
       </p>
       ${
         ficha.mapa
-          ? `<a href="${ficha.mapa}" style="display:inline-block;background:#be123c;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:15px;margin-bottom:18px">Ver a localizacao no mapa</a>`
+          ? `<a href="${ficha.mapa}" style="display:inline-block;background:#be123c;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:15px;margin:0 8px 10px 0">Ver a localizacao no mapa</a>`
           : `<p style="margin:0 0 18px;padding:10px 14px;background:#fef3c7;border-radius:10px;font-size:14px;color:#92400e">Nao foi possivel obter a localizacao.</p>`
+      }
+      ${
+        ficha.hospitaisPerto
+          ? `<a href="${ficha.hospitaisPerto}" style="display:inline-block;background:#0f766e;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:15px;margin:0 0 18px">Hospitais perto dela</a>`
+          : ""
       }
       <p style="margin:0 0 6px;font-size:12px;letter-spacing:.14em;color:#6b7280;font-weight:700">
         FICHA DE EMERGENCIA
@@ -391,6 +425,25 @@ function emailHtml(nome: string, ficha: Ficha): string {
         Mensagem automatica do app Obstetrica.
       </p>
     </div>`;
+}
+
+/**
+ * Telefone no formato que o WhatsApp reconhece e transforma em "ligar":
+ * `+55 31 98634-2903`. Sem o `+55` ele fica texto morto na mensagem, e quem
+ * precisa ligar teria que digitar o número na mão — exatamente no momento em
+ * que ninguém digita nada direito.
+ */
+function paraExibir(tel?: string | null): string | null {
+  const d = (tel ?? "").replace(/\D/g, "");
+  if (!d) return null;
+  const cheio = d.length === 10 || d.length === 11 ? `55${d}` : d;
+  if (cheio.length < 12) return null;
+  const local = cheio.slice(2);
+  const ddd = local.slice(0, 2);
+  const resto = local.slice(2);
+  const meio = resto.length === 9 ? resto.slice(0, 5) : resto.slice(0, 4);
+  const fim = resto.length === 9 ? resto.slice(5) : resto.slice(4);
+  return `+55 ${ddd} ${meio}-${fim}`;
 }
 
 /** "(31) 98888-7777" a partir do E.164 sem o +. */
