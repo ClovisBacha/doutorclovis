@@ -1014,7 +1014,18 @@ export function AppHomeScreen({
           para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
           encosta nas quatro bordas para máxima imersão no celular. */}
       <div
-        className="shine relative -mx-5 -mt-2 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000"
+        /* O céu sobe ATÉ O TOPO DA TELA, por baixo da barra de status.
+
+           A página empurra o conteúdo para baixo pela altura da safe area
+           (`pt-[calc(0.5rem+env(safe-area-inset-top))]`), e este bloco só subia
+           8px — então no app instalado sobrava uma faixa branca acima do céu,
+           bem onde fica o relógio. No Safari isso não aparecia porque a barra do
+           navegador ocupava aquele espaço; em modo standalone, não ocupa.
+
+           A margem negativa cancela a folga inteira e o padding devolve o mesmo
+           tanto por dentro: a arte encosta no topo do aparelho, e o ícone do
+           perfil e o clima continuam abaixo do relógio, onde dá para tocar. */
+        className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(0.5rem+env(safe-area-inset-top))] pt-[calc(0.5rem+env(safe-area-inset-top))]"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Arte do momento do dia (tema V2). Fica ACIMA do gradiente, que
