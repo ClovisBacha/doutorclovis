@@ -566,8 +566,13 @@ export const searchDoctors = createServerFn({ method: "POST" })
            aparece antes, dentro da mesma faixa de plano — mas deixar de ter o
            selo passou a ser uma posição na lista, não a inexistência. */
         .eq("active", true)
-        .eq("accepting_patients", true)
         .not("display_name", "is", null);
+      /* `accepting_patients` é de uma migração POSTERIOR à criação da tabela
+         (20260709000000), então o degrau mínimo — que existe justamente para
+         sobreviver a migrações pendentes — não pode exigi-la: com ela, os três
+         degraus davam 42703 e a busca falhava num diretório cheio. Nos demais
+         degraus o filtro continua valendo. */
+      if (campos !== CAMPOS_TEXTO_MINIMO) q = q.eq("accepting_patients", true);
       /* O texto passa a filtrar NO BANCO.
          
          Antes o `limit(200)` cortava a lista antes de qualquer busca por nome,
@@ -590,11 +595,16 @@ export const searchDoctors = createServerFn({ method: "POST" })
         const like = `"%${seguro}%"`;
         q = q.or(campos.map((c) => `${c}.ilike.${like}`).join(","));
       }
-      if (data.state) q = q.ilike("state", data.state);
-      if (data.city) q = q.ilike("city", `%${data.city}%`);
-      if (data.hasMasters) q = q.eq("has_masters", true);
-      if (data.hasDoctorate) q = q.eq("has_doctorate", true);
-      if (data.minExperience > 0) q = q.gte("years_experience", data.minExperience);
+      /* Mesma razão: `state`, `city`, `has_*` e `years_experience` vêm da
+         migração do perfil. No degrau mínimo eles saem — melhor devolver a lista
+         inteira sem os filtros do que devolver erro. */
+      if (campos !== CAMPOS_TEXTO_MINIMO) {
+        if (data.state) q = q.ilike("state", data.state);
+        if (data.city) q = q.ilike("city", `%${data.city}%`);
+        if (data.hasMasters) q = q.eq("has_masters", true);
+        if (data.hasDoctorate) q = q.eq("has_doctorate", true);
+        if (data.minExperience > 0) q = q.gte("years_experience", data.minExperience);
+      }
       /* Ordem estável no SQL para o recorte ser sempre o mesmo conjunto; o
          ranking por plano continua no JS, sobre a lista já filtrada. */
       return q.order("display_name", { ascending: true }).limit(200);

@@ -315,9 +315,12 @@ export const addBrainEntry = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) return { ok: false as const };
-    // Vetor semântico (fire-and-forget): a entrada já nasce "encontrável".
+    /* Vetor semântico AGUARDADO: a entrada já nasce "encontrável".
+       Sem o await, em serverless o processo morre junto com a resposta e a
+       entrada fica sem vetor — invisível para a busca por significado até
+       alguém abrir a base e disparar o backfill. */
     const { embedBrainEntry } = await import("./embeddings.server");
-    embedBrainEntry(row.id, data.question, data.answer);
+    await embedBrainEntry(row.id, data.question, data.answer);
     return { ok: true as const, entry: row as BrainEntry };
   });
 
@@ -491,7 +494,7 @@ export const answerAndTrain = createServerFn({ method: "POST" })
     if (insertError || !entry) return { ok: false as const };
     {
       const { embedBrainEntry } = await import("./embeddings.server");
-      embedBrainEntry(entry.id, questionText, data.answer);
+      await embedBrainEntry(entry.id, questionText, data.answer);
     }
 
     // Grava TAMBÉM o texto na pergunta: a paciente vê a resposta do médico
@@ -671,7 +674,7 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
     {
       // A lacuna respondida já nasce encontrável por significado.
       const { embedBrainEntry } = await import("./embeddings.server");
-      embedBrainEntry(entry.id, questionText, data.answer);
+      await embedBrainEntry(entry.id, questionText, data.answer);
     }
 
     const { error: updErr } = await sb
@@ -980,13 +983,15 @@ export const extractKnowledgeFromTranscript = createServerFn({ method: "POST" })
       .select("id,question,answer");
     if (error) return { ok: false as const };
 
-    // Vetores dos rascunhos (fire-and-forget) — já nascem "encontráveis"
-    // quando forem aprovados.
+    /* Vetores dos rascunhos — já nascem "encontráveis" quando forem aprovados.
+       Em PARALELO e não em série: é o kit de partida inteiro (dezenas de
+       entradas), e uma fila sequencial de chamadas de embedding estouraria o
+       teto de 30s da função. `allSettled` porque uma falha isolada não pode
+       derrubar a instalação do kit — o backfill cobre quem ficou para trás. */
     {
       const { embedBrainEntry } = await import("./embeddings.server");
-      for (const r of (rows ?? []) as { id: string; question: string; answer: string }[]) {
-        embedBrainEntry(r.id, r.question, r.answer);
-      }
+      const lote = (rows ?? []) as { id: string; question: string; answer: string }[];
+      await Promise.allSettled(lote.map((r) => embedBrainEntry(r.id, r.question, r.answer)));
     }
     return { ok: true as const, created: pairs.length };
   });

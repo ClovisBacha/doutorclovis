@@ -43,26 +43,36 @@ export async function embedText(text: string, timeoutMs = 6000): Promise<number[
 }
 
 /**
- * Calcula e grava (fire-and-forget) o embedding de UMA entrada do cérebro.
- * O texto indexado é pergunta+resposta — é assim que "enjoo" encontra uma
- * entrada cuja pergunta diz "náuseas".
+ * Calcula e grava o embedding de UMA entrada do cérebro. O texto indexado é
+ * pergunta+resposta — é assim que "enjoo" encontra uma entrada cuja pergunta
+ * diz "náuseas".
+ *
+ * É `async` DE PROPÓSITO, e quem chama decide se aguarda.
+ *
+ * Antes era `void (async () => {…})()` com retorno `void`: uma função que
+ * dispara e devolve na hora. Quem tentasse `await embedBrainEntry(...)` estaria
+ * aguardando `undefined` — resolve no microtask seguinte e a função de servidor
+ * retorna antes da chamada de embedding acontecer. Em serverless o processo
+ * morre com a resposta, então o texto novo ficava com o vetor velho e a busca
+ * continuava achando a versão antiga. O `await` parecia certo e não era.
+ *
+ * Nunca lança: erro aqui é enriquecimento perdido, não escrita perdida.
  */
-export function embedBrainEntry(entryId: string, question: string, answer: string): void {
-  void (async () => {
-    try {
-      const vec = await embedText(`${question}\n${answer}`);
-      if (!vec) return;
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      // Coluna embedding ausente (migração pendente): o supabase-js devolve
-      // {error} sem lançar — o update vira no-op silencioso, que é o desejado.
-      await (supabaseAdmin as any)
-        .from("brain_entries")
-        .update({ embedding: vec })
-        .eq("id", entryId);
-    } catch {
-      /* enriquecimento é best-effort — o backfill cobre depois */
-    }
-  })();
+export async function embedBrainEntry(
+  entryId: string,
+  question: string,
+  answer: string,
+): Promise<void> {
+  try {
+    const vec = await embedText(`${question}\n${answer}`);
+    if (!vec) return;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Coluna embedding ausente (migração pendente): o supabase-js devolve
+    // {error} sem lançar — o update vira no-op silencioso, que é o desejado.
+    await (supabaseAdmin as any).from("brain_entries").update({ embedding: vec }).eq("id", entryId);
+  } catch {
+    /* enriquecimento é best-effort — o backfill cobre depois */
+  }
 }
 
 /**

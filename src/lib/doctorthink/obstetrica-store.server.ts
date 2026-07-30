@@ -116,7 +116,8 @@ export function createObstetricaBrainStore(): BrainStore {
         .single();
       if (error || !row) return null;
       const { embedBrainEntry } = await import("../embeddings.server");
-      embedBrainEntry(row.id, question, answer); // vetor fire-and-forget
+      // Aguardado: em serverless o que roda depois da resposta não roda.
+      await embedBrainEntry(row.id, question, answer);
       return { id: row.id as string };
     },
   };

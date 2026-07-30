@@ -566,12 +566,19 @@ export const setPatientQuizPremium = createServerFn({ method: "POST" })
        ativa") transformava este endpoint num oráculo: o médico A passava o id de
        uma paciente do médico B e descobria se ela paga assinatura. É dado de
        outra pessoa saindo por uma mensagem de erro. */
-    const { data: minha } = await (supabaseAdmin as any)
+    const { data: minha, error: erroDona } = await (supabaseAdmin as any)
       .from("patient_profiles")
       .select("id")
       .eq("id", data.patientId)
       .eq("doctor_id", user.id)
       .maybeSingle();
+    /* Falha de leitura ≠ paciente inexistente. Descartar o erro fazia a tela
+       dizer "paciente não encontrada" para um problema de rede — o médico
+       procuraria a paciente, não a conexão. Fecha do mesmo jeito, mas dizendo a
+       verdade sobre o motivo. */
+    if (erroDona) {
+      return { ok: false as const, error: "Não foi possível verificar a paciente agora." };
+    }
     if (!minha) return { ok: false as const, error: "Paciente não encontrada." };
 
     // Proteção: o toggle manual NÃO pode revogar quem tem assinatura ativa

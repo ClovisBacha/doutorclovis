@@ -210,6 +210,22 @@ function PainelPage() {
   const [rotuloPlano, setRotuloPlano] = useState("");
 
   const [tab, setTab] = useState<PanelTab>("Painel 📊");
+  /* A fita de abas rola, então a aba ativa pode estar fora da tela.
+  
+     Isso importa porque várias trocas de aba são PROGRAMÁTICAS, não um toque do
+     médico: um médico com assinatura inativa cai direto em "Meu Perfil" (a
+     ÚLTIMA das 12 abas, ~1100px à direita), e os cartões do Painel levam para
+     "Cérebro" e "Meu Perfil". Ele chegava numa tela cujo indicador de posição
+     estava fora do campo de visão — justamente quando mais precisa se situar. */
+  const fitaAbas = useRef<HTMLDivElement | null>(null);
+  const refsAbas = useRef<Partial<Record<PanelTab, HTMLButtonElement | null>>>({});
+  useEffect(() => {
+    const el = refsAbas.current[tab];
+    if (!el || !fitaAbas.current) return;
+    // `nearest` não mexe na rolagem vertical da página — só traz a aba para
+    // dentro da fita, que é o que queremos.
+    el.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+  }, [tab]);
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   // null = o próprio cérebro (comportamento de sempre).
   const [brainAsDoctor, setBrainAsDoctor] = useState<{ id: string; name: string } | null>(null);
@@ -445,12 +461,23 @@ function PainelPage() {
           a aba selecionada caía numa linha de cima — o indicador apontava para o
           nada. Uma fita rolável resolve as duas coisas: uma linha só, com o
           sublinhado sempre em cima da borda. `snap` para a aba parar alinhada. */}
-      <div className="mt-8 flex snap-x gap-2 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={fitaAbas}
+        /* `pb-px` em vez de `-mb-px` nos filhos: `overflow-x: auto` faz o
+           `overflow-y` computar para `auto` também (regra do CSS: `visible` ao
+           lado de um valor não-`visible` vira `auto`), então a caixa passou a
+           recortar no padding box e comia 1px da `border-b-2` da aba ativa —
+           sobrava um fiapo de cor com a linha cinza aparecendo por baixo. */
+        className="mt-8 flex snap-x gap-2 overflow-x-auto border-b border-border pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {DOCTOR_TABS.map((t) => (
           <button
             key={t}
+            ref={(el) => {
+              refsAbas.current[t] = el;
+            }}
             onClick={() => setTab(t)}
-            className={`-mb-px shrink-0 snap-start whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 snap-start whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
               tab === t
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-primary"
@@ -5932,7 +5959,12 @@ function ReceiptModal({
 
           `svh` e não `vh` porque no Safari do iPhone `vh` ignora a barra de
           endereço e o modal passa do fundo da tela. */}
-      <div className="flex max-h-[90svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+      {/* `print:*` no PAI, não no corpo: `handlePrint` copia o `innerHTML` para
+          uma janela nova com CSS próprio, onde nenhuma classe do Tailwind
+          existe — um `print:` no filho seria letra morta. Estas valem para o
+          outro caminho, o Ctrl+P na própria página, onde era o `max-h` do pai
+          que cortava o recibo. */}
+      <div className="flex max-h-[90svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl print:max-h-none print:overflow-visible print:shadow-none">
         {/* Toolbar */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-3">
           <p className="text-sm font-medium text-muted-foreground">Recibo #{receiptNumber}</p>
@@ -5953,10 +5985,7 @@ function ReceiptModal({
         </div>
 
         {/* Receipt content */}
-        <div
-          ref={printRef}
-          className="min-h-0 flex-1 overflow-y-auto px-8 py-6 print:overflow-visible"
-        >
+        <div ref={printRef} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
           {/* Header */}
           <div className="border-b border-gray-200 pb-5 mb-5">
             <h1 className="font-serif text-2xl text-gray-900">{nomeMed}</h1>
@@ -6126,10 +6155,10 @@ function DoctorBilling({
   if (isPaid) {
     return (
       <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 dark:bg-emerald-500/10 dark:border-emerald-500/30">
-        <p className="font-serif text-lg text-emerald-900">
+        <p className="font-serif text-lg text-emerald-900 dark:text-emerald-100">
           Assinatura ativa · plano {plan === "clinica" ? "Pro Equipe" : plan}
         </p>
-        <p className="mt-1 text-sm text-emerald-800">
+        <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
           Sua cobrança é automática. Troque o cartão, veja faturas ou cancele quando quiser.
         </p>
         <button
@@ -6373,8 +6402,8 @@ function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
   return (
     <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-500/10 dark:border-amber-500/30">
-      <p className="font-serif text-lg text-amber-900">🎟️ Convites premium</p>
-      <p className="mt-1 text-sm text-amber-800">
+      <p className="font-serif text-lg text-amber-900 dark:text-amber-100">🎟️ Convites premium</p>
+      <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
         Gere um código na hora e envie para a sua paciente do jeito que quiser (WhatsApp, e-mail…).
         Cada código vale para <strong>uma paciente</strong> e libera o Obstétrica Premium completo —
         por sua conta.
@@ -6407,10 +6436,10 @@ function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
       </button>
 
       <div className="mt-3 flex items-center justify-between text-sm">
-        <span className="text-amber-800">
+        <span className="text-amber-800 dark:text-amber-200">
           Gerados este mês: <strong>{info.used}</strong> de {info.limit}
         </span>
-        <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800">
+        <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800 dark:text-amber-200">
           {info.remaining} restantes
         </span>
       </div>
