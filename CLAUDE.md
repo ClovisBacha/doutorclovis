@@ -143,6 +143,42 @@ corretas e enunciado repetido dentro de 14 dias:
 bun run audit:conteudo
 ```
 
+## Fluxo unificado de eventos clínicos (jul/2026)
+
+O painel do médico enxergava **seis** tabelas. Triagem de sintomas, contrações,
+SOS, exames, glicemia, biometria fetal, EPDS e a série pós-parto inteira eram
+gravados pela paciente e nunca lidos por ninguém.
+
+Agora existe um contrato só: a view **`clinical_events`** une onze fontes em
+`(fonte, fonte_id, user_id, ocorrido_em, especie, dados jsonb, texto)`.
+
+- **É view, não tabela.** Metade das fontes é escrita direto do navegador com a
+  chave anon, então materializar a gravidade exigiria trigger em SQL — e a régua
+  clínica passaria a viver em dois lugares. A view entrega números CRUS; a
+  gravidade sai de `src/lib/sinais-clinicos.ts`, a mesma régua do app da
+  paciente. **Nunca duplique um limite clínico fora desse arquivo.**
+- **É montada dinamicamente** (`DO` + `to_regclass`): produção tem menos tabelas
+  que o repo, e `CREATE VIEW` sobre tabela ausente falharia inteiro. Rode o SQL
+  de novo depois de aplicar migrations — a view se amplia sozinha.
+- **`security_invoker = true`**: a view respeita a RLS de quem consulta.
+- `clinical_acks` guarda o DESFECHO que o médico registra ("já cuidei"), não a
+  leitura.
+
+Leitura: `src/lib/clinical.functions.ts` (`eventosQuePedemOlhar`,
+`prontuarioDaPaciente`, `fichaClinica`, `registrarDesfecho`, `serieDe`).
+Tela: `src/components/prontuario-paciente.tsx`.
+Recorte: **sempre** pelo vínculo ATUAL (`patient_profiles.doctor_id`), nunca por
+`doctor_id` carimbado na linha de origem.
+
+**Aplicar no Supabase:** `supabase/APLICAR_EVENTOS_CLINICOS.sql` (idempotente).
+Ele também traz seis índices que faltavam, as faixas plausíveis (CHECK) e o
+`ON DELETE CASCADE` — sem o qual apagar a conta de uma paciente falhava com
+violação de chave, tornando a LGPD inexequível.
+
+A IA lê as medidas em `buildMedidasBlock` (`src/routes/api/chat.ts`): última
+pressão, última glicemia e até três registros alterados dos últimos 14 dias.
+Contexto, não conduta — o portão de cobertura do cérebro continua mandando.
+
 ## Resquícios do Lovable (opcional remover)
 
 - `@lovable.dev/vite-tanstack-config` — preset de build (funciona; remover é
