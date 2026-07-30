@@ -29,6 +29,13 @@ import { CampoComOutro } from "@/components/campo-com-outro";
 import { CampoFocos } from "@/components/campo-focos";
 import { CampoFoto } from "@/components/campo-foto";
 import { conferirMeuCrm } from "@/lib/crm-conferencia.functions";
+import {
+  acionamentosDaPaciente,
+  listarAcionamentos,
+  marcarAcionamentoAtendido,
+  type AcionamentoSos,
+} from "@/lib/acionamentos.functions";
+import { AlertaSosMedico } from "@/components/alerta-sos-medico";
 import { ESPECIALIDADES_MEDICO, TITULOS_MEDICO } from "@/lib/medico-opcoes";
 import {
   MOEDAS,
@@ -234,6 +241,7 @@ function PainelPage() {
      estava fora do campo de visão — justamente quando mais precisa se situar. */
   const fitaAbas = useRef<HTMLDivElement | null>(null);
   const refsAbas = useRef<Partial<Record<PanelTab, HTMLButtonElement | null>>>({});
+
   useEffect(() => {
     const el = refsAbas.current[tab];
     if (!el || !fitaAbas.current) return;
@@ -253,6 +261,45 @@ function PainelPage() {
   /* Solicitações de vínculo no nível do painel. Antes só a aba Pacientes as
      carregava, então o resumo do topo não tinha como saber que existiam. */
   const [pedidosVinculo, setPedidosVinculo] = useState<{ id: string }[]>([]);
+  /* Acionamentos de SOS pendentes. Consultados ao abrir e a cada 60s: um SOS
+     que chega enquanto ele está com o painel aberto tem que aparecer sozinho —
+     esperar ele recarregar a página é esperar demais. */
+  const [sosPendentes, setSosPendentes] = useState<AcionamentoSos[]>([]);
+  const [sosAberto, setSosAberto] = useState<AcionamentoSos | null>(null);
+  const [sosAtendendo, setSosAtendendo] = useState(false);
+  /* Adiados nesta sessão: some da tela agora e volta na próxima visita. */
+  const [sosAdiados, setSosAdiados] = useState<Set<string>>(new Set());
+
+  /* Vigia de SOS. Roda em paralelo ao resto e nunca derruba o painel: um erro
+     aqui custa o aviso, não o consultório. */
+  useEffect(() => {
+    let vivo = true;
+    async function olhar() {
+      try {
+        const tk = await token();
+        const r = await listarAcionamentos({
+          data: { accessToken: tk, apenasPendentes: true, limite: 20 },
+        });
+        if (vivo && r.ok) setSosPendentes(r.acionamentos);
+      } catch {
+        /* sem aviso desta vez */
+      }
+    }
+    void olhar();
+    const t = setInterval(olhar, 60_000);
+    return () => {
+      vivo = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  /* Abre o modal sozinho no acionamento mais recente que ele ainda não adiou.
+     Um aviso de emergência que espera um clique para aparecer não é aviso. */
+  useEffect(() => {
+    if (sosAberto) return;
+    const novo = sosPendentes.find((a) => !sosAdiados.has(a.id));
+    if (novo) setSosAberto(novo);
+  }, [sosPendentes, sosAdiados, sosAberto]);
   const [teleconsultas, setTeleconsultas] = useState<TeleconsultaSession[]>([]);
   const [privateConsults, setPrivateConsults] = useState<any[]>([]);
   const [corporateLeads, setCorporateLeads] = useState<CorporateLead[]>([]);
@@ -471,6 +518,7 @@ function PainelPage() {
   const pendingQs = questions.filter((q) => !q.answered).length;
   const unseenForms = preForms.filter((f) => !f.seen_by_doctor).length;
   const novasPacientes = pedidosVinculo.length;
+  const sosNaoAtendidos = sosPendentes.length;
 
   return (
     <section className="mx-auto max-w-5xl px-5 py-12">
@@ -481,6 +529,61 @@ function PainelPage() {
 
       {/* Resumo — números já recortados por médico no servidor (equipe vê a
           instalação inteira; assinante vê só os próprios). */}
+      {/* O SOS vem ANTES de tudo, inclusive do resumo. Nada no painel é mais
+          urgente que uma paciente que apertou o botão de emergência. */}
+      {sosAberto && (
+        <AlertaSosMedico
+          acionamento={sosAberto}
+          atendendo={sosAtendendo}
+          onAtender={async () => {
+            setSosAtendendo(true);
+            try {
+              const r = await marcarAcionamentoAtendido({
+                data: { accessToken: await token(), id: sosAberto.id },
+              });
+              if (!r.ok) {
+                toast.error("Não consegui registrar. Tente de novo.");
+                return;
+              }
+              setSosPendentes((ps) => ps.filter((a) => a.id !== sosAberto.id));
+              setSosAberto(null);
+              toast.success("Registrado no histórico da paciente ✓");
+            } finally {
+              setSosAtendendo(false);
+            }
+          }}
+          onFechar={() => {
+            // Adiar, não dispensar: volta na próxima visita ao painel.
+            setSosAdiados((s) => new Set(s).add(sosAberto.id));
+            setSosAberto(null);
+          }}
+        />
+      )}
+
+      {/* Faixa vermelha permanente enquanto houver acionamento sem desfecho —
+          mesmo depois de ele adiar o modal. */}
+      {sosNaoAtendidos > 0 && (
+        <button
+          onClick={() => setSosAberto(sosPendentes[0])}
+          className="press mt-6 flex w-full items-center justify-between gap-3 rounded-2xl bg-rose-600 px-4 py-3 text-left text-white"
+        >
+          <span>
+            <span className="block text-sm font-bold">
+              🆘{" "}
+              {sosNaoAtendidos === 1
+                ? "1 acionamento de emergência sem desfecho"
+                : `${sosNaoAtendidos} acionamentos de emergência sem desfecho`}
+            </span>
+            <span className="mt-0.5 block text-[12px] leading-snug text-white/85">
+              {sosPendentes[0]?.paciente ?? "Uma paciente"} apertou o SOS.
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-rose-700">
+            Abrir
+          </span>
+        </button>
+      )}
+
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {/* Primeiro da fila de propósito: uma paciente esperando aceite é o
             item mais urgente do painel — ela está do outro lado vendo
@@ -8644,6 +8747,7 @@ function PatientDetailModal({
      Engajamento, dois lugares que o médico não abre para olhar uma paciente
      específica. Quem clica numa paciente quer a paciente inteira. */
   const [ficha, setFicha] = useState<any | null>(null);
+  const [sosDela, setSosDela] = useState<AcionamentoSos[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -8659,6 +8763,15 @@ function PatientDetailModal({
         setFicha(rep.ok ? rep : null);
       } catch {
         setFicha(null);
+      }
+      /* Acionamentos de SOS dela. Fica na ficha e não numa aba separada porque
+         é dado clínico: quantas vezes ela acionou, por quê e quando, ao lado do
+         peso e da pressão. Numa gestação de alto risco isso é prontuário. */
+      try {
+        const so = await acionamentosDaPaciente({ data: { accessToken: tk, pacienteId: p.id } });
+        setSosDela(so.ok ? so.acionamentos : []);
+      } catch {
+        setSosDela([]);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -8785,6 +8898,52 @@ function PatientDetailModal({
             </span>
           )}
         </div>
+
+        {/* Histórico de emergências ANTES dos registros: se ela acionou o SOS,
+              é a primeira coisa que o médico precisa ver ao abrir a ficha. */}
+        {sosDela.length > 0 && (
+          <div className="px-4 pt-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600">
+              🆘 Acionamentos de emergência ({sosDela.length})
+            </p>
+            <div className="mt-1.5 space-y-1.5">
+              {sosDela.slice(0, 5).map((a) => (
+                <div
+                  key={a.id}
+                  className="rounded-xl border border-rose-200 bg-rose-50/60 p-2.5 dark:border-rose-500/30 dark:bg-rose-500/10"
+                >
+                  <p className="text-[12px] font-semibold text-foreground">
+                    {new Date(a.created_at).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                    {a.motivo ? ` · ${a.motivo}` : ""}
+                    {a.ficha?.semana ? ` · ${a.ficha.semana}` : ""}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                    {a.atendido_em
+                      ? `Atendido em ${new Date(a.atendido_em).toLocaleString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`
+                      : "Sem desfecho registrado"}
+                    {a.address ? ` · ${a.address}` : ""}
+                  </p>
+                </div>
+              ))}
+              {sosDela.length > 5 && (
+                <p className="text-[11px] text-muted-foreground">
+                  + {sosDela.length - 5} mais antigos
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Ficha clínica — o que ela registrou no app */}
         {ficha && (

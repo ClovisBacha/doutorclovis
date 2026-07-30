@@ -413,27 +413,51 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
       }
       // Só é "faltou" quando existe um contato cadastrado e nada chegou nele.
       if (contatoNome && !canais.contatoEmail && !canais.sms) canais.faltou = contatoNome;
-      /* ── Registro, com o que saiu ─────────────────────────────────────── */
-      try {
-        await sb.from("panic_events").insert({
-          user_id: u.user.id,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          address: data.address,
-          channels: canais,
-        });
-      } catch {
-        /* a coluna `channels` pode não existir ainda; o evento importa mais */
-        try {
-          await sb.from("panic_events").insert({
-            user_id: u.user.id,
-            latitude: data.latitude,
-            longitude: data.longitude,
-            address: data.address,
-          });
-        } catch {
-          /* melhor esforço */
-        }
+      /* ── Registro: o acionamento como DADO, não como log ───────────────
+      
+         `doctor_id` e `ficha` são CONGELADOS aqui, no instante do disparo, e
+         isso é a decisão central deste bloco. O prontuário muda — ela troca de
+         médico, corrige a alergia, a semana avança — e o evento não pode mudar
+         junto. Quem quiser saber "como ela estava naquela noite" precisa do
+         retrato daquela noite, não do estado de hoje. É o que separa um
+         histórico clínico de uma lista de coordenadas.
+      
+         O insert desce em degraus pelo mesmo motivo da ficha: colunas novas
+         podem não existir num banco sem a migração, e o evento importa mais do
+         que os campos extras. */
+      const eventoBase = {
+        user_id: u.user.id,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        address: data.address,
+      };
+      const eventoCompleto = {
+        ...eventoBase,
+        channels: canais,
+        doctor_id: (prof?.doctor_id as string | null) ?? null,
+        ficha: {
+          nome: ficha.nome ?? null,
+          telefone: ficha.telefone ?? null,
+          bebe: ficha.bebe ?? null,
+          semana: ficha.semana ?? null,
+          dpp: ficha.dpp ?? null,
+          sangue: ficha.sangue ?? null,
+          alergias: ficha.alergias ?? null,
+          medicamentos: ficha.medicamentos ?? null,
+          contato: contatoNome || null,
+          contatoTel: paraExibir(prof?.emergency_phone as string | null),
+          medico: ficha.medico ?? null,
+          medicoTel: ficha.medicoTel ?? null,
+          endereco: ficha.endereco ?? null,
+          avisados: canais.destinos,
+        },
+      };
+      for (const linha of [eventoCompleto, { ...eventoBase, channels: canais }, eventoBase]) {
+        const { error } = await sb.from("panic_events").insert(linha);
+        if (!error) break;
+        // 42703 = coluna inexistente. Qualquer outro erro não melhora tentando
+        // com menos colunas, então não insistimos.
+        if ((error as { code?: string }).code !== "42703") break;
       }
 
       return { ok: true as const, canais, mensagem: texto };
