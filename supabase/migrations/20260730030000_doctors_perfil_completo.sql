@@ -63,9 +63,16 @@ COMMENT ON COLUMN public.doctors.verified IS
   'Selo de conferido pela plataforma. NÃO é pré-requisito para aparecer na busca — só ordena melhor.';
 
 -- ── 4. Busca da paciente ────────────────────────────────────────────────────
--- A busca ordena por plano e nome e filtra por nome/cidade/especialidade. Sem
--- índice, cada digitada é um seq scan na tabela inteira.
-CREATE INDEX IF NOT EXISTS idx_doctors_busca
-  ON public.doctors(active, accepting_patients, plan);
-CREATE INDEX IF NOT EXISTS idx_doctors_nome
-  ON public.doctors(display_name);
+-- A consulta da busca é sempre a mesma forma: filtra `active` e
+-- `accepting_patients`, e ordena por `display_name` antes do LIMIT. Este índice
+-- cobre os três na ordem certa, então o Postgres não precisa ordenar depois de
+-- filtrar. `idx_doctors_directory` já cobre o filtro por UF.
+--
+-- Não indexamos `plan`: o ranking por plano acontece em JavaScript, sobre a
+-- lista já recortada — um índice ali seria peso morto para escrita.
+CREATE INDEX IF NOT EXISTS idx_doctors_busca_nome
+  ON public.doctors(active, accepting_patients, display_name);
+
+-- Versão anterior deste arquivo criava um índice em (active, accepting_patients,
+-- plan). Removido: `plan` nunca entra no WHERE, então era peso morto na escrita.
+DROP INDEX IF EXISTS public.idx_doctors_busca;
