@@ -37,6 +37,13 @@ import {
 } from "@/lib/acionamentos.functions";
 import { AlertaSosMedico } from "@/components/alerta-sos-medico";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
+import {
+  ESTILO_SINAL,
+  PESO_SINAL,
+  sinalGlicemia,
+  sinalPressao,
+  sinalSilencio,
+} from "@/lib/sinais-clinicos";
 import { ESPECIALIDADES_MEDICO, TITULOS_MEDICO } from "@/lib/medico-opcoes";
 import {
   MOEDAS,
@@ -2429,6 +2436,20 @@ function EngagementSection({
   const inactivePatients = patients.filter((p) => !p.isActive);
   const activePatients = patients.filter((p) => p.isActive);
 
+  /* QUEM SUMIU, em ordem de silêncio.
+
+     "Inativa nos últimos 7 dias" é ruído: quase toda gestante passa uma semana
+     sem abrir o app e está ótima. O que merece a atenção dele é o silêncio
+     LONGO — duas semanas, um mês — e é isso que esta lista separa.
+
+     Silêncio não é sinal clínico, é sinal de engajamento: ela pode estar bem e
+     sem paciência para o app. Por isso o texto diz "sem registro" e nunca "sem
+     acompanhamento". */
+  const sumidas = patients
+    .map((p) => ({ p, s: sinalSilencio(p.lastActivityAt) }))
+    .filter((x) => x.s && x.s.gravidade !== "normal")
+    .sort((a, b) => PESO_SINAL[a.s!.gravidade] - PESO_SINAL[b.s!.gravidade]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -2437,6 +2458,41 @@ function EngagementSection({
           ↺ Atualizar
         </button>
       </div>
+
+      {/* A lista de sumidas vem ANTES dos números: o número diz que existem,
+          a lista diz quem são — e é a lista que vira ação. */}
+      {sumidas.length > 0 && (
+        <div className="rounded-3xl border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+            {sumidas.length === 1
+              ? "1 paciente sem registro há mais de 2 semanas"
+              : `${sumidas.length} pacientes sem registro há mais de 2 semanas`}
+          </p>
+          <p className="mt-1 text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+            Pode ser só falta de paciência com o app — mas numa gestação de alto risco vale um
+            telefonema antes da próxima consulta.
+          </p>
+          <ul className="mt-3 space-y-1.5">
+            {sumidas.slice(0, 8).map(({ p, s }) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 text-[13px]">
+                <span className="truncate font-medium text-foreground">
+                  {p.display_name ?? "Paciente"}
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    ESTILO_SINAL[s!.gravidade]
+                  }`}
+                >
+                  {s!.nota}
+                </span>
+              </li>
+            ))}
+            {sumidas.length > 8 && (
+              <li className="text-[12px] text-muted-foreground">+ {sumidas.length - 8} outras</li>
+            )}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Total de pacientes" value={totalPatients} />
@@ -2614,8 +2670,13 @@ function EngagementReportSnippet({ data }: { data: any }) {
           );
           if (!l) return "—";
           const d = diaCurto(l.log_date ?? l.created_at ?? null);
-          const alta = l.systolic >= 140 || l.diastolic >= 90;
-          return `${alta ? "⚠️ " : ""}${l.systolic}/${l.diastolic}${d ? ` · ${d}` : ""}`;
+          /* Regra compartilhada em `lib/sinais-clinicos`, não repetida aqui:
+             a mesma faixa precisa valer em toda tela que mostra pressão, senão
+             o médico aprende que a cor não quer dizer nada. */
+          const sinal = sinalPressao(l.systolic, l.diastolic);
+          const marca =
+            sinal?.gravidade === "grave" ? "🔴 " : sinal?.gravidade === "atencao" ? "⚠️ " : "";
+          return `${marca}${l.systolic}/${l.diastolic}${d ? ` · ${d}` : ""}`;
         })()}
       />
       <InfoBox label="Entradas no diário" value={String(journals?.length ?? 0)} />
@@ -8961,14 +9022,25 @@ function PatientDetailModal({
       rot: "Pressão",
       v: ultimoOnde(
         (l) => l.systolic != null && l.diastolic != null,
-        (l) => `${l.systolic}/${l.diastolic}`,
+        (l) => {
+          /* A marca vem da MESMA regra que a aba de Engajamento usa. Duas
+             faixas diferentes na mesma tela ensinariam o médico a ignorar a
+             cor — que é o pior desfecho possível para um alerta. */
+          const sn = sinalPressao(l.systolic, l.diastolic);
+          const m = sn?.gravidade === "grave" ? "🔴 " : sn?.gravidade === "atencao" ? "⚠️ " : "";
+          return `${m}${l.systolic}/${l.diastolic}`;
+        },
       ),
     },
     {
       rot: "Glicemia",
       v: ultimoOnde(
         (l) => l.glucose_mg_dl != null,
-        (l) => `${l.glucose_mg_dl}`,
+        (l) => {
+          const sn = sinalGlicemia(l.glucose_mg_dl);
+          const m = sn?.gravidade === "grave" ? "🔴 " : sn?.gravidade === "atencao" ? "⚠️ " : "";
+          return `${m}${l.glucose_mg_dl}`;
+        },
       ),
     },
   ];
