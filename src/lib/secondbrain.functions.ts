@@ -339,9 +339,15 @@ export const updateBrainEntry = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const target = await resolveBrainDoctor(user, data.asDoctor);
     if (!target) return { ok: false as const };
+    /* Portão de plano, que faltava só aqui e no delete — as outras nove escritas
+       do cérebro têm. A aba é escondida no cliente para quem não tem plano, mas
+       o endpoint continua vivo: um médico no Free editava e re-aprovava
+       conhecimento chamando direto, e cada edição dispara uma chamada de
+       embedding que a plataforma paga. */
+    if (!(await brainPlanAllows(user, target))) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { error } = await (supabaseAdmin as any)
+    const { data: mexeu, error } = await (supabaseAdmin as any)
       .from("brain_entries")
       .update({
         question: data.question,
@@ -350,13 +356,21 @@ export const updateBrainEntry = createServerFn({ method: "POST" })
         approved: data.approved,
       })
       .eq("id", data.id)
-      .eq("doctor_id", target.doctorId);
-    if (!error) {
-      // Texto mudou → o vetor antigo mente; recalcula (fire-and-forget).
+      .eq("doctor_id", target.doctorId)
+      // Sem `select`, um id de outro consultório (ou inexistente) devolvia
+      // sucesso e a tela dizia "salvo".
+      .select("id");
+    if (error || !mexeu?.length) return { ok: false as const };
+    /* Recalcula o vetor — AGUARDADO. Em serverless nada garante execução depois
+       da resposta, então o fire-and-forget deixava o texto novo com o vetor
+       velho: a busca do cérebro continuaria achando a versão antiga. */
+    try {
       const { embedBrainEntry } = await import("./embeddings.server");
-      embedBrainEntry(data.id, data.question, data.answer);
+      await embedBrainEntry(data.id, data.question, data.answer);
+    } catch {
+      /* o texto já está salvo; o vetor é reconstruível */
     }
-    return { ok: !error };
+    return { ok: true as const };
   });
 
 const DeleteSchema = z.object({
@@ -373,14 +387,16 @@ export const deleteBrainEntry = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const target = await resolveBrainDoctor(user, data.asDoctor);
     if (!target) return { ok: false as const };
+    if (!(await brainPlanAllows(user, target))) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { error } = await (supabaseAdmin as any)
+    const { data: apagou, error } = await (supabaseAdmin as any)
       .from("brain_entries")
       .delete()
       .eq("id", data.id)
-      .eq("doctor_id", target.doctorId);
-    return { ok: !error };
+      .eq("doctor_id", target.doctorId)
+      .select("id");
+    return error || !apagou?.length ? { ok: false as const } : { ok: true as const };
   });
 
 /**

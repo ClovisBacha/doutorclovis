@@ -1099,7 +1099,7 @@ function RecentQuestionsCard({
         )}
       </div>
       {items.length === 0 ? (
-        <p className="mt-4 flex-1 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700">
+        <p className="mt-4 flex-1 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
           🎉 Nenhuma pergunta pendente. Suas pacientes estão em dia!
         </p>
       ) : (
@@ -1131,7 +1131,7 @@ function ChurnRiskCard({ patients }: { patients: DoctorDashboard["engagement"]["
         diferença.
       </p>
       {patients.length === 0 ? (
-        <p className="mt-5 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700">
+        <p className="mt-5 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
           ✨ Ninguém em risco de abandono. Suas pacientes estão engajadas!
         </p>
       ) : (
@@ -1139,7 +1139,7 @@ function ChurnRiskCard({ patients }: { patients: DoctorDashboard["engagement"]["
           {patients.map((p, i) => (
             <li
               key={`${p.name}-${i}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/50 px-4 py-3"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 dark:bg-amber-500/10 dark:border-amber-500/30"
             >
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-700">
@@ -1751,7 +1751,7 @@ function AppointmentsSection({
                   {ext.price_brl && payStatus !== "pago" && (
                     <button
                       onClick={() => pixWhatsApp(a)}
-                      className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                      className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30"
                     >
                       💰 Cobrar via PIX
                     </button>
@@ -1759,7 +1759,7 @@ function AppointmentsSection({
                   {ext.price_brl && payStatus !== "pago" && (
                     <button
                       onClick={() => markPaid(a.id)}
-                      className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800"
+                      className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/30"
                     >
                       ✓ Marcar pago
                     </button>
@@ -2214,7 +2214,10 @@ function EngagementSection({
                 referenceDays: p.reference_days,
               });
               return (
-                <div key={p.id} className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+                <div
+                  key={p.id}
+                  className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:bg-amber-500/10 dark:border-amber-500/30"
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{p.display_name ?? "Paciente sem nome"}</p>
@@ -2264,7 +2267,7 @@ function EngagementSection({
               return (
                 <div
                   key={p.id}
-                  className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4"
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 dark:bg-emerald-500/10 dark:border-emerald-500/30"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -3264,7 +3267,7 @@ function AffiliatesCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
       </p>
 
       {missing && (
-        <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
           Rode o <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar os afiliados.
         </p>
       )}
@@ -4164,7 +4167,7 @@ function BrainConversationsCard({
           <div className="h-14 animate-pulse rounded-xl bg-secondary" />
         </div>
       ) : missingTable ? (
-        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
           O histórico de conversas ainda não existe no banco — rode o{" "}
           <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar.
         </p>
@@ -4808,7 +4811,7 @@ function BrainGapsCard({
       {loading ? (
         <div className="skeleton mt-4 h-20 rounded-2xl" />
       ) : loadError === "migracao" ? (
-        <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
           A tabela de lacunas ainda não existe no banco — rode o{" "}
           <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar o autoaprendizado.
         </p>
@@ -5675,7 +5678,7 @@ function ClinicaSection({
 
   if (migrate)
     return (
-      <p className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+      <p className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
         As tabelas do plano Clínica ainda não existem no banco — rode o{" "}
         <strong>APLICAR_PENDENTES.sql</strong> no SQL Editor do Supabase.
       </p>
@@ -6100,7 +6103,7 @@ function DoctorBilling({
 
   if (isPaid) {
     return (
-      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 dark:bg-emerald-500/10 dark:border-emerald-500/30">
         <p className="font-serif text-lg text-emerald-900">
           Assinatura ativa · plano {plan === "clinica" ? "Pro Equipe" : plan}
         </p>
@@ -6347,7 +6350,7 @@ function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const esgotado = info.remaining <= 0;
 
   return (
-    <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6">
+    <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-500/10 dark:border-amber-500/30">
       <p className="font-serif text-lg text-amber-900">🎟️ Convites premium</p>
       <p className="mt-1 text-sm text-amber-800">
         Gere um código na hora e envie para a sua paciente do jeito que quiser (WhatsApp, e-mail…).
@@ -7765,7 +7768,7 @@ function LivesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   return (
     <div className="space-y-6">
       {missingTable && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
           A tabela <code>lives</code> ainda não existe no banco — rode o{" "}
           <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar o gerenciador.
         </div>

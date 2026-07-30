@@ -558,6 +558,22 @@ export const setPatientQuizPremium = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, error: "Sem permissão." };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    /* DONA DA LINHA ANTES DE QUALQUER CONSULTA sobre ela.
+    
+       A checagem de assinatura abaixo rodava primeiro, com o `patientId` cru do
+       pedido. O UPDATE no fim é escopado por `doctor_id`, então nunca houve
+       escrita indevida — mas a resposta diferente ("esta paciente tem assinatura
+       ativa") transformava este endpoint num oráculo: o médico A passava o id de
+       uma paciente do médico B e descobria se ela paga assinatura. É dado de
+       outra pessoa saindo por uma mensagem de erro. */
+    const { data: minha } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("id")
+      .eq("id", data.patientId)
+      .eq("doctor_id", user.id)
+      .maybeSingle();
+    if (!minha) return { ok: false as const, error: "Paciente não encontrada." };
+
     // Proteção: o toggle manual NÃO pode revogar quem tem assinatura ativa
     // (Stripe) ou convite ativo — o acesso pago é gerido pelo webhook, não
     // pela mão do médico. (Se a tabela subscriptions ainda não existe, ignora.)
@@ -589,20 +605,24 @@ export const setPatientQuizPremium = createServerFn({ method: "POST" })
       }
     }
 
-    const { error } = await (supabaseAdmin as any)
+    const { data: mexeu, error } = await (supabaseAdmin as any)
       .from("patient_profiles")
       .update({ quiz_premium: data.premium })
       .eq("id", data.patientId)
-      .eq("doctor_id", user.id); // tenancy: só as próprias pacientes
+      .eq("doctor_id", user.id) // tenancy: só as próprias pacientes
+      .select("id"); // sem isto, zero linhas afetadas voltava como sucesso
     if (error?.code === "42703") {
       return {
         ok: false as const,
         error: "Aplique a migração quiz_premium no Supabase (APLICAR_PENDENTES.sql).",
       };
     }
-    return error
-      ? { ok: false as const, error: error.message }
-      : { ok: true as const, error: null };
+    if (error) return { ok: false as const, error: error.message };
+    // "Salvo ✓" sem ter salvado nada é pior do que um erro.
+    if (!mexeu || mexeu.length === 0) {
+      return { ok: false as const, error: "Nada foi alterado — recarregue a lista." };
+    }
+    return { ok: true as const, error: null };
   });
 
 /**
