@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
 import { RED_SYMPTOMS } from "@/lib/triage";
-import { DOCTOR } from "@/lib/doctor.config";
 import { linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
 import { dispararEmergencia, type CanaisAviso } from "@/lib/emergencia.functions";
@@ -38,7 +37,8 @@ export function EmergencySheet({
   /**
    * O médico DA PACIENTE, lido do cadastro dele (`getMyDoctorContact`).
    * `null` = ela ainda não tem médico vinculado, ou ele não preencheu o
-   * WhatsApp: aí vale o `doctor.config`, que é o dono da instalação.
+   * WhatsApp: sem médico vinculado, NENHUM nome é mostrado (nunca o do dono da
+   * instalação — ver `temVinculo` abaixo).
    *
    * Isto não é preciosismo de multi-tenant: um SOS que liga para o médico
    * errado é pior que um SOS que não liga para ninguém, porque ela vai
@@ -59,8 +59,7 @@ export function EmergencySheet({
      o botão diria "Ligar para Dra. Marina" e chamaria outra pessoa, e ela
      ficaria esperando do outro lado uma resposta que nunca vem.
 
-     Sem vínculo (a maioria hoje), vale o `doctor.config` — o médico dono da
-     instalação, que é de fato quem a atende. */
+     Sem vínculo, nada do médico aparece. */
   /* `temVinculo` decide se a tela nomeia um médico.
      
      Sem vínculo ela nomeava o dono da instalação — "Ligar para Dr. Clóvis",
