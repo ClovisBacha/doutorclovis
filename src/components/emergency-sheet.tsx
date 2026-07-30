@@ -30,6 +30,7 @@ type Info = {
 export function EmergencySheet({
   info,
   medico,
+  medicoResolvido,
   onClose,
   onOpenCard,
 }: {
@@ -44,6 +45,8 @@ export function EmergencySheet({
    * esperar do outro lado uma resposta que não vem.
    */
   medico?: DoctorContato | null;
+  /** `false` = ainda não sabemos se ela tem médico. Ver `medicoResolvido`. */
+  medicoResolvido?: boolean;
   onClose: () => void;
   /** Abre a carteirinha completa (QR grande, copiar, imprimir) fora do SOS. */
   onOpenCard?: () => void;
@@ -66,12 +69,18 @@ export function EmergencySheet({
      prometia o que o disparo não entrega. Agora, sem vínculo, o botão do
      médico dá lugar ao 193 e o texto não cita nome nenhum. */
   const temVinculo = !!medico?.nome?.trim();
+  /* Não sabemos ainda: nem afirma que ela tem médico, nem que não tem. */
+  const medicoIndefinido = medicoResolvido === false && !temVinculo;
   const medNome = temVinculo ? medico!.nome.trim() : "";
   const medCrm = temVinculo ? (medico!.crm ?? "").trim() : "";
   const medZap = temVinculo ? linkWhatsApp(medico!.whatsapp) : null;
   const medTel = temVinculo ? linkTel(medico!.whatsapp) : null;
   const [qr, setQr] = useState<string | null>(null);
-  const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
+  /* "sent" não bastava. O botão dizia "✓ Aviso enviado" só porque o servidor
+     respondeu, mesmo quando a lista de avisados voltava VAZIA — e o texto abaixo
+     dizia, em letra menor, "ninguém foi avisado". O maior e mais vermelho
+     elemento da tela contradizia o aviso importante. `ninguem` é esse caso. */
+  const [panic, setPanic] = useState<"idle" | "sending" | "sent" | "ninguem">("idle");
   /** O que DE FATO saiu, devolvido pelo servidor. A tela só diz o que houve. */
   const [canais, setCanais] = useState<CanaisAviso | null>(null);
   /** Mensagem pronta para o WhatsApp do contato principal, vinda do servidor. */
@@ -170,10 +179,26 @@ export function EmergencySheet({
           lat = pos.coords.latitude;
           lng = pos.coords.longitude;
           try {
-            const resp = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-            );
-            address = (await resp.json()).display_name ?? null;
+            /* TETO OBRIGATÓRIO aqui. Este `fetch` é opcional — só traduz a
+               coordenada em "Rua tal, bairro tal" — e estava entre a
+               localização e o DISPARO, sem timeout. Numa rede ruim ou num wi-fi
+               de hospital que engole a requisição, o SOS nunca saía: o botão
+               ficava travado em "Localizando e avisando…" para sempre, sem erro
+               e sem aviso a ninguém. Um enfeite não pode segurar a emergência.
+
+               2 segundos: se o nome da rua não chegou nisso, o link do mapa
+               resolve igual. */
+            const corta = new AbortController();
+            const alarme = setTimeout(() => corta.abort(), 2000);
+            try {
+              const resp = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+                { signal: corta.signal },
+              );
+              address = (await resp.json()).display_name ?? null;
+            } finally {
+              clearTimeout(alarme);
+            }
           } catch {
             /* nome do local é opcional — o link do mapa já resolve */
           }
@@ -191,6 +216,12 @@ export function EmergencySheet({
             { duration: 6000 },
           );
         }
+      } else {
+        /* Sem API de localização (contexto não seguro, WebView antiga): a tela
+           prometia "com a sua localização" e o aviso saía sem ela, calado. */
+        toast.error("Este aparelho não compartilha localização — o aviso vai sem ela.", {
+          duration: 6000,
+        });
       }
 
       const { data: s } = await supabase.auth.getSession();
@@ -201,7 +232,7 @@ export function EmergencySheet({
       if (!r.ok) throw new Error("falhou");
 
       setCanais(r.canais);
-      setPanic("sent");
+      setPanic(r.canais.destinos.length ? "sent" : "ninguem");
       /* A mensagem do WhatsApp é a MESMA que saiu por e-mail e SMS — vem
          pronta do servidor em vez de ser remontada aqui, senão o parente que
          receber pelos dois canais leria duas versões diferentes do mesmo
@@ -330,7 +361,9 @@ export function EmergencySheet({
           <p className="mt-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-center text-[12px] leading-snug text-amber-900">
             {medNome
               ? `${medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.`
-              : "Você ainda não tem um médico vinculado no app. Use o 192 ou o 193 acima."}
+              : medicoIndefinido
+                ? "Carregando os dados do seu médico… o 192 e o 193 acima funcionam agora."
+                : "Você ainda não tem um médico vinculado no app. Use o 192 ou o 193 acima."}
           </p>
         )}
         {medTel && (
@@ -346,13 +379,17 @@ export function EmergencySheet({
         <button
           onClick={sendLocation}
           disabled={panic !== "idle"}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-full bg-rose-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-70"
+          className={`mt-2 flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold text-white disabled:opacity-70 ${
+            panic === "ninguem" ? "bg-amber-600" : "bg-rose-600"
+          }`}
         >
           {panic === "sending"
             ? "📍 Localizando e avisando…"
             : panic === "sent"
               ? "✓ Aviso enviado"
-              : "🆘 Pedir socorro agora"}
+              : panic === "ninguem"
+                ? "⚠️ Ninguém para avisar — ligue 192"
+                : "🆘 Pedir socorro agora"}
         </button>
         {panic === "idle" && (
           <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
@@ -369,7 +406,7 @@ export function EmergencySheet({
 
         {/* O que REALMENTE saiu. A tela nunca diz "enviado" no genérico: quem
             foi avisado aparece pelo nome, e quem não foi também. */}
-        {panic === "sent" && canais && (
+        {(panic === "sent" || panic === "ninguem") && canais && (
           <div className="mt-2 rounded-2xl bg-emerald-50 px-3.5 py-3 text-[12px] leading-snug text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
             {canais.destinos.length ? (
               <>

@@ -78,6 +78,12 @@ export type LinkedPatient = {
   fetal_bpm_at?: string | null;
   /** Semana gestacional atual (calculada no servidor) — espelho do bebê no painel. */
   weeks?: number | null;
+  /** Dias dentro da semana (0–6). Conduta em 36s0d ≠ 36s6d. */
+  days?: number | null;
+  /** Nascimento, quando já houve: liga o espelho pós-parto. */
+  birth_date?: string | null;
+  /** Nome do bebê — é como ela chama a gestação. */
+  baby_name?: string | null;
   /** Tom de pele do bebê (0–4) escolhido pela paciente — espelho fiel. */
   baby_skin_tone?: number | null;
 };
@@ -158,7 +164,11 @@ export const requestDoctor = createServerFn({ method: "POST" })
           .from("patient_profiles")
           .select("id", { count: "exact", head: true })
           .eq("doctor_id", data.doctorId);
-        if (!cntErr && (count ?? 0) >= ent.maxPatients) {
+        /* Falha FECHADA. Antes era `!cntErr && …`: qualquer falha da contagem
+           (timeout, RLS, tabela indisponível) fazia `count` virar null, o teto
+           desaparecer e o vínculo passar. Um limite que se desliga sozinho no
+           primeiro erro de rede não é um limite. */
+        if (cntErr || (count ?? 0) >= ent.maxPatients) {
           return { ok: false as const, reason: "lotado" as const };
         }
       }
@@ -400,7 +410,8 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
           .from("patient_profiles")
           .select("id", { count: "exact", head: true })
           .eq("doctor_id", user.id);
-        if (!cntErr && (count ?? 0) >= ent.maxPatients) {
+        // Falha fechada, igual ao aceite: erro de contagem não abre o teto.
+        if (cntErr || (count ?? 0) >= ent.maxPatients) {
           // Teto do plano: a solicitação volta a pendente para ele aceitar
           // depois do upgrade, em vez de sumir.
           await desfazer();
@@ -470,7 +481,8 @@ export const listMyPatients = createServerFn({ method: "POST" })
     // lmp_date/reference_* alimentam a semana gestacional (espelho do bebê).
     const gestCols = "lmp_date,reference_date,reference_weeks,reference_days";
     const selects = [
-      `id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,baby_skin_tone,${gestCols}`,
+      `id,display_name,baby_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,baby_skin_tone,birth_date,${gestCols}`,
+      `id,display_name,baby_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,birth_date,${gestCols}`,
       `id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,${gestCols}`,
       `id,display_name,due_date,created_at,quiz_premium,${gestCols}`,
       `id,display_name,due_date,created_at,${gestCols}`,
@@ -505,10 +517,21 @@ export const listMyPatients = createServerFn({ method: "POST" })
         display_name: r.display_name ?? null,
         due_date: r.due_date ?? null,
         created_at: r.created_at ?? null,
+        // O nome do bebê é como a paciente chama a gestação — e o médico não
+        // via nem isso na lista.
+        baby_name: r.baby_name ?? null,
         quiz_premium: r.quiz_premium ?? null,
         fetal_bpm: r.fetal_bpm ?? null,
         fetal_bpm_at: r.fetal_bpm_at ?? null,
         weeks: g && g.weeks >= 1 && g.weeks <= 44 ? g.weeks : null,
+        /* Os DIAS, não só as semanas. Conduta em 36s0d não é conduta em 36s6d,
+           e o espelho mostrava "36 semanas" para as duas. A tela da paciente
+           sempre disse "36 semanas e 3d" — o painel é que arredondava. */
+        days: g && g.weeks >= 1 && g.weeks <= 44 ? g.days : null,
+        /* Pós-parto. Passando de 44 semanas o `weeks` virava null e o painel
+           dizia "Sem data de gestação" para uma puérpera — enquanto a tela dela
+           mostrava os dias de vida do bebê. `birth_date` nem era selecionado. */
+        birth_date: r.birth_date ?? null,
         baby_skin_tone: r.baby_skin_tone ?? null,
       } as LinkedPatient;
     });

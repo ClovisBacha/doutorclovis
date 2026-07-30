@@ -7,8 +7,6 @@
 // - MAIL_FROM: remetente. Padrão "onboarding@resend.dev" (só envia para o dono
 //   da conta enquanto você não verifica um domínio próprio no Resend).
 
-import { DOCTOR } from "@/lib/doctor.config";
-
 type SendArgs = { to: string | string[]; subject: string; html: string; replyTo?: string };
 
 export async function sendEmail({ to, subject, html, replyTo }: SendArgs): Promise<boolean> {
@@ -17,7 +15,12 @@ export async function sendEmail({ to, subject, html, replyTo }: SendArgs): Promi
     console.warn(`[email] RESEND_API_KEY ausente — e-mail não enviado: "${subject}"`);
     return false;
   }
-  const from = process.env.MAIL_FROM || `${DOCTOR.name} <onboarding@resend.dev>`;
+  /* Remetente da PLATAFORMA quando `MAIL_FROM` não está configurado. Antes o
+     padrão era o nome do fundador, então o e-mail de consulta da paciente de
+     outro médico chegava "De: Dr. Clóvis Bacha" — inclusive o aviso de SOS para
+     a família dela. Quem assina o conteúdo é `emailLayout(…, marca)`; o
+     envelope nunca deve nomear um médico específico. */
+  const from = process.env.MAIL_FROM || "Obstétrica <onboarding@resend.dev>";
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",

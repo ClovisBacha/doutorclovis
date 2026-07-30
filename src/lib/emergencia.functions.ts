@@ -140,13 +140,52 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
       if (!u.user) return { ok: false as const, canais: vazio, mensagem: "" };
 
       const sb = supabaseAdmin as any;
-      const { data: prof } = await sb
-        .from("patient_profiles")
-        .select(
-          "display_name, phone, baby_name, blood_type, allergies, medications, emergency_contact, emergency_phone, emergency_email, doctor_id, due_date, lmp_date, reference_date, reference_weeks, reference_days",
-        )
-        .eq("id", u.user.id)
-        .maybeSingle();
+
+      /* A ficha é lida em DEGRAUS, e isto é a diferença entre avisar alguém e
+         não avisar ninguém.
+      
+         O PostgREST devolve 42703 para a consulta INTEIRA quando UMA coluna não
+         existe. Com um select único de 15 colunas — duas delas criadas só nos
+         arquivos APLICAR_SOS/SOS2 — bastava uma migração pendente para `prof`
+         virar null; e aí `prof?.doctor_id` é falso (médico não é avisado),
+         `emergency_email` é vazio (contato não é avisado), e o handler ainda
+         devolvia `ok: true`. O botão dizia "✓ Aviso enviado" e ninguém tinha
+         sido avisado. Numa emergência.
+      
+         Cada degrau abre mão do que é dispensável e mantém o que decide PARA
+         QUEM o aviso vai. O último só pede o que existe desde a criação da
+         tabela — se nem ele funcionar, o erro é real e vira `ok: false`. */
+      const DEGRAUS = [
+        "display_name, phone, baby_name, blood_type, allergies, medications, emergency_contact, emergency_phone, emergency_email, doctor_id, due_date, lmp_date, reference_date, reference_weeks, reference_days",
+        // Sem `phone` (só em APLICAR_SOS2) nem `reference_*`.
+        "display_name, baby_name, blood_type, allergies, medications, emergency_contact, emergency_phone, emergency_email, doctor_id, due_date, lmp_date",
+        // Sem `emergency_email` (só em APLICAR_SOS) nem `medications`.
+        "display_name, baby_name, blood_type, allergies, emergency_contact, emergency_phone, doctor_id, due_date, lmp_date",
+        // Piso: quem é ela e quem é o médico dela.
+        "display_name, doctor_id",
+      ];
+      let prof: any = null;
+      let erroFicha: unknown = null;
+      for (const cols of DEGRAUS) {
+        const r = await sb.from("patient_profiles").select(cols).eq("id", u.user.id).maybeSingle();
+        if (!r.error) {
+          prof = r.data;
+          erroFicha = null;
+          break;
+        }
+        erroFicha = r.error;
+        // Só vale descer um degrau quando o problema é coluna inexistente.
+        if ((r.error as { code?: string }).code !== "42703") break;
+      }
+      if (erroFicha) {
+        console.error("[dispararEmergencia] ficha ilegível", erroFicha);
+        return {
+          ok: false as const,
+          canais: vazio,
+          mensagem: "",
+          erro: "ficha" as const,
+        };
+      }
 
       const nome = (prof?.display_name as string) || "Uma paciente";
       const mapa =

@@ -1840,14 +1840,42 @@ function PreConsultasSection({
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reportData, setReportData] = useState<any>(null);
+  /* DE QUEM é o relatório que está em `reportData`.
+  
+     Sem isto havia vazamento de dado clínico entre pacientes: `reportData` é um
+     estado só, e `loadReport` só escrevia nele em caso de SUCESSO. Abrir a
+     paciente B, depois abrir a paciente A cujo relatório falha, deixava o card
+     da A renderizando o relatório da B — peso, pressão, perguntas pendentes,
+     com o nome da B dentro do card da A. E a falha é alcançável: a lista de
+     pré-consultas é escopada por `preconsulta_forms.doctor_id` (gravado no
+     envio), enquanto o relatório é autorizado por `patient_profiles.doctor_id`;
+     uma paciente que trocou de médico continua listada e o relatório é negado.
+  
+     Agora o relatório só é exibido quando pertence à paciente aberta. */
+  const [reportOwner, setReportOwner] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [reportErro, setReportErro] = useState(false);
 
   async function loadReport(userId: string) {
     setReportLoading(true);
-    const tk = await tokenFn();
-    const res = await getPatientReport({ data: { accessToken: tk, userId } });
-    if (res.ok) setReportData(res);
-    setReportLoading(false);
+    setReportErro(false);
+    // Limpa antes de buscar: nada de mostrar o anterior enquanto carrega.
+    setReportData(null);
+    setReportOwner(null);
+    try {
+      const tk = await tokenFn();
+      const res = await getPatientReport({ data: { accessToken: tk, userId } });
+      if (res.ok) {
+        setReportData(res);
+        setReportOwner(userId);
+      } else {
+        setReportErro(true);
+      }
+    } catch {
+      setReportErro(true);
+    } finally {
+      setReportLoading(false);
+    }
   }
 
   function printReport() {
@@ -1933,7 +1961,12 @@ function PreConsultasSection({
             <div className="mt-5 border-t border-border pt-5">
               {reportLoading ? (
                 <p className="text-sm text-muted-foreground">Carregando relatório...</p>
-              ) : reportData ? (
+              ) : reportErro ? (
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Não foi possível carregar o histórico desta paciente. Ela pode ter trocado de
+                  médico — os dados dela deixam de ser seus quando isso acontece.
+                </p>
+              ) : reportData && reportOwner === f.user_id ? (
                 <PatientReportView data={reportData} formData={f} onPrint={printReport} />
               ) : null}
             </div>
@@ -1963,7 +1996,6 @@ function PatientReportView({
       })
     : null;
 
-  const lastLog = healthLogs?.[0];
   const completeSessions = (kicks ?? []).filter((k: any) => k.kick_count >= 10).length;
 
   return (
@@ -1999,25 +2031,30 @@ function PatientReportView({
           Sinais Vitais (pré-consulta)
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
+          {/* O fallback procura a linha em que AQUELA medida existe, não a
+              linha mais recente: quem anotou só a pressão hoje deixava o peso
+              em "—", que o médico lê como "nunca se pesou". */}
           <InfoBox
             label="Peso"
-            value={
-              formData.current_weight
-                ? `${formData.current_weight} kg`
-                : lastLog?.weight_kg
-                  ? `${lastLog.weight_kg} kg (último reg.)`
-                  : "—"
-            }
+            value={(() => {
+              if (formData.current_weight) return `${formData.current_weight} kg`;
+              const u = ultimaMedida(healthLogs, "weight_kg");
+              return u.valor ? `${u.valor} kg (reg. ${diaCurto(u.quando) || "anterior"})` : "—";
+            })()}
           />
           <InfoBox
             label="Pressão arterial"
-            value={
-              formData.systolic && formData.diastolic
-                ? `${formData.systolic}/${formData.diastolic} mmHg`
-                : lastLog?.systolic
-                  ? `${lastLog.systolic}/${lastLog.diastolic} mmHg (último reg.)`
-                  : "—"
-            }
+            value={(() => {
+              if (formData.systolic && formData.diastolic)
+                return `${formData.systolic}/${formData.diastolic} mmHg`;
+              const l = (healthLogs ?? []).find(
+                (x: any) => x?.systolic != null && x?.diastolic != null,
+              );
+              if (!l) return "—";
+              return `${l.systolic}/${l.diastolic} mmHg (reg. ${
+                diaCurto(l.log_date ?? l.created_at ?? null) || "anterior"
+              })`;
+            })()}
           />
           <InfoBox label="Estado emocional" value={formData.emotional_state ?? "—"} />
         </div>
@@ -2269,15 +2306,64 @@ function EngagementSection({
   );
 }
 
+/**
+ * A última medida DE VERDADE.
+ *
+ * `health_logs` tem uma linha por registro, e o app envia só os campos que a
+ * paciente preencheu (`minha-conta.tsx` monta o objeto com o que existe). Ler
+ * `healthLogs[0]` e pegar dali o peso significa que uma paciente que hoje
+ * anotou só a pressão faz o médico ver "Último peso: —" — indistinguível de
+ * "nunca se pesou". Aqui procuramos a linha mais recente em que AQUELA medida
+ * está preenchida, e devolvemos também a data, que é metade da informação.
+ */
+function ultimaMedida<T extends Record<string, any>>(
+  logs: T[] | null | undefined,
+  campo: keyof T,
+): { valor: any; quando: string | null } {
+  for (const l of logs ?? []) {
+    const v = l?.[campo];
+    if (v !== null && v !== undefined && v !== "") {
+      return { valor: v, quando: (l.log_date as string) ?? (l.created_at as string) ?? null };
+    }
+  }
+  return { valor: null, quando: null };
+}
+
+/** "12/03" — data curta para caber ao lado do número. */
+function diaCurto(ymd: string | null): string {
+  if (!ymd) return "";
+  const d = new Date(ymd.length <= 10 ? `${ymd}T00:00:00` : ymd);
+  return isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 function EngagementReportSnippet({ data }: { data: any }) {
   const { healthLogs, journals, kicks, pendingQuestions, latestPreConsulta } = data;
-  const lastLog = healthLogs?.[0];
+  const peso = ultimaMedida(healthLogs, "weight_kg");
   return (
     <div className="grid gap-3 sm:grid-cols-4 text-sm">
-      <InfoBox label="Último peso" value={lastLog?.weight_kg ? `${lastLog.weight_kg} kg` : "—"} />
+      <InfoBox
+        label="Último peso"
+        value={
+          peso.valor
+            ? `${peso.valor} kg${diaCurto(peso.quando) ? ` · ${diaCurto(peso.quando)}` : ""}`
+            : "—"
+        }
+      />
+      {/* A PA é UM par: a sistólica sem a diastólica renderizava o literal
+          "120/null". Se falta metade, a medida não está pronta para ser lida. */}
       <InfoBox
         label="Última PA"
-        value={lastLog?.systolic ? `${lastLog.systolic}/${lastLog.diastolic}` : "—"}
+        value={(() => {
+          const l = (healthLogs ?? []).find(
+            (x: any) => x?.systolic != null && x?.diastolic != null,
+          );
+          if (!l) return "—";
+          const d = diaCurto(l.log_date ?? l.created_at ?? null);
+          const alta = l.systolic >= 140 || l.diastolic >= 90;
+          return `${alta ? "⚠️ " : ""}${l.systolic}/${l.diastolic}${d ? ` · ${d}` : ""}`;
+        })()}
       />
       <InfoBox label="Entradas no diário" value={String(journals?.length ?? 0)} />
       <InfoBox label="Perguntas pendentes" value={String(pendingQuestions?.length ?? 0)} />
@@ -8284,11 +8370,28 @@ function PatientDetailModal({
 
         {/* Dados rápidos */}
         <div className="flex flex-wrap gap-2 px-4 pt-3">
-          {weeks != null && (
+          {weeks != null ? (
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              {weeks} semanas
+              {/* Com os dias: conduta em 36s0d não é conduta em 36s6d, e a tela
+                  dela sempre mostrou os dois. */}
+              {weeks} semanas{p.days != null ? ` e ${p.days}d` : ""}
             </span>
-          )}
+          ) : p.birth_date ? (
+            /* Puérpera: antes o painel dizia "Sem data de gestação" para quem
+               já teve o bebê, enquanto a tela dela contava os dias de vida. */
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              🍼{" "}
+              {(() => {
+                const dias = Math.floor(
+                  (Date.now() - new Date(`${p.birth_date}T00:00:00`).getTime()) / 86400000,
+                );
+                if (dias < 0) return "recém-nascido";
+                if (dias < 14) return `${dias} ${dias === 1 ? "dia" : "dias"} de vida`;
+                const sem = Math.floor(dias / 7);
+                return `${sem} ${sem === 1 ? "semana" : "semanas"} de vida`;
+              })()}
+            </span>
+          ) : null}
           {due && (
             <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
               DPP {due}

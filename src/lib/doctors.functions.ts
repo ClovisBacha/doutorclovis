@@ -544,7 +544,10 @@ export const searchDoctors = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const DIR_BASE =
       "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,plan_expires_at,slug,bio,whatsapp,active,accepting_patients,verified";
-    const buildQuery = (cols: string) => {
+    /* Só o que `doctors` tem desde a criação (20260707200000). É o piso: se nem
+       isto existir, o problema não é migração pendente. */
+    const DIR_MINIMO = "id,display_name,title,specialty,crm,whatsapp,slug,plan,active";
+    const buildQuery = (cols: string, comTexto = true) => {
       let q = (supabaseAdmin as any)
         .from("doctors")
         .select(cols)
@@ -566,9 +569,19 @@ export const searchDoctors = createServerFn({ method: "POST" })
          200 médicos cadastrados, procurar "Marina" podia não achar a Marina —
          ela simplesmente não estava nas 200 linhas que o Postgres devolveu, e
          em ordem nenhuma, porque também não havia `ORDER BY`. */
-      const termo = data.q.trim();
+      const termo = comTexto ? data.q.trim() : "";
       if (termo) {
-        const like = `%${termo.replace(/[%_]/g, "")}%`;
+        /* O valor vai ENTRE ASPAS dentro do `or(...)`.
+        
+           Sem elas, o PostgREST parte o grupo `or=(...)` na primeira vírgula de
+           primeiro nível: buscar "Souza, Maria" ou "Bacha (obstetra)" produzia
+           um filtro inválido → 400 → lista vazia, e a tela culpava os filtros
+           dela. Pior: dava para injetar termos extras no OR e usar a lista como
+           oráculo sobre colunas que nem são selecionadas (`pix_key`,
+           `personal_phone`). Aspas duplas resolvem os dois casos; as barras e
+           aspas internas são escapadas para não fechar a string. */
+        const seguro = termo.replace(/[%_]/g, "").replace(/[\\"]/g, "\\$&");
+        const like = `"%${seguro}%"`;
         q = q.or(
           [
             `display_name.ilike.${like}`,
@@ -590,12 +603,30 @@ export const searchDoctors = createServerFn({ method: "POST" })
 
     let { data: rows, error } = await buildQuery(`${DIR_BASE},${RICH_COLS}`);
     if (error?.code === "42703") {
-      // Perfil rico ainda não migrado: busca com as colunas básicas.
+      /* Degrau intermediário e degrau mínimo.
+      
+         `DIR_BASE` nomeia colunas que a MESMA migração cria (bio, city, state,
+         verified…), então usá-lo como rede de segurança era pedir a mesma coisa
+         duas vezes: os dois selects davam 42703 e a paciente via "nenhum médico
+         encontrado" num diretório cheio. O último degrau só pede o que existe
+         desde a criação da tabela. */
       ({ data: rows, error } = await buildQuery(DIR_BASE));
+      if (error?.code === "42703") {
+        ({ data: rows, error } = await buildQuery(DIR_MINIMO));
+      }
     }
     if (error) return { ok: false as const, error: error.message, doctors: [] };
 
-    const term = data.q.trim().toLowerCase();
+    /* Comparação sem acento nem caixa: "jose" tem de achar "José", "sao paulo"
+       tem de achar "São Paulo". O `ilike` do Postgres dobra a caixa e NÃO dobra
+       o acento, então a passada em JS é o que salva a busca mais provável de
+       todas — o primeiro nome digitado sem acento. */
+    const semAcento = (v: unknown) =>
+      String(v ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "");
+    const term = semAcento(data.q.trim());
     let list = (rows ?? []) as (DirectoryDoctor & { active: boolean })[];
     // Perfis reais só (com nome) e, se houver texto, casa nome/especialidade/cidade.
     list = list.filter((d) => (d.display_name ?? "").trim().length >= 2);
@@ -607,12 +638,45 @@ export const searchDoctors = createServerFn({ method: "POST" })
        é o momento da emergência. Os outros campos que faltam só empurram para
        baixo no ranking; este exclui. */
     list = list.filter((d) => (d.whatsapp ?? "").replace(/\D+/g, "").length >= 10);
-    if (term) {
-      list = list.filter((d) =>
-        `${d.display_name} ${d.specialty} ${d.subspecialty} ${d.city} ${d.bio}`
-          .toLowerCase()
-          .includes(term),
+    const casa = (d: DirectoryDoctor) =>
+      semAcento(`${d.display_name} ${d.specialty} ${d.subspecialty} ${d.city} ${d.bio}`).includes(
+        term,
       );
+    if (term) list = list.filter(casa);
+
+    /* Segunda tentativa: sem o filtro de texto no banco.
+    
+       Resolve DOIS problemas de uma vez.
+    
+       1) Acento. O `ilike` do Postgres dobra a caixa e não dobra o acento, então
+          "jose" nunca traz "José" DO BANCO — nenhum filtro em JS recupera uma
+          linha que não veio. Refazendo a consulta sem o termo, a comparação sem
+          acento acontece sobre um conjunto que contém o médico.
+    
+       2) "O médico dela não está aqui". Era um beco: uma linha cinza e nada
+          mais. Agora, quando o nome não casa com ninguém, a resposta é o
+          diretório inteiro ranqueado (plano mais caro primeiro) com
+          `semCorrespondencia: true`, para a tela poder dizer "não achamos esse
+          nome — estes são os obstetras do app" em vez de "amplie sua busca".
+    
+       O custo é uma consulta a mais, e só quando a primeira não achou nada. */
+    let semCorrespondencia = false;
+    if (term && list.length === 0) {
+      let alt = await buildQuery(`${DIR_BASE},${RICH_COLS}`, false);
+      if (alt.error?.code === "42703") alt = await buildQuery(DIR_BASE, false);
+      if (alt.error?.code === "42703") alt = await buildQuery(DIR_MINIMO, false);
+      if (!alt.error) {
+        const todos = ((alt.data ?? []) as (DirectoryDoctor & { active: boolean })[])
+          .filter((d) => (d.display_name ?? "").trim().length >= 2)
+          .filter((d) => (d.whatsapp ?? "").replace(/\D+/g, "").length >= 10);
+        const porAcento = todos.filter(casa);
+        if (porAcento.length) {
+          list = porAcento;
+        } else {
+          list = todos;
+          semCorrespondencia = true;
+        }
+      }
     }
     // Ranking: plano melhor primeiro, depois mais experiência, depois nome.
     /* Plano VENCIDO não ranqueia como plano pago.
@@ -649,7 +713,7 @@ export const searchDoctors = createServerFn({ method: "POST" })
 
     const comEndereco = await anexarEnderecos(supabaseAdmin, list as any[]);
     const doctors: DirectoryDoctor[] = comEndereco.map((d) => toDirectoryDoctor(d));
-    return { ok: true as const, doctors };
+    return { ok: true as const, doctors, semCorrespondencia };
   });
 
 /**
@@ -963,23 +1027,26 @@ export const chooseDoctor = createServerFn({ method: "POST" })
       return { ok: false as const, error: "indisponivel" };
     }
 
-    // Plano EFETIVO (trial vencido conta como free) para o limite bater com os
-    // demais gates — senão um trial expirado teria pacientes ilimitados.
-    const effectivePlan =
-      doc.plan === "trial" &&
-      doc.plan_expires_at &&
-      new Date(doc.plan_expires_at).getTime() < Date.now()
-        ? "free"
-        : doc.plan;
-
-    // Limite de pacientes do plano (free = 5): não deixa passar do teto.
-    const limit = entitlementsFor(effectivePlan).maxPatients;
+    /* O teto vem do MESMO resolvedor que o painel e o aceite usam.
+    
+       Antes esta função recalculava o plano efetivo na mão, a partir da coluna
+       crua. Isso ignorava duas promoções que só o resolvedor conhece: a conta
+       dona da plataforma e o assento de clínica. O resultado era um médico que
+       via "sem limite" no painel e aceitava pacientes à vontade por um caminho,
+       enquanto toda paciente que o escolhia pela busca pública levava "este
+       médico já atingiu o limite" a partir da quinta. Duas verdades sobre o
+       mesmo médico, e a paciente perdida no caminho mais usado. */
+    const { getEntitlements } = await import("./entitlements.server");
+    const { data: docUser } = await supabaseAdmin.auth.admin.getUserById(data.doctorId);
+    const entDoc = docUser?.user ? await getEntitlements(docUser.user) : entitlementsFor(doc.plan);
+    const limit = entDoc.maxPatients;
     if (limit != null) {
-      const { count } = await (supabaseAdmin as any)
+      const { count, error: cntErr } = await (supabaseAdmin as any)
         .from("patient_profiles")
         .select("id", { count: "exact", head: true })
         .eq("doctor_id", data.doctorId);
-      if ((count ?? 0) >= limit) {
+      // Falha fechada: erro de contagem não vira teto infinito.
+      if (cntErr || (count ?? 0) >= limit) {
         return { ok: false as const, error: "medico_lotado" };
       }
     }

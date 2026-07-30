@@ -67,21 +67,21 @@ function CadastroMedicoPage() {
       } catch {
         /* sem rede/perfil: segue para a etapa de perfil */
       }
-      /* Voltou do Google clicando em "sou médico": marca o papel agora.
+      /* NÃO marcamos o papel aqui. Isto é o conserto de um estrago que eu
+         mesmo criei.
          
-         Só com `?papel=medico` — ou seja, só quando a intenção foi explícita.
-         Marcar por ter ABERTO esta página tiraria o app da gestante de
-         qualquer paciente que entrasse aqui por curiosidade, o que seria um
-         estrago maior que o bug que estamos consertando. */
-      try {
-        const veioComoMedico =
-          new URLSearchParams(window.location.search).get("papel") === "medico";
-        if (veioComoMedico && data.session.user.user_metadata?.role !== "doctor") {
-          await supabase.auth.updateUser({ data: { role: "doctor" } });
-        }
-      } catch {
-        /* a linha em `doctors` cobre o resto; não travar o cadastro */
-      }
+         A versão anterior marcava `role=doctor` só por a URL trazer
+         `?papel=medico`, sem checar se a sessão tinha acabado de nascer do
+         Google. Bastava uma paciente já logada tocar em "Sou médico(a)" na tela
+         de entrada por curiosidade — ou receber esse link de alguém — para
+         perder o app da gestante inteiro (bebê, jogo, diário, loja), sem
+         nenhuma saída dentro do app se ela ainda não tivesse data de gestação.
+         Um clique de curiosidade não pode custar a conta.
+
+         A marca não se perde: para cadastro por e-mail ela é gravada no próprio
+         signUp (é o que faz o gatilho do banco não criar perfil de gestante), e
+         para qualquer caminho ela é gravada quando o `registerDoctor` dá certo —
+         aí sim o papel é fato, não intenção. */
       setExistingSession(data.session.user.email ?? "sua conta atual");
       // Pré-preenche o nome com o do Google, se veio no cadastro social.
       const gName =
@@ -238,6 +238,18 @@ function CadastroMedicoPage() {
             ? `Não foi possível criar seu perfil: ${res.error}`
             : "Não foi possível criar seu perfil. Tente novamente.",
         );
+        /* Sem perfil de médico, a marca de papel não pode ficar: ela bloqueia o
+           app da gestante e a linha em `doctors` — que é o que abre o painel —
+           não existe. O resultado era uma conta sem NENHUM app aberto e sem
+           caminho de volta a não ser sair. Desmarcar devolve a conta ao estado
+           anterior à tentativa. */
+        try {
+          if (s.session.user.user_metadata?.role === "doctor") {
+            await supabase.auth.updateUser({ data: { role: null } });
+          }
+        } catch {
+          /* se nem isso funcionar, a tela de bloqueio agora tem saída */
+        }
         return;
       }
       /* Perfil criado: agora o papel é fato, não intenção. Marcar aqui fecha o

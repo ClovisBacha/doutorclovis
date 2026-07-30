@@ -64,6 +64,11 @@ function EncontrarMedicoPage() {
   const [masters, setMasters] = useState(false);
   const [doctorate, setDoctorate] = useState(false);
   const [results, setResults] = useState<DirectoryDoctor[]>([]);
+  /* Três estados diferentes que antes eram um só ("lista vazia"): não achou o
+     nome mas há médicos, não há resultado nenhum, e a busca falhou. Cada um
+     pede uma frase diferente — e a última pede um botão. */
+  const [semMatch, setSemMatch] = useState(false);
+  const [erro, setErro] = useState<"rede" | "falha" | null>(null);
   const [loading, setLoading] = useState(true);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -120,8 +125,18 @@ function EncontrarMedicoPage() {
         },
       });
       setResults(res.ok ? res.doctors : []);
+      /* `semCorrespondencia` = o nome não casou com ninguém, então a lista é o
+         diretório inteiro. Sem esse sinal a tela mostraria os outros médicos
+         como se fossem o resultado da busca dela. */
+      setSemMatch(res.ok ? !!res.semCorrespondencia : false);
+      setErro(res.ok ? null : "falha");
     } catch {
       setResults([]);
+      setSemMatch(false);
+      /* Falha de rede não é "seus filtros são estreitos". Antes as duas
+         situações davam a mesma frase, e ela ficava mexendo nos filtros para
+         resolver uma queda de conexão. */
+      setErro("rede");
     } finally {
       setLoading(false);
     }
@@ -270,6 +285,20 @@ function EncontrarMedicoPage() {
         <div className="mt-5 space-y-3">
           {loading ? (
             <div className="skeleton h-28 rounded-2xl" />
+          ) : erro ? (
+            <div className="space-y-4 py-6">
+              <p className="text-center text-sm text-muted-foreground">
+                {erro === "rede"
+                  ? "Sem conexão para buscar agora."
+                  : "A busca falhou por um instante."}
+              </p>
+              <button
+                onClick={run}
+                className="mx-auto block rounded-full border border-primary/40 px-4 py-2 text-sm font-semibold text-primary"
+              >
+                Tentar de novo
+              </button>
+            </div>
           ) : results.length === 0 ? (
             <div className="space-y-5 py-6">
               <p className="text-center text-sm text-muted-foreground">
@@ -279,6 +308,30 @@ function EncontrarMedicoPage() {
               {loggedIn && <InviteDoctorCTA variant="hero" />}
             </div>
           ) : (
+            <>
+              {/* Não achou o nome que ela digitou: dizer isso, e então mostrar
+                  quem existe — em vez de "amplie sua busca" e uma tela vazia. */}
+              {semMatch && (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:bg-amber-500/10">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    Não encontramos “{q.trim()}” no app
+                  </p>
+                  <p className="mt-1 text-[13px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+                    Talvez o seu médico ainda não esteja aqui. Estes são os obstetras que já atendem
+                    pelo app — e você também pode convidar o seu.
+                  </p>
+                  {loggedIn && (
+                    <div className="mt-3">
+                      <InviteDoctorCTA />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {!loading &&
+            !erro &&
+            results.length > 0 &&
             results.map((d) => (
               <div key={d.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -402,8 +455,7 @@ function EncontrarMedicoPage() {
                       : "Entrar e escolher"}
                 </button>
               </div>
-            ))
-          )}
+            ))}
         </div>
       </section>
     </div>

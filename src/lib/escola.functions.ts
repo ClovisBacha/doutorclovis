@@ -46,29 +46,14 @@ export const markModuleComplete = createServerFn({ method: "POST" })
     return { ok: !error };
   });
 
-export const savePanicEvent = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) =>
-    z
-      .object({
-        accessToken: z.string().min(10),
-        latitude: z.number().nullable(),
-        longitude: z.number().nullable(),
-        address: z.string().nullable(),
-      })
-      .parse(i),
-  )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
-    if (authErr || !u.user) return { ok: false as const };
-    const { error } = await supabaseAdmin.from("panic_events").insert({
-      user_id: u.user.id,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      address: data.address,
-    });
-    return { ok: !error };
-  });
+/* `savePanicEvent` foi REMOVIDA daqui.
+
+   Ela gravava um `panic_events` e não avisava ninguém — um segundo SOS, com
+   regras próprias, exposto como endpoint HTTP vivo mesmo depois de perder o
+   último chamador. Duas emergências com comportamentos diferentes no mesmo app
+   é o tipo de coisa que só se descobre no dia em que a errada é chamada.
+   O caminho único é `dispararEmergencia` (`emergencia.functions.ts`), que
+   registra o evento E aciona os canais. */
 
 export const getRecentPanicByToken = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ token: z.string() }).parse(i))

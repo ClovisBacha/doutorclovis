@@ -806,16 +806,30 @@ function MinhaContaPage() {
      vínculo (ou sem a tabela `doctors` no banco), fica `null` e as telas usam
      o `doctor.config`, que é o dono da instalação. */
   const [meuMedico, setMeuMedico] = useState<DoctorContato | null>(null);
+  /* Se JÁ SABEMOS a resposta. `null` sem esta flag é ambíguo: pode ser "ela não
+     tem médico" ou "a resposta ainda não chegou". O SOS está clicável desde o
+     primeiro pixel, então tocar nele antes da ida-e-volta — ou com a rede ruim,
+     que é justamente uma emergência — fazia a tela AFIRMAR "você ainda não tem
+     um médico vinculado" e esconder os dois botões de ligar para ele. Uma frase
+     falsa, não uma degradação. */
+  const [medicoResolvido, setMedicoResolvido] = useState(false);
   useEffect(() => {
     let vivo = true;
     (async () => {
       try {
         const { data: s } = await supabase.auth.getSession();
-        if (!s.session) return;
+        if (!s.session) {
+          if (vivo) setMedicoResolvido(true);
+          return;
+        }
         const r = await getMyDoctorContact({ data: { accessToken: s.session.access_token } });
-        if (vivo && r.ok) setMeuMedico(r.doctor);
+        if (vivo && r.ok) {
+          setMeuMedico(r.doctor);
+          setMedicoResolvido(true);
+        }
       } catch {
-        /* fica no padrão */
+        /* não marca como resolvido: melhor "carregando" do que uma afirmação
+           falsa sobre não ter médico */
       }
     })();
     return () => {
@@ -1213,6 +1227,7 @@ function MinhaContaPage() {
             medications: profile?.medications ?? null,
           }}
           medico={meuMedico}
+          medicoResolvido={medicoResolvido}
           onClose={() => setEmergencyOpen(false)}
           onOpenCard={() => {
             setEmergencyOpen(false);
@@ -2556,8 +2571,13 @@ function DoctorPresenceCard({
   // doloroso); fica só o selo de acompanhamento, que é acolhedor.
   const showBpm = bpm != null && at != null && recent && !careMode;
   /* Quem este cartão nomeia. A foto é do dono da instalação, então só aparece
-     quando o médico É ele; para os demais, a inicial do nome. */
-  const nomeMedico = medico?.nome?.trim() || DOCTOR.name;
+     quando o médico É ele; para os demais, a inicial do nome.
+
+     Sem vínculo NÃO cai no fundador: o cartão dizia "Dr. Clóvis Bacha está
+     acompanhando sua gestação" com a foto dele para quem não escolheu médico
+     nenhum. Agora vira um convite para escolher. */
+  const nomeMedico = medico?.nome?.trim() ?? "";
+  const semMedico = !nomeMedico;
   const ehODono = nomeMedico === DOCTOR.name;
 
   return (
@@ -5924,15 +5944,20 @@ function CardTab({
   /** Médico da paciente; `null` = usa o dono da instalação. */
   medico?: DoctorContato | null;
 }) {
-  /* Sem vínculo, vale o dono da instalação (é quem de fato atende). COM
-     vínculo, valem SÓ os dados dele: um CRM em branco não vira o CRM do
-     fundador impresso na carteirinha que ela mostra no hospital. */
+  /* Tudo-ou-nada, e sem fundador.
+  
+     Esta carteirinha é o documento que ela mostra no pronto-socorro. Enquanto
+     "sem médico vinculado" caía em `DOCTOR.name` / `DOCTOR.crm`, o cartão
+     impresso, o QR e o texto de copiar afirmavam "Dr. Clóvis Bacha · CRM-MG
+     22.333" para a paciente de qualquer outro médico — uma identidade médica
+     falsa num documento clínico. Sem vínculo, a linha do médico simplesmente
+     não existe. */
   const temMedicoVinculado = !!medico?.nome?.trim();
-  const medNome = temMedicoVinculado ? medico!.nome.trim() : DOCTOR.name;
-  const medCrm = temMedicoVinculado ? (medico!.crm ?? "").trim() : DOCTOR.crm;
-  const medEspec = temMedicoVinculado
-    ? (medico!.specialty ?? medico!.title ?? "").trim()
-    : DOCTOR.specialty;
+  const medNome = temMedicoVinculado ? medico!.nome.trim() : "";
+  const medCrm = temMedicoVinculado ? (medico!.crm ?? "").trim() : "";
+  const medEspec = temMedicoVinculado ? (medico!.specialty ?? medico!.title ?? "").trim() : "";
+  /** Linha "Médico" pronta, ou vazia quando não há vínculo. */
+  const medLinha = [medNome, medCrm].filter(Boolean).join(" · ");
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
@@ -5952,9 +5977,13 @@ function CardTab({
         `Alergias: ${profile.allergies ?? "Nenhuma"}`,
         `Medicamentos: ${profile.medications ?? "Nenhum"}`,
         `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
-        `Médico: ${medNome} | ${medCrm}`,
+        // Sem vínculo a linha sai fora do QR: melhor o hospital não ver
+        // médico nenhum do que ver o nome errado.
+        medLinha ? `Médico: ${medLinha}` : null,
         `Atualizado: ${updatedAt}`,
-      ].join("\n")
+      ]
+        .filter(Boolean)
+        .join("\n")
     : "";
 
   // QR gerado localmente: dados de saúde não saem do aparelho e funciona offline
@@ -6015,7 +6044,7 @@ function CardTab({
           {profile.emergency_phone && (
             <Info label="Tel. emergência" value={profile.emergency_phone} />
           )}
-          <Info label="Médico" value={`${medNome} · ${medCrm}`} />
+          {medLinha ? <Info label="Médico" value={medLinha} /> : null}
         </div>
 
         <div className="mt-5 rounded-xl bg-card/60 p-3 text-xs text-muted-foreground">
@@ -6035,9 +6064,15 @@ function CardTab({
           <p className="mt-2 text-xs text-muted-foreground text-center">
             Escaneie para ver todos os dados em caso de emergência
           </p>
-          <p className="mt-2 text-xs font-medium text-primary">
-            {medNome} — {medEspec}
-          </p>
+          {medNome ? (
+            <p className="mt-2 text-xs font-medium text-primary">
+              {[medNome, medEspec].filter(Boolean).join(" — ")}
+            </p>
+          ) : (
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              Escolha seu obstetra no app para o nome e o CRM dele entrarem aqui.
+            </p>
+          )}
         </div>
       </div>
 

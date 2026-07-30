@@ -66,10 +66,33 @@ CREATE POLICY "doctor manages own addresses" ON public.doctor_addresses
 
 -- Qualquer pessoa logada LÊ os endereços de médicos ativos: a paciente precisa
 -- ver onde o médico atende antes de escolher, e depois para ir à consulta.
+--
+-- O `EXISTS (SELECT ... FROM doctors)` direto NÃO funciona aqui, e isso não é
+-- óbvio: a subconsulta roda com os direitos de quem pergunta, e `doctors` tem
+-- RLS que só deixa cada um ver a PRÓPRIA linha. Resultado: para a paciente o
+-- EXISTS era sempre falso e ela via ZERO endereços — a política existia e não
+-- concedia nada. (Testado num Postgres 16 de verdade: `SET ROLE authenticated`
+-- + uid da médica A devolvia 1 endereço, o dela, em vez dos dois ativos.)
+--
+-- A função abaixo é SECURITY DEFINER só para responder "esse médico está
+-- ativo?" — nada mais sai dela, então não vaza dado de médico nenhum.
+CREATE OR REPLACE FUNCTION public.doctor_is_active(p_doctor uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $fn$
+  SELECT EXISTS (SELECT 1 FROM public.doctors d WHERE d.id = p_doctor AND d.active);
+$fn$;
+
+REVOKE ALL     ON FUNCTION public.doctor_is_active(uuid) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.doctor_is_active(uuid) TO authenticated, service_role;
+
 DROP POLICY IF EXISTS "authenticated reads active doctor addresses" ON public.doctor_addresses;
 CREATE POLICY "authenticated reads active doctor addresses" ON public.doctor_addresses
   FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.doctors d WHERE d.id = doctor_id AND d.active));
+  USING (public.doctor_is_active(doctor_id));
 
 GRANT ALL    ON public.doctor_addresses TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.doctor_addresses TO authenticated;
