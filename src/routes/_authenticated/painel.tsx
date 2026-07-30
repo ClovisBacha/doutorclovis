@@ -300,6 +300,12 @@ function PainelPage() {
    */
   /* Triagens de alerta das pacientes dele. A avaliação já era calculada e
      gravada; faltava alguém do lado do médico ler. */
+  /* Eventos clínicos fora de faixa — de TODAS as pacientes dele, das onze
+     fontes. É o que transforma a fila de "coisas administrativas" em "coisas
+     clínicas". */
+  const [eventosClinicos, setEventosClinicos] = useState<EventoClinico[]>([]);
+  const [nomesPacientes, setNomesPacientes] = useState<Record<string, string>>({});
+
   const [triagens, setTriagens] = useState<
     {
       id: string;
@@ -323,6 +329,7 @@ function PainelPage() {
     consultasEPerguntas: false,
     preConsultas: false,
     triagens: false,
+    eventos: false,
   });
 
   /* Vigia de SOS. Roda em paralelo ao resto e nunca derruba o painel: um erro
@@ -378,6 +385,7 @@ function PainelPage() {
       load(true).catch(() => {});
       loadPreForms().catch(() => {});
       loadTriagens().catch(() => {});
+      loadEventosClinicos().catch(() => {});
     };
     const t = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
@@ -572,6 +580,21 @@ function PainelPage() {
     if (res.ok) setEngagement(res);
   }
 
+  async function loadEventosClinicos() {
+    try {
+      const tk = await token();
+      const { eventosQuePedemOlhar } = await import("@/lib/clinical.functions");
+      const r = await eventosQuePedemOlhar({ data: { accessToken: tk, dias: 14 } });
+      if (r.ok) {
+        setEventosClinicos(r.eventos);
+        setNomesPacientes(r.nomes);
+        setFonteFalhou((f) => ({ ...f, eventos: r.incompleto }));
+      } else setFonteFalhou((f) => ({ ...f, eventos: true }));
+    } catch {
+      setFonteFalhou((f) => ({ ...f, eventos: true }));
+    }
+  }
+
   async function loadTriagens() {
     try {
       const tk = await token();
@@ -630,6 +653,7 @@ function PainelPage() {
        mesmo bug que a fila existe para consertar, um nível abaixo. */
     loadPreForms().catch(() => {});
     loadTriagens().catch(() => {});
+    loadEventosClinicos().catch(() => {});
   }, []);
 
   // Retorno do checkout do Stripe (assinatura do médico): o webhook ativa o
@@ -758,6 +782,21 @@ function PainelPage() {
       acao: "Abrir",
       onAcao: () => setSosAberto(a),
     })),
+    /* MEDIDA FORA DE FAIXA. Antes, uma pressão de 180/120 registrada no diário
+       esperava o médico abrir a ficha dela por iniciativa própria — só a
+       pré-consulta promovia item. Grave entra como emergência. */
+    ...eventosClinicos.map((e) => {
+      const quem = nomesPacientes[e.user_id] || "Uma paciente";
+      return {
+        id: `ev-${e.fonte}-${e.fonte_id}`,
+        nivel: e.gravidade === "grave" ? ("emergencia" as const) : ("espera" as const),
+        titulo: `${quem} — ${e.notas[0] ?? "registro fora de faixa"}`,
+        detalhe: [e.notas.slice(1).join(" · "), e.texto].filter(Boolean).join(" · ") || "Ver ficha",
+        em: e.ocorrido_em,
+        acao: "Ver ficha",
+        onAcao: () => setTab("Pacientes 👩‍🍼"),
+      };
+    }),
     /* TRIAGEM DE ALERTA — logo abaixo do SOS, e acima de tudo o mais.
 
        É a paciente descrevendo sintomas e o app respondendo "procure
@@ -937,6 +976,7 @@ function PainelPage() {
           ...(fonteFalhou.consultasEPerguntas ? ["consultas e perguntas"] : []),
           ...(fonteFalhou.preConsultas ? ["pré-consultas"] : []),
           ...(fonteFalhou.triagens ? ["alertas de sintomas"] : []),
+          ...(fonteFalhou.eventos ? ["registros clínicos"] : []),
         ]}
       />
 

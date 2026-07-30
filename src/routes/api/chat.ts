@@ -167,6 +167,88 @@ function buildClinicalBlock(
 }
 
 /**
+ * Bloco de MEDIDAS RECENTES.
+ *
+ * A IA sabia o histórico obstétrico de risco, a semana e o humor — e não sabia
+ * nenhum número medido NESTA gestação. O efeito é específico e perverso: a
+ * paciente com pré-eclâmpsia prévia escreve "estou com muita dor de cabeça", a
+ * IA calibra certo pelo histórico e ignora que ela registrou 158/102 duas horas
+ * antes. Responde bem pelo motivo certo e não vê o dado que decidiria a
+ * conduta.
+ *
+ * E como a IA responde 24 horas por dia e o médico não, era ela que estava na
+ * linha de frente do alto risco, cega.
+ *
+ * Três decisões que valem mais que o código:
+ *
+ * 1. **Só o que está fora de faixa, e só 14 dias.** Despejar a série inteira
+ *    faria o modelo recitar números de volta. O que muda a resposta é "há algo
+ *    alterado agora"; o resto é ruído que compete com a pergunta dela.
+ * 2. **A régua é a mesma** de `sinais-clinicos.ts`. Se a IA achasse que 145/92
+ *    é normal enquanto a tela dela diz "pressão elevada", a paciente receberia
+ *    duas verdades do mesmo produto.
+ * 3. **Isto é contexto, não autorização.** O portão de cobertura do cérebro do
+ *    médico continua mandando na conduta: saber a pressão não faz a IA
+ *    prescrever nada.
+ */
+async function buildMedidasBlock(patientId: string): Promise<string> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { sinalGlicemia, sinalPressao } = await import("@/lib/sinais-clinicos");
+    const desde = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+    const { data, error } = await (supabaseAdmin as any)
+      .from("health_logs")
+      .select("log_date,systolic,diastolic,glucose_mg_dl,weight_kg")
+      .eq("user_id", patientId)
+      .gte("log_date", desde)
+      .order("log_date", { ascending: false })
+      .limit(30);
+    if (error || !data?.length) return "";
+
+    const linhas: string[] = [];
+    let ultimaPA: string | null = null;
+    let ultimaGli: string | null = null;
+    for (const l of data as Record<string, number | string | null>[]) {
+      const dia = new Date(`${l.log_date}T12:00:00`).toLocaleDateString("pt-BR");
+      const pa = sinalPressao(l.systolic as number, l.diastolic as number);
+      if (pa && ultimaPA === null) {
+        ultimaPA = `- Última pressão registrada por ela: ${l.systolic}/${l.diastolic} em ${dia}${
+          pa.gravidade !== "normal" ? ` — ${pa.nota}` : " (dentro da faixa de referência)"
+        }`;
+      }
+      const gl = sinalGlicemia(l.glucose_mg_dl as number);
+      if (gl && ultimaGli === null) {
+        ultimaGli = `- Última glicemia registrada por ela: ${l.glucose_mg_dl} mg/dL em ${dia}${
+          gl.gravidade !== "normal" ? ` — ${gl.nota}` : " (dentro do alvo)"
+        }`;
+      }
+      /* Alterados dos últimos 14 dias, no máximo três: uma lista longa vira
+         recitação, e três já mostram que não é medida isolada. */
+      if (linhas.length < 3) {
+        if (pa && pa.gravidade !== "normal") {
+          linhas.push(`- ${dia}: pressão ${l.systolic}/${l.diastolic} — ${pa.nota}`);
+        } else if (gl && gl.gravidade !== "normal") {
+          linhas.push(`- ${dia}: glicemia ${l.glucose_mg_dl} mg/dL — ${gl.nota}`);
+        }
+      }
+    }
+
+    const corpo = [ultimaPA, ultimaGli].filter(Boolean) as string[];
+    if (linhas.length) {
+      corpo.push("- Registros alterados nos últimos 14 dias:", ...linhas);
+    }
+    if (!corpo.length) return "";
+    return [
+      "## Medidas que ELA MESMA registrou no app (fonte: sistema — confiável)",
+      ...corpo,
+      "São medidas caseiras e auto-relatadas, não aferidas em consultório: trate como contexto, nunca como diagnóstico. Se houver valor alterado e a queixa dela tiver relação, reforce os sinais de alerta e o contato precoce com o médico. NÃO recite estes números de volta sem que ela pergunte.",
+    ].join("\n");
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Bloco de CICLO + BEM-ESTAR da paciente para o system prompt. Lê os dados
  * DELA no banco (menstrual_cycles + humor recente do diário) — fonte confiável,
  * nunca do texto do cliente. Só o `mood` (rótulo curto) do diário entra, NUNCA
@@ -304,7 +386,7 @@ export const Route = createFileRoute("/api/chat")({
           // getBrainContext/getChatMemory são safe (falha vira bloco vazio).
           const userText = lastUserText(messages);
           const { getChatMemory, memoryBlock } = await import("@/lib/chat-memory.server");
-          const [brain, memorySummary, cicloBemEstar] = await Promise.all([
+          const [brain, memorySummary, cicloBemEstar, medidas] = await Promise.all([
             // Fonte resolvida: local por padrão; DoctorThink remoto se ligado
             // (env + flag doctorthink_remote). Fallback local em qualquer falha.
             getBrainContextResolved(userText, patient.doctorId, "app"),
@@ -312,6 +394,7 @@ export const Route = createFileRoute("/api/chat")({
             // Ciclo + humor DELA (fonte confiável): a IA conversa com sensibilidade
             // à fase do ciclo e a como ela vem se sentindo.
             buildCycleMoodBlock(patient.patientId),
+            buildMedidasBlock(patient.patientId),
           ]);
           const memoria = memoryBlock(memorySummary);
           const base = medicalSystemPrompt(patient.doctorName);
@@ -335,6 +418,11 @@ export const Route = createFileRoute("/api/chat")({
           system = [
             base,
             patient.clinicalBlock,
+            /* As MEDIDAS logo depois do histórico e ANTES do humor: é a ordem
+               em que elas se qualificam. "Pré-eclâmpsia anterior" muda o peso
+               de "pressão 158/102 ontem", e as duas juntas mudam o peso de
+               "estou com dor de cabeça". */
+            medidas,
             cicloBemEstar,
             memoria,
             brain.enabledApp && brain.block ? brain.block : "",
