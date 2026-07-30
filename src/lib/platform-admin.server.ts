@@ -54,21 +54,16 @@ export async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   }
 }
 
-// Preços mensais de lista por plano do médico (jul/2026). Clínica = sob consulta.
-export const PLAN_PRICE: Record<string, number> = {
-  trial: 0,
-  free: 0,
-  starter: 149,
-  pro: 297,
-  clinica: 0,
-  elite: 597,
-  black: 1499,
-};
+/* A TABELA DE PREÇOS mudou de casa: agora vive em `lib/entitlements`, que o
+   navegador também importa. O painel precisa dela para comparar o valor gerado
+   com a mensalidade, e manter uma cópia aqui garantiria que um dia as duas
+   discordassem — com a tela mentindo sobre a própria cobrança. */
+export { PLAN_PRICE } from "./entitlements";
+import { mensalidadeCentavos } from "./entitlements";
 
 /** Preço mensal do plano do médico em centavos (anual normalizado ao mensal). */
 export function doctorPlanMonthlyCents(plan: string): number {
-  const base = plan.replace(/_annual$/, "");
-  return (PLAN_PRICE[base] ?? 0) * 100;
+  return mensalidadeCentavos(plan);
 }
 
 /** Premium da paciente: R$19,90/mês; anual equivale a ~R$9,90/mês. */

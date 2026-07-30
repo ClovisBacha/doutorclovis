@@ -54,6 +54,7 @@ import {
   type MoedaChave,
 } from "@/lib/dinheiro";
 import { pendenciasDoMedico, type Pendencia } from "@/lib/doctor-required";
+import { mensalidadeCentavos } from "@/lib/entitlements";
 import {
   listMyAddresses,
   saveMyAddress,
@@ -738,7 +739,9 @@ function PainelPage() {
       )}
 
       <div className="mt-8">
-        {tab === "Painel 📊" && <DashboardSection tokenFn={token} onNavigate={setTab} />}
+        {tab === "Painel 📊" && (
+          <DashboardSection tokenFn={token} onNavigate={setTab} medico={euMedico} />
+        )}
         {tab === "Calendário" && (
           <CalendárioSection appointments={appointments} onNavigate={setTab} />
         )}
@@ -884,9 +887,12 @@ const STAGE_META: {
 function DashboardSection({
   tokenFn,
   onNavigate,
+  medico,
 }: {
   tokenFn: () => Promise<string>;
   onNavigate: (tab: PanelTab) => void;
+  /** Perfil dele — só para a prova de valor saber o preço da consulta e o plano. */
+  medico?: DoctorProfile | null;
 }) {
   const [data, setData] = useState<DoctorDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -930,7 +936,7 @@ function DashboardSection({
       </div>
     );
 
-  return <DashboardView data={data} onNavigate={onNavigate} onRefresh={load} />;
+  return <DashboardView data={data} onNavigate={onNavigate} onRefresh={load} medico={medico} />;
 }
 
 /**
@@ -943,11 +949,19 @@ function ValorGeradoBanner({
   answered,
   activePatients,
   onNavigate,
+  precoConsultaCentavos,
+  moedaDoMedico,
+  mensalidadeCentavos,
 }: {
   aiHits: number;
   answered: number;
   activePatients: number;
   onNavigate: (tab: PanelTab) => void;
+  /** O que ELE cobra por consulta — o tempo dele vale o que ele cobra. */
+  precoConsultaCentavos?: number | null;
+  moedaDoMedico?: string | null;
+  /** O que ele paga por mês. Sem isso não há comparação honesta a fazer. */
+  mensalidadeCentavos: number;
 }) {
   const assists = aiHits + answered;
 
@@ -986,9 +1000,48 @@ function ValorGeradoBanner({
         <ValueTile big={savedTimeLabel(assists)} label="do seu tempo economizado (estimativa)" />
         <ValueTile big={activePatients} label="pacientes ativas nos últimos 7 dias" />
       </div>
-      <p className="mt-3 text-[11px] text-muted-foreground">
-        Estimativa: cada atendimento da IA equivale a ~3 min seus. É por isso que o plano se paga.
-      </p>
+      {/* A conta fechada, em dinheiro.
+
+          "Você economizou 3 horas" é bonito e some da cabeça na hora de
+          renovar. "Isso é mais que o valor do plano" é o argumento que fica —
+          e só funciona se for verdade, então a frase só aparece quando o tempo
+          economizado, valorizado pela própria consulta DELE, passa do que ele
+          paga. Sem preço de consulta cadastrado, mostramos só as horas. */}
+      {(() => {
+        const minutos = assists * 3;
+        const horas = minutos / 60;
+        /* A mensalidade da tabela é em REAIS. Se ele cobra a consulta em dólar
+           ou euro, comparar os dois números é comparar grandezas diferentes —
+           e a frase sairia dizendo uma coisa falsa com ar de conta fechada.
+           Sem câmbio confiável, o certo é não afirmar nada. */
+        const mesmaMoeda = (moedaDoMedico || "BRL") === "BRL";
+        if (
+          mesmaMoeda &&
+          precoConsultaCentavos &&
+          precoConsultaCentavos > 0 &&
+          mensalidadeCentavos > 0
+        ) {
+          /* Uma consulta ocupa cerca de 40 min do dia dele — é a conversão mais
+             conservadora que dá para fazer e continua sendo a certa: o tempo
+             dele vale o que ele cobra por ele. */
+          const equivalente = (horas * 60) / 40;
+          const valorCentavos = Math.round(equivalente * precoConsultaCentavos);
+          if (valorCentavos > mensalidadeCentavos) {
+            return (
+              <p className="mt-3 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
+                Esse tempo equivale a cerca de{" "}
+                <strong>{formatarDinheiro(valorCentavos, moedaDoMedico)}</strong> em consultas suas
+                — mais que a mensalidade do seu plano.
+              </p>
+            );
+          }
+        }
+        return (
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            Estimativa: cada atendimento da IA equivale a ~3 min seus.
+          </p>
+        );
+      })()}
     </div>
   );
 }
@@ -1007,10 +1060,12 @@ export function DashboardView({
   data,
   onNavigate,
   onRefresh,
+  medico,
 }: {
   data: DoctorDashboard;
   onNavigate: (tab: PanelTab) => void;
   onRefresh?: () => void;
+  medico?: DoctorProfile | null;
 }) {
   const { patients, questions, brain, appointments, engagement } = data;
   const stageTotal = STAGE_META.reduce((s, m) => s + patients.stages[m.key], 0);
@@ -1050,6 +1105,11 @@ export function DashboardView({
         answered={questions.answered}
         activePatients={patients.active7d}
         onNavigate={onNavigate}
+        precoConsultaCentavos={
+          medico?.consultation_price_cents ?? (medico?.consultation_price_brl ?? 0) * 100
+        }
+        moedaDoMedico={medico?.consultation_currency}
+        mensalidadeCentavos={mensalidadeCentavos(medico?.plan ?? "")}
       />
 
       {/* 2. Cards de destaque */}

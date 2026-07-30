@@ -156,6 +156,32 @@ export const OWNER_ENTITLEMENTS: Entitlements = {
 };
 
 /** Ordem de prioridade dos planos (maior = melhor) — usado no ranking da busca. */
+/**
+ * Preço mensal de lista de cada plano do médico, em reais (jul/2026).
+ *
+ * Mora aqui, e não no módulo de servidor onde nasceu, porque o PAINEL precisa
+ * dele: a prova de valor compara o tempo economizado com o que ele paga, e essa
+ * comparação acontece na tela. Preço em dois arquivos é a divergência clássica —
+ * um sobe, o outro fica, e a tela passa a mentir sobre a própria cobrança.
+ *
+ * Clínica é "sob consulta": zero aqui significa "não dá para comparar", e as
+ * telas tratam zero como "não mostrar", nunca como "de graça".
+ */
+export const PLAN_PRICE: Record<string, number> = {
+  trial: 0,
+  free: 0,
+  starter: 149,
+  pro: 297,
+  clinica: 0,
+  elite: 597,
+  black: 1499,
+};
+
+/** Mensalidade do plano em CENTAVOS. O sufixo `_annual` cai para o mensal. */
+export function mensalidadeCentavos(plan: string): number {
+  return (PLAN_PRICE[plan.replace(/_annual$/, "")] ?? 0) * 100;
+}
+
 export const PLAN_RANK: Record<PlanKey, number> = {
   free: 0,
   trial: 1,
