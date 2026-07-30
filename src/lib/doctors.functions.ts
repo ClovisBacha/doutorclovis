@@ -495,7 +495,7 @@ export const searchDoctors = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const DIR_BASE =
-      "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,slug,bio,whatsapp,active,accepting_patients,verified";
+      "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,plan_expires_at,slug,bio,whatsapp,active,accepting_patients,verified";
     const buildQuery = (cols: string) => {
       let q = (supabaseAdmin as any)
         .from("doctors")
@@ -511,12 +511,33 @@ export const searchDoctors = createServerFn({ method: "POST" })
         .eq("active", true)
         .eq("accepting_patients", true)
         .not("display_name", "is", null);
+      /* O texto passa a filtrar NO BANCO.
+         
+         Antes o `limit(200)` cortava a lista antes de qualquer busca por nome,
+         e a filtragem acontecia em JavaScript sobre esse pedaço. Com mais de
+         200 médicos cadastrados, procurar "Marina" podia não achar a Marina —
+         ela simplesmente não estava nas 200 linhas que o Postgres devolveu, e
+         em ordem nenhuma, porque também não havia `ORDER BY`. */
+      const termo = data.q.trim();
+      if (termo) {
+        const like = `%${termo.replace(/[%_]/g, "")}%`;
+        q = q.or(
+          [
+            `display_name.ilike.${like}`,
+            `specialty.ilike.${like}`,
+            `subspecialty.ilike.${like}`,
+            `city.ilike.${like}`,
+          ].join(","),
+        );
+      }
       if (data.state) q = q.ilike("state", data.state);
       if (data.city) q = q.ilike("city", `%${data.city}%`);
       if (data.hasMasters) q = q.eq("has_masters", true);
       if (data.hasDoctorate) q = q.eq("has_doctorate", true);
       if (data.minExperience > 0) q = q.gte("years_experience", data.minExperience);
-      return q.limit(200);
+      /* Ordem estável no SQL para o recorte ser sempre o mesmo conjunto; o
+         ranking por plano continua no JS, sobre a lista já filtrada. */
+      return q.order("display_name", { ascending: true }).limit(200);
     };
 
     let { data: rows, error } = await buildQuery(`${DIR_BASE},${RICH_COLS}`);
@@ -538,8 +559,19 @@ export const searchDoctors = createServerFn({ method: "POST" })
       );
     }
     // Ranking: plano melhor primeiro, depois mais experiência, depois nome.
+    /* Plano VENCIDO não ranqueia como plano pago.
+       
+       `entitlements.server` derruba o trial vencido, mas a lista usava a coluna
+       crua: um Elite cujo cartão falhou continuava no topo de toda busca
+       indefinidamente, na frente de quem está pagando. Aqui a data manda. */
+    const planoValido = (d: { plan: string; plan_expires_at?: string | null }) => {
+      const venc = d.plan_expires_at ? new Date(d.plan_expires_at).getTime() : null;
+      if (venc != null && venc < Date.now()) return "free";
+      return d.plan;
+    };
     list.sort((a, b) => {
-      const pr = PLAN_RANK[normalizePlan(b.plan)] - PLAN_RANK[normalizePlan(a.plan)];
+      const pr =
+        PLAN_RANK[normalizePlan(planoValido(b))] - PLAN_RANK[normalizePlan(planoValido(a))];
       if (pr !== 0) return pr;
       /* O selo desempata DENTRO da faixa de plano. Ele deixou de ser filtro
          (um médico novo era invisível) e virou posição: quem foi conferido
@@ -836,5 +868,47 @@ export const chooseDoctor = createServerFn({ method: "POST" })
     if (!updated || updated.length === 0) {
       return { ok: false as const, error: "vinculo_falhou" };
     }
+
+    /* AVISA O MÉDICO.
+       
+       Este é o caminho mais usado — a página pública de busca — e era o único
+       que não avisava ninguém: ele ganhava uma paciente e só descobria abrindo
+       o painel por conta própria. Aguardado, e não disparado e esquecido: em
+       função serverless o que roda depois da resposta pode não rodar. */
+    try {
+      const { data: prof } = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const nome = ((prof?.display_name as string) || "Uma gestante").trim();
+      try {
+        const { sendPushToUser } = await import("./push.server");
+        await sendPushToUser(data.doctorId, {
+          title: "Você tem uma nova paciente",
+          body: `${nome} escolheu você como obstetra no app.`,
+          url: "/painel",
+        });
+      } catch {
+        /* push é opcional */
+      }
+      const { data: dUser } = await supabaseAdmin.auth.admin.getUserById(data.doctorId);
+      if (dUser?.user?.email) {
+        const { sendEmail, emailLayout } = await import("./email.server");
+        const seguro = nome.replace(/[&<>"]/g, "");
+        await sendEmail({
+          to: dUser.user.email,
+          subject: `👩‍🍼 Nova paciente: ${nome}`,
+          html: emailLayout(
+            "Você tem uma nova paciente",
+            `<p style="margin:0 0 10px"><strong>${seguro}</strong> escolheu você como obstetra no app Obstétrica.</p>
+             <p style="margin:0">Ela já aparece na aba <strong>Pacientes</strong> do seu painel.</p>`,
+          ),
+        });
+      }
+    } catch {
+      /* melhor esforço — o vínculo já está gravado */
+    }
+
     return { ok: true as const };
   });

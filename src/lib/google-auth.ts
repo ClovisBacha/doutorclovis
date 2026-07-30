@@ -15,7 +15,18 @@ import { supabase } from "@/integrations/supabase/client";
 export async function signInWithGoogle(role: "paciente" | "medico"): Promise<Error | null> {
   if (typeof window === "undefined") return null;
   const origin = window.location.origin;
-  const redirectTo = role === "medico" ? `${origin}/medicos/cadastro` : `${origin}/minha-conta`;
+  /* `?papel=medico` na volta do Google.
+     
+     O OAuth não deixa gravar `user_metadata` no momento do cadastro, e é esse
+     metadata que separa a conta de médico da de gestante. Sem nenhuma pista,
+     quem entrasse por aqui viraria uma gestante aos olhos do app — o mesmo bug
+     do cadastro por e-mail, por outra porta.
+     
+     O parâmetro é a pista, e ela é explícita: só existe quando a pessoa clicou
+     em "sou médico". Marcar o papel só porque alguém ABRIU /medicos/cadastro
+     seria pior — tiraria o app da gestante de qualquer paciente curiosa. */
+  const redirectTo =
+    role === "medico" ? `${origin}/medicos/cadastro?papel=medico` : `${origin}/minha-conta`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo },

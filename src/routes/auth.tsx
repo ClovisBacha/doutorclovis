@@ -65,7 +65,14 @@ function AuthPage() {
       // as demais, para o app da paciente.
       try {
         const me = await getMyDoctor({ data: { accessToken: data.session.access_token } });
-        if (me.ok && me.doctor?.active) {
+        /* Basta TER perfil de médico — ativo ou não.
+           
+           Com `?.active` aqui, um médico com a conta inativa era mandado para o
+           app da gestante, batia no bloqueio "esta área é da gestante", clicava
+           em "ir para o meu painel" e recebia "área restrita": um ciclo fechado
+           sem nenhuma tela utilizável. Agora ele chega ao painel, que mostra o
+           perfil e a assinatura — que é justamente o que ele precisa mexer. */
+        if (me.ok && me.doctor) {
           navigate({ to: "/painel" });
           return;
         }

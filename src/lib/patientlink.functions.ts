@@ -16,6 +16,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+/** Escapa texto da paciente que vai dentro de HTML de e-mail. */
+function escaparHtml(v: string): string {
+  return v.replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
+  );
+}
+
 async function requireUser(accessToken: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.auth.getUser(accessToken);
@@ -77,23 +85,15 @@ export type LinkedPatient = {
 const TokenSchema = z.object({ accessToken: z.string().min(10) });
 
 /** Busca médicos ativos que aceitam pacientes (nome/especialidade). */
-export const searchDoctors = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), query: z.string().max(80) }).parse(i),
-  )
-  .handler(async ({ data }) => {
-    const user = await requireUser(data.accessToken);
-    if (!user) return { ok: false as const, doctors: [] as DoctorPublic[] };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const query = data.query.replace(/[%,()]/g, " ").trim();
-    const { data: rows, error } = await (supabaseAdmin as any).rpc("search_doctors", {
-      p_query: query,
-    });
-    if (error) return { ok: false as const, doctors: [] as DoctorPublic[] };
-    return { ok: true as const, doctors: (rows ?? []) as DoctorPublic[] };
-  });
+/* A busca por RPC (`search_doctors`) foi removida daqui.
+   
+   Ela filtrava `d.verified = true` no SQL — ou seja, escondia todo médico
+   recém-cadastrado — e ordenava por nome, ignorando o plano. Nenhuma tela a
+   usava mais (o app passou a chamar o diretório de `doctors.functions.ts`),
+   mas `createServerFn` publica um endereço HTTP de qualquer jeito: deixá-la
+   exportada mantinha viva uma segunda busca com regras diferentes da que
+   valem. Uma pergunta, uma resposta. */
 
-/** A paciente envia (ou reaproveita) uma solicitação de vínculo a um médico. */
 export const requestDoctor = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -143,6 +143,29 @@ export const requestDoctor = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) return { ok: true as const, status: "pending" as const };
 
+    /* O teto do plano dele é checado AQUI, não só na hora do aceite.
+       
+       Antes, uma paciente pedia, o médico tentava aceitar, batia no limite — e
+       o pedido ficava `pending` para sempre. Ela via "aguardando aceitar" sem
+       fim e sem explicação, e nem podia buscar outro médico (a tela esconde a
+       busca enquanto há pendência). Recusar na hora, com motivo, deixa ela
+       procurar outro obstetra em vez de esperar por nada. */
+    try {
+      const { getEntitlementsByDoctorId } = await import("./entitlements.server");
+      const ent = await getEntitlementsByDoctorId(data.doctorId);
+      if (ent.maxPatients != null) {
+        const { count, error: cntErr } = await (supabaseAdmin as any)
+          .from("patient_profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("doctor_id", data.doctorId);
+        if (!cntErr && (count ?? 0) >= ent.maxPatients) {
+          return { ok: false as const, reason: "lotado" as const };
+        }
+      }
+    } catch {
+      /* não bloqueia por falha na contagem: o aceite ainda checa */
+    }
+
     const { error } = await (supabaseAdmin as any).from("patient_link_requests").insert({
       patient_id: user.id,
       doctor_id: data.doctorId,
@@ -157,7 +180,17 @@ export const requestDoctor = createServerFn({ method: "POST" })
        aceitar" para sempre, sem que o médico soubesse que havia alguém
        esperando. Melhor esforço nos dois canais — falhar aqui não desfaz o
        pedido, que já está gravado. */
-    void (async () => {
+    /* AGUARDADO, não disparado e esquecido.
+       
+       Isto roda em função serverless (Vercel): quando a resposta é enviada, a
+       execução pode ser congelada e recuperada na hora seguinte. Um
+       `void (async () => …)()` depois do `return` é um envio que às vezes
+       acontece e às vezes não — e "às vezes" aqui significa um pedido de
+       paciente que ninguém fica sabendo, o exato buraco que este trecho existe
+       para fechar. Os poucos milissegundos a mais na resposta valem a certeza.
+       O `try` interno garante que uma falha de push ou de e-mail não desfaz o
+       pedido, que já está gravado. */
+    await (async () => {
       try {
         const { data: prof } = await (supabaseAdmin as any)
           .from("patient_profiles")
@@ -184,10 +217,12 @@ export const requestDoctor = createServerFn({ method: "POST" })
           await sendEmail({
             to: email,
             subject: `👩‍🍼 ${nome} quer te acompanhar no app`,
+            /* Escapado: o nome e a mensagem são texto que a paciente digitou, e
+               vão para dentro de um HTML que outra pessoa abre. */
             html: emailLayout(
               "Nova solicitação de paciente",
-              `<p style="margin:0 0 10px"><strong>${nome}</strong> enviou uma solicitação para ser acompanhada por você no app Obstétrica.</p>
-               ${data.message ? `<p style="margin:0 0 10px;padding:10px 14px;background:#f8fafc;border-radius:10px">"${data.message}"</p>` : ""}
+              `<p style="margin:0 0 10px"><strong>${escaparHtml(nome)}</strong> enviou uma solicitação para ser acompanhada por você no app Obstétrica.</p>
+               ${data.message ? `<p style="margin:0 0 10px;padding:10px 14px;background:#f8fafc;border-radius:10px">"${escaparHtml(data.message)}"</p>` : ""}
                <p style="margin:0">Aceite (ou recuse) no seu painel, na aba <strong>Pacientes</strong>.</p>`,
             ),
           });
@@ -372,7 +407,9 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
        nunca tivesse pedido nada. Uma decisão que ninguém comunica é uma decisão
        que a pessoa vive como um bug. */
     if (!error) {
-      void (async () => {
+      // Aguardado pelo mesmo motivo do pedido: serverless não garante o que
+      // roda depois da resposta.
+      await (async () => {
         try {
           const { data: d } = await (supabaseAdmin as any)
             .from("doctors")

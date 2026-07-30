@@ -58,6 +58,21 @@ function CadastroMedicoPage() {
       } catch {
         /* sem rede/perfil: segue para a etapa de perfil */
       }
+      /* Voltou do Google clicando em "sou médico": marca o papel agora.
+         
+         Só com `?papel=medico` — ou seja, só quando a intenção foi explícita.
+         Marcar por ter ABERTO esta página tiraria o app da gestante de
+         qualquer paciente que entrasse aqui por curiosidade, o que seria um
+         estrago maior que o bug que estamos consertando. */
+      try {
+        const veioComoMedico =
+          new URLSearchParams(window.location.search).get("papel") === "medico";
+        if (veioComoMedico && data.session.user.user_metadata?.role !== "doctor") {
+          await supabase.auth.updateUser({ data: { role: "doctor" } });
+        }
+      } catch {
+        /* a linha em `doctors` cobre o resto; não travar o cadastro */
+      }
       setExistingSession(data.session.user.email ?? "sua conta atual");
       // Pré-preenche o nome com o do Google, se veio no cadastro social.
       const gName =
@@ -140,14 +155,17 @@ function CadastroMedicoPage() {
         setStep("confirm-email");
         return;
       }
-      /* Quem ENTROU por esta página (conta antiga, ou a que caiu no
-         "use o modo Entrar") também é médico. Sem esta linha, contas criadas
-         antes desta correção continuariam abrindo o app da gestante. */
-      try {
-        await supabase.auth.updateUser({ data: { role: "doctor" } });
-      } catch {
-        /* a linha em `doctors` ainda cobre o caso; não travar o cadastro */
-      }
+      /* NÃO marca o papel aqui.
+         
+         Marcar em qualquer login por esta página era um estrago: uma paciente
+         que clicasse em "sou médico" por curiosidade e entrasse com o e-mail e
+         a senha dela ficava marcada como médica — perdia o app da gestação e
+         não entrava no painel, sem nenhum caminho de volta. Três cliques para
+         trancar alguém fora da própria conta.
+         
+         A marca acontece em dois momentos em que a intenção é inequívoca: ao
+         CRIAR a conta por aqui, e ao SALVAR o perfil profissional (quando a
+         linha em `doctors` passa a existir de fato). */
       setStep("perfil");
     } catch {
       toast.error("Falha de conexão — tente novamente.");
@@ -215,6 +233,15 @@ function CadastroMedicoPage() {
             : "Não foi possível criar seu perfil. Tente novamente.",
         );
         return;
+      }
+      /* Perfil criado: agora o papel é fato, não intenção. Marcar aqui fecha o
+         caso de quem chegou por um caminho sem pista nenhuma (link direto,
+         e-mail de confirmação, outra aba) — a partir deste ponto o app da
+         gestante não abre mais para esta conta, e não deve. */
+      try {
+        await supabase.auth.updateUser({ data: { role: "doctor" } });
+      } catch {
+        /* a linha em `doctors` já basta para o app decidir */
       }
       setStep("pronto");
     } catch {

@@ -208,6 +208,7 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       .update({ quiz_premium: true })
       .eq("id", u.user.id);
 
+    let semVaga = false;
     // Vincula ao médico só se a paciente ainda não tem um (não "rouba").
     const { data: prof } = await (supabaseAdmin as any)
       .from("patient_profiles")
@@ -248,6 +249,12 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
           .from("patient_profiles")
           .update({ doctor_id: row.doctor_id })
           .eq("id", u.user.id);
+      } else {
+        /* Não vinculou porque o plano dele está no teto. Ela precisa saber:
+           antes a tela dizia "código aplicado" e ela ficava sem médico sem
+           entender por quê — e ele nunca soube que perdeu uma paciente para o
+           próprio limite. O Premium dela continua valendo. */
+        semVaga = true;
       }
     }
 
@@ -268,5 +275,5 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       /* opcional */
     }
 
-    return { ok: true as const };
+    return { ok: true as const, semVaga };
   });

@@ -986,12 +986,22 @@ export function AppHomeScreen({
   const overArt: React.CSSProperties =
     artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
 
-  /* Quem o cartão do médico mostra. Sem vínculo, ele deixa de afirmar um
-     médico que não existe e passa a convidar: "Encontre o seu médico". */
-  const vinculadaAoDono = !medico || medico.nome.trim() === DOCTOR.name;
-  const medNome = medico?.nome?.trim() || DOCTOR.name;
-  const medEspec = medico?.specialty?.trim() || medico?.title?.trim() || DOCTOR.specialty;
-  const medCrm = (medico?.crm ?? "").trim() || (medico ? "" : DOCTOR.crm);
+  /* Quem o cartão do médico mostra.
+     
+     SEM vínculo ele não nomeia ninguém. Antes o rótulo dizia "Encontre o seu
+     médico" e as três linhas abaixo davam nome, especialidade, CRM e a FOTO do
+     dono da instalação — convidava a procurar um médico enquanto afirmava um.
+     
+     COM vínculo, valem só os dados dele; a foto (que é do dono) aparece apenas
+     quando o médico É o dono, senão entra a inicial do nome. Melhor uma
+     inicial certa que um rosto errado. */
+  const semMedico = !medico?.nome?.trim();
+  const vinculadaAoDono = !semMedico && medico!.nome.trim() === DOCTOR.name;
+  const medNome = semMedico ? "Você ainda não tem médico" : medico!.nome.trim();
+  const medEspec = semMedico
+    ? "Toque para encontrar um obstetra no app"
+    : (medico!.specialty ?? medico!.title ?? "").trim();
+  const medCrm = semMedico ? "" : (medico!.crm ?? "").trim();
 
   return (
     /* Sem `pb` aqui: a página que renderiza esta tela (minha-conta) já reserva
@@ -1449,12 +1459,12 @@ export function AppHomeScreen({
             />
           ) : (
             <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/12 font-serif text-2xl text-primary ring-1 ring-primary/20">
-              {medNome.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
+              {semMedico ? "🔍" : medNome.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
             </span>
           )}
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-              {medico ? "Seu médico" : "Encontre o seu médico"}
+              {semMedico ? "Encontre o seu médico" : "Seu médico"}
             </p>
             <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">{medNome}</p>
             <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{medEspec}</p>

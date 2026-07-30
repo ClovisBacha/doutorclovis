@@ -188,7 +188,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  searchDoctors as searchDoctorsSimples,
   requestDoctor,
   getMyDoctorLink,
   getMyDoctorContact,
@@ -930,6 +929,35 @@ function MinhaContaPage() {
       // Papel ANTES de liberar o render: sem isso o médico via o app da
       // gestante piscar por 2-3 round-trips até o bloqueio assumir.
       let roleIsPatient = true;
+
+      /* A MARCA DO AUTH VEM PRIMEIRO, antes de qualquer chamada de rede.
+         
+         Ela é local (está no token que já temos em mãos) e não pode falhar.
+         Estava depois do `checkIsAdmin`, que é um ida-e-volta ao servidor: se
+         aquela chamada caísse, a leitura da marca nunca acontecia e o médico
+         recebia o app da gestante inteiro — exatamente o bug que a marca
+         existe para evitar, ressuscitado por uma falha de rede.
+         
+         E há a válvula de escape: marca de médico SEM linha em `doctors` e com
+         gestação em curso é quase certamente alguém que se marcou por engano
+         (passou pela tela de cadastro de médico e não seguiu). Nesse caso a
+         marca é apagada em vez de trancá-la fora dos dois apps — sem isto, um
+         clique errado não tinha desfazer em nenhum lugar do sistema. */
+      const papelMarcado = (u.user.user_metadata as { role?: string } | null)?.role;
+      const temAncoraGestacional = !!(data?.lmp_date || data?.due_date || data?.reference_date);
+      if (papelMarcado === "doctor") {
+        if (temAncoraGestacional) {
+          try {
+            await supabase.auth.updateUser({ data: { role: null } });
+          } catch {
+            /* se não der, o pior caso é ela ver a tela de médico e falar comigo */
+          }
+        } else {
+          setIsDoctor(true);
+          roleIsPatient = false;
+        }
+      }
+
       try {
         const { data: s } = await supabase.auth.getSession();
         if (s.session?.access_token) {
@@ -940,33 +968,25 @@ function MinhaContaPage() {
           // gestante (o render abaixo troca o app pela tela de redirecionamento
           // ao /painel). Admin nunca entra aqui: continua vendo tudo p/ testar.
           if (!r.isAdmin) {
-            /* PRIMEIRO a marca do Auth, DEPOIS a linha em `doctors`.
-               
-               A ordem importa: quem começou o cadastro de médico e não chegou
-               a preencher o perfil não tem linha em `doctors`, e antes disto o
-               app o tratava como gestante — pedia o nome do bebê a um
-               obstetra. Era o bug relatado. A marca é gravada no primeiro
-               passo do cadastro, então cobre exatamente essa janela.
-               
-               `getMyDoctor` continua valendo como segunda fonte: cobre as
-               contas criadas antes desta correção, que não têm a marca. */
-            const papel = (u.user.user_metadata as { role?: string } | null)?.role;
-            if (papel === "doctor") {
-              setIsDoctor(true);
-              roleIsPatient = false;
-            } else {
-              try {
-                const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
-                if (me.ok && me.doctor) {
-                  setIsDoctor(true);
-                  roleIsPatient = false;
-                }
-              } catch {
-                /* sem perfil de médico → é gestante, segue no app */
+            /* `getMyDoctor` é a segunda fonte: cobre as contas criadas antes
+               da marca existir. A primeira fonte (o metadata) já rodou lá
+               acima, fora de qualquer chamada de rede. */
+            try {
+              const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
+              if (me.ok && me.doctor) {
+                setIsDoctor(true);
+                roleIsPatient = false;
               }
+            } catch {
+              /* sem perfil de médico → é gestante, segue no app */
             }
           }
         }
+      } catch {
+        /* Falha de rede na resolução de papel. `roleIsPatient` já carrega o que
+           a marca do Auth disse lá acima, então uma queda aqui não transforma
+           mais um médico em gestante — era o que acontecia quando este `try`
+           não tinha `catch` nenhum e a exceção escapava. */
       } finally {
         setLoading(false);
       }
@@ -1509,6 +1529,15 @@ function MinhaContaPage() {
                     onBabyTap={() => setJourneyOpen(true)}
                     careMode={careMode}
                     initialSub={consultasSub}
+                    medico={
+                      meuMedico
+                        ? {
+                            nome: meuMedico.nome,
+                            title: meuMedico.title,
+                            specialty: meuMedico.specialty,
+                          }
+                        : null
+                    }
                   />
                 )}
                 {tab === "Caminho" && (
@@ -2251,6 +2280,7 @@ export const BEBE_SUBTABS = [
 
 function BebeHub({
   profile,
+  medico,
   gest,
   onNavigate,
   onBabyTap,
@@ -2258,6 +2288,8 @@ function BebeHub({
   initialSub = null,
 }: {
   profile: Profile | null;
+  /** Médico da paciente — repassado ao cartão de presença. */
+  medico?: { nome: string; title?: string; specialty?: string } | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
   onBabyTap: () => void;
@@ -2290,6 +2322,7 @@ function BebeHub({
         {sub === "semana" && (
           <BabyTab
             profile={profile}
+            medico={medico}
             gest={gest}
             onNavigate={onNavigate}
             onBabyTap={onBabyTap}
@@ -2488,7 +2521,9 @@ function HomeMoodCheckin({ name }: { name: string }) {
  * médico acompanha a gestação e, quando ele registrou o batimento do bebê
  * recentemente, uma "novidade" acolhedora com o coração pulsando.
  *
- * Identidade vem do doctor.config (a instalação do Dr. Clóvis). O sinal do
+ * A identidade vem do médico VINCULADO à paciente; o `doctor.config` só entra
+ * quando não há vínculo (aí o médico é o dono da instalação, que é quem de
+ * fato atende). O sinal do
  * batimento é real (profile.fetal_bpm_at, gravado pelo médico) — nada é
  * inventado: sem batimento recente, mostra só o selo de acompanhamento.
  */
@@ -2496,10 +2531,15 @@ function DoctorPresenceCard({
   profile,
   onNavigate,
   careMode = false,
+  medico,
 }: {
   profile: Profile | null;
   onNavigate: (tab: string) => void;
   careMode?: boolean;
+  /** O médico DA PACIENTE. Sem ele o cartão afirmava, com a foto e o nome do
+      dono da instalação, que "Dr. Clóvis ouviu o coração do seu bebê" — para
+      quem é paciente de outro profissional e para quem não tem médico. */
+  medico?: { nome: string; title?: string; specialty?: string } | null;
 }) {
   const bpm = profile?.fetal_bpm ?? null;
   const at = profile?.fetal_bpm_at ?? null;
@@ -2515,6 +2555,10 @@ function DoctorPresenceCard({
   // Em Modo Cuidado nunca mostra a novidade do batimento do bebê (pode ser
   // doloroso); fica só o selo de acompanhamento, que é acolhedor.
   const showBpm = bpm != null && at != null && recent && !careMode;
+  /* Quem este cartão nomeia. A foto é do dono da instalação, então só aparece
+     quando o médico É ele; para os demais, a inicial do nome. */
+  const nomeMedico = medico?.nome?.trim() || DOCTOR.name;
+  const ehODono = nomeMedico === DOCTOR.name;
 
   return (
     <button
@@ -2522,11 +2566,17 @@ function DoctorPresenceCard({
       className="flex w-full items-center gap-4 rounded-3xl border border-primary/20 bg-primary/5 p-4 text-left transition-colors hover:border-primary/40"
     >
       <span className="relative shrink-0">
-        <img
-          src={drPortrait}
-          alt={DOCTOR.name}
-          className="h-14 w-14 rounded-full object-cover ring-2 ring-primary/20"
-        />
+        {ehODono ? (
+          <img
+            src={drPortrait}
+            alt={nomeMedico}
+            className="h-14 w-14 rounded-full object-cover ring-2 ring-primary/20"
+          />
+        ) : (
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/12 font-serif text-xl text-primary ring-2 ring-primary/20">
+            {nomeMedico.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
+          </span>
+        )}
         <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground ring-2 ring-card">
           ✓
         </span>
@@ -2536,7 +2586,7 @@ function DoctorPresenceCard({
           <>
             <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
               <span className="heartbeat-icon text-rose-500">💓</span>
-              {DOCTOR.name.split(" ").slice(0, 2).join(" ")} ouviu o coração de {baby}
+              {nomeMedico.split(" ").slice(0, 2).join(" ")} ouviu o coração de {baby}
             </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
               {bpm} bpm · {whenLabel} · toque para sentir o batimento
@@ -2545,7 +2595,7 @@ function DoctorPresenceCard({
         ) : (
           <>
             <span className="block text-sm font-semibold text-foreground">
-              {DOCTOR.name} está acompanhando sua gestação
+              {nomeMedico} está acompanhando sua gestação
             </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
               Você não está sozinha — seu médico acompanha cada semana por aqui. 💛
@@ -2559,12 +2609,15 @@ function DoctorPresenceCard({
 
 function BabyTab({
   profile,
+  medico,
   gest,
   onNavigate,
   onBabyTap,
   careMode = false,
 }: {
   profile: Profile | null;
+  /** Médico da paciente — o cartão de presença fala em nome dele. */
+  medico?: { nome: string; title?: string; specialty?: string } | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
   /** Toque na foto do bebê → Jornada do Bebê (gatilho Premium). */
@@ -2732,7 +2785,12 @@ function BabyTab({
 
       {/* ── Presença do médico (integração real sentida) ─────────────── */}
       <StaggerItem>
-        <DoctorPresenceCard profile={profile} onNavigate={onNavigate} careMode={careMode} />
+        <DoctorPresenceCard
+          profile={profile}
+          onNavigate={onNavigate}
+          careMode={careMode}
+          medico={medico}
+        />
       </StaggerItem>
 
       {/* ── Linha de cards: DPP · próxima consulta · exame ─────────────── */}
@@ -5866,9 +5924,15 @@ function CardTab({
   /** Médico da paciente; `null` = usa o dono da instalação. */
   medico?: DoctorContato | null;
 }) {
-  const medNome = medico?.nome?.trim() || DOCTOR.name;
-  const medCrm = medico?.crm?.trim() || DOCTOR.crm;
-  const medEspec = medico?.specialty?.trim() || DOCTOR.specialty;
+  /* Sem vínculo, vale o dono da instalação (é quem de fato atende). COM
+     vínculo, valem SÓ os dados dele: um CRM em branco não vira o CRM do
+     fundador impresso na carteirinha que ela mostra no hospital. */
+  const temMedicoVinculado = !!medico?.nome?.trim();
+  const medNome = temMedicoVinculado ? medico!.nome.trim() : DOCTOR.name;
+  const medCrm = temMedicoVinculado ? (medico!.crm ?? "").trim() : DOCTOR.crm;
+  const medEspec = temMedicoVinculado
+    ? (medico!.specialty ?? medico!.title ?? "").trim()
+    : DOCTOR.specialty;
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
@@ -15396,14 +15460,16 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
   const [newId, setNewId] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
 
-  // PIX do PRÓPRIO médico da paciente (não uma chave central). Começa no
-  // fallback central e, se a paciente tiver médico com chave PIX, atualiza.
-  const [pix, setPix] = useState<{ key: string; name: string }>({
-    key: DOCTOR.pixKey,
-    name: DOCTOR.pixName,
-  });
-  const PIX_KEY = pix.key;
-  const PIX_NAME = pix.name;
+  /* PIX do médico DA PACIENTE — e `null` até saber qual é.
+     
+     Antes o estado nascia na chave central do dono da plataforma, e como
+     `getMyDoctorPix` devolve nulo quando o médico dela não cadastrou chave, o
+     fallback nunca era substituído: ela pagava a consulta de outro profissional
+     na conta do fundador. Dinheiro no lugar errado é o tipo de erro que não
+     pode ter fallback — sem chave, a tela diz que não há como pagar por aqui. */
+  const [pix, setPix] = useState<{ key: string; name: string } | null>(null);
+  const PIX_KEY = pix?.key ?? "";
+  const PIX_NAME = pix?.name ?? "";
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
@@ -15413,10 +15479,11 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
     }
     const res = await getMyPrivateConsultations({ data: { accessToken: s.session.access_token } });
     if (res.ok) setConsultations(res.consultations);
-    // PIX do médico da paciente (fallback central se não houver)
+    /* PIX do médico DELA. Sem chave cadastrada, fica nulo de propósito — a
+       tela avisa em vez de mostrar a chave de outra pessoa. */
     const pixRes = await getMyDoctorPix({ data: { accessToken: s.session.access_token } });
     if (pixRes.ok && pixRes.pix?.key) {
-      setPix({ key: pixRes.pix.key, name: pixRes.pix.name || DOCTOR.pixName });
+      setPix({ key: pixRes.pix.key, name: pixRes.pix.name || "seu médico" });
     }
     setLoading(false);
   }
@@ -15574,29 +15641,43 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
-          <p className="font-semibold mb-3">💳 Pagamento via PIX</p>
-          <p className="text-sm text-muted-foreground mb-3">
-            Após solicitar, efetue o pagamento via PIX e marque como pago. Seu médico confirmará e
-            entrará em contato.
-          </p>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
-              <span className="text-xs text-muted-foreground">Chave PIX</span>
-              <span className="font-mono text-sm font-medium">{PIX_KEY}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
-              <span className="text-xs text-muted-foreground">Favorecido</span>
-              <span className="text-sm font-medium">{PIX_NAME}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
-              <span className="text-xs text-muted-foreground">Valor</span>
-              <span className="text-sm font-semibold text-primary">
-                {selectedConsultType.price}
-              </span>
+        {/* Sem chave PIX do médico dela não há o que mostrar — e mostrar a de
+            outra pessoa seria mandar o dinheiro para a conta errada. */}
+        {!pix ? (
+          <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-500/10">
+            <p className="font-semibold text-amber-800 dark:text-amber-300">
+              💳 Pagamento a combinar
+            </p>
+            <p className="mt-1 text-sm leading-snug text-amber-900/85 dark:text-amber-200/85">
+              Seu médico ainda não cadastrou uma chave PIX no app. Solicite a consulta normalmente —
+              ele entra em contato para combinar o pagamento.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
+            <p className="font-semibold mb-3">💳 Pagamento via PIX</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Após solicitar, efetue o pagamento via PIX e marque como pago. Seu médico confirmará e
+              entrará em contato.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
+                <span className="text-xs text-muted-foreground">Chave PIX</span>
+                <span className="font-mono text-sm font-medium">{PIX_KEY}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
+                <span className="text-xs text-muted-foreground">Favorecido</span>
+                <span className="text-sm font-medium">{PIX_NAME}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-background border border-border px-4 py-2.5">
+                <span className="text-xs text-muted-foreground">Valor</span>
+                <span className="text-sm font-semibold text-primary">
+                  {selectedConsultType.price}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <button
           onClick={handleRequest}

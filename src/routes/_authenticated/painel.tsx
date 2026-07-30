@@ -197,10 +197,14 @@ function PainelPage() {
      Numa plataforma multi-médico isso não é um detalhe de layout: é dinheiro
      indo para a conta errada e documento assinado por quem não atendeu. */
   const [euMedico, setEuMedico] = useState<DoctorProfile | null>(null);
+  /** Perfil de médico existe mas está inativo: entra, com aviso, em Meu Perfil. */
+  const [inativo, setInativo] = useState(false);
   /* O que o plano libera. Ficava disponível em `getMyDoctor` e não era lido:
      o Cérebro aparecia para todo mundo e, no Free, cada tentativa de treinar
      devolvia "Tente novamente" — um paywall disfarçado de bug. */
   const [podeIA, setPodeIA] = useState(true);
+  /* Ambos começam liberados e só são FECHADOS por um entitlement que chegou de
+     fato. Fechar por falta de resposta seria mostrar um paywall a quem paga. */
   const [podeEquipe, setPodeEquipe] = useState(true);
   const [rotuloPlano, setRotuloPlano] = useState("");
 
@@ -263,13 +267,30 @@ function PainelPage() {
       // Fallback (getAdminData negou): médico assinante inativo/sem linha ativa?
       const me = await getMyDoctor({ data: { accessToken: tk } });
       if (me.ok && me.doctor) setEuMedico(me.doctor as DoctorProfile);
-      if (me.ok) {
+      /* O gate só vale para quem TEM perfil de médico.
+         
+         Sem esta condição, o gestor de clínica (que entra pelo resgate mais
+         abaixo e não tem linha em `doctors`) recebia entitlements de plano Free
+         — e era barrado justamente da Clínica e do Cérebro, as duas telas para
+         as quais ele foi admitido. */
+      if (me.ok && me.doctor) {
         setPodeIA(me.entitlements?.aiApp !== false);
         setPodeEquipe(!!me.entitlements?.teamSeats);
         setRotuloPlano(me.entitlements?.label ?? "");
       }
-      if (me.ok && me.doctor?.active) {
+      /* Perfil de médico INATIVO também entra — só que direto em Meu Perfil.
+         
+         Antes ele era recusado aqui e caía em "área restrita", vindo de um
+         "esta área é da gestante": dois blocos apontando um para o outro, sem
+         nenhuma tela onde resolver o problema. As abas de dados continuam
+         vazias (o servidor recorta tudo por médico ativo), e é assim que deve
+         ser — o que ele precisa mexer é a assinatura, que está em Meu Perfil. */
+      if (me.ok && me.doctor) {
         setAllowed(true);
+        if (!me.doctor.active) {
+          setInativo(true);
+          setTab("Meu Perfil");
+        }
         return;
       }
       // Dono de clínica sem conta de médico (gestor): entra para administrar
@@ -445,6 +466,20 @@ function PainelPage() {
           </button>
         ))}
       </div>
+
+      {/* Conta inativa: ele entra, mas precisa saber por que as listas estão
+          vazias — senão conclui que o painel está quebrado. */}
+      {inativo && (
+        <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:bg-amber-500/10">
+          <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+            Sua conta de médico está inativa
+          </p>
+          <p className="mt-1 text-[13px] leading-snug text-amber-900/85 dark:text-amber-200/85">
+            Enquanto estiver assim, as pacientes não encontram você na busca e as listas do painel
+            ficam vazias. Ative a assinatura em Meu Perfil, abaixo.
+          </p>
+        </div>
+      )}
 
       <div className="mt-8">
         {tab === "Painel 📊" && <DashboardSection tokenFn={token} onNavigate={setTab} />}
@@ -5732,10 +5767,14 @@ function ReceiptModal({
      assinante entregava à paciente um documento assinado "Dr. Clóvis Bacha,
      CRM-MG 22.333". Um recibo com o CRM de outro profissional não é um erro
      de layout. */
-  const nomeMed = medico?.display_name?.trim() || DOCTOR.name;
-  const tituloMed = medico?.title?.trim() || DOCTOR.title;
-  const crmMed = medico?.crm?.trim() || DOCTOR.crm;
-  const rqeMed = (medico?.rqe ?? "")?.trim() || (medico ? "" : DOCTOR.rqe);
+  /* Tudo ou nada. Um recibo é documento: com médico logado valem SÓ os dados
+     dele, e um CRM em branco imprime em branco. Cair no CRM do fundador na
+     linha da assinatura é pior que não imprimir CRM nenhum. */
+  const temMed = !!medico?.display_name?.trim();
+  const nomeMed = temMed ? medico!.display_name.trim() : DOCTOR.name;
+  const tituloMed = temMed ? (medico!.title ?? "").trim() : DOCTOR.title;
+  const crmMed = temMed ? (medico!.crm ?? "").trim() : DOCTOR.crm;
+  const rqeMed = temMed ? (medico!.rqe ?? "").trim() : DOCTOR.rqe;
   const ext = appt as any;
   const printRef = useRef<HTMLDivElement>(null);
   const receiptDate = ext.confirmed_date
@@ -5846,7 +5885,7 @@ function ReceiptModal({
               <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                 Descrição
               </p>
-              <p className="text-sm text-gray-800">Consulta de {DOCTOR.title}</p>
+              <p className="text-sm text-gray-800">Consulta de {tituloMed}</p>
               <p className="text-xs text-gray-500">{appt.reason}</p>
             </div>
           </div>
@@ -7989,7 +8028,11 @@ function InvitePatientModal({
   tokenFn: () => Promise<string>;
   onClose: () => void;
 }) {
-  const [doctorName, setDoctorName] = useState<string>(DOCTOR.name);
+  const [doctorName, setDoctorName] =
+    /* Começa vazio: mostrar o nome do dono da instalação por meio segundo faz o
+     médico copiar uma mensagem assinada por outra pessoa — os botões de copiar
+     e de WhatsApp já estão vivos no primeiro quadro. */
+    useState<string>("");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -8245,7 +8288,7 @@ function PatientDetailModal({
                 🦶 {(ficha.kicks ?? []).length} sessões de chutes
               </span>
               <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
-                ❓ {(ficha.questions ?? []).length} perguntas
+                ❓ {(ficha.pendingQuestions ?? []).length} perguntas
               </span>
             </div>
             {/* Dados clínicos do perfil: o que ela levaria escrito na

@@ -162,8 +162,15 @@ export const PLAN_RANK: Record<PlanKey, number> = {
   starter: 2,
   pro: 3,
   elite: 4,
-  black: 5,
-  clinica: 6, // o plano mais caro/completo — topo da escada
+  /* `clinica` fica ABAIXO de black, e isto é uma correção.
+     
+     Ela estava em 6, no topo, com o comentário "o plano mais caro". Mas o preço
+     dela é "sob consulta" (`PLAN_PRICE.clinica = 0`) e o Black custa R$ 1.499 —
+     e o assento de clínica é concedido automaticamente a qualquer membro de uma
+     clínica ativa. Ou seja: um assento de valor indefinido passava na frente de
+     quem paga o plano mais caro da tabela, na busca que a paciente vê. */
+  clinica: 5,
+  black: 6, // o mais caro da tabela — topo da escada
 };
 
 /** Normaliza um valor livre de `doctors.plan` para uma PlanKey conhecida. */

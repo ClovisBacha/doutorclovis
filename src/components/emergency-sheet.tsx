@@ -58,11 +58,18 @@ export function EmergencySheet({
 
      Sem vínculo (a maioria hoje), vale o `doctor.config` — o médico dono da
      instalação, que é de fato quem a atende. */
+  /* `temVinculo` decide se a tela nomeia um médico.
+     
+     Sem vínculo ela nomeava o dono da instalação — "Ligar para Dr. Clóvis",
+     "Avisa Dr. Clóvis" — enquanto o servidor, corretamente, não avisa médico
+     nenhum (`emergencia.functions.ts` só notifica `doctor_id`). A tela
+     prometia o que o disparo não entrega. Agora, sem vínculo, o botão do
+     médico dá lugar ao 193 e o texto não cita nome nenhum. */
   const temVinculo = !!medico?.nome?.trim();
-  const medNome = temVinculo ? medico!.nome.trim() : DOCTOR.name;
-  const medCrm = (temVinculo ? medico!.crm?.trim() : DOCTOR.crm) || "";
-  const medZap = temVinculo ? linkWhatsApp(medico!.whatsapp) : DOCTOR.whatsappUrl;
-  const medTel = temVinculo ? linkTel(medico!.whatsapp) : linkTel(DOCTOR.whatsappUrl);
+  const medNome = temVinculo ? medico!.nome.trim() : "";
+  const medCrm = temVinculo ? (medico!.crm ?? "").trim() : "";
+  const medZap = temVinculo ? linkWhatsApp(medico!.whatsapp) : null;
+  const medTel = temVinculo ? linkTel(medico!.whatsapp) : null;
   const [qr, setQr] = useState<string | null>(null);
   const [panic, setPanic] = useState<"idle" | "sending" | "sent">("idle");
   /** O que DE FATO saiu, devolvido pelo servidor. A tela só diz o que houve. */
@@ -250,7 +257,7 @@ export function EmergencySheet({
     `Alergias: ${info.allergies || "nenhuma informada"}`,
     `Medicamentos: ${info.medications || "nenhum"}`,
     `Contato emergencia: ${info.emergencyContact || "-"} ${info.emergencyPhone || ""}`.trim(),
-    medCrm ? `Medico: ${medNome} - ${medCrm}` : `Medico: ${medNome}`,
+    medNome ? (medCrm ? `Medico: ${medNome} - ${medCrm}` : `Medico: ${medNome}`) : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -321,7 +328,9 @@ export function EmergencySheet({
         </div>
         {!medZap && !medTel && (
           <p className="mt-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-center text-[12px] leading-snug text-amber-900">
-            {medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.
+            {medNome
+              ? `${medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.`
+              : "Você ainda não tem um médico vinculado no app. Use o 192 ou o 193 acima."}
           </p>
         )}
         {medTel && (
@@ -347,9 +356,14 @@ export function EmergencySheet({
         </button>
         {panic === "idle" && (
           <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
-            Avisa {medNome.split(" ").slice(0, 2).join(" ")}
-            {info.emergencyContact ? ` e ${info.emergencyContact.split(" ")[0]}` : ""} com a sua
-            localização, sem você precisar escrever nada.
+            Avisa{" "}
+            {[
+              medNome ? medNome.split(" ").slice(0, 2).join(" ") : null,
+              info.emergencyContact ? info.emergencyContact.split(" ")[0] : null,
+            ]
+              .filter(Boolean)
+              .join(" e ") || "quem você cadastrou"}{" "}
+            com a sua localização, sem você precisar escrever nada.
           </p>
         )}
 
@@ -497,7 +511,9 @@ export function EmergencySheet({
                 <Row label="DPP" value={info.dpp} />
                 <Row label="Medicamentos" value={info.medications || "nenhum"} />
                 <Row label="Tel. emergência" value={info.emergencyPhone} />
-                <Row label="Médico" value={medCrm ? `${medNome} · ${medCrm}` : medNome} />
+                {medNome && (
+                  <Row label="Médico" value={medCrm ? `${medNome} · ${medCrm}` : medNome} />
+                )}
               </dl>
             </>
           )}
