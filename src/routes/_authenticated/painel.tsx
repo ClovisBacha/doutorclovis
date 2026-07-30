@@ -222,8 +222,11 @@ function PainelPage() {
   useEffect(() => {
     const el = refsAbas.current[tab];
     if (!el || !fitaAbas.current) return;
-    // `nearest` não mexe na rolagem vertical da página — só traz a aba para
-    // dentro da fita, que é o que queremos.
+    /* `inline: "nearest"` traz a aba para dentro da fita. `block: "nearest"`
+       PODE rolar a página na vertical — ele percorre todos os ancestrais
+       roláveis, e aqui o documento é o mais próximo. Como as trocas
+       programáticas vêm de cartões abaixo da fita, o efeito colateral é levar a
+       página de volta para o topo da aba, que é para onde ele quer olhar. */
     el.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
   }, [tab]);
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
@@ -463,12 +466,13 @@ function PainelPage() {
           sublinhado sempre em cima da borda. `snap` para a aba parar alinhada. */}
       <div
         ref={fitaAbas}
-        /* `pb-px` em vez de `-mb-px` nos filhos: `overflow-x: auto` faz o
-           `overflow-y` computar para `auto` também (regra do CSS: `visible` ao
-           lado de um valor não-`visible` vira `auto`), então a caixa passou a
-           recortar no padding box e comia 1px da `border-b-2` da aba ativa —
-           sobrava um fiapo de cor com a linha cinza aparecendo por baixo. */
-        className="mt-8 flex snap-x gap-2 overflow-x-auto border-b border-border pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        /* Sem `-mb-px` nos filhos. `overflow-x: auto` faz o `overflow-y`
+           computar para `auto` também (regra do CSS: `visible` ao lado de um
+           valor não-`visible` vira `auto`), então a caixa recorta no padding box
+           e comia 1px da `border-b-2` da aba ativa. Tirar a margem negativa
+           basta — o `pb-px` que eu tinha posto junto só abria uma folga de 1px
+           entre o sublinhado e a linha cinza, sem cobrir nada. */
+        className="mt-8 flex snap-x gap-2 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {DOCTOR_TABS.map((t) => (
           <button
@@ -5985,7 +5989,10 @@ function ReceiptModal({
         </div>
 
         {/* Receipt content */}
-        <div ref={printRef} className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+        <div
+          ref={printRef}
+          className="min-h-0 flex-1 overflow-y-auto px-8 py-6 print:overflow-visible"
+        >
           {/* Header */}
           <div className="border-b border-gray-200 pb-5 mb-5">
             <h1 className="font-serif text-2xl text-gray-900">{nomeMed}</h1>
@@ -6439,7 +6446,11 @@ function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
         <span className="text-amber-800 dark:text-amber-200">
           Gerados este mês: <strong>{info.used}</strong> de {info.limit}
         </span>
-        <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800 dark:text-amber-200">
+        <span /* O fundo aqui é `bg-amber-200` e NÃO escurece — então o texto também não
+             pode. Eu tinha escurecido só a fonte por padrão, deixando âmbar sobre
+             âmbar: o contador "N restantes" sumia. */
+          className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800"
+        >
           {info.remaining} restantes
         </span>
       </div>

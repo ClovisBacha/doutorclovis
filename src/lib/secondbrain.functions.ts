@@ -983,16 +983,23 @@ export const extractKnowledgeFromTranscript = createServerFn({ method: "POST" })
       .select("id,question,answer");
     if (error) return { ok: false as const };
 
-    /* Vetores dos rascunhos — já nascem "encontráveis" quando forem aprovados.
-       Em PARALELO e não em série: é o kit de partida inteiro (dezenas de
-       entradas), e uma fila sequencial de chamadas de embedding estouraria o
-       teto de 30s da função. `allSettled` porque uma falha isolada não pode
-       derrubar a instalação do kit — o backfill cobre quem ficou para trás. */
-    {
-      const { embedBrainEntry } = await import("./embeddings.server");
-      const lote = (rows ?? []) as { id: string; question: string; answer: string }[];
-      await Promise.allSettled(lote.map((r) => embedBrainEntry(r.id, r.question, r.answer)));
-    }
+    /* Aqui os rascunhos NÃO são vetorizados, e isso é deliberado.
+    
+       Duas razões. Primeira: eles nascem `approved: false` — ninguém os
+       encontra até o médico aprovar, e a aprovação (`updateBrainEntry`) já
+       recalcula o vetor. Vetorizar agora é pagar por 12 embeddings que talvez
+       sejam descartados.
+    
+       Segunda, e mais séria: este handler já gastou quase todo o orçamento de
+       30s chamando o modelo sobre uma transcrição de até 30 mil caracteres, e o
+       INSERT acima já foi confirmado. Somar mais 6s de embeddings depois da
+       escrita é convidar o timeout a acontecer no ponto em que a paciente já
+       tem os rascunhos gravados mas recebe "não foi possível extrair" — e este
+       insert não é idempotente, então tentar de novo duplica tudo.
+    
+       (Um comentário meu anterior aqui dizia que este bloco era o kit de
+       partida. Não era: `installStarterPack` é outra função, e ela nem vetoriza.
+       O lote daqui é no máximo 12, pelo `.slice(0, 12)` acima.) */
     return { ok: true as const, created: pairs.length };
   });
 

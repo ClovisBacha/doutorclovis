@@ -553,7 +553,13 @@ export const searchDoctors = createServerFn({ method: "POST" })
        citá-las no `or(...)` fazia qualquer busca com termo dar 42703 nos três
        degraus — "a busca falhou" num diretório cheio. */
     const CAMPOS_TEXTO_MINIMO = ["display_name", "specialty"];
-    const buildQuery = (cols: string, comTexto = true, campos = CAMPOS_TEXTO) => {
+    const buildQuery = (
+      cols: string,
+      comTexto = true,
+      campos = CAMPOS_TEXTO,
+      /** Último recurso: sem nenhum filtro de coluna nova. */
+      semFiltros = false,
+    ) => {
       let q = (supabaseAdmin as any)
         .from("doctors")
         .select(cols)
@@ -567,12 +573,16 @@ export const searchDoctors = createServerFn({ method: "POST" })
            selo passou a ser uma posição na lista, não a inexistência. */
         .eq("active", true)
         .not("display_name", "is", null);
-      /* `accepting_patients` é de uma migração POSTERIOR à criação da tabela
-         (20260709000000), então o degrau mínimo — que existe justamente para
-         sobreviver a migrações pendentes — não pode exigi-la: com ela, os três
-         degraus davam 42703 e a busca falhava num diretório cheio. Nos demais
-         degraus o filtro continua valendo. */
-      if (campos !== CAMPOS_TEXTO_MINIMO) q = q.eq("accepting_patients", true);
+      /* `accepting_patients` continua valendo até o penúltimo degrau.
+      
+         Eu tinha tirado esse filtro do degrau mínimo com um raciocínio errado:
+         "degrau mínimo ⇒ a coluna não existe". Não segue. `DIR_BASE` cita
+         colunas de DUAS migrações diferentes, e a que provavelmente está
+         pendente é a mais nova (o perfil rico) — nesse estado
+         `accepting_patients` existe e quer dizer alguma coisa. O resultado era
+         devolver na busca justamente o médico que fechou a agenda; e escolher um
+         médico é o que liga o botão SOS dela ao telefone dele. */
+      if (!semFiltros) q = q.eq("accepting_patients", true);
       /* O texto passa a filtrar NO BANCO.
          
          Antes o `limit(200)` cortava a lista antes de qualquer busca por nome,
@@ -595,10 +605,12 @@ export const searchDoctors = createServerFn({ method: "POST" })
         const like = `"%${seguro}%"`;
         q = q.or(campos.map((c) => `${c}.ilike.${like}`).join(","));
       }
-      /* Mesma razão: `state`, `city`, `has_*` e `years_experience` vêm da
-         migração do perfil. No degrau mínimo eles saem — melhor devolver a lista
-         inteira sem os filtros do que devolver erro. */
-      if (campos !== CAMPOS_TEXTO_MINIMO) {
+      /* `state`, `city`, `has_*` e `years_experience` vêm da migração do perfil.
+         Só o ÚLTIMO degrau abre mão deles — e quem chama avisa a paciente, com
+         `filtrosIgnorados`, que a lista veio sem os filtros dela. Descartar em
+         silêncio é pior que o erro que isso substituiu: ela filtra "São Paulo +
+         doutorado" e recebe o diretório nacional achando que está filtrado. */
+      if (!semFiltros) {
         if (data.state) q = q.ilike("state", data.state);
         if (data.city) q = q.ilike("city", `%${data.city}%`);
         if (data.hasMasters) q = q.eq("has_masters", true);
@@ -610,6 +622,8 @@ export const searchDoctors = createServerFn({ method: "POST" })
       return q.order("display_name", { ascending: true }).limit(200);
     };
 
+    /** Verdadeiro quando a lista veio SEM os filtros que ela escolheu. */
+    let filtrosIgnorados = false;
     let { data: rows, error } = await buildQuery(`${DIR_BASE},${RICH_COLS}`);
     if (error?.code === "42703") {
       /* Degrau intermediário e degrau mínimo.
@@ -621,7 +635,13 @@ export const searchDoctors = createServerFn({ method: "POST" })
          desde a criação da tabela. */
       ({ data: rows, error } = await buildQuery(DIR_BASE));
       if (error?.code === "42703") {
+        // Ainda com o filtro de agenda aberta — só as colunas do perfil saem.
         ({ data: rows, error } = await buildQuery(DIR_MINIMO, true, CAMPOS_TEXTO_MINIMO));
+      }
+      if (error?.code === "42703") {
+        // Piso de verdade: nem `accepting_patients` existe.
+        ({ data: rows, error } = await buildQuery(DIR_MINIMO, true, CAMPOS_TEXTO_MINIMO, true));
+        filtrosIgnorados = !error;
       }
     }
     if (error) return { ok: false as const, error: error.message, doctors: [] };
@@ -648,9 +668,12 @@ export const searchDoctors = createServerFn({ method: "POST" })
        baixo no ranking; este exclui. */
     list = list.filter((d) => (d.whatsapp ?? "").replace(/\D+/g, "").length >= 10);
     const casa = (d: DirectoryDoctor) =>
-      semAcento(`${d.display_name} ${d.specialty} ${d.subspecialty} ${d.city} ${d.bio}`).includes(
-        term,
-      );
+      semAcento(
+        [d.display_name, d.specialty, d.subspecialty, d.city, d.bio].filter(Boolean).join(" "),
+      ).includes(term);
+    /* `.filter(Boolean)` e não interpolação direta: nos degraus reduzidos essas
+       colunas não vêm, e `${undefined}` vira a STRING "undefined" — aí buscar
+       "def", "ine" ou "nde" casava com todo mundo. */
     if (term) list = list.filter(casa);
 
     /* Segunda tentativa: sem o filtro de texto no banco.
@@ -675,6 +698,10 @@ export const searchDoctors = createServerFn({ method: "POST" })
       if (alt.error?.code === "42703") alt = await buildQuery(DIR_BASE, false);
       if (alt.error?.code === "42703")
         alt = await buildQuery(DIR_MINIMO, false, CAMPOS_TEXTO_MINIMO);
+      if (alt.error?.code === "42703") {
+        alt = await buildQuery(DIR_MINIMO, false, CAMPOS_TEXTO_MINIMO, true);
+        filtrosIgnorados = filtrosIgnorados || !alt.error;
+      }
       if (!alt.error) {
         const todos = ((alt.data ?? []) as (DirectoryDoctor & { active: boolean })[])
           .filter((d) => (d.display_name ?? "").trim().length >= 2)
@@ -723,7 +750,7 @@ export const searchDoctors = createServerFn({ method: "POST" })
 
     const comEndereco = await anexarEnderecos(supabaseAdmin, list as any[]);
     const doctors: DirectoryDoctor[] = comEndereco.map((d) => toDirectoryDoctor(d));
-    return { ok: true as const, doctors, semCorrespondencia };
+    return { ok: true as const, doctors, semCorrespondencia, filtrosIgnorados };
   });
 
 /**
