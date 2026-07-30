@@ -373,3 +373,189 @@ export const registrarDesfecho = createServerFn({ method: "POST" })
     );
     return { ok: !error };
   });
+
+/* ════════════════════════════════════════════════════════════════════════════
+   A FICHA — o que um obstetra procura primeiro
+
+   A ficha da paciente no painel era, literalmente, um desenho do bebê e o log
+   do chatbot. Nenhuma pressão, nenhum peso, nenhuma medicação — e os quatro
+   fatores de risco da gestação anterior, que decidem conduta em alto risco,
+   eram lidos SÓ pelo prompt da IA. A IA sabia que a paciente teve pré-eclâmpsia
+   na gestação passada; a tela do médico, não.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export type FichaClinica = {
+  nome: string | null;
+  bebe: string | null;
+  /** Idade gestacional em dias. Em obstetrícia os DIAS decidem conduta —
+      corticoide, viabilidade, 36+6 versus 37+0 —, então a tela nunca deve
+      arredondar para semanas. */
+  gestDias: number | null;
+  dpp: string | null;
+  gestacaoNumero: number | null;
+  tipoSanguineo: string | null;
+  alergias: string | null;
+  medicamentos: string | null;
+  alturaCm: number | null;
+  pesoPreGestacional: number | null;
+  telefone: string | null;
+  contatoEmergencia: string | null;
+  telefoneEmergencia: string | null;
+  /** Os quatro que hoje só a IA lê. */
+  riscos: string[];
+  observacoesPrevias: string | null;
+  modoCuidado: boolean;
+};
+
+const PERFIL_COLS =
+  "display_name,baby_name,lmp_date,due_date,reference_date,reference_weeks,reference_days," +
+  "pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm," +
+  "prior_cesarean,prior_notes,blood_type,allergies,medications,height_cm," +
+  "pre_pregnancy_weight_kg,emergency_contact,emergency_phone,care_mode";
+
+/**
+ * Dias de gestação hoje.
+ *
+ * `reference_*` tem precedência sobre a DUM porque é a correção feita pelo
+ * ultrassom — que é o padrão-ouro quando existe. Usar a DUM tendo o ultrassom
+ * é o erro clássico e desloca a idade gestacional em semanas.
+ */
+function diasDeGestacao(p: Record<string, unknown>): number | null {
+  const ref = p.reference_date as string | null;
+  const rw = p.reference_weeks as number | null;
+  const rd = p.reference_days as number | null;
+  if (ref && rw != null) {
+    const passados = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+    return rw * 7 + (rd ?? 0) + passados;
+  }
+  const dum = p.lmp_date as string | null;
+  if (!dum) return null;
+  return Math.floor((Date.now() - new Date(dum).getTime()) / 86400000);
+}
+
+export const fichaClinica = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), pacienteId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ok: false as const, ficha: null };
+    const pacientes = await pacientesAtuais(user.id);
+    if (!pacientes.has(data.pacienteId)) return { ok: false as const, ficha: null };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    /* Escada de colunas: um banco sem as migrations de perfil rico devolve
+       42703 para a consulta INTEIRA, não só para a coluna que falta — então
+       uma coluna ausente apagaria a ficha toda em vez de um campo. */
+    let perfil: Record<string, unknown> | null = null;
+    for (const cols of [PERFIL_COLS, "display_name,baby_name,lmp_date,due_date"]) {
+      const { data: row, error } = await sb
+        .from("patient_profiles")
+        .select(cols)
+        .eq("id", data.pacienteId)
+        .maybeSingle();
+      if (!error) {
+        perfil = row as Record<string, unknown> | null;
+        break;
+      }
+    }
+    if (!perfil) return { ok: false as const, ficha: null };
+
+    const riscos: string[] = [];
+    if (perfil.prior_bp_elevated) {
+      const s = perfil.prior_bp_week as number | null;
+      riscos.push(`Pressão alta em gestação anterior${s ? ` (a partir de ${s}s)` : ""}`);
+    }
+    if (perfil.prior_gestational_diabetes) riscos.push("Diabetes gestacional anterior");
+    if (perfil.prior_preterm) riscos.push("Parto prematuro anterior");
+    if (perfil.prior_cesarean) riscos.push("Cesariana anterior");
+
+    // Telefone da paciente mora em `auth.users`, não no perfil.
+    let telefone: string | null = null;
+    try {
+      const { data: u } = await sb.auth.admin.getUserById(data.pacienteId);
+      telefone = (u?.user?.phone as string) || null;
+    } catch {
+      /* sem telefone; a ficha abre igual */
+    }
+
+    const ficha: FichaClinica = {
+      nome: (perfil.display_name as string) ?? null,
+      bebe: (perfil.baby_name as string) ?? null,
+      gestDias: diasDeGestacao(perfil),
+      dpp: (perfil.due_date as string) ?? null,
+      gestacaoNumero: (perfil.pregnancy_number as number) ?? null,
+      tipoSanguineo: (perfil.blood_type as string) ?? null,
+      alergias: (perfil.allergies as string) ?? null,
+      medicamentos: (perfil.medications as string) ?? null,
+      alturaCm: (perfil.height_cm as number) ?? null,
+      pesoPreGestacional: (perfil.pre_pregnancy_weight_kg as number) ?? null,
+      telefone,
+      contatoEmergencia: (perfil.emergency_contact as string) ?? null,
+      telefoneEmergencia: (perfil.emergency_phone as string) ?? null,
+      riscos,
+      observacoesPrevias: (perfil.prior_notes as string) ?? null,
+      modoCuidado: !!perfil.care_mode,
+    };
+    return { ok: true as const, ficha };
+  });
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TENDÊNCIA
+
+   Hipertensão gestacional se diagnostica por tendência, não por um valor; ganho
+   ponderal súbito é sinal de pré-eclâmpsia. O painel mostrava o último ponto e
+   contava os pontos — três pressões subindo em dez dias eram invisíveis.
+
+   Mora aqui e não numa server function porque a série já vem no prontuário: um
+   cálculo derivado que exige ida ao banco é um cálculo que a tela vai deixar de
+   fazer.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export type Serie = {
+  rotulo: string;
+  unidade: string;
+  pontos: { em: string; valor: number }[];
+  /** Positivo = subindo. Em unidades por semana, para ser legível. */
+  variacaoSemanal: number | null;
+  ultimo: number | null;
+};
+
+export function serieDe(
+  eventos: EventoClinico[],
+  campo: "systolic" | "diastolic" | "glucose_mg_dl" | "weight_kg",
+  rotulo: string,
+  unidade: string,
+): Serie {
+  const pontos = eventos
+    .map((e) => ({ em: e.ocorrido_em, valor: e.dados[campo] }))
+    .filter((p): p is { em: string; valor: number } => typeof p.valor === "number")
+    .sort((a, b) => a.em.localeCompare(b.em));
+
+  /* Regressão simples sobre os últimos 60 dias. Dois pontos não fazem
+     tendência — com menos de três a resposta honesta é "não sei", e uma seta
+     desenhada a partir de duas medidas é a tela inventando conteúdo. */
+  const corte = Date.now() - 60 * 86400000;
+  const recentes = pontos.filter((p) => new Date(p.em).getTime() >= corte);
+  let variacaoSemanal: number | null = null;
+  if (recentes.length >= 3) {
+    const t0 = new Date(recentes[0].em).getTime();
+    const xs = recentes.map((p) => (new Date(p.em).getTime() - t0) / (7 * 86400000));
+    const ys = recentes.map((p) => p.valor);
+    const n = xs.length;
+    const mx = xs.reduce((a, b) => a + b, 0) / n;
+    const my = ys.reduce((a, b) => a + b, 0) / n;
+    const num = xs.reduce((acc, x, i) => acc + (x - mx) * (ys[i] - my), 0);
+    const den = xs.reduce((acc, x) => acc + (x - mx) ** 2, 0);
+    if (den > 0) variacaoSemanal = Math.round((num / den) * 10) / 10;
+  }
+
+  return {
+    rotulo,
+    unidade,
+    pontos,
+    variacaoSemanal,
+    ultimo: pontos.length ? pontos[pontos.length - 1].valor : null,
+  };
+}

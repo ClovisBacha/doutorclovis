@@ -36,6 +36,14 @@ import {
   type AcionamentoSos,
 } from "@/lib/acionamentos.functions";
 import { AlertaSosMedico } from "@/components/alerta-sos-medico";
+import { ProntuarioPaciente } from "@/components/prontuario-paciente";
+import {
+  fichaClinica,
+  prontuarioDaPaciente,
+  registrarDesfecho,
+  type EventoClinico,
+  type FichaClinica,
+} from "@/lib/clinical.functions";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
 import {
   ESTILO_SINAL,
@@ -9522,6 +9530,15 @@ function PatientDetailModal({
      específica. Quem clica numa paciente quer a paciente inteira. */
   const [ficha, setFicha] = useState<any | null>(null);
   const [sosDela, setSosDela] = useState<AcionamentoSos[]>([]);
+  /* O PRONTUÁRIO. Vem do fluxo unificado de eventos clínicos, que enxerga onze
+     fontes — contra as seis que o relatório antigo lia, e sem a janela de
+     catorze dias que fazia uma medida de vinte dias atrás aparecer como "—",
+     indistinguível de "ela nunca registrou". */
+  const [prontuario, setProntuario] = useState<EventoClinico[]>([]);
+  const [fichaClin, setFichaClin] = useState<FichaClinica | null>(null);
+  const [carregandoProntuario, setCarregandoProntuario] = useState(true);
+  const [prontuarioIncompleto, setProntuarioIncompleto] = useState(false);
+  const [registrandoDesfecho, setRegistrandoDesfecho] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -9546,6 +9563,19 @@ function PatientDetailModal({
         setSosDela(so.ok ? so.acionamentos : []);
       } catch {
         setSosDela([]);
+      }
+      try {
+        const [pr, fc] = await Promise.all([
+          prontuarioDaPaciente({ data: { accessToken: tk, pacienteId: p.id } }),
+          fichaClinica({ data: { accessToken: tk, pacienteId: p.id } }),
+        ]);
+        setProntuario(pr.ok ? pr.eventos : []);
+        setProntuarioIncompleto(!pr.ok || pr.incompleto);
+        setFichaClin(fc.ok ? fc.ficha : null);
+      } catch {
+        setProntuarioIncompleto(true);
+      } finally {
+        setCarregandoProntuario(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -9613,12 +9643,14 @@ function PatientDetailModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-xl"
+        className="flex max-h-[92svh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-card shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Cabeçalho: espelho do céu + bebê da semana */}
+        {/* Cabeçalho: espelho do céu + bebê da semana.
+            Mais baixo do que era: ocupava metade da altura útil do modal, e
+            quem abre a ficha de uma paciente às 13h50 não veio ver o desenho. */}
         <div
-          className="relative flex h-40 shrink-0 items-center justify-center"
+          className="relative flex h-24 shrink-0 items-center justify-center"
           style={{ background: gradientFor(period, 1) }}
         >
           {weeks ? (
@@ -9643,201 +9675,239 @@ function PatientDetailModal({
           </div>
         </div>
 
-        {/* Dados rápidos */}
-        <div className="flex flex-wrap gap-2 px-4 pt-3">
-          {weeks != null ? (
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              {/* Com os dias: conduta em 36s0d não é conduta em 36s6d, e a tela
-                  dela sempre mostrou os dois. */}
-              {weeks} semanas{p.days != null ? ` e ${p.days}d` : ""}
-            </span>
-          ) : p.birth_date ? (
-            /* Puérpera: antes o painel dizia "Sem data de gestação" para quem
-               já teve o bebê, enquanto a tela dela contava os dias de vida. */
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              🍼{" "}
-              {(() => {
-                const dias = Math.floor(
-                  (Date.now() - new Date(`${p.birth_date}T00:00:00`).getTime()) / 86400000,
+        {/* O PRONTUÁRIO — primeiro, porque é o que ele veio ver. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
+          <ProntuarioPaciente
+            ficha={fichaClin}
+            eventos={prontuario}
+            carregando={carregandoProntuario}
+            incompleto={prontuarioIncompleto}
+            registrando={registrandoDesfecho}
+            onRegistrarDesfecho={async (fonte, fonteId) => {
+              const chave = `${fonte}:${fonteId}`;
+              setRegistrandoDesfecho(chave);
+              try {
+                const r = await registrarDesfecho({
+                  data: { accessToken: await tokenFn(), fonte, fonteId, pacienteId: p.id },
+                });
+                if (!r.ok) throw new Error("recusado");
+                /* Some da lista de pendentes na hora, sem recarregar tudo: o
+                   `tratado_em` é o que a tela usa para filtrar. */
+                setProntuario((es) =>
+                  es.map((e) =>
+                    e.fonte === fonte && e.fonte_id === fonteId
+                      ? { ...e, tratado_em: new Date().toISOString() }
+                      : e,
+                  ),
                 );
-                if (dias < 0) return "recém-nascido";
-                if (dias < 14) return `${dias} ${dias === 1 ? "dia" : "dias"} de vida`;
-                const sem = Math.floor(dias / 7);
-                return `${sem} ${sem === 1 ? "semana" : "semanas"} de vida`;
-              })()}
-            </span>
-          ) : null}
-          {due && (
-            <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
-              DPP {due}
-            </span>
-          )}
-          {p.fetal_bpm != null && (
-            <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">
-              💓 {p.fetal_bpm} bpm
-            </span>
-          )}
-          {p.quiz_premium && (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-              ⭐ Premium
-            </span>
-          )}
-        </div>
+              } catch {
+                toast.error("Não consegui registrar. Tente de novo.");
+              } finally {
+                setRegistrandoDesfecho(null);
+              }
+            }}
+          />
 
-        {/* Histórico de emergências ANTES dos registros: se ela acionou o SOS,
+          {/* Dados rápidos — o espelho do bebê e os controles ficam DEPOIS do
+              prontuário, dentro da mesma rolagem. */}
+          <div className="flex flex-wrap gap-2 px-4 pt-3">
+            {weeks != null ? (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {/* Com os dias: conduta em 36s0d não é conduta em 36s6d, e a tela
+                  dela sempre mostrou os dois. */}
+                {weeks} semanas{p.days != null ? ` e ${p.days}d` : ""}
+              </span>
+            ) : p.birth_date ? (
+              /* Puérpera: antes o painel dizia "Sem data de gestação" para quem
+               já teve o bebê, enquanto a tela dela contava os dias de vida. */
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                🍼{" "}
+                {(() => {
+                  const dias = Math.floor(
+                    (Date.now() - new Date(`${p.birth_date}T00:00:00`).getTime()) / 86400000,
+                  );
+                  if (dias < 0) return "recém-nascido";
+                  if (dias < 14) return `${dias} ${dias === 1 ? "dia" : "dias"} de vida`;
+                  const sem = Math.floor(dias / 7);
+                  return `${sem} ${sem === 1 ? "semana" : "semanas"} de vida`;
+                })()}
+              </span>
+            ) : null}
+            {due && (
+              <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+                DPP {due}
+              </span>
+            )}
+            {p.fetal_bpm != null && (
+              <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">
+                💓 {p.fetal_bpm} bpm
+              </span>
+            )}
+            {p.quiz_premium && (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                ⭐ Premium
+              </span>
+            )}
+          </div>
+
+          {/* Histórico de emergências ANTES dos registros: se ela acionou o SOS,
               é a primeira coisa que o médico precisa ver ao abrir a ficha. */}
-        {sosDela.length > 0 && (
-          <div className="px-4 pt-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600 dark:text-rose-300">
-              🆘 Acionamentos de emergência ({sosDela.length})
-            </p>
-            <div className="mt-1.5 space-y-1.5">
-              {sosDela.slice(0, 5).map((a) => (
-                <div
-                  key={a.id}
-                  className="rounded-xl border border-rose-200 bg-rose-50/60 p-2.5 dark:border-rose-500/30 dark:bg-rose-500/10"
-                >
-                  <p className="text-[12px] font-semibold text-foreground">
-                    {new Date(a.created_at).toLocaleString("pt-BR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "2-digit",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {a.motivo ? ` · ${a.motivo}` : ""}
-                    {a.ficha?.semana ? ` · ${a.ficha.semana}` : ""}
+          {sosDela.length > 0 && (
+            <div className="px-4 pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600 dark:text-rose-300">
+                🆘 Acionamentos de emergência ({sosDela.length})
+              </p>
+              <div className="mt-1.5 space-y-1.5">
+                {sosDela.slice(0, 5).map((a) => (
+                  <div
+                    key={a.id}
+                    className="rounded-xl border border-rose-200 bg-rose-50/60 p-2.5 dark:border-rose-500/30 dark:bg-rose-500/10"
+                  >
+                    <p className="text-[12px] font-semibold text-foreground">
+                      {new Date(a.created_at).toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {a.motivo ? ` · ${a.motivo}` : ""}
+                      {a.ficha?.semana ? ` · ${a.ficha.semana}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                      {a.atendido_em
+                        ? `Atendido em ${new Date(a.atendido_em).toLocaleString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}`
+                        : "Sem desfecho registrado"}
+                      {a.address ? ` · ${a.address}` : ""}
+                    </p>
+                  </div>
+                ))}
+                {sosDela.length > 5 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    + {sosDela.length - 5} mais antigos
                   </p>
-                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                    {a.atendido_em
-                      ? `Atendido em ${new Date(a.atendido_em).toLocaleString("pt-BR", {
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Ficha clínica — o que ela registrou no app */}
+          {ficha && (
+            <div className="px-4 pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                🩺 Registros dela
+              </p>
+              {/* Sem esta linha, "sem etiqueta" era lido como "está tudo bem" — e
+                cobre também "não mediu" e "mediu errado". A tela nunca deve
+                deixar o médico concluir nada a partir da AUSÊNCIA de marca. */}
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                Medidas informadas por ela no app, não aferidas em consultório. Sem etiqueta
+                significa dentro da faixa de referência ou sem registro — não é diagnóstico.
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {medidas.map(({ rot, v }) => (
+                  <div key={rot} className="rounded-2xl border border-border p-2.5 text-center">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {rot}
+                    </p>
+                    <p className="mt-0.5 text-sm font-bold text-foreground">{v ? v.valor : "—"}</p>
+                    {v?.quando && (
+                      <p className="text-[9.5px] text-muted-foreground">
+                        {new Date(`${String(v.quando).slice(0, 10)}T00:00:00`).toLocaleDateString(
+                          "pt-BR",
+                        )}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                  📓 {(ficha.journals ?? []).length} no diário
+                </span>
+                <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                  🦶 {(ficha.kicks ?? []).length} sessões de chutes
+                </span>
+                <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                  ❓ {(ficha.pendingQuestions ?? []).length} perguntas
+                </span>
+              </div>
+              {/* Dados clínicos do perfil: o que ela levaria escrito na
+                carteirinha. É o que muda a conduta numa emergência. */}
+              {(ficha.profile?.blood_type ||
+                ficha.profile?.allergies ||
+                ficha.profile?.medications) && (
+                <div className="mt-2 rounded-2xl bg-secondary/50 p-2.5 text-[11.5px] leading-snug">
+                  {ficha.profile?.blood_type && (
+                    <p>
+                      <span className="font-semibold">Sangue:</span> {ficha.profile.blood_type}
+                    </p>
+                  )}
+                  {ficha.profile?.allergies && (
+                    <p>
+                      <span className="font-semibold">Alergias:</span> {ficha.profile.allergies}
+                    </p>
+                  )}
+                  {ficha.profile?.medications && (
+                    <p>
+                      <span className="font-semibold">Medicamentos:</span>{" "}
+                      {ficha.profile.medications}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Conversa com a IA (somente leitura) */}
+          <div className="py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              💬 Conversa com a IA
+            </p>
+            {messages === null ? (
+              <div className="mt-2 space-y-2">
+                <div className="h-12 animate-pulse rounded-xl bg-secondary" />
+                <div className="h-12 animate-pulse rounded-xl bg-secondary" />
+              </div>
+            ) : messages.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Ela ainda não conversou com a IA (ou o histórico ainda não foi ativado no banco).
+              </p>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {messages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
+                        m.role === "user"
+                          ? "rounded-br-sm bg-primary/10 text-foreground"
+                          : "rounded-bl-sm bg-secondary"
+                      }`}
+                    >
+                      {m.content}
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {m.role === "user" ? "Paciente" : "IA"} ·{" "}
+                        {new Date(m.created_at).toLocaleString("pt-BR", {
                           day: "2-digit",
                           month: "2-digit",
                           hour: "2-digit",
                           minute: "2-digit",
-                        })}`
-                      : "Sem desfecho registrado"}
-                    {a.address ? ` · ${a.address}` : ""}
-                  </p>
-                </div>
-              ))}
-              {sosDela.length > 5 && (
-                <p className="text-[11px] text-muted-foreground">
-                  + {sosDela.length - 5} mais antigos
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Ficha clínica — o que ela registrou no app */}
-        {ficha && (
-          <div className="px-4 pt-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              🩺 Registros dela
-            </p>
-            {/* Sem esta linha, "sem etiqueta" era lido como "está tudo bem" — e
-                cobre também "não mediu" e "mediu errado". A tela nunca deve
-                deixar o médico concluir nada a partir da AUSÊNCIA de marca. */}
-            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-              Medidas informadas por ela no app, não aferidas em consultório. Sem etiqueta significa
-              dentro da faixa de referência ou sem registro — não é diagnóstico.
-            </p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              {medidas.map(({ rot, v }) => (
-                <div key={rot} className="rounded-2xl border border-border p-2.5 text-center">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{rot}</p>
-                  <p className="mt-0.5 text-sm font-bold text-foreground">{v ? v.valor : "—"}</p>
-                  {v?.quando && (
-                    <p className="text-[9.5px] text-muted-foreground">
-                      {new Date(`${String(v.quando).slice(0, 10)}T00:00:00`).toLocaleDateString(
-                        "pt-BR",
-                      )}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-              <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
-                📓 {(ficha.journals ?? []).length} no diário
-              </span>
-              <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
-                🦶 {(ficha.kicks ?? []).length} sessões de chutes
-              </span>
-              <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
-                ❓ {(ficha.pendingQuestions ?? []).length} perguntas
-              </span>
-            </div>
-            {/* Dados clínicos do perfil: o que ela levaria escrito na
-                carteirinha. É o que muda a conduta numa emergência. */}
-            {(ficha.profile?.blood_type ||
-              ficha.profile?.allergies ||
-              ficha.profile?.medications) && (
-              <div className="mt-2 rounded-2xl bg-secondary/50 p-2.5 text-[11.5px] leading-snug">
-                {ficha.profile?.blood_type && (
-                  <p>
-                    <span className="font-semibold">Sangue:</span> {ficha.profile.blood_type}
-                  </p>
-                )}
-                {ficha.profile?.allergies && (
-                  <p>
-                    <span className="font-semibold">Alergias:</span> {ficha.profile.allergies}
-                  </p>
-                )}
-                {ficha.profile?.medications && (
-                  <p>
-                    <span className="font-semibold">Medicamentos:</span> {ficha.profile.medications}
-                  </p>
-                )}
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        )}
-
-        {/* Conversa com a IA (somente leitura) */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-            💬 Conversa com a IA
-          </p>
-          {messages === null ? (
-            <div className="mt-2 space-y-2">
-              <div className="h-12 animate-pulse rounded-xl bg-secondary" />
-              <div className="h-12 animate-pulse rounded-xl bg-secondary" />
-            </div>
-          ) : messages.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">
-              Ela ainda não conversou com a IA (ou o histórico ainda não foi ativado no banco).
-            </p>
-          ) : (
-            <div className="mt-2 space-y-2">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
-                      m.role === "user"
-                        ? "rounded-br-sm bg-primary/10 text-foreground"
-                        : "rounded-bl-sm bg-secondary"
-                    }`}
-                  >
-                    {m.content}
-                    <p className="mt-1 text-[10px] text-muted-foreground">
-                      {m.role === "user" ? "Paciente" : "IA"} ·{" "}
-                      {new Date(m.created_at).toLocaleString("pt-BR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
