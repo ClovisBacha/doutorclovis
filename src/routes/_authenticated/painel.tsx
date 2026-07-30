@@ -135,6 +135,7 @@ import {
 } from "@/lib/google-calendar.functions";
 import { DoctorBadge } from "@/components/doctor-badge";
 import {
+  encerrarAcompanhamento,
   listPatientRequests,
   respondPatientRequest,
   listMyPatients,
@@ -786,7 +787,9 @@ function PainelPage() {
         )}
         {tab === "Pacientes 👩‍🍼" && <PacientesSection tokenFn={token} />}
         {tab === "Lives" && <LivesSection tokenFn={token} />}
-        {tab === "Meu Perfil" && <MeuPerfilSection tokenFn={token} />}
+        {tab === "Meu Perfil" && (
+          <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
+        )}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
         )}
@@ -6913,9 +6916,15 @@ function TrancadoCard({
 function ConsumoCard({
   uso,
   plano,
+  onUpgrade,
+  onVerPacientes,
 }: {
   uso: { pacientes: number; maxPacientes: number | null; rotulo: string; expira: string | null };
   plano: string;
+  /** Leva para a cobrança — é o clique que o momento do teto pede. */
+  onUpgrade: () => void;
+  /** Leva para a lista, onde agora dá para encerrar um acompanhamento. */
+  onVerPacientes: () => void;
 }) {
   const semTeto = uso.maxPacientes == null;
   const pct = semTeto ? 0 : Math.min(100, Math.round((uso.pacientes / uso.maxPacientes!) * 100));
@@ -6967,16 +6976,54 @@ function ConsumoCard({
         )}
       </div>
 
+      {/* O TETO É O MOMENTO DA VENDA, e ele estava passando em branco.
+
+          Este é o instante exato em que o valor já foi provado (ele tem
+          pacientes de verdade aqui) e a dor é agora (quer aceitar mais uma e não
+          pode). Um aviso de texto aqui é a mensagem certa sem a ação certa — o
+          botão de mudar de plano ficava três blocos abaixo, e ele precisava
+          procurar.
+
+          A frase também mudou: "abrir uma vaga" era uma instrução impossível
+          quando escrevi, porque não existia como soltar uma paciente. Agora
+          existe, e as duas saídas aparecem juntas. */}
       {cheio && (
-        <p className="mt-3 rounded-2xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-rose-900 dark:bg-rose-500/10 dark:text-rose-200">
-          <strong>Você está no limite.</strong> A próxima paciente que pedir para te acompanhar não
-          vai poder ser aceita até você abrir uma vaga ou mudar de plano.
-        </p>
+        <div className="mt-3 rounded-2xl bg-rose-50 px-3.5 py-3 dark:bg-rose-500/10">
+          <p className="text-[12.5px] leading-snug text-rose-900 dark:text-rose-200">
+            <strong>Você está no limite de {uso.maxPacientes} pacientes.</strong> A próxima que
+            pedir para te acompanhar não poderá ser aceita.
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <button
+              onClick={onUpgrade}
+              className="press rounded-full bg-rose-600 px-4 py-2 text-xs font-bold text-white"
+            >
+              Aumentar meu limite →
+            </button>
+            <button
+              onClick={onVerPacientes}
+              className="rounded-full border border-rose-300 px-4 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300"
+            >
+              Encerrar um acompanhamento
+            </button>
+          </div>
+        </div>
       )}
       {perto && (
-        <p className="mt-3 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-          Faltam {uso.maxPacientes! - uso.pacientes} vagas no seu plano.
-        </p>
+        <div className="mt-3 rounded-2xl bg-amber-50 px-3.5 py-3 dark:bg-amber-500/10">
+          <p className="text-[12.5px] leading-snug text-amber-900 dark:text-amber-200">
+            {uso.maxPacientes! - uso.pacientes === 1
+              ? "Falta 1 vaga no seu plano."
+              : `Faltam ${uso.maxPacientes! - uso.pacientes} vagas no seu plano.`}{" "}
+            Depois disso, quem pedir para te acompanhar fica esperando.
+          </p>
+          <button
+            onClick={onUpgrade}
+            className="press mt-2.5 rounded-full bg-amber-600 px-4 py-2 text-xs font-bold text-white"
+          >
+            Ver planos
+          </button>
+        </div>
       )}
       {diasRestantes != null && diasRestantes <= 3 && (
         <p className="mt-3 rounded-2xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-rose-900 dark:bg-rose-500/10 dark:text-rose-200">
@@ -7285,7 +7332,14 @@ function EnderecosCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   );
 }
 
-function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function MeuPerfilSection({
+  tokenFn,
+  onIrParaPacientes,
+}: {
+  tokenFn: () => Promise<string>;
+  /** Trocar de aba mora no painel; esta seção só pede. */
+  onIrParaPacientes: () => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exists, setExists] = useState(false);
@@ -7587,8 +7641,25 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           </ul>
         </div>
       )}
-      {uso && <ConsumoCard uso={uso} plano={plan} />}
-      <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
+      {uso && (
+        <ConsumoCard
+          uso={uso}
+          plano={plan}
+          onUpgrade={() => {
+            /* A cobrança vive nesta mesma aba, logo abaixo: rolar até ela é
+               mais honesto que abrir outra tela e perder o contexto do número
+               que ele acabou de ler. */
+            document
+              .getElementById("cobranca")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          onVerPacientes={onIrParaPacientes}
+        />
+      )}
+      {/* Âncora para o botão do teto: "aumentar meu limite" rola até aqui. */}
+      <div id="cobranca">
+        <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
+      </div>
       <EnderecosCard tokenFn={tokenFn} />
       <DoctorInviteCard tokenFn={tokenFn} />
       <ReferralCard tokenFn={tokenFn} />
@@ -8362,6 +8433,38 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
   // Ativa/desativa o premium do quiz (após o PIX, o médico libera aqui)
   const [premiumBusyId, setPremiumBusyId] = useState<string | null>(null);
+  const [encerrandoId, setEncerrandoId] = useState<string | null>(null);
+  const [confirmarEncerrar, setConfirmarEncerrar] = useState<string | null>(null);
+
+  /* Encerrar o acompanhamento. Dois toques: o primeiro arma, o segundo executa,
+     e a confirmação some sozinha em 4s para não ficar armada esperando um toque
+     errado depois. */
+  async function encerrar(p: LinkedPatient) {
+    if (confirmarEncerrar !== p.id) {
+      setConfirmarEncerrar(p.id);
+      setTimeout(() => setConfirmarEncerrar((c) => (c === p.id ? null : c)), 4000);
+      return;
+    }
+    setConfirmarEncerrar(null);
+    setEncerrandoId(p.id);
+    try {
+      const r = await encerrarAcompanhamento({
+        data: { accessToken: await tokenFn(), pacienteId: p.id },
+      });
+      if (!r.ok) {
+        toast.error("Não foi possível encerrar agora.");
+        return;
+      }
+      setPatients((ps) => ps.filter((x) => x.id !== p.id));
+      toast.success(
+        `Acompanhamento de ${(p.display_name ?? "").split(" ")[0] || "a paciente"} encerrado. A vaga do seu plano voltou.`,
+      );
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setEncerrandoId(null);
+    }
+  }
   async function togglePremium(p: LinkedPatient) {
     setPremiumBusyId(p.id);
     try {
@@ -8595,6 +8698,26 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                         }`}
                       >
                         {premiumBusyId === p.id ? "…" : p.quiz_premium ? "⭐ Premium" : "☆ Premium"}
+                      </button>
+                      {/* Encerrar acompanhamento. Confirmação em DOIS toques e
+                          não um `confirm()` do navegador: o segundo toque é o
+                          mesmo botão dizendo o que vai acontecer, o que é mais
+                          claro no celular e não pode ser dispensado por engano. */}
+                      <button
+                        onClick={() => encerrar(p)}
+                        disabled={encerrandoId === p.id}
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                          confirmarEncerrar === p.id
+                            ? "bg-rose-600 text-white"
+                            : "border border-border text-muted-foreground hover:border-rose-400 hover:text-rose-600"
+                        }`}
+                        title="Encerrar o acompanhamento desta paciente"
+                      >
+                        {encerrandoId === p.id
+                          ? "…"
+                          : confirmarEncerrar === p.id
+                            ? "Confirmar?"
+                            : "Encerrar"}
                       </button>
                     </li>
                   );

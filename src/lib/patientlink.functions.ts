@@ -468,6 +468,74 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+/**
+ * Encerra o acompanhamento de uma paciente.
+ *
+ * Não existia, e a falta custava dos dois lados. O médico chegava no teto do
+ * plano com pacientes que já tiveram bebê ocupando vaga, e a única saída era
+ * pagar mais — upgrade pelo motivo errado, que vira cancelamento no mês
+ * seguinte. Do lado dela, ficava presa a um médico que não a acompanha mais e
+ * sem conseguir escolher outro.
+ *
+ * O vínculo é desfeito, não apagado: o histórico dela continua inteiro no app
+ * dela, e os acionamentos de SOS mantêm o `doctor_id` congelado de quando
+ * aconteceram — quem era o responsável naquele dia não muda porque o
+ * acompanhamento terminou depois.
+ */
+export const encerrarAcompanhamento = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), pacienteId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireDoctor(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    /* `doctor_id` no próprio WHERE: uma paciente de outro consultório não
+       afeta linha nenhuma, sem checagem separada que abriria corrida. */
+    const { data: mexeu, error } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .update({ doctor_id: null, updated_at: new Date().toISOString() })
+      .eq("id", data.pacienteId)
+      .eq("doctor_id", user.id)
+      .select("id");
+    if (error || !mexeu?.length) return { ok: false as const };
+
+    /* A solicitação antiga volta a "declined" e não some: sem isso, o par
+       ficaria com um pedido "accepted" de um vínculo que não existe mais, e ela
+       não conseguiria pedir de novo. */
+    try {
+      await (supabaseAdmin as any)
+        .from("patient_link_requests")
+        .update({ status: "declined", decided_at: new Date().toISOString() })
+        .eq("patient_id", data.pacienteId)
+        .eq("doctor_id", user.id)
+        .eq("status", "accepted");
+    } catch {
+      /* o vínculo já caiu, que é o que importa */
+    }
+
+    /* AVISA ELA. Descobrir sozinha que o médico sumiu do app é a pior forma de
+       saber — e ela precisa saber para escolher outro. */
+    try {
+      const { data: d } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const medico = ((d?.display_name as string) || "Seu médico").trim();
+      const { sendPushToUser } = await import("./push.server");
+      await sendPushToUser(data.pacienteId, {
+        title: "Acompanhamento encerrado",
+        body: `${medico} encerrou o acompanhamento no app. Você pode escolher outro obstetra em Meu médico.`,
+        url: "/minha-conta",
+      });
+    } catch {
+      /* melhor esforço — o vínculo já foi desfeito */
+    }
+    return { ok: true as const };
+  });
+
 /** Lista as pacientes vinculadas ao médico logado. */
 export const listMyPatients = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))
