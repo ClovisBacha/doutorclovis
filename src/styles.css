@@ -989,6 +989,12 @@ button:active > .duo3d {
    status. Elementos fixos/sticky no topo compensam com --safe-top. */
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
+  /* O par de baixo. Existir como VARIÁVEL e não como `env()` solto em cada
+     lugar tem duas razões: a conta do rodapé aparece em quatro pontos e
+     precisa bater entre eles, e um teste automatizado consegue redefinir a
+     variável para medir o layout com a geometria real de um iPhone — coisa que
+     `env()` não permite, porque no navegador de teste ele vale zero. */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ── Segundo Cérebro: visual tecnológico do card de score ─────────────── */

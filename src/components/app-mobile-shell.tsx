@@ -475,7 +475,7 @@ export function AppBottomNav({
     <nav
       aria-label="Navegação do app"
       className="pointer-events-none fixed inset-x-0 z-40 flex justify-center md:hidden print:hidden"
-      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
+      style={{ bottom: "calc(var(--safe-bottom) + 10px)" }}
     >
       {/* Mesma receita de vidro dos cartões da home (`glass` em AppHomeScreen):
           verniz diagonal por cima de uma base clara, desfoque com saturação
@@ -1003,6 +1003,31 @@ export function AppHomeScreen({
     : (medico!.specialty ?? medico!.title ?? "").trim();
   const medCrm = semMedico ? "" : (medico!.crm ?? "").trim();
 
+  /* A MOLDURA do iOS em modo standalone.
+
+     Fora da área segura — atrás do relógio, em volta do indicador de início — o
+     iOS não pinta o conteúdo da página: pinta o fundo do DOCUMENTO. Como o
+     `body` deste app é creme, sobrava uma faixa clara em cima e embaixo do céu,
+     justamente no aparelho em que a imersão importa mais.
+
+     Enquanto a home está montada, a raiz recebe a cor do céu do momento e volta
+     ao que era ao sair — as outras telas têm fundo claro de propósito. É o
+     `documentElement` e não o `body`: é a cor da raiz que o iOS propaga para
+     essa moldura. */
+  useEffect(() => {
+    const raiz = document.documentElement;
+    const antes = raiz.style.backgroundColor;
+    /* `gradientFor` devolve um gradiente, e a moldura precisa de uma COR
+       chapada. A primeira cor do gradiente é a do topo do céu, que é
+       exatamente a borda que encosta na barra de status. */
+    const grad = gradientFor(period, weather?.code ?? 1);
+    const primeira = grad.match(/(#[0-9a-f]{3,8}|rgba?\([^)]+\)|oklch\([^)]+\)|hsla?\([^)]+\))/i);
+    if (primeira) raiz.style.backgroundColor = primeira[0];
+    return () => {
+      raiz.style.backgroundColor = antes;
+    };
+  }, [period, weather?.code]);
+
   return (
     /* Sem `pb` aqui: a página que renderiza esta tela (minha-conta) já reserva
        `7rem + safe-area` no rodapé para a barra flutuante, e as duas folgas
@@ -1017,7 +1042,7 @@ export function AppHomeScreen({
         /* O céu sobe ATÉ O TOPO DA TELA, por baixo da barra de status.
 
            A página empurra o conteúdo para baixo pela altura da safe area
-           (`pt-[calc(0.5rem+env(safe-area-inset-top))]`), e este bloco só subia
+           (`pt-[calc(0.5rem+var(--safe-top))]`), e este bloco só subia
            8px — então no app instalado sobrava uma faixa branca acima do céu,
            bem onde fica o relógio. No Safari isso não aparecia porque a barra do
            navegador ocupava aquele espaço; em modo standalone, não ocupa.
@@ -1025,7 +1050,7 @@ export function AppHomeScreen({
            A margem negativa cancela a folga inteira e o padding devolve o mesmo
            tanto por dentro: a arte encosta no topo do aparelho, e o ícone do
            perfil e o clima continuam abaixo do relógio, onde dá para tocar. */
-        className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(0.5rem+env(safe-area-inset-top))] pt-[calc(0.5rem+env(safe-area-inset-top))]"
+        className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(0.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
         style={{ background: gradientFor(period, weather?.code ?? 1) }}
       >
         {/* Arte do momento do dia (tema V2). Fica ACIMA do gradiente, que
@@ -1092,7 +1117,7 @@ export function AppHomeScreen({
               O bebê é o protagonista e fica com TODO o espaço que sobrar —
               por isso `h-[100svh]` aqui e não `min-h`: o que não couber vai
               para a dobra de baixo em vez de espremer o bebê. ── */}
-          <div className="flex h-[100svh] flex-col pt-[calc(0.5rem+env(safe-area-inset-top))] pb-[calc(env(safe-area-inset-bottom,0px)+6rem)] short:pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)]">
+          <div className="flex h-[100svh] flex-col pt-[calc(0.5rem+var(--safe-top))] pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]">
             {/* ── Barra de topo flutuante: menu + clima ─────────────── */}
             <div className="flex items-start justify-between gap-3">
               <button
