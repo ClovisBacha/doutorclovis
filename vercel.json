@@ -2,10 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "bun run build",
   "installCommand": "bun install",
-  "crons": [{ "path": "/api/push-weekly-tick", "schedule": "0 12 * * *" }],
-  "functions": {
-    "**": {
-      "maxDuration": 30
-    }
-  }
+  "crons": [{ "path": "/api/push-weekly-tick", "schedule": "0 12 * * *" }]
 }
