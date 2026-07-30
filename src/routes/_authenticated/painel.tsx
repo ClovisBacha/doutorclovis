@@ -23,6 +23,8 @@ import {
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
+import { buscarCep, digitosCep, formatarCep } from "@/lib/cep";
+import { PerfilProgresso, itensDoPerfil } from "@/components/perfil-progresso";
 import {
   MOEDAS,
   centavosDe,
@@ -6801,6 +6803,7 @@ function EnderecosCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [carregando, setCarregando] = useState(true);
   const [editando, setEditando] = useState<Partial<DoctorAddress> | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
 
   async function carregar() {
     try {
@@ -6992,11 +6995,49 @@ function EnderecosCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
             </div>
             <div>
               <label className={label}>CEP</label>
+              {/* Preenche rua, bairro, cidade e UF sozinho.
+              
+                  Não é só conforto: a CIDADE digitada à mão é o que a busca por
+                  proximidade compara, e "Belo Horizonte", "belo horizonte" e
+                  "BH" são três cidades diferentes para um `ilike`. Vindo do CEP,
+                  ela sai sempre escrita igual. */}
               <input
-                value={editando.zip ?? ""}
-                onChange={(e) => setEditando((v) => ({ ...v, zip: e.target.value }))}
+                value={formatarCep(editando.zip ?? "")}
+                onChange={async (e) => {
+                  const bruto = e.target.value;
+                  setEditando((v) => (v ? { ...v, zip: formatarCep(bruto) } : v));
+                  if (digitosCep(bruto).length !== 8) return;
+                  setBuscandoCep(true);
+                  try {
+                    const end = await buscarCep(bruto);
+                    if (!end) {
+                      toast.error("CEP não encontrado — preencha à mão.");
+                      return;
+                    }
+                    setEditando((v) =>
+                      v
+                        ? {
+                            ...v,
+                            // Não sobrescreve o que ele já digitou: se a rua
+                            // está preenchida, quem manda é ele.
+                            street: (v.street ?? "").trim() || end.rua,
+                            city: (v.city ?? "").trim() || end.cidade,
+                            state: (v.state ?? "").trim() || end.uf,
+                          }
+                        : v,
+                    );
+                    toast.success(`${end.cidade}/${end.uf} ✓`);
+                  } finally {
+                    setBuscandoCep(false);
+                  }
+                }}
+                placeholder="30140-071"
+                inputMode="numeric"
                 className={input}
               />
+              {buscandoCep && (
+                <p className="mt-1 text-[11px] text-muted-foreground">Buscando endereço…</p>
+              )}
             </div>
             <div>
               <label className={label}>Telefone deste local</label>
@@ -7271,6 +7312,9 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
      das pendências vira uma lista abaixo dele. */
   const faltaEmergencia = !form.crm.trim() || form.whatsapp.replace(/\D/g, "").length < 10;
   const outrasPendencias = pendencias.filter((p) => p.campo !== "crm" && p.campo !== "whatsapp");
+  /* O servidor já respondeu sobre o endereço: se ele não está entre as
+     pendências, existe. Reconsultar aqui seria uma segunda fonte de verdade. */
+  const temEndereco = !pendencias.some((p) => p.campo === "endereco");
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -7291,6 +7335,30 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           </p>
         </div>
       )}
+      {/* Progresso do perfil, com o EFEITO de cada campo faltando. Fica acima do
+          aviso de pendências porque responde outra pergunta: aquele diz "o que
+          falta", este diz "quanto falta e o que isso te custa". */}
+      {!loading && (
+        <PerfilProgresso
+          itens={itensDoPerfil({
+            display_name: form.display_name,
+            crm: form.crm,
+            whatsapp: form.whatsapp,
+            education: form.education,
+            bio: form.bio,
+            specialty: form.specialty,
+            accepts_insurance: form.accepts_insurance,
+            accepts_private: form.accepts_private,
+            insurances: form.insurances,
+            precoCentavos: centavosDe(valorTexto),
+            /* O endereço vem da lista do card abaixo; a foto ainda não existe
+               como campo, então não é cobrada. */
+            temEndereco: temEndereco,
+            temFoto: true,
+          })}
+        />
+      )}
+
       {/* Cadastro incompleto não tranca o painel — só empurra ele para baixo na
           busca da paciente. Trancar seria repetir o erro que deixou o médico
           preso na tela de dados: o caminho certo é dizer o que falta e por quê,

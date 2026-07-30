@@ -6,6 +6,11 @@ import { registerDoctor, getMyDoctor } from "@/lib/doctors.functions";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
 import { pendenciasDoMedico } from "@/lib/doctor-required";
 import { CampoComOutro } from "@/components/campo-com-outro";
+import { PerfilProgresso, itensDoPerfil } from "@/components/perfil-progresso";
+import { apagarRascunho, lerRascunho, quandoRascunho, salvarRascunho } from "@/lib/rascunho";
+
+/** Chave do rascunho deste formulário. */
+const RASCUNHO_CADASTRO = "obst_rascunho_cadastro_medico";
 import { CampoFormacoes } from "@/components/campo-formacoes";
 import { TITULOS_MEDICO, ESPECIALIDADES_MEDICO, montarFormacoes } from "@/lib/medico-opcoes";
 import {
@@ -79,6 +84,8 @@ function CadastroMedicoPage() {
      reescrever "450," para "450" no meio da digitação. */
   const [moeda, setMoeda] = useState<MoedaChave>("BRL");
   const [valorTexto, setValorTexto] = useState("");
+  /* Quando o rascunho salvo foi gravado — some depois que ele muda algo. */
+  const [rascunhoDe, setRascunhoDe] = useState("");
 
   /* As duas metades do CRM têm ESTADO PRÓPRIO, e isso é o conserto de um bug meu.
   
@@ -96,6 +103,43 @@ function CadastroMedicoPage() {
   const [crmUf, setCrmUf] = useState("");
   const [crmNumero, setCrmNumero] = useState("");
   const crmCompleto = juntarCrm(crmUf, crmNumero);
+
+  /* RASCUNHO. Quinze campos, preenchidos uma vez na vida, quase sempre no
+     celular entre uma coisa e outra: uma ligação ou o navegador reciclando a aba
+     levava tudo. Fica no aparelho — rascunho é de quem digita, não da
+     plataforma — e some ao concluir ou depois de uma semana. */
+  useEffect(() => {
+    const r = lerRascunho<{
+      profile: typeof profile;
+      formacoes: Record<string, string>;
+      crmUf: string;
+      crmNumero: string;
+      moeda: MoedaChave;
+      valorTexto: string;
+    }>(RASCUNHO_CADASTRO);
+    if (!r) return;
+    if (r.profile) setProfile((p) => ({ ...p, ...r.profile }));
+    if (r.formacoes) setFormacoes(r.formacoes);
+    if (r.crmUf) setCrmUf(r.crmUf);
+    if (r.crmNumero) setCrmNumero(r.crmNumero);
+    if (r.moeda) setMoeda(r.moeda);
+    if (r.valorTexto) setValorTexto(r.valorTexto);
+    setRascunhoDe(quandoRascunho(RASCUNHO_CADASTRO));
+  }, []);
+
+  useEffect(() => {
+    // Só depois que houver algo a salvar: gravar o formulário vazio no primeiro
+    // render criaria um "rascunho" que não é rascunho de nada.
+    if (!profile.display_name && !crmUf && !crmNumero && !profile.whatsapp) return;
+    salvarRascunho(RASCUNHO_CADASTRO, {
+      profile,
+      formacoes,
+      crmUf,
+      crmNumero,
+      moeda,
+      valorTexto,
+    });
+  }, [profile, formacoes, crmUf, crmNumero, moeda, valorTexto]);
 
   /* Guarda a INTENÇÃO de ser médico no aparelho.
   
@@ -411,6 +455,7 @@ function CadastroMedicoPage() {
       } catch {
         /* sem storage, sem problema */
       }
+      apagarRascunho(RASCUNHO_CADASTRO);
       setStep("pronto");
     } catch {
       toast.error("Falha de conexão — tente novamente.");
@@ -587,6 +632,39 @@ function CadastroMedicoPage() {
             onSubmit={submitPerfil}
             className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
           >
+            {/* Rascunho recuperado: dizer, senão ele estranha campos preenchidos
+                que não lembra de ter digitado agora. */}
+            {rascunhoDe && (
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3">
+                <p className="text-[12px] leading-snug text-foreground">
+                  Recuperamos o que você tinha escrito {rascunhoDe}. Continue de onde parou.
+                </p>
+              </div>
+            )}
+
+            {/* Barra de progresso no TOPO, em modo compacto: um passo por vez.
+                A lista inteira de pendências antes de terminar o formulário
+                desanima em vez de guiar. */}
+            <PerfilProgresso
+              compacto
+              itens={itensDoPerfil({
+                display_name: profile.display_name,
+                crm: crmCompleto,
+                whatsapp: profile.whatsapp,
+                education: montarFormacoes(formacoes),
+                bio: profile.bio,
+                specialty: profile.specialty,
+                accepts_insurance: profile.accepts_insurance,
+                accepts_private: profile.accepts_private,
+                insurances: profile.insurances,
+                precoCentavos: centavosDe(valorTexto),
+                /* Endereço e foto entram no painel, depois do cadastro — cobrar
+                   aqui seria pedir algo que esta tela não oferece. */
+                temEndereco: true,
+                temFoto: true,
+              })}
+            />
+
             <div>
               <label className={label}>Nome completo *</label>
               <input
