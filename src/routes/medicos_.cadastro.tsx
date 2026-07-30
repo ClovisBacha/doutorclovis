@@ -104,8 +104,20 @@ function CadastroMedicoPage() {
          condições juntas — `?papel=medico` e conta recém-criada — cobrem o
          médico do Google sem alcançar ninguém que já usava o app. */
       try {
+        /* A pista agora vem do APARELHO, não da URL.
+        
+           O `?papel=medico` que existia aqui tinha um problema fora do nosso
+           controle: a allowlist de Redirect URLs do Supabase compara a URL
+           inteira, e a entrada cadastrada é `.../medicos/cadastro`, sem curinga.
+           Com a query string o `redirectTo` era recusado em silêncio e a pessoa
+           era devolvida na Site URL do projeto — a home. O médico entrava com o
+           Google e reaparecia no app da gestante, sem erro nenhum na tela.
+        
+           A chave no `localStorage` é gravada antes de sair para o Google e
+           sobrevive à volta, inclusive quando o Supabase ignora o destino. */
+        const { querSerMedico } = await import("@/lib/intencao-medico");
         const veioComoMedico =
-          new URLSearchParams(window.location.search).get("papel") === "medico";
+          querSerMedico() || new URLSearchParams(window.location.search).get("papel") === "medico";
         const nascidaAgora = Date.now() - Date.parse(data.session.user.created_at || "") < 120_000;
         if (veioComoMedico && nascidaAgora && data.session.user.user_metadata?.role !== "doctor") {
           await supabase.auth.updateUser({ data: { role: "doctor" } });
@@ -177,7 +189,10 @@ function CadastroMedicoPage() {
                e-mail e caía na tela "configure sua data de gestação", com o
                cadastro profissional pela metade e nenhuma pista de como voltar.
                O `?papel=medico` sobrevive à ida e volta e traz ele para cá. */
-            emailRedirectTo: `${window.location.origin}/medicos/cadastro?papel=medico`,
+            /* Sem query string, pelo mesmo motivo do OAuth: a allowlist do
+               Supabase compara a URL inteira e a entrada cadastrada não tem
+               curinga. A intenção de ser médico vem do aparelho. */
+            emailRedirectTo: `${window.location.origin}/medicos/cadastro`,
           },
         });
         // Anti-enumeração do Supabase: e-mail já cadastrado retorna "sucesso"

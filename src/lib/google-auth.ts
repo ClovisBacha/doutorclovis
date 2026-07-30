@@ -15,18 +15,31 @@ import { supabase } from "@/integrations/supabase/client";
 export async function signInWithGoogle(role: "paciente" | "medico"): Promise<Error | null> {
   if (typeof window === "undefined") return null;
   const origin = window.location.origin;
-  /* `?papel=medico` na volta do Google.
-     
-     O OAuth não deixa gravar `user_metadata` no momento do cadastro, e é esse
-     metadata que separa a conta de médico da de gestante. Sem nenhuma pista,
-     quem entrasse por aqui viraria uma gestante aos olhos do app — o mesmo bug
-     do cadastro por e-mail, por outra porta.
-     
-     O parâmetro é a pista, e ela é explícita: só existe quando a pessoa clicou
-     em "sou médico". Marcar o papel só porque alguém ABRIU /medicos/cadastro
-     seria pior — tiraria o app da gestante de qualquer paciente curiosa. */
-  const redirectTo =
-    role === "medico" ? `${origin}/medicos/cadastro?papel=medico` : `${origin}/minha-conta`;
+  /* A intenção é gravada ANTES de sair para o Google: é o único momento em que
+     temos certeza do que a pessoa escolheu, e ela precisa sobreviver à ida e
+     volta — inclusive se o Supabase recusar o `redirectTo` e devolver na home. */
+  try {
+    const { INTENCAO_MEDICO, esquecerIntencaoMedico } = await import("@/lib/intencao-medico");
+    if (role === "medico") localStorage.setItem(INTENCAO_MEDICO, String(Date.now()));
+    else esquecerIntencaoMedico();
+  } catch {
+    /* sem storage: o `redirectTo` ainda leva ao lugar certo */
+  }
+  /* URL LIMPA, sem query string. Isso não é estética — é o que faz o Supabase
+     aceitar o redirecionamento.
+
+     A allowlist de "Redirect URLs" do Supabase compara a URL inteira, e uma
+     entrada sem curinga casa de forma exata. `.../medicos/cadastro?papel=medico`
+     NÃO casa com a entrada `.../medicos/cadastro` que está cadastrada — e
+     quando o `redirectTo` é recusado o Supabase não avisa: ele manda a pessoa
+     para a Site URL do projeto, que é a home. O médico entrava com o Google e
+     aparecia no app da gestante sem nenhum erro na tela.
+
+     A pista de "sou médico" não precisa mais viajar na URL: ela é gravada no
+     aparelho (`lib/intencao-medico.ts`) antes de sair para o Google e ainda
+     está lá quando ele volta. Uma pista que não depende de configuração de
+     terceiro é melhor que uma que depende. */
+  const redirectTo = role === "medico" ? `${origin}/medicos/cadastro` : `${origin}/minha-conta`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo },
