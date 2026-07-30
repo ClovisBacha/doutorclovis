@@ -435,13 +435,22 @@ function PainelPage() {
         <Stat label="Total agendamentos" value={appointments.length} />
       </div>
 
-      {/* Tabs — todo médico é inquilino, recortado por doctor_id */}
-      <div className="mt-8 flex flex-wrap gap-2 border-b border-border">
+      {/* Tabs — todo médico é inquilino, recortado por doctor_id.
+
+          Rola na horizontal em vez de quebrar linha. Com `flex-wrap`, as 12 abas
+          num celular de 360px viravam ~5 linhas: perto de 200px de tela só para
+          navegar, empurrando o conteúdo para baixo do dobra. E pior, a
+          `border-b` do container só encosta na ÚLTIMA linha, então o sublinhado
+          de aba ativa (`-mb-px` + `border-b-2`) flutuava no meio do bloco quando
+          a aba selecionada caía numa linha de cima — o indicador apontava para o
+          nada. Uma fita rolável resolve as duas coisas: uma linha só, com o
+          sublinhado sempre em cima da borda. `snap` para a aba parar alinhada. */}
+      <div className="mt-8 flex snap-x gap-2 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {DOCTOR_TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+            className={`-mb-px shrink-0 snap-start whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
               tab === t
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-primary"
@@ -5913,9 +5922,19 @@ function ReceiptModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden">
+      {/* `max-h-[90svh]` + coluna + rolagem SÓ no corpo.
+
+          Antes era `overflow-hidden` sem teto de altura: num celular o recibo é
+          mais alto que a tela, então o fim dele — valor, forma de pagamento,
+          assinatura — ficava cortado, sem barra de rolagem e sem jeito de
+          alcançar. A barra de botões fica fixa em cima, que é onde o médico
+          precisa do "Imprimir" mesmo tendo rolado até o fim.
+
+          `svh` e não `vh` porque no Safari do iPhone `vh` ignora a barra de
+          endereço e o modal passa do fundo da tela. */}
+      <div className="flex max-h-[90svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
         {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-3">
           <p className="text-sm font-medium text-muted-foreground">Recibo #{receiptNumber}</p>
           <div className="flex gap-2">
             <button
@@ -5934,7 +5953,10 @@ function ReceiptModal({
         </div>
 
         {/* Receipt content */}
-        <div ref={printRef} className="px-8 py-6">
+        <div
+          ref={printRef}
+          className="min-h-0 flex-1 overflow-y-auto px-8 py-6 print:overflow-visible"
+        >
           {/* Header */}
           <div className="border-b border-gray-200 pb-5 mb-5">
             <h1 className="font-serif text-2xl text-gray-900">{nomeMed}</h1>
