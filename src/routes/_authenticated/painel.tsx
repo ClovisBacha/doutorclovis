@@ -36,6 +36,7 @@ import {
   type AcionamentoSos,
 } from "@/lib/acionamentos.functions";
 import { AlertaSosMedico } from "@/components/alerta-sos-medico";
+import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
 import { ESPECIALIDADES_MEDICO, TITULOS_MEDICO } from "@/lib/medico-opcoes";
 import {
   MOEDAS,
@@ -260,7 +261,9 @@ function PainelPage() {
   const [preForms, setPreForms] = useState<AdminPreConsulta[]>([]);
   /* Solicitações de vínculo no nível do painel. Antes só a aba Pacientes as
      carregava, então o resumo do topo não tinha como saber que existiam. */
-  const [pedidosVinculo, setPedidosVinculo] = useState<{ id: string }[]>([]);
+  const [pedidosVinculo, setPedidosVinculo] = useState<
+    { id: string; patient_name: string | null; created_at: string }[]
+  >([]);
   /* Acionamentos de SOS pendentes. Consultados ao abrir e a cada 60s: um SOS
      que chega enquanto ele está com o painel aberto tem que aparecer sozinho —
      esperar ele recarregar a página é esperar demais. */
@@ -353,7 +356,14 @@ function PainelPage() {
         try {
           const { listPatientRequests } = await import("@/lib/patientlink.functions");
           const pr = await listPatientRequests({ data: { accessToken: tk } });
-          if (pr.ok) setPedidosVinculo(pr.requests.map((r) => ({ id: r.id })));
+          if (pr.ok)
+            setPedidosVinculo(
+              pr.requests.map((r) => ({
+                id: r.id,
+                patient_name: r.patient_name,
+                created_at: r.created_at,
+              })),
+            );
         } catch {
           /* sem o aviso; a aba Pacientes continua mostrando */
         }
@@ -520,6 +530,69 @@ function PainelPage() {
   const novasPacientes = pedidosVinculo.length;
   const sosNaoAtendidos = sosPendentes.length;
 
+  /* A FILA. Montada do que o painel já carregou — nenhuma consulta a mais, e
+     por construção não pode divergir das abas, porque é a mesma fonte. */
+  const fila: ItemFila[] = [
+    ...sosPendentes.map((a) => ({
+      id: `sos-${a.id}`,
+      nivel: "emergencia" as const,
+      titulo: `${a.paciente ?? "Uma paciente"} acionou o SOS`,
+      detalhe: a.motivo
+        ? `${a.motivo}${a.address ? ` · ${a.address}` : ""}`
+        : "Ligue para ela e registre o desfecho.",
+      em: a.created_at,
+      acao: "Abrir",
+      onAcao: () => setSosAberto(a),
+    })),
+    ...pedidosVinculo.map((r) => ({
+      id: `vinc-${r.id}`,
+      nivel: "espera" as const,
+      titulo: `${r.patient_name ?? "Uma paciente"} quer ser acompanhada por você`,
+      detalhe: "Ela está vendo “aguardando o médico aceitar” na tela dela.",
+      em: r.created_at,
+      acao: "Ver",
+      onAcao: () => setTab("Pacientes 👩‍🍼"),
+    })),
+    ...questions
+      .filter((q) => !q.answered)
+      .map((q) => ({
+        id: `perg-${q.id}`,
+        nivel: "pergunta" as const,
+        titulo: `${q.patient || "Uma paciente"} perguntou`,
+        detalhe: q.question,
+        em: q.created_at,
+        acao: "Responder",
+        onAcao: () => setTab("Perguntas"),
+      })),
+    ...appointments
+      .filter((a) => a.status === "pending")
+      .map((a) => ({
+        id: `cons-${a.id}`,
+        nivel: "consulta" as const,
+        titulo: `${a.patient_name} pediu consulta`,
+        detalhe: `${new Date(`${a.preferred_date}T00:00:00`).toLocaleDateString("pt-BR")} às ${
+          a.preferred_time
+        }${a.reason ? ` · ${a.reason}` : ""}`,
+        em: a.created_at,
+        acao: "Confirmar",
+        onAcao: () => setTab("Agendamentos"),
+      })),
+    ...preForms
+      .filter((f) => !f.seen_by_doctor)
+      .map((f) => ({
+        id: `pre-${f.id}`,
+        nivel: "leitura" as const,
+        titulo: `Pré-consulta de ${f.patient_name}`,
+        detalhe:
+          f.symptoms?.length > 0
+            ? `Sintomas: ${f.symptoms.join(", ")}`
+            : (f.questions ?? "Sem sintomas relatados."),
+        em: f.submitted_at,
+        acao: "Ler",
+        onAcao: () => setTab("Pré-consultas"),
+      })),
+  ];
+
   return (
     <section className="mx-auto max-w-5xl px-5 py-12">
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
@@ -560,62 +633,26 @@ function PainelPage() {
         />
       )}
 
-      {/* Faixa vermelha permanente enquanto houver acionamento sem desfecho —
-          mesmo depois de ele adiar o modal. */}
-      {sosNaoAtendidos > 0 && (
-        <button
-          onClick={() => setSosAberto(sosPendentes[0])}
-          className="press mt-6 flex w-full items-center justify-between gap-3 rounded-2xl bg-rose-600 px-4 py-3 text-left text-white"
-        >
-          <span>
-            <span className="block text-sm font-bold">
-              🆘{" "}
-              {sosNaoAtendidos === 1
-                ? "1 acionamento de emergência sem desfecho"
-                : `${sosNaoAtendidos} acionamentos de emergência sem desfecho`}
-            </span>
-            <span className="mt-0.5 block text-[12px] leading-snug text-white/85">
-              {sosPendentes[0]?.paciente ?? "Uma paciente"} apertou o SOS.
-            </span>
-          </span>
-          <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-rose-700">
-            Abrir
-          </span>
-        </button>
-      )}
-
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {/* Primeiro da fila de propósito: uma paciente esperando aceite é o
             item mais urgente do painel — ela está do outro lado vendo
             "aguardando o médico aceitar". */}
+        {/* Emergência é o primeiro número porque é o único que não pode
+            esperar. Antes o resumo começava por "pedidos de consulta". */}
+        <Stat
+          label="Emergências sem desfecho"
+          value={sosNaoAtendidos}
+          highlight={sosNaoAtendidos > 0}
+        />
         <Stat label="Pacientes esperando" value={novasPacientes} highlight={novasPacientes > 0} />
         <Stat label="Pedidos de consulta" value={pendingAppts} highlight={pendingAppts > 0} />
         <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
-        <Stat label="Pré-consultas novas" value={unseenForms} highlight={unseenForms > 0} />
       </div>
 
-      {/* Chamada direta: o número sozinho não diz PARA ONDE ir, e a aba
-          Pacientes fica fora da tela numa fita de 12 abas no celular. */}
-      {novasPacientes > 0 && (
-        <button
-          onClick={() => setTab("Pacientes 👩‍🍼")}
-          className="press mt-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-left dark:bg-amber-500/10"
-        >
-          <span>
-            <span className="block text-sm font-bold text-amber-800 dark:text-amber-200">
-              {novasPacientes === 1
-                ? "1 paciente quer ser acompanhada por você"
-                : `${novasPacientes} pacientes querem ser acompanhadas por você`}
-            </span>
-            <span className="mt-0.5 block text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
-              Ela está vendo “aguardando o médico aceitar” na tela dela.
-            </span>
-          </span>
-          <span className="shrink-0 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white">
-            Ver
-          </span>
-        </button>
-      )}
+      {/* A fila ABSORVEU as faixas soltas de SOS e de paciente esperando: elas
+          existiam porque não havia lista, e duas chamadas para a mesma coisa é
+          ruído. O modal de emergência continua, esse é outro assunto. */}
+      {!loading && <FilaDeTrabalho itens={fila} />}
 
       {/* Tabs — todo médico é inquilino, recortado por doctor_id.
 
