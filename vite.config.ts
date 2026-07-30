@@ -36,10 +36,11 @@ export default defineConfig({
        webhook de SMS configurado pelo usuário). No teto padrão de 10s a função
        era cortada no meio: o médico já tinha recebido push e e-mail, e a tela
        dizia "não consegui avisar — ligue 192". */
-    vercel: {
-      functions: {
-        maxDuration: 30,
-      },
-    },
+    /* O cast existe porque o tipo do preset do Lovable declara só
+       `preset`/`output`/`cloudflare` — mas o Nitro repassa o objeto inteiro para
+       o preset, e o `vercel.functions.maxDuration` é honrado (conferido no
+       `.vc-config.json` gerado). Sem o cast, `tsc --noEmit` reprova uma
+       configuração que funciona. */
+    ...({ vercel: { functions: { maxDuration: 30 } } } as Record<string, unknown>),
   },
 });
