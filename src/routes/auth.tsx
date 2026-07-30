@@ -47,6 +47,19 @@ function AuthPage() {
   );
   // Papel escolhido: define o destino pós-login e o fluxo de cadastro.
   const [role, setRole] = useState<"paciente" | "medico">("paciente");
+  /* Se esta pessoa já começou um cadastro de médico neste aparelho, o seletor
+     nasce em "médico".
+
+     Sem isto, o botão "Continuar com Google" — que usa este estado — mandava o
+     médico para `/minha-conta`, porque o padrão é paciente e o seletor fica
+     ACIMA do botão: dá para tocar no Google sem nunca notar que havia uma
+     escolha. É a porta mais provável do relato de cair no app da gestante
+     entrando com o Google. */
+  useEffect(() => {
+    void import("@/lib/intencao-medico").then((m) => {
+      if (m.querSerMedico()) setRole("medico");
+    });
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
