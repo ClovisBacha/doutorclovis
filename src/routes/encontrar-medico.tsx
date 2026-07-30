@@ -390,6 +390,20 @@ function EncontrarMedicoPage() {
                       {d.accepts_private ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">💰 Particular</span>
                       ) : null}
+                      {/* Focos extras: sem mostrá-los, marcar não muda nada para
+                          ela — e é justamente por eles que ela chegou aqui. O
+                          principal já está na linha do título, então sai. */}
+                      {(d.focos ?? [])
+                        .filter((f) => f && f !== d.specialty)
+                        .slice(0, 4)
+                        .map((f) => (
+                          <span
+                            key={f}
+                            className="rounded-full bg-primary/10 px-2 py-0.5 text-primary"
+                          >
+                            {f}
+                          </span>
+                        ))}
                       {d.years_experience ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">
                           {d.years_experience} anos de experiência

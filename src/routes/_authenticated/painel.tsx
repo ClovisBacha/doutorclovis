@@ -25,6 +25,9 @@ import { computeGestation } from "@/lib/gestacao";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
 import { buscarCep, digitosCep, formatarCep } from "@/lib/cep";
 import { PerfilProgresso, itensDoPerfil } from "@/components/perfil-progresso";
+import { CampoComOutro } from "@/components/campo-com-outro";
+import { CampoFocos } from "@/components/campo-focos";
+import { ESPECIALIDADES_MEDICO, TITULOS_MEDICO } from "@/lib/medico-opcoes";
 import {
   MOEDAS,
   centavosDe,
@@ -7153,6 +7156,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     approach: "",
     consultation_price_brl: null as number | null,
     offers_telehealth: false,
+    focos: [] as string[],
   });
 
   useEffect(() => {
@@ -7200,6 +7204,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             approach: d.approach ?? "",
             consultation_price_brl: d.consultation_price_brl ?? null,
             offers_telehealth: !!d.offers_telehealth,
+            focos: Array.isArray(d.focos) ? d.focos : [],
           });
           /* Semeia as duas metades a partir do que veio do banco: o
              formulário mostra o CRM já existente, e a partir daí quem manda são
@@ -7274,6 +7279,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         consultation_currency: moeda,
         consultation_price_cents: cents,
         consultation_price_brl: unidadesInteirasDe(cents),
+        focos: Array.from(new Set((form.focos ?? []).filter(Boolean))),
       };
       // Equipe da instalação pode ainda não ter linha em doctors: cria na hora
       if (exists) {
@@ -7494,22 +7500,42 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               Privado. Só a plataforma usa — nunca aparece para as pacientes.
             </p>
           </div>
-          <div>
-            <label className={label}>Título</label>
-            <input
-              value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="Ginecologista e Obstetra"
-              className={input}
-            />
-          </div>
-          <div>
-            <label className={label}>Especialidade / foco</label>
-            <input
-              value={form.specialty}
-              onChange={(e) => setForm((f) => ({ ...f, specialty: e.target.value }))}
-              placeholder="Gestação de alto risco"
-              className={input}
+          <CampoComOutro
+            label="Título"
+            opcoes={TITULOS_MEDICO}
+            valor={form.title}
+            onChange={(v) => setForm((f) => ({ ...f, title: v }))}
+            placeholderOutro="Ex.: Especialista em Endometriose"
+            ajuda="Aparece embaixo do seu nome, no card e na carteirinha."
+            classeInput={input}
+            classeLabel={label}
+          />
+          {/* Mesmos componentes do cadastro: lista curada + "Outro" no
+              principal, chips nos demais. Campos diferentes nas duas telas
+              produziriam dados diferentes para o mesmo médico. */}
+          <CampoComOutro
+            label="Especialidade / foco principal"
+            opcoes={ESPECIALIDADES_MEDICO}
+            valor={form.specialty}
+            onChange={(v) =>
+              setForm((f) => ({
+                ...f,
+                specialty: v,
+                focos: v && !f.focos.includes(v) ? [...f.focos, v] : f.focos,
+              }))
+            }
+            placeholderOutro="Ex.: Gestação gemelar"
+            ajuda="Aparece embaixo do seu nome no card."
+            classeInput={input}
+            classeLabel={label}
+          />
+          <div className="md:col-span-2">
+            <CampoFocos
+              valor={form.focos}
+              onChange={(v) => setForm((f) => ({ ...f, focos: v }))}
+              principal={form.specialty}
+              classeInput={input}
+              classeLabel={label}
             />
           </div>
           <div className="md:col-span-2">

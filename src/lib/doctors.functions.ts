@@ -43,6 +43,8 @@ export type DoctorProfile = {
      unidades inteiras. As duas convivem até a última leitura migrar. */
   consultation_currency?: string | null;
   consultation_price_cents?: number | null;
+  /** Focos adicionais. `specialty` segue sendo o principal, exibido no card. */
+  focos?: string[] | null;
   offers_telehealth?: boolean | null;
   personal_phone?: string | null;
   accepts_insurance?: boolean | null;
@@ -53,7 +55,7 @@ export type DoctorProfile = {
 
 /** Colunas do perfil lidas em todas as consultas de médico. */
 const RICH_COLS =
-  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,consultation_currency,consultation_price_cents,offers_telehealth,personal_phone,accepts_insurance,accepts_private";
+  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,consultation_currency,consultation_price_cents,focos,offers_telehealth,personal_phone,accepts_insurance,accepts_private";
 const BASE_COLS =
   "id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,plan_expires_at,verified,active,bio,subspecialty,years_experience,has_masters,has_doctorate,city,state,accepting_patients";
 const DOCTOR_COLS = `${BASE_COLS},${RICH_COLS}`;
@@ -120,6 +122,9 @@ const ProfileSchema = z.object({
   /* Centavos em inteiro: ponto flutuante para dinheiro erra. Teto de 10 milhões
      de centavos (100 mil na moeda) pelo mesmo motivo do campo acima. */
   consultation_price_cents: z.number().int().min(0).max(10_000_000).nullable().optional(),
+  /* Focos adicionais. Teto de 8 porque um médico que marca tudo não está
+     dizendo no que é bom — está dizendo que não escolheu. */
+  focos: z.array(z.string().max(80)).max(8).optional(),
   offers_telehealth: z.boolean().optional(),
   /* Telefone PESSOAL — nunca mostrado à paciente. Existe porque `whatsapp` é
      o número DAS PACIENTES (o que o SOS disca), e um médico tem dois. Sem a
@@ -525,6 +530,8 @@ export type DirectoryDoctor = {
   consultation_currency?: string | null;
   /** Valor em centavos — fonte de verdade do preço. */
   consultation_price_cents?: number | null;
+  /** Focos adicionais — as palavras pelas quais ela encontra o médico. */
+  focos?: string[] | null;
   offers_telehealth?: boolean | null;
   /* Como ele atende. Dois booleanos e não um enum porque há quem faça os dois
      — e porque `insurances` em branco antes era ambíguo entre "só particular"
@@ -684,7 +691,9 @@ export const searchDoctors = createServerFn({ method: "POST" })
     list = list.filter((d) => (d.whatsapp ?? "").replace(/\D+/g, "").length >= 10);
     const casa = (d: DirectoryDoctor) =>
       semAcento(
-        [d.display_name, d.specialty, d.subspecialty, d.city, d.bio].filter(Boolean).join(" "),
+        [d.display_name, d.specialty, d.subspecialty, d.city, d.bio, ...(d.focos ?? [])]
+          .filter(Boolean)
+          .join(" "),
       ).includes(term);
     /* `.filter(Boolean)` e não interpolação direta: nos degraus reduzidos essas
        colunas não vêm, e `${undefined}` vira a STRING "undefined" — aí buscar
@@ -808,6 +817,7 @@ function toDirectoryDoctor(d: any): DirectoryDoctor {
     consultation_price_brl: d.consultation_price_brl ?? null,
     consultation_currency: d.consultation_currency ?? "BRL",
     consultation_price_cents: d.consultation_price_cents ?? null,
+    focos: Array.isArray(d.focos) ? d.focos : [],
     offers_telehealth: d.offers_telehealth ?? null,
     accepts_insurance: d.accepts_insurance ?? null,
     accepts_private: d.accepts_private ?? null,

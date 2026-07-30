@@ -12,6 +12,8 @@ import { apagarRascunho, lerRascunho, quandoRascunho, salvarRascunho } from "@/l
 /** Chave do rascunho deste formulário. */
 const RASCUNHO_CADASTRO = "obst_rascunho_cadastro_medico";
 import { CampoFormacoes } from "@/components/campo-formacoes";
+import { CampoFocos } from "@/components/campo-focos";
+import { PreviaCardMedico } from "@/components/previa-card-medico";
 import { TITULOS_MEDICO, ESPECIALIDADES_MEDICO, montarFormacoes } from "@/lib/medico-opcoes";
 import {
   MOEDAS,
@@ -68,6 +70,7 @@ function CadastroMedicoPage() {
     consultation_price_brl: null as number | null,
     consultation_currency: "BRL" as MoedaChave,
     consultation_price_cents: null as number | null,
+    focos: [] as string[],
     education: "",
     /* Texto corrido do perfil. Separado das formações de propósito: é o que
        aparece no card abaixo do nome, e misturar os dois faria a lista de
@@ -86,6 +89,9 @@ function CadastroMedicoPage() {
   const [valorTexto, setValorTexto] = useState("");
   /* Quando o rascunho salvo foi gravado — some depois que ele muda algo. */
   const [rascunhoDe, setRascunhoDe] = useState("");
+  /* No celular a prévia nasce fechada: meia tela ocupada por um card ainda
+     vazio atrapalharia justamente quem tem menos espaço. */
+  const [previaAberta, setPreviaAberta] = useState(false);
 
   /* As duas metades do CRM têm ESTADO PRÓPRIO, e isso é o conserto de um bug meu.
   
@@ -391,6 +397,8 @@ function CadastroMedicoPage() {
       /* Espelho arredondado na coluna antiga: telas e cálculo de receita ainda a
          leem. As duas convivem até a última leitura migrar. */
       consultation_price_brl: unidadesInteirasDe(cents),
+      // Sem duplicata e sem vazio: o principal já está lá dentro.
+      focos: Array.from(new Set(profile.focos.filter(Boolean))),
     };
     const faltas = pendenciasDoMedico(paraEnviar, { temEndereco: true });
     if (faltas.length) {
@@ -628,53 +636,58 @@ function CadastroMedicoPage() {
             </p>
           </form>
         ) : step === "perfil" ? (
-          <form
-            onSubmit={submitPerfil}
-            className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
-          >
-            {/* Rascunho recuperado: dizer, senão ele estranha campos preenchidos
+          /* Duas colunas a partir de `lg`: formulário à esquerda, prévia grudada
+             à direita. No celular a prévia vira um bloco recolhível no topo —
+             ocupar meia tela de um aparelho estreito com um card que ele ainda
+             não preencheu seria atrapalhar em vez de ajudar. */
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
+            <form
+              onSubmit={submitPerfil}
+              className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+            >
+              {/* Rascunho recuperado: dizer, senão ele estranha campos preenchidos
                 que não lembra de ter digitado agora. */}
-            {rascunhoDe && (
-              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3">
-                <p className="text-[12px] leading-snug text-foreground">
-                  Recuperamos o que você tinha escrito {rascunhoDe}. Continue de onde parou.
-                </p>
-              </div>
-            )}
+              {rascunhoDe && (
+                <div className="rounded-2xl border border-primary/30 bg-primary/5 p-3">
+                  <p className="text-[12px] leading-snug text-foreground">
+                    Recuperamos o que você tinha escrito {rascunhoDe}. Continue de onde parou.
+                  </p>
+                </div>
+              )}
 
-            {/* Barra de progresso no TOPO, em modo compacto: um passo por vez.
+              {/* Barra de progresso no TOPO, em modo compacto: um passo por vez.
                 A lista inteira de pendências antes de terminar o formulário
                 desanima em vez de guiar. */}
-            <PerfilProgresso
-              compacto
-              itens={itensDoPerfil({
-                display_name: profile.display_name,
-                crm: crmCompleto,
-                whatsapp: profile.whatsapp,
-                education: montarFormacoes(formacoes),
-                bio: profile.bio,
-                specialty: profile.specialty,
-                accepts_insurance: profile.accepts_insurance,
-                accepts_private: profile.accepts_private,
-                insurances: profile.insurances,
-                precoCentavos: centavosDe(valorTexto),
-                /* Endereço e foto entram no painel, depois do cadastro — cobrar
+              <PerfilProgresso
+                compacto
+                itens={itensDoPerfil({
+                  display_name: profile.display_name,
+                  crm: crmCompleto,
+                  whatsapp: profile.whatsapp,
+                  education: montarFormacoes(formacoes),
+                  bio: profile.bio,
+                  specialty: profile.specialty,
+                  accepts_insurance: profile.accepts_insurance,
+                  accepts_private: profile.accepts_private,
+                  insurances: profile.insurances,
+                  precoCentavos: centavosDe(valorTexto),
+                  /* Endereço e foto entram no painel, depois do cadastro — cobrar
                    aqui seria pedir algo que esta tela não oferece. */
-                temEndereco: true,
-                temFoto: true,
-              })}
-            />
-
-            <div>
-              <label className={label}>Nome completo *</label>
-              <input
-                value={profile.display_name}
-                onChange={(e) => setProfile((p) => ({ ...p, display_name: e.target.value }))}
-                placeholder="Dra. Ana Souza"
-                className={input}
+                  temEndereco: true,
+                  temFoto: true,
+                })}
               />
-            </div>
-            {/* CRM e WhatsApp em LINHAS PRÓPRIAS, cada um com a largura toda.
+
+              <div>
+                <label className={label}>Nome completo *</label>
+                <input
+                  value={profile.display_name}
+                  onChange={(e) => setProfile((p) => ({ ...p, display_name: e.target.value }))}
+                  placeholder="Dra. Ana Souza"
+                  className={input}
+                />
+              </div>
+              {/* CRM e WhatsApp em LINHAS PRÓPRIAS, cada um com a largura toda.
 
                 Antes os dois dividiam um `grid-cols-2` que valia em qualquer
                 largura. Num celular de 390px cada coluna ficava com ~170px, e
@@ -686,206 +699,251 @@ function CadastroMedicoPage() {
                 Dois campos obrigatórios lado a lado num celular é economia de
                 espaço que custa legibilidade. Cada um numa linha resolve os dois
                 problemas e não precisa de exceção por breakpoint. */}
-            <div>
-              {/* UF primeiro, número depois — o registro é estadual, e
+              <div>
+                {/* UF primeiro, número depois — o registro é estadual, e
                   "CRM 12345" sozinho não identifica ninguém. Em dois controles
                   o formato sai sempre igual e dá para conferir no portal do
                   conselho. */}
-              <label className={label}>CRM *</label>
-              <div className="mt-1 grid grid-cols-[96px_1fr] gap-2">
-                <select
-                  value={crmUf}
-                  onChange={(e) => setCrmUf(e.target.value)}
-                  /* `mt-0` porque a linha já tem o respiro: o `input` traz um
+                <label className={label}>CRM *</label>
+                <div className="mt-1 grid grid-cols-[96px_1fr] gap-2">
+                  <select
+                    value={crmUf}
+                    onChange={(e) => setCrmUf(e.target.value)}
+                    /* `mt-0` porque a linha já tem o respiro: o `input` traz um
                      `mt-1` embutido e aqui ele viraria margem dupla. */
-                  className={`${input} mt-0`}
-                  aria-label="Estado do CRM"
-                >
-                  <option value="">UF</option>
-                  {UFS.map((uf) => (
-                    <option key={uf} value={uf}>
-                      {uf}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  value={crmNumero}
-                  onChange={(e) => setCrmNumero(e.target.value.replace(/\D/g, ""))}
-                  placeholder="Número — ex.: 12345"
-                  inputMode="numeric"
-                  className={`${input} mt-0`}
-                  aria-label="Número do CRM"
-                />
-              </div>
-              {/* Mostra como vai ficar. Duas caixas separadas deixam a dúvida
+                    className={`${input} mt-0`}
+                    aria-label="Estado do CRM"
+                  >
+                    <option value="">UF</option>
+                    {UFS.map((uf) => (
+                      <option key={uf} value={uf}>
+                        {uf}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={crmNumero}
+                    onChange={(e) => setCrmNumero(e.target.value.replace(/\D/g, ""))}
+                    placeholder="Número — ex.: 12345"
+                    inputMode="numeric"
+                    className={`${input} mt-0`}
+                    aria-label="Número do CRM"
+                  />
+                </div>
+                {/* Mostra como vai ficar. Duas caixas separadas deixam a dúvida
                   "e o formato final, sai certo?" — aqui ele aparece. */}
-              {crmCompleto ? (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Vai aparecer como <strong className="text-foreground">{crmCompleto}</strong>
-                </p>
-              ) : (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Escolha o estado e digite o número — o registro é estadual.
-                </p>
-              )}
-            </div>
-            {/* OBRIGATÓRIO, e com o nome do que ele é.
+                {crmCompleto ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Vai aparecer como <strong className="text-foreground">{crmCompleto}</strong>
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Escolha o estado e digite o número — o registro é estadual.
+                  </p>
+                )}
+              </div>
+              {/* OBRIGATÓRIO, e com o nome do que ele é.
                 
                 Este é o número que aparece no botão SOS das pacientes e na
                 carteirinha de emergência que elas mostram no hospital. Estava
                 rotulado só "WhatsApp" e era opcional: dava para terminar o
                 cadastro sem ele, e aí as pacientes daquele médico abriam a
                 emergência e não tinham para onde ligar. */}
-            <div>
-              <label className={label}>WhatsApp para pacientes *</label>
-              <input
-                value={profile.whatsapp}
-                onChange={(e) => setProfile((p) => ({ ...p, whatsapp: e.target.value }))}
-                placeholder="(31) 99999-9999"
-                inputMode="tel"
-                className={input}
-              />
-              <p className="mt-1 text-[11px] leading-snug text-amber-700">
-                É o número que aparece no <strong>botão SOS</strong> das suas pacientes e na
-                carteirinha que elas mostram no hospital. Cadastre o número em que você quer ser
-                encontrado numa emergência.
-              </p>
-            </div>
-            {/* Lista + "Outro" no lugar de campo livre. Em campo livre o mesmo
+              <div>
+                <label className={label}>WhatsApp para pacientes *</label>
+                <input
+                  value={profile.whatsapp}
+                  onChange={(e) => setProfile((p) => ({ ...p, whatsapp: e.target.value }))}
+                  placeholder="(31) 99999-9999"
+                  inputMode="tel"
+                  className={input}
+                />
+                <p className="mt-1 text-[11px] leading-snug text-amber-700">
+                  É o número que aparece no <strong>botão SOS</strong> das suas pacientes e na
+                  carteirinha que elas mostram no hospital. Cadastre o número em que você quer ser
+                  encontrado numa emergência.
+                </p>
+              </div>
+              {/* Lista + "Outro" no lugar de campo livre. Em campo livre o mesmo
                 profissional escreve "Gineco e Obstetra", "GO" e
                 "Ginecologista/Obstetra" — a busca por "obstetra" acha um e perde
                 os outros, e dois médicos iguais parecem diferentes no card. */}
-            <CampoComOutro
-              label="Título"
-              opcoes={TITULOS_MEDICO}
-              valor={profile.title}
-              onChange={(v) => setProfile((p) => ({ ...p, title: v }))}
-              placeholderOutro="Ex.: Especialista em Endometriose"
-              ajuda="Aparece embaixo do seu nome, no card e na carteirinha."
-              classeInput={input}
-              classeLabel={label}
-            />
-            <CampoComOutro
-              label="Especialidade / foco"
-              opcoes={ESPECIALIDADES_MEDICO}
-              valor={profile.specialty}
-              onChange={(v) => setProfile((p) => ({ ...p, specialty: v }))}
-              placeholderOutro="Ex.: Gestação gemelar"
-              ajuda="É por aqui que a paciente te encontra na busca — ela procura pelo problema dela, não pelo nome da especialidade."
-              classeInput={input}
-              classeLabel={label}
-            />
-            {/* Como ele atende — a primeira pergunta que a paciente faz. Dois
+              <CampoComOutro
+                label="Título"
+                opcoes={TITULOS_MEDICO}
+                valor={profile.title}
+                onChange={(v) => setProfile((p) => ({ ...p, title: v }))}
+                placeholderOutro="Ex.: Especialista em Endometriose"
+                ajuda="Aparece embaixo do seu nome, no card e na carteirinha."
+                classeInput={input}
+                classeLabel={label}
+              />
+              <CampoComOutro
+                label="Especialidade / foco principal"
+                opcoes={ESPECIALIDADES_MEDICO}
+                valor={profile.specialty}
+                onChange={(v) =>
+                  setProfile((p) => ({
+                    ...p,
+                    specialty: v,
+                    // O principal entra nos focos sozinho: ele já disse que atende
+                    // isso, e pedir para marcar de novo é trabalho repetido.
+                    focos: v && !p.focos.includes(v) ? [...p.focos, v] : p.focos,
+                  }))
+                }
+                placeholderOutro="Ex.: Gestação gemelar"
+                ajuda="É o que aparece embaixo do seu nome no card."
+                classeInput={input}
+                classeLabel={label}
+              />
+              <CampoFocos
+                valor={profile.focos}
+                onChange={(v) => setProfile((p) => ({ ...p, focos: v }))}
+                principal={profile.specialty}
+                classeInput={input}
+                classeLabel={label}
+              />
+              {/* Como ele atende — a primeira pergunta que a paciente faz. Dois
                 checkboxes e não um seletor porque há quem faça os dois. */}
-            <div>
-              <label className={label}>Como você atende? *</label>
-              <div className="mt-2 flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 text-sm">
+              <div>
+                <label className={label}>Como você atende? *</label>
+                <div className="mt-2 flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={profile.accepts_insurance}
+                      onChange={(e) =>
+                        setProfile((p) => ({ ...p, accepts_insurance: e.target.checked }))
+                      }
+                      className="size-4 accent-primary"
+                    />
+                    Convênio
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={profile.accepts_private}
+                      onChange={(e) =>
+                        setProfile((p) => ({ ...p, accepts_private: e.target.checked }))
+                      }
+                      className="size-4 accent-primary"
+                    />
+                    Particular
+                  </label>
+                </div>
+                {profile.accepts_insurance && (
                   <input
-                    type="checkbox"
-                    checked={profile.accepts_insurance}
-                    onChange={(e) =>
-                      setProfile((p) => ({ ...p, accepts_insurance: e.target.checked }))
-                    }
-                    className="size-4 accent-primary"
+                    value={profile.insurances}
+                    onChange={(e) => setProfile((p) => ({ ...p, insurances: e.target.value }))}
+                    placeholder="Quais convênios? Unimed, Bradesco Saúde…"
+                    className={`${input} mt-2`}
                   />
-                  Convênio
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={profile.accepts_private}
-                    onChange={(e) =>
-                      setProfile((p) => ({ ...p, accepts_private: e.target.checked }))
-                    }
-                    className="size-4 accent-primary"
-                  />
-                  Particular
-                </label>
-              </div>
-              {profile.accepts_insurance && (
-                <input
-                  value={profile.insurances}
-                  onChange={(e) => setProfile((p) => ({ ...p, insurances: e.target.value }))}
-                  placeholder="Quais convênios? Unimed, Bradesco Saúde…"
-                  className={`${input} mt-2`}
-                />
-              )}
-              {profile.accepts_private && (
-                <div className="mt-2">
-                  {/* Moeda ANTES do valor, e o valor formatado enquanto digita.
+                )}
+                {profile.accepts_private && (
+                  <div className="mt-2">
+                    {/* Moeda ANTES do valor, e o valor formatado enquanto digita.
                       A moeda decide a pontuação: real e euro usam vírgula
                       decimal, dólar usa ponto — formatar tudo como real daria
                       "US$ 1.250,00", que não existe. */}
-                  <div className="grid grid-cols-[132px_1fr] gap-2">
-                    <select
-                      value={moeda}
-                      onChange={(e) => {
-                        const nova = e.target.value as MoedaChave;
-                        setMoeda(nova);
-                        // Reformata o que já está digitado na pontuação da nova.
-                        setValorTexto((t) => digitandoDinheiro(t, nova));
-                      }}
-                      className={`${input} mt-0`}
-                      aria-label="Moeda da consulta"
-                    >
-                      {MOEDAS.map((m) => (
-                        <option key={m.chave} value={m.chave}>
-                          {m.rotulo}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      value={valorTexto}
-                      onChange={(e) => setValorTexto(digitandoDinheiro(e.target.value, moeda))}
-                      placeholder="450,00"
-                      inputMode="numeric"
-                      className={`${input} mt-0`}
-                      aria-label="Valor da consulta"
-                    />
+                    <div className="grid grid-cols-[132px_1fr] gap-2">
+                      <select
+                        value={moeda}
+                        onChange={(e) => {
+                          const nova = e.target.value as MoedaChave;
+                          setMoeda(nova);
+                          // Reformata o que já está digitado na pontuação da nova.
+                          setValorTexto((t) => digitandoDinheiro(t, nova));
+                        }}
+                        className={`${input} mt-0`}
+                        aria-label="Moeda da consulta"
+                      >
+                        {MOEDAS.map((m) => (
+                          <option key={m.chave} value={m.chave}>
+                            {m.rotulo}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={valorTexto}
+                        onChange={(e) => setValorTexto(digitandoDinheiro(e.target.value, moeda))}
+                        placeholder="450,00"
+                        inputMode="numeric"
+                        className={`${input} mt-0`}
+                        aria-label="Valor da consulta"
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {centavosDe(valorTexto)
+                        ? `A paciente vê ${formatarDinheiro(centavosDe(valorTexto), moeda)} antes de pedir consulta.`
+                        : "A paciente vê esse valor antes de pedir consulta. Dá para mudar quando quiser."}
+                    </p>
                   </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {centavosDe(valorTexto)
-                      ? `A paciente vê ${formatarDinheiro(centavosDe(valorTexto), moeda)} antes de pedir consulta.`
-                      : "A paciente vê esse valor antes de pedir consulta. Dá para mudar quando quiser."}
-                  </p>
-                </div>
-              )}
-            </div>
-            {/* Formações por CATEGORIA. O textarea "uma linha por item" ou fica
+                )}
+              </div>
+              {/* Formações por CATEGORIA. O textarea "uma linha por item" ou fica
                 vazio (é trabalho em branco, sem pista do que entra) ou vem tudo
                 numa linha só, que a paciente lê como borrão e a busca não acha.
                 As categorias são andaime de digitação: o banco continua com uma
                 coluna de texto, uma linha por item. */}
-            <CampoFormacoes
-              valores={formacoes}
-              onChange={(chave, v) => setFormacoes((f) => ({ ...f, [chave]: v }))}
-              livre={profile.bio}
-              onChangeLivre={(v) => setProfile((p) => ({ ...p, bio: v }))}
-              classeInput={input}
-              classeLabel={label}
-            />
-            <div>
-              <label className={label}>Chave PIX (cobranças)</label>
-              <input
-                value={profile.pix_key}
-                onChange={(e) => setProfile((p) => ({ ...p, pix_key: e.target.value }))}
-                placeholder="Opcional — dá para configurar depois"
-                className={input}
+              <CampoFormacoes
+                valores={formacoes}
+                onChange={(chave, v) => setFormacoes((f) => ({ ...f, [chave]: v }))}
+                livre={profile.bio}
+                onChangeLivre={(v) => setProfile((p) => ({ ...p, bio: v }))}
+                classeInput={input}
+                classeLabel={label}
               />
-            </div>
-            <button
-              type="submit"
-              disabled={busy}
-              className="press glow-cta w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {busy ? "Criando seu consultório..." : "Abrir meu consultório digital 🚀"}
-            </button>
-            <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-              Ao continuar você concorda com os termos de uso. Seus dados e os das suas pacientes
-              ficam protegidos por Row Level Security e LGPD.
-            </p>
-          </form>
+              <div>
+                <label className={label}>Chave PIX (cobranças)</label>
+                <input
+                  value={profile.pix_key}
+                  onChange={(e) => setProfile((p) => ({ ...p, pix_key: e.target.value }))}
+                  placeholder="Opcional — dá para configurar depois"
+                  className={input}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={busy}
+                className="press glow-cta w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {busy ? "Criando seu consultório..." : "Abrir meu consultório digital 🚀"}
+              </button>
+              <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+                Ao continuar você concorda com os termos de uso. Seus dados e os das suas pacientes
+                ficam protegidos por Row Level Security e LGPD.
+              </p>
+            </form>
+
+            {/* A prévia é o mesmo componente nas duas larguras; o que muda é onde
+              ela mora. `order-first` no celular a leva para cima do formulário,
+              onde ele a vê ao abrir; no desktop ela volta para a direita. */}
+            <aside className="order-first lg:order-none">
+              <button
+                type="button"
+                onClick={() => setPreviaAberta((v) => !v)}
+                className="mb-2 w-full rounded-2xl border border-border bg-card px-4 py-2.5 text-left text-sm font-medium text-foreground lg:hidden"
+              >
+                {previaAberta ? "▾" : "▸"} Ver como a paciente te vê
+              </button>
+              <div className={previaAberta ? "" : "hidden lg:block"}>
+                <PreviaCardMedico
+                  nome={profile.display_name}
+                  titulo={profile.title}
+                  especialidade={profile.specialty}
+                  focos={profile.focos.filter((f) => f !== profile.specialty)}
+                  bio={profile.bio}
+                  formacoes={montarFormacoes(formacoes)}
+                  aceitaConvenio={profile.accepts_insurance}
+                  aceitaParticular={profile.accepts_private}
+                  convenios={profile.insurances}
+                  precoCentavos={centavosDe(valorTexto)}
+                  moeda={moeda}
+                  crm={crmCompleto}
+                />
+              </div>
+            </aside>
+          </div>
         ) : null}
       </div>
     </main>
