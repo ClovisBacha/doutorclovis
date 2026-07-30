@@ -250,6 +250,9 @@ function PainelPage() {
   const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [preForms, setPreForms] = useState<AdminPreConsulta[]>([]);
+  /* Solicitações de vínculo no nível do painel. Antes só a aba Pacientes as
+     carregava, então o resumo do topo não tinha como saber que existiam. */
+  const [pedidosVinculo, setPedidosVinculo] = useState<{ id: string }[]>([]);
   const [teleconsultas, setTeleconsultas] = useState<TeleconsultaSession[]>([]);
   const [privateConsults, setPrivateConsults] = useState<any[]>([]);
   const [corporateLeads, setCorporateLeads] = useState<CorporateLead[]>([]);
@@ -296,6 +299,16 @@ function PainelPage() {
           }
         } catch {
           /* segue com o padrão */
+        }
+        /* Solicitações de vínculo, para o resumo do topo poder contá-las.
+           Best-effort: uma falha aqui não pode derrubar o painel inteiro — o
+           médico perde o aviso, não o consultório. */
+        try {
+          const { listPatientRequests } = await import("@/lib/patientlink.functions");
+          const pr = await listPatientRequests({ data: { accessToken: tk } });
+          if (pr.ok) setPedidosVinculo(pr.requests.map((r) => ({ id: r.id })));
+        } catch {
+          /* sem o aviso; a aba Pacientes continua mostrando */
         }
         return;
       }
@@ -449,9 +462,15 @@ function PainelPage() {
       </section>
     );
 
+  /* "Pedidos pendentes" conta pedido de CONSULTA. A solicitação de uma paciente
+     para ser acompanhada por ele é outra coisa, mora em outra tabela e vivia só
+     dentro da aba Pacientes — então o médico lia "0 pedidos pendentes" no topo
+     enquanto uma paciente esperava resposta do outro lado. Um número que diz
+     zero quando há alguém esperando é pior que número nenhum. */
   const pendingAppts = appointments.filter((a) => a.status === "pending").length;
   const pendingQs = questions.filter((q) => !q.answered).length;
   const unseenForms = preForms.filter((f) => !f.seen_by_doctor).length;
+  const novasPacientes = pedidosVinculo.length;
 
   return (
     <section className="mx-auto max-w-5xl px-5 py-12">
@@ -463,11 +482,37 @@ function PainelPage() {
       {/* Resumo — números já recortados por médico no servidor (equipe vê a
           instalação inteira; assinante vê só os próprios). */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Pedidos pendentes" value={pendingAppts} highlight={pendingAppts > 0} />
+        {/* Primeiro da fila de propósito: uma paciente esperando aceite é o
+            item mais urgente do painel — ela está do outro lado vendo
+            "aguardando o médico aceitar". */}
+        <Stat label="Pacientes esperando" value={novasPacientes} highlight={novasPacientes > 0} />
+        <Stat label="Pedidos de consulta" value={pendingAppts} highlight={pendingAppts > 0} />
         <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
         <Stat label="Pré-consultas novas" value={unseenForms} highlight={unseenForms > 0} />
-        <Stat label="Total agendamentos" value={appointments.length} />
       </div>
+
+      {/* Chamada direta: o número sozinho não diz PARA ONDE ir, e a aba
+          Pacientes fica fora da tela numa fita de 12 abas no celular. */}
+      {novasPacientes > 0 && (
+        <button
+          onClick={() => setTab("Pacientes 👩‍🍼")}
+          className="press mt-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-left dark:bg-amber-500/10"
+        >
+          <span>
+            <span className="block text-sm font-bold text-amber-800 dark:text-amber-200">
+              {novasPacientes === 1
+                ? "1 paciente quer ser acompanhada por você"
+                : `${novasPacientes} pacientes querem ser acompanhadas por você`}
+            </span>
+            <span className="mt-0.5 block text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+              Ela está vendo “aguardando o médico aceitar” na tela dela.
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white">
+            Ver
+          </span>
+        </button>
+      )}
 
       {/* Tabs — todo médico é inquilino, recortado por doctor_id.
 
@@ -503,6 +548,13 @@ function PainelPage() {
             }`}
           >
             {t}
+            {/* Mesmo contador da aba Perguntas: numa fita de 12 abas, o número
+                é o que faz a aba certa se anunciar sem ele precisar rolar. */}
+            {t === "Pacientes 👩‍🍼" && novasPacientes > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white">
+                {novasPacientes}
+              </span>
+            )}
             {t === "Perguntas" && pendingQs > 0 && (
               <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white">
                 {pendingQs}
