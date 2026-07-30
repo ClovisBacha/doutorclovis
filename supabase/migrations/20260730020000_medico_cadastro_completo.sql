@@ -149,8 +149,18 @@ WHERE EXISTS (SELECT 1 FROM public.doctors d WHERE d.id = p.id)
 -- tabelas hoje (a aba que as usava não está no menu), então uma coluna nova
 -- seria esquema morto. Quando a agenda por médico for construída, ela nasce
 -- com a coluna e com política própria.
-DROP POLICY IF EXISTS "auth_write_availability" ON public.doctor_availability;
-DROP POLICY IF EXISTS "auth_write_blocked"      ON public.blocked_dates;
-
-REVOKE INSERT, UPDATE, DELETE ON public.doctor_availability FROM authenticated;
-REVOKE INSERT, UPDATE, DELETE ON public.blocked_dates       FROM authenticated;
+-- Guardado em DO porque DROP POLICY e REVOKE nao aceitam "IF EXISTS" de
+-- tabela: num banco sem a migracao de agenda, as duas linhas abortariam a
+-- migracao inteira.
+DO $guard$
+BEGIN
+  IF to_regclass('public.doctor_availability') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "auth_write_availability" ON public.doctor_availability';
+    EXECUTE 'REVOKE INSERT, UPDATE, DELETE ON public.doctor_availability FROM authenticated';
+  END IF;
+  IF to_regclass('public.blocked_dates') IS NOT NULL THEN
+    EXECUTE 'DROP POLICY IF EXISTS "auth_write_blocked" ON public.blocked_dates';
+    EXECUTE 'REVOKE INSERT, UPDATE, DELETE ON public.blocked_dates FROM authenticated';
+  END IF;
+END
+$guard$;

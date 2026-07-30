@@ -23,6 +23,7 @@ import {
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
+import type { Pendencia } from "@/lib/doctor-required";
 import {
   listMyAddresses,
   saveMyAddress,
@@ -6691,14 +6692,27 @@ function EnderecosCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
       toast.success("Endereço salvo ✓");
       setEditando(null);
       await carregar();
+    } catch {
+      /* Sem catch, uma queda de rede aqui virava uma Promise rejeitada sem dono
+         e o formulário ficava aberto sem dizer nada — o médico achava que tinha
+         salvado. */
+      toast.error("Sem conexão para salvar o endereço. Tente de novo.");
     } finally {
       setSalvando(false);
     }
   }
 
   async function apagar(id: string) {
-    const r = await deleteMyAddress({ data: { accessToken: await tokenFn(), id } });
-    if (r.ok) await carregar();
+    try {
+      const r = await deleteMyAddress({ data: { accessToken: await tokenFn(), id } });
+      if (!r.ok) {
+        toast.error("Não foi possível apagar o endereço.");
+        return;
+      }
+      await carregar();
+    } catch {
+      toast.error("Sem conexão para apagar o endereço.");
+    }
   }
 
   return (
@@ -6890,6 +6904,11 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   } | null>(null);
   const [active, setActive] = useState(false);
   const [slug, setSlug] = useState<string | null>(null);
+  /* O que falta para ele poder receber paciente, calculado no SERVIDOR pela
+     mesma regra que a busca usa (`doctor-required.ts`). Vem de lá e não daqui
+     de propósito: uma checagem de tela que discorda do servidor é pior do que
+     nenhuma — o médico "completa" o cadastro e continua invisível na busca. */
+  const [pendencias, setPendencias] = useState<Pendencia[]>([]);
   const [form, setForm] = useState({
     display_name: "",
     title: "",
@@ -6937,6 +6956,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             rotulo: res.entitlements?.label ?? d.plan,
             expira: d.plan_expires_at ?? null,
           });
+          setPendencias((res as { pendencias?: Pendencia[] }).pendencias ?? []);
           setForm({
             display_name: d.display_name,
             title: d.title,
@@ -7023,7 +7043,10 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     "mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary";
   const label = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
+  /* O bloqueio do SOS é o mais grave e continua com destaque próprio; o resto
+     das pendências vira uma lista abaixo dele. */
   const faltaEmergencia = !form.crm.trim() || form.whatsapp.replace(/\D/g, "").length < 10;
+  const outrasPendencias = pendencias.filter((p) => p.campo !== "crm" && p.campo !== "whatsapp");
   /* O `crm` continua UMA string no banco (`CRM-MG 12345`) — a tela só a lê em
      duas partes. Assim a carteirinha e o aviso do SOS não mudam de formato. */
   const { uf: crmUf, numero: crmNum } = separarCrm(form.crm);
@@ -7045,6 +7068,30 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             eles, a Central de Emergência esconde os seus botões e sobra o 192 para a paciente — o
             app não coloca o telefone de outro médico no lugar do seu.
           </p>
+        </div>
+      )}
+      {/* Cadastro incompleto não tranca o painel — só empurra ele para baixo na
+          busca da paciente. Trancar seria repetir o erro que deixou o médico
+          preso na tela de dados: o caminho certo é dizer o que falta e por quê,
+          e deixar ele decidir a ordem. */}
+      {!loading && outrasPendencias.length > 0 && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:bg-amber-500/10">
+          <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+            Faltam {outrasPendencias.length}{" "}
+            {outrasPendencias.length === 1 ? "informação" : "informações"} no seu cadastro
+          </p>
+          <p className="mt-1 text-[13px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+            Seu perfil aparece na busca, mas <strong>abaixo</strong> de quem preencheu tudo — uma
+            paciente que abre um card sem valor, sem convênio e sem formação volta para a lista.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {outrasPendencias.map((p) => (
+              <li key={p.campo} className="text-[13px] leading-snug">
+                <span className="font-semibold text-amber-900 dark:text-amber-100">{p.rotulo}</span>
+                <span className="text-amber-900/70 dark:text-amber-100/70"> — {p.porque}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {uso && <ConsumoCard uso={uso} plano={plan} />}

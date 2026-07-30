@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { registerDoctor, getMyDoctor } from "@/lib/doctors.functions";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
+import { pendenciasDoMedico } from "@/lib/doctor-required";
 import { GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/medicos_/cadastro")({
@@ -41,6 +42,14 @@ function CadastroMedicoPage() {
     crm: "",
     whatsapp: "",
     pix_key: "",
+    /* Obrigatórios que o formulário não coletava: o médico terminava o
+       cadastro, ia para a busca da paciente e o card dele não respondia
+       "aceita meu convênio", "quanto custa" nem "formado onde". */
+    accepts_insurance: false,
+    accepts_private: true,
+    insurances: "",
+    consultation_price_brl: null as number | null,
+    education: "",
   });
 
   // Já logado? Médico ativo vai direto ao painel (ex.: login com Google);
@@ -176,20 +185,17 @@ function CadastroMedicoPage() {
 
   async function submitPerfil(e: React.FormEvent) {
     e.preventDefault();
-    /* Três obrigatórios, e cada um por um motivo de uso, não de burocracia:
-       o nome é como a paciente o encontra; o CRM vai impresso na carteirinha
-       de emergência; e o WhatsApp é o número que o botão SOS disca. Faltando
-       qualquer um, alguma tela do app fica sem o que mostrar. */
-    if (profile.display_name.trim().length < 2) {
-      toast.error("Informe o seu nome completo.");
-      return;
-    }
-    if (!profile.crm.trim()) {
-      toast.error("Informe o CRM — estado e número.");
-      return;
-    }
-    if (profile.whatsapp.replace(/\D/g, "").length < 10) {
-      toast.error("Informe o WhatsApp para pacientes — é o número que o SOS delas usa.");
+    /* Uma regra só, compartilhada com o servidor e com o painel
+       (`doctor-required.ts`). Duplicar a lista aqui era como o formulário e o
+       servidor discordavam: a tela exigia três campos, o servidor aceitava
+       vazio, e o médico saía do cadastro achando que estava pronto.
+
+       O endereço não é cobrado nesta etapa (`temEndereco: true`): ele vive em
+       outra tabela e o cadastro é justamente o momento em que ainda não há
+       endereço nenhum. O painel cobra depois, com o card de endereços à mão. */
+    const faltas = pendenciasDoMedico(profile, { temEndereco: true });
+    if (faltas.length) {
+      toast.error(`${faltas[0].rotulo}: ${faltas[0].porque}`);
       return;
     }
     setBusy(true);
@@ -507,6 +513,80 @@ function CadastroMedicoPage() {
                 placeholder="Gestação de alto risco"
                 className={input}
               />
+            </div>
+            {/* Como ele atende — a primeira pergunta que a paciente faz. Dois
+                checkboxes e não um seletor porque há quem faça os dois. */}
+            <div>
+              <label className={label}>Como você atende? *</label>
+              <div className="mt-2 flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={profile.accepts_insurance}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, accepts_insurance: e.target.checked }))
+                    }
+                    className="size-4 accent-primary"
+                  />
+                  Convênio
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={profile.accepts_private}
+                    onChange={(e) =>
+                      setProfile((p) => ({ ...p, accepts_private: e.target.checked }))
+                    }
+                    className="size-4 accent-primary"
+                  />
+                  Particular
+                </label>
+              </div>
+              {profile.accepts_insurance && (
+                <input
+                  value={profile.insurances}
+                  onChange={(e) => setProfile((p) => ({ ...p, insurances: e.target.value }))}
+                  placeholder="Quais convênios? Unimed, Bradesco Saúde…"
+                  className={`${input} mt-2`}
+                />
+              )}
+              {profile.accepts_private && (
+                <div className="mt-2">
+                  <input
+                    type="number"
+                    min={0}
+                    value={profile.consultation_price_brl ?? ""}
+                    onChange={(e) =>
+                      setProfile((p) => ({
+                        ...p,
+                        consultation_price_brl:
+                          e.target.value === "" ? null : Number(e.target.value),
+                      }))
+                    }
+                    placeholder="Valor da consulta em reais — ex.: 450"
+                    className={input}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    A paciente vê esse valor antes de pedir consulta. Dá para mudar quando quiser.
+                  </p>
+                </div>
+              )}
+            </div>
+            {/* Formações: é o que decide entre dois nomes que ela não conhece. */}
+            <div>
+              <label className={label}>Formações e títulos *</label>
+              <textarea
+                value={profile.education}
+                onChange={(e) => setProfile((p) => ({ ...p, education: e.target.value }))}
+                rows={3}
+                placeholder={
+                  "Medicina — UFMG\nResidência em GO — Hospital das Clínicas\nMestrado em Medicina Fetal — USP"
+                }
+                className={input}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Uma linha por item. É o que aparece no seu card quando a paciente compara médicos.
+              </p>
             </div>
             <div>
               <label className={label}>Chave PIX (cobranças)</label>

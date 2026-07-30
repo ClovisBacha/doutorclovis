@@ -305,10 +305,19 @@ function EncontrarMedicoPage() {
                       </div>
                     )}
                     <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
-                      {d.city || d.state ? (
+                      {d.city || d.state || d.endereco_cidade ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">
-                          📍 {[d.city, d.state].filter(Boolean).join("/")}
+                          📍 {[d.city || d.endereco_cidade, d.state].filter(Boolean).join("/")}
                         </span>
+                      ) : null}
+                      {/* Convênio/particular ANTES do resto: é a primeira
+                          pergunta dela, e antes o card só dizia o preço — o que
+                          fazia um médico de convênio parecer sem informação. */}
+                      {d.accepts_insurance ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5">💳 Convênio</span>
+                      ) : null}
+                      {d.accepts_private ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5">💰 Particular</span>
                       ) : null}
                       {d.years_experience ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">
@@ -341,6 +350,13 @@ function EncontrarMedicoPage() {
                       <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
                         <span className="font-semibold text-foreground/70">Abordagem:</span>{" "}
                         {d.approach}
+                      </p>
+                    ) : null}
+                    {/* Endereço do consultório: o médico cadastra desde a
+                        migração do cadastro completo e a paciente nunca via. */}
+                    {d.endereco ? (
+                      <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
+                        📍 {d.endereco}
                       </p>
                     ) : null}
                     {d.hospitals ? (

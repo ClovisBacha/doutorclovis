@@ -1,4 +1,3 @@
-import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -286,35 +285,41 @@ async function createGoogleMeetRoom(refreshOverride?: string | null): Promise<st
   }
 }
 
+/**
+ * Convite da sala por e-mail.
+ *
+ * `doctorId` é quem assina: antes o e-mail dizia "Dr. Clóvis Bacha —
+ * Ginecologista e Obstetra" para paciente de qualquer médico da plataforma.
+ * Sem médico resolvido, ninguém assina — a moldura vira a da plataforma.
+ */
 async function sendPatientMeetEmail(
   patientEmail: string,
   patientName: string,
   meetUrl: string,
   scheduledFor: string | null,
+  doctorId: string | null,
 ): Promise<void> {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return;
   const dateStr = scheduledFor
     ? new Date(scheduledFor).toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" })
     : "hoje";
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: process.env.MAIL_FROM ?? `${DOCTOR.name} <onboarding@resend.dev>`,
-      to: patientEmail,
-      subject: `Sua teleconsulta está pronta — ${DOCTOR.name}`,
-      html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto">
-        <h2 style="color:#7c3aed">Sua teleconsulta está pronta</h2>
-        <p>Olá, ${patientName}!</p>
-        <p>Seu médico abriu sua sala de teleconsulta para <strong>${dateStr}</strong>.</p>
-        <p>Clique no botão abaixo para entrar:</p>
-        <a href="${meetUrl}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;margin:16px 0">Entrar na teleconsulta</a>
-        <p style="color:#666;font-size:12px">Ou acesse o portal → Minha Conta → Teleconsulta e clique no link da sessão.</p>
-        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-        <p style="color:#666;font-size:12px">${DOCTOR.name} — Ginecologista e Obstetra</p>
-      </div>`,
-    }),
+  const { sendEmail, emailLayout, escEmail } = await import("@/lib/email.server");
+  const { destinoMedico } = await import("@/lib/doctor-mail.server");
+  const med = await destinoMedico(doctorId);
+  const quem = med.nome ? escEmail(med.nome) : "Seu médico";
+  await sendEmail({
+    to: patientEmail,
+    replyTo: med.email || undefined,
+    subject: med.nome
+      ? `Sua teleconsulta está pronta — ${med.nome}`
+      : "Sua teleconsulta está pronta",
+    html: emailLayout(
+      "Sua teleconsulta está pronta",
+      `<p style="margin:0 0 10px">Olá, ${escEmail(patientName)}!</p>
+       <p style="margin:0 0 14px">${quem} abriu sua sala de teleconsulta para <strong>${dateStr}</strong>.</p>
+       <p style="margin:0 0 6px"><a href="${meetUrl}" style="display:inline-block;background:#a85a44;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;margin:8px 0">Entrar na teleconsulta</a></p>
+       <p style="margin:10px 0 0;font-size:13px;color:#9b8178">Ou abra o app → Minha Conta → Teleconsulta e toque no link da sessão.</p>`,
+      med.marca,
+    ),
   });
 }
 
@@ -489,7 +494,7 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
     // 3) E-mail ao paciente: se o convite da Agenda já saiu (convida os dois),
     //    não duplica; senão manda o link por Resend (comportamento antigo).
     if (!invitedViaCalendar && patientEmail) {
-      await sendPatientMeetEmail(patientEmail, patientName, meetUrl, scheduledFor);
+      await sendPatientMeetEmail(patientEmail, patientName, meetUrl, scheduledFor, admin.id);
     }
 
     return { ok: true as const, meetUrl, invited: invitedViaCalendar };

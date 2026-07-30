@@ -364,6 +364,30 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
     if (!req) return { ok: false as const };
 
     const now = new Date().toISOString();
+
+    /* A decisão é RECLAMADA antes de qualquer outra escrita.
+    
+       A ordem anterior era: vincular a paciente, depois marcar a solicitação
+       como aceita. Se a segunda falhasse, a paciente ficava vinculada ao médico
+       com a solicitação ainda "pending" — o cartão dela dizia "aguardando o
+       médico aceitar" para sempre, enquanto ele já a via na lista de pacientes.
+       Reclamar primeiro, com `.eq("status","pending")`, também fecha a corrida
+       de dois cliques: o segundo encontra 0 linhas e desiste. */
+    const { data: claimed } = await (supabaseAdmin as any)
+      .from("patient_link_requests")
+      .update({ status: data.accept ? "accepted" : "declined", decided_at: now })
+      .eq("id", req.id)
+      .eq("status", "pending")
+      .select("id");
+    if (!claimed?.length) return { ok: false as const };
+
+    /** Devolve a solicitação para pendente quando o passo seguinte falha. */
+    const desfazer = async () =>
+      await (supabaseAdmin as any)
+        .from("patient_link_requests")
+        .update({ status: "pending", decided_at: null })
+        .eq("id", req.id);
+
     if (data.accept) {
       // Escada de planos: cada plano tem um teto de pacientes ativas por
       // médico (Free 5 → Starter 50 → Pro 150 → Elite 300 → Black/Clínica
@@ -377,6 +401,9 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
           .select("id", { count: "exact", head: true })
           .eq("doctor_id", user.id);
         if (!cntErr && (count ?? 0) >= ent.maxPatients) {
+          // Teto do plano: a solicitação volta a pendente para ele aceitar
+          // depois do upgrade, em vez de sumir.
+          await desfazer();
           return {
             ok: false as const,
             reason: "limit" as const,
@@ -390,13 +417,11 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
         .from("patient_profiles")
         .update({ doctor_id: user.id, updated_at: now })
         .eq("id", req.patient_id);
-      if (linkErr) return { ok: false as const };
+      if (linkErr) {
+        await desfazer();
+        return { ok: false as const };
+      }
     }
-
-    const { error } = await (supabaseAdmin as any)
-      .from("patient_link_requests")
-      .update({ status: data.accept ? "accepted" : "declined", decided_at: now })
-      .eq("id", req.id);
 
     /* AVISA A PACIENTE da decisão.
        
@@ -405,34 +430,31 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
        sem nenhum momento em que alguém lhe dissesse "ele aceitou". E a recusa
        era pior: o cartão simplesmente voltava ao estado vazio, como se ela
        nunca tivesse pedido nada. Uma decisão que ninguém comunica é uma decisão
-       que a pessoa vive como um bug. */
-    if (!error) {
-      // Aguardado pelo mesmo motivo do pedido: serverless não garante o que
-      // roda depois da resposta.
-      await (async () => {
-        try {
-          const { data: d } = await (supabaseAdmin as any)
-            .from("doctors")
-            .select("display_name")
-            .eq("id", user.id)
-            .maybeSingle();
-          const medico = ((d?.display_name as string) || "Seu médico").trim();
-          const { sendPushToUser } = await import("./push.server");
-          await sendPushToUser(req.patient_id as string, {
-            title: data.accept
-              ? `${medico} aceitou te acompanhar 💛`
-              : "Sua solicitação não foi aceita",
-            body: data.accept
-              ? "A partir de agora o app responde no estilo do consultório dele."
-              : "Você pode escolher outro obstetra no app, em Meu médico.",
-            url: "/minha-conta",
-          });
-        } catch {
-          /* melhor esforço — a decisão já está gravada */
-        }
-      })();
+       que a pessoa vive como um bug.
+
+       Aguardado (e não fire-and-forget) pelo mesmo motivo do pedido: em
+       serverless não há garantia de que algo rode depois da resposta. */
+    try {
+      const { data: d } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const medico = ((d?.display_name as string) || "Seu médico").trim();
+      const { sendPushToUser } = await import("./push.server");
+      await sendPushToUser(req.patient_id as string, {
+        title: data.accept
+          ? `${medico} aceitou te acompanhar 💛`
+          : "Sua solicitação não foi aceita",
+        body: data.accept
+          ? "A partir de agora o app responde no estilo do consultório dele."
+          : "Você pode escolher outro obstetra no app, em Meu médico.",
+        url: "/minha-conta",
+      });
+    } catch {
+      /* melhor esforço — a decisão já está gravada */
     }
-    return { ok: !error };
+    return { ok: true as const };
   });
 
 /** Lista as pacientes vinculadas ao médico logado. */

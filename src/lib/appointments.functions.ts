@@ -110,6 +110,13 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
     // fluxo se o e-mail falhar ou não estiver configurado).
     try {
       const { sendEmail, emailLayout } = await import("@/lib/email.server");
+      const { avisarMedico } = await import("@/lib/doctor-mail.server");
+      /* O aviso vai para o MÉDICO DELA. Antes ia para ADMIN_EMAILS: nome,
+         telefone, e-mail e motivo da consulta de paciente de qualquer médico
+         caíam na caixa da plataforma, e o médico que precisava confirmar o
+         horário nunca era avisado. `plataformaSeOrfa` cobre o formulário
+         público do site, onde ainda não existe médico para avisar. */
+      const aviso = await avisarMedico(doctorId, { plataformaSeOrfa: true });
       const dataBr = new Date(data.preferred_date + "T00:00:00").toLocaleDateString("pt-BR");
       const resumo = `
         <p style="margin:0 0 6px"><strong>Data preferida:</strong> ${dataBr} às ${esc(data.preferred_time)}</p>
@@ -118,23 +125,24 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
 
       await sendEmail({
         to: data.patient_email,
-        replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+        replyTo: aviso.para[0],
         subject: "Recebemos seu pedido de consulta 💛",
         html: emailLayout(
           `Olá, ${esc(data.patient_name.split(" ")[0])}!`,
-          `<p style="margin:0 0 14px">Recebemos sua solicitação de consulta. Nossa equipe vai confirmar o horário disponível com o seu médico em até 1 dia útil.</p>
+          `<p style="margin:0 0 14px">Recebemos sua solicitação de consulta. ${
+            aviso.nome
+              ? `${esc(aviso.nome)} vai confirmar o horário disponível`
+              : "Vamos confirmar o horário disponível com o seu médico"
+          } em até 1 dia útil.</p>
            ${resumo}
            <p style="margin:14px 0 0;font-size:13px;color:#9b8178">Em caso de urgência, ligue 192 (SAMU) ou procure o pronto-socorro.</p>`,
+          aviso.marca,
         ),
       });
 
-      const notify = (process.env.ADMIN_EMAILS || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (notify.length) {
+      if (aviso.para.length) {
         await sendEmail({
-          to: notify,
+          to: aviso.para,
           replyTo: data.patient_email,
           subject: `Novo pedido de consulta — ${data.patient_name}`,
           html: emailLayout(
@@ -143,6 +151,7 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
              <p style="margin:0 0 6px"><strong>Contato:</strong> ${esc(data.patient_phone)} · ${esc(data.patient_email)}</p>
              ${resumo}
              <p style="margin:14px 0 0"><a href="https://www.obstetrica.com.br/painel" style="color:#a85a44">Abrir o painel do médico →</a></p>`,
+            aviso.marca,
           ),
         });
       }
@@ -249,18 +258,20 @@ export const respondToProposedTime = createServerFn({ method: "POST" })
       // Avisa o consultório que a paciente recusou (best-effort).
       try {
         const { sendEmail, emailLayout } = await import("@/lib/email.server");
-        const notify = (process.env.ADMIN_EMAILS || "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        if (notify.length) {
+        const { avisarMedico } = await import("@/lib/doctor-mail.server");
+        /* Quem sugeriu o horário foi o médico dela — é ele que precisa saber
+           que foi recusado. Sem `plataformaSeOrfa`: consulta dentro do app
+           sempre tem médico, e se não tiver, ninguém precisa do dado. */
+        const aviso = await avisarMedico(row.doctor_id);
+        if (aviso.para.length) {
           await sendEmail({
-            to: notify,
+            to: aviso.para,
             replyTo: row.patient_email,
             subject: `Horário sugerido recusado — ${row.patient_name ?? "paciente"}`,
             html: emailLayout(
               "Contraproposta recusada",
               `<p style="margin:0 0 6px">${esc(row.patient_name ?? "A paciente")} recusou o horário sugerido. Talvez queira sugerir outro.</p>`,
+              aviso.marca,
             ),
           });
         }
@@ -322,19 +333,18 @@ export const respondToProposedTime = createServerFn({ method: "POST" })
     // Avisa o consultório que a paciente aprovou (best-effort).
     try {
       const { sendEmail, emailLayout } = await import("@/lib/email.server");
-      const notify = (process.env.ADMIN_EMAILS || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const { avisarMedico } = await import("@/lib/doctor-mail.server");
+      const aviso = await avisarMedico(row.doctor_id);
       const dataBr = new Date(row.proposed_date + "T00:00:00").toLocaleDateString("pt-BR");
-      if (notify.length) {
+      if (aviso.para.length) {
         await sendEmail({
-          to: notify,
+          to: aviso.para,
           replyTo: row.patient_email,
           subject: `Horário confirmado pela paciente — ${row.patient_name ?? "paciente"}`,
           html: emailLayout(
             "Consulta confirmada",
             `<p style="margin:0 0 6px">${esc(row.patient_name ?? "A paciente")} aprovou o horário sugerido: ${dataBr} às ${esc(row.proposed_time)}.</p>`,
+            aviso.marca,
           ),
         });
       }

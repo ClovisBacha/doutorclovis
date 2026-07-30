@@ -176,12 +176,33 @@ export const getMyDoctor = createServerFn({ method: "POST" })
       /* contagem é informativa — não derruba o perfil */
     }
 
+    /* O que falta para ele poder receber paciente. Calculado no servidor e
+       devolvido junto do perfil: o painel cobra a lista, e a busca da paciente
+       usa a MESMA regra — sem isso, cada tela tinha a sua ideia de "completo".
+
+       Endereço mora em outra tabela, então é consultado aqui e entra como
+       booleano. Erro de tabela não migrada = `undefined`, que não cobra nada
+       (melhor não cobrar do que cobrar algo que não dá para preencher). */
+    let temEndereco: boolean | undefined = undefined;
+    try {
+      const { count, error: eAddr } = await (supabaseAdmin as any)
+        .from("doctor_addresses")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", user.id);
+      if (!eAddr) temEndereco = (count ?? 0) > 0;
+    } catch {
+      /* sem tabela de endereços: não cobra */
+    }
+    const { pendenciasDoMedico } = await import("./doctor-required");
+    const pendencias = row ? pendenciasDoMedico(row as any, { temEndereco }) : [];
+
     return {
       ok: true as const,
       doctor: (row ?? null) as DoctorProfile | null,
       isPlatformAdmin,
       entitlements,
       patientCount,
+      pendencias,
     };
   });
 
@@ -228,6 +249,22 @@ export const registerDoctor = createServerFn({ method: "POST" })
       .select("id,slug")
       .eq("id", user.id)
       .maybeSingle();
+
+    /* Cadastro NOVO passa pela mesma regra que o formulário aplica — o servidor
+       não confia na tela. Só no cadastro novo: um perfil que já existe pode
+       estar salvando um campo por vez em "Meu Perfil", e barrar ali trancaria o
+       médico fora do próprio painel (foi exatamente o beco sem saída relatado).
+       Endereço não é cobrado aqui: ele é criado depois, no painel. */
+    if (!existing) {
+      const { pendenciasDoMedico } = await import("./doctor-required");
+      const faltas = pendenciasDoMedico(data.profile as any, { temEndereco: true });
+      if (faltas.length) {
+        return {
+          ok: false as const,
+          error: `${faltas[0].rotulo} — ${faltas[0].porque}`,
+        };
+      }
+    }
 
     // Indicação (só no cadastro NOVO): o `ref` precisa ser um médico REAL e
     // diferente do próprio (sem auto-indicação). Best-effort — não bloqueia.
@@ -375,7 +412,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
     // não há ativação manual. Não bloqueia o fluxo se o e-mail falhar.
     if (!existing) {
       try {
-        const { sendEmail, emailLayout } = await import("@/lib/email.server");
+        const { sendEmail, emailLayout, escEmail } = await import("@/lib/email.server");
         const notify = (process.env.ADMIN_EMAILS || "")
           .split(",")
           .map((s) => s.trim())
@@ -387,10 +424,12 @@ export const registerDoctor = createServerFn({ method: "POST" })
             subject: `🩺 Novo médico cadastrado — ${data.profile.display_name}`,
             html: emailLayout(
               "Novo médico na plataforma",
-              `<p style="margin:0 0 6px"><strong>Nome:</strong> ${data.profile.display_name}</p>
-               <p style="margin:0 0 6px"><strong>CRM:</strong> ${data.profile.crm}</p>
-               <p style="margin:0 0 6px"><strong>WhatsApp:</strong> ${data.profile.whatsapp ?? "—"}</p>
-               <p style="margin:0 0 6px"><strong>E-mail:</strong> ${user.email ?? "—"}</p>
+              // Campos livres do cadastro: escapados, senão um "<" no nome
+              // quebra a moldura do e-mail.
+              `<p style="margin:0 0 6px"><strong>Nome:</strong> ${escEmail(data.profile.display_name)}</p>
+               <p style="margin:0 0 6px"><strong>CRM:</strong> ${escEmail(data.profile.crm)}</p>
+               <p style="margin:0 0 6px"><strong>WhatsApp:</strong> ${escEmail(data.profile.whatsapp ?? "—")}</p>
+               <p style="margin:0 0 6px"><strong>E-mail:</strong> ${escEmail(user.email ?? "—")}</p>
                <p style="margin:14px 0 0">O painel dele já está ativo (trial 14 dias) — vale dar as boas-vindas e ajudar no onboarding.</p>`,
             ),
           });
@@ -472,6 +511,15 @@ export type DirectoryDoctor = {
   approach?: string | null;
   consultation_price_brl?: number | null;
   offers_telehealth?: boolean | null;
+  /* Como ele atende. Dois booleanos e não um enum porque há quem faça os dois
+     — e porque `insurances` em branco antes era ambíguo entre "só particular"
+     e "não preenchi". É a primeira pergunta da paciente. */
+  accepts_insurance?: boolean | null;
+  accepts_private?: boolean | null;
+  /** Endereço principal, já montado numa linha. "" = não informado. */
+  endereco?: string;
+  /** Cidade do endereço principal — quando o perfil não tem cidade preenchida. */
+  endereco_cidade?: string;
   /** Preenchido pela busca com IA: por que este médico deu match. */
   matchReasons?: string[];
 };
@@ -551,6 +599,14 @@ export const searchDoctors = createServerFn({ method: "POST" })
     let list = (rows ?? []) as (DirectoryDoctor & { active: boolean })[];
     // Perfis reais só (com nome) e, se houver texto, casa nome/especialidade/cidade.
     list = list.filter((d) => (d.display_name ?? "").trim().length >= 2);
+    /* Sem telefone para pacientes, ele NÃO entra na lista.
+    
+       Não é rigor de cadastro: escolher um médico é o que liga o botão SOS
+       dela ao telefone dele. Oferecer na busca alguém sem número é entregar um
+       botão de emergência que não disca — e o pior momento para descobrir isso
+       é o momento da emergência. Os outros campos que faltam só empurram para
+       baixo no ranking; este exclui. */
+    list = list.filter((d) => (d.whatsapp ?? "").replace(/\D+/g, "").length >= 10);
     if (term) {
       list = list.filter((d) =>
         `${d.display_name} ${d.specialty} ${d.subspecialty} ${d.city} ${d.bio}`
@@ -581,14 +637,33 @@ export const searchDoctors = createServerFn({ method: "POST" })
         Number(!!(b as { verified?: boolean }).verified) -
         Number(!!(a as { verified?: boolean }).verified);
       if (vf !== 0) return vf;
+      /* Perfil completo antes de perfil pela metade: a paciente que abre um
+         card sem valor de consulta, sem convênio e sem formação não tem como
+         decidir, e volta para a lista. Quem preencheu aparece primeiro. */
+      const cp = Number(cadastroUtil(b)) - Number(cadastroUtil(a));
+      if (cp !== 0) return cp;
       const ex = (b.years_experience ?? 0) - (a.years_experience ?? 0);
       if (ex !== 0) return ex;
       return (a.display_name ?? "").localeCompare(b.display_name ?? "");
     });
 
-    const doctors: DirectoryDoctor[] = list.map((d) => toDirectoryDoctor(d));
+    const comEndereco = await anexarEnderecos(supabaseAdmin, list as any[]);
+    const doctors: DirectoryDoctor[] = comEndereco.map((d) => toDirectoryDoctor(d));
     return { ok: true as const, doctors };
   });
+
+/**
+ * O card dele responde as perguntas da paciente?
+ *
+ * Serve só para ORDENAR (quem responde aparece antes). Não exclui ninguém:
+ * excluir por perfil incompleto deixaria a busca vazia justamente no começo da
+ * plataforma, quando ninguém terminou o cadastro ainda.
+ */
+function cadastroUtil(d: any): boolean {
+  const temPreco = !d?.accepts_private || (d?.consultation_price_brl ?? 0) > 0;
+  const temConv = !d?.accepts_insurance || !!String(d?.insurances ?? "").trim();
+  return !!String(d?.education ?? "").trim() && temPreco && temConv;
+}
 
 /** Normaliza uma linha crua de doctors para o card público do diretório. */
 function toDirectoryDoctor(d: any): DirectoryDoctor {
@@ -616,7 +691,50 @@ function toDirectoryDoctor(d: any): DirectoryDoctor {
     approach: d.approach ?? null,
     consultation_price_brl: d.consultation_price_brl ?? null,
     offers_telehealth: d.offers_telehealth ?? null,
+    accepts_insurance: d.accepts_insurance ?? null,
+    accepts_private: d.accepts_private ?? null,
+    endereco: d.__endereco ?? "",
+    endereco_cidade: d.__endereco_cidade ?? "",
   };
+}
+
+/**
+ * Anexa o endereço principal a cada linha antes de virar card.
+ *
+ * O médico cadastra endereços (`doctor_addresses`) desde a migração do cadastro
+ * completo, mas a paciente nunca via nenhum: o painel dizia "a paciente vê o
+ * endereço principal" e isso simplesmente não era verdade. Uma consulta só,
+ * para todos os médicos da página, em vez de uma por card.
+ */
+async function anexarEnderecos(sb: any, rows: any[]): Promise<any[]> {
+  const ids = rows.map((r) => r.id).filter(Boolean);
+  if (!ids.length) return rows;
+  try {
+    const { data: addrs, error } = await sb
+      .from("doctor_addresses")
+      .select("doctor_id,label,street,city,state,is_primary,position")
+      .in("doctor_id", ids)
+      .order("position", { ascending: true });
+    if (error) return rows;
+    const porMedico = new Map<string, any>();
+    for (const a of (addrs ?? []) as any[]) {
+      // O primário ganha; sem primário, o primeiro da ordem escolhida por ele.
+      const atual = porMedico.get(a.doctor_id);
+      if (!atual || (a.is_primary && !atual.is_primary)) porMedico.set(a.doctor_id, a);
+    }
+    return rows.map((r) => {
+      const a = porMedico.get(r.id);
+      if (!a) return r;
+      const linha = [a.street, a.city, a.state].map((x) => String(x ?? "").trim()).filter(Boolean);
+      return {
+        ...r,
+        __endereco: linha.join(" · "),
+        __endereco_cidade: String(a.city ?? "").trim(),
+      };
+    });
+  } catch {
+    return rows;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -754,6 +872,9 @@ export const aiSearchDoctors = createServerFn({ method: "POST" })
 
     const scored = ((rows ?? []) as any[])
       .filter((d) => (d.display_name ?? "").trim().length >= 2)
+      // Mesma regra do diretório: sem telefone para pacientes, o SOS dela não
+      // teria para onde ligar depois de escolher — então ele não é oferecido.
+      .filter((d) => String(d.whatsapp ?? "").replace(/\D+/g, "").length >= 10)
       .map((d) => {
         let score = 0;
         const reasons: string[] = [];
@@ -804,8 +925,13 @@ export const aiSearchDoctors = createServerFn({ method: "POST" })
       .sort((a, b) => b.score - a.score)
       .slice(0, 20);
 
-    const doctors: DirectoryDoctor[] = scored.map((x) => ({
-      ...toDirectoryDoctor(x.d),
+    // Mesmo endereço que o diretório mostra — o card é o mesmo componente.
+    const comEndereco = await anexarEnderecos(
+      supabaseAdmin,
+      scored.map((x) => x.d),
+    );
+    const doctors: DirectoryDoctor[] = scored.map((x, i) => ({
+      ...toDirectoryDoctor(comEndereco[i] ?? x.d),
       matchReasons: x.reasons,
     }));
     return { ok: true as const, doctors, criteria: crit };

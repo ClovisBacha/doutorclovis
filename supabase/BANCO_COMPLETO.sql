@@ -135,11 +135,21 @@ DROP POLICY IF EXISTS "own checklist all" ON public.checklist_items;
 CREATE POLICY "own checklist all" ON public.checklist_items FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- Auto-create profile on signup
+--
+-- Pula quem chega marcado como medico: o gatilho roda em CADA insercao em
+-- auth.users, e criar perfil de gestante para um obstetra e o que fazia o app
+-- pedir o nome do bebe a quem se cadastrou como medico. A marca vem do
+-- formulario de cadastro, no raw_user_meta_data, antes de existir perfil algum.
+-- ON CONFLICT porque o cadastro tambem pode ter criado a linha.
 CREATE OR REPLACE FUNCTION public.handle_new_patient()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
+  IF COALESCE(NEW.raw_user_meta_data->>'role', '') = 'doctor' THEN
+    RETURN NEW;
+  END IF;
   INSERT INTO public.patient_profiles (id, display_name)
-  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)));
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)))
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$;

@@ -238,14 +238,20 @@ export const updateAppointmentStatus = createServerFn({ method: "POST" })
         if (row?.patient_email) {
           const { sendEmail, emailLayout } = await import("@/lib/email.server");
           const dataBr = new Date(row.preferred_date + "T00:00:00").toLocaleDateString("pt-BR");
+          /* Quem assina e quem responde é o MÉDICO DELA. Antes o e-mail saía
+             assinado pelo fundador e com reply-to na caixa da plataforma —
+             paciente de outro médico respondia para o lugar errado. */
+          const { destinoMedico } = await import("@/lib/doctor-mail.server");
+          const med = await destinoMedico((row.doctor_id as string | null) ?? null);
           await sendEmail({
             to: row.patient_email,
-            replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+            replyTo: med.email || undefined,
             subject: "Sobre sua solicitação de consulta",
             html: emailLayout(
               `Olá, ${esc((row.patient_name ?? "").split(" ")[0]) || "tudo bem"}!`,
               `<p style="margin:0 0 14px">Não foi possível confirmar sua consulta solicitada para ${dataBr} às ${esc(row.preferred_time)}.</p>
                <p style="margin:0 0 6px">Responda este e-mail ou solicite um novo horário — teremos prazer em encontrar uma alternativa.</p>`,
+              med.marca,
             ),
           });
         }
@@ -329,11 +335,13 @@ export const confirmAppointment = createServerFn({ method: "POST" })
     try {
       const { data: row } = await (supabaseAdmin as any)
         .from("appointment_requests")
-        .select("patient_name, patient_email")
+        .select("patient_name, patient_email, doctor_id")
         .eq("id", data.id)
         .maybeSingle();
       if (row?.patient_email) {
         const { sendEmail, emailLayout } = await import("@/lib/email.server");
+        const { destinoMedico } = await import("@/lib/doctor-mail.server");
+        const med = await destinoMedico((row.doctor_id as string | null) ?? null);
         const dataBr = new Date(data.confirmedDate + "T00:00:00").toLocaleDateString("pt-BR", {
           weekday: "long",
           day: "2-digit",
@@ -345,7 +353,7 @@ export const confirmAppointment = createServerFn({ method: "POST" })
             : "";
         await sendEmail({
           to: row.patient_email,
-          replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+          replyTo: med.email || undefined,
           subject: "Sua consulta foi confirmada ✅",
           html: emailLayout(
             `Olá, ${esc((row.patient_name ?? "").split(" ")[0]) || "tudo bem"}!`,
@@ -355,6 +363,7 @@ export const confirmAppointment = createServerFn({ method: "POST" })
              ${preco}
              <p style="margin:14px 0 0">Você também acompanha o status na aba <strong>Consultas</strong> do app.</p>
              <p style="margin:10px 0 0;font-size:13px;color:#9b8178">Precisa remarcar? Responda este e-mail.</p>`,
+            med.marca,
           ),
         });
         const { sendPushToEmail } = await import("@/lib/push.server");
@@ -411,11 +420,13 @@ export const proposeAppointmentTime = createServerFn({ method: "POST" })
     try {
       const { data: row } = await (supabaseAdmin as any)
         .from("appointment_requests")
-        .select("patient_name, patient_email")
+        .select("patient_name, patient_email, doctor_id")
         .eq("id", data.id)
         .maybeSingle();
       if (row?.patient_email) {
         const { sendEmail, emailLayout } = await import("@/lib/email.server");
+        const { destinoMedico } = await import("@/lib/doctor-mail.server");
+        const med = await destinoMedico((row.doctor_id as string | null) ?? null);
         const dataBr = new Date(data.proposedDate + "T00:00:00").toLocaleDateString("pt-BR", {
           weekday: "long",
           day: "2-digit",
@@ -423,15 +434,18 @@ export const proposeAppointmentTime = createServerFn({ method: "POST" })
         });
         await sendEmail({
           to: row.patient_email,
-          replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+          replyTo: med.email || undefined,
           subject: "O médico sugeriu um novo horário 🗓️",
           html: emailLayout(
             `Olá, ${esc((row.patient_name ?? "").split(" ")[0]) || "tudo bem"}!`,
-            `<p style="margin:0 0 14px">O horário que você pediu não estava disponível, então o médico <strong>sugeriu um novo horário</strong>:</p>
+            `<p style="margin:0 0 14px">O horário que você pediu não estava disponível, então ${
+              med.nome ? esc(med.nome) : "o médico"
+            } <strong>sugeriu um novo horário</strong>:</p>
              <p style="margin:0 0 6px"><strong>Data:</strong> ${dataBr}</p>
              <p style="margin:0 0 6px"><strong>Horário:</strong> ${data.proposedTime}</p>
              <p style="margin:14px 0 0">Abra a aba <strong>Consultas</strong> no app para <strong>aprovar</strong> ou <strong>recusar</strong> esse horário.</p>
              <p style="margin:10px 0 0"><a href="https://www.obstetrica.com.br/minha-conta" style="color:#a85a44">Abrir o app →</a></p>`,
+            med.marca,
           ),
         });
         const { sendPushToEmail } = await import("@/lib/push.server");

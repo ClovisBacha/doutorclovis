@@ -17044,17 +17044,43 @@ function MédicoTab() {
                   )}
                   {/* Cidade e tempo de atuação: era o que faltava para ela
                       decidir. Antes o resultado dizia só nome e especialidade —
-                      insuficiente para escolher entre cinco obstetras. */}
-                  {(d.city || d.years_experience) && (
+                      insuficiente para escolher entre cinco obstetras.
+                      A cidade cai no endereço do consultório quando o perfil
+                      não tem cidade preenchida — é o mesmo dado, e ela só
+                      quer saber se é perto. */}
+                  {(d.city || d.endereco_cidade || d.years_experience) && (
                     <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                       {[
-                        d.city ? `${d.city}${d.state ? `/${d.state}` : ""}` : null,
+                        d.city
+                          ? `${d.city}${d.state ? `/${d.state}` : ""}`
+                          : d.endereco_cidade || null,
                         d.years_experience ? `${d.years_experience} anos de atuação` : null,
                       ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
                   )}
+                  {/* Como ele atende e quanto custa: as duas perguntas que ela
+                      faz antes de solicitar. Sem elas, "Solicitar" era um pedido
+                      no escuro — e ela descobria o preço depois de aceita. */}
+                  {(d.accepts_insurance || d.accepts_private || d.consultation_price_brl) && (
+                    <p className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                      {d.accepts_insurance && (
+                        <span className="rounded-full bg-secondary px-1.5 py-0.5">💳 Convênio</span>
+                      )}
+                      {d.accepts_private && (
+                        <span className="rounded-full bg-secondary px-1.5 py-0.5">
+                          💰 Particular
+                          {d.consultation_price_brl ? ` · R$ ${d.consultation_price_brl}` : ""}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  {d.endereco ? (
+                    <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                      📍 {d.endereco}
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   onClick={() => sendRequest(d)}

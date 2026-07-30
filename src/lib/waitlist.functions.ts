@@ -58,13 +58,17 @@ async function notifyOffer(row: {
   patient_email?: string | null;
   offer_date?: string | null;
   offer_time?: string | null;
+  /** Médico da fila: quem assina o e-mail e recebe a resposta dela. */
+  doctor_id?: string | null;
 }): Promise<void> {
   if (!row.patient_email || !row.offer_date) return;
   try {
     const { sendEmail, emailLayout } = await import("@/lib/email.server");
+    const { destinoMedico } = await import("@/lib/doctor-mail.server");
+    const med = await destinoMedico(row.doctor_id ?? null);
     await sendEmail({
       to: row.patient_email,
-      replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+      replyTo: med.email || undefined,
       subject: "Abriu uma vaga pra você! 🗓️",
       html: emailLayout(
         `Olá, ${esc((row.patient_name ?? "").split(" ")[0]) || "tudo bem"}!`,
@@ -73,6 +77,7 @@ async function notifyOffer(row: {
          <p style="margin:0 0 6px"><strong>Horário:</strong> ${esc(row.offer_time)}</p>
          <p style="margin:14px 0 0">Você tem <strong>${WAITLIST_RESPONSE_HOURS} horas</strong> pra aceitar na aba <strong>Consultas</strong> do app — depois a vaga passa pra próxima da fila.</p>
          <p style="margin:10px 0 0"><a href="https://www.obstetrica.com.br/minha-conta" style="color:#a85a44">Aceitar no app →</a></p>`,
+        med.marca,
       ),
     });
   } catch (e) {
@@ -151,6 +156,7 @@ async function offerNextForWeek(
     patient_email: entry.patient_email,
     offer_date: offerDate,
     offer_time: offerTime,
+    doctor_id: doctorId,
   });
   return true;
 }
@@ -395,18 +401,18 @@ export const respondWaitlistOffer = createServerFn({ method: "POST" })
     // Avisa o consultório (best-effort).
     try {
       const { sendEmail, emailLayout } = await import("@/lib/email.server");
-      const notify = (process.env.ADMIN_EMAILS || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (notify.length) {
+      const { avisarMedico } = await import("@/lib/doctor-mail.server");
+      // A agenda que mudou é a do médico da fila — é ele que precisa saber.
+      const aviso = await avisarMedico(entry.doctor_id ?? null);
+      if (aviso.para.length) {
         await sendEmail({
-          to: notify,
+          to: aviso.para,
           replyTo: email,
           subject: `Vaga da fila preenchida — ${entry.patient_name ?? "paciente"}`,
           html: emailLayout(
             "Fila de espera",
             `<p style="margin:0 0 6px">${esc(entry.patient_name ?? "A paciente")} aceitou a vaga de ${fmtDateBr(entry.offer_date)} às ${esc(entry.offer_time)}.</p>`,
+            aviso.marca,
           ),
         });
       }
