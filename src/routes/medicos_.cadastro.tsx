@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { registerDoctor, getMyDoctor } from "@/lib/doctors.functions";
+import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
 import { GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/medicos_/cadastro")({
@@ -366,14 +367,45 @@ function CadastroMedicoPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
+              {/* UF primeiro, número depois — o registro é estadual, e
+                  "CRM 12345" sozinho não identifica ninguém. Em dois controles
+                  o formato sai sempre igual e dá para conferir no portal do
+                  conselho. */}
               <div>
                 <label className={label}>CRM *</label>
-                <input
-                  value={profile.crm}
-                  onChange={(e) => setProfile((p) => ({ ...p, crm: e.target.value }))}
-                  placeholder="CRM-MG 12345"
-                  className={input}
-                />
+                <div className="mt-1 flex gap-2">
+                  <select
+                    value={separarCrm(profile.crm).uf}
+                    onChange={(e) =>
+                      setProfile((p) => ({
+                        ...p,
+                        crm: juntarCrm(e.target.value, separarCrm(p.crm).numero),
+                      }))
+                    }
+                    className={`${input} w-[86px] shrink-0`}
+                    aria-label="Estado do CRM"
+                  >
+                    <option value="">UF</option>
+                    {UFS.map((uf) => (
+                      <option key={uf} value={uf}>
+                        {uf}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={separarCrm(profile.crm).numero}
+                    onChange={(e) =>
+                      setProfile((p) => ({
+                        ...p,
+                        crm: juntarCrm(separarCrm(p.crm).uf, e.target.value),
+                      }))
+                    }
+                    placeholder="12345"
+                    inputMode="numeric"
+                    className={input}
+                    aria-label="Número do CRM"
+                  />
+                </div>
               </div>
               <div>
                 <label className={label}>WhatsApp</label>

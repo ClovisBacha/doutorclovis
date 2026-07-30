@@ -22,6 +22,7 @@ import {
   type AdminWaitlistEntry,
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
+import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { gradientFor, periodFor } from "@/components/weather-sky";
 import { ymdLocal } from "@/lib/utils";
@@ -6758,6 +6759,9 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const label = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
   const faltaEmergencia = !form.crm.trim() || form.whatsapp.replace(/\D/g, "").length < 10;
+  /* O `crm` continua UMA string no banco (`CRM-MG 12345`) — a tela só a lê em
+     duas partes. Assim a carteirinha e o aviso do SOS não mudam de formato. */
+  const { uf: crmUf, numero: crmNum } = separarCrm(form.crm);
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -6808,16 +6812,39 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               className={input}
             />
           </div>
+          {/* UF primeiro, número depois: o registro é estadual, e "CRM 12345"
+              sozinho não identifica ninguém. Em dois controles não há como
+              gravar "crm mg 12345" ou "12345/MG" — o formato sai sempre igual e
+              dá para conferir no portal do conselho. */}
           <div>
             <label className={label}>CRM *</label>
-            <input
-              value={form.crm}
-              onChange={(e) => setForm((f) => ({ ...f, crm: e.target.value }))}
-              className={input}
-              placeholder="CRM-MG 12.345"
-            />
+            <div className="mt-1 flex gap-2">
+              <select
+                value={crmUf}
+                onChange={(e) => setForm((f) => ({ ...f, crm: juntarCrm(e.target.value, crmNum) }))}
+                className={`${input} w-[92px] shrink-0`}
+                aria-label="Estado do CRM"
+              >
+                <option value="">UF</option>
+                {UFS.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={crmNum}
+                onChange={(e) => setForm((f) => ({ ...f, crm: juntarCrm(crmUf, e.target.value) }))}
+                className={input}
+                placeholder="12345"
+                inputMode="numeric"
+                aria-label="Número do CRM"
+              />
+            </div>
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              Vai impresso na carteirinha de emergência que a paciente mostra no hospital.
+              {form.crm
+                ? `Vai impresso como "${form.crm}" na carteirinha de emergência da paciente.`
+                : "Vai impresso na carteirinha de emergência que a paciente mostra no hospital."}
             </p>
           </div>
           <div>
