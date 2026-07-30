@@ -16989,6 +16989,8 @@ function MédicoTab() {
   const [searched, setSearched] = useState(false);
   /** O nome digitado não casou com ninguém — a lista é o diretório inteiro. */
   const [semMatch, setSemMatch] = useState(false);
+  /** A lista veio sem os filtros (banco sem as colunas do perfil). */
+  const [filtrosFora, setFiltrosFora] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -17038,6 +17040,7 @@ function MédicoTab() {
          um botão "Solicitar". Pedir vínculo ao médico errado era o desfecho
          provável. */
       setSemMatch(res.ok ? !!res.semCorrespondencia : false);
+      setFiltrosFora(res.ok ? !!res.filtrosIgnorados : false);
       setResults(res.ok ? res.doctors : []);
     } catch {
       setResults([]);
@@ -17169,6 +17172,11 @@ function MédicoTab() {
               <p className="text-sm text-muted-foreground">
                 Nenhum médico com esse nome. Tente só o sobrenome, ou deixe o campo vazio e toque em
                 Buscar para ver todos os obstetras do app.
+              </p>
+            )}
+            {filtrosFora && results.length > 0 && (
+              <p className="rounded-xl bg-secondary/60 p-3 text-[12px] leading-snug text-muted-foreground">
+                Esta lista está sem filtros — mostrando todos os obstetras do app.
               </p>
             )}
             {semMatch && results.length > 0 && (

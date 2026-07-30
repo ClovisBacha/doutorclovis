@@ -68,6 +68,8 @@ function EncontrarMedicoPage() {
      nome mas há médicos, não há resultado nenhum, e a busca falhou. Cada um
      pede uma frase diferente — e a última pede um botão. */
   const [semMatch, setSemMatch] = useState(false);
+  /** A lista veio SEM os filtros dela (banco sem as colunas do perfil). */
+  const [filtrosFora, setFiltrosFora] = useState(false);
   const [erro, setErro] = useState<"rede" | "falha" | null>(null);
   const [loading, setLoading] = useState(true);
   const [choosing, setChoosing] = useState<string | null>(null);
@@ -129,10 +131,12 @@ function EncontrarMedicoPage() {
          diretório inteiro. Sem esse sinal a tela mostraria os outros médicos
          como se fossem o resultado da busca dela. */
       setSemMatch(res.ok ? !!res.semCorrespondencia : false);
+      setFiltrosFora(res.ok ? !!res.filtrosIgnorados : false);
       setErro(res.ok ? null : "falha");
     } catch {
       setResults([]);
       setSemMatch(false);
+      setFiltrosFora(false);
       /* Falha de rede não é "seus filtros são estreitos". Antes as duas
          situações davam a mesma frase, e ela ficava mexendo nos filtros para
          resolver uma queda de conexão. */
@@ -309,6 +313,19 @@ function EncontrarMedicoPage() {
             </div>
           ) : (
             <>
+              {/* A lista ignorou os filtros: dizer, em vez de deixá-la achar que
+                  "São Paulo + doutorado" devolveu o país inteiro. */}
+              {filtrosFora && (
+                <div className="rounded-2xl border border-border bg-secondary/60 p-4">
+                  <p className="text-sm font-semibold text-foreground">
+                    Mostrando todos os obstetras
+                  </p>
+                  <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+                    Os filtros de cidade, estado e formação estão indisponíveis no momento — esta
+                    lista não está filtrada.
+                  </p>
+                </div>
+              )}
               {/* Não achou o nome que ela digitou: dizer isso, e então mostrar
                   quem existe — em vez de "amplie sua busca" e uma tela vazia. */}
               {semMatch && (
