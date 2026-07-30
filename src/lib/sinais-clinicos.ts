@@ -181,3 +181,63 @@ export const ESTILO_SINAL: Record<Gravidade, string> = {
 
 /** Peso para ordenação: grave primeiro. */
 export const PESO_SINAL: Record<Gravidade, number> = { grave: 0, atencao: 1, normal: 2 };
+
+/**
+ * A MESMA gravidade, dita para a paciente.
+ *
+ * O app dela tinha cópias inline destas faixas — e a cópia da glicemia calava
+ * para baixo: 35 mg/dL, que é neuroglicopenia, saía rotulado "Normal" em verde,
+ * enquanto o painel do médico dizia "Glicemia muito baixa". Não era ausência de
+ * alerta, era alerta INVERTIDO, e é o pior que este arquivo pode produzir.
+ *
+ * A saída não é mostrar a ela o texto do médico: "Pressão em faixa grave" às 23h
+ * manda gente ao pronto-socorro por medida caseira mal feita. A saída é uma
+ * régua só e duas VOZES — a gravidade é a mesma, o texto é diferente, e o texto
+ * dela sempre termina em uma ação que ela consegue executar.
+ */
+export function vozDaPaciente(
+  s: Sinal | null,
+  /** A conduta muda com a medida: repetir uma pressão e corrigir uma
+      hipoglicemia não são a mesma frase, e a genérica não serve para nenhuma
+      das duas. */
+  tipo: "pressao" | "glicemia" = "pressao",
+): { rotulo: string; orientacao: string } | null {
+  if (!s || s.gravidade === "normal") return null;
+  if (tipo === "glicemia") {
+    /* Três condutas diferentes, e confundi-las é o mesmo erro de escala de
+       antes: mandar conferir a unidade para uma glicemia de 250 real é tão
+       inútil quanto mandar comer doce para uma leitura em mmol/L. */
+    const implausivel = s.nota.includes("implausível");
+    const baixa = s.nota.includes("baixa");
+    if (implausivel) {
+      return {
+        rotulo: s.nota,
+        orientacao:
+          "Confira se o seu aparelho mede em mg/dL e refaça a medida. Se o número se repetir, avise seu médico hoje.",
+      };
+    }
+    if (s.gravidade === "grave") {
+      return {
+        rotulo: s.nota,
+        orientacao: baixa
+          ? "Se estiver se sentindo mal, tome algo doce agora e meça de novo em 15 minutos. Avise seu médico hoje."
+          : "Meça de novo daqui a pouco e avise seu médico hoje. Anote o que comeu antes.",
+      };
+    }
+    return {
+      rotulo: s.nota,
+      orientacao: "Anote o horário e se foi antes ou depois de comer, e leve na próxima consulta.",
+    };
+  }
+  if (s.gravidade === "grave") {
+    return {
+      rotulo: s.nota,
+      orientacao:
+        "Repita em 5 minutos, sentada e em repouso. Se vier parecido, ligue para o seu médico agora — e se não conseguir falar, procure a maternidade.",
+    };
+  }
+  return {
+    rotulo: s.nota,
+    orientacao: "Vale repetir mais tarde e comentar na próxima consulta.",
+  };
+}

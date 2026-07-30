@@ -529,3 +529,26 @@ UPDATE public.panic_events e
  WHERE p.id = e.user_id
    AND e.doctor_id IS NULL
    AND p.doctor_id IS NOT NULL;
+
+-- ============================================================================
+-- 15. RESPOSTA DO MEDICO: texto + carimbo de tempo (ver 20260730100000)
+-- ============================================================================
+-- Estas colunas eram referenciadas pelo codigo e pelo APLICAR_PENDENTES, mas a
+-- migration numerada nunca existiu. A prova de valor do painel conta
+-- "respondidas DESTE MES" por `answered_at`: sem a coluna, o numero fica zero
+-- para sempre.
+
+ALTER TABLE public.doctor_questions
+  ADD COLUMN IF NOT EXISTS answer text,
+  ADD COLUMN IF NOT EXISTS answered_at timestamptz;
+
+-- Retroativo aproximado (data da pergunta). Nao e a data real da resposta —
+-- serve para o historico nao ficar fora de toda contagem por periodo.
+UPDATE public.doctor_questions
+   SET answered_at = created_at
+ WHERE answered IS TRUE
+   AND answered_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_doctor_questions_answered_at
+    ON public.doctor_questions (doctor_id, answered_at)
+ WHERE answered IS TRUE;

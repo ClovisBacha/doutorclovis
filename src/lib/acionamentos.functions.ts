@@ -79,6 +79,31 @@ async function medicoDaSessao(accessToken: string) {
 }
 
 /**
+ * Pacientes que são dele AGORA — e não as que já foram.
+ *
+ * `panic_events.doctor_id` é carimbado no instante do disparo e nunca
+ * revisitado. Encerrar o acompanhamento zera `patient_profiles.doctor_id`, mas
+ * o carimbo antigo continuava abrindo a porta: o ex-médico seguia vendo a ficha
+ * congelada do SOS dela — nome, telefone, tipo sanguíneo, alergias,
+ * medicamentos, contato de emergência — e as coordenadas de onde ela estava.
+ *
+ * O painel já promete isso por escrito à paciente em outra tela ("os dados dela
+ * deixam de ser seus quando isso acontece"). Aqui a promessa passa a valer.
+ *
+ * A linha continua no banco: retenção de prontuário é obrigação legal (CFM),
+ * e guardar não é a mesma coisa que renderizar no painel todo dia. O que se
+ * corta é a leitura pela interface, não o registro.
+ */
+async function pacientesAtuais(doctorId: string): Promise<string[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await (supabaseAdmin as any)
+    .from("patient_profiles")
+    .select("id")
+    .eq("doctor_id", doctorId);
+  return ((data ?? []) as { id: string }[]).map((p) => p.id);
+}
+
+/**
  * Acionamentos das pacientes DESTE médico, mais recentes primeiro.
  *
  * `desde` existe para o painel poder perguntar "tem algo novo?" sem baixar o
@@ -100,16 +125,31 @@ export const listarAcionamentos = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, acionamentos: [] as AcionamentoSos[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     try {
-      let q = (supabaseAdmin as any)
-        .from("panic_events")
-        .select(COLS)
-        .eq("doctor_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(data.limite);
-      if (data.apenasPendentes) q = q.is("atendido_em", null);
-      const { data: rows, error } = await q;
-      // Migração pendente: lista vazia em vez de painel quebrado.
-      if (error) return vazio;
+      const atuais = await pacientesAtuais(user.id);
+      if (atuais.length === 0) return vazio;
+      /* EM LOTES DE 100: `.in()` viaja na query string, e uma lista longa
+         estoura o buffer do proxy — devolvendo 414, que aqui viraria "nenhuma
+         emergência". Cortar a lista em 100 seria pior ainda: esconderia em
+         silêncio o SOS de quem tem carteira grande. */
+      const rows: Record<string, unknown>[] = [];
+      for (let i = 0; i < atuais.length; i += 100) {
+        let q = (supabaseAdmin as any)
+          .from("panic_events")
+          .select(COLS)
+          .eq("doctor_id", user.id)
+          // O vínculo ATUAL, além do carimbo: quem deixou de ser paciente dele
+          // sai desta lista no mesmo instante.
+          .in("user_id", atuais.slice(i, i + 100))
+          .order("created_at", { ascending: false })
+          .limit(data.limite);
+        if (data.apenasPendentes) q = q.is("atendido_em", null);
+        const { data: parte, error } = await q;
+        // Migração pendente: lista vazia em vez de painel quebrado.
+        if (error) return vazio;
+        rows.push(...((parte ?? []) as Record<string, unknown>[]));
+      }
+      rows.sort((a, b) => (String(a.created_at) < String(b.created_at) ? 1 : -1));
+      rows.splice(data.limite);
 
       /* Os nomes das pacientes numa consulta só. Um `select` por linha viraria
          cinquenta idas ao banco para desenhar uma lista. */
@@ -180,6 +220,10 @@ export const acionamentosDaPaciente = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, acionamentos: [] as AcionamentoSos[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     try {
+      /* Vínculo atual antes de qualquer leitura: depois de encerrado o
+         acompanhamento, esta consulta não devolve mais nada. */
+      const atuais = await pacientesAtuais(user.id);
+      if (!atuais.includes(data.pacienteId)) return vazio;
       const { data: rows, error } = await (supabaseAdmin as any)
         .from("panic_events")
         .select(COLS)

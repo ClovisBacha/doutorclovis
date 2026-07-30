@@ -657,17 +657,43 @@ export const getEngagementData = createServerFn({ method: "POST" })
     );
     const idsDele = ((profiles.data ?? []) as { id: string }[]).map((p) => p.id);
 
-    const desde = (tabela: string, coluna: string) =>
-      idsDele.length === 0
-        ? Promise.resolve({ data: [] as never[] })
-        : (supabaseAdmin as any)
-            .from(tabela)
-            .select(`user_id,${coluna}`)
-            .in("user_id", idsDele)
-            .gte(coluna, inicioJanela);
+    /* EM LOTES DE 100 — porque `.in()` vai na URL.
+       
+       O PostgREST monta a lista na query string e cada uuid custa 39 caracteres
+       depois do percent-encoding da vírgula. A partir de ~206 pacientes a
+       request line passa dos 8 KB do buffer do proxy e volta 414 — e o sintoma
+       é o pior possível: `data` nula, `error` que ninguém lê, mapa de atividade
+       vazio e TODAS as pacientes marcadas como sumidas há mais de 45 dias, em
+       vermelho, no dia em que o consultório passou de 205 para 206. Sem uma
+       palavra de erro na tela.
 
-    const [healthLogs, journals, kicks, qs, forms, contracoes, exames, panicos] = await Promise.all(
-      [
+       O erro passa a ser propagado: um lote que falha derruba a leitura inteira
+       daquela tabela para o `catch` de quem chama, em vez de virar silêncio. */
+    const LOTE = 100;
+    const desde = async (tabela: string, coluna: string) => {
+      if (idsDele.length === 0) return { data: [] as never[], erro: false };
+      const partes: unknown[] = [];
+      let erro = false;
+      for (let i = 0; i < idsDele.length; i += LOTE) {
+        const { data: linhas, error } = await (supabaseAdmin as any)
+          .from(tabela)
+          .select(`user_id,${coluna}`)
+          .in("user_id", idsDele.slice(i, i + LOTE))
+          .gte(coluna, inicioJanela);
+        /* Tabela ainda não migrada (42703/42P01) é ausência esperada, não
+           falha: segue sem essa fonte de atividade, como antes. */
+        if (error) {
+          const code = (error as { code?: string }).code;
+          if (code !== "42703" && code !== "42P01") erro = true;
+          continue;
+        }
+        partes.push(...(linhas ?? []));
+      }
+      return { data: partes, erro };
+    };
+
+    const [healthLogs, journals, kicks, qs, forms, contracoes, exames, panicos, triagens] =
+      await Promise.all([
         desde("health_logs", "created_at"),
         desde("journal_entries", "created_at"),
         desde("kick_sessions", "started_at"),
@@ -692,8 +718,12 @@ export const getEngagementData = createServerFn({ method: "POST" })
         desde("contraction_logs", "created_at"),
         desde("exam_files", "created_at"),
         desde("panic_events", "created_at"),
-      ],
-    );
+        /* Triagem de sintomas: ela abriu o app, descreveu o que sentia e
+           recebeu uma orientação. Não contar isso como sinal de vida permitia
+           que a paciente aparecesse na lista de "sumidas há 30 dias" no mesmo
+           dia em que fez uma triagem VERMELHA. */
+        desde("triage_logs", "created_at"),
+      ]);
 
     // Map userId → most recent activity timestamp
     const activityMap = new Map<string, string>();
@@ -707,12 +737,26 @@ export const getEngagementData = createServerFn({ method: "POST" })
       ((res?.data ?? []) as LinhaAtividade[]).forEach((r) =>
         record(String(r.user_id ?? ""), String(r[coluna] ?? "")),
       );
+    /* Se ALGUMA leitura de atividade falhou de verdade, a tela não pode
+       apresentar o resultado como se fosse completo — seria transformar uma
+       falha de infraestrutura numa lista de pacientes abandonadas. */
+    const atividadeIncompleta = [
+      healthLogs,
+      journals,
+      kicks,
+      qs,
+      contracoes,
+      exames,
+      panicos,
+      triagens,
+    ].some((r) => (r as { erro?: boolean }).erro);
     registrar(healthLogs, "created_at");
     registrar(journals, "created_at");
     registrar(kicks, "started_at");
     registrar(contracoes, "created_at");
     registrar(exames, "created_at");
     registrar(panicos, "created_at");
+    registrar(triagens, "created_at");
     /* Pré-consulta enviada também é sinal de vida — a lista já vinha carregada
        para outro fim e nunca era registrada como atividade. */
     (forms.data as { user_id: string; submitted_at: string | null }[] | null)?.forEach((r) => {
@@ -766,6 +810,9 @@ export const getEngagementData = createServerFn({ method: "POST" })
          tenha ido buscar" — e foi essa confusão que fez o painel afirmar
          "nunca registrou nada no app" sobre paciente antiga. */
       janelaAtividadeDias: JANELA_ATIVIDADE_DIAS,
+      /** Alguma fonte de atividade não pôde ser lida — a tela avisa em vez de
+          afirmar que ninguém registrou nada. */
+      atividadeIncompleta,
     };
   });
 

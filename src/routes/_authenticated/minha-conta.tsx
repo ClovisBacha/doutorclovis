@@ -55,6 +55,7 @@ import { subscribeToPush, vapidPublicKey } from "@/lib/push";
 import { sendTestPushToMe } from "@/lib/push.functions";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
+import { sinalGlicemia, sinalPressao, vozDaPaciente } from "@/lib/sinais-clinicos";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
   babyForWeek,
@@ -4896,15 +4897,29 @@ function HealthTab({
   const totalGain =
     firstWeight != null && lastWeight != null ? (lastWeight - firstWeight).toFixed(1) : null;
 
+  /* A MESMA RÉGUA DO PAINEL DO MÉDICO.
+
+     Aqui havia uma cópia inline dos cortes. Os números batiam por sorte, mas as
+     GUARDAS não existiam: "0/0" saía como "PA normal" em verde (e o número ao
+     lado saía como "—", porque aquele teste é truthy — o mesmo card afirmava
+     duas coisas incompatíveis), e pressão de pulso zero também passava. Uma
+     régua só, duas vozes: a gravidade vem de `sinalPressao`, o texto de ação
+     vem de `vozDaPaciente`. */
   const lastBp = logs.find((l) => l.systolic != null && l.diastolic != null);
-  const bpStatus =
-    lastBp?.systolic != null && lastBp?.diastolic != null
-      ? lastBp.systolic >= 160 || lastBp.diastolic >= 110
-        ? { label: "PA muito elevada", color: "rose" }
-        : lastBp.systolic >= 140 || lastBp.diastolic >= 90
-          ? { label: "PA elevada", color: "amber" }
-          : { label: "PA normal", color: "emerald" }
-      : null;
+  const bpSinal = sinalPressao(lastBp?.systolic, lastBp?.diastolic);
+  const bpVoz = vozDaPaciente(bpSinal);
+  const bpStatus = bpSinal
+    ? {
+        label: bpSinal.gravidade === "normal" ? "PA normal" : bpSinal.nota,
+        color:
+          bpSinal.gravidade === "grave"
+            ? "rose"
+            : bpSinal.gravidade === "atencao"
+              ? "amber"
+              : "emerald",
+        orientacao: bpVoz?.orientacao ?? null,
+      }
+    : null;
 
   // IOM weight curve — Feature #9
   const prePregW = profile?.pre_pregnancy_weight_kg
@@ -5010,7 +5025,9 @@ function HealthTab({
             🩺 Última PA
           </p>
           <p className="mt-2 font-serif text-3xl">
-            {lastBp?.systolic && lastBp?.diastolic ? `${lastBp.systolic}/${lastBp.diastolic}` : "—"}
+            {lastBp?.systolic != null && lastBp?.diastolic != null
+              ? `${lastBp.systolic}/${lastBp.diastolic}`
+              : "—"}
           </p>
           {bpStatus && (
             <p
@@ -5019,13 +5036,34 @@ function HealthTab({
               {bpStatus.label}
             </p>
           )}
+          {/* A etiqueta sozinha é meia informação. "PA muito elevada" sem o que
+              fazer produz susto às 23h; com a próxima ação, produz conduta. */}
+          {bpStatus?.orientacao && (
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              {bpStatus.orientacao}
+            </p>
+          )}
         </div>
         {(() => {
           const lastGlucose = logs.find((l) => l.glucose_mg_dl != null);
           const gv = lastGlucose?.glucose_mg_dl;
-          const gColor = gv == null ? null : gv > 140 ? "rose" : gv > 95 ? "amber" : "emerald";
+          /* A escala antiga só olhava para CIMA: 35 mg/dL — neuroglicopenia —
+             saía rotulado "Normal", em verde, enquanto o painel do médico dizia
+             "Glicemia muito baixa". Não era falta de alerta, era o alerta
+             invertido, e para uma gestante em insulina isso é a diferença entre
+             comer agora e desmaiar. Mesma função do painel. */
+          const gSinal = sinalGlicemia(gv);
+          const gVoz = vozDaPaciente(gSinal, "glicemia");
+          const gColor =
+            gSinal == null
+              ? null
+              : gSinal.gravidade === "grave"
+                ? "rose"
+                : gSinal.gravidade === "atencao"
+                  ? "amber"
+                  : "emerald";
           const gLabel =
-            gv == null ? null : gv > 140 ? "Atenção: elevada" : gv > 95 ? "Limite" : "Normal";
+            gSinal == null ? null : gSinal.gravidade === "normal" ? "Normal" : gSinal.nota;
           return (
             <div
               className={`press rounded-3xl p-5 ${gColor === "rose" ? "glass-card glass-rose" : gColor === "amber" ? "glass-card glass-amber" : "glass-card glass-sky"}`}
@@ -5041,6 +5079,11 @@ function HealthTab({
                   className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-amber-700" : "text-emerald-700"}`}
                 >
                   {gLabel}
+                </p>
+              )}
+              {gVoz?.orientacao && (
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  {gVoz.orientacao}
                 </p>
               )}
             </div>
@@ -5305,13 +5348,17 @@ function HealthTab({
                   cx={sx(i)}
                   cy={sy(l.glucose_mg_dl!)}
                   r="3.5"
-                  fill={
-                    l.glucose_mg_dl! > 140
+                  fill={(() => {
+                    /* Terceira cópia da escala, agora removida: os pontos do
+                       gráfico pintavam de verde exatamente os mesmos valores
+                       baixos que o card. */
+                    const g = sinalGlicemia(l.glucose_mg_dl)?.gravidade;
+                    return g === "grave"
                       ? "#f87171"
-                      : l.glucose_mg_dl! > 95
+                      : g === "atencao"
                         ? "#fb923c"
-                        : "var(--primary)"
-                  }
+                        : "var(--primary)";
+                  })()}
                 />
               ))}
             </svg>

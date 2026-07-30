@@ -71,6 +71,16 @@ export function AlertaSosMedico({
       const primeiro = alvos[0];
       const ultimo = alvos[alvos.length - 1];
       const atual = document.activeElement;
+      /* O foco pode estar FORA da caixa sem ninguém ter tabulado para fora:
+         apertar "Já atendi" põe `disabled` no botão, o navegador solta o foco e
+         `activeElement` vira o `<body>`. A partir daí o Tab caía no ramo mudo e
+         ia parar na navegação do site, atrás do fundo preto — justamente
+         enquanto ele espera a rede responder sobre uma emergência. */
+      if (!atual || !caixa.current.contains(atual)) {
+        e.preventDefault();
+        (e.shiftKey ? ultimo : primeiro).focus();
+        return;
+      }
       if (e.shiftKey && (atual === primeiro || atual === caixa.current)) {
         e.preventDefault();
         ultimo.focus();
@@ -83,8 +93,10 @@ export function AlertaSosMedico({
     return () => {
       window.removeEventListener("keydown", onKey);
       /* Devolve o foco a quem abriu — senão o próximo Tab recomeça do topo do
-         documento, longe da fila de onde ele veio. */
-      antes?.focus?.();
+         documento, longe da fila de onde ele veio. `isConnected` porque o
+         botão que abriu costuma sair da tela junto (atender remove o item da
+         fila), e focar um nó desmontado é no-op silencioso. */
+      if (antes?.isConnected) antes.focus();
     };
   }, []);
 

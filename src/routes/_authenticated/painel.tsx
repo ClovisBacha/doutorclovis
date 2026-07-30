@@ -290,6 +290,21 @@ function PainelPage() {
    * verdade é uma falha de rede é a pior coisa que este painel pode dizer: o
    * médico fecha a tela tranquilo com uma emergência não lida do outro lado.
    */
+  /* Triagens de alerta das pacientes dele. A avaliação já era calculada e
+     gravada; faltava alguém do lado do médico ler. */
+  const [triagens, setTriagens] = useState<
+    {
+      id: string;
+      created_at: string;
+      user_id: string;
+      paciente: string | null;
+      level: string;
+      symptoms: string[];
+      systolic: number | null;
+      diastolic: number | null;
+    }[]
+  >([]);
+
   const [fonteFalhou, setFonteFalhou] = useState({
     sos: false,
     vinculos: false,
@@ -299,6 +314,7 @@ function PainelPage() {
        não lidas — que é exatamente o bug que a trava existe para impedir. */
     consultasEPerguntas: false,
     preConsultas: false,
+    triagens: false,
   });
 
   /* Vigia de SOS. Roda em paralelo ao resto e nunca derruba o painel: um erro
@@ -342,9 +358,18 @@ function PainelPage() {
     /* `load(true)` já recarrega as solicitações de vínculo por dentro — chamar
        `loadPedidosVinculo` aqui também era uma requisição a mais por tique, num
        efeito cuja justificativa é economia de cota. */
+    /* Freio de um minuto. `visibilitychange` dispara em toda troca de app — no
+       iPhone, também a cada bloqueio de tela. Sem isto, quinze idas ao WhatsApp
+       em cinco minutos custavam sessenta chamadas de servidor, num efeito cuja
+       justificativa escrita é economizar cota. */
+    let ultima = 0;
     const atualizar = () => {
+      const agora = Date.now();
+      if (agora - ultima < 60_000) return;
+      ultima = agora;
       load(true).catch(() => {});
       loadPreForms().catch(() => {});
+      loadTriagens().catch(() => {});
     };
     const t = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
@@ -384,6 +409,7 @@ function PainelPage() {
     /** Até onde o servidor foi buscar atividade — a tela precisa para não
         chamar de "nunca" o que é só "fora da janela". */
     janelaAtividadeDias?: number;
+    atividadeIncompleta?: boolean;
   } | null>(null);
 
   /**
@@ -488,6 +514,14 @@ function PainelPage() {
         /* segue para o bloqueio padrão */
       }
       setAllowed(false);
+    } catch {
+      /* Os modos de falha COMUNS lançam — rede caiu, sessão expirou e o token
+         vazio é recusado pelo validador. O ramo `!res.ok` não os cobre, então
+         com a sessão morta a tela ficava congelada e a faixa "não consegui
+         conferir tudo" nunca aparecia: o médico trabalhava num retrato antigo
+         achando que era ao vivo, que é exatamente o que a faixa existe para
+         impedir. */
+      setFonteFalhou((f) => ({ ...f, consultasEPerguntas: true }));
     } finally {
       setLoading(false);
     }
@@ -528,6 +562,20 @@ function PainelPage() {
     const tk = await token();
     const res = await getEngagementData({ data: { accessToken: tk } });
     if (res.ok) setEngagement(res);
+  }
+
+  async function loadTriagens() {
+    try {
+      const tk = await token();
+      const { listarTriagens } = await import("@/lib/triage.functions");
+      const r = await listarTriagens({ data: { accessToken: tk, apenasAlerta: true, dias: 14 } });
+      if (r.ok) {
+        setTriagens(r.triagens);
+        setFonteFalhou((f) => ({ ...f, triagens: false }));
+      } else setFonteFalhou((f) => ({ ...f, triagens: true }));
+    } catch {
+      setFonteFalhou((f) => ({ ...f, triagens: true }));
+    }
   }
 
   async function loadPreForms() {
@@ -573,6 +621,7 @@ function PainelPage() {
        "nada esperando por você" com seis pré-consultas não lidas na caixa. É o
        mesmo bug que a fila existe para consertar, um nível abaixo. */
     loadPreForms().catch(() => {});
+    loadTriagens().catch(() => {});
   }, []);
 
   // Retorno do checkout do Stripe (assinatura do médico): o webhook ativa o
@@ -610,8 +659,16 @@ function PainelPage() {
      o F5. Com o refresh de três minutos ficou pior: o item se desfazia sozinho
      na cara do médico, sem uma palavra de explicação. Falhou, ele volta ao
      estado anterior E fica sabendo por quê. */
+  /* O ROLLBACK É POR ITEM, e nunca um snapshot do array inteiro.
+
+     Guardar `const antes = appointments` e restaurá-lo no erro descarta tudo o
+     que entrou entre a captura e a falha. Dois cenários reais: o médico cancela
+     B enquanto a confirmação de A está em voo, A falha, e B volta a "pendente"
+     na tela apesar de o servidor ter aceitado; ou o refresh traz um pedido novo
+     C nesse meio-tempo, A falha, e C SOME do painel e da fila — uma paciente
+     esperando aceite desaparece por causa de outra operação que deu errado. */
   async function changeStatus(id: string, status: AdminAppointment["status"]) {
-    const antes = appointments;
+    const anterior = appointments.find((x) => x.id === id)?.status;
     setAppointments((a) => a.map((x) => (x.id === id ? { ...x, status } : x)));
     try {
       const r = await updateAppointmentStatus({
@@ -619,31 +676,30 @@ function PainelPage() {
       });
       if (!r?.ok) throw new Error("recusado");
     } catch {
-      setAppointments(antes);
+      if (anterior !== undefined)
+        setAppointments((a) => a.map((x) => (x.id === id ? { ...x, status: anterior } : x)));
       toast.error("Não consegui salvar essa mudança. Tente de novo.");
     }
   }
 
   async function toggleAnswered(id: string, answered: boolean) {
-    const antes = questions;
     setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered } : x)));
     try {
       const r = await setQuestionAnswered({ data: { accessToken: await token(), id, answered } });
       if (!r?.ok) throw new Error("recusado");
     } catch {
-      setQuestions(antes);
+      setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered: !answered } : x)));
       toast.error("Não consegui salvar essa mudança. Tente de novo.");
     }
   }
 
   async function markSeen(id: string) {
-    const antes = preForms;
     setPreForms((f) => f.map((x) => (x.id === id ? { ...x, seen_by_doctor: true } : x)));
     try {
       const r = await markPreConsultaSeen({ data: { accessToken: await token(), id } });
       if (!r?.ok) throw new Error("recusado");
     } catch {
-      setPreForms(antes);
+      setPreForms((f) => f.map((x) => (x.id === id ? { ...x, seen_by_doctor: false } : x)));
       toast.error("Não consegui marcar como lida. Tente de novo.");
     }
   }
@@ -693,6 +749,32 @@ function PainelPage() {
       em: a.created_at,
       acao: "Abrir",
       onAcao: () => setSosAberto(a),
+    })),
+    /* TRIAGEM DE ALERTA — logo abaixo do SOS, e acima de tudo o mais.
+
+       É a paciente descrevendo sintomas e o app respondendo "procure
+       atendimento agora" com base em regra clínica determinística. Ficava só no
+       histórico dela: o médico não sabia nem na noite do episódio nem na
+       consulta seguinte. Vermelho entra como emergência; amarelo, como algo que
+       ele precisa ver antes da consulta. */
+    ...triagens.map((t) => ({
+      id: `tri-${t.id}`,
+      nivel: t.level === "vermelho" ? ("emergencia" as const) : ("espera" as const),
+      titulo:
+        t.level === "vermelho"
+          ? `${t.paciente ?? "Uma paciente"} — alerta VERMELHO nos sintomas`
+          : `${t.paciente ?? "Uma paciente"} relatou sintomas de atenção`,
+      detalhe: [
+        t.symptoms.length ? t.symptoms.join(", ") : "Sem sintomas listados",
+        t.systolic != null && t.diastolic != null
+          ? `PA ${t.systolic}/${t.diastolic}${sinalPressao(t.systolic, t.diastolic)?.nota ? ` · ${sinalPressao(t.systolic, t.diastolic)!.nota}` : ""}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      em: t.created_at,
+      acao: "Ver",
+      onAcao: () => setTab("Pacientes 👩‍🍼"),
     })),
     ...pedidosVinculo.map((r) => ({
       id: `vinc-${r.id}`,
@@ -846,6 +928,7 @@ function PainelPage() {
           ...(fonteFalhou.vinculos ? ["solicitações de pacientes"] : []),
           ...(fonteFalhou.consultasEPerguntas ? ["consultas e perguntas"] : []),
           ...(fonteFalhou.preConsultas ? ["pré-consultas"] : []),
+          ...(fonteFalhou.triagens ? ["alertas de sintomas"] : []),
         ]}
       />
 
@@ -1133,7 +1216,15 @@ function DashboardSection({
       </div>
     );
 
-  return <DashboardView data={data} onNavigate={onNavigate} onRefresh={load} medico={medico} />;
+  return (
+    <DashboardView
+      data={data}
+      onNavigate={onNavigate}
+      onRefresh={load}
+      medico={medico}
+      rotuloPlano={rotuloPlano}
+    />
+  );
 }
 
 /**
@@ -1180,7 +1271,11 @@ function ValorGeradoBanner({
      teste. Sem o rótulo, a gente não afirma. */
   const p = (plano ?? "").trim().toLowerCase();
   const r = (rotuloPlano ?? "").trim().toLowerCase();
-  const emTeste = (p === "trial" || p === "free") && (r === "trial" || r === "free" || r === "");
+  /* `""` FORA do conjunto permissivo: é o estado inicial do `useState` E o
+     fallback quando `getMyDoctor` falha. Aceitá-lo transformava "não sei" em
+     "é teste" — o card afirmava "você não paga nada" para quem paga, no exato
+     momento em que a informação não tinha chegado. Desconhecido não afirma. */
+  const emTeste = (p === "trial" || p === "free") && (r === "trial" || r === "free");
   /* TEMPO ECONOMIZADO É SÓ O QUE A IA FEZ NO LUGAR DELE.
 
      Antes esta conta era `aiHits + answered`, e `answered` é gravado no
@@ -2731,6 +2826,7 @@ function EngagementSection({
     unseenPreConsultas: number;
     patients: PatientEngagement[];
     janelaAtividadeDias?: number;
+    atividadeIncompleta?: boolean;
   } | null;
   onRefresh: () => void;
   tokenFn: () => Promise<string>;
@@ -2811,6 +2907,21 @@ function EngagementSection({
 
       {/* A lista de sumidas vem ANTES dos números: o número diz que existem,
           a lista diz quem são — e é a lista que vira ação. */}
+      {engagement?.atividadeIncompleta && (
+        /* Sem este aviso, uma falha de leitura no banco se apresentaria como
+           uma lista de pacientes abandonadas — e o médico ligaria para gente
+           que está registrando tudo direitinho. */
+        <div className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3">
+          <p className="text-[13px] font-semibold text-amber-900">
+            📡 Não consegui ler todos os registros
+          </p>
+          <p className="mt-0.5 text-[12px] leading-snug text-amber-900/80">
+            A lista abaixo pode incluir pacientes que na verdade estão ativas. Atualize antes de
+            ligar para alguém.
+          </p>
+        </div>
+      )}
+
       {sumidas.length > 0 && (
         <div className="rounded-3xl border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
           <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
@@ -3363,7 +3474,7 @@ function TeleconsultasSection({
                             {pre.systolic}/{pre.diastolic} mmHg
                             {(() => {
                               const sn = sinalPressao(pre.systolic, pre.diastolic);
-                              return sn && sn.gravidade !== "normal" ? (
+                              return sn?.nota ? (
                                 <span
                                   className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ESTILO_SINAL[sn.gravidade]}`}
                                 >

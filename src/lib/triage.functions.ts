@@ -94,3 +94,103 @@ export const saveTriageLog = createServerFn({ method: "POST" })
   });
 
 export { ALL_SYMPTOMS };
+
+/**
+ * Triagens das pacientes DESTE médico — o outro lado do que já era gravado.
+ *
+ * O comentário de `saveTriageLog` diz que a triagem "alimenta o dashboard do
+ * médico". Não alimentava: `triage_logs` não era lida por arquivo nenhum do
+ * lado dele. A avaliação já estava calculada por regra determinística, já
+ * gravada, e morria no INSERT.
+ *
+ * O caso concreto: 34 semanas, sábado à noite, ela marca "dor de cabeça forte
+ * com visão turva" e "inchaço súbito no rosto", digita 175/115. A tela dela diz
+ * "procure atendimento agora". O médico não ficava sabendo — nem naquela noite,
+ * nem na consulta de terça.
+ */
+export const listarTriagens = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        /** Só as que ainda pedem olhar: vermelho e amarelo. */
+        apenasAlerta: z.boolean().default(true),
+        dias: z.number().int().min(1).max(90).default(14),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    type Triagem = {
+      id: string;
+      created_at: string;
+      user_id: string;
+      paciente: string | null;
+      level: string;
+      symptoms: string[];
+      systolic: number | null;
+      diastolic: number | null;
+    };
+    const vazio = { ok: true as const, triagens: [] as Triagem[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (!u.user) return { ok: false as const, triagens: [] as Triagem[] };
+    const sb = supabaseAdmin as any;
+    const { data: doc } = await sb
+      .from("doctors")
+      .select("id,active")
+      .eq("id", u.user.id)
+      .maybeSingle();
+    if (!doc || doc.active === false) return { ok: false as const, triagens: [] as Triagem[] };
+
+    try {
+      /* Recorte pelo vínculo ATUAL, e não por um `doctor_id` carimbado na
+         linha: quem deixou de ser paciente dele deixa de aparecer aqui no
+         mesmo instante. */
+      const { data: perfis } = await sb
+        .from("patient_profiles")
+        .select("id,display_name")
+        .eq("doctor_id", u.user.id);
+      const ids = ((perfis ?? []) as { id: string }[]).map((p) => p.id);
+      if (ids.length === 0) return vazio;
+      const nomes = new Map<string, string>(
+        ((perfis ?? []) as { id: string; display_name: string | null }[]).map((p) => [
+          p.id,
+          p.display_name ?? "",
+        ]),
+      );
+
+      const desde = new Date(Date.now() - data.dias * 86400000).toISOString();
+      const linhas: Triagem[] = [];
+      /* Lotes de 100: `.in()` viaja na URL e uma lista longa estoura o buffer
+         do proxy, devolvendo 414 — que aqui viraria "nenhuma triagem". */
+      for (let i = 0; i < ids.length; i += 100) {
+        let q = sb
+          .from("triage_logs")
+          .select("id,created_at,user_id,level,symptoms,systolic,diastolic")
+          .in("user_id", ids.slice(i, i + 100))
+          .gte("created_at", desde)
+          .order("created_at", { ascending: false })
+          .limit(100);
+        if (data.apenasAlerta) q = q.in("level", ["vermelho", "amarelo"]);
+        const { data: rows, error } = await q;
+        // Migração pendente: sem a aba, não sem o painel.
+        if (error) return vazio;
+        for (const r of (rows ?? []) as Record<string, unknown>[]) {
+          linhas.push({
+            id: String(r.id),
+            created_at: String(r.created_at),
+            user_id: String(r.user_id),
+            paciente: nomes.get(String(r.user_id)) || null,
+            level: String(r.level),
+            symptoms: (r.symptoms as string[]) ?? [],
+            systolic: (r.systolic as number) ?? null,
+            diastolic: (r.diastolic as number) ?? null,
+          });
+        }
+      }
+      linhas.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      return { ok: true as const, triagens: linhas };
+    } catch {
+      return vazio;
+    }
+  });
