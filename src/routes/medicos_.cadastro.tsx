@@ -53,6 +53,23 @@ function CadastroMedicoPage() {
     education: "",
   });
 
+  /* As duas metades do CRM têm ESTADO PRÓPRIO, e isso é o conserto de um bug meu.
+  
+     Antes o seletor lia `separarCrm(profile.crm).uf` e escrevia
+     `juntarCrm(uf, numero)`. Como `juntarCrm` devolve string vazia quando falta
+     uma das partes — e faltava, porque o número ainda não tinha sido digitado —
+     escolher "MG" gravava `""`, o `separarCrm("")` devolvia UF vazia e o seletor
+     pulava de volta para "UF". A escolha não tinha onde existir. O mesmo valia
+     ao contrário: digitar o número antes de escolher o estado era descartado.
+  
+     A causa foi usar o formato de ARMAZENAMENTO como estado de tela. O canônico
+     `CRM-MG 12345` é ótimo para o banco e não sabe representar "escolhi o estado
+     e ainda não digitei o número", que é metade do tempo em que o formulário
+     existe. Agora a tela guarda as duas metades e junta só na hora de enviar. */
+  const [crmUf, setCrmUf] = useState("");
+  const [crmNumero, setCrmNumero] = useState("");
+  const crmCompleto = juntarCrm(crmUf, crmNumero);
+
   /* Guarda a INTENÇÃO de ser médico no aparelho.
   
      Marcar `role=doctor` no Auth é forte demais para uma intenção (bloqueia o
@@ -290,7 +307,11 @@ function CadastroMedicoPage() {
        O endereço não é cobrado nesta etapa (`temEndereco: true`): ele vive em
        outra tabela e o cadastro é justamente o momento em que ainda não há
        endereço nenhum. O painel cobra depois, com o card de endereços à mão. */
-    const faltas = pendenciasDoMedico(profile, { temEndereco: true });
+    /* O CRM é montado AQUI, a partir das duas metades — é o único ponto em que
+       o formato canônico precisa existir. Validar e enviar usam o mesmo objeto,
+       então não há como a tela aprovar uma coisa e o servidor receber outra. */
+    const paraEnviar = { ...profile, crm: crmCompleto };
+    const faltas = pendenciasDoMedico(paraEnviar, { temEndereco: true });
     if (faltas.length) {
       toast.error(`${faltas[0].rotulo}: ${faltas[0].porque}`);
       return;
@@ -324,7 +345,7 @@ function CadastroMedicoPage() {
       const res = await registerDoctor({
         data: {
           accessToken: s.session.access_token,
-          profile,
+          profile: paraEnviar,
           ref: ref || undefined,
           ...(patientInvite ? { patientInvite } : {}),
         },
@@ -558,13 +579,8 @@ function CadastroMedicoPage() {
               <label className={label}>CRM *</label>
               <div className="mt-1 grid grid-cols-[96px_1fr] gap-2">
                 <select
-                  value={separarCrm(profile.crm).uf}
-                  onChange={(e) =>
-                    setProfile((p) => ({
-                      ...p,
-                      crm: juntarCrm(e.target.value, separarCrm(p.crm).numero),
-                    }))
-                  }
+                  value={crmUf}
+                  onChange={(e) => setCrmUf(e.target.value)}
                   /* `mt-0` porque a linha já tem o respiro: o `input` traz um
                      `mt-1` embutido e aqui ele viraria margem dupla. */
                   className={`${input} mt-0`}
@@ -578,13 +594,8 @@ function CadastroMedicoPage() {
                   ))}
                 </select>
                 <input
-                  value={separarCrm(profile.crm).numero}
-                  onChange={(e) =>
-                    setProfile((p) => ({
-                      ...p,
-                      crm: juntarCrm(separarCrm(p.crm).uf, e.target.value),
-                    }))
-                  }
+                  value={crmNumero}
+                  onChange={(e) => setCrmNumero(e.target.value.replace(/\D/g, ""))}
                   placeholder="Número — ex.: 12345"
                   inputMode="numeric"
                   className={`${input} mt-0`}
@@ -593,12 +604,9 @@ function CadastroMedicoPage() {
               </div>
               {/* Mostra como vai ficar. Duas caixas separadas deixam a dúvida
                   "e o formato final, sai certo?" — aqui ele aparece. */}
-              {separarCrm(profile.crm).uf && separarCrm(profile.crm).numero ? (
+              {crmCompleto ? (
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Vai aparecer como{" "}
-                  <strong className="text-foreground">
-                    {juntarCrm(separarCrm(profile.crm).uf, separarCrm(profile.crm).numero)}
-                  </strong>
+                  Vai aparecer como <strong className="text-foreground">{crmCompleto}</strong>
                 </p>
               ) : (
                 <p className="mt-1 text-[11px] text-muted-foreground">

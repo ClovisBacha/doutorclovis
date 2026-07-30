@@ -7060,6 +7060,18 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
      de propósito: uma checagem de tela que discorda do servidor é pior do que
      nenhuma — o médico "completa" o cadastro e continua invisível na busca. */
   const [pendencias, setPendencias] = useState<Pendencia[]>([]);
+  /* As duas metades do CRM NÃO são derivadas de `form.crm` a cada render.
+
+     `juntarCrm` devolve vazio quando falta uma das partes, e derivar as metades
+     da string junta significava que trocar a UF antes de ter número (ou apagar o
+     número) zerava a string e a tela voltava para "UF" sozinha — a escolha não
+     tinha onde existir. O formato canônico é bom para o banco e não sabe
+     representar "meio preenchido", que é metade do tempo de um formulário.
+
+     `form.crm` continua sendo a string única do banco (`CRM-MG 12345`), escrita
+     pelos handlers abaixo — é dela que a carteirinha e o aviso do SOS vivem. */
+  const [crmUf, setCrmUf] = useState("");
+  const [crmNum, setCrmNum] = useState("");
   const [form, setForm] = useState({
     display_name: "",
     title: "",
@@ -7136,6 +7148,14 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             consultation_price_brl: d.consultation_price_brl ?? null,
             offers_telehealth: !!d.offers_telehealth,
           });
+          /* Semeia as duas metades a partir do que veio do banco: o
+             formulário mostra o CRM já existente, e a partir daí quem manda são
+             as metades. */
+          {
+            const partes = separarCrm(d.crm);
+            setCrmUf(partes.uf);
+            setCrmNum(partes.numero);
+          }
         }
       } finally {
         setLoading(false);
@@ -7221,9 +7241,6 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
      das pendências vira uma lista abaixo dele. */
   const faltaEmergencia = !form.crm.trim() || form.whatsapp.replace(/\D/g, "").length < 10;
   const outrasPendencias = pendencias.filter((p) => p.campo !== "crm" && p.campo !== "whatsapp");
-  /* O `crm` continua UMA string no banco (`CRM-MG 12345`) — a tela só a lê em
-     duas partes. Assim a carteirinha e o aviso do SOS não mudam de formato. */
-  const { uf: crmUf, numero: crmNum } = separarCrm(form.crm);
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -7313,7 +7330,10 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             <div className="mt-1 grid grid-cols-[96px_1fr] gap-2">
               <select
                 value={crmUf}
-                onChange={(e) => setForm((f) => ({ ...f, crm: juntarCrm(e.target.value, crmNum) }))}
+                onChange={(e) => {
+                  setCrmUf(e.target.value);
+                  setForm((f) => ({ ...f, crm: juntarCrm(e.target.value, crmNum) }));
+                }}
                 className={`${input} mt-0`}
                 aria-label="Estado do CRM"
               >
@@ -7326,7 +7346,11 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               </select>
               <input
                 value={crmNum}
-                onChange={(e) => setForm((f) => ({ ...f, crm: juntarCrm(crmUf, e.target.value) }))}
+                onChange={(e) => {
+                  const n = e.target.value.replace(/\D/g, "");
+                  setCrmNum(n);
+                  setForm((f) => ({ ...f, crm: juntarCrm(crmUf, n) }));
+                }}
                 className={`${input} mt-0`}
                 placeholder="Número — ex.: 12345"
                 inputMode="numeric"
