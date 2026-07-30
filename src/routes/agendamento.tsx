@@ -109,8 +109,13 @@ function AgendamentoPage() {
     setLoading(true);
     const fd = new FormData(e.currentTarget);
     try {
+      /* Manda o token quando ela está logada: é o que liga o pedido ao médico
+         DELA. Sem isso o servidor tinha que adivinhar pelo e-mail digitado, e
+         quem escreve um e-mail diferente do da conta some do painel. */
+      const { data: sess } = await supabase.auth.getSession();
       const res = await submit({
         data: {
+          accessToken: sess.session?.access_token,
           patient_name: String(fd.get("name") ?? ""),
           patient_email: String(fd.get("email") ?? ""),
           patient_phone: String(fd.get("phone") ?? ""),

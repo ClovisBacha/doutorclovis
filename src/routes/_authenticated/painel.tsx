@@ -148,7 +148,6 @@ const PANEL_TABS = [
   "Painel 📊",
   "Calendário",
   "Agendamentos",
-  "Agenda",
   "Ferramentas",
   "Perguntas",
   "Cérebro 🧠",
@@ -198,6 +197,13 @@ function PainelPage() {
      Numa plataforma multi-médico isso não é um detalhe de layout: é dinheiro
      indo para a conta errada e documento assinado por quem não atendeu. */
   const [euMedico, setEuMedico] = useState<DoctorProfile | null>(null);
+  /* O que o plano libera. Ficava disponível em `getMyDoctor` e não era lido:
+     o Cérebro aparecia para todo mundo e, no Free, cada tentativa de treinar
+     devolvia "Tente novamente" — um paywall disfarçado de bug. */
+  const [podeIA, setPodeIA] = useState(true);
+  const [podeEquipe, setPodeEquipe] = useState(true);
+  const [rotuloPlano, setRotuloPlano] = useState("");
+
   const [tab, setTab] = useState<PanelTab>("Painel 📊");
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   // null = o próprio cérebro (comportamento de sempre).
@@ -244,6 +250,11 @@ function PainelPage() {
         try {
           const me = await getMyDoctor({ data: { accessToken: tk } });
           if (me.ok && me.doctor) setEuMedico(me.doctor as DoctorProfile);
+          if (me.ok) {
+            setPodeIA(me.entitlements?.aiApp !== false);
+            setPodeEquipe(!!me.entitlements?.teamSeats);
+            setRotuloPlano(me.entitlements?.label ?? "");
+          }
         } catch {
           /* segue com o padrão */
         }
@@ -252,6 +263,11 @@ function PainelPage() {
       // Fallback (getAdminData negou): médico assinante inativo/sem linha ativa?
       const me = await getMyDoctor({ data: { accessToken: tk } });
       if (me.ok && me.doctor) setEuMedico(me.doctor as DoctorProfile);
+      if (me.ok) {
+        setPodeIA(me.entitlements?.aiApp !== false);
+        setPodeEquipe(!!me.entitlements?.teamSeats);
+        setRotuloPlano(me.entitlements?.label ?? "");
+      }
       if (me.ok && me.doctor?.active) {
         setAllowed(true);
         return;
@@ -447,11 +463,18 @@ function PainelPage() {
             <BroadcastSection />
           </div>
         )}
-        {tab === "Agenda" && <AgendaSection />}
         {tab === "Perguntas" && (
           <QuestionsSection questions={questions} onToggle={toggleAnswered} />
         )}
-        {tab === "Cérebro 🧠" && (
+        {tab === "Cérebro 🧠" && !podeIA && (
+          <TrancadoCard
+            titulo="O Segundo Cérebro precisa de um plano com IA"
+            plano={rotuloPlano}
+            texto="É aqui que a IA aprende a responder como você: as respostas que você aprova passam a ser o que a paciente lê no app. No plano Free a IA fica desligada, então nada do que você treinar aqui seria usado."
+            onIrParaPlanos={() => setTab("Meu Perfil")}
+          />
+        )}
+        {tab === "Cérebro 🧠" && podeIA && (
           <CerebroSection
             tokenFn={token}
             asDoctor={brainAsDoctor}
@@ -461,7 +484,15 @@ function PainelPage() {
             }
           />
         )}
-        {tab === "Clínica 🏥" && (
+        {tab === "Clínica 🏥" && !podeEquipe && (
+          <TrancadoCard
+            titulo="A Clínica é do plano Pro Equipe"
+            plano={rotuloPlano}
+            texto="Com ela você adiciona outros médicos, cada um com as próprias pacientes e o próprio cérebro, e opera todos de um lugar só. No seu plano atual a criação de clínica não está liberada."
+            onIrParaPlanos={() => setTab("Meu Perfil")}
+          />
+        )}
+        {tab === "Clínica 🏥" && podeEquipe && (
           <ClinicaSection
             tokenFn={token}
             onOperateBrain={(d) => {
@@ -3661,284 +3692,20 @@ function CalendárioSection({
 }
 
 /* ---------- Agenda (availability config) ---------- */
-interface DoctorAvailability {
-  id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  slot_minutes: number;
-  enabled: boolean;
-}
 
-interface BlockedDate {
-  id: string;
-  date: string;
-  reason: string | null;
-}
-
-function AgendaSection() {
-  const [availability, setAvailability] = useState<DoctorAvailability[]>([]);
-  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [newBlockDate, setNewBlockDate] = useState("");
-  const [newBlockReason, setNewBlockReason] = useState("");
-  const [addingBlock, setAddingBlock] = useState(false);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    setLoading(true);
-    const [avail, blocked] = await Promise.all([
-      (supabase as any).from("doctor_availability").select("*").order("day_of_week"),
-      (supabase as any).from("blocked_dates").select("*").order("date"),
-    ]);
-    if (avail.data) setAvailability(avail.data);
-    if (blocked.data) setBlockedDates(blocked.data);
-    setLoading(false);
-  }
-
-  async function saveAvailability(row: DoctorAvailability) {
-    setSaving(true);
-    // .select() para detectar update que não afetou nenhuma linha (ex.: RLS)
-    const { data, error } = await (supabase as any)
-      .from("doctor_availability")
-      .update({
-        start_time: row.start_time,
-        end_time: row.end_time,
-        slot_minutes: row.slot_minutes,
-        enabled: row.enabled,
-      })
-      .eq("id", row.id)
-      .select("id");
-    setSaving(false);
-    if (error || !data?.length) {
-      toast.error(
-        "Não foi possível salvar o horário. Verifique sua permissão de administrador e tente novamente." +
-          (error ? ` (${error.message})` : ""),
-      );
-      return;
-    }
-    toast.success("Horário salvo.");
-  }
-
-  function updateRow(idx: number, patch: Partial<DoctorAvailability>) {
-    setAvailability((prev) => {
-      const next = prev.map((r, i) => (i === idx ? { ...r, ...patch } : r));
-      return next;
-    });
-  }
-
-  async function addBlockedDate() {
-    if (!newBlockDate) return;
-    setAddingBlock(true);
-    const { data, error } = await (supabase as any)
-      .from("blocked_dates")
-      .insert({ date: newBlockDate, reason: newBlockReason || null })
-      .select()
-      .single();
-    setAddingBlock(false);
-    if (error || !data) {
-      toast.error(
-        "Não foi possível bloquear a data. Tente novamente." + (error ? ` (${error.message})` : ""),
-      );
-      return;
-    }
-    setBlockedDates((prev) => [...prev, data].sort((a, b) => a.date.localeCompare(b.date)));
-    setNewBlockDate("");
-    setNewBlockReason("");
-  }
-
-  async function removeBlockedDate(id: string) {
-    // .select() para detectar delete que não afetou nenhuma linha (ex.: RLS)
-    const { data, error } = await (supabase as any)
-      .from("blocked_dates")
-      .delete()
-      .eq("id", id)
-      .select("id");
-    if (error || !data?.length) {
-      toast.error(
-        "Não foi possível remover a data bloqueada. Tente novamente." +
-          (error ? ` (${error.message})` : ""),
-      );
-      return;
-    }
-    setBlockedDates((prev) => prev.filter((b) => b.id !== id));
-  }
-
-  if (loading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
-
-  return (
-    <div className="space-y-8">
-      {/* Availability per day */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="font-serif text-xl">Disponibilidade semanal</p>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Configure os dias e horários de atendimento. Salve cada linha individualmente.
-            </p>
-          </div>
-        </div>
-        <div className="space-y-2">
-          {availability.map((row, idx) => (
-            <div
-              key={row.id}
-              className={`rounded-2xl border p-4 transition-colors ${row.enabled ? "border-border bg-card" : "border-dashed border-border bg-secondary/30"}`}
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 w-28">
-                  <button
-                    onClick={() => updateRow(idx, { enabled: !row.enabled })}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${row.enabled ? "bg-primary" : "bg-muted"}`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${row.enabled ? "translate-x-4" : "translate-x-0"}`}
-                    />
-                  </button>
-                  <span
-                    className={`text-sm font-medium w-8 ${row.enabled ? "" : "text-muted-foreground"}`}
-                  >
-                    {DOW_LABELS[row.day_of_week]}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">Início</label>
-                    <input
-                      type="time"
-                      disabled={!row.enabled}
-                      value={row.start_time}
-                      onChange={(e) => updateRow(idx, { start_time: e.target.value })}
-                      className="rounded-lg border border-input bg-background px-2 py-1 text-xs disabled:opacity-40"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">Fim</label>
-                    <input
-                      type="time"
-                      disabled={!row.enabled}
-                      value={row.end_time}
-                      onChange={(e) => updateRow(idx, { end_time: e.target.value })}
-                      className="rounded-lg border border-input bg-background px-2 py-1 text-xs disabled:opacity-40"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">
-                      Duração (min)
-                    </label>
-                    <select
-                      disabled={!row.enabled}
-                      value={row.slot_minutes}
-                      onChange={(e) => updateRow(idx, { slot_minutes: Number(e.target.value) })}
-                      className="rounded-lg border border-input bg-background px-2 py-1 text-xs disabled:opacity-40"
-                    >
-                      {[15, 20, 30, 45, 60].map((v) => (
-                        <option key={v} value={v}>
-                          {v} min
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    onClick={() => saveAvailability(row)}
-                    disabled={saving}
-                    className="self-end rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
-                  >
-                    Salvar
-                  </button>
-                </div>
-                {row.enabled && (
-                  <p className="text-xs text-muted-foreground ml-auto hidden sm:block">
-                    {Math.floor(
-                      (timeToMins(row.end_time) - timeToMins(row.start_time)) / row.slot_minutes,
-                    )}{" "}
-                    slots/dia
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Blocked dates */}
-      <div>
-        <p className="font-serif text-xl mb-1">Datas bloqueadas</p>
-        <p className="text-sm text-muted-foreground mb-4">
-          Férias, feriados ou dias sem atendimento.
-        </p>
-
-        {/* Add form */}
-        <div className="flex flex-wrap gap-2 mb-4 items-end">
-          <div>
-            <label className="block text-xs text-muted-foreground mb-0.5">Data *</label>
-            <input
-              type="date"
-              value={newBlockDate}
-              onChange={(e) => setNewBlockDate(e.target.value)}
-              className="rounded-xl border border-input bg-background px-3 py-1.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-muted-foreground mb-0.5">Motivo (opcional)</label>
-            <input
-              placeholder="Ex: Férias"
-              value={newBlockReason}
-              onChange={(e) => setNewBlockReason(e.target.value)}
-              className="rounded-xl border border-input bg-background px-3 py-1.5 text-sm w-44"
-            />
-          </div>
-          <button
-            onClick={addBlockedDate}
-            disabled={addingBlock || !newBlockDate}
-            className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
-          >
-            {addingBlock ? "..." : "+ Bloquear data"}
-          </button>
-        </div>
-
-        {blockedDates.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma data bloqueada.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {blockedDates.map((b) => (
-              <div
-                key={b.id}
-                className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50/60 px-4 py-2"
-              >
-                <div className="flex items-center gap-3">
-                  <p className="text-sm font-medium">
-                    {new Date(b.date + "T00:00:00").toLocaleDateString("pt-BR", {
-                      weekday: "short",
-                      day: "2-digit",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-                  {b.reason && <span className="text-xs text-muted-foreground">{b.reason}</span>}
-                </div>
-                <button
-                  onClick={() => removeBlockedDate(b.id)}
-                  className="rounded-full border border-rose-300 px-2.5 py-0.5 text-xs text-rose-600 hover:bg-rose-100"
-                >
-                  Remover
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function timeToMins(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
+/* A aba "Agenda" (grade semanal + datas bloqueadas) foi removida.
+   
+   Ela escrevia direto, do navegador, em `doctor_availability` e
+   `blocked_dates` — duas tabelas que nasceram single-tenant: sem coluna
+   `doctor_id`, uma linha por dia da semana para o consultório inteiro, e com
+   política de RLS que deixava QUALQUER pessoa logada (inclusive uma paciente)
+   reescrever os horários e apagar as férias.
+   
+   A tabela também não alimentava nada: nenhum fluxo de agendamento lia esses
+   horários. Era uma tela que gravava num lugar que ninguém consultava, por um
+   caminho que ninguém deveria ter. A escrita foi revogada na migration
+   `20260730020000`, e a tela saiu junto — quando a agenda por médico for
+   construída, ela nasce com `doctor_id` e com política própria. */
 
 /* ---------- Cérebro 🧠 (Segundo Cérebro do médico) ---------- */
 
@@ -6704,6 +6471,47 @@ function GoogleCalendarCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
  * Também mostra quando o teste acaba: `plan_expires_at` já estava no banco e
  * simplesmente não era lido, então o trial de 14 dias virava Free sem aviso.
  */
+/**
+ * O que este plano não inclui — dito de frente.
+ *
+ * Antes, uma aba fora do plano não avisava nada: o Cérebro abria normal e cada
+ * tentativa de treinar devolvia "Não foi possível. Tente novamente", e a
+ * Clínica oferecia um botão "Criar clínica" que errava sempre. Um paywall
+ * disfarçado de defeito é pior que um paywall: o médico conclui que o produto
+ * está quebrado e para de tentar, sem nunca descobrir que bastaria mudar de
+ * plano.
+ */
+function TrancadoCard({
+  titulo,
+  texto,
+  plano,
+  onIrParaPlanos,
+}: {
+  titulo: string;
+  texto: string;
+  plano: string;
+  onIrParaPlanos: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-xl rounded-3xl border border-border bg-card p-8 text-center">
+      <p className="text-4xl">🔒</p>
+      <h2 className="mt-3 font-serif text-xl text-foreground">{titulo}</h2>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{texto}</p>
+      {plano && (
+        <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+          Seu plano atual: {plano}
+        </p>
+      )}
+      <button
+        onClick={onIrParaPlanos}
+        className="press mt-6 block w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground"
+      >
+        Ver os planos
+      </button>
+    </div>
+  );
+}
+
 function ConsumoCard({
   uso,
   plano,

@@ -12,6 +12,14 @@ function esc(s: string | null | undefined): string {
 }
 
 const Schema = z.object({
+  /* Token da sessão, quando a paciente está logada.
+     
+     Sem ele, o médico era resolvido pelo E-MAIL DIGITADO no formulário — e
+     quem se cadastrou com um e-mail e digitou outro tinha o pedido gravado com
+     `doctor_id` nulo. Como o painel filtra por `doctor_id`, esse pedido caía
+     no painel de NINGUÉM: a paciente esperava resposta e o médico via a lista
+     vazia. O token diz de quem é a sessão sem depender do que foi digitado. */
+  accessToken: z.string().optional(),
   patient_name: z.string().min(2).max(120),
   patient_email: z.string().email().max(160),
   patient_phone: z.string().min(8).max(40),
@@ -48,6 +56,24 @@ async function resolveDoctorIdForEmail(email: string): Promise<string | null> {
   }
 }
 
+/** Médico da paciente pela SESSÃO — não depende do e-mail digitado. */
+async function resolveDoctorIdForSession(accessToken?: string): Promise<string | null> {
+  if (!accessToken || accessToken.length < 10) return null;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(accessToken);
+    if (!u.user) return null;
+    const { data: profile } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", u.user.id)
+      .maybeSingle();
+    return (profile?.doctor_id as string | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const submitAppointmentRequest = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Schema.parse(input))
   .handler(async ({ data }) => {
@@ -56,7 +82,12 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
     if (data.website) return { ok: true as const };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const doctorId = await resolveDoctorIdForEmail(data.patient_email);
+    /* Primeiro pela SESSÃO (quem está de fato logada), depois pelo e-mail
+       digitado. A ordem é o conserto: o e-mail do formulário é o que ela
+       escreveu agora, não necessariamente o da conta dela. */
+    const doctorId =
+      (await resolveDoctorIdForSession(data.accessToken)) ??
+      (await resolveDoctorIdForEmail(data.patient_email));
     const { error } = await (supabaseAdmin as any).from("appointment_requests").insert({
       patient_name: data.patient_name,
       patient_email: data.patient_email.toLowerCase(),

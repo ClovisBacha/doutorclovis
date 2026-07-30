@@ -137,3 +137,26 @@ WHERE EXISTS (SELECT 1 FROM public.doctors d WHERE d.id = p.id)
   AND p.due_date IS NULL
   AND p.reference_date IS NULL
   AND (p.baby_name IS NULL OR p.baby_name = '');
+
+-- ── 7. A agenda global que qualquer pessoa logada podia reescrever ──────────
+-- `doctor_availability` e `blocked_dates` nasceram single-tenant: sem coluna
+-- `doctor_id`, com uma linha por dia da semana para o consultório inteiro, e
+-- com a política `FOR ALL USING (auth.role() = 'authenticated')`.
+--
+-- Numa plataforma com vários médicos isso significa duas coisas graves: a
+-- agenda de um é a agenda de todos, e QUALQUER pessoa logada — inclusive uma
+-- paciente — pode apagar as férias e reescrever os horários do consultório.
+--
+-- A correção mínima e segura é fechar a escrita: nenhum cliente escreve
+-- direto; só o `service_role`, através de server functions que sabem de quem é
+-- a agenda. A leitura pública continua (a tela de agendamento precisa dela).
+--
+-- Não adicionamos `doctor_id` aqui de propósito: nada em `src/` lê estas
+-- tabelas hoje (a aba que as usava não está no menu), então uma coluna nova
+-- seria esquema morto. Quando a agenda por médico for construída, ela nasce
+-- com a coluna e com política própria.
+DROP POLICY IF EXISTS "auth_write_availability" ON public.doctor_availability;
+DROP POLICY IF EXISTS "auth_write_blocked"      ON public.blocked_dates;
+
+REVOKE INSERT, UPDATE, DELETE ON public.doctor_availability FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.blocked_dates       FROM authenticated;
