@@ -1133,7 +1133,41 @@ CREATE POLICY "doctor reads own profile" ON public.doctors
 DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
 CREATE POLICY "doctor updates own profile" ON public.doctors
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-GRANT SELECT, UPDATE ON public.doctors TO authenticated;
+-- ATENCAO: UPDATE nao e mais concedido na tabela inteira.
+--
+-- Um `GRANT UPDATE ON public.doctors` sem lista de colunas deixa o proprio
+-- medico escrever `plan`, `plan_expires_at`, `verified` e `active` — as colunas
+-- que `entitlements.server.ts` le como fonte de verdade do que ele pagou. Com
+-- uma linha no console do navegador ele viraria plano Black e ganharia o selo da
+-- plataforma. O gatilho `protect_doctor_billing` cobre plan/active/expires, mas
+-- NAO cobre `verified`; o grant por coluna cobre os quatro.
+--
+-- Concedido em bloco tolerante porque, neste ponto do arquivo, algumas colunas
+-- do perfil podem ainda nao existir — a lista real e filtrada pelo catalogo.
+GRANT SELECT ON public.doctors TO authenticated;
+DO $grant_doctors$
+DECLARE
+  cols text;
+BEGIN
+  SELECT string_agg(quote_ident(column_name), ', ')
+    INTO cols
+    FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name   = 'doctors'
+     AND column_name IN (
+       'display_name','title','specialty','crm','whatsapp','personal_phone','pix_key',
+       'bio','subspecialty','years_experience','has_masters','has_doctorate',
+       'city','state','accepting_patients',
+       'instagram','rqe','education','hospitals','insurances','languages','approach',
+       'consultation_price_brl','offers_telehealth',
+       'accepts_insurance','accepts_private','updated_at'
+     );
+  EXECUTE 'REVOKE UPDATE ON public.doctors FROM authenticated';
+  IF cols IS NOT NULL THEN
+    EXECUTE format('GRANT UPDATE (%s) ON public.doctors TO authenticated', cols);
+  END IF;
+END
+$grant_doctors$;
 GRANT ALL ON public.doctors TO service_role;
 
 -- 2. Cada paciente pertence a um médico (null = médico dono da instalação,
@@ -1294,7 +1328,41 @@ CREATE POLICY "doctor reads own profile" ON public.doctors
 DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
 CREATE POLICY "doctor updates own profile" ON public.doctors
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-GRANT SELECT, UPDATE ON public.doctors TO authenticated;
+-- ATENCAO: UPDATE nao e mais concedido na tabela inteira.
+--
+-- Um `GRANT UPDATE ON public.doctors` sem lista de colunas deixa o proprio
+-- medico escrever `plan`, `plan_expires_at`, `verified` e `active` — as colunas
+-- que `entitlements.server.ts` le como fonte de verdade do que ele pagou. Com
+-- uma linha no console do navegador ele viraria plano Black e ganharia o selo da
+-- plataforma. O gatilho `protect_doctor_billing` cobre plan/active/expires, mas
+-- NAO cobre `verified`; o grant por coluna cobre os quatro.
+--
+-- Concedido em bloco tolerante porque, neste ponto do arquivo, algumas colunas
+-- do perfil podem ainda nao existir — a lista real e filtrada pelo catalogo.
+GRANT SELECT ON public.doctors TO authenticated;
+DO $grant_doctors$
+DECLARE
+  cols text;
+BEGIN
+  SELECT string_agg(quote_ident(column_name), ', ')
+    INTO cols
+    FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name   = 'doctors'
+     AND column_name IN (
+       'display_name','title','specialty','crm','whatsapp','personal_phone','pix_key',
+       'bio','subspecialty','years_experience','has_masters','has_doctorate',
+       'city','state','accepting_patients',
+       'instagram','rqe','education','hospitals','insurances','languages','approach',
+       'consultation_price_brl','offers_telehealth',
+       'accepts_insurance','accepts_private','updated_at'
+     );
+  EXECUTE 'REVOKE UPDATE ON public.doctors FROM authenticated';
+  IF cols IS NOT NULL THEN
+    EXECUTE format('GRANT UPDATE (%s) ON public.doctors TO authenticated', cols);
+  END IF;
+END
+$grant_doctors$;
 GRANT ALL ON public.doctors TO service_role;
 
 -- 2. Cada paciente pertence a um médico (null = médico dono da instalação,

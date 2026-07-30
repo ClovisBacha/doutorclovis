@@ -2,6 +2,14 @@
 -- CADASTRO DO MEDICO  (aplicar no SQL Editor do Supabase)
 -- ============================================================================
 -- Idempotente: pode rodar mais de uma vez.
+--
+-- PRE-REQUISITO: rode o APLICAR_PENDENTES.sql ANTES deste arquivo.
+-- Este arquivo altera a tabela `public.doctors` e usa a coluna
+-- `accepting_patients`; as duas vem do APLICAR_PENDENTES. Num banco que ainda
+-- nao o rodou, a PRIMEIRA linha aqui falha com
+--   ERROR: relation "public.doctors" does not exist
+-- e, como o SQL Editor roda o arquivo inteiro numa transacao so, NADA e
+-- aplicado. Se vir esse erro, rode o APLICAR_PENDENTES.sql e volte para ca.
 -- ============================================================================
 
 -- ============================================================================

@@ -80,6 +80,14 @@ export async function avisarMedico(
 ): Promise<{ para: string[]; marca: MarcaEmail; nome: string }> {
   const d = await destinoMedico(doctorId);
   if (d.email) return { para: [d.email], marca: d.marca, nome: d.nome };
-  if (opts?.plataformaSeOrfa) return { para: emailsDaPlataforma(), marca: {}, nome: "" };
+  /* `!doctorId` é essencial aqui. Sem ele, um `doctorId` REAL cuja busca falhou
+     (timeout no `getUserById`, catch do `destinoMedico`) caía no ramo da
+     plataforma e mandava nome, telefone, e-mail e motivo da consulta de uma
+     paciente vinculada para a caixa de ADMIN_EMAILS — exatamente o vazamento que
+     este módulo existe para fechar. Órfã é quem não TEM médico, não quem tem um
+     médico que não conseguimos ler agora. */
+  if (opts?.plataformaSeOrfa && !doctorId) {
+    return { para: emailsDaPlataforma(), marca: {}, nome: "" };
+  }
   return { para: [], marca: {}, nome: "" };
 }

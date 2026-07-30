@@ -547,7 +547,13 @@ export const searchDoctors = createServerFn({ method: "POST" })
     /* Só o que `doctors` tem desde a criação (20260707200000). É o piso: se nem
        isto existir, o problema não é migração pendente. */
     const DIR_MINIMO = "id,display_name,title,specialty,crm,whatsapp,slug,plan,active";
-    const buildQuery = (cols: string, comTexto = true) => {
+    const CAMPOS_TEXTO = ["display_name", "specialty", "subspecialty", "city"];
+    /* No piso, só o que a tabela tem desde a criação: `subspecialty` e `city`
+       são da MESMA migração cuja ausência o piso existe para sobreviver, então
+       citá-las no `or(...)` fazia qualquer busca com termo dar 42703 nos três
+       degraus — "a busca falhou" num diretório cheio. */
+    const CAMPOS_TEXTO_MINIMO = ["display_name", "specialty"];
+    const buildQuery = (cols: string, comTexto = true, campos = CAMPOS_TEXTO) => {
       let q = (supabaseAdmin as any)
         .from("doctors")
         .select(cols)
@@ -580,16 +586,9 @@ export const searchDoctors = createServerFn({ method: "POST" })
            oráculo sobre colunas que nem são selecionadas (`pix_key`,
            `personal_phone`). Aspas duplas resolvem os dois casos; as barras e
            aspas internas são escapadas para não fechar a string. */
-        const seguro = termo.replace(/[%_]/g, "").replace(/[\\"]/g, "\\$&");
+        const seguro = termo.replace(/[%_*]/g, "").replace(/[\\"]/g, "\\$&");
         const like = `"%${seguro}%"`;
-        q = q.or(
-          [
-            `display_name.ilike.${like}`,
-            `specialty.ilike.${like}`,
-            `subspecialty.ilike.${like}`,
-            `city.ilike.${like}`,
-          ].join(","),
-        );
+        q = q.or(campos.map((c) => `${c}.ilike.${like}`).join(","));
       }
       if (data.state) q = q.ilike("state", data.state);
       if (data.city) q = q.ilike("city", `%${data.city}%`);
@@ -612,7 +611,7 @@ export const searchDoctors = createServerFn({ method: "POST" })
          desde a criação da tabela. */
       ({ data: rows, error } = await buildQuery(DIR_BASE));
       if (error?.code === "42703") {
-        ({ data: rows, error } = await buildQuery(DIR_MINIMO));
+        ({ data: rows, error } = await buildQuery(DIR_MINIMO, true, CAMPOS_TEXTO_MINIMO));
       }
     }
     if (error) return { ok: false as const, error: error.message, doctors: [] };
@@ -664,7 +663,8 @@ export const searchDoctors = createServerFn({ method: "POST" })
     if (term && list.length === 0) {
       let alt = await buildQuery(`${DIR_BASE},${RICH_COLS}`, false);
       if (alt.error?.code === "42703") alt = await buildQuery(DIR_BASE, false);
-      if (alt.error?.code === "42703") alt = await buildQuery(DIR_MINIMO, false);
+      if (alt.error?.code === "42703")
+        alt = await buildQuery(DIR_MINIMO, false, CAMPOS_TEXTO_MINIMO);
       if (!alt.error) {
         const todos = ((alt.data ?? []) as (DirectoryDoctor & { active: boolean })[])
           .filter((d) => (d.display_name ?? "").trim().length >= 2)
@@ -1038,7 +1038,18 @@ export const chooseDoctor = createServerFn({ method: "POST" })
        mesmo médico, e a paciente perdida no caminho mais usado. */
     const { getEntitlements } = await import("./entitlements.server");
     const { data: docUser } = await supabaseAdmin.auth.admin.getUserById(data.doctorId);
-    const entDoc = docUser?.user ? await getEntitlements(docUser.user) : entitlementsFor(doc.plan);
+    /* O fallback também respeita o vencimento: `TRIAL` herda os limites de PRO,
+       então usar a coluna crua dava 150 pacientes a um trial expirado — falhando
+       ABERTO no caminho que acabamos de fechar. */
+    const planoEfetivo =
+      doc.plan === "trial" &&
+      doc.plan_expires_at &&
+      new Date(doc.plan_expires_at).getTime() < Date.now()
+        ? "free"
+        : doc.plan;
+    const entDoc = docUser?.user
+      ? await getEntitlements(docUser.user)
+      : entitlementsFor(planoEfetivo);
     const limit = entDoc.maxPatients;
     if (limit != null) {
       const { count, error: cntErr } = await (supabaseAdmin as any)

@@ -161,8 +161,16 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         "display_name, baby_name, blood_type, allergies, medications, emergency_contact, emergency_phone, emergency_email, doctor_id, due_date, lmp_date",
         // Sem `emergency_email` (só em APLICAR_SOS) nem `medications`.
         "display_name, baby_name, blood_type, allergies, emergency_contact, emergency_phone, doctor_id, due_date, lmp_date",
-        // Piso: quem é ela e quem é o médico dela.
-        "display_name, doctor_id",
+        // Sem `doctor_id` (multi-tenant, migração 20260707200000).
+        "display_name, emergency_contact, emergency_phone, doctor_id",
+        /* Piso REAL: só o que a tabela tem desde a criação
+           (20260607050155). O piso anterior pedia `doctor_id`, que é de uma
+           migração posterior — então num banco sem ela os quatro degraus
+           falhavam e o SOS inteiro virava erro. Pior que antes: o cliente
+           passava a lançar e FECHAVA a aba do WhatsApp já aberta, matando o
+           único canal que ainda funcionava naquele estado. */
+        "display_name, emergency_contact, emergency_phone",
+        "display_name",
       ];
       let prof: any = null;
       let erroFicha: unknown = null;
@@ -177,6 +185,11 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         // Só vale descer um degrau quando o problema é coluna inexistente.
         if ((r.error as { code?: string }).code !== "42703") break;
       }
+      /* Quais colunas de fato vieram. Sem isto, um degrau que não leu
+         `allergies` produzia "Alergias: nenhuma informada" na mensagem que a
+         equipe de resgate lê — afirmar ausência de alergia por não ter
+         conseguido ler o campo é o pior erro possível nesta tela. */
+      const leu = (c: string) => !!prof && Object.prototype.hasOwnProperty.call(prof, c);
       if (erroFicha) {
         console.error("[dispararEmergencia] ficha ilegível", erroFicha);
         return {
@@ -227,8 +240,14 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
         semana,
         dpp,
         sangue: (prof?.blood_type as string) ?? null,
-        alergias: (prof?.allergies as string) ?? null,
-        medicamentos: (prof?.medications as string) ?? null,
+        /* "não consegui ler" ≠ "não tem". Quando o degrau usado não trouxe a
+           coluna, a mensagem diz isso em vez de afirmar ausência de alergia. */
+        alergias: leu("allergies")
+          ? ((prof?.allergies as string) ?? null)
+          : "NÃO VERIFICADO — confirmar com a paciente",
+        medicamentos: leu("medications")
+          ? ((prof?.medications as string) ?? null)
+          : "NÃO VERIFICADO — confirmar com a paciente",
         medico: null, // preenchidos logo abaixo, quando houver vínculo
         medicoTel: null,
         hospitais: null,

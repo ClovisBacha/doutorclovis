@@ -388,7 +388,7 @@ export function EmergencySheet({
             : panic === "sent"
               ? "✓ Aviso enviado"
               : panic === "ninguem"
-                ? "⚠️ Ninguém para avisar — ligue 192"
+                ? "⚠️ Ninguém foi avisado — ligue 192"
                 : "🆘 Pedir socorro agora"}
         </button>
         {panic === "idle" && (
@@ -407,7 +407,15 @@ export function EmergencySheet({
         {/* O que REALMENTE saiu. A tela nunca diz "enviado" no genérico: quem
             foi avisado aparece pelo nome, e quem não foi também. */}
         {(panic === "sent" || panic === "ninguem") && canais && (
-          <div className="mt-2 rounded-2xl bg-emerald-50 px-3.5 py-3 text-[12px] leading-snug text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
+          <div
+            /* Âmbar quando ninguém foi avisado: o painel ficava verde de sucesso
+               enquanto o texto dentro dele dizia "ninguém foi avisado". */
+            className={`mt-2 rounded-2xl px-3.5 py-3 text-[12px] leading-snug ${
+              panic === "ninguem"
+                ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
+                : "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
+            }`}
+          >
             {canais.destinos.length ? (
               <>
                 <p className="font-bold">SOS enviado para:</p>
@@ -437,7 +445,7 @@ export function EmergencySheet({
         {/* O botão fica MESMO quando o WhatsApp abriu sozinho: ela pode ter
             fechado sem enviar, ou voltado para cá para ligar 192 antes. Sem
             ele, refazer o caminho exigiria acionar o SOS de novo. */}
-        {panic === "sent" && zap && linkWhatsApp(info.emergencyPhone) && (
+        {(panic === "sent" || panic === "ninguem") && zap && linkWhatsApp(info.emergencyPhone) && (
           <a
             href={`${linkWhatsApp(info.emergencyPhone)}?text=${encodeURIComponent(zap)}`}
             target="_blank"
@@ -448,7 +456,7 @@ export function EmergencySheet({
             {!zapAbriu && info.emergencyContact ? ` de ${info.emergencyContact.split(" ")[0]}` : ""}
           </a>
         )}
-        {panic === "sent" && zapAbriu && (
+        {(panic === "sent" || panic === "ninguem") && zapAbriu && (
           <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
             A mensagem já está escrita no WhatsApp — é só apertar enviar.
           </p>
@@ -462,7 +470,7 @@ export function EmergencySheet({
             é o que está aqui: dizer os três toques, na ordem, na tela em que
             ela já está. Enviada a mensagem, o aviso é o que vale mais: uma
             coordenada de um instante vira um trajeto de oito horas. */}
-        {panic === "sent" && zapAbriu && (
+        {(panic === "sent" || panic === "ninguem") && zapAbriu && (
           <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
             <p className="text-[12.5px] font-bold text-emerald-800 dark:text-emerald-300">
               Se você estiver a caminho do hospital, compartilhe onde você está

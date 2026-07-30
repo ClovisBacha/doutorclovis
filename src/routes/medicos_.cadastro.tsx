@@ -67,8 +67,36 @@ function CadastroMedicoPage() {
       } catch {
         /* sem rede/perfil: segue para a etapa de perfil */
       }
-      /* NÃO marcamos o papel aqui. Isto é o conserto de um estrago que eu
-         mesmo criei.
+      /* Marca o papel SÓ quando a sessão acabou de nascer.
+
+         Isto é o conserto de um estrago meu, e do conserto do conserto.
+
+         Primeiro eu marcava `role=doctor` só por a URL trazer `?papel=medico`,
+         sem olhar se a sessão tinha acabado de vir do Google. Bastava uma
+         paciente já logada tocar em "Sou médico(a)" por curiosidade — ou
+         receber esse link — para perder o app da gestante inteiro.
+
+         Depois eu tirei a marcação por completo, e aí quebrei o caminho do
+         Google: o Supabase cria o usuário com a metadata do Google, sem `role`,
+         então o gatilho do banco cria perfil de gestante para o obstetra e, se
+         ele abandonar o formulário, o app pede o nome do bebê a ele. Era
+         exatamente o bug relatado, de volta.
+
+         A pista que faltava é a IDADE da conta: no retorno do OAuth de cadastro
+         a conta tem segundos de vida; a paciente curiosa tem dias. Duas
+         condições juntas — `?papel=medico` e conta recém-criada — cobrem o
+         médico do Google sem alcançar ninguém que já usava o app. */
+      try {
+        const veioComoMedico =
+          new URLSearchParams(window.location.search).get("papel") === "medico";
+        const nascidaAgora = Date.now() - Date.parse(data.session.user.created_at || "") < 120_000;
+        if (veioComoMedico && nascidaAgora && data.session.user.user_metadata?.role !== "doctor") {
+          await supabase.auth.updateUser({ data: { role: "doctor" } });
+        }
+      } catch {
+        /* sem a marca, a linha em `doctors` ainda decide — e o cadastro segue */
+      }
+      /* Nota sobre o que NÃO fazemos aqui.
          
          A versão anterior marcava `role=doctor` só por a URL trazer
          `?papel=medico`, sem checar se a sessão tinha acabado de nascer do
@@ -78,10 +106,12 @@ function CadastroMedicoPage() {
          nenhuma saída dentro do app se ela ainda não tivesse data de gestação.
          Um clique de curiosidade não pode custar a conta.
 
-         A marca não se perde: para cadastro por e-mail ela é gravada no próprio
-         signUp (é o que faz o gatilho do banco não criar perfil de gestante), e
-         para qualquer caminho ela é gravada quando o `registerDoctor` dá certo —
-         aí sim o papel é fato, não intenção. */
+         Nada de marcar por ter apenas ABERTO esta página com uma sessão
+         antiga: a marca bloqueia o app da gestante, e um clique de curiosidade
+         não pode custar a conta. Para o cadastro por e-mail a marca vem do
+         próprio `signUp` (é o que faz o gatilho do banco não criar perfil de
+         gestante), e em qualquer caminho ela é regravada quando o
+         `registerDoctor` dá certo — aí o papel é fato, não intenção. */
       setExistingSession(data.session.user.email ?? "sua conta atual");
       // Pré-preenche o nome com o do Google, se veio no cadastro social.
       const gName =
@@ -177,9 +207,36 @@ function CadastroMedicoPage() {
          linha em `doctors` passa a existir de fato). */
       setStep("perfil");
     } catch {
+      /* O `catch` também desmarca. Antes só o retorno `ok:false` desmarcava, e
+         tudo que LANÇA passava por aqui: rede caindo, 500, e — alcançável pela
+         tela — um preço de consulta com centavos, que o Zod recusa como
+         `z.number().int()`. O médico via "falha de conexão" e ficava marcado sem
+         perfil, ou seja, sem app nenhum. */
+      const { data: s2 } = await supabase.auth.getSession();
+      if (s2.session) await desmarcarSePreciso(s2.session.access_token);
       toast.error("Falha de conexão — tente novamente.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Tira a marca de médico quando ela ficou sem lastro.
+   *
+   * Só desmarca se NÃO existir linha em `doctors` — é o que o comentário da
+   * válvula sempre disse e o código não conferia. Um médico de verdade (mesmo
+   * inativo) tentando salvar de novo e batendo num erro perdia a marca, e com
+   * ela a única proteção que sobrevive a uma falha de rede.
+   */
+  async function desmarcarSePreciso(accessToken: string) {
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (s.session?.user.user_metadata?.role !== "doctor") return;
+      const me = await getMyDoctor({ data: { accessToken } });
+      // Só mexe quando a resposta é confiável E diz que não há perfil.
+      if (me.ok && !me.doctor) await supabase.auth.updateUser({ data: { role: null } });
+    } catch {
+      /* a tela de bloqueio tem saída própria — ver "Não sou médico(a)" */
     }
   }
 
@@ -238,18 +295,7 @@ function CadastroMedicoPage() {
             ? `Não foi possível criar seu perfil: ${res.error}`
             : "Não foi possível criar seu perfil. Tente novamente.",
         );
-        /* Sem perfil de médico, a marca de papel não pode ficar: ela bloqueia o
-           app da gestante e a linha em `doctors` — que é o que abre o painel —
-           não existe. O resultado era uma conta sem NENHUM app aberto e sem
-           caminho de volta a não ser sair. Desmarcar devolve a conta ao estado
-           anterior à tentativa. */
-        try {
-          if (s.session.user.user_metadata?.role === "doctor") {
-            await supabase.auth.updateUser({ data: { role: null } });
-          }
-        } catch {
-          /* se nem isso funcionar, a tela de bloqueio agora tem saída */
-        }
+        await desmarcarSePreciso(s.session.access_token);
         return;
       }
       /* Perfil criado: agora o papel é fato, não intenção. Marcar aqui fecha o

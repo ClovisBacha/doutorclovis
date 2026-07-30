@@ -828,8 +828,25 @@ function MinhaContaPage() {
           setMedicoResolvido(true);
         }
       } catch {
-        /* não marca como resolvido: melhor "carregando" do que uma afirmação
-           falsa sobre não ter médico */
+        /* Uma falha de transporte não pode deixar a tela em "carregando" para
+           sempre: o SOS ficaria eternamente sem os botões de ligar para ele.
+           Uma tentativa a mais e, se falhar de novo, damos a resposta que
+           temos — que é "não sei de médico nenhum". */
+        try {
+          await new Promise((r) => setTimeout(r, 1500));
+          const { data: s2 } = await supabase.auth.getSession();
+          if (!vivo) return;
+          if (s2.session) {
+            const r2 = await getMyDoctorContact({
+              data: { accessToken: s2.session.access_token },
+            });
+            if (vivo && r2.ok) setMeuMedico(r2.doctor);
+          }
+        } catch {
+          /* segunda falha: segue para o `finally` */
+        } finally {
+          if (vivo) setMedicoResolvido(true);
+        }
       }
     })();
     return () => {
@@ -987,7 +1004,16 @@ function MinhaContaPage() {
                acima, fora de qualquer chamada de rede. */
             try {
               const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
-              if (me.ok && me.doctor) {
+              /* Linha em `doctors` E âncora gestacional = ela é as DUAS coisas.
+              
+                 Uma obstetra grávida existe, e antes ela perdia o próprio app
+                 no instante em que criava o perfil profissional: diário, chutes,
+                 álbum e jornada continuavam no banco e inalcançáveis por
+                 qualquer tela, sem nenhum caminho de volta dentro do produto —
+                 só SQL. A separação que o produto quer é entre CONTAS, não entre
+                 pessoas: quem tem gestação em curso continua com o app dela, e o
+                 painel segue aberto pelo menu. */
+              if (me.ok && me.doctor && !temAncoraGestacional) {
                 setIsDoctor(true);
                 roleIsPatient = false;
               }
@@ -1169,6 +1195,34 @@ function MinhaContaPage() {
         >
           Ir para o meu painel →
         </Link>
+        {/* SAÍDA. Sem ela havia um beco sem volta real: quem tocasse em "Criar
+            conta grátis" na página de médicos por curiosidade — uma gestante,
+            inclusive — ficava marcada como médica, sem linha em `doctors`, com
+            este bloqueio de um lado e "Área restrita" do outro. Sair e entrar de
+            novo não resolvia (a marca é do servidor) e nenhuma tela do produto
+            a apagava. Este botão apaga, e só quando não existe perfil médico —
+            então não tira o painel de médico nenhum. */}
+        <button
+          onClick={async () => {
+            try {
+              const { data: s } = await supabase.auth.getSession();
+              if (!s.session) return;
+              const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
+              if (me.ok && me.doctor) {
+                toast.error("Sua conta tem perfil de médico — o seu espaço é o painel.");
+                return;
+              }
+              await supabase.auth.updateUser({ data: { role: null } });
+              toast.success("Pronto — abrindo o app da gestante.");
+              window.location.reload();
+            } catch {
+              toast.error("Sem conexão para trocar agora. Tente de novo em instantes.");
+            }
+          }}
+          className="mt-4 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground"
+        >
+          Não sou médico(a) — abrir o app da gestante
+        </button>
         <button
           onClick={signOut}
           className="mt-3 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
@@ -2606,7 +2660,9 @@ function DoctorPresenceCard({
           <>
             <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
               <span className="heartbeat-icon text-rose-500">💓</span>
-              {nomeMedico.split(" ").slice(0, 2).join(" ")} ouviu o coração de {baby}
+              {semMedico
+                ? `O coração de ${baby} foi ouvido`
+                : `${nomeMedico.split(" ").slice(0, 2).join(" ")} ouviu o coração de ${baby}`}
             </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
               {bpm} bpm · {whenLabel} · toque para sentir o batimento
@@ -2615,7 +2671,11 @@ function DoctorPresenceCard({
         ) : (
           <>
             <span className="block text-sm font-semibold text-foreground">
-              {nomeMedico} está acompanhando sua gestação
+              {/* Sem médico vinculado o cartão renderizava " está acompanhando
+                  sua gestação" — frase sem sujeito. Vira um convite. */}
+              {semMedico
+                ? "Escolha o seu obstetra"
+                : `${nomeMedico} está acompanhando sua gestação`}
             </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
               Você não está sozinha — seu médico acompanha cada semana por aqui. 💛
@@ -15503,8 +15563,22 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
      na conta do fundador. Dinheiro no lugar errado é o tipo de erro que não
      pode ter fallback — sem chave, a tela diz que não há como pagar por aqui. */
   const [pix, setPix] = useState<{ key: string; name: string } | null>(null);
+  const [meuMedicoNome, setMeuMedicoNome] = useState("");
   const PIX_KEY = pix?.key ?? "";
   const PIX_NAME = pix?.name ?? "";
+
+  /* O valor que a tela mostra é o valor GRAVADO na consulta.
+  
+     A tabela de `CONSULT_TYPES` é uma sugestão da plataforma; o servidor agora
+     cobra o `consultation_price_brl` do médico dela e grava isso em
+     `amount_cents`. Enquanto a tela lia a tabela, um médico de R$ 600 gerava um
+     registro de R$ 600 e a paciente lia "R$ 150" ao lado da chave PIX dele — e
+     pagava 150. Preço exibido diferente do preço cobrado é dinheiro errado nas
+     duas direções. */
+  const precoDaConsulta = (c: { amount_cents?: number | null }, tabela?: string) =>
+    c.amount_cents != null && c.amount_cents > 0
+      ? `R$ ${(c.amount_cents / 100).toFixed(2).replace(".", ",")}`
+      : (tabela ?? "a combinar");
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
@@ -15519,6 +15593,14 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
     const pixRes = await getMyDoctorPix({ data: { accessToken: s.session.access_token } });
     if (pixRes.ok && pixRes.pix?.key) {
       setPix({ key: pixRes.pix.key, name: pixRes.pix.name || "seu médico" });
+    }
+    /* Nome do médico DELA para o título da aba. Sem vínculo fica vazio e o
+       título vira "Consulta particular" — nunca o nome do fundador. */
+    try {
+      const cont = await getMyDoctorContact({ data: { accessToken: s.session.access_token } });
+      if (cont.ok && cont.doctor?.nome) setMeuMedicoNome(cont.doctor.nome.trim());
+    } catch {
+      /* título genérico é resposta suficiente */
     }
     setLoading(false);
   }
@@ -15731,7 +15813,10 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
         <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
           Consultas particulares
         </p>
-        <h2 className="font-serif text-2xl">Consulta com {DOCTOR.name}</h2>
+        {/* Sem nome do fundador: esta aba é de TODA paciente de TODO médico. */}
+        <h2 className="font-serif text-2xl">
+          {meuMedicoNome ? `Consulta com ${meuMedicoNome}` : "Consulta particular"}
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Videochamadas particulares sem intermediário. Pagamento via PIX direto ao médico.
         </p>
@@ -15799,11 +15884,9 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                       <p className="text-xs mt-1 italic text-muted-foreground">"{c.message}"</p>
                     )}
                   </div>
-                  {typeInfo && (
-                    <span className="shrink-0 font-bold text-sm text-primary">
-                      {typeInfo.price}
-                    </span>
-                  )}
+                  <span className="shrink-0 font-bold text-sm text-primary">
+                    {precoDaConsulta(c, typeInfo?.price)}
+                  </span>
                 </div>
                 {c.status === "pendente_pagamento" && (
                   <div className="mt-4 space-y-3">
@@ -15832,6 +15915,22 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                           a confirmação.
                         </p>
                       </>
+                    ) : !PIX_KEY ? (
+                      /* Sem chave PIX do médico dela, o cartão mostrava
+                         "Chave PIX:" e "Favorecido:" em branco, com um botão
+                         "✓ Marquei o pagamento" — e um banner acima dizendo
+                         "use a chave PIX abaixo". Nada para copiar e um botão
+                         para confirmar um pagamento impossível. */
+                      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs dark:bg-amber-500/10">
+                        <p className="font-semibold text-amber-800 dark:text-amber-200">
+                          Pagamento a combinar
+                        </p>
+                        <p className="mt-1 leading-snug text-amber-900/80 dark:text-amber-100/80">
+                          {meuMedicoNome || "Seu médico"} ainda não cadastrou uma chave PIX no app.
+                          Combine o pagamento direto com o consultório — o pedido de consulta já
+                          está registrado.
+                        </p>
+                      </div>
                     ) : (
                       <>
                         <div className="rounded-xl bg-white/70 border border-border p-3 text-xs space-y-1">
@@ -15839,7 +15938,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                             Chave PIX: <span className="font-mono">{PIX_KEY}</span>
                           </p>
                           <p>
-                            Favorecido: {PIX_NAME} · Valor: {typeInfo?.price ?? "—"}
+                            Favorecido: {PIX_NAME} · Valor: {precoDaConsulta(c, typeInfo?.price)}
                           </p>
                         </div>
                         <button
@@ -16888,6 +16987,8 @@ function MédicoTab() {
   const [results, setResults] = useState<DirectoryDoctor[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
+  /** O nome digitado não casou com ninguém — a lista é o diretório inteiro. */
+  const [semMatch, setSemMatch] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -16930,6 +17031,13 @@ function MédicoTab() {
     setSearching(true);
     try {
       const res = await buscarDiretorio({ data: { q: query.trim() } });
+      /* `semCorrespondencia` = o nome que ela digitou não casou com ninguém, e
+         a lista é o diretório inteiro. Sem ler esse sinal, esta aba — que é
+         justamente "Meu médico", onde ela procura o SEU obstetra — mostrava
+         obstetras aleatórios como se fossem o resultado da busca, cada um com
+         um botão "Solicitar". Pedir vínculo ao médico errado era o desfecho
+         provável. */
+      setSemMatch(res.ok ? !!res.semCorrespondencia : false);
       setResults(res.ok ? res.doctors : []);
     } catch {
       setResults([]);
@@ -17062,6 +17170,17 @@ function MédicoTab() {
                 Nenhum médico com esse nome. Tente só o sobrenome, ou deixe o campo vazio e toque em
                 Buscar para ver todos os obstetras do app.
               </p>
+            )}
+            {semMatch && results.length > 0 && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:bg-amber-500/10">
+                <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">
+                  Não encontramos “{query.trim()}” no app
+                </p>
+                <p className="mt-0.5 text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+                  Seu médico talvez ainda não esteja aqui. Abaixo estão os obstetras que já atendem
+                  pelo app — confira o nome antes de solicitar.
+                </p>
+              </div>
             )}
             {results.map((d) => (
               <div

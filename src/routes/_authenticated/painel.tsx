@@ -23,7 +23,7 @@ import {
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
-import type { Pendencia } from "@/lib/doctor-required";
+import { pendenciasDoMedico, type Pendencia } from "@/lib/doctor-required";
 import {
   listMyAddresses,
   saveMyAddress,
@@ -7085,17 +7085,36 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
      Barrar o salvamento é o único momento em que dá para cobrar isso antes de
      a falta virar um problema às 3h da manhã. */
   async function save() {
-    if (form.display_name.trim().length < 2) {
-      toast.error("Informe seu nome.");
-      return;
-    }
-    if (!form.crm.trim()) {
-      toast.error("Informe o CRM — ele vai na carteirinha de emergência da paciente.");
-      return;
-    }
-    if (form.whatsapp.replace(/\D/g, "").length < 10) {
-      toast.error("Informe o WhatsApp de emergência — é o número que o SOS das pacientes usa.");
-      return;
+    /* Duas regras diferentes conforme o caminho, e de propósito.
+
+       Perfil que JÁ EXISTE (`updateMyDoctor`): só o mínimo para a carteirinha e
+       o SOS não quebrarem. Ele pode salvar um campo por vez, e barrar aqui
+       trancaria o médico fora do próprio painel.
+
+       Perfil NOVO (`registerDoctor`): a regra completa, a MESMA que o servidor
+       aplica. Sem isso o botão ficava impossível: a tela exigia três campos, o
+       servidor exigia sete, e o erro era descartado — um "Não foi possível
+       salvar o perfil" sem dizer o quê. Quem cai aqui é o gestor de clínica
+       (admitido sem linha em `doctors`) e o médico cujo perfil não carregou. */
+    if (!exists) {
+      const faltas = pendenciasDoMedico(form, { temEndereco: true });
+      if (faltas.length) {
+        toast.error(`${faltas[0].rotulo}: ${faltas[0].porque}`);
+        return;
+      }
+    } else {
+      if (form.display_name.trim().length < 2) {
+        toast.error("Informe seu nome.");
+        return;
+      }
+      if (!form.crm.trim()) {
+        toast.error("Informe o CRM — ele vai na carteirinha de emergência da paciente.");
+        return;
+      }
+      if (form.whatsapp.replace(/\D/g, "").length < 10) {
+        toast.error("Informe o WhatsApp de emergência — é o número que o SOS das pacientes usa.");
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -7110,7 +7129,11 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
       } else {
         const res = await registerDoctor({ data: { accessToken: tk, profile: form } });
         if (!res.ok || !res.doctor) {
-          toast.error("Não foi possível salvar o perfil.");
+          // O servidor diz POR QUE recusou; descartar isso é o que fazia o
+          // botão parecer quebrado.
+          toast.error(
+            "error" in res && res.error ? res.error : "Não foi possível salvar o perfil.",
+          );
           return;
         }
         setExists(true);
