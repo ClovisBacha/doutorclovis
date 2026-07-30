@@ -353,7 +353,26 @@ function EncontrarMedicoPage() {
             results.map((d) => (
               <div key={d.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  {/* A foto abre o card. Um rosto é a maior diferença isolada
+                      entre dois cards num diretório de saúde — e quem não tem
+                      mostra a inicial, que é honesto sobre a ausência em vez de
+                      desenhar um avatar genérico. */}
+                  {d.photo_url ? (
+                    <img
+                      src={d.photo_url}
+                      alt={d.display_name}
+                      loading="lazy"
+                      className="size-14 shrink-0 rounded-full object-cover ring-2 ring-primary/15"
+                    />
+                  ) : (
+                    <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-lg text-primary ring-2 ring-primary/15">
+                      {(d.display_name ?? "")
+                        .replace(/^(Dr|Dra)\.?\s*/i, "")
+                        .charAt(0)
+                        .toUpperCase() || "?"}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-serif text-lg">{d.display_name}</p>
                       <DoctorBadge plan={d.plan} />

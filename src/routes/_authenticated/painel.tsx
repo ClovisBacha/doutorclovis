@@ -27,6 +27,8 @@ import { buscarCep, digitosCep, formatarCep } from "@/lib/cep";
 import { PerfilProgresso, itensDoPerfil } from "@/components/perfil-progresso";
 import { CampoComOutro } from "@/components/campo-com-outro";
 import { CampoFocos } from "@/components/campo-focos";
+import { CampoFoto } from "@/components/campo-foto";
+import { conferirMeuCrm } from "@/lib/crm-conferencia.functions";
 import { ESPECIALIDADES_MEDICO, TITULOS_MEDICO } from "@/lib/medico-opcoes";
 import {
   MOEDAS,
@@ -7128,6 +7130,8 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
      tela, e os centavos só existem na hora de salvar. */
   const [moeda, setMoeda] = useState<MoedaChave>("BRL");
   const [valorTexto, setValorTexto] = useState("");
+  const [conferindo, setConferindo] = useState(false);
+  const [crmConferido, setCrmConferido] = useState("");
   const [form, setForm] = useState({
     display_name: "",
     title: "",
@@ -7157,6 +7161,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     consultation_price_brl: null as number | null,
     offers_telehealth: false,
     focos: [] as string[],
+    photo_url: "",
   });
 
   useEffect(() => {
@@ -7205,6 +7210,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             consultation_price_brl: d.consultation_price_brl ?? null,
             offers_telehealth: !!d.offers_telehealth,
             focos: Array.isArray(d.focos) ? d.focos : [],
+            photo_url: d.photo_url ?? "",
           });
           /* Semeia as duas metades a partir do que veio do banco: o
              formulário mostra o CRM já existente, e a partir daí quem manda são
@@ -7360,7 +7366,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             /* O endereço vem da lista do card abaixo; a foto ainda não existe
                como campo, então não é cobrada. */
             temEndereco: temEndereco,
-            temFoto: true,
+            temFoto: !!form.photo_url,
           })}
         />
       )}
@@ -7414,6 +7420,14 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
+            <CampoFoto
+              url={form.photo_url}
+              onChange={(u) => setForm((f) => ({ ...f, photo_url: u }))}
+              nome={form.display_name}
+              classeLabel={label}
+            />
+          </div>
+          <div className="md:col-span-2">
             <label className={label}>Nome completo *</label>
             <input
               value={form.display_name}
@@ -7466,6 +7480,57 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                 ? `Vai impresso como "${form.crm}" na carteirinha de emergência da paciente.`
                 : "Vai impresso na carteirinha de emergência que a paciente mostra no hospital."}
             </p>
+            {/* Conferência no conselho. O botão só aparece com CRM completo, e o
+                resultado NUNCA é apresentado como selo — o selo é outra coisa,
+                que só o super-admin dá. Aqui é informação: o conselho reconhece
+                este registro, e com que nome. */}
+            {form.crm && (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  disabled={conferindo}
+                  onClick={async () => {
+                    setConferindo(true);
+                    try {
+                      const r = await conferirMeuCrm({ data: { accessToken: await tokenFn() } });
+                      if (!r.ok || !r.resultado) {
+                        toast.error("Não foi possível conferir agora.");
+                        return;
+                      }
+                      const res = r.resultado;
+                      if (res.status === "confirmado") {
+                        setCrmConferido(
+                          `${res.nome}${res.situacao ? ` · ${res.situacao}` : ""}${
+                            r.nomeDivergente ? " · nome diferente do cadastrado" : ""
+                          }`,
+                        );
+                        toast.success("Registro encontrado no conselho ✓");
+                      } else if (res.status === "nao_encontrado") {
+                        setCrmConferido("não encontrado no conselho");
+                        toast.error("Esse CRM não foi encontrado. Confira a UF e o número.");
+                      } else {
+                        setCrmConferido("");
+                        toast.error(
+                          res.motivo === "sem_provedor"
+                            ? "A conferência automática ainda não está ligada nesta instalação."
+                            : "O conselho não respondeu agora. Tente mais tarde.",
+                        );
+                      }
+                    } finally {
+                      setConferindo(false);
+                    }
+                  }}
+                  className="rounded-full border border-primary/40 px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-50"
+                >
+                  {conferindo ? "Conferindo…" : "Conferir no conselho"}
+                </button>
+                {crmConferido && (
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                    Conselho respondeu: <strong className="text-foreground">{crmConferido}</strong>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <label className={label}>WhatsApp para pacientes *</label>

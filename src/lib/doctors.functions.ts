@@ -45,6 +45,8 @@ export type DoctorProfile = {
   consultation_price_cents?: number | null;
   /** Focos adicionais. `specialty` segue sendo o principal, exibido no card. */
   focos?: string[] | null;
+  /** URL pública da foto. Só a URL: a imagem vive no Storage. */
+  photo_url?: string | null;
   offers_telehealth?: boolean | null;
   personal_phone?: string | null;
   accepts_insurance?: boolean | null;
@@ -55,7 +57,7 @@ export type DoctorProfile = {
 
 /** Colunas do perfil lidas em todas as consultas de médico. */
 const RICH_COLS =
-  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,consultation_currency,consultation_price_cents,focos,offers_telehealth,personal_phone,accepts_insurance,accepts_private";
+  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,consultation_currency,consultation_price_cents,focos,photo_url,offers_telehealth,personal_phone,accepts_insurance,accepts_private";
 const BASE_COLS =
   "id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,plan_expires_at,verified,active,bio,subspecialty,years_experience,has_masters,has_doctorate,city,state,accepting_patients";
 const DOCTOR_COLS = `${BASE_COLS},${RICH_COLS}`;
@@ -125,6 +127,8 @@ const ProfileSchema = z.object({
   /* Focos adicionais. Teto de 8 porque um médico que marca tudo não está
      dizendo no que é bom — está dizendo que não escolheu. */
   focos: z.array(z.string().max(80)).max(8).optional(),
+  /* Só a URL. Enviar a imagem por aqui encheria a linha e a resposta da busca. */
+  photo_url: z.string().max(500).optional(),
   offers_telehealth: z.boolean().optional(),
   /* Telefone PESSOAL — nunca mostrado à paciente. Existe porque `whatsapp` é
      o número DAS PACIENTES (o que o SOS disca), e um médico tem dois. Sem a
@@ -532,6 +536,8 @@ export type DirectoryDoctor = {
   consultation_price_cents?: number | null;
   /** Focos adicionais — as palavras pelas quais ela encontra o médico. */
   focos?: string[] | null;
+  /** Foto do médico. Um rosto é a maior diferença entre dois cards. */
+  photo_url?: string | null;
   offers_telehealth?: boolean | null;
   /* Como ele atende. Dois booleanos e não um enum porque há quem faça os dois
      — e porque `insurances` em branco antes era ambíguo entre "só particular"
@@ -818,6 +824,7 @@ function toDirectoryDoctor(d: any): DirectoryDoctor {
     consultation_currency: d.consultation_currency ?? "BRL",
     consultation_price_cents: d.consultation_price_cents ?? null,
     focos: Array.isArray(d.focos) ? d.focos : [],
+    photo_url: d.photo_url ?? null,
     offers_telehealth: d.offers_telehealth ?? null,
     accepts_insurance: d.accepts_insurance ?? null,
     accepts_private: d.accepts_private ?? null,
