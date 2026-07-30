@@ -85,7 +85,22 @@ function CadastroMedicoPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { data: su, error } = await supabase.auth.signUp({ email: email.trim(), password });
+        /* `role: "doctor"` no metadata do Auth, no PRIMEIRO passo.
+           
+           É o que corrige o bug de quem começa este cadastro e não termina:
+           sem linha em `doctors`, o app não tinha como saber que aquela conta é
+           de médico e abria o app da gestante — pedindo nome do bebê a um
+           obstetra. A marca existe antes de qualquer perfil.
+           
+           Ela só RESTRINGE: tira o acesso ao app da gestante e não dá nenhum
+           acesso ao painel. Quem manda no painel continua sendo a linha em
+           `public.doctors` com `active = true`, escrita só pelo servidor —
+           então um metadata forjado no cliente não vira privilégio. */
+        const { data: su, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { role: "doctor" } },
+        });
         // Anti-enumeração do Supabase: e-mail já cadastrado retorna "sucesso"
         // sem sessão e com identities vazio — orienta a entrar em vez de
         // prometer um e-mail de confirmação que nunca chega.
@@ -125,6 +140,14 @@ function CadastroMedicoPage() {
         setStep("confirm-email");
         return;
       }
+      /* Quem ENTROU por esta página (conta antiga, ou a que caiu no
+         "use o modo Entrar") também é médico. Sem esta linha, contas criadas
+         antes desta correção continuariam abrindo o app da gestante. */
+      try {
+        await supabase.auth.updateUser({ data: { role: "doctor" } });
+      } catch {
+        /* a linha em `doctors` ainda cobre o caso; não travar o cadastro */
+      }
       setStep("perfil");
     } catch {
       toast.error("Falha de conexão — tente novamente.");
@@ -135,8 +158,20 @@ function CadastroMedicoPage() {
 
   async function submitPerfil(e: React.FormEvent) {
     e.preventDefault();
-    if (profile.display_name.trim().length < 2 || !profile.crm.trim()) {
-      toast.error("Nome e CRM são obrigatórios.");
+    /* Três obrigatórios, e cada um por um motivo de uso, não de burocracia:
+       o nome é como a paciente o encontra; o CRM vai impresso na carteirinha
+       de emergência; e o WhatsApp é o número que o botão SOS disca. Faltando
+       qualquer um, alguma tela do app fica sem o que mostrar. */
+    if (profile.display_name.trim().length < 2) {
+      toast.error("Informe o seu nome completo.");
+      return;
+    }
+    if (!profile.crm.trim()) {
+      toast.error("Informe o CRM — estado e número.");
+      return;
+    }
+    if (profile.whatsapp.replace(/\D/g, "").length < 10) {
+      toast.error("Informe o WhatsApp para pacientes — é o número que o SOS delas usa.");
       return;
     }
     setBusy(true);
@@ -407,14 +442,26 @@ function CadastroMedicoPage() {
                   />
                 </div>
               </div>
+              {/* OBRIGATÓRIO, e com o nome do que ele é.
+                  
+                  Este é o número que aparece no botão SOS das pacientes e na
+                  carteirinha de emergência que elas mostram no hospital. Estava
+                  rotulado só "WhatsApp" e era opcional: dava para terminar o
+                  cadastro sem ele, e aí as pacientes daquele médico abriam a
+                  emergência e não tinham para onde ligar. */}
               <div>
-                <label className={label}>WhatsApp</label>
+                <label className={label}>WhatsApp para pacientes *</label>
                 <input
                   value={profile.whatsapp}
                   onChange={(e) => setProfile((p) => ({ ...p, whatsapp: e.target.value }))}
                   placeholder="(31) 99999-9999"
                   className={input}
                 />
+                <p className="mt-1 text-[11px] leading-snug text-amber-700">
+                  É o número que aparece no <strong>botão SOS</strong> das suas pacientes e na
+                  carteirinha que elas mostram no hospital. Cadastre o número em que você quer ser
+                  encontrado numa emergência.
+                </p>
               </div>
             </div>
             <div>

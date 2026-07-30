@@ -40,13 +40,18 @@ export type DoctorProfile = {
   approach?: string | null;
   consultation_price_brl?: number | null;
   offers_telehealth?: boolean | null;
+  personal_phone?: string | null;
+  accepts_insurance?: boolean | null;
+  accepts_private?: boolean | null;
+  plan_expires_at?: string | null;
+  verified?: boolean | null;
 };
 
 /** Colunas do perfil lidas em todas as consultas de médico. */
 const RICH_COLS =
-  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,offers_telehealth";
+  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,offers_telehealth,personal_phone,accepts_insurance,accepts_private";
 const BASE_COLS =
-  "id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,active,bio,subspecialty,years_experience,has_masters,has_doctorate,city,state,accepting_patients";
+  "id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,plan_expires_at,verified,active,bio,subspecialty,years_experience,has_masters,has_doctorate,city,state,accepting_patients";
 const DOCTOR_COLS = `${BASE_COLS},${RICH_COLS}`;
 
 function adminEmails() {
@@ -105,6 +110,15 @@ const ProfileSchema = z.object({
   approach: z.string().max(1500).optional(),
   consultation_price_brl: z.number().int().min(0).max(100000).nullable().optional(),
   offers_telehealth: z.boolean().optional(),
+  /* Telefone PESSOAL — nunca mostrado à paciente. Existe porque `whatsapp` é
+     o número DAS PACIENTES (o que o SOS disca), e um médico tem dois. Sem a
+     separação, ou ele expõe o pessoal ou a emergência fica sem destino. */
+  personal_phone: z.string().max(40).optional(),
+  /* Convênio e particular são independentes: há quem faça os dois. Dois
+     booleanos dizem isso sem ambiguidade — uma lista de convênios em branco
+     antes podia significar "só particular" OU "ainda não preencheu". */
+  accepts_insurance: z.boolean().optional(),
+  accepts_private: z.boolean().optional(),
 });
 
 /** Remove chaves com valor undefined (não sobrescrevem colunas no upsert/update). */
@@ -147,11 +161,27 @@ export const getMyDoctor = createServerFn({ method: "POST" })
     const { getEntitlements } = await import("./entitlements.server");
     const entitlements = await getEntitlements(user);
 
+    /* Quantas pacientes ele JÁ TEM. Sem este número o painel mostrava o plano
+       e escondia o consumo: o médico no Free descobria o teto de 5 como um
+       erro ao tentar aceitar a sexta. Um limite que só aparece quando é
+       atingido é indistinguível de um bug. */
+    let patientCount = 0;
+    try {
+      const { count } = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", user.id);
+      patientCount = count ?? 0;
+    } catch {
+      /* contagem é informativa — não derruba o perfil */
+    }
+
     return {
       ok: true as const,
       doctor: (row ?? null) as DoctorProfile | null,
       isPlatformAdmin,
       entitlements,
+      patientCount,
     };
   });
 
@@ -265,6 +295,9 @@ export const registerDoctor = createServerFn({ method: "POST" })
       "approach",
       "consultation_price_brl",
       "offers_telehealth",
+      "personal_phone",
+      "accepts_insurance",
+      "accepts_private",
     ] as const;
     const doUpsert = (s: string | null, richOk: boolean) => {
       const profile = stripUndefined(data.profile) as Record<string, unknown>;
@@ -380,10 +413,35 @@ export const updateMyDoctor = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { error } = await (supabaseAdmin as any)
-      .from("doctors")
-      .update({ ...stripUndefined(data.profile), updated_at: new Date().toISOString() })
-      .eq("id", user.id);
+    /* Mesmo escudo que o `registerDoctor` tem e que aqui faltava: num banco
+       onde as colunas do perfil rico ainda não foram migradas, o update
+       inteiro falhava e o médico perdia tudo o que digitou sem entender por
+       quê. Se o Postgres reclamar de coluna inexistente (42703), grava o
+       básico — o trabalho dele não se perde. */
+    const RICH_UPDATE_KEYS = [
+      "instagram",
+      "rqe",
+      "education",
+      "hospitals",
+      "insurances",
+      "languages",
+      "approach",
+      "consultation_price_brl",
+      "offers_telehealth",
+      "personal_phone",
+      "accepts_insurance",
+      "accepts_private",
+    ] as const;
+    const doUpdate = (richOk: boolean) => {
+      const profile = stripUndefined(data.profile) as Record<string, unknown>;
+      if (!richOk) for (const k of RICH_UPDATE_KEYS) delete profile[k];
+      return (supabaseAdmin as any)
+        .from("doctors")
+        .update({ ...profile, updated_at: new Date().toISOString() })
+        .eq("id", user.id);
+    };
+    let { error } = await doUpdate(true);
+    if (error && error.code === "42703") ({ error } = await doUpdate(false));
     return { ok: !error };
   });
 
@@ -437,14 +495,21 @@ export const searchDoctors = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const DIR_BASE =
-      "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,slug,bio,whatsapp,active,accepting_patients";
+      "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,slug,bio,whatsapp,active,accepting_patients,verified";
     const buildQuery = (cols: string) => {
       let q = (supabaseAdmin as any)
         .from("doctors")
         .select(cols)
+        /* `verified` NÃO filtra mais — ele ordena.
+           
+           Antes um médico recém-cadastrado ficava invisível para toda paciente
+           até um super-admin apertar um botão que ninguém avisava que existia:
+           ele esperava pacientes que não tinham como chegar nele, e a paciente
+           procurava e não achava ninguém. O selo continua valendo — quem o tem
+           aparece antes, dentro da mesma faixa de plano — mas deixar de ter o
+           selo passou a ser uma posição na lista, não a inexistência. */
         .eq("active", true)
         .eq("accepting_patients", true)
-        .eq("verified", true)
         .not("display_name", "is", null);
       if (data.state) q = q.ilike("state", data.state);
       if (data.city) q = q.ilike("city", `%${data.city}%`);
@@ -476,6 +541,14 @@ export const searchDoctors = createServerFn({ method: "POST" })
     list.sort((a, b) => {
       const pr = PLAN_RANK[normalizePlan(b.plan)] - PLAN_RANK[normalizePlan(a.plan)];
       if (pr !== 0) return pr;
+      /* O selo desempata DENTRO da faixa de plano. Ele deixou de ser filtro
+         (um médico novo era invisível) e virou posição: quem foi conferido
+         aparece antes de quem ainda não foi, sem que o não-conferido deixe de
+         existir para a paciente. */
+      const vf =
+        Number(!!(b as { verified?: boolean }).verified) -
+        Number(!!(a as { verified?: boolean }).verified);
+      if (vf !== 0) return vf;
       const ex = (b.years_experience ?? 0) - (a.years_experience ?? 0);
       if (ex !== 0) return ex;
       return (a.display_name ?? "").localeCompare(b.display_name ?? "");
@@ -625,7 +698,7 @@ export const aiSearchDoctors = createServerFn({ method: "POST" })
       .select(`${DIR_BASE},${RICH_COLS}`)
       .eq("active", true)
       .eq("accepting_patients", true)
-      .eq("verified", true)
+      /* Sem filtro de selo, igual ao diretório: ele pesa no score abaixo. */
       .not("display_name", "is", null)
       .limit(300);
     if (error?.code === "42703") {
@@ -634,7 +707,7 @@ export const aiSearchDoctors = createServerFn({ method: "POST" })
         .select(DIR_BASE)
         .eq("active", true)
         .eq("accepting_patients", true)
-        .eq("verified", true)
+        /* Sem filtro de selo, igual ao diretório: ele pesa no score abaixo. */
         .not("display_name", "is", null)
         .limit(300));
     }
@@ -689,8 +762,9 @@ export const aiSearchDoctors = createServerFn({ method: "POST" })
           score += 20;
           reasons.push(`🏥 ${crit.insurance}`);
         }
-        // Desempate leve por plano/experiência (mesma lógica do diretório)
+        // Desempate leve por plano/selo/experiência (mesma lógica do diretório)
         score += PLAN_RANK[normalizePlan(d.plan)] ?? 0;
+        score += (d as { verified?: boolean }).verified ? 3 : 0;
         score += Math.min(5, (d.years_experience ?? 0) / 10);
         return { d, score, reasons };
       })
@@ -723,7 +797,11 @@ export const chooseDoctor = createServerFn({ method: "POST" })
     // Defense-in-depth: além de ativo e aceitando pacientes, o médico precisa
     // estar VERIFICADO — igual à busca. Impede vínculo direto a um id de médico
     // não verificado (que a vitrine e a busca já escondem).
-    if (!doc || !doc.active || !doc.accepting_patients || !doc.verified) {
+    /* O selo saiu da condição: exigir selo aqui fazia a paciente encontrar o
+       médico na busca (agora ele aparece) e levar "indisponível" ao tocar —
+       o pior dos dois mundos. Quem está ativo e aceitando pacientes pode ser
+       escolhido; o selo é reputação, não permissão. */
+    if (!doc || !doc.active || !doc.accepting_patients) {
       return { ok: false as const, error: "indisponivel" };
     }
 

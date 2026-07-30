@@ -118,6 +118,12 @@ import {
   type TestimonialStatus,
 } from "@/lib/testimonials.functions";
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
+/* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
+   cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
+   alfabética que só devolvia nome e especialidade — e exigia selo, então
+   nenhum médico recém-cadastrado aparecia. Duas buscas com regras diferentes
+   para a mesma pergunta é uma a mais do que o app precisa. */
+import { searchDoctors as buscarDiretorio, type DirectoryDoctor } from "@/lib/doctors.functions";
 import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
@@ -182,7 +188,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  searchDoctors,
+  searchDoctors as searchDoctorsSimples,
   requestDoctor,
   getMyDoctorLink,
   getMyDoctorContact,
@@ -934,14 +940,30 @@ function MinhaContaPage() {
           // gestante (o render abaixo troca o app pela tela de redirecionamento
           // ao /painel). Admin nunca entra aqui: continua vendo tudo p/ testar.
           if (!r.isAdmin) {
-            try {
-              const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
-              if (me.ok && me.doctor) {
-                setIsDoctor(true);
-                roleIsPatient = false;
+            /* PRIMEIRO a marca do Auth, DEPOIS a linha em `doctors`.
+               
+               A ordem importa: quem começou o cadastro de médico e não chegou
+               a preencher o perfil não tem linha em `doctors`, e antes disto o
+               app o tratava como gestante — pedia o nome do bebê a um
+               obstetra. Era o bug relatado. A marca é gravada no primeiro
+               passo do cadastro, então cobre exatamente essa janela.
+               
+               `getMyDoctor` continua valendo como segunda fonte: cobre as
+               contas criadas antes desta correção, que não têm a marca. */
+            const papel = (u.user.user_metadata as { role?: string } | null)?.role;
+            if (papel === "doctor") {
+              setIsDoctor(true);
+              roleIsPatient = false;
+            } else {
+              try {
+                const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
+                if (me.ok && me.doctor) {
+                  setIsDoctor(true);
+                  roleIsPatient = false;
+                }
+              } catch {
+                /* sem perfil de médico → é gestante, segue no app */
               }
-            } catch {
-              /* sem perfil de médico → é gestante, segue no app */
             }
           }
         }
@@ -1339,6 +1361,16 @@ function MinhaContaPage() {
                 gest={gest}
                 onNavigate={mobileNavigate}
                 onOpenMenu={() => setHomeMenu(true)}
+                medico={
+                  meuMedico
+                    ? {
+                        nome: meuMedico.nome,
+                        title: meuMedico.title,
+                        specialty: meuMedico.specialty,
+                        crm: meuMedico.crm,
+                      }
+                    : null
+                }
                 temNaoLidas={naoLidas > 0}
                 onOrigemLocal={setOrigemLocal}
                 babyTone={profile?.baby_skin_tone ?? 0}
@@ -16737,7 +16769,7 @@ function MédicoTab() {
   const [link, setLink] = useState<MyDoctorLink | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<DoctorPublic[]>([]);
+  const [results, setResults] = useState<DirectoryDoctor[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -16765,18 +16797,32 @@ function MédicoTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* Já busca ao abrir, com o campo vazio: a paciente vê a lista de obstetras
+     sem digitar nada. Antes a tela abria vazia esperando um nome — e quem não
+     sabe o nome de nenhum obstetra do app não tinha o que digitar. */
+  useEffect(() => {
+    if (!link?.doctor && !link?.pending) void doSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [link]);
+
+  /* Busca no diretório, não na RPC antiga: ranqueada por plano, devolvendo
+     cidade e experiência. E sem exigir selo — antes um médico que acabou de se
+     cadastrar não aparecia para ninguém, e a paciente concluía que ele não
+     estava no app. */
   async function doSearch(e?: React.FormEvent) {
     e?.preventDefault();
-    const tk = token ?? (await getToken());
-    if (!tk) return;
     setSearching(true);
-    const res = await searchDoctors({ data: { accessToken: tk, query: query.trim() } });
-    setResults(res.ok ? res.doctors : []);
+    try {
+      const res = await buscarDiretorio({ data: { q: query.trim() } });
+      setResults(res.ok ? res.doctors : []);
+    } catch {
+      setResults([]);
+    }
     setSearched(true);
     setSearching(false);
   }
 
-  async function sendRequest(d: DoctorPublic) {
+  async function sendRequest(d: DirectoryDoctor) {
     const tk = token ?? (await getToken());
     if (!tk) return;
     setBusyId(d.id);
@@ -16897,7 +16943,8 @@ function MédicoTab() {
           <div className="mt-4 space-y-2">
             {searched && results.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                Nenhum médico encontrado. Confira o nome ou peça o convite ao seu obstetra.
+                Nenhum médico com esse nome. Tente só o sobrenome, ou deixe o campo vazio e toque em
+                Buscar para ver todos os obstetras do app.
               </p>
             )}
             {results.map((d) => (
@@ -16905,13 +16952,26 @@ function MédicoTab() {
                 key={d.id}
                 className="flex items-center justify-between gap-3 rounded-xl border border-border p-3"
               >
-                <div>
-                  <p className="text-sm font-medium text-foreground">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
                     {d.display_name || "Obstetra"}
                   </p>
                   {(d.title || d.specialty) && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="truncate text-xs text-muted-foreground">
                       {[d.title, d.specialty].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                  {/* Cidade e tempo de atuação: era o que faltava para ela
+                      decidir. Antes o resultado dizia só nome e especialidade —
+                      insuficiente para escolher entre cinco obstetras. */}
+                  {(d.city || d.years_experience) && (
+                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                      {[
+                        d.city ? `${d.city}${d.state ? `/${d.state}` : ""}` : null,
+                        d.years_experience ? `${d.years_experience} anos de atuação` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   )}
                 </div>

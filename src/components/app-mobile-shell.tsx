@@ -816,6 +816,7 @@ export function AppHomeScreen({
   gest,
   onNavigate,
   onOpenMenu,
+  medico,
   babyTone = 0,
   careMode = false,
   skyTheme = "v2",
@@ -838,6 +839,13 @@ export function AppHomeScreen({
   skyTheme?: SkyThemeId;
   /** Cidade do cadastro, quando preenchida — degrau entre o GPS e o IP. */
   homeCity?: { nome: string; lat: number; lon: number } | null;
+  /**
+   * O médico DA PACIENTE. Sem isto o cartão "Seu médico" mostrava sempre o
+   * `doctor.config` — nome, especialidade, CRM e FOTO do dono da instalação —
+   * para quem está vinculada a outro profissional e até para quem não tem
+   * médico nenhum. Ela via um rosto que não é o dela rotulado como o dela.
+   */
+  medico?: { nome: string; title?: string; specialty?: string; crm?: string } | null;
   /** Acende o ponto vermelho na silhueta — há notificação por abrir. */
   temNaoLidas?: boolean;
   /**
@@ -977,6 +985,13 @@ export function AppHomeScreen({
      sombra: o fundo atrás deles muda de luminosidade ao longo do dia. */
   const overArt: React.CSSProperties =
     artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
+
+  /* Quem o cartão do médico mostra. Sem vínculo, ele deixa de afirmar um
+     médico que não existe e passa a convidar: "Encontre o seu médico". */
+  const vinculadaAoDono = !medico || medico.nome.trim() === DOCTOR.name;
+  const medNome = medico?.nome?.trim() || DOCTOR.name;
+  const medEspec = medico?.specialty?.trim() || medico?.title?.trim() || DOCTOR.specialty;
+  const medCrm = (medico?.crm ?? "").trim() || (medico ? "" : DOCTOR.crm);
 
   return (
     /* Sem `pb` aqui: a página que renderiza esta tela (minha-conta) já reserva
@@ -1422,18 +1437,28 @@ export function AppHomeScreen({
         className="shine group w-full rounded-3xl border border-border bg-card overflow-hidden text-left shadow-[var(--shadow-card)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98]"
       >
         <div className="flex items-center gap-4 p-4">
-          <img
-            src={portrait}
-            alt={DOCTOR.name}
-            className="h-16 w-16 shrink-0 rounded-2xl object-cover"
-          />
+          {/* A FOTO é do dono da instalação e não temos foto dos outros médicos:
+              então ela só aparece quando o cartão é de fato dele. Para os
+              demais entra a inicial do nome — melhor uma inicial certa que um
+              rosto errado. */}
+          {vinculadaAoDono ? (
+            <img
+              src={portrait}
+              alt={medNome}
+              className="h-16 w-16 shrink-0 rounded-2xl object-cover"
+            />
+          ) : (
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/12 font-serif text-2xl text-primary ring-1 ring-primary/20">
+              {medNome.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
+            </span>
+          )}
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-              Seu médico
+              {medico ? "Seu médico" : "Encontre o seu médico"}
             </p>
-            <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">{DOCTOR.name}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{DOCTOR.specialty}</p>
-            <p className="mt-1 text-[10px] text-muted-foreground">{DOCTOR.crm}</p>
+            <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">{medNome}</p>
+            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{medEspec}</p>
+            {medCrm && <p className="mt-1 text-[10px] text-muted-foreground">{medCrm}</p>}
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
         </div>

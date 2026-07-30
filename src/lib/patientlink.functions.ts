@@ -116,7 +116,10 @@ export const requestDoctor = createServerFn({ method: "POST" })
       .select("id,active,accepting_patients,verified")
       .eq("id", data.doctorId)
       .maybeSingle();
-    if (!doc || doc.active === false || doc.accepting_patients === false || doc.verified !== true) {
+    /* O selo (`verified`) saiu da condição: ele é reputação, não permissão.
+       Exigi-lo aqui fazia a paciente achar o médico na busca — que agora
+       mostra os não-conferidos — e receber "indisponível" ao tocar. */
+    if (!doc || doc.active === false || doc.accepting_patients === false) {
       return { ok: false as const, reason: "unavailable" as const };
     }
 
@@ -147,6 +150,53 @@ export const requestDoctor = createServerFn({ method: "POST" })
       status: "pending",
     });
     if (error) return { ok: false as const, reason: "db" as const };
+
+    /* AVISA O MÉDICO. Sem isto o pedido era um buraco silencioso: nada de push,
+       nada de e-mail, e ele só descobriria abrindo o painel na aba Pacientes
+       por conta própria. Do lado dela o cartão dizia "aguardando o médico
+       aceitar" para sempre, sem que o médico soubesse que havia alguém
+       esperando. Melhor esforço nos dois canais — falhar aqui não desfaz o
+       pedido, que já está gravado. */
+    void (async () => {
+      try {
+        const { data: prof } = await (supabaseAdmin as any)
+          .from("patient_profiles")
+          .select("display_name")
+          .eq("id", user.id)
+          .maybeSingle();
+        const nome = ((prof?.display_name as string) || "Uma gestante").trim();
+
+        try {
+          const { sendPushToUser } = await import("./push.server");
+          await sendPushToUser(data.doctorId, {
+            title: "Nova paciente quer te acompanhar",
+            body: `${nome} enviou uma solicitação. Toque para aceitar.`,
+            url: "/painel",
+          });
+        } catch {
+          /* push é o canal opcional */
+        }
+
+        const { data: dUser } = await supabaseAdmin.auth.admin.getUserById(data.doctorId);
+        const email = dUser?.user?.email;
+        if (email) {
+          const { sendEmail, emailLayout } = await import("./email.server");
+          await sendEmail({
+            to: email,
+            subject: `👩‍🍼 ${nome} quer te acompanhar no app`,
+            html: emailLayout(
+              "Nova solicitação de paciente",
+              `<p style="margin:0 0 10px"><strong>${nome}</strong> enviou uma solicitação para ser acompanhada por você no app Obstétrica.</p>
+               ${data.message ? `<p style="margin:0 0 10px;padding:10px 14px;background:#f8fafc;border-radius:10px">"${data.message}"</p>` : ""}
+               <p style="margin:0">Aceite (ou recuse) no seu painel, na aba <strong>Pacientes</strong>.</p>`,
+            ),
+          });
+        }
+      } catch {
+        /* melhor esforço — o pedido continua valendo */
+      }
+    })();
+
     return { ok: true as const, status: "pending" as const };
   });
 
@@ -312,6 +362,39 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
       .from("patient_link_requests")
       .update({ status: data.accept ? "accepted" : "declined", decided_at: now })
       .eq("id", req.id);
+
+    /* AVISA A PACIENTE da decisão.
+       
+       Antes o aceite era silencioso: o cartão dela dizia "aguardando o médico
+       aceitar" e, na próxima vez que ela abrisse a aba, tinha mudado sozinho —
+       sem nenhum momento em que alguém lhe dissesse "ele aceitou". E a recusa
+       era pior: o cartão simplesmente voltava ao estado vazio, como se ela
+       nunca tivesse pedido nada. Uma decisão que ninguém comunica é uma decisão
+       que a pessoa vive como um bug. */
+    if (!error) {
+      void (async () => {
+        try {
+          const { data: d } = await (supabaseAdmin as any)
+            .from("doctors")
+            .select("display_name")
+            .eq("id", user.id)
+            .maybeSingle();
+          const medico = ((d?.display_name as string) || "Seu médico").trim();
+          const { sendPushToUser } = await import("./push.server");
+          await sendPushToUser(req.patient_id as string, {
+            title: data.accept
+              ? `${medico} aceitou te acompanhar 💛`
+              : "Sua solicitação não foi aceita",
+            body: data.accept
+              ? "A partir de agora o app responde no estilo do consultório dele."
+              : "Você pode escolher outro obstetra no app, em Meu médico.",
+            url: "/minha-conta",
+          });
+        } catch {
+          /* melhor esforço — a decisão já está gravada */
+        }
+      })();
+    }
     return { ok: !error };
   });
 

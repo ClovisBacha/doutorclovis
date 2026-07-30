@@ -215,10 +215,40 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       .eq("id", u.user.id)
       .maybeSingle();
     if (prof && !prof.doctor_id) {
-      await (supabaseAdmin as any)
-        .from("patient_profiles")
-        .update({ doctor_id: row.doctor_id })
-        .eq("id", u.user.id);
+      /* O TETO DE PACIENTES do plano vale aqui também.
+         
+         Este era o terceiro caminho de vínculo e o único sem a checagem: os
+         outros dois (`respondPatientRequest` e `chooseDoctor`) contam as
+         pacientes antes de ligar mais uma, e este ligava direto. Um médico no
+         Free (5 pacientes) podia passar do teto distribuindo códigos — o
+         limite existia em dois lugares e vazava no terceiro.
+         
+         Passando do teto, o cupom Premium dela continua valendo: ela ganhou o
+         que o código prometia. O que não acontece é o vínculo — e é o médico
+         que precisa resolver isso, fazendo upgrade. */
+      let podeVincular = true;
+      try {
+        const { getEntitlementsByDoctorId } = await import("./entitlements.server");
+        const ent = await getEntitlementsByDoctorId(row.doctor_id as string);
+        if (ent.maxPatients != null) {
+          const { count, error: cntErr } = await (supabaseAdmin as any)
+            .from("patient_profiles")
+            .select("id", { count: "exact", head: true })
+            .eq("doctor_id", row.doctor_id);
+          /* Fail-CLOSED: se a contagem falhar, não vincula. O outro caminho
+             erra para o lado de vincular; aqui, sem interação humana do outro
+             lado, o silêncio tem de ser o lado seguro. */
+          if (cntErr || (count ?? 0) >= ent.maxPatients) podeVincular = false;
+        }
+      } catch {
+        podeVincular = false;
+      }
+      if (podeVincular) {
+        await (supabaseAdmin as any)
+          .from("patient_profiles")
+          .update({ doctor_id: row.doctor_id })
+          .eq("id", u.user.id);
+      }
     }
 
     // Registro em subscriptions (origem convite) — não trava se faltar a tabela.

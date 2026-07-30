@@ -23,6 +23,12 @@ import {
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
+import {
+  listMyAddresses,
+  saveMyAddress,
+  deleteMyAddress,
+  type DoctorAddress,
+} from "@/lib/doctor-addresses.functions";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { gradientFor, periodFor } from "@/components/weather-sky";
 import { ymdLocal } from "@/lib/utils";
@@ -186,6 +192,12 @@ async function token() {
 function PainelPage() {
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  /* O perfil do médico LOGADO. Sem ele, três telas do painel usavam o
+     `doctor.config` — o arquivo fixo do dono da instalação — e um assinante
+     cobrava PIX na chave do Dr. Clóvis e imprimia recibo com o CRM dele.
+     Numa plataforma multi-médico isso não é um detalhe de layout: é dinheiro
+     indo para a conta errada e documento assinado por quem não atendeu. */
+  const [euMedico, setEuMedico] = useState<DoctorProfile | null>(null);
   const [tab, setTab] = useState<PanelTab>("Painel 📊");
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   // null = o próprio cérebro (comportamento de sempre).
@@ -227,10 +239,19 @@ function PainelPage() {
         setAllowed(true);
         setAppointments(res.appointments);
         setQuestions(res.questions);
+        /* Carrega o próprio perfil também no caminho felizes: é dele que saem
+           a chave PIX e o CRM do recibo. Best-effort — o painel abre sem. */
+        try {
+          const me = await getMyDoctor({ data: { accessToken: tk } });
+          if (me.ok && me.doctor) setEuMedico(me.doctor as DoctorProfile);
+        } catch {
+          /* segue com o padrão */
+        }
         return;
       }
       // Fallback (getAdminData negou): médico assinante inativo/sem linha ativa?
       const me = await getMyDoctor({ data: { accessToken: tk } });
+      if (me.ok && me.doctor) setEuMedico(me.doctor as DoctorProfile);
       if (me.ok && me.doctor?.active) {
         setAllowed(true);
         return;
@@ -420,6 +441,7 @@ function PainelPage() {
               appointments={appointments}
               onChangeStatus={changeStatus}
               onRefresh={load}
+              medico={euMedico}
             />
             <WaitlistSection />
             <BroadcastSection />
@@ -1298,10 +1320,13 @@ function AppointmentsSection({
   appointments,
   onChangeStatus,
   onRefresh,
+  medico,
 }: {
   appointments: AdminAppointment[];
   onChangeStatus: (id: string, s: AdminAppointment["status"]) => void;
   onRefresh: () => void;
+  /** O médico LOGADO. `null` só para a conta de equipe da plataforma. */
+  medico?: DoctorProfile | null;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmForm, setConfirmForm] = useState<{
@@ -1373,10 +1398,21 @@ function AppointmentsSection({
     onRefresh();
   }
 
+  /* A chave é a DELE. Sem a linha abaixo, o assinante mandava a paciente
+     pagar na chave do dono da instalação — o erro mais caro que este painel
+     tinha. Só cai no `doctor.config` quando não há perfil de médico, que é o
+     caso da conta de equipe da plataforma. */
+  const pixKey = medico?.pix_key?.trim() || DOCTOR.pixKey;
+  const pixName = medico?.display_name?.trim() || DOCTOR.pixName;
+
   function pixWhatsApp(a: AdminAppointment) {
+    if (!medico?.pix_key?.trim()) {
+      toast.error("Cadastre a sua chave PIX em Meu Perfil antes de cobrar.");
+      return;
+    }
     const price = (a as any).price_brl ? ((a as any).price_brl / 100).toFixed(2) : "___";
     const msg = encodeURIComponent(
-      `Olá, ${a.patient_name}! Para confirmar sua consulta no dia ${(a as any).confirmed_date ? new Date((a as any).confirmed_date + "T00:00:00").toLocaleDateString("pt-BR") : new Date(a.preferred_date + "T00:00:00").toLocaleDateString("pt-BR")} às ${(a as any).confirmed_time ?? a.preferred_time}, envie R$ ${price} via PIX para a chave: ${DOCTOR.pixKey} (${DOCTOR.pixName}). Após o pagamento, envie o comprovante aqui. Obrigado!`,
+      `Olá, ${a.patient_name}! Para confirmar sua consulta no dia ${(a as any).confirmed_date ? new Date((a as any).confirmed_date + "T00:00:00").toLocaleDateString("pt-BR") : new Date(a.preferred_date + "T00:00:00").toLocaleDateString("pt-BR")} às ${(a as any).confirmed_time ?? a.preferred_time}, envie R$ ${price} via PIX para a chave: ${pixKey} (${pixName}). Após o pagamento, envie o comprovante aqui. Obrigado!`,
     );
     window.open(`https://wa.me/55${a.patient_phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
   }
@@ -1677,7 +1713,9 @@ function AppointmentsSection({
       )}
 
       {/* Receipt Modal */}
-      {receiptAppt && <ReceiptModal appt={receiptAppt} onClose={() => setReceiptAppt(null)} />}
+      {receiptAppt && (
+        <ReceiptModal appt={receiptAppt} medico={medico} onClose={() => setReceiptAppt(null)} />
+      )}
     </div>
   );
 }
@@ -5913,7 +5951,24 @@ function ClinicaSection({
 /* ---------- Receipt Modal ---------- */
 import { DOCTOR } from "@/lib/doctor.config";
 
-function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () => void }) {
+function ReceiptModal({
+  appt,
+  medico,
+  onClose,
+}: {
+  appt: AdminAppointment;
+  /** O médico LOGADO — o recibo é assinado por quem atendeu. */
+  medico?: DoctorProfile | null;
+  onClose: () => void;
+}) {
+  /* Antes o recibo imprimia o nome, o título e o CRM do `doctor.config`: todo
+     assinante entregava à paciente um documento assinado "Dr. Clóvis Bacha,
+     CRM-MG 22.333". Um recibo com o CRM de outro profissional não é um erro
+     de layout. */
+  const nomeMed = medico?.display_name?.trim() || DOCTOR.name;
+  const tituloMed = medico?.title?.trim() || DOCTOR.title;
+  const crmMed = medico?.crm?.trim() || DOCTOR.crm;
+  const rqeMed = (medico?.rqe ?? "")?.trim() || (medico ? "" : DOCTOR.rqe);
   const ext = appt as any;
   const printRef = useRef<HTMLDivElement>(null);
   const receiptDate = ext.confirmed_date
@@ -5986,11 +6041,11 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
         <div ref={printRef} className="px-8 py-6">
           {/* Header */}
           <div className="border-b border-gray-200 pb-5 mb-5">
-            <h1 className="font-serif text-2xl text-gray-900">{DOCTOR.name}</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{DOCTOR.title}</p>
+            <h1 className="font-serif text-2xl text-gray-900">{nomeMed}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{tituloMed}</p>
             <p className="text-xs text-gray-400">
-              {DOCTOR.crm}
-              {DOCTOR.rqe ? ` · ${DOCTOR.rqe}` : ""}
+              {crmMed}
+              {rqeMed ? ` · ${rqeMed}` : ""}
             </p>
           </div>
 
@@ -6051,8 +6106,8 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
           <div className="mt-10 flex justify-end">
             <div className="text-center">
               <div className="h-12 border-b border-gray-400 w-48" />
-              <p className="text-xs text-gray-500 mt-1">{DOCTOR.name}</p>
-              <p className="text-[10px] text-gray-400">{DOCTOR.crm}</p>
+              <p className="text-xs text-gray-500 mt-1">{nomeMed}</p>
+              <p className="text-[10px] text-gray-400">{crmMed}</p>
             </div>
           </div>
 
@@ -6630,11 +6685,362 @@ function GoogleCalendarCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   );
 }
 
+/**
+ * Endereços de atendimento — vários, com um principal.
+ *
+ * Um médico com dois consultórios é a regra, não a exceção, e a paciente
+ * precisa saber em qual dos dois ele atende no dia e para qual telefone ligar.
+ * Um campo de texto com "Savassi e Nova Lima" não responde nenhuma das duas
+ * perguntas.
+ */
+/**
+ * O que você já usou do seu plano.
+ *
+ * Existia o teto (Free = 5 pacientes) e existia a checagem que o aplica, mas
+ * não existia lugar nenhum que dissesse ao médico onde ele está. Ele descobria
+ * o limite ao tentar aceitar a sexta paciente e receber um erro — que é o pior
+ * momento possível, porque já havia alguém esperando do outro lado.
+ *
+ * Também mostra quando o teste acaba: `plan_expires_at` já estava no banco e
+ * simplesmente não era lido, então o trial de 14 dias virava Free sem aviso.
+ */
+function ConsumoCard({
+  uso,
+  plano,
+}: {
+  uso: { pacientes: number; maxPacientes: number | null; rotulo: string; expira: string | null };
+  plano: string;
+}) {
+  const semTeto = uso.maxPacientes == null;
+  const pct = semTeto ? 0 : Math.min(100, Math.round((uso.pacientes / uso.maxPacientes!) * 100));
+  const cheio = !semTeto && uso.pacientes >= uso.maxPacientes!;
+  const perto = !semTeto && !cheio && pct >= 80;
+
+  const diasRestantes = (() => {
+    if (!uso.expira || plano !== "trial") return null;
+    const ms = new Date(uso.expira).getTime() - Date.now();
+    return ms > 0 ? Math.ceil(ms / 86400000) : 0;
+  })();
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="font-serif text-lg">Seu plano: {uso.rotulo}</p>
+        {diasRestantes != null && (
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-bold ${
+              diasRestantes <= 3
+                ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+                : "bg-primary/12 text-primary"
+            }`}
+          >
+            {diasRestantes === 0
+              ? "Teste encerrado"
+              : `${diasRestantes} ${diasRestantes === 1 ? "dia" : "dias"} de teste`}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="text-muted-foreground">Pacientes</span>
+          <span className="font-bold text-foreground">
+            {uso.pacientes}
+            {semTeto ? " · sem limite" : ` de ${uso.maxPacientes}`}
+          </span>
+        </div>
+        {!semTeto && (
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
+            <div
+              className={`h-full rounded-full transition-[width] duration-500 ${
+                cheio ? "bg-rose-500" : perto ? "bg-amber-500" : "bg-primary"
+              }`}
+              style={{ width: `${Math.max(4, pct)}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      {cheio && (
+        <p className="mt-3 rounded-2xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-rose-900 dark:bg-rose-500/10 dark:text-rose-200">
+          <strong>Você está no limite.</strong> A próxima paciente que pedir para te acompanhar não
+          vai poder ser aceita até você abrir uma vaga ou mudar de plano.
+        </p>
+      )}
+      {perto && (
+        <p className="mt-3 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+          Faltam {uso.maxPacientes! - uso.pacientes} vagas no seu plano.
+        </p>
+      )}
+      {diasRestantes != null && diasRestantes <= 3 && (
+        <p className="mt-3 rounded-2xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-rose-900 dark:bg-rose-500/10 dark:text-rose-200">
+          Quando o teste acabar, o plano vira <strong>Free</strong>: 5 pacientes e sem IA no app. As
+          pacientes acima de 5 continuam vinculadas, mas você não recebe novas.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function EnderecosCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  /* As mesmas classes do formulário de perfil, repetidas aqui de propósito:
+     este card é um componente irmão, não um filho, e herdar as constantes
+     por escopo criaria uma dependência invisível entre os dois. */
+  const input =
+    "mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary";
+  const label = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
+
+  const [lista, setLista] = useState<DoctorAddress[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [editando, setEditando] = useState<Partial<DoctorAddress> | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  async function carregar() {
+    try {
+      const r = await listMyAddresses({ data: { accessToken: await tokenFn() } });
+      setLista(r.addresses);
+    } catch {
+      setLista([]);
+    } finally {
+      setCarregando(false);
+    }
+  }
+  useEffect(() => {
+    void carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function salvar() {
+    if (!editando) return;
+    if (!(editando.street ?? "").trim()) {
+      toast.error("Informe o endereço.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      const r = await saveMyAddress({
+        data: {
+          accessToken: await tokenFn(),
+          address: {
+            id: editando.id,
+            label: editando.label ?? "",
+            street: editando.street ?? "",
+            city: editando.city ?? "",
+            state: (editando.state ?? "").toUpperCase(),
+            zip: editando.zip ?? "",
+            phone: editando.phone ?? "",
+            notes: editando.notes ?? "",
+            /* O primeiro endereço nasce principal: sem isso o médico salva um
+               só e a paciente não vê nenhum marcado como o principal. */
+            is_primary: editando.is_primary ?? lista.length === 0,
+            position: editando.position ?? lista.length,
+          },
+        },
+      });
+      if (!r.ok) {
+        toast.error("Não foi possível salvar o endereço. Rode o APLICAR_MEDICO.sql no Supabase.");
+        return;
+      }
+      toast.success("Endereço salvo ✓");
+      setEditando(null);
+      await carregar();
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function apagar(id: string) {
+    const r = await deleteMyAddress({ data: { accessToken: await tokenFn(), id } });
+    if (r.ok) await carregar();
+  }
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-serif text-lg">Onde você atende</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A paciente vê o endereço principal ao escolher você, e todos eles antes da consulta.
+          </p>
+        </div>
+        {!editando && (
+          <button
+            onClick={() => setEditando({})}
+            className="shrink-0 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+          >
+            + Endereço
+          </button>
+        )}
+      </div>
+
+      {carregando ? (
+        <p className="mt-4 text-sm text-muted-foreground">Carregando…</p>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {lista.length === 0 && !editando && (
+            <p className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Nenhum endereço cadastrado. A paciente não tem como saber onde você atende.
+            </p>
+          )}
+          {lista.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-start justify-between gap-3 rounded-2xl border border-border p-3"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  {a.label || "Consultório"}
+                  {a.is_primary && (
+                    <span className="ml-2 rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      principal
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {[a.street, a.city && `${a.city}${a.state ? `/${a.state}` : ""}`, a.zip]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {(a.phone || a.notes) && (
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {[a.phone, a.notes].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 gap-1.5">
+                <button
+                  onClick={() => setEditando(a)}
+                  className="rounded-full border border-border px-3 py-1 text-[11px]"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => void apagar(a.id)}
+                  className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground"
+                >
+                  Apagar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editando && (
+        <div className="mt-4 space-y-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className={label}>Nome do local</label>
+              <input
+                value={editando.label ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, label: e.target.value }))}
+                placeholder="Consultório Savassi"
+                className={input}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={label}>Endereço *</label>
+              <input
+                value={editando.street ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, street: e.target.value }))}
+                placeholder="Rua Antônio de Albuquerque, 156 — sala 302"
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Cidade</label>
+              <input
+                value={editando.city ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, city: e.target.value }))}
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>UF</label>
+              <select
+                value={(editando.state ?? "").toUpperCase()}
+                onChange={(e) => setEditando((v) => ({ ...v, state: e.target.value }))}
+                className={input}
+              >
+                <option value="">UF</option>
+                {UFS.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={label}>CEP</label>
+              <input
+                value={editando.zip ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, zip: e.target.value }))}
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Telefone deste local</label>
+              <input
+                value={editando.phone ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, phone: e.target.value }))}
+                placeholder="(31) 3333-3333"
+                className={input}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={label}>Observação</label>
+              <input
+                value={editando.notes ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, notes: e.target.value }))}
+                placeholder="3º andar · estacionamento no prédio"
+                className={input}
+              />
+            </div>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={editando.is_primary ?? lista.length === 0}
+              onChange={(e) => setEditando((v) => ({ ...v, is_primary: e.target.checked }))}
+              className="h-4 w-4 accent-primary"
+            />
+            Este é o endereço principal
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => void salvar()}
+              disabled={salvando}
+              className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {salvando ? "Salvando…" : "Salvar endereço"}
+            </button>
+            <button
+              onClick={() => setEditando(null)}
+              className="rounded-full border border-border px-5 py-2 text-sm"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exists, setExists] = useState(false);
   const [plan, setPlan] = useState("trial");
+  /* Consumo e teto do plano, mais a data em que o teste acaba. O painel tinha
+     tudo isso disponível em `getMyDoctor` e não mostrava nada: o médico via o
+     nome do plano e descobria o limite como um erro. */
+  const [uso, setUso] = useState<{
+    pacientes: number;
+    maxPacientes: number | null;
+    rotulo: string;
+    expira: string | null;
+  } | null>(null);
   const [active, setActive] = useState(false);
   const [slug, setSlug] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -6643,6 +7049,9 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     specialty: "",
     crm: "",
     whatsapp: "",
+    personal_phone: "",
+    accepts_insurance: false,
+    accepts_private: true,
     pix_key: "",
     bio: "",
     subspecialty: "",
@@ -6675,12 +7084,21 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           setPlan(d.plan);
           setActive(d.active);
           setSlug(d.slug);
+          setUso({
+            pacientes: res.patientCount ?? 0,
+            maxPacientes: res.entitlements?.maxPatients ?? null,
+            rotulo: res.entitlements?.label ?? d.plan,
+            expira: d.plan_expires_at ?? null,
+          });
           setForm({
             display_name: d.display_name,
             title: d.title,
             specialty: d.specialty,
             crm: d.crm,
             whatsapp: d.whatsapp,
+            personal_phone: d.personal_phone ?? "",
+            accepts_insurance: !!d.accepts_insurance,
+            accepts_private: d.accepts_private ?? true,
             pix_key: d.pix_key,
             bio: d.bio ?? "",
             subspecialty: d.subspecialty ?? "",
@@ -6782,7 +7200,9 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           </p>
         </div>
       )}
+      {uso && <ConsumoCard uso={uso} plano={plan} />}
       <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
+      <EnderecosCard tokenFn={tokenFn} />
       <DoctorInviteCard tokenFn={tokenFn} />
       <ReferralCard tokenFn={tokenFn} />
       <GoogleCalendarCard tokenFn={tokenFn} />
@@ -6848,7 +7268,7 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             </p>
           </div>
           <div>
-            <label className={label}>WhatsApp de emergência *</label>
+            <label className={label}>WhatsApp para pacientes *</label>
             <input
               value={form.whatsapp}
               onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.value }))}
@@ -6862,6 +7282,22 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               <strong>Atenção:</strong> este é o número que aparece no botão SOS das suas pacientes.
               Elas vão ligar e chamar no WhatsApp por aqui em uma emergência, a qualquer hora.
               Cadastre o número em que você quer ser encontrado nessa situação.
+            </p>
+          </div>
+          {/* O segundo número. Existe porque o de cima é PÚBLICO para as suas
+              pacientes; este a plataforma usa para falar com você, e ele nunca
+              aparece no app delas. Sem a separação, ou você expõe o pessoal ou
+              a emergência fica sem destino. */}
+          <div>
+            <label className={label}>Telefone pessoal</label>
+            <input
+              value={form.personal_phone}
+              onChange={(e) => setForm((f) => ({ ...f, personal_phone: e.target.value }))}
+              className={input}
+              placeholder="(31) 90000-0000"
+            />
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              Privado. Só a plataforma usa — nunca aparece para as pacientes.
             </p>
           </div>
           <div>
@@ -6994,15 +7430,54 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                 className={`${input} resize-none`}
               />
             </div>
-            <div>
-              <label className={label}>Convênios aceitos</label>
-              <textarea
-                value={form.insurances}
-                onChange={(e) => setForm((f) => ({ ...f, insurances: e.target.value }))}
-                rows={2}
-                placeholder="Ex: Unimed, Bradesco Saúde, particular"
-                className={`${input} resize-none`}
-              />
+            {/* Como você atende — a primeira pergunta que a paciente faz.
+                
+                Antes havia só a lista de convênios em texto livre, e uma lista
+                vazia era ambígua: podia significar "só particular" ou "ainda
+                não preenchi". Duas caixas respondem sem ambiguidade, e a busca
+                passa a poder filtrar por elas. */}
+            <div className="md:col-span-2 rounded-2xl border border-border bg-secondary/30 p-4">
+              <p className="text-sm font-semibold">Como você atende</p>
+              <div className="mt-3 flex flex-wrap gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.accepts_insurance}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, accepts_insurance: e.target.checked }))
+                    }
+                    className="h-4 w-4 accent-primary"
+                  />
+                  🏥 Atendo por convênio
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.accepts_private}
+                    onChange={(e) => setForm((f) => ({ ...f, accepts_private: e.target.checked }))}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  💳 Atendo particular
+                </label>
+              </div>
+              {form.accepts_insurance && (
+                <div className="mt-3">
+                  <label className={label}>Quais convênios</label>
+                  <textarea
+                    value={form.insurances}
+                    onChange={(e) => setForm((f) => ({ ...f, insurances: e.target.value }))}
+                    rows={2}
+                    placeholder="Ex: Unimed, Bradesco Saúde, Amil"
+                    className={`${input} resize-none`}
+                  />
+                </div>
+              )}
+              {!form.accepts_insurance && !form.accepts_private && (
+                <p className="mt-2 text-[11.5px] leading-snug text-amber-700 dark:text-amber-400">
+                  Sem convênio e sem particular, a paciente não tem como saber como marcar com você.
+                  Marque pelo menos um.
+                </p>
+              )}
             </div>
             <div className="md:col-span-2">
               <label className={label}>Sua abordagem (filosofia de cuidado)</label>
