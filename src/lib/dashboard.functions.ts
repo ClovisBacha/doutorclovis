@@ -53,7 +53,10 @@ export type DoctorDashboard = {
   };
   questions: {
     pending: number;
+    /** Total histórico. NÃO use em nada rotulado "este mês". */
     answered: number;
+    /** Respondidas DENTRO do mês corrente — é esta que a prova de valor lê. */
+    answeredThisMonth: number;
     recentPending: { id: string; question: string; created_at: string }[];
     topThemes: { theme: string; count: number }[];
   };
@@ -259,6 +262,11 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     const emptyQuestions = {
       pending: 0,
       answered: 0,
+      /* Precisa existir AQUI: `safe<T>` infere `T` do fallback, então um campo
+         que só aparece no caminho feliz é apagado do tipo em silêncio — foi
+         assim que a métrica mensal ficou pronta no servidor e nunca chegou à
+         tela, sem o `tsc` reclamar de nada. */
+      answeredThisMonth: 0,
       recentPending: [] as { id: string; question: string; created_at: string }[],
       topThemes: [] as { theme: string; count: number }[],
     };

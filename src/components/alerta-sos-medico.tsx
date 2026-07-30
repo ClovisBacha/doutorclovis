@@ -39,18 +39,54 @@ export function AlertaSosMedico({
   restantes?: number;
 }) {
   const caixa = useRef<HTMLDivElement>(null);
+  /* O callback vive numa ref para que o efeito abaixo possa ter dependências
+     VAZIAS. Com `[onFechar]` — e o call site passa uma arrow inline — o efeito
+     refazia a cada render do painel, e o corpo dele começa com `.focus()`: o
+     vigia de SOS troca o array a cada 60 s, então o foco do médico voltava
+     sozinho para o topo do diálogo uma vez por minuto, no meio da ligação.
+     Para leitor de tela, a leitura recomeçava do zero junto. */
+  const fechar = useRef(onFechar);
+  fechar.current = onFechar;
 
-  /* Esc adia (não dispensa), e o foco entra na caixa.
-     Sem isto, quem usa teclado ou leitor de tela ficava preso atrás de um
-     overlay que não se anunciava e do qual não havia saída. */
   useEffect(() => {
+    const antes = document.activeElement as HTMLElement | null;
     caixa.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onFechar();
+      /* `repeat` fora: segurar Esc dispara ~30 vezes por segundo, e cada
+         disparo adiava um acionamento diferente — quatro emergências
+         dispensadas num toque preso, no componente cujo princípio é que
+         emergência não se dispensa. */
+      if (e.key === "Escape" && !e.repeat) {
+        fechar.current();
+        return;
+      }
+      /* Tab preso na caixa. `aria-modal` resolve para o cursor virtual do
+         leitor de tela, não para o Tab: sem isto o foco saía para as doze abas
+         do painel atrás de um fundo preto, e o médico navegava às cegas. */
+      if (e.key !== "Tab" || !caixa.current) return;
+      const alvos = caixa.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (alvos.length === 0) return;
+      const primeiro = alvos[0];
+      const ultimo = alvos[alvos.length - 1];
+      const atual = document.activeElement;
+      if (e.shiftKey && (atual === primeiro || atual === caixa.current)) {
+        e.preventDefault();
+        ultimo.focus();
+      } else if (!e.shiftKey && atual === ultimo) {
+        e.preventDefault();
+        primeiro.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onFechar]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      /* Devolve o foco a quem abriu — senão o próximo Tab recomeça do topo do
+         documento, longe da fila de onde ele veio. */
+      antes?.focus?.();
+    };
+  }, []);
 
   const f = (acionamento.ficha ?? {}) as Record<string, string | null>;
   const telPaciente = f.telefone ?? null;
@@ -75,7 +111,7 @@ export function AlertaSosMedico({
         role="dialog"
         aria-modal="true"
         aria-labelledby="sos-titulo"
-        className="flex max-h-[92svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-2xl outline-none"
+        className="flex max-h-[92svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
       >
         {/* Faixa vermelha: a tela inteira tem que dizer "emergência" antes de
             qualquer palavra ser lida. */}

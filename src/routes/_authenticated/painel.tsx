@@ -290,7 +290,16 @@ function PainelPage() {
    * verdade é uma falha de rede é a pior coisa que este painel pode dizer: o
    * médico fecha a tela tranquilo com uma emergência não lida do outro lado.
    */
-  const [fonteFalhou, setFonteFalhou] = useState({ sos: false, vinculos: false });
+  const [fonteFalhou, setFonteFalhou] = useState({
+    sos: false,
+    vinculos: false,
+    /* As cinco fontes da fila, e não duas. Com só `sos` e `vinculos`
+       rastreados, uma falha em `getPreConsultaForms` deixava a banda "Para ler"
+       vazia e a tela dizia "☕ Nada esperando por você" com seis pré-consultas
+       não lidas — que é exatamente o bug que a trava existe para impedir. */
+    consultasEPerguntas: false,
+    preConsultas: false,
+  });
 
   /* Vigia de SOS. Roda em paralelo ao resto e nunca derruba o painel: um erro
      aqui custa o aviso, não o consultório. */
@@ -330,13 +339,28 @@ function PainelPage() {
      bateria e cota de banco para ninguém ver. */
   useEffect(() => {
     if (!allowed) return;
+    /* `load(true)` já recarrega as solicitações de vínculo por dentro — chamar
+       `loadPedidosVinculo` aqui também era uma requisição a mais por tique, num
+       efeito cuja justificativa é economia de cota. */
+    const atualizar = () => {
+      load(true).catch(() => {});
+      loadPreForms().catch(() => {});
+    };
     const t = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      load();
-      loadPedidosVinculo();
-      loadPreForms().catch(() => {});
+      atualizar();
     }, 180_000);
-    return () => clearInterval(t);
+    /* E ao VOLTAR para a aba: quem pula o tique escondido precisa de um jeito de
+       se pôr em dia, senão o médico volta do WhatsApp e olha para dados de três
+       minutos atrás sem saber disso. */
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") atualizar();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowed]);
 
@@ -362,16 +386,33 @@ function PainelPage() {
     janelaAtividadeDias?: number;
   } | null>(null);
 
-  async function load() {
+  /**
+   * @param ehRefresh Atualização periódica, e não a entrada na tela.
+   *
+   * A diferença não é cosmética: fora do primeiro carregamento, esta função
+   * NUNCA pode rebaixar autorização. Um soluço de dois segundos no Auth do
+   * Supabase faz `getAdminData` devolver `{ok:false}` sem lançar exceção — e
+   * no caminho de fallback isso terminava em `setAllowed(false)`, ou seja, o
+   * painel inteiro do médico virava "Área restrita — crie sua conta aqui" no
+   * meio do trabalho dele, levando junto o texto que ele estava digitando e
+   * qualquer modal de emergência aberto. No primeiro carregamento o bloqueio é
+   * a resposta certa; a cada três minutos, para sempre, é uma armadilha.
+   */
+  async function load(ehRefresh = false) {
     try {
       const tk = await token();
       const res = await getAdminData({ data: { accessToken: tk } });
+      if (!res.ok && ehRefresh) {
+        setFonteFalhou((f) => ({ ...f, consultasEPerguntas: true }));
+        return;
+      }
       if (res.ok) {
         // Conta da plataforma (ADMIN_EMAILS) NÃO é médico: seu lugar é o
         // console /admin. Só redireciona quem SERÁ admitido lá (o super-admin
         // dono); um e-mail admin secundário sem conta de médico vê o bloqueio
         // coerente em vez de um beco sem saída (redirect → /admin negado).
         if (res.isTeam) {
+          if (ehRefresh) return;
           const { checkIsSuperAdmin } = await import("@/lib/platform.functions");
           const sa = await checkIsSuperAdmin({ data: { accessToken: tk } });
           if (sa.isSuperAdmin) {
@@ -384,6 +425,7 @@ function PainelPage() {
         setAllowed(true);
         setAppointments(res.appointments);
         setQuestions(res.questions);
+        setFonteFalhou((f) => ({ ...f, consultasEPerguntas: false }));
         /* Carrega o próprio perfil também no caminho felizes: é dele que saem
            a chave PIX e o CRM do recibo. Best-effort — o painel abre sem. */
         try {
@@ -428,7 +470,9 @@ function PainelPage() {
         setAllowed(true);
         if (!me.doctor.active) {
           setInativo(true);
-          setTab("Meu Perfil");
+          /* Só na entrada: arrancar o médico da aba em que ele está, de três em
+             três minutos, seria pior que o problema que isto resolve. */
+          if (!ehRefresh) setTab("Meu Perfil");
         }
         return;
       }
@@ -487,9 +531,16 @@ function PainelPage() {
   }
 
   async function loadPreForms() {
-    const tk = await token();
-    const res = await getPreConsultaForms({ data: { accessToken: tk } });
-    if (res.ok) setPreForms(res.forms);
+    try {
+      const tk = await token();
+      const res = await getPreConsultaForms({ data: { accessToken: tk } });
+      if (res.ok) {
+        setPreForms(res.forms);
+        setFonteFalhou((f) => ({ ...f, preConsultas: false }));
+      } else setFonteFalhou((f) => ({ ...f, preConsultas: true }));
+    } catch {
+      setFonteFalhou((f) => ({ ...f, preConsultas: true }));
+    }
   }
 
   async function loadTeleconsultas() {
@@ -553,21 +604,48 @@ function PainelPage() {
     if (tab === "Empresas") loadCorporate();
   }, [tab, allowed]);
 
+  /* AS TRÊS MUTAÇÕES OTIMISTAS pintam a tela antes do servidor responder — e
+     ignoravam o retorno. Um `updateAppointmentStatus` recusado (o índice único
+     de horário barrando double-booking, a sessão expirada) ficava mentindo até
+     o F5. Com o refresh de três minutos ficou pior: o item se desfazia sozinho
+     na cara do médico, sem uma palavra de explicação. Falhou, ele volta ao
+     estado anterior E fica sabendo por quê. */
   async function changeStatus(id: string, status: AdminAppointment["status"]) {
+    const antes = appointments;
     setAppointments((a) => a.map((x) => (x.id === id ? { ...x, status } : x)));
-    await updateAppointmentStatus({
-      data: { accessToken: await token(), id, status: status as never },
-    });
+    try {
+      const r = await updateAppointmentStatus({
+        data: { accessToken: await token(), id, status: status as never },
+      });
+      if (!r?.ok) throw new Error("recusado");
+    } catch {
+      setAppointments(antes);
+      toast.error("Não consegui salvar essa mudança. Tente de novo.");
+    }
   }
 
   async function toggleAnswered(id: string, answered: boolean) {
+    const antes = questions;
     setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered } : x)));
-    await setQuestionAnswered({ data: { accessToken: await token(), id, answered } });
+    try {
+      const r = await setQuestionAnswered({ data: { accessToken: await token(), id, answered } });
+      if (!r?.ok) throw new Error("recusado");
+    } catch {
+      setQuestions(antes);
+      toast.error("Não consegui salvar essa mudança. Tente de novo.");
+    }
   }
 
   async function markSeen(id: string) {
+    const antes = preForms;
     setPreForms((f) => f.map((x) => (x.id === id ? { ...x, seen_by_doctor: true } : x)));
-    await markPreConsultaSeen({ data: { accessToken: await token(), id } });
+    try {
+      const r = await markPreConsultaSeen({ data: { accessToken: await token(), id } });
+      if (!r?.ok) throw new Error("recusado");
+    } catch {
+      setPreForms(antes);
+      toast.error("Não consegui marcar como lida. Tente de novo.");
+    }
   }
 
   if (loading)
@@ -655,20 +733,33 @@ function PainelPage() {
         acao: "Confirmar",
         onAcao: () => setTab("Agendamentos"),
       })),
+    /* A pressão da pré-consulta agora ganha etiqueta clínica na aba — mas a aba
+       deixou de ser a porta de entrada. Sem promover o nível aqui, uma
+       pré-consulta com 175/115 entrava como "Para ler", peso 4, o ÚLTIMO de
+       todos, abaixo de "Fulana pediu consulta" e sem nenhuma marca. O
+       formulário desenhado para ser lido antes da consulta ficava no fim da
+       fila justamente quando trazia o número que não podia esperar. */
     ...preForms
       .filter((f) => !f.seen_by_doctor)
-      .map((f) => ({
-        id: `pre-${f.id}`,
-        nivel: "leitura" as const,
-        titulo: `Pré-consulta de ${f.patient_name}`,
-        detalhe:
+      .map((f) => {
+        const sn = sinalPressao(f.systolic, f.diastolic);
+        const grave = sn?.gravidade === "grave";
+        const sintomas =
           f.symptoms?.length > 0
             ? `Sintomas: ${f.symptoms.join(", ")}`
-            : (f.questions ?? "Sem sintomas relatados."),
-        em: f.submitted_at,
-        acao: "Ler",
-        onAcao: () => setTab("Pré-consultas"),
-      })),
+            : (f.questions ?? "Sem sintomas relatados.");
+        return {
+          id: `pre-${f.id}`,
+          nivel: grave ? ("pergunta" as const) : ("leitura" as const),
+          titulo: grave
+            ? `Pré-consulta de ${f.patient_name} — ${f.systolic}/${f.diastolic}`
+            : `Pré-consulta de ${f.patient_name}`,
+          detalhe: sn && sn.gravidade !== "normal" ? `${sn.nota} · ${sintomas}` : sintomas,
+          em: f.submitted_at,
+          acao: "Ler",
+          onAcao: () => setTab("Pré-consultas"),
+        };
+      }),
   ];
 
   return (
@@ -753,6 +844,8 @@ function PainelPage() {
         fontesComFalha={[
           ...(fonteFalhou.sos ? ["emergências"] : []),
           ...(fonteFalhou.vinculos ? ["solicitações de pacientes"] : []),
+          ...(fonteFalhou.consultasEPerguntas ? ["consultas e perguntas"] : []),
+          ...(fonteFalhou.preConsultas ? ["pré-consultas"] : []),
         ]}
       />
 
@@ -833,7 +926,12 @@ function PainelPage() {
 
       <div className="mt-8">
         {tab === "Painel 📊" && (
-          <DashboardSection tokenFn={token} onNavigate={setTab} medico={euMedico} />
+          <DashboardSection
+            tokenFn={token}
+            onNavigate={setTab}
+            medico={euMedico}
+            rotuloPlano={rotuloPlano}
+          />
         )}
         {tab === "Calendário" && (
           <CalendárioSection appointments={appointments} onNavigate={setTab} />
@@ -983,11 +1081,15 @@ function DashboardSection({
   tokenFn,
   onNavigate,
   medico,
+  rotuloPlano,
 }: {
   tokenFn: () => Promise<string>;
   onNavigate: (tab: PanelTab) => void;
   /** Perfil dele — só para a prova de valor saber o preço da consulta e o plano. */
   medico?: DoctorProfile | null;
+  /** Rótulo do plano já resolvido (entitlements) — a coluna crua não conhece o
+      assento de clínica. */
+  rotuloPlano?: string | null;
 }) {
   const [data, setData] = useState<DoctorDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1048,6 +1150,7 @@ function ValorGeradoBanner({
   moedaDoMedico,
   mensalidadeDoPlanoCentavos,
   plano,
+  rotuloPlano,
 }: {
   aiHits: number;
   answered: number;
@@ -1067,9 +1170,17 @@ function ValorGeradoBanner({
    * para uma clínica seria falso justamente com o cliente de maior ticket.
    */
   plano?: string | null;
+  /** Rótulo do plano JÁ resolvido pelo servidor (entitlements). */
+  rotuloPlano?: string | null;
 }) {
+  /* `plano` é a coluna CRUA de `doctors`. O assento de clínica não é gravado
+     nela — quem entra por uma clínica ativa fica com `trial` no banco e só vira
+     "Clínica" na resolução em memória do servidor. Por isso a frase "você ainda
+     não paga nada" exige as DUAS coisas: coluna de teste E rótulo resolvido de
+     teste. Sem o rótulo, a gente não afirma. */
   const p = (plano ?? "").trim().toLowerCase();
-  const emTeste = p === "trial" || p === "free" || p === "";
+  const r = (rotuloPlano ?? "").trim().toLowerCase();
+  const emTeste = (p === "trial" || p === "free") && (r === "trial" || r === "free" || r === "");
   /* TEMPO ECONOMIZADO É SÓ O QUE A IA FEZ NO LUGAR DELE.
 
      Antes esta conta era `aiHits + answered`, e `answered` é gravado no
@@ -1081,7 +1192,12 @@ function ValorGeradoBanner({
      no painel — como produção dele, que é o que são. */
   const assists = aiHits;
 
-  if (assists === 0 && answered === 0 && activePatients === 0) {
+  /* A porta do CTA é governada pelo que o card AFIRMA — produção da
+     plataforma —, não pelo trabalho dele. Com `answered` na condição, quem
+     respondeu 5 perguntas na mão e nunca usou a IA perdia o empurrão "treine a
+     IA" e ganhava uma vitrine anunciando dois zeros embaixo de "Valor gerado":
+     prova de valor negativa, para quem acabou de pagar. */
+  if (assists === 0 && activePatients === 0) {
     return (
       <div className="fade-slide-up rounded-3xl border border-primary/20 bg-primary/5 p-5">
         <p className="font-serif text-lg">💚 Comece a gerar valor</p>
@@ -1147,13 +1263,29 @@ function ValorGeradoBanner({
           const texto = formatarDinheiro(valorCentavos, moedaDoMedico);
           /* `formatarDinheiro` devolve "" para valor não finito. Uma frase de
              cobrança com o número faltando é pior que frase nenhuma. */
+          const ganha =
+            mensalidadeDoPlanoCentavos > 0 && valorCentavos > mensalidadeDoPlanoCentavos;
           if (texto && valorCentavos > 0) {
             return (
               <>
-                <p className="mt-3 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-emerald-900">
+                {/* A mensalidade aparece SEMPRE que é conhecida, favoreça ou
+                    não. Mostrar a comparação só quando ela ganha é escolher a
+                    dedo — e um card que argumenta cobrança e é estruturalmente
+                    incapaz de sair desfavorável não é prova de valor, é
+                    propaganda. Quando não favorece, o próprio número vira o
+                    argumento honesto: falta uso, e o painel diz onde. */}
+                <p
+                  className={`mt-3 rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
+                    ganha
+                      ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
+                      : "bg-secondary text-foreground"
+                  }`}
+                >
                   A IA trabalhou o equivalente a <strong>{texto}</strong> em consultas suas
-                  {mensalidadeDoPlanoCentavos > 0 && valorCentavos > mensalidadeDoPlanoCentavos
-                    ? " — mais que a mensalidade do seu plano."
+                  {mensalidadeDoPlanoCentavos > 0
+                    ? ganha
+                      ? " — mais que a mensalidade do seu plano."
+                      : ` — sua mensalidade é ${formatarDinheiro(mensalidadeDoPlanoCentavos, "BRL")}.`
                     : emTeste
                       ? " — e você ainda não paga nada por isso."
                       : "."}
@@ -1184,11 +1316,13 @@ export function DashboardView({
   onNavigate,
   onRefresh,
   medico,
+  rotuloPlano,
 }: {
   data: DoctorDashboard;
   onNavigate: (tab: PanelTab) => void;
   onRefresh?: () => void;
   medico?: DoctorProfile | null;
+  rotuloPlano?: string | null;
 }) {
   const { patients, questions, brain, appointments, engagement } = data;
   const stageTotal = STAGE_META.reduce((s, m) => s + patients.stages[m.key], 0);
@@ -1225,7 +1359,7 @@ export function DashboardView({
       {/* Valor gerado no mês — reenquadra os números como ROI (retenção). */}
       <ValorGeradoBanner
         aiHits={brain.hitsThisMonth}
-        answered={questions.answered}
+        answered={questions.answeredThisMonth}
         activePatients={patients.active7d}
         onNavigate={onNavigate}
         precoConsultaCentavos={
@@ -1234,6 +1368,7 @@ export function DashboardView({
         moedaDoMedico={medico?.consultation_currency}
         mensalidadeDoPlanoCentavos={mensalidadeCentavos(medico?.plan ?? "")}
         plano={medico?.plan}
+        rotuloPlano={rotuloPlano}
       />
 
       {/* 2. Cards de destaque */}
@@ -9025,7 +9160,15 @@ function PacientesSection({
                       key={p.id}
                       className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4"
                     >
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                      {/* LINHA INTEIRA no celular, e isto não é preferência de
+                          layout. `flex-1` é `flex: 1 1 0%` — base zero —, então
+                          o bloco do nome nunca provoca quebra: ele é esmagado
+                          até sumir e só depois um botão desce. Medido: com três
+                          controles ao lado, o nome ficava com 0 px a 360 e 390.
+                          O médico escolhia qual vínculo encerrar — ação que só
+                          a paciente pode desfazer — olhando para uma inicial e
+                          uma data. */}
+                      <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                           {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
                         </span>
@@ -9033,7 +9176,11 @@ function PacientesSection({
                           <p className="truncate text-sm font-medium">
                             {p.display_name ?? "Sem nome"}
                           </p>
-                          {due && <p className="text-xs text-muted-foreground">DPP {due}</p>}
+                          {due && (
+                            <p className="truncate whitespace-nowrap text-xs text-muted-foreground">
+                              DPP {due}
+                            </p>
+                          )}
                         </div>
                       </div>
                       {/* BPM fetal da consulta → "Sentir o coração" da família */}

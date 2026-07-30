@@ -580,10 +580,27 @@ export const setQuestionAnswered = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (!(await assertOwnsRow(supabaseAdmin as any, "doctor_questions", data.id, scope)))
       return { ok: false as const };
-    const { error } = await supabaseAdmin
+    /* `answered_at` junto, e não só a flag. Este é o botão "marcar respondida"
+       da aba Perguntas — o caminho que o médico mais usa quando responde sem
+       treinar a IA. Sem o carimbo, a resposta dele ficava invisível para
+       qualquer contagem "deste mês", para sempre.
+
+       Mesmo recuo do `secondbrain.functions.ts`: banco sem a coluna devolve
+       42703 e a gente grava só a flag, como antes. */
+    let { error } = await (supabaseAdmin as any)
       .from("doctor_questions")
-      .update({ answered: data.answered })
+      .update(
+        data.answered
+          ? { answered: true, answered_at: new Date().toISOString() }
+          : { answered: false, answered_at: null },
+      )
       .eq("id", data.id);
+    if ((error as { code?: string } | null)?.code === "42703") {
+      ({ error } = await (supabaseAdmin as any)
+        .from("doctor_questions")
+        .update({ answered: data.answered })
+        .eq("id", data.id));
+    }
     return { ok: !error };
   });
 
@@ -617,40 +634,49 @@ export const getEngagementData = createServerFn({ method: "POST" })
       Date.now() - JANELA_ATIVIDADE_DIAS * 24 * 60 * 60 * 1000,
     ).toISOString();
 
-    const [profiles, healthLogs, journals, kicks, qs, forms, contracoes, exames, panicos] =
-      await Promise.all([
-        scopedBy(
-          sb
-            .from("patient_profiles")
-            .select(
-              "id,display_name,baby_name,lmp_date,reference_date,reference_weeks,reference_days,doctor_id,created_at",
-            ),
-          scope,
+    /* PERFIS PRIMEIRO, ATIVIDADE DEPOIS — e recortada pelas pacientes DELE.
+
+       As consultas de atividade rodam com service role e não passavam por
+       `scopedBy`: liam a plataforma inteira. Com o teto de 1000 linhas do
+       PostgREST, o orçamento de um médico de cinco pacientes era disputado com
+       todas as pacientes de todos os médicos — e ordenar por mais recente não
+       resolve, PIORA: esta tela precisa justamente das linhas mais ANTIGAS, que
+       são as primeiras a serem cortadas. O resultado seria uma paciente que
+       usou o app na semana passada aparecendo em vermelho como sumida.
+
+       `.in("user_id", ids)` recorta o volume pelo número de pacientes dele, que
+       é a ordem de grandeza certa, e fecha o vazamento de orçamento entre
+       consultórios. Custa uma ida a mais ao banco, em série. */
+    const profiles = await scopedBy(
+      sb
+        .from("patient_profiles")
+        .select(
+          "id,display_name,baby_name,lmp_date,reference_date,reference_weeks,reference_days,doctor_id,created_at",
         ),
-        /* `order` decrescente em todas: o teto de linhas do PostgREST (1000)
-           corta o FIM da lista. Sem ordenar, o que sobrevive é arbitrário e uma
-           paciente ativa pode aparecer como sumida; ordenando do mais novo para
-           o mais velho, o que sobrevive é justamente o que interessa aqui. */
-        supabaseAdmin
-          .from("health_logs")
-          .select("user_id,created_at")
-          .gte("created_at", inicioJanela)
-          .order("created_at", { ascending: false }),
-        supabaseAdmin
-          .from("journal_entries")
-          .select("user_id,created_at")
-          .gte("created_at", inicioJanela)
-          .order("created_at", { ascending: false }),
-        supabaseAdmin
-          .from("kick_sessions")
-          .select("user_id,started_at")
-          .gte("started_at", inicioJanela)
-          .order("started_at", { ascending: false }),
-        supabaseAdmin
-          .from("doctor_questions")
-          .select("user_id,created_at")
-          .gte("created_at", inicioJanela)
-          .order("created_at", { ascending: false }),
+      scope,
+    );
+    const idsDele = ((profiles.data ?? []) as { id: string }[]).map((p) => p.id);
+
+    const desde = (tabela: string, coluna: string) =>
+      idsDele.length === 0
+        ? Promise.resolve({ data: [] as never[] })
+        : (supabaseAdmin as any)
+            .from(tabela)
+            .select(`user_id,${coluna}`)
+            .in("user_id", idsDele)
+            .gte(coluna, inicioJanela);
+
+    const [healthLogs, journals, kicks, qs, forms, contracoes, exames, panicos] = await Promise.all(
+      [
+        desde("health_logs", "created_at"),
+        desde("journal_entries", "created_at"),
+        desde("kick_sessions", "started_at"),
+        desde("doctor_questions", "created_at"),
+        /* Pré-consulta tem janela PRÓPRIA e mais larga porque a lista de
+           pendentes precisa dela inteira. Por isso ela não entra no mapa de
+           atividade sem ser filtrada: um formulário de 300 dias atrás fazia a
+           etiqueta dizer "sem registro há 300 dias" para quem registrou há 50 —
+           um número específico, de aparência confiável, 250 dias errado. */
         scopedBy(
           sb
             .from("preconsulta_forms")
@@ -661,25 +687,13 @@ export const getEngagementData = createServerFn({ method: "POST" })
         /* As três abaixo faltavam, e a falta doía justamente em quem mais usa o
            app: cronometrar contração, subir exame e acionar o SOS não contavam
            como sinal de vida. Uma gestante de 38 semanas contando contrações
-           todo dia aparecia na lista de "sumidas". Tabelas que ainda não
-           existem no banco devolvem erro e `data` indefinida — o `?.forEach`
-           abaixo ignora, então a migração pendente não quebra a tela. */
-        supabaseAdmin
-          .from("contraction_logs")
-          .select("user_id,created_at")
-          .gte("created_at", inicioJanela)
-          .order("created_at", { ascending: false }),
-        supabaseAdmin
-          .from("exam_files")
-          .select("user_id,created_at")
-          .gte("created_at", inicioJanela)
-          .order("created_at", { ascending: false }),
-        supabaseAdmin
-          .from("panic_events")
-          .select("user_id,created_at")
-          .gte("created_at", inicioJanela)
-          .order("created_at", { ascending: false }),
-      ]);
+           todo dia aparecia na lista de "sumidas". Tabela ainda não migrada
+           devolve erro e `data` indefinida — o `?.forEach` abaixo ignora. */
+        desde("contraction_logs", "created_at"),
+        desde("exam_files", "created_at"),
+        desde("panic_events", "created_at"),
+      ],
+    );
 
     // Map userId → most recent activity timestamp
     const activityMap = new Map<string, string>();
@@ -688,24 +702,23 @@ export const getEngagementData = createServerFn({ method: "POST" })
       const prev = activityMap.get(uid);
       if (!prev || ts > prev) activityMap.set(uid, ts);
     };
-    healthLogs.data?.forEach((r) => record(r.user_id, r.created_at));
-    journals.data?.forEach((r) => record(r.user_id, r.created_at));
-    kicks.data?.forEach((r) => record(r.user_id, r.started_at));
-    (contracoes.data as { user_id: string; created_at: string }[] | null)?.forEach((r) =>
-      record(r.user_id, r.created_at),
-    );
-    (exames.data as { user_id: string; created_at: string }[] | null)?.forEach((r) =>
-      record(r.user_id, r.created_at),
-    );
-    (panicos.data as { user_id: string; created_at: string }[] | null)?.forEach((r) =>
-      record(r.user_id, r.created_at),
-    );
+    type LinhaAtividade = Record<string, string | null>;
+    const registrar = (res: { data?: unknown }, coluna: string) =>
+      ((res?.data ?? []) as LinhaAtividade[]).forEach((r) =>
+        record(String(r.user_id ?? ""), String(r[coluna] ?? "")),
+      );
+    registrar(healthLogs, "created_at");
+    registrar(journals, "created_at");
+    registrar(kicks, "started_at");
+    registrar(contracoes, "created_at");
+    registrar(exames, "created_at");
+    registrar(panicos, "created_at");
     /* Pré-consulta enviada também é sinal de vida — a lista já vinha carregada
        para outro fim e nunca era registrada como atividade. */
     (forms.data as { user_id: string; submitted_at: string | null }[] | null)?.forEach((r) => {
-      if (r.submitted_at) record(r.user_id, r.submitted_at);
+      if (r.submitted_at && r.submitted_at >= inicioJanela) record(r.user_id, r.submitted_at);
     });
-    qs.data?.forEach((r) => record(r.user_id, r.created_at));
+    registrar(qs, "created_at");
 
     const unseenByUser = new Set<string>(
       ((forms.data ?? []) as { user_id: string; seen_by_doctor: boolean }[])

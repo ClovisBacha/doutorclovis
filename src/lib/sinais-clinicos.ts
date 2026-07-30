@@ -43,22 +43,45 @@ export function sinalPressao(sistolica?: number | null, diastolica?: number | nu
   if (sistolica < 50 || sistolica > 300 || diastolica < 20 || diastolica > 200) {
     return { gravidade: "atencao", nota: "Valor de pressão implausível" };
   }
-  /* Campos trocados. 80/120 batia em `120 >= 110` e virava "faixa grave": um
-     alarme de crise hipertensiva em cima de uma pressão perfeitamente normal
-     digitada nos campos invertidos. Alarme falso repetido é o que faz o médico
-     aprender a ignorar a cor. */
-  if (sistolica <= diastolica) {
-    return { gravidade: "atencao", nota: "Sistólica e diastólica parecem invertidas" };
+  /* Campos trocados: avalia o par NA ORDEM CERTA e mantém a gravidade dele.
+     
+     A primeira versão desta guarda devolvia sempre `atencao`, e isso rebaixava
+     o caso que mata: 170/100 é pré-eclâmpsia grave, e digitado invertido
+     (100/170) saía como amarelo, abaixo de qualquer vermelho na ordenação. Era
+     o oposto do princípio aplicado à hipoglicemia três funções abaixo — a
+     escala tem que estar ancorada na urgência, não no formato do dado. O
+     inverso continua valendo: 80/120 é 120/80 lido ao contrário e segue
+     normal. */
+  if (sistolica < diastolica) {
+    return {
+      gravidade: faixaPressao(diastolica, sistolica),
+      nota: `Valores parecem invertidos (lido como ${diastolica}/${sistolica})`,
+    };
   }
-  if (sistolica >= 160 || diastolica >= 110) {
-    return { gravidade: "grave", nota: "Pressão em faixa grave" };
+  /* Sistólica IGUAL à diastólica é pressão de pulso zero — ausência de débito.
+     Trocar não muda nada, então trocar aqui só produziria recursão infinita:
+     é caso de valor implausível, não de campo invertido. */
+  if (sistolica === diastolica) {
+    return { gravidade: "atencao", nota: "Diferença implausível entre os dois valores" };
   }
-  if (sistolica >= 140 || diastolica >= 90) {
-    return { gravidade: "atencao", nota: "Pressão elevada" };
-  }
+  return {
+    gravidade: faixaPressao(sistolica, diastolica),
+    nota: notaPressao(sistolica, diastolica),
+  };
+}
+
+/** Só a classificação por faixa — sem as guardas, para poder ser reusada. */
+function faixaPressao(sistolica: number, diastolica: number): Gravidade {
+  if (sistolica >= 160 || diastolica >= 110) return "grave";
+  if (sistolica >= 140 || diastolica >= 90) return "atencao";
   /* Hipotensão sintomática existe, mas isolada num registro caseiro gera mais
      alarme do que ajuda — fica de fora de propósito. */
-  return { gravidade: "normal", nota: "" };
+  return "normal";
+}
+
+function notaPressao(sistolica: number, diastolica: number): string {
+  const g = faixaPressao(sistolica, diastolica);
+  return g === "grave" ? "Pressão em faixa grave" : g === "atencao" ? "Pressão elevada" : "";
 }
 
 /**
@@ -77,7 +100,12 @@ export function sinalGlicemia(valor?: number | null): Sinal | null {
      coluna inteira e saía rotulado "Glicemia baixa" — o alerta exatamente
      oposto ao correto. Aqui a gente admite que não sabe. */
   if (valor > 0 && valor < 20) {
-    return { gravidade: "atencao", nota: "Valor implausível — confira a unidade (mg/dL)" };
+    /* `grave`, e não `atencao`: os dois cenários por trás deste número são
+       graves. Ou é mmol/L (10,0 = 180 mg/dL, hiperglicemia) ou é mg/dL de
+       verdade (15 = neuroglicopenia). O único falso-grave é a leitura mmol/L
+       normal — e errar por excesso num de três é melhor que rebaixar dois de
+       três, que era o efeito de `atencao`. */
+    return { gravidade: "grave", nota: "Valor implausível — confira a unidade (mg/dL)" };
   }
   if (valor <= 0 || valor > 900) {
     return { gravidade: "atencao", nota: "Valor de glicemia implausível" };

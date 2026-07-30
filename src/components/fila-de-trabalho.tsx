@@ -102,25 +102,26 @@ export function FilaDeTrabalho({
     return quando(a.em) - quando(b.em);
   });
 
+  /* Fila vazia por FALHA não é boa notícia — e o aviso é uma FAIXA, não um
+     estado vazio alternativo. Antes ele só aparecia com a fila vazia, que é o
+     caso raro num médico ativo: no caso comum (três perguntas na fila e a
+     leitura de SOS falhada) ele trabalhava os três, chegava em "fila limpa" e
+     nunca ficava sabendo que o canal de EMERGÊNCIA não respondeu. */
+  const avisoFalha =
+    fontesComFalha.length > 0 ? (
+      <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3">
+        <p className="text-[13px] font-semibold text-amber-900">
+          📡 Não consegui conferir tudo agora
+        </p>
+        <p className="mt-0.5 text-[12px] leading-snug text-amber-900/80">
+          Falhou a leitura de: {fontesComFalha.join(", ")}. Pode ser conexão — atualize antes de
+          considerar esta lista completa.
+        </p>
+      </div>
+    ) : null;
+
   if (ordenada.length === 0) {
-    /* Fila vazia por FALHA não pode ser contada como boa notícia. Se uma das
-       fontes não respondeu, o que a gente sabe é "não consegui olhar", e é
-       isso que a tela diz — porque o médico que lê "nada esperando" fecha o
-       painel tranquilo, e do outro lado pode haver uma emergência não lida. */
-    if (fontesComFalha.length > 0) {
-      return (
-        <div className="mt-6 rounded-3xl border border-amber-300 bg-amber-50/60 p-6 text-center">
-          <p className="text-3xl">📡</p>
-          <p className="mt-2 font-serif text-lg text-foreground">
-            Não consegui conferir tudo agora
-          </p>
-          <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-            Falhou a leitura de: {fontesComFalha.join(", ")}. Pode ser conexão — atualize a página
-            antes de considerar a fila vazia.
-          </p>
-        </div>
-      );
-    }
+    if (avisoFalha) return <div className="mt-2">{avisoFalha}</div>;
     return (
       <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50/60 p-6 text-center">
         <p className="text-3xl">☕</p>
@@ -134,7 +135,8 @@ export function FilaDeTrabalho({
 
   return (
     <div className="mt-6">
-      <div className="flex items-baseline justify-between gap-3">
+      {avisoFalha}
+      <div className="mt-2 flex items-baseline justify-between gap-3">
         <h2 className="font-serif text-lg text-foreground">Precisa de você</h2>
         <span className="text-[11px] text-muted-foreground">
           {ordenada.length} {ordenada.length === 1 ? "item" : "itens"}
