@@ -8085,20 +8085,67 @@ function PatientDetailModal({
   onClose: () => void;
 }) {
   const [messages, setMessages] = useState<BrainChatMessage[] | null>(null);
+  /* A ficha clínica dela. O espelho do bebê já estava aqui, mas a aba
+     "Pacientes" era justamente a que tinha MENOS dado clínico do painel: peso,
+     pressão, glicemia, diário e chutes só apareciam em Pré-consultas e
+     Engajamento, dois lugares que o médico não abre para olhar uma paciente
+     específica. Quem clica numa paciente quer a paciente inteira. */
+  const [ficha, setFicha] = useState<any | null>(null);
 
   useEffect(() => {
     (async () => {
+      const tk = await tokenFn();
       try {
-        const res = await getBrainConversation({
-          data: { accessToken: await tokenFn(), patientId: p.id },
-        });
+        const res = await getBrainConversation({ data: { accessToken: tk, patientId: p.id } });
         setMessages(res.ok ? res.messages : []);
       } catch {
         setMessages([]);
       }
+      try {
+        const rep = await getPatientReport({ data: { accessToken: tk, userId: p.id } });
+        setFicha(rep.ok ? rep : null);
+      } catch {
+        setFicha(null);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.id]);
+
+  /* Último de cada medida. O médico não quer a série inteira num modal — quer
+     o valor mais recente e a data, que é o que ele olharia na consulta.
+     
+     `health_logs` guarda uma LINHA POR DIA com várias medidas (peso, sistólica,
+     diastólica, glicemia), e cada uma pode estar vazia naquele dia. Então o
+     "último peso" não é a última linha: é a última linha em que o peso foi
+     preenchido. Procurar na linha mais recente daria "—" para quem mediu a
+     pressão hoje e o peso ontem. */
+  const ultimoOnde = (tem: (l: any) => boolean, ler: (l: any) => string) => {
+    const l = (ficha?.healthLogs ?? []).find((x: any) => tem(x));
+    return l ? { valor: ler(l), quando: l.log_date ?? l.created_at } : null;
+  };
+  const medidas = [
+    {
+      rot: "Peso",
+      v: ultimoOnde(
+        (l) => l.weight_kg != null,
+        (l) => `${l.weight_kg} kg`,
+      ),
+    },
+    {
+      rot: "Pressão",
+      v: ultimoOnde(
+        (l) => l.systolic != null && l.diastolic != null,
+        (l) => `${l.systolic}/${l.diastolic}`,
+      ),
+    },
+    {
+      rot: "Glicemia",
+      v: ultimoOnde(
+        (l) => l.glucose_mg_dl != null,
+        (l) => `${l.glucose_mg_dl}`,
+      ),
+    },
+  ];
 
   const period = periodFor(new Date().getHours());
   const weeks = p.weeks ?? null;
@@ -8168,6 +8215,64 @@ function PatientDetailModal({
             </span>
           )}
         </div>
+
+        {/* Ficha clínica — o que ela registrou no app */}
+        {ficha && (
+          <div className="px-4 pt-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              🩺 Registros dela
+            </p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {medidas.map(({ rot, v }) => (
+                <div key={rot} className="rounded-2xl border border-border p-2.5 text-center">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{rot}</p>
+                  <p className="mt-0.5 text-sm font-bold text-foreground">{v ? v.valor : "—"}</p>
+                  {v?.quando && (
+                    <p className="text-[9.5px] text-muted-foreground">
+                      {new Date(`${String(v.quando).slice(0, 10)}T00:00:00`).toLocaleDateString(
+                        "pt-BR",
+                      )}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+              <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                📓 {(ficha.journals ?? []).length} no diário
+              </span>
+              <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                🦶 {(ficha.kicks ?? []).length} sessões de chutes
+              </span>
+              <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                ❓ {(ficha.questions ?? []).length} perguntas
+              </span>
+            </div>
+            {/* Dados clínicos do perfil: o que ela levaria escrito na
+                carteirinha. É o que muda a conduta numa emergência. */}
+            {(ficha.profile?.blood_type ||
+              ficha.profile?.allergies ||
+              ficha.profile?.medications) && (
+              <div className="mt-2 rounded-2xl bg-secondary/50 p-2.5 text-[11.5px] leading-snug">
+                {ficha.profile?.blood_type && (
+                  <p>
+                    <span className="font-semibold">Sangue:</span> {ficha.profile.blood_type}
+                  </p>
+                )}
+                {ficha.profile?.allergies && (
+                  <p>
+                    <span className="font-semibold">Alergias:</span> {ficha.profile.allergies}
+                  </p>
+                )}
+                {ficha.profile?.medications && (
+                  <p>
+                    <span className="font-semibold">Medicamentos:</span> {ficha.profile.medications}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Conversa com a IA (somente leitura) */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
