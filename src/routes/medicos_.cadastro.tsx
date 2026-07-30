@@ -538,68 +538,95 @@ function CadastroMedicoPage() {
                 className={input}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            {/* CRM e WhatsApp em LINHAS PRÓPRIAS, cada um com a largura toda.
+
+                Antes os dois dividiam um `grid-cols-2` que valia em qualquer
+                largura. Num celular de 390px cada coluna ficava com ~170px, e
+                dentro da coluna do CRM ainda havia um select de 86px mais o
+                campo do número — não cabe. Pior: o rótulo "WhatsApp para
+                pacientes" quebra em duas linhas e "CRM" não, então os campos
+                desalinhavam na vertical e se encavalavam.
+
+                Dois campos obrigatórios lado a lado num celular é economia de
+                espaço que custa legibilidade. Cada um numa linha resolve os dois
+                problemas e não precisa de exceção por breakpoint. */}
+            <div>
               {/* UF primeiro, número depois — o registro é estadual, e
                   "CRM 12345" sozinho não identifica ninguém. Em dois controles
                   o formato sai sempre igual e dá para conferir no portal do
                   conselho. */}
-              <div>
-                <label className={label}>CRM *</label>
-                <div className="mt-1 flex gap-2">
-                  <select
-                    value={separarCrm(profile.crm).uf}
-                    onChange={(e) =>
-                      setProfile((p) => ({
-                        ...p,
-                        crm: juntarCrm(e.target.value, separarCrm(p.crm).numero),
-                      }))
-                    }
-                    className={`${input} w-[86px] shrink-0`}
-                    aria-label="Estado do CRM"
-                  >
-                    <option value="">UF</option>
-                    {UFS.map((uf) => (
-                      <option key={uf} value={uf}>
-                        {uf}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    value={separarCrm(profile.crm).numero}
-                    onChange={(e) =>
-                      setProfile((p) => ({
-                        ...p,
-                        crm: juntarCrm(separarCrm(p.crm).uf, e.target.value),
-                      }))
-                    }
-                    placeholder="12345"
-                    inputMode="numeric"
-                    className={input}
-                    aria-label="Número do CRM"
-                  />
-                </div>
-              </div>
-              {/* OBRIGATÓRIO, e com o nome do que ele é.
-                  
-                  Este é o número que aparece no botão SOS das pacientes e na
-                  carteirinha de emergência que elas mostram no hospital. Estava
-                  rotulado só "WhatsApp" e era opcional: dava para terminar o
-                  cadastro sem ele, e aí as pacientes daquele médico abriam a
-                  emergência e não tinham para onde ligar. */}
-              <div>
-                <label className={label}>WhatsApp para pacientes *</label>
+              <label className={label}>CRM *</label>
+              <div className="mt-1 grid grid-cols-[96px_1fr] gap-2">
+                <select
+                  value={separarCrm(profile.crm).uf}
+                  onChange={(e) =>
+                    setProfile((p) => ({
+                      ...p,
+                      crm: juntarCrm(e.target.value, separarCrm(p.crm).numero),
+                    }))
+                  }
+                  /* `mt-0` porque a linha já tem o respiro: o `input` traz um
+                     `mt-1` embutido e aqui ele viraria margem dupla. */
+                  className={`${input} mt-0`}
+                  aria-label="Estado do CRM"
+                >
+                  <option value="">UF</option>
+                  {UFS.map((uf) => (
+                    <option key={uf} value={uf}>
+                      {uf}
+                    </option>
+                  ))}
+                </select>
                 <input
-                  value={profile.whatsapp}
-                  onChange={(e) => setProfile((p) => ({ ...p, whatsapp: e.target.value }))}
-                  placeholder="(31) 99999-9999"
-                  className={input}
+                  value={separarCrm(profile.crm).numero}
+                  onChange={(e) =>
+                    setProfile((p) => ({
+                      ...p,
+                      crm: juntarCrm(separarCrm(p.crm).uf, e.target.value),
+                    }))
+                  }
+                  placeholder="Número — ex.: 12345"
+                  inputMode="numeric"
+                  className={`${input} mt-0`}
+                  aria-label="Número do CRM"
                 />
-                <p className="mt-1 text-[11px] leading-snug text-amber-700">
-                  É o número que aparece no <strong>botão SOS</strong> das suas pacientes e na
-                  carteirinha que elas mostram no hospital. Cadastre o número em que você quer ser
-                  encontrado numa emergência.
-                </p>
               </div>
+              {/* Mostra como vai ficar. Duas caixas separadas deixam a dúvida
+                  "e o formato final, sai certo?" — aqui ele aparece. */}
+              {separarCrm(profile.crm).uf && separarCrm(profile.crm).numero ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Vai aparecer como{" "}
+                  <strong className="text-foreground">
+                    {juntarCrm(separarCrm(profile.crm).uf, separarCrm(profile.crm).numero)}
+                  </strong>
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Escolha o estado e digite o número — o registro é estadual.
+                </p>
+              )}
+            </div>
+            {/* OBRIGATÓRIO, e com o nome do que ele é.
+                
+                Este é o número que aparece no botão SOS das pacientes e na
+                carteirinha de emergência que elas mostram no hospital. Estava
+                rotulado só "WhatsApp" e era opcional: dava para terminar o
+                cadastro sem ele, e aí as pacientes daquele médico abriam a
+                emergência e não tinham para onde ligar. */}
+            <div>
+              <label className={label}>WhatsApp para pacientes *</label>
+              <input
+                value={profile.whatsapp}
+                onChange={(e) => setProfile((p) => ({ ...p, whatsapp: e.target.value }))}
+                placeholder="(31) 99999-9999"
+                inputMode="tel"
+                className={input}
+              />
+              <p className="mt-1 text-[11px] leading-snug text-amber-700">
+                É o número que aparece no <strong>botão SOS</strong> das suas pacientes e na
+                carteirinha que elas mostram no hospital. Cadastre o número em que você quer ser
+                encontrado numa emergência.
+              </p>
             </div>
             <div>
               <label className={label}>Título</label>

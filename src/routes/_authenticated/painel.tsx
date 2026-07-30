@@ -7306,11 +7306,15 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               dá para conferir no portal do conselho. */}
           <div>
             <label className={label}>CRM *</label>
-            <div className="mt-1 flex gap-2">
+            {/* Grid com a coluna da UF fixa, igual ao cadastro: com `flex` +
+                `w-[92px] shrink-0` o campo do número herda o `mt-1` do `input` e
+                fica um degrau abaixo do select. Em grid os dois compartilham a
+                linha e o `mt-0` tira a margem dupla. */}
+            <div className="mt-1 grid grid-cols-[96px_1fr] gap-2">
               <select
                 value={crmUf}
                 onChange={(e) => setForm((f) => ({ ...f, crm: juntarCrm(e.target.value, crmNum) }))}
-                className={`${input} w-[92px] shrink-0`}
+                className={`${input} mt-0`}
                 aria-label="Estado do CRM"
               >
                 <option value="">UF</option>
@@ -7323,8 +7327,8 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               <input
                 value={crmNum}
                 onChange={(e) => setForm((f) => ({ ...f, crm: juntarCrm(crmUf, e.target.value) }))}
-                className={input}
-                placeholder="12345"
+                className={`${input} mt-0`}
+                placeholder="Número — ex.: 12345"
                 inputMode="numeric"
                 aria-label="Número do CRM"
               />
