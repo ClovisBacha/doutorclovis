@@ -813,6 +813,13 @@ function MinhaContaPage() {
      um médico vinculado" e esconder os dois botões de ligar para ele. Uma frase
      falsa, não uma degradação. */
   const [medicoResolvido, setMedicoResolvido] = useState(false);
+  /** Cadastro profissional começado neste aparelho e ainda sem perfil. */
+  const [querSerMedicoAqui, setQuerSerMedicoAqui] = useState(false);
+  useEffect(() => {
+    // `isDoctor` já cobre quem TEM perfil: o aviso é só para quem não tem.
+    if (isDoctor) return;
+    void import("@/lib/intencao-medico").then((m) => setQuerSerMedicoAqui(m.querSerMedico()));
+  }, [isDoctor]);
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -1235,6 +1242,41 @@ function MinhaContaPage() {
 
   return (
     <>
+      {/* ── Cadastro de médico pela metade ───────────────────────────
+          Última rede: se a pessoa começou um cadastro profissional neste
+          aparelho e ainda não tem perfil de médico, ela chegou aqui por um
+          desvio (link de confirmação de e-mail, sessão viva num reload). Antes
+          isso era silencioso — o app pedia o nome do bebê a um obstetra e não
+          havia nenhuma porta de volta. */}
+      {querSerMedicoAqui && (
+        <div className="mx-auto mb-3 max-w-md rounded-2xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-bold text-amber-800">Seu cadastro de médico está incompleto</p>
+          <p className="mt-1 text-[13px] leading-snug text-amber-900/80">
+            Você começou a criar uma conta profissional neste aparelho. Termine o perfil para abrir
+            o painel do consultório.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              to="/medicos/cadastro"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              Continuar o cadastro de médico →
+            </Link>
+            <button
+              onClick={() => {
+                void import("@/lib/intencao-medico").then((m) => {
+                  m.esquecerIntencaoMedico();
+                  setQuerSerMedicoAqui(false);
+                });
+              }}
+              className="rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground"
+            >
+              Não era isso, sou gestante
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Ritual de boas-vindas (primeiro acesso) ─────────────── */}
       {showOnboarding && (
         <OnboardingRitual

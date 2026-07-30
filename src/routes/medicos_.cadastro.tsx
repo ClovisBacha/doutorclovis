@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerDoctor, getMyDoctor } from "@/lib/doctors.functions";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
 import { pendenciasDoMedico } from "@/lib/doctor-required";
+import { INTENCAO_MEDICO } from "@/lib/intencao-medico";
 import { GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/medicos_/cadastro")({
@@ -51,6 +52,22 @@ function CadastroMedicoPage() {
     consultation_price_brl: null as number | null,
     education: "",
   });
+
+  /* Guarda a INTENÇÃO de ser médico no aparelho.
+  
+     Marcar `role=doctor` no Auth é forte demais para uma intenção (bloqueia o
+     app da gestante) e frágil demais como pista (só é gravado na criação da
+     conta). Esta chave é o meio: dura entre recarregamentos, sobrevive à volta
+     do Google e ao link de confirmação, e não tira acesso de ninguém — só diz
+     "esta pessoa estava tentando se cadastrar como médico", para as outras telas
+     pararem de mandá-la para o app da gestante. */
+  useEffect(() => {
+    try {
+      localStorage.setItem(INTENCAO_MEDICO, String(Date.now()));
+    } catch {
+      /* sem storage: os outros caminhos ainda funcionam */
+    }
+  }, []);
 
   // Já logado? Médico ativo vai direto ao painel (ex.: login com Google);
   // senão mostra o perfil profissional, avisando qual conta está em uso e
@@ -153,7 +170,15 @@ function CadastroMedicoPage() {
         const { data: su, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { role: "doctor" } },
+          options: {
+            data: { role: "doctor" },
+            /* Sem isto, o link do e-mail de confirmação volta para a Site URL do
+               projeto Supabase — que é o app da gestante. O médico confirmava o
+               e-mail e caía na tela "configure sua data de gestação", com o
+               cadastro profissional pela metade e nenhuma pista de como voltar.
+               O `?papel=medico` sobrevive à ida e volta e traz ele para cá. */
+            emailRedirectTo: `${window.location.origin}/medicos/cadastro?papel=medico`,
+          },
         });
         // Anti-enumeração do Supabase: e-mail já cadastrado retorna "sucesso"
         // sem sessão e com identities vazio — orienta a entrar em vez de
@@ -306,6 +331,12 @@ function CadastroMedicoPage() {
         await supabase.auth.updateUser({ data: { role: "doctor" } });
       } catch {
         /* a linha em `doctors` já basta para o app decidir */
+      }
+      /* Virou médico de fato: a intenção cumpriu o papel e sai de cena. */
+      try {
+        localStorage.removeItem(INTENCAO_MEDICO);
+      } catch {
+        /* sem storage, sem problema */
       }
       setStep("pronto");
     } catch {

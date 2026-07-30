@@ -79,6 +79,21 @@ function AuthPage() {
       } catch {
         /* sem rede/perfil: segue como paciente */
       }
+      /* Antes de despachar para o app da gestante: esta pessoa estava tentando
+         se cadastrar como médico?
+
+         Este redirecionamento era a porta pela qual o médico caía no app da
+         paciente. Ele roda no MOUNT, com a sessão que já existe — então acontece
+         antes de a pessoa poder tocar em "Sou médico(a)", e o botão de papel
+         (que o handler de login respeita) nunca entrava em jogo. Resultado: quem
+         voltava do link de confirmação de e-mail, ou reabria o site com sessão
+         viva, ia para "configure sua data de gestação" com o cadastro
+         profissional pela metade. */
+      const { querSerMedico } = await import("@/lib/intencao-medico");
+      if (querSerMedico()) {
+        navigate({ to: "/medicos/cadastro" });
+        return;
+      }
       navigate({ to: "/minha-conta" });
     });
   }, [navigate, isRecoveryLink]);
@@ -249,7 +264,17 @@ function AuthPage() {
             <button
               key={r.key}
               type="button"
-              onClick={() => setRole(r.key)}
+              onClick={() => {
+                setRole(r.key);
+                /* Escolher "médico" aqui é o único sinal explícito que temos
+                   antes de a conta existir. Guardado, ele sobrevive ao OAuth e
+                   ao link de confirmação. Escolher "paciente" apaga. */
+                void import("@/lib/intencao-medico").then((m) => {
+                  if (r.key === "medico")
+                    localStorage.setItem(m.INTENCAO_MEDICO, String(Date.now()));
+                  else m.esquecerIntencaoMedico();
+                });
+              }}
               aria-pressed={role === r.key}
               className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition-all ${
                 role === r.key
