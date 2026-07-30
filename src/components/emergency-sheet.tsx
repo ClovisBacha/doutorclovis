@@ -75,6 +75,43 @@ export function EmergencySheet({
   const medZap = temVinculo ? linkWhatsApp(medico!.whatsapp) : null;
   const medTel = temVinculo ? linkTel(medico!.whatsapp) : null;
   const [qr, setQr] = useState<string | null>(null);
+  /* Localização PRÉ-AQUECIDA, obtida ao abrir a Central — não no toque do SOS.
+
+     Este é o conserto de um estrago meu. Para escapar do bloqueador de pop-up
+     eu passei a abrir a aba do WhatsApp DENTRO do toque, antes de tudo. Só que
+     abrir uma aba manda a página do SOS para segundo plano, e o iOS SUSPENDE a
+     geolocalização de página em segundo plano: o pedido nunca era respondido e
+     estourava o prazo sem nada. O aviso saía sem a coordenada, em silêncio.
+
+     Pedindo ao ABRIR a central, a coordenada já está na mão quando ela toca no
+     botão — e o toque não precisa esperar por nada. De quebra, a tela consegue
+     dizer ANTES da emergência se a localização vai junto, que é a hora de
+     descobrir isso. */
+  const [posicao, setPosicao] = useState<{ lat: number; lng: number; em: number } | null>(null);
+  const [posicaoNegada, setPosicaoNegada] = useState(false);
+
+  useEffect(() => {
+    if (!navigator?.geolocation) return;
+    let vivo = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!vivo) return;
+        setPosicao({ lat: pos.coords.latitude, lng: pos.coords.longitude, em: Date.now() });
+        setPosicaoNegada(false);
+      },
+      (err) => {
+        if (!vivo) return;
+        // 1 = PERMISSION_DENIED. Só isso é "ela disse não"; o resto é técnico.
+        setPosicaoNegada(err?.code === 1);
+      },
+      /* Aqui pode esperar mais: ninguém está travado numa tela. 10s dá tempo do
+         aparelho responder até com sinal ruim, e o resultado fica guardado. */
+      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false },
+    );
+    return () => {
+      vivo = false;
+    };
+  }, []);
   /* "sent" não bastava. O botão dizia "✓ Aviso enviado" só porque o servidor
      respondeu, mesmo quando a lista de avisados voltava VAZIA — e o texto abaixo
      dizia, em letra menor, "ninguém foi avisado". O maior e mais vermelho
@@ -148,8 +185,16 @@ export function EmergencySheet({
     let lat: number | null = null;
     let lng: number | null = null;
     let address: string | null = null;
+    /* Se a leitura pré-aquecida ainda vale (5 min), ela é usada e NÃO pedimos de
+       novo — o pedido novo aconteceria com a página já em segundo plano por
+       causa da aba do WhatsApp, que é exatamente o que não funciona no iOS. */
+    const fresca = posicao && Date.now() - posicao.em < 5 * 60_000 ? posicao : null;
+    if (fresca) {
+      lat = fresca.lat;
+      lng = fresca.lng;
+    }
     try {
-      if (navigator?.geolocation) {
+      if (!fresca && navigator?.geolocation) {
         try {
           const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
             /* Três escolhas, e nenhuma é sobre "ser rápido por ser rápido":
@@ -391,16 +436,44 @@ export function EmergencySheet({
                 : "🆘 Pedir socorro agora"}
         </button>
         {panic === "idle" && (
-          <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
-            Avisa{" "}
-            {[
-              medNome ? medNome.split(" ").slice(0, 2).join(" ") : null,
-              info.emergencyContact ? info.emergencyContact.split(" ")[0] : null,
-            ]
-              .filter(Boolean)
-              .join(" e ") || "quem você cadastrou"}{" "}
-            com a sua localização, sem você precisar escrever nada.
-          </p>
+          <>
+            <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+              Avisa{" "}
+              {[
+                medNome ? medNome.split(" ").slice(0, 2).join(" ") : null,
+                info.emergencyContact ? info.emergencyContact.split(" ")[0] : null,
+              ]
+                .filter(Boolean)
+                .join(" e ") || "quem você cadastrou"}
+              {posicao ? " com a sua localização" : ""}, sem você precisar escrever nada.
+            </p>
+            {/* O estado da localização, ANTES da emergência.
+
+                A hora de descobrir que o aviso vai sair sem localização não é
+                depois de apertar — é agora, com calma, quando ainda dá para
+                liberar a permissão. */}
+            {posicao ? (
+              <p className="mt-1 text-center text-[11px] font-medium text-emerald-700">
+                📍 Localização pronta
+              </p>
+            ) : posicaoNegada ? (
+              <button
+                type="button"
+                onClick={() =>
+                  toast("Libere a localização nos ajustes do navegador e reabra esta tela.", {
+                    duration: 7000,
+                  })
+                }
+                className="mt-1 block w-full text-center text-[11px] font-medium text-amber-700 underline underline-offset-2"
+              >
+                📍 Sem permissão de localização — o aviso vai sem ela
+              </button>
+            ) : (
+              <p className="mt-1 text-center text-[11px] text-muted-foreground">
+                📍 Buscando sua localização…
+              </p>
+            )}
+          </>
         )}
 
         {/* O que REALMENTE saiu. A tela nunca diz "enviado" no genérico: quem
