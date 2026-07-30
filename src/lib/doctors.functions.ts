@@ -39,6 +39,10 @@ export type DoctorProfile = {
   languages?: string | null;
   approach?: string | null;
   consultation_price_brl?: number | null;
+  /* Moeda e centavos: `consultation_price_brl` traz a moeda no NOME e guarda
+     unidades inteiras. As duas convivem até a última leitura migrar. */
+  consultation_currency?: string | null;
+  consultation_price_cents?: number | null;
   offers_telehealth?: boolean | null;
   personal_phone?: string | null;
   accepts_insurance?: boolean | null;
@@ -49,7 +53,7 @@ export type DoctorProfile = {
 
 /** Colunas do perfil lidas em todas as consultas de médico. */
 const RICH_COLS =
-  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,offers_telehealth,personal_phone,accepts_insurance,accepts_private";
+  "instagram,rqe,education,hospitals,insurances,languages,approach,consultation_price_brl,consultation_currency,consultation_price_cents,offers_telehealth,personal_phone,accepts_insurance,accepts_private";
 const BASE_COLS =
   "id,display_name,title,specialty,crm,whatsapp,pix_key,slug,plan,plan_expires_at,verified,active,bio,subspecialty,years_experience,has_masters,has_doctorate,city,state,accepting_patients";
 const DOCTOR_COLS = `${BASE_COLS},${RICH_COLS}`;
@@ -109,6 +113,13 @@ const ProfileSchema = z.object({
   languages: z.string().max(200).optional(),
   approach: z.string().max(1500).optional(),
   consultation_price_brl: z.number().int().min(0).max(100000).nullable().optional(),
+  /* Moeda escolhida, não deduzida do nome da coluna: um médico que atende
+     brasileiras fora do país cobra em dólar ou euro, e "450" sem moeda é lido
+     errado por um fator de cinco. Lista fechada — moeda é enum, não texto. */
+  consultation_currency: z.enum(["BRL", "USD", "EUR"]).optional(),
+  /* Centavos em inteiro: ponto flutuante para dinheiro erra. Teto de 10 milhões
+     de centavos (100 mil na moeda) pelo mesmo motivo do campo acima. */
+  consultation_price_cents: z.number().int().min(0).max(10_000_000).nullable().optional(),
   offers_telehealth: z.boolean().optional(),
   /* Telefone PESSOAL — nunca mostrado à paciente. Existe porque `whatsapp` é
      o número DAS PACIENTES (o que o SOS disca), e um médico tem dois. Sem a
@@ -510,6 +521,10 @@ export type DirectoryDoctor = {
   languages?: string | null;
   approach?: string | null;
   consultation_price_brl?: number | null;
+  /** Moeda do valor. O card formata com ela, nunca com "R$" fixo. */
+  consultation_currency?: string | null;
+  /** Valor em centavos — fonte de verdade do preço. */
+  consultation_price_cents?: number | null;
   offers_telehealth?: boolean | null;
   /* Como ele atende. Dois booleanos e não um enum porque há quem faça os dois
      — e porque `insurances` em branco antes era ambíguo entre "só particular"
@@ -791,6 +806,8 @@ function toDirectoryDoctor(d: any): DirectoryDoctor {
     languages: d.languages ?? null,
     approach: d.approach ?? null,
     consultation_price_brl: d.consultation_price_brl ?? null,
+    consultation_currency: d.consultation_currency ?? "BRL",
+    consultation_price_cents: d.consultation_price_cents ?? null,
     offers_telehealth: d.offers_telehealth ?? null,
     accepts_insurance: d.accepts_insurance ?? null,
     accepts_private: d.accepts_private ?? null,

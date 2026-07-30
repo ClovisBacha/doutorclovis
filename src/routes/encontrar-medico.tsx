@@ -8,6 +8,7 @@ import {
   type DirectoryDoctor,
 } from "@/lib/doctors.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { formatarDinheiro } from "@/lib/dinheiro";
 import { DoctorBadge } from "@/components/doctor-badge";
 import { InviteDoctorCTA } from "@/components/invite-doctor-cta";
 
@@ -407,9 +408,17 @@ function EncontrarMedicoPage() {
                           💻 Teleconsulta
                         </span>
                       ) : null}
-                      {d.consultation_price_brl ? (
+                      {/* Formatado com a MOEDA do médico. "R$" fixo no código
+                          mostrava US$ 250 como "R$ 250" — erro de leitura por um
+                          fator de cinco. `?? brl*100` cobre quem cadastrou antes
+                          da coluna de centavos existir. */}
+                      {(d.consultation_price_cents ?? d.consultation_price_brl) ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">
-                          💰 R$ {d.consultation_price_brl}
+                          💰{" "}
+                          {formatarDinheiro(
+                            d.consultation_price_cents ?? (d.consultation_price_brl ?? 0) * 100,
+                            d.consultation_currency,
+                          )}
                         </span>
                       ) : null}
                     </div>

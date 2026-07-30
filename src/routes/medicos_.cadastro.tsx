@@ -5,6 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { registerDoctor, getMyDoctor } from "@/lib/doctors.functions";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
 import { pendenciasDoMedico } from "@/lib/doctor-required";
+import { CampoComOutro } from "@/components/campo-com-outro";
+import { CampoFormacoes } from "@/components/campo-formacoes";
+import { TITULOS_MEDICO, ESPECIALIDADES_MEDICO, montarFormacoes } from "@/lib/medico-opcoes";
+import {
+  MOEDAS,
+  centavosDe,
+  digitandoDinheiro,
+  formatarDinheiro,
+  unidadesInteirasDe,
+  type MoedaChave,
+} from "@/lib/dinheiro";
 import { INTENCAO_MEDICO } from "@/lib/intencao-medico";
 import { GoogleButton, OrDivider } from "@/components/google-button";
 
@@ -50,8 +61,24 @@ function CadastroMedicoPage() {
     accepts_private: true,
     insurances: "",
     consultation_price_brl: null as number | null,
+    consultation_currency: "BRL" as MoedaChave,
+    consultation_price_cents: null as number | null,
     education: "",
+    /* Texto corrido do perfil. Separado das formações de propósito: é o que
+       aparece no card abaixo do nome, e misturar os dois faria a lista de
+       títulos virar parágrafo. */
+    bio: "",
   });
+
+  /* Formações por categoria. O estado é por CHAVE e vira uma coluna de texto só
+     na hora de enviar — as categorias existem para guiar a digitação, não para
+     virar esquema de banco. */
+  const [formacoes, setFormacoes] = useState<Record<string, string>>({});
+  /* Moeda e valor digitado. O valor vive como TEXTO formatado enquanto ele
+     digita e só vira centavos no envio: guardar número aqui faria o campo
+     reescrever "450," para "450" no meio da digitação. */
+  const [moeda, setMoeda] = useState<MoedaChave>("BRL");
+  const [valorTexto, setValorTexto] = useState("");
 
   /* As duas metades do CRM têm ESTADO PRÓPRIO, e isso é o conserto de um bug meu.
   
@@ -310,7 +337,17 @@ function CadastroMedicoPage() {
     /* O CRM é montado AQUI, a partir das duas metades — é o único ponto em que
        o formato canônico precisa existir. Validar e enviar usam o mesmo objeto,
        então não há como a tela aprovar uma coisa e o servidor receber outra. */
-    const paraEnviar = { ...profile, crm: crmCompleto };
+    const cents = centavosDe(valorTexto);
+    const paraEnviar = {
+      ...profile,
+      crm: crmCompleto,
+      education: montarFormacoes(formacoes),
+      consultation_currency: moeda,
+      consultation_price_cents: cents,
+      /* Espelho arredondado na coluna antiga: telas e cálculo de receita ainda a
+         leem. As duas convivem até a última leitura migrar. */
+      consultation_price_brl: unidadesInteirasDe(cents),
+    };
     const faltas = pendenciasDoMedico(paraEnviar, { temEndereco: true });
     if (faltas.length) {
       toast.error(`${faltas[0].rotulo}: ${faltas[0].porque}`);
@@ -636,23 +673,30 @@ function CadastroMedicoPage() {
                 encontrado numa emergência.
               </p>
             </div>
-            <div>
-              <label className={label}>Título</label>
-              <input
-                value={profile.title}
-                onChange={(e) => setProfile((p) => ({ ...p, title: e.target.value }))}
-                className={input}
-              />
-            </div>
-            <div>
-              <label className={label}>Especialidade / foco</label>
-              <input
-                value={profile.specialty}
-                onChange={(e) => setProfile((p) => ({ ...p, specialty: e.target.value }))}
-                placeholder="Gestação de alto risco"
-                className={input}
-              />
-            </div>
+            {/* Lista + "Outro" no lugar de campo livre. Em campo livre o mesmo
+                profissional escreve "Gineco e Obstetra", "GO" e
+                "Ginecologista/Obstetra" — a busca por "obstetra" acha um e perde
+                os outros, e dois médicos iguais parecem diferentes no card. */}
+            <CampoComOutro
+              label="Título"
+              opcoes={TITULOS_MEDICO}
+              valor={profile.title}
+              onChange={(v) => setProfile((p) => ({ ...p, title: v }))}
+              placeholderOutro="Ex.: Especialista em Endometriose"
+              ajuda="Aparece embaixo do seu nome, no card e na carteirinha."
+              classeInput={input}
+              classeLabel={label}
+            />
+            <CampoComOutro
+              label="Especialidade / foco"
+              opcoes={ESPECIALIDADES_MEDICO}
+              valor={profile.specialty}
+              onChange={(v) => setProfile((p) => ({ ...p, specialty: v }))}
+              placeholderOutro="Ex.: Gestação gemelar"
+              ajuda="É por aqui que a paciente te encontra na busca — ela procura pelo problema dela, não pelo nome da especialidade."
+              classeInput={input}
+              classeLabel={label}
+            />
             {/* Como ele atende — a primeira pergunta que a paciente faz. Dois
                 checkboxes e não um seletor porque há quem faça os dois. */}
             <div>
@@ -691,42 +735,58 @@ function CadastroMedicoPage() {
               )}
               {profile.accepts_private && (
                 <div className="mt-2">
-                  <input
-                    type="number"
-                    min={0}
-                    value={profile.consultation_price_brl ?? ""}
-                    onChange={(e) =>
-                      setProfile((p) => ({
-                        ...p,
-                        consultation_price_brl:
-                          e.target.value === "" ? null : Number(e.target.value),
-                      }))
-                    }
-                    placeholder="Valor da consulta em reais — ex.: 450"
-                    className={input}
-                  />
+                  {/* Moeda ANTES do valor, e o valor formatado enquanto digita.
+                      A moeda decide a pontuação: real e euro usam vírgula
+                      decimal, dólar usa ponto — formatar tudo como real daria
+                      "US$ 1.250,00", que não existe. */}
+                  <div className="grid grid-cols-[132px_1fr] gap-2">
+                    <select
+                      value={moeda}
+                      onChange={(e) => {
+                        const nova = e.target.value as MoedaChave;
+                        setMoeda(nova);
+                        // Reformata o que já está digitado na pontuação da nova.
+                        setValorTexto((t) => digitandoDinheiro(t, nova));
+                      }}
+                      className={`${input} mt-0`}
+                      aria-label="Moeda da consulta"
+                    >
+                      {MOEDAS.map((m) => (
+                        <option key={m.chave} value={m.chave}>
+                          {m.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={valorTexto}
+                      onChange={(e) => setValorTexto(digitandoDinheiro(e.target.value, moeda))}
+                      placeholder="450,00"
+                      inputMode="numeric"
+                      className={`${input} mt-0`}
+                      aria-label="Valor da consulta"
+                    />
+                  </div>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    A paciente vê esse valor antes de pedir consulta. Dá para mudar quando quiser.
+                    {centavosDe(valorTexto)
+                      ? `A paciente vê ${formatarDinheiro(centavosDe(valorTexto), moeda)} antes de pedir consulta.`
+                      : "A paciente vê esse valor antes de pedir consulta. Dá para mudar quando quiser."}
                   </p>
                 </div>
               )}
             </div>
-            {/* Formações: é o que decide entre dois nomes que ela não conhece. */}
-            <div>
-              <label className={label}>Formações e títulos *</label>
-              <textarea
-                value={profile.education}
-                onChange={(e) => setProfile((p) => ({ ...p, education: e.target.value }))}
-                rows={3}
-                placeholder={
-                  "Medicina — UFMG\nResidência em GO — Hospital das Clínicas\nMestrado em Medicina Fetal — USP"
-                }
-                className={input}
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Uma linha por item. É o que aparece no seu card quando a paciente compara médicos.
-              </p>
-            </div>
+            {/* Formações por CATEGORIA. O textarea "uma linha por item" ou fica
+                vazio (é trabalho em branco, sem pista do que entra) ou vem tudo
+                numa linha só, que a paciente lê como borrão e a busca não acha.
+                As categorias são andaime de digitação: o banco continua com uma
+                coluna de texto, uma linha por item. */}
+            <CampoFormacoes
+              valores={formacoes}
+              onChange={(chave, v) => setFormacoes((f) => ({ ...f, [chave]: v }))}
+              livre={profile.bio}
+              onChangeLivre={(v) => setProfile((p) => ({ ...p, bio: v }))}
+              classeInput={input}
+              classeLabel={label}
+            />
             <div>
               <label className={label}>Chave PIX (cobranças)</label>
               <input

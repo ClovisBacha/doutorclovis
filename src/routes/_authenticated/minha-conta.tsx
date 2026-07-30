@@ -23,6 +23,7 @@ import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
+import { formatarDinheiro } from "@/lib/dinheiro";
 import { DOCTOR } from "@/lib/doctor.config";
 import drPortrait from "@/assets/dr-clovis-portrait.jpg";
 import { ymdLocal } from "@/lib/utils";
@@ -17275,7 +17276,12 @@ function MédicoTab() {
                       {d.accepts_private && (
                         <span className="rounded-full bg-secondary px-1.5 py-0.5">
                           💰 Particular
-                          {d.consultation_price_brl ? ` · R$ ${d.consultation_price_brl}` : ""}
+                          {(d.consultation_price_cents ?? d.consultation_price_brl)
+                            ? ` · ${formatarDinheiro(
+                                d.consultation_price_cents ?? (d.consultation_price_brl ?? 0) * 100,
+                                d.consultation_currency,
+                              )}`
+                            : ""}
                         </span>
                       )}
                     </p>

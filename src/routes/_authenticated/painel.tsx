@@ -23,6 +23,14 @@ import {
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
 import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
+import {
+  MOEDAS,
+  centavosDe,
+  digitandoDinheiro,
+  formatarDinheiro,
+  unidadesInteirasDe,
+  type MoedaChave,
+} from "@/lib/dinheiro";
 import { pendenciasDoMedico, type Pendencia } from "@/lib/doctor-required";
 import {
   listMyAddresses,
@@ -7072,6 +7080,10 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
      pelos handlers abaixo — é dela que a carteirinha e o aviso do SOS vivem. */
   const [crmUf, setCrmUf] = useState("");
   const [crmNum, setCrmNum] = useState("");
+  /* Moeda e valor, pelo mesmo motivo do CRM: o texto formatado é o estado da
+     tela, e os centavos só existem na hora de salvar. */
+  const [moeda, setMoeda] = useState<MoedaChave>("BRL");
+  const [valorTexto, setValorTexto] = useState("");
   const [form, setForm] = useState({
     display_name: "",
     title: "",
@@ -7155,6 +7167,11 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             const partes = separarCrm(d.crm);
             setCrmUf(partes.uf);
             setCrmNum(partes.numero);
+            setMoeda(((d.consultation_currency as MoedaChave) ?? "BRL") || "BRL");
+            /* Cai na coluna antiga (unidades inteiras) para quem cadastrou o
+               preço antes de a coluna de centavos existir. */
+            const cents = d.consultation_price_cents ?? (d.consultation_price_brl ?? 0) * 100;
+            setValorTexto(cents ? digitandoDinheiro(String(cents), d.consultation_currency) : "");
           }
         }
       } finally {
@@ -7182,7 +7199,10 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
        salvar o perfil" sem dizer o quê. Quem cai aqui é o gestor de clínica
        (admitido sem linha em `doctors`) e o médico cujo perfil não carregou. */
     if (!exists) {
-      const faltas = pendenciasDoMedico(form, { temEndereco: true });
+      const faltas = pendenciasDoMedico(
+        { ...form, consultation_price_brl: unidadesInteirasDe(centavosDe(valorTexto)) },
+        { temEndereco: true },
+      );
       if (faltas.length) {
         toast.error(`${faltas[0].rotulo}: ${faltas[0].porque}`);
         return;
@@ -7204,15 +7224,25 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     setSaving(true);
     try {
       const tk = await tokenFn();
+      /* O dinheiro é montado aqui, num lugar só: centavos como fonte de verdade
+         e a coluna antiga como espelho arredondado, para as telas e o cálculo de
+         receita que ainda a leem. */
+      const cents = centavosDe(valorTexto);
+      const perfil = {
+        ...form,
+        consultation_currency: moeda,
+        consultation_price_cents: cents,
+        consultation_price_brl: unidadesInteirasDe(cents),
+      };
       // Equipe da instalação pode ainda não ter linha em doctors: cria na hora
       if (exists) {
-        const res = await updateMyDoctor({ data: { accessToken: tk, profile: form } });
+        const res = await updateMyDoctor({ data: { accessToken: tk, profile: perfil } });
         if (!res.ok) {
           toast.error("Não foi possível salvar o perfil.");
           return;
         }
       } else {
-        const res = await registerDoctor({ data: { accessToken: tk, profile: form } });
+        const res = await registerDoctor({ data: { accessToken: tk, profile: perfil } });
         if (!res.ok || !res.doctor) {
           // O servidor diz POR QUE recusou; descartar isso é o que fazia o
           // botão parecer quebrado.
@@ -7595,20 +7625,40 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               />
             </div>
             <div>
-              <label className={label}>Consulta particular (R$, opcional)</label>
-              <input
-                type="number"
-                min={0}
-                value={form.consultation_price_brl ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    consultation_price_brl: e.target.value === "" ? null : Number(e.target.value),
-                  }))
-                }
-                placeholder="Ex: 450"
-                className={input}
-              />
+              <label className={label}>Consulta particular (opcional)</label>
+              {/* Moeda antes do valor, igual ao cadastro: o mesmo campo nos dois
+                  lugares, senão ele edita num e o outro contradiz. */}
+              <div className="mt-1 grid grid-cols-[132px_1fr] gap-2">
+                <select
+                  value={moeda}
+                  onChange={(e) => {
+                    const nova = e.target.value as MoedaChave;
+                    setMoeda(nova);
+                    setValorTexto((t) => digitandoDinheiro(t, nova));
+                  }}
+                  className={`${input} mt-0`}
+                  aria-label="Moeda da consulta"
+                >
+                  {MOEDAS.map((m) => (
+                    <option key={m.chave} value={m.chave}>
+                      {m.rotulo}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={valorTexto}
+                  onChange={(e) => setValorTexto(digitandoDinheiro(e.target.value, moeda))}
+                  placeholder="450,00"
+                  inputMode="numeric"
+                  className={`${input} mt-0`}
+                  aria-label="Valor da consulta"
+                />
+              </div>
+              {centavosDe(valorTexto) ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  A paciente vê {formatarDinheiro(centavosDe(valorTexto), moeda)}.
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-4 text-sm">
