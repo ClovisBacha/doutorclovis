@@ -11,6 +11,7 @@
  * atendido, e essa marca é o que registra o desfecho — não a leitura.
  */
 
+import { useEffect, useRef } from "react";
 import { formataTelefone, linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { AcionamentoSos } from "@/lib/acionamentos.functions";
 
@@ -27,13 +28,30 @@ export function AlertaSosMedico({
   onAtender,
   onFechar,
   atendendo,
+  restantes,
 }: {
   acionamento: AcionamentoSos;
   onAtender: () => void;
   /** Fechar SEM atender: ele volta a aparecer. Emergência não se dispensa. */
   onFechar: () => void;
   atendendo: boolean;
+  /** Quantos outros aguardam atrás deste — o médico merece saber onde está. */
+  restantes?: number;
 }) {
+  const caixa = useRef<HTMLDivElement>(null);
+
+  /* Esc adia (não dispensa), e o foco entra na caixa.
+     Sem isto, quem usa teclado ou leitor de tela ficava preso atrás de um
+     overlay que não se anunciava e do qual não havia saída. */
+  useEffect(() => {
+    caixa.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onFechar();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onFechar]);
+
   const f = (acionamento.ficha ?? {}) as Record<string, string | null>;
   const telPaciente = f.telefone ?? null;
   const mapa =
@@ -51,12 +69,19 @@ export function AlertaSosMedico({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
-      <div className="flex max-h-[92svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-2xl">
+      <div
+        ref={caixa}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sos-titulo"
+        className="flex max-h-[92svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-2xl outline-none"
+      >
         {/* Faixa vermelha: a tela inteira tem que dizer "emergência" antes de
             qualquer palavra ser lida. */}
         <div className="shrink-0 bg-rose-600 px-6 py-4 text-white">
           <p className="text-xs font-bold uppercase tracking-[0.2em]">Emergência</p>
-          <h2 className="mt-0.5 font-serif text-2xl">
+          <h2 id="sos-titulo" className="mt-0.5 font-serif text-2xl">
             {acionamento.paciente || "Uma paciente sua"}
           </h2>
           <p className="mt-0.5 text-sm text-white/85">
@@ -158,6 +183,16 @@ export function AlertaSosMedico({
           >
             Ver depois — o aviso continua aqui
           </button>
+          {restantes != null && restantes > 0 && (
+            /* Sem este contador, o médico que nunca clicou em "Já atendi" (e
+               ninguém clica: numa emergência a pessoa LIGA) levava uma cascata
+               de modais a cada carregamento do painel, sem saber quantos
+               faltavam nem por que continuavam vindo. */
+            <p className="mt-2 text-center text-[11px] text-muted-foreground">
+              Mais {restantes} {restantes === 1 ? "acionamento" : "acionamentos"} sem desfecho
+              registrado. Marque como atendidos para parar de vê-los.
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -38,6 +38,17 @@ export function moedaDe(chave?: string | null) {
 }
 
 /**
+ * A moeda é conhecida? Moeda desconhecida cai em real no `moedaDe` acima, e o
+ * fallback é seguro para DESENHAR (melhor um símbolo que nenhum) e perigoso
+ * para AFIRMAR: `formatarDinheiro(30000, "GBP")` imprime "R$ 300,00", que é
+ * exatamente o erro de fator que o cabeçalho deste arquivo existe para evitar.
+ * Quem vai usar o número numa conta pergunta aqui primeiro.
+ */
+export function moedaConhecida(chave?: string | null): boolean {
+  return MOEDAS.some((m) => m.chave === chave);
+}
+
+/**
  * Formata centavos para leitura: `45000, "BRL"` → `"R$ 450,00"`.
  *
  * Usado na tela do médico e no card que a paciente vê — o mesmo formatador nos

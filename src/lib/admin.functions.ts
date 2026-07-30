@@ -116,6 +116,12 @@ export type PatientEngagement = {
   isActive: boolean;
   lastActivityAt: string | null;
   hasUnseenForm: boolean;
+  /**
+   * Quando a conta dela nasceu. Sem isto, "nenhum registro na janela" era
+   * indistinguível entre a paciente que sumiu e a que se cadastrou ontem — e a
+   * segunda entrava na lista de sumidas no dia seguinte ao cadastro.
+   */
+  createdAt?: string | null;
 };
 
 export type AdminPreConsulta = {
@@ -595,50 +601,110 @@ export const getEngagementData = createServerFn({ method: "POST" })
     const sb = supabaseAdmin as any;
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    /* JANELA DA ÚLTIMA ATIVIDADE — 45 dias, e não 7.
 
-    const [profiles, healthLogs, journals, kicks, qs, forms] = await Promise.all([
-      scopedBy(
-        sb
-          .from("patient_profiles")
-          .select(
-            "id,display_name,baby_name,lmp_date,reference_date,reference_weeks,reference_days,doctor_id",
-          ),
-        scope,
-      ),
-      supabaseAdmin
-        .from("health_logs")
-        .select("user_id,created_at")
-        .gte("created_at", sevenDaysAgo),
-      supabaseAdmin
-        .from("journal_entries")
-        .select("user_id,created_at")
-        .gte("created_at", sevenDaysAgo),
-      supabaseAdmin
-        .from("kick_sessions")
-        .select("user_id,started_at")
-        .gte("started_at", sevenDaysAgo),
-      supabaseAdmin
-        .from("doctor_questions")
-        .select("user_id,created_at")
-        .gte("created_at", sevenDaysAgo),
-      scopedBy(
-        sb
-          .from("preconsulta_forms")
-          .select("user_id,submitted_at,seen_by_doctor")
-          .order("submitted_at", { ascending: false }),
-        scope,
-      ),
-    ]);
+       Enquanto todas as consultas de atividade usavam a mesma janela de 7 dias,
+       `lastActivityAt` só podia ser nulo ou de menos de uma semana atrás. Ou
+       seja: a paciente que registrou algo há 8 dias vinha nula, e a tela dizia
+       "Nunca registrou nada no app" sobre alguém que usa o app há meses — e os
+       cortes de 14 e 30 dias do sinal de silêncio nunca podiam ser atingidos.
+
+       45 dias cobre com folga o corte mais longo (30). Fora da janela não
+       viramos "nunca": viramos "há mais de 45 dias", que é o que de fato
+       sabemos. */
+    const JANELA_ATIVIDADE_DIAS = 45;
+    const inicioJanela = new Date(
+      Date.now() - JANELA_ATIVIDADE_DIAS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const [profiles, healthLogs, journals, kicks, qs, forms, contracoes, exames, panicos] =
+      await Promise.all([
+        scopedBy(
+          sb
+            .from("patient_profiles")
+            .select(
+              "id,display_name,baby_name,lmp_date,reference_date,reference_weeks,reference_days,doctor_id,created_at",
+            ),
+          scope,
+        ),
+        /* `order` decrescente em todas: o teto de linhas do PostgREST (1000)
+           corta o FIM da lista. Sem ordenar, o que sobrevive é arbitrário e uma
+           paciente ativa pode aparecer como sumida; ordenando do mais novo para
+           o mais velho, o que sobrevive é justamente o que interessa aqui. */
+        supabaseAdmin
+          .from("health_logs")
+          .select("user_id,created_at")
+          .gte("created_at", inicioJanela)
+          .order("created_at", { ascending: false }),
+        supabaseAdmin
+          .from("journal_entries")
+          .select("user_id,created_at")
+          .gte("created_at", inicioJanela)
+          .order("created_at", { ascending: false }),
+        supabaseAdmin
+          .from("kick_sessions")
+          .select("user_id,started_at")
+          .gte("started_at", inicioJanela)
+          .order("started_at", { ascending: false }),
+        supabaseAdmin
+          .from("doctor_questions")
+          .select("user_id,created_at")
+          .gte("created_at", inicioJanela)
+          .order("created_at", { ascending: false }),
+        scopedBy(
+          sb
+            .from("preconsulta_forms")
+            .select("user_id,submitted_at,seen_by_doctor")
+            .order("submitted_at", { ascending: false }),
+          scope,
+        ),
+        /* As três abaixo faltavam, e a falta doía justamente em quem mais usa o
+           app: cronometrar contração, subir exame e acionar o SOS não contavam
+           como sinal de vida. Uma gestante de 38 semanas contando contrações
+           todo dia aparecia na lista de "sumidas". Tabelas que ainda não
+           existem no banco devolvem erro e `data` indefinida — o `?.forEach`
+           abaixo ignora, então a migração pendente não quebra a tela. */
+        supabaseAdmin
+          .from("contraction_logs")
+          .select("user_id,created_at")
+          .gte("created_at", inicioJanela)
+          .order("created_at", { ascending: false }),
+        supabaseAdmin
+          .from("exam_files")
+          .select("user_id,created_at")
+          .gte("created_at", inicioJanela)
+          .order("created_at", { ascending: false }),
+        supabaseAdmin
+          .from("panic_events")
+          .select("user_id,created_at")
+          .gte("created_at", inicioJanela)
+          .order("created_at", { ascending: false }),
+      ]);
 
     // Map userId → most recent activity timestamp
     const activityMap = new Map<string, string>();
     const record = (uid: string, ts: string) => {
+      if (!uid || !ts) return;
       const prev = activityMap.get(uid);
       if (!prev || ts > prev) activityMap.set(uid, ts);
     };
     healthLogs.data?.forEach((r) => record(r.user_id, r.created_at));
     journals.data?.forEach((r) => record(r.user_id, r.created_at));
     kicks.data?.forEach((r) => record(r.user_id, r.started_at));
+    (contracoes.data as { user_id: string; created_at: string }[] | null)?.forEach((r) =>
+      record(r.user_id, r.created_at),
+    );
+    (exames.data as { user_id: string; created_at: string }[] | null)?.forEach((r) =>
+      record(r.user_id, r.created_at),
+    );
+    (panicos.data as { user_id: string; created_at: string }[] | null)?.forEach((r) =>
+      record(r.user_id, r.created_at),
+    );
+    /* Pré-consulta enviada também é sinal de vida — a lista já vinha carregada
+       para outro fim e nunca era registrada como atividade. */
+    (forms.data as { user_id: string; submitted_at: string | null }[] | null)?.forEach((r) => {
+      if (r.submitted_at) record(r.user_id, r.submitted_at);
+    });
     qs.data?.forEach((r) => record(r.user_id, r.created_at));
 
     const unseenByUser = new Set<string>(
@@ -655,6 +721,7 @@ export const getEngagementData = createServerFn({ method: "POST" })
       reference_date: string | null;
       reference_weeks: number | null;
       reference_days: number | null;
+      created_at?: string | null;
     };
     const patients: PatientEngagement[] = ((profiles.data ?? []) as EngProfile[]).map((p) => {
       const lastAt = activityMap.get(p.id) ?? null;
@@ -670,6 +737,7 @@ export const getEngagementData = createServerFn({ method: "POST" })
         isActive,
         lastActivityAt: lastAt,
         hasUnseenForm: unseenByUser.has(p.id),
+        createdAt: p.created_at ?? null,
       };
     });
 
@@ -680,6 +748,11 @@ export const getEngagementData = createServerFn({ method: "POST" })
       activeLastWeek: patients.filter((p) => p.isActive).length,
       inactiveLastWeek: patients.filter((p) => !p.isActive).length,
       unseenPreConsultas: unseenByUser.size,
+      /* A tela precisa saber ATÉ ONDE olhamos. Sem isso ela não tem como
+         distinguir "não registrou nada" de "não registrou nada que a gente
+         tenha ido buscar" — e foi essa confusão que fez o painel afirmar
+         "nunca registrou nada no app" sobre paciente antiga. */
+      janelaAtividadeDias: JANELA_ATIVIDADE_DIAS,
     };
   });
 

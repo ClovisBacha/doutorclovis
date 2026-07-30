@@ -34,6 +34,22 @@ export type Sinal = {
  */
 export function sinalPressao(sistolica?: number | null, diastolica?: number | null): Sinal | null {
   if (sistolica == null || diastolica == null) return null;
+  /* IMPLAUSÍVEL ≠ NORMAL. Sem esta guarda, "0/0" — que chega ao banco porque o
+     formulário testa `if (form.systolic)` e a string "0" é truthy — passava
+     pelos dois `if` abaixo e saía como `normal`, sem etiqueta, ocupando na
+     ficha o lugar da última medida de verdade. Um número que não pode existir
+     tem que dizer que não pode existir. */
+  if (!Number.isFinite(sistolica) || !Number.isFinite(diastolica)) return null;
+  if (sistolica < 50 || sistolica > 300 || diastolica < 20 || diastolica > 200) {
+    return { gravidade: "atencao", nota: "Valor de pressão implausível" };
+  }
+  /* Campos trocados. 80/120 batia em `120 >= 110` e virava "faixa grave": um
+     alarme de crise hipertensiva em cima de uma pressão perfeitamente normal
+     digitada nos campos invertidos. Alarme falso repetido é o que faz o médico
+     aprender a ignorar a cor. */
+  if (sistolica <= diastolica) {
+    return { gravidade: "atencao", nota: "Sistólica e diastólica parecem invertidas" };
+  }
   if (sistolica >= 160 || diastolica >= 110) {
     return { gravidade: "grave", nota: "Pressão em faixa grave" };
   }
@@ -55,10 +71,24 @@ export function sinalPressao(sistolica?: number | null, diastolica?: number | nu
  * aprende a ignorar a cor.
  */
 export function sinalGlicemia(valor?: number | null): Sinal | null {
-  if (valor == null) return null;
+  if (valor == null || !Number.isFinite(valor)) return null;
+  /* Abaixo de 20 mg/dL ninguém está consciente para digitar o número. O caso
+     real é o glicosímetro em mmol/L: 10,0 mmol (= 180 mg/dL, GRAVE) vira 10 na
+     coluna inteira e saía rotulado "Glicemia baixa" — o alerta exatamente
+     oposto ao correto. Aqui a gente admite que não sabe. */
+  if (valor > 0 && valor < 20) {
+    return { gravidade: "atencao", nota: "Valor implausível — confira a unidade (mg/dL)" };
+  }
+  if (valor <= 0 || valor > 900) {
+    return { gravidade: "atencao", nota: "Valor de glicemia implausível" };
+  }
+  /* Hipoglicemia grave vem ANTES do teto alto: 25 mg/dL é neuroglicopenia,
+     emergência imediata, e ordenava abaixo de uma glicemia de 185 porque a
+     escala estava ancorada no número e não na urgência. */
+  if (valor < 50) return { gravidade: "grave", nota: "Glicemia muito baixa" };
   if (valor >= 180) return { gravidade: "grave", nota: "Glicemia alta" };
   if (valor >= 140) return { gravidade: "atencao", nota: "Glicemia acima do alvo" };
-  if (valor > 0 && valor < 60) return { gravidade: "atencao", nota: "Glicemia baixa" };
+  if (valor < 60) return { gravidade: "atencao", nota: "Glicemia baixa" };
   return { gravidade: "normal", nota: "" };
 }
 
@@ -69,14 +99,42 @@ export function sinalGlicemia(valor?: number | null): Sinal | null {
  * gestante engajada some sem um motivo trivial; um mês já é alguém que
  * praticamente abandonou o app — e vale saber antes de a consulta chegar.
  */
-export function sinalSilencio(ultimaAtividade?: string | null): Sinal | null {
+export function sinalSilencio(
+  ultimaAtividade?: string | null,
+  /**
+   * Até onde o servidor foi buscar atividade. Sem registro DENTRO da janela não
+   * é "nunca registrou": é "não registrou nos últimos N dias", e essa é a única
+   * frase que a gente pode assinar. Dizer "nunca" sobre uma paciente que usa o
+   * app há meses é a tela mentindo com cara de dado.
+   */
+  janelaDias = 45,
+): Sinal | null {
   if (!ultimaAtividade) {
-    return { gravidade: "atencao", nota: "Nunca registrou nada no app" };
+    /* "há mais de N dias" afirmaria que ela existia há N dias. O que a gente
+       de fato sabe é que não houve registro DENTRO da janela — e isso vale
+       tanto para quem sumiu quanto para quem se cadastrou ontem. Quem chama
+       filtra as recém-chegadas antes; a frase, sozinha, é verdadeira nos dois
+       casos. */
+    return { gravidade: "grave", nota: `Nenhum registro nos últimos ${janelaDias} dias` };
   }
-  const dias = Math.floor((Date.now() - new Date(ultimaAtividade).getTime()) / 86400000);
+  const t = new Date(ultimaAtividade).getTime();
+  /* Data corrompida some da lista se cair no ramo "normal", e é o contrário do
+     que uma lista de "quem sumiu" deve fazer. Sem data legível, ela aparece. */
+  if (!Number.isFinite(t)) {
+    return { gravidade: "atencao", nota: "Sem data de último registro" };
+  }
+  const dias = Math.floor((Date.now() - t) / 86400000);
   if (dias >= 30) return { gravidade: "grave", nota: `Sem registro há ${dias} dias` };
   if (dias >= 14) return { gravidade: "atencao", nota: `Sem registro há ${dias} dias` };
   return { gravidade: "normal", nota: "" };
+}
+
+/** Quantos dias de silêncio — para desempatar a ordem dentro da mesma cor. */
+export function diasDeSilencio(ultimaAtividade?: string | null, janelaDias = 45): number {
+  if (!ultimaAtividade) return janelaDias + 1;
+  const t = new Date(ultimaAtividade).getTime();
+  if (!Number.isFinite(t)) return janelaDias + 1;
+  return Math.floor((Date.now() - t) / 86400000);
 }
 
 /** A pior gravidade de um conjunto — é ela que ordena a lista. */

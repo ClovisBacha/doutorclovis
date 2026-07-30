@@ -177,9 +177,22 @@ export const PLAN_PRICE: Record<string, number> = {
   black: 1499,
 };
 
-/** Mensalidade do plano em CENTAVOS. O sufixo `_annual` cai para o mensal. */
+/**
+ * Mensalidade do plano em CENTAVOS.
+ *
+ * Normaliza igual a `normalizePlan` — e isso não é preciosismo: enquanto esta
+ * função indexava o dicionário cru, um `doctors.plan` gravado como `"Pro"` ou
+ * `" pro"` dava entitlements de Pro e mensalidade ZERO, e a prova de valor
+ * sumia da tela de um assinante pagante. Duas normalizações diferentes para a
+ * mesma coluna, a vinte linhas de distância.
+ */
 export function mensalidadeCentavos(plan: string): number {
-  return (PLAN_PRICE[plan.replace(/_annual$/, "")] ?? 0) * 100;
+  const p = (plan ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/_annual$/, "");
+  const chave = /^(enterprise|equipe|clinic)$/.test(p) ? "clinica" : p;
+  return (PLAN_PRICE[chave] ?? 0) * 100;
 }
 
 export const PLAN_RANK: Record<PlanKey, number> = {

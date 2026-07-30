@@ -62,6 +62,10 @@ const ESTILO: Record<ItemFila["nivel"], { faixa: string; rotulo: string; texto: 
 function faz(iso: string | null): string {
   if (!iso) return "";
   const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  /* Data ilegível renderizava literalmente "Emergência · há NaN dias" — os
+     três `if` abaixo comparam contra NaN e todos dão false. Numa emergência,
+     essa linha é a única pista de tempo que ele tem. */
+  if (!Number.isFinite(min)) return "";
   if (min < 1) return "agora";
   if (min < 60) return `há ${min} min`;
   const h = Math.floor(min / 60);
@@ -70,19 +74,55 @@ function faz(iso: string | null): string {
   return `há ${d} ${d === 1 ? "dia" : "dias"}`;
 }
 
-export function FilaDeTrabalho({ itens }: { itens: ItemFila[] }) {
+function quando(iso: string | null): number {
+  if (!iso) return Number.MAX_SAFE_INTEGER;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : Number.MAX_SAFE_INTEGER;
+}
+
+export function FilaDeTrabalho({
+  itens,
+  /** Fontes que não puderam ser lidas — muda o que o estado vazio pode afirmar. */
+  fontesComFalha = [],
+}: {
+  itens: ItemFila[];
+  fontesComFalha?: string[];
+}) {
   const ordenada = [...itens].sort((a, b) => {
     const p = PESO[a.nivel] - PESO[b.nivel];
     if (p !== 0) return p;
     /* Dentro do mesmo nível, o MAIS ANTIGO primeiro. É o contrário da ordem
        natural de feed, e de propósito: quem esperou mais tempo é quem está mais
-       perto de desistir. */
-    return new Date(a.em ?? 0).getTime() - new Date(b.em ?? 0).getTime();
+       perto de desistir.
+
+       Sem data vai para o FIM, e não para o começo. Com `?? 0` o item ia parar
+       em 1970 e liderava o nível como "o mais antigo de todos" — a posição de
+       maior urgência — sendo o único da lista sem o rótulo de idade que
+       justificaria essa posição. */
+    return quando(a.em) - quando(b.em);
   });
 
   if (ordenada.length === 0) {
+    /* Fila vazia por FALHA não pode ser contada como boa notícia. Se uma das
+       fontes não respondeu, o que a gente sabe é "não consegui olhar", e é
+       isso que a tela diz — porque o médico que lê "nada esperando" fecha o
+       painel tranquilo, e do outro lado pode haver uma emergência não lida. */
+    if (fontesComFalha.length > 0) {
+      return (
+        <div className="mt-6 rounded-3xl border border-amber-300 bg-amber-50/60 p-6 text-center">
+          <p className="text-3xl">📡</p>
+          <p className="mt-2 font-serif text-lg text-foreground">
+            Não consegui conferir tudo agora
+          </p>
+          <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+            Falhou a leitura de: {fontesComFalha.join(", ")}. Pode ser conexão — atualize a página
+            antes de considerar a fila vazia.
+          </p>
+        </div>
+      );
+    }
     return (
-      <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50/60 p-6 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
+      <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50/60 p-6 text-center">
         <p className="text-3xl">☕</p>
         <p className="mt-2 font-serif text-lg text-foreground">Nada esperando por você</p>
         <p className="mt-1 text-[13px] leading-snug text-muted-foreground">

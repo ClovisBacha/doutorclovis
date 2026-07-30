@@ -263,7 +263,7 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
       topThemes: [] as { theme: string; count: number }[],
     };
     const questions = await safe(async () => {
-      const [pendingRes, answeredRes, recentRes, textsRes] = await Promise.all([
+      const [pendingRes, answeredRes, recentRes, textsRes, answeredMonthRes] = await Promise.all([
         scoped(
           sb
             .from("doctor_questions")
@@ -291,10 +291,29 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
             .order("created_at", { ascending: false })
             .limit(500),
         ),
+        /* RESPONDIDAS NESTE MÊS.
+
+           `answered` acima não tem janela nenhuma — é o total histórico. Um
+           médico de catorze meses de casa carregava 380 ali, e o card "Valor
+           gerado ESTE MÊS" somava as 380 no dia 2. Pior: como o contador nunca
+           desce, quem parou de usar continuava vendo o mês cheio para sempre —
+           justamente quem está prestes a cancelar.
+
+           `answered_at` pode não existir em banco não migrado: nesse caso a
+           consulta falha, `count` fica nulo e a tela cai para zero, que é o
+           erro na direção honesta (não inventa mês). */
+        scoped(
+          sb
+            .from("doctor_questions")
+            .select("*", { count: "exact", head: true })
+            .eq("answered", true)
+            .gte("answered_at", monthStart),
+        ),
       ]);
       return {
         pending: (pendingRes.count ?? 0) as number,
         answered: (answeredRes.count ?? 0) as number,
+        answeredThisMonth: (answeredMonthRes?.count ?? 0) as number,
         recentPending: (recentRes.data ?? []) as {
           id: string;
           question: string;

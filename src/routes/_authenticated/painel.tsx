@@ -40,6 +40,7 @@ import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
 import {
   ESTILO_SINAL,
   PESO_SINAL,
+  diasDeSilencio,
   sinalGlicemia,
   sinalPressao,
   sinalSilencio,
@@ -282,6 +283,15 @@ function PainelPage() {
   /* Adiados nesta sessão: some da tela agora e volta na próxima visita. */
   const [sosAdiados, setSosAdiados] = useState<Set<string>>(new Set());
 
+  /**
+   * Quais fontes da fila falharam ao carregar.
+   *
+   * "☕ Nada esperando por você" é uma boa notícia, e uma boa notícia que na
+   * verdade é uma falha de rede é a pior coisa que este painel pode dizer: o
+   * médico fecha a tela tranquilo com uma emergência não lida do outro lado.
+   */
+  const [fonteFalhou, setFonteFalhou] = useState({ sos: false, vinculos: false });
+
   /* Vigia de SOS. Roda em paralelo ao resto e nunca derruba o painel: um erro
      aqui custa o aviso, não o consultório. */
   useEffect(() => {
@@ -292,9 +302,13 @@ function PainelPage() {
         const r = await listarAcionamentos({
           data: { accessToken: tk, apenasPendentes: true, limite: 20 },
         });
-        if (vivo && r.ok) setSosPendentes(r.acionamentos);
+        if (!vivo) return;
+        if (r.ok) {
+          setSosPendentes(r.acionamentos);
+          setFonteFalhou((f) => ({ ...f, sos: false }));
+        } else setFonteFalhou((f) => ({ ...f, sos: true }));
       } catch {
-        /* sem aviso desta vez */
+        if (vivo) setFonteFalhou((f) => ({ ...f, sos: true }));
       }
     }
     void olhar();
@@ -304,6 +318,27 @@ function PainelPage() {
       clearInterval(t);
     };
   }, []);
+
+  /* A fila envelhece sozinha se ninguém a atualizar.
+     Só o SOS tinha vigia; perguntas, pedidos de consulta e vínculos ficavam
+     congelados no instante do carregamento. Um painel deixado aberto — que é
+     justamente como se usa uma fila de trabalho — dizia "nada esperando" por
+     horas enquanto chegava coisa. Pior: o poll de SOS trocava o array a cada
+     minuto, então a tela PARECIA viva com o dado morto.
+
+     Três minutos, e só com a aba à vista: atualizar em segundo plano gasta
+     bateria e cota de banco para ninguém ver. */
+  useEffect(() => {
+    if (!allowed) return;
+    const t = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      load();
+      loadPedidosVinculo();
+      loadPreForms().catch(() => {});
+    }, 180_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowed]);
 
   /* Abre o modal sozinho no acionamento mais recente que ele ainda não adiou.
      Um aviso de emergência que espera um clique para aparecer não é aviso. */
@@ -322,6 +357,9 @@ function PainelPage() {
     inactiveLastWeek: number;
     unseenPreConsultas: number;
     patients: PatientEngagement[];
+    /** Até onde o servidor foi buscar atividade — a tela precisa para não
+        chamar de "nunca" o que é só "fora da janela". */
+    janelaAtividadeDias?: number;
   } | null>(null);
 
   async function load() {
@@ -362,20 +400,7 @@ function PainelPage() {
         /* Solicitações de vínculo, para o resumo do topo poder contá-las.
            Best-effort: uma falha aqui não pode derrubar o painel inteiro — o
            médico perde o aviso, não o consultório. */
-        try {
-          const { listPatientRequests } = await import("@/lib/patientlink.functions");
-          const pr = await listPatientRequests({ data: { accessToken: tk } });
-          if (pr.ok)
-            setPedidosVinculo(
-              pr.requests.map((r) => ({
-                id: r.id,
-                patient_name: r.patient_name,
-                created_at: r.created_at,
-              })),
-            );
-        } catch {
-          /* sem o aviso; a aba Pacientes continua mostrando */
-        }
+        await loadPedidosVinculo();
         return;
       }
       // Fallback (getAdminData negou): médico assinante inativo/sem linha ativa?
@@ -424,6 +449,37 @@ function PainelPage() {
     }
   }
 
+  /**
+   * Solicitações de vínculo pendentes.
+   *
+   * Extraída para poder ser chamada de novo quando a aba Pacientes responde uma
+   * — antes era carregada uma única vez no `load()` e a fila de trabalho ficava
+   * afirmando que a paciente ainda esperava depois de ela ter sido aceita.
+   */
+  async function loadPedidosVinculo() {
+    try {
+      const tk = await token();
+      const { listPatientRequests } = await import("@/lib/patientlink.functions");
+      const pr = await listPatientRequests({ data: { accessToken: tk } });
+      if (pr.ok) {
+        setPedidosVinculo(
+          pr.requests.map((r) => ({
+            id: r.id,
+            patient_name: r.patient_name,
+            created_at: r.created_at,
+          })),
+        );
+        setFonteFalhou((f) => ({ ...f, vinculos: false }));
+      } else setFonteFalhou((f) => ({ ...f, vinculos: true }));
+    } catch {
+      /* Best-effort: uma falha aqui não derruba o painel. Mas fica REGISTRADA,
+         porque uma fila vazia por falha de rede é indistinguível de uma fila
+         vazia de verdade — e a segunda é uma boa notícia que ninguém deveria
+         receber sem ser verdade. */
+      setFonteFalhou((f) => ({ ...f, vinculos: true }));
+    }
+  }
+
   async function loadEngagement() {
     const tk = await token();
     const res = await getEngagementData({ data: { accessToken: tk } });
@@ -459,6 +515,13 @@ function PainelPage() {
 
   useEffect(() => {
     load();
+    /* Pré-consultas junto do resto, e não só ao abrir a aba.
+       A fila de trabalho vive na tela inicial e lê `preForms`; enquanto essa
+       lista só era carregada dentro do efeito de aba, a banda "Para ler" era
+       vazia por construção na única tela onde a fila aparece — e o médico lia
+       "nada esperando por você" com seis pré-consultas não lidas na caixa. É o
+       mesmo bug que a fila existe para consertar, um nível abaixo. */
+    loadPreForms().catch(() => {});
   }, []);
 
   // Retorno do checkout do Stripe (assinatura do médico): o webhook ativa o
@@ -573,12 +636,18 @@ function PainelPage() {
         acao: "Responder",
         onAcao: () => setTab("Perguntas"),
       })),
+    /* `declined` também é bola com ele: é a paciente RECUSANDO o horário que ele
+       contrapropôs — o servidor até manda e-mail dizendo "talvez queira sugerir
+       outro". O item aparecia só na aba Agendamentos e morria lá. */
     ...appointments
-      .filter((a) => a.status === "pending")
+      .filter((a) => a.status === "pending" || a.status === "declined")
       .map((a) => ({
         id: `cons-${a.id}`,
         nivel: "consulta" as const,
-        titulo: `${a.patient_name} pediu consulta`,
+        titulo:
+          a.status === "declined"
+            ? `${a.patient_name} recusou o horário sugerido`
+            : `${a.patient_name} pediu consulta`,
         detalhe: `${new Date(`${a.preferred_date}T00:00:00`).toLocaleDateString("pt-BR")} às ${
           a.preferred_time
         }${a.reason ? ` · ${a.reason}` : ""}`,
@@ -617,6 +686,9 @@ function PainelPage() {
         <AlertaSosMedico
           acionamento={sosAberto}
           atendendo={sosAtendendo}
+          restantes={
+            sosPendentes.filter((a) => a.id !== sosAberto.id && !sosAdiados.has(a.id)).length
+          }
           onAtender={async () => {
             setSosAtendendo(true);
             try {
@@ -628,8 +700,19 @@ function PainelPage() {
                 return;
               }
               setSosPendentes((ps) => ps.filter((a) => a.id !== sosAberto.id));
+              /* Também entra em `sosAdiados`: o poll de 60s pode ter saído
+                 ANTES deste clique e chegar depois, ressuscitando na lista o
+                 acionamento que ele acabou de registrar — e o efeito de
+                 auto-abrir reabriria o modal justo quando ele espera o
+                 contrário. */
+              setSosAdiados((s) => new Set(s).add(sosAberto.id));
               setSosAberto(null);
               toast.success("Registrado no histórico da paciente ✓");
+            } catch {
+              /* Sem `catch`, o botão piscava "Registrando…", voltava ao normal
+                 e não dizia nada: o médico saía achando que registrou o
+                 desfecho de uma emergência e não registrou. */
+              toast.error("Falha de conexão — o desfecho não foi registrado.");
             } finally {
               setSosAtendendo(false);
             }
@@ -652,6 +735,10 @@ function PainelPage() {
           label="Emergências sem desfecho"
           value={sosNaoAtendidos}
           highlight={sosNaoAtendidos > 0}
+          /* Vermelho, e não a cor da marca. Promover este número a "o único que
+             não pode esperar" e pintá-lo igual a "pedidos de consulta" é
+             desfazer a promoção no mesmo gesto. */
+          tom={sosNaoAtendidos > 0 ? "urgente" : undefined}
         />
         <Stat label="Pacientes esperando" value={novasPacientes} highlight={novasPacientes > 0} />
         <Stat label="Pedidos de consulta" value={pendingAppts} highlight={pendingAppts > 0} />
@@ -661,7 +748,13 @@ function PainelPage() {
       {/* A fila ABSORVEU as faixas soltas de SOS e de paciente esperando: elas
           existiam porque não havia lista, e duas chamadas para a mesma coisa é
           ruído. O modal de emergência continua, esse é outro assunto. */}
-      {!loading && <FilaDeTrabalho itens={fila} />}
+      <FilaDeTrabalho
+        itens={fila}
+        fontesComFalha={[
+          ...(fonteFalhou.sos ? ["emergências"] : []),
+          ...(fonteFalhou.vinculos ? ["solicitações de pacientes"] : []),
+        ]}
+      />
 
       {/* Tabs — todo médico é inquilino, recortado por doctor_id.
 
@@ -795,7 +888,9 @@ function PainelPage() {
             }}
           />
         )}
-        {tab === "Pacientes 👩‍🍼" && <PacientesSection tokenFn={token} />}
+        {tab === "Pacientes 👩‍🍼" && (
+          <PacientesSection tokenFn={token} onVinculoRespondido={loadPedidosVinculo} />
+        )}
         {tab === "Lives" && <LivesSection tokenFn={token} />}
         {tab === "Meu Perfil" && (
           <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
@@ -863,7 +958,7 @@ function savedTimeLabel(hits: number): string {
   if (totalMin < 60) return `${totalMin} min`;
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return m === 0 ? `${h}h` : `${h}h${m}`;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
 }
 
 const STAGE_META: {
@@ -951,7 +1046,8 @@ function ValorGeradoBanner({
   onNavigate,
   precoConsultaCentavos,
   moedaDoMedico,
-  mensalidadeCentavos,
+  mensalidadeDoPlanoCentavos,
+  plano,
 }: {
   aiHits: number;
   answered: number;
@@ -960,12 +1056,32 @@ function ValorGeradoBanner({
   /** O que ELE cobra por consulta — o tempo dele vale o que ele cobra. */
   precoConsultaCentavos?: number | null;
   moedaDoMedico?: string | null;
-  /** O que ele paga por mês. Sem isso não há comparação honesta a fazer. */
-  mensalidadeCentavos: number;
+  /** O que ele paga por mês. Sem isso não há comparação honesta a fazer.
+      Nome diferente da função homônima de `entitlements` de propósito: dentro
+      deste componente o identificador curto virava um número, e a função ficava
+      inalcançável a três linhas de distância. */
+  mensalidadeDoPlanoCentavos: number;
+  /**
+   * Plano cru. Mensalidade zero cobre três casos diferentes — teste, grátis e
+   * clínica ("sob consulta", contrato PAGO). Dizer "você ainda não paga nada"
+   * para uma clínica seria falso justamente com o cliente de maior ticket.
+   */
+  plano?: string | null;
 }) {
-  const assists = aiHits + answered;
+  const p = (plano ?? "").trim().toLowerCase();
+  const emTeste = p === "trial" || p === "free" || p === "";
+  /* TEMPO ECONOMIZADO É SÓ O QUE A IA FEZ NO LUGAR DELE.
 
-  if (assists === 0 && activePatients === 0) {
+     Antes esta conta era `aiHits + answered`, e `answered` é gravado no
+     instante em que o MÉDICO digita a resposta (`secondbrain.functions.ts`).
+     Ou seja: a tela pegava hora-médico GASTA, chamava de "seu tempo
+     economizado" e ainda convertia em dinheiro para justificar a mensalidade.
+     Um médico com a IA desligada, respondendo tudo sozinho, via a plataforma
+     levar crédito pelo trabalho dele. As perguntas que ele resolveu continuam
+     no painel — como produção dele, que é o que são. */
+  const assists = aiHits;
+
+  if (assists === 0 && answered === 0 && activePatients === 0) {
     return (
       <div className="fade-slide-up rounded-3xl border border-primary/20 bg-primary/5 p-5">
         <p className="font-serif text-lg">💚 Comece a gerar valor</p>
@@ -996,51 +1112,58 @@ function ValorGeradoBanner({
       <p className="font-serif text-lg">💚 Valor gerado este mês</p>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <ValueTile big={aiHits} label="dúvidas respondidas pela sua IA" />
-        <ValueTile big={answered} label="perguntas de pacientes resolvidas" />
-        <ValueTile big={savedTimeLabel(assists)} label="do seu tempo economizado (estimativa)" />
+        <ValueTile big={answered} label="perguntas que você respondeu" />
+        <ValueTile big={savedTimeLabel(assists)} label="que a IA respondeu por você (estimativa)" />
         <ValueTile big={activePatients} label="pacientes ativas nos últimos 7 dias" />
       </div>
       {/* A conta fechada, em dinheiro.
 
-          "Você economizou 3 horas" é bonito e some da cabeça na hora de
-          renovar. "Isso é mais que o valor do plano" é o argumento que fica —
-          e só funciona se for verdade, então a frase só aparece quando o tempo
-          economizado, valorizado pela própria consulta DELE, passa do que ele
-          paga. Sem preço de consulta cadastrado, mostramos só as horas. */}
+          "A IA respondeu 3 horas por você" é bonito e some da cabeça na hora de
+          renovar. Em dinheiro, fica. Mas uma tela que argumenta cobrança não
+          pode esconder a premissa: as duas conversões — 3 min por atendimento e
+          40 min por consulta — vão escritas embaixo, porque quem lê "3h" e
+          "R$ 2.025" com consulta de R$ 450 faz a conta de cabeça, chega em
+          R$ 1.350 e conclui, com razão, que a tela está inflando. */}
       {(() => {
         const minutos = assists * 3;
-        const horas = minutos / 60;
+        /* `(horas * 60) / 40` era ida e volta: a conta real é minutos/40, ou
+           seja uma consulta a cada ~13 atendimentos da IA. */
+        const equivalente = minutos / 40;
         /* A mensalidade da tabela é em REAIS. Se ele cobra a consulta em dólar
            ou euro, comparar os dois números é comparar grandezas diferentes —
            e a frase sairia dizendo uma coisa falsa com ar de conta fechada.
-           Sem câmbio confiável, o certo é não afirmar nada. */
-        const mesmaMoeda = (moedaDoMedico || "BRL") === "BRL";
-        if (
-          mesmaMoeda &&
-          precoConsultaCentavos &&
-          precoConsultaCentavos > 0 &&
-          mensalidadeCentavos > 0
-        ) {
-          /* Uma consulta ocupa cerca de 40 min do dia dele — é a conversão mais
-             conservadora que dá para fazer e continua sendo a certa: o tempo
-             dele vale o que ele cobra por ele. */
-          const equivalente = (horas * 60) / 40;
+           Sem câmbio confiável, o certo é não afirmar nada. E "não sei a moeda"
+           (`null`, `""`) entra aqui como não-sei, não como real. */
+        const mesmaMoeda = moedaDoMedico === "BRL";
+        const rodape = (
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+            Estimativa: cada resposta da IA poupa ~3 min seus, e uma consulta ocupa ~40 min da sua
+            agenda.
+          </p>
+        );
+
+        if (mesmaMoeda && precoConsultaCentavos && precoConsultaCentavos > 0) {
           const valorCentavos = Math.round(equivalente * precoConsultaCentavos);
-          if (valorCentavos > mensalidadeCentavos) {
+          const texto = formatarDinheiro(valorCentavos, moedaDoMedico);
+          /* `formatarDinheiro` devolve "" para valor não finito. Uma frase de
+             cobrança com o número faltando é pior que frase nenhuma. */
+          if (texto && valorCentavos > 0) {
             return (
-              <p className="mt-3 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
-                Esse tempo equivale a cerca de{" "}
-                <strong>{formatarDinheiro(valorCentavos, moedaDoMedico)}</strong> em consultas suas
-                — mais que a mensalidade do seu plano.
-              </p>
+              <>
+                <p className="mt-3 rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-emerald-900">
+                  A IA trabalhou o equivalente a <strong>{texto}</strong> em consultas suas
+                  {mensalidadeDoPlanoCentavos > 0 && valorCentavos > mensalidadeDoPlanoCentavos
+                    ? " — mais que a mensalidade do seu plano."
+                    : emTeste
+                      ? " — e você ainda não paga nada por isso."
+                      : "."}
+                </p>
+                {rodape}
+              </>
             );
           }
         }
-        return (
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            Estimativa: cada atendimento da IA equivale a ~3 min seus.
-          </p>
-        );
+        return rodape;
       })()}
     </div>
   );
@@ -1109,7 +1232,8 @@ export function DashboardView({
           medico?.consultation_price_cents ?? (medico?.consultation_price_brl ?? 0) * 100
         }
         moedaDoMedico={medico?.consultation_currency}
-        mensalidadeCentavos={mensalidadeCentavos(medico?.plan ?? "")}
+        mensalidadeDoPlanoCentavos={mensalidadeCentavos(medico?.plan ?? "")}
+        plano={medico?.plan}
       />
 
       {/* 2. Cards de destaque */}
@@ -2260,11 +2384,26 @@ function PreConsultasSection({
                 ⚖️ {f.current_weight} kg
               </span>
             )}
-            {f.systolic && f.diastolic && (
-              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-                💓 {f.systolic}/{f.diastolic}
-              </span>
-            )}
+            {f.systolic != null &&
+              f.diastolic != null &&
+              /* `!= null` e não truthy: com `&&`, um "0/80" sumia da tela por
+                 inteiro em vez de aparecer marcado como implausível. */
+              (() => {
+                const sn = sinalPressao(f.systolic, f.diastolic);
+                return (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs ${
+                      sn && sn.gravidade !== "normal"
+                        ? ESTILO_SINAL[sn.gravidade]
+                        : "bg-secondary text-muted-foreground"
+                    }`}
+                    title={sn?.nota || undefined}
+                  >
+                    💓 {f.systolic}/{f.diastolic}
+                    {sn && sn.gravidade !== "normal" ? ` · ${sn.nota}` : ""}
+                  </span>
+                );
+              })()}
           </div>
 
           {f.questions && (
@@ -2456,6 +2595,7 @@ function EngagementSection({
     inactiveLastWeek: number;
     unseenPreConsultas: number;
     patients: PatientEngagement[];
+    janelaAtividadeDias?: number;
   } | null;
   onRefresh: () => void;
   tokenFn: () => Promise<string>;
@@ -2505,10 +2645,25 @@ function EngagementSection({
      Silêncio não é sinal clínico, é sinal de engajamento: ela pode estar bem e
      sem paciência para o app. Por isso o texto diz "sem registro" e nunca "sem
      acompanhamento". */
+  const janela = engagement?.janelaAtividadeDias ?? 45;
   const sumidas = patients
-    .map((p) => ({ p, s: sinalSilencio(p.lastActivityAt) }))
+    /* Recém-chegada não é sumida. Sem esta linha, a paciente que se cadastrou
+       ontem e ainda não abriu nada entrava na lista no dia seguinte — e o
+       médico ligava perguntando por que ela "parou de usar". Duas semanas é o
+       mesmo corte da primeira faixa de silêncio: antes disso, não há silêncio
+       para observar. */
+    .filter((p) => !p.createdAt || diasDeSilencio(p.createdAt, janela) >= 14)
+    .map((p) => ({
+      p,
+      s: sinalSilencio(p.lastActivityAt, janela),
+      dias: diasDeSilencio(p.lastActivityAt, janela),
+    }))
     .filter((x) => x.s && x.s.gravidade !== "normal")
-    .sort((a, b) => PESO_SINAL[a.s!.gravidade] - PESO_SINAL[b.s!.gravidade]);
+    /* Desempate por tempo de silêncio. Sem ele, a ordem dentro de cada cor era
+       a ordem que o Postgres devolvesse (o `select` de perfis não tem
+       `ORDER BY`) — então QUAIS oito pacientes ele via podia mudar a cada
+       "Atualizar", sem nada ter mudado nos dados. */
+    .sort((a, b) => PESO_SINAL[a.s!.gravidade] - PESO_SINAL[b.s!.gravidade] || b.dias - a.dias);
 
   return (
     <div className="space-y-6">
@@ -2524,9 +2679,13 @@ function EngagementSection({
       {sumidas.length > 0 && (
         <div className="rounded-3xl border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
           <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+            {/* O texto dizia "há mais de 2 semanas" enquanto a lista contava
+                gente com 8 dias de silêncio — o corte anunciado tem que ser o
+                corte aplicado, senão um número errado aqui vira desconfiança em
+                tudo o mais que a tela diz. */}
             {sumidas.length === 1
-              ? "1 paciente sem registro há mais de 2 semanas"
-              : `${sumidas.length} pacientes sem registro há mais de 2 semanas`}
+              ? "1 paciente sem registro há duas semanas ou mais"
+              : `${sumidas.length} pacientes sem registro há duas semanas ou mais`}
           </p>
           <p className="mt-1 text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
             Pode ser só falta de paciência com o app — mas numa gestação de alto risco vale um
@@ -2759,13 +2918,39 @@ function EngagementReportSnippet({ data }: { data: any }) {
 }
 
 /* ---------- Shared components ---------- */
-function Stat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+function Stat({
+  label,
+  value,
+  highlight,
+  tom,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+  /** `urgente` sai da cor da marca — é o que separa "olhe isto" de "corra". */
+  tom?: "urgente";
+}) {
+  const urgente = tom === "urgente";
   return (
     <div
-      className={`rounded-2xl border p-4 text-center shadow-[var(--shadow-card)] ${highlight ? "border-primary/30 bg-primary/5" : "border-border bg-card"}`}
+      className={`rounded-2xl border p-4 text-center shadow-[var(--shadow-card)] ${
+        urgente
+          ? "border-rose-300 bg-rose-50"
+          : highlight
+            ? "border-primary/30 bg-primary/5"
+            : "border-border bg-card"
+      }`}
     >
-      <p className={`font-serif text-3xl ${highlight ? "text-primary" : ""}`}>{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+      <p
+        className={`font-serif text-3xl ${
+          urgente ? "text-rose-700" : highlight ? "text-primary" : ""
+        }`}
+      >
+        {value}
+      </p>
+      <p className={`mt-1 text-xs ${urgente ? "text-rose-900/80" : "text-muted-foreground"}`}>
+        {label}
+      </p>
     </div>
   );
 }
@@ -3037,10 +3222,20 @@ function TeleconsultasSection({
                             {pre.current_weight} kg
                           </span>
                         )}
-                        {pre.systolic && pre.diastolic && (
+                        {pre.systolic != null && pre.diastolic != null && (
                           <span>
                             <span className="text-muted-foreground">PA: </span>
                             {pre.systolic}/{pre.diastolic} mmHg
+                            {(() => {
+                              const sn = sinalPressao(pre.systolic, pre.diastolic);
+                              return sn && sn.gravidade !== "normal" ? (
+                                <span
+                                  className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ESTILO_SINAL[sn.gravidade]}`}
+                                >
+                                  {sn.nota}
+                                </span>
+                              ) : null;
+                            })()}
                           </span>
                         )}
                         {pre.emotional_state && (
@@ -8536,7 +8731,21 @@ function LivesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   );
 }
 
-function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function PacientesSection({
+  tokenFn,
+  onVinculoRespondido,
+}: {
+  tokenFn: () => Promise<string>;
+  /**
+   * Avisa o painel que a lista de solicitações mudou.
+   *
+   * Sem isto, a seção respondia o pedido no estado INTERNO dela e a fila de
+   * trabalho — que fica na mesma tela, logo acima — continuava dizendo "Ana
+   * quer ser acompanhada por você" depois de o médico aceitar a Ana. Duas
+   * afirmações contraditórias ao mesmo tempo, e o fantasma só saía com F5.
+   */
+  onVinculoRespondido?: () => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<PatientRequest[]>([]);
   const [patients, setPatients] = useState<LinkedPatient[]>([]);
@@ -8556,6 +8765,9 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [premiumBusyId, setPremiumBusyId] = useState<string | null>(null);
   const [encerrandoId, setEncerrandoId] = useState<string | null>(null);
   const [confirmarEncerrar, setConfirmarEncerrar] = useState<string | null>(null);
+  const armado = useRef<number | null>(null);
+  const armadoEm = useRef(0);
+  useEffect(() => () => void (armado.current && clearTimeout(armado.current)), []);
 
   /* Encerrar o acompanhamento. Dois toques: o primeiro arma, o segundo executa,
      e a confirmação some sozinha em 4s para não ficar armada esperando um toque
@@ -8563,9 +8775,22 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   async function encerrar(p: LinkedPatient) {
     if (confirmarEncerrar !== p.id) {
       setConfirmarEncerrar(p.id);
-      setTimeout(() => setConfirmarEncerrar((c) => (c === p.id ? null : c)), 4000);
+      /* Marca do instante do armamento: um duplo toque — reflexo quando o
+         primeiro parece não responder — armava e confirmava no mesmo gesto,
+         desfazendo um vínculo real sem que o médico tivesse lido a palavra
+         "Confirmar?". Ele não consegue reverter sozinho: só a paciente pode
+         religar. Meio segundo de carência resolve. */
+      armadoEm.current = Date.now();
+      /* Guardado para poder ser cancelado: trocar de aba dentro dos 4 s
+         desmonta a seção e o timer disparava `setState` no vazio. */
+      if (armado.current) clearTimeout(armado.current);
+      armado.current = setTimeout(
+        () => setConfirmarEncerrar((c) => (c === p.id ? null : c)),
+        4000,
+      ) as unknown as number;
       return;
     }
+    if (Date.now() - armadoEm.current < 500) return;
     setConfirmarEncerrar(null);
     setEncerrandoId(p.id);
     try {
@@ -8573,7 +8798,13 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         data: { accessToken: await tokenFn(), pacienteId: p.id },
       });
       if (!r.ok) {
-        toast.error("Não foi possível encerrar agora.");
+        /* `ok:false` também sai quando o UPDATE não achou linha — ou seja,
+           quando a paciente JÁ não é mais dele (segunda aba, retry depois de
+           timeout com a escrita aplicada). Dizer "não foi possível" para uma
+           ação que já deu certo faz o médico tentar de novo sem parar. Por isso
+           a lista é recarregada antes de acusar falha. */
+        await loadPatients();
+        toast.error("Não foi possível encerrar agora — confira a lista.");
         return;
       }
       setPatients((ps) => ps.filter((x) => x.id !== p.id));
@@ -8642,6 +8873,7 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
       }
       // Remove o card otimisticamente e, ao aceitar, atualiza as pacientes.
       setRequests((rs) => rs.filter((r) => r.id !== req.id));
+      onVinculoRespondido?.();
       if (accept) {
         toast.success("Paciente vinculada ✓");
         await loadPatients();
@@ -8789,8 +9021,11 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                 {patients.map((p) => {
                   const due = fmtDate(p.due_date);
                   return (
-                    <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-4">
-                      <div className="flex min-w-0 items-center gap-3">
+                    <li
+                      key={p.id}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4"
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                           {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
                         </span>
@@ -9195,7 +9430,7 @@ function PatientDetailModal({
               é a primeira coisa que o médico precisa ver ao abrir a ficha. */}
         {sosDela.length > 0 && (
           <div className="px-4 pt-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600 dark:text-rose-300">
               🆘 Acionamentos de emergência ({sosDela.length})
             </p>
             <div className="mt-1.5 space-y-1.5">
@@ -9242,6 +9477,13 @@ function PatientDetailModal({
           <div className="px-4 pt-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
               🩺 Registros dela
+            </p>
+            {/* Sem esta linha, "sem etiqueta" era lido como "está tudo bem" — e
+                cobre também "não mediu" e "mediu errado". A tela nunca deve
+                deixar o médico concluir nada a partir da AUSÊNCIA de marca. */}
+            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              Medidas informadas por ela no app, não aferidas em consultório. Sem etiqueta significa
+              dentro da faixa de referência ou sem registro — não é diagnóstico.
             </p>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {medidas.map(({ rot, v }) => (
