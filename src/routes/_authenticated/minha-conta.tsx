@@ -8551,9 +8551,14 @@ function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         role: m.role,
         parts: [{ type: "text", text: m.content }],
       }));
+      const { data: sess } = await supabase.auth.getSession();
       const res = await fetch("/api/nutrition", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // O endpoint agora exige sessão: era proxy aberto para o Gemini.
+          Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
+        },
         body: JSON.stringify({ messages: uiMessages }),
       });
       if (!res.body) throw new Error("no stream");
@@ -9286,7 +9291,13 @@ function ConsultasTab() {
           ? "ogg"
           : "webm";
       fd.append("audio", audioBlob, `consulta.${ext}`);
-      const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        body: fd,
+        // O endpoint agora exige sessão: aceitava 20 MB de áudio de qualquer um.
+        headers: { Authorization: `Bearer ${sess.session?.access_token ?? ""}` },
+      });
       const json: TranscribeResult = await res.json();
       setResult(json);
     } catch {

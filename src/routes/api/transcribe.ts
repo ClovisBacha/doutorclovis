@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
+import { naoAutorizado, usuarioDaRequisicao } from "@/lib/api-auth.server";
 
 // Rate limit: 10 transcrições por minuto por IP
 const rateLimited = makeRateLimiter(10, 60_000); // 10 req/min
@@ -21,8 +22,13 @@ export const Route = createFileRoute("/api/transcribe")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const ip = clientIp(request);
+        /* SESSÃO ANTES DE QUALQUER COISA. Este endpoint aceitava 20 MB de áudio
+           por requisição, de qualquer um, e transcrevia na chave do
+           consultório. */
+        const usuario = await usuarioDaRequisicao(request);
+        if (!usuario) return naoAutorizado();
 
+        const ip = clientIp(request);
         if (rateLimited(ip)) {
           return new Response(JSON.stringify({ error: "Muitas requisições. Aguarde." }), {
             status: 429,

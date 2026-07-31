@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
+import { naoAutorizado, usuarioDaRequisicao } from "@/lib/api-auth.server";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 
@@ -22,8 +23,13 @@ export const Route = createFileRoute("/api/nutrition")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const ip = clientIp(request);
+        /* SESSÃO ANTES DE QUALQUER COISA. Sem isto, este endpoint era um proxy
+           aberto para o Gemini na chave do consultório: qualquer um mandava o
+           array de mensagens que quisesse e a fatura era do dono. */
+        const usuario = await usuarioDaRequisicao(request);
+        if (!usuario) return naoAutorizado();
 
+        const ip = clientIp(request);
         if (rateLimited(ip)) {
           return new Response("Muitas mensagens em pouco tempo. Aguarde.", { status: 429 });
         }

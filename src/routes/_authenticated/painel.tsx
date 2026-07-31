@@ -5346,7 +5346,13 @@ function BrainConsultaCard({
     try {
       const fd = new FormData();
       fd.append("audio", file);
-      const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        body: fd,
+        // O endpoint agora exige sessão: aceitava 20 MB de áudio de qualquer um.
+        headers: { Authorization: `Bearer ${sess.session?.access_token ?? ""}` },
+      });
       if (!res.ok) {
         toast.error("Não foi possível transcrever o áudio — tente novamente.");
         return;
