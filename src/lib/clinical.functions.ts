@@ -1036,3 +1036,131 @@ export const devolutivaDoExame = createServerFn({ method: "POST" })
     }
     return { ok: true as const, avisou: true as const };
   });
+
+/* ════════════════════════════════════════════════════════════════════════════
+   O QUE O MÉDICO EMITE — receita, pedido de exame, orientação
+
+   A aba Ferramentas tinha os modelos prontos e fazia duas coisas: copiar e
+   imprimir. A receita existia só no papel que ela levava, e o sistema — que tem
+   a caixa onde o laudo volta — nunca soube que o exame tinha sido pedido.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export type TipoDeEmissao = "prescricao" | "exame" | "orientacao";
+
+export type Emissao = {
+  id: string;
+  user_id: string;
+  paciente: string | null;
+  kind: TipoDeEmissao;
+  titulo: string;
+  conteudo: string;
+  nota: string | null;
+  cumprido_em: string | null;
+  created_at: string;
+};
+
+const EMISSAO_COLS = "id,user_id,kind,titulo,conteudo,nota,cumprido_em,created_at";
+
+const ROTULO_EMISSAO: Record<TipoDeEmissao, string> = {
+  prescricao: "Receita",
+  exame: "Pedido de exame",
+  orientacao: "Orientação",
+};
+
+/**
+ * Emite e entrega.
+ *
+ * As duas coisas juntas, e não em passos separados: emitir sem entregar
+ * reproduz o que já acontecia — o documento existe e ela não sabe. A entrega
+ * usa a aba Perguntas dela, que já sabe renderizar recado do médico.
+ */
+export const emitirParaPaciente = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        pacienteId: z.string().uuid(),
+        tipo: z.enum(["prescricao", "exame", "orientacao"]),
+        titulo: z.string().min(2).max(200),
+        conteudo: z.string().min(2).max(8000),
+        nota: z.string().max(2000).optional(),
+        consultaId: z.string().uuid().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ok: false as const };
+    const pacientes = await pacientesAtuais(user.id);
+    if (!pacientes.has(data.pacienteId)) return { ok: false as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: nova, error } = await (supabaseAdmin as any)
+      .from("doctor_orders")
+      .insert({
+        doctor_id: user.id,
+        user_id: data.pacienteId,
+        kind: data.tipo,
+        titulo: data.titulo,
+        conteudo: data.conteudo,
+        nota: data.nota ?? null,
+        consultation_id: data.consultaId ?? null,
+      })
+      .select("id")
+      .single();
+    if (error || !nova) return { ok: false as const };
+
+    /* Avisa. Best-effort: o documento já está gravado e ela o encontra na aba
+       dela — uma falha de push não pode desfazer a emissão. */
+    try {
+      const { sendPushToUser } = await import("./push.server");
+      await sendPushToUser(data.pacienteId, {
+        title: `${ROTULO_EMISSAO[data.tipo]} do seu médico`,
+        body: data.titulo,
+        url: "/minha-conta?tab=Consultas&sub=perguntas",
+      });
+    } catch {
+      /* sem push; o documento está lá */
+    }
+    return { ok: true as const, id: nova.id as string };
+  });
+
+/** O que ele emitiu para uma paciente. */
+export const emissoesDaPaciente = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), pacienteId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const vazio = { ok: true as const, emissoes: [] as Emissao[] };
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ...vazio, ok: false as const };
+    const pacientes = await pacientesAtuais(user.id);
+    if (!pacientes.has(data.pacienteId)) return { ...vazio, ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    try {
+      const { data: rows, error } = await (supabaseAdmin as any)
+        .from("doctor_orders")
+        .select(EMISSAO_COLS)
+        .eq("user_id", data.pacienteId)
+        .eq("doctor_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) return vazio;
+      return {
+        ok: true as const,
+        emissoes: ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
+          id: String(r.id),
+          user_id: String(r.user_id),
+          paciente: pacientes.get(String(r.user_id)) || null,
+          kind: String(r.kind) as TipoDeEmissao,
+          titulo: String(r.titulo),
+          conteudo: String(r.conteudo),
+          nota: (r.nota as string) ?? null,
+          cumprido_em: (r.cumprido_em as string) ?? null,
+          created_at: String(r.created_at),
+        })),
+      };
+    } catch {
+      return vazio;
+    }
+  });

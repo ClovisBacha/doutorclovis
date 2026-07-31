@@ -9059,6 +9059,122 @@ function ResumosDasConsultas() {
   );
 }
 
+/**
+ * Receitas, pedidos de exame e orientações que o médico enviou.
+ *
+ * Lida direto do banco pelo navegador: a tabela tem policy de SELECT para a
+ * dona da linha, e o GRANT de UPDATE é só na coluna `cumprido_em` — ela marca
+ * que fez, e não consegue reescrever a posologia da própria receita.
+ */
+function MeusPedidos() {
+  type Pedido = {
+    id: string;
+    kind: string;
+    titulo: string;
+    conteudo: string;
+    nota: string | null;
+    cumprido_em: string | null;
+    created_at: string;
+  };
+  const [itens, setItens] = useState<Pedido[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [marcando, setMarcando] = useState<string | null>(null);
+
+  const ROT: Record<string, string> = {
+    prescricao: "💊 Receita",
+    exame: "🧾 Pedido de exame",
+    orientacao: "📋 Orientação",
+  };
+
+  async function carregar() {
+    try {
+      const { data } = await (supabase as any)
+        .from("doctor_orders")
+        .select("id,kind,titulo,conteudo,nota,cumprido_em,created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      setItens((data ?? []) as Pedido[]);
+    } catch {
+      /* tabela ainda não aplicada: seção some, o resto da aba continua */
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  async function marcarFeito(id: string) {
+    setMarcando(id);
+    try {
+      const { error } = await (supabase as any)
+        .from("doctor_orders")
+        .update({ cumprido_em: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+      setItens((xs) =>
+        xs.map((x) => (x.id === id ? { ...x, cumprido_em: new Date().toISOString() } : x)),
+      );
+      toast.success("Marcado como feito ✓");
+    } catch {
+      toast.error("Não consegui marcar agora. Tente de novo.");
+    } finally {
+      setMarcando(null);
+    }
+  }
+
+  if (carregando || itens.length === 0) return null;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <p className="font-serif text-lg">Do seu médico</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Receitas, pedidos de exame e orientações. Marque o que já fez.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {itens.map((p) => (
+          <li
+            key={p.id}
+            className={`rounded-2xl p-3 ${p.cumprido_em ? "bg-secondary/40" : "bg-secondary/70"}`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {ROT[p.kind] ?? p.kind} · {new Date(p.created_at).toLocaleDateString("pt-BR")}
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-foreground">{p.titulo}</p>
+              </div>
+              {p.cumprido_em ? (
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                  ✓ feito
+                </span>
+              ) : (
+                <button
+                  onClick={() => marcarFeito(p.id)}
+                  disabled={marcando === p.id}
+                  className="press shrink-0 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold disabled:opacity-50"
+                >
+                  {marcando === p.id ? "…" : "Já fiz"}
+                </button>
+              )}
+            </div>
+            <pre className="mt-1.5 whitespace-pre-wrap font-sans text-[13px] leading-snug text-foreground">
+              {p.conteudo}
+            </pre>
+            {p.nota && (
+              <p className="mt-1.5 rounded-xl bg-card px-3 py-2 text-[12.5px] leading-snug">
+                <span className="font-semibold">Recado dele: </span>
+                {p.nota}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ConsultasTab() {
   const [appts, setAppts] = useState<MyAppointment[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(true);
@@ -9263,6 +9379,7 @@ function ConsultasTab() {
       {/* O que ele escreveu para ela vem PRIMEIRO: é a única coisa nesta tela
           que ela não podia saber sozinha. O status do agendamento ela já sabe —
           foi ela que pediu. */}
+      <MeusPedidos />
       <ResumosDasConsultas />
 
       {/* ── Minhas consultas: o ciclo médico→paciente fecha AQUI ────── */}

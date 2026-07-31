@@ -39,6 +39,7 @@ import { AlertaSosMedico } from "@/components/alerta-sos-medico";
 import { ProntuarioPaciente } from "@/components/prontuario-paciente";
 import { RegistrarConsulta } from "@/components/registrar-consulta";
 import { ExamesRecebidos } from "@/components/exames-recebidos";
+import { EnviarParaPaciente } from "@/components/enviar-para-paciente";
 import {
   consultasDaPaciente,
   fichaClinica,
@@ -47,6 +48,7 @@ import {
   type Consulta,
   type EventoClinico,
   type FichaClinica,
+  type TipoDeEmissao,
 } from "@/lib/clinical.functions";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
 import {
@@ -219,6 +221,10 @@ const DOCTOR_TABS: readonly PanelTab[] = [
   "Painel 📊",
   "Agendamentos",
   "Perguntas",
+  /* FERRAMENTAS ligada. Ela já existia — receituário e painéis de exame, ~1.150
+     linhas escritas — e nunca foi listada aqui, então nenhum botão a montava.
+     Era a única tela de receituário do produto, inalcançável. */
+  "Ferramentas",
   "Pré-consultas",
   /* A caixa de entrada dos exames. Fica ao lado de Pré-consultas porque é onde
      ele já procura o que a paciente mandou — e porque quatro abas deste arquivo
@@ -1126,6 +1132,7 @@ function PainelPage() {
         {tab === "Meu Perfil" && (
           <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
         )}
+        {tab === "Ferramentas" && <FerramentasSection />}
         {tab === "Exames" && <ExamesRecebidos tokenFn={token} />}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
@@ -4350,6 +4357,11 @@ const EXAM_PANELS = [
 
 function FerramentasSection() {
   const [openRx, setOpenRx] = useState<number | null>(null);
+  const [envio, setEnvio] = useState<{
+    tipo: TipoDeEmissao;
+    titulo: string;
+    conteudo: string;
+  } | null>(null);
   const [openExam, setOpenExam] = useState<number | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -4411,9 +4423,22 @@ function FerramentasSection() {
                     </button>
                     <button
                       onClick={() => printText(rx.title, rx.text)}
-                      className="rounded-full bg-primary px-4 py-1.5 text-xs text-primary-foreground"
+                      className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
                     >
                       🖨️ Imprimir
+                    </button>
+                    {/* ENVIAR vira a ação principal, e imprimir desce para
+                        secundária. Enquanto imprimir era o destaque, a receita
+                        existia só no papel que ela levava — e o sistema, que
+                        tem a caixa onde o laudo volta, nunca soube que o exame
+                        tinha sido pedido. */}
+                    <button
+                      onClick={() =>
+                        setEnvio({ tipo: "prescricao", titulo: rx.title, conteudo: rx.text })
+                      }
+                      className="press rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
+                    >
+                      Enviar a uma paciente
                     </button>
                   </div>
                 </div>
@@ -4467,9 +4492,17 @@ function FerramentasSection() {
                         onClick={() =>
                           printText(`Solicitação de Exames — ${panel.title}`, examText)
                         }
-                        className="rounded-full bg-primary px-4 py-1.5 text-xs text-primary-foreground"
+                        className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
                       >
-                        🖨️ Imprimir solicitação
+                        🖨️ Imprimir
+                      </button>
+                      <button
+                        onClick={() =>
+                          setEnvio({ tipo: "exame", titulo: panel.title, conteudo: examText })
+                        }
+                        className="press rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
+                      >
+                        Enviar a uma paciente
                       </button>
                     </div>
                   </div>
@@ -4484,6 +4517,16 @@ function FerramentasSection() {
         ⚕️ Prescrições e painéis baseados nos protocolos FEBRASGO/SBD/SBH 2022–2024. Sempre confirme
         com o protocolo vigente da sua instituição e ajuste conforme o quadro clínico da paciente.
       </p>
+
+      {envio && (
+        <EnviarParaPaciente
+          tipo={envio.tipo}
+          titulo={envio.titulo}
+          conteudoInicial={envio.conteudo}
+          tokenFn={token}
+          onFechar={() => setEnvio(null)}
+        />
+      )}
     </div>
   );
 }
