@@ -221,6 +221,7 @@ const LOTE = 100;
  */
 const TETO_FILA = 1200;
 const TETO_PRONTUARIO = 2500;
+const TETO_EXAMES = 400;
 
 async function lerEventos(
   ids: string[],
@@ -344,7 +345,7 @@ export const eventosQuePedemOlhar = createServerFn({ method: "POST" })
         TETO_FILA,
       );
 
-      const tratados = await lerDesfechos(user.id);
+      const tratados = await lerDesfechos(user.id, { desde });
       const eventos = montar(linhas, tratados)
         .filter((e) => e.gravidade !== "normal" && !e.tratado_em)
         .sort((a, b) => {
@@ -370,15 +371,30 @@ export const eventosQuePedemOlhar = createServerFn({ method: "POST" })
     }
   });
 
-async function lerDesfechos(doctorId: string): Promise<Map<string, string>> {
+async function lerDesfechos(
+  doctorId: string,
+  recorte?: { desde?: string; pacienteId?: string },
+): Promise<Map<string, string>> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   try {
-    const { data } = await (supabaseAdmin as any)
+    /* RECORTADO PELA MESMA JANELA DOS EVENTOS.
+       Antes eram os 1000 desfechos mais recentes do médico INTEIRO, sem
+       recorte. Passando de mil, os mais antigos caíam — e um desfecho que cai é
+       um evento JÁ RESOLVIDO que volta a aparecer como pendente na fila e como
+       "sem leitura" no exame. O médico registra que cuidou, e meses depois o
+       item ressuscita.
+
+       Um desfecho é sempre POSTERIOR ao evento que ele resolve, então filtrar
+       por `visto_em >= desde` não pode descartar o desfecho de nenhum evento
+       dentro da janela — e tira da conta os anos de histórico que só existiam
+       para consumir o teto. */
+    let q = (supabaseAdmin as any)
       .from("clinical_acks")
       .select("fonte,fonte_id,user_id,visto_em")
-      .eq("doctor_id", doctorId)
-      .order("visto_em", { ascending: false })
-      .limit(1000);
+      .eq("doctor_id", doctorId);
+    if (recorte?.pacienteId) q = q.eq("user_id", recorte.pacienteId);
+    if (recorte?.desde) q = q.gte("visto_em", recorte.desde);
+    const { data } = await q.order("visto_em", { ascending: false }).limit(2000);
     return new Map(
       (
         (data ?? []) as { fonte: string; fonte_id: string; user_id: string; visto_em: string }[]
@@ -423,7 +439,7 @@ export const prontuarioDaPaciente = createServerFn({ method: "POST" })
         (q: any) => q.gte("ocorrido_em", desde).order("ocorrido_em", { ascending: false }),
         TETO_PRONTUARIO,
       );
-      const tratados = await lerDesfechos(user.id);
+      const tratados = await lerDesfechos(user.id, { desde, pacienteId: data.pacienteId });
       return { ok: true as const, eventos: montar(linhas, tratados), incompleto };
     } catch {
       // Idem: "nenhum registro dela no período" não pode ser o rosto de uma
@@ -1038,6 +1054,7 @@ export const examesRecebidos = createServerFn({ method: "POST" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const desde = new Date(Date.now() - data.dias * 86400000).toISOString();
       const linhas: Record<string, unknown>[] = [];
+      let truncou = false;
       // Lotes de 100: `.in()` viaja na URL e uma lista longa volta 414, que aqui
       // viraria "nenhum exame" em silêncio.
       for (let i = 0; i < ids.length; i += LOTE) {
@@ -1047,12 +1064,19 @@ export const examesRecebidos = createServerFn({ method: "POST" })
           .in("user_id", ids.slice(i, i + LOTE))
           .gte("created_at", desde)
           .order("created_at", { ascending: false })
-          .limit(200);
+          .limit(TETO_EXAMES);
         if (error) return { ...vazio, incompleto: true };
-        linhas.push(...((rows ?? []) as Record<string, unknown>[]));
+        const lote = (rows ?? []) as Record<string, unknown>[];
+        /* Mesmo princípio de `lerEventos`: encostar no teto é dado que ficou de
+           fora, e a ordem é DESC — some o laudo MAIS ANTIGO da janela, que é
+           justamente o que ainda pode estar sem leitura. Silêncio aqui vira
+           "nenhuma paciente enviou exame", que é a pior notícia possível
+           vestida de boa. */
+        if (lote.length >= TETO_EXAMES) truncou = true;
+        linhas.push(...lote);
       }
 
-      const vistos = await lerDesfechos(user.id);
+      const vistos = await lerDesfechos(user.id, { desde });
       const exames = linhas
         .map((r) => ({
           id: String(r.id),
@@ -1067,7 +1091,7 @@ export const examesRecebidos = createServerFn({ method: "POST" })
         }))
         .filter((e) => !data.apenasNaoVistos || !e.visto_em)
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return { ok: true as const, exames, incompleto: false };
+      return { ok: true as const, exames, incompleto: truncou };
     } catch {
       return { ...vazio, incompleto: true };
     }

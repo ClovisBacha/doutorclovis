@@ -33,7 +33,11 @@ export function ExamesRecebidos({ tokenFn }: { tokenFn: () => Promise<string> })
       const r = await examesRecebidos({ data: { accessToken: await tokenFn(), dias: 120 } });
       if (r.ok) {
         setExames(r.exames);
-        setFalhou(false);
+        /* `incompleto` também acende a faixa: o servidor passou a avisar quando
+           o teto de leitura cortou, e descartar esse aviso aqui seria repetir o
+           erro que ele existe para corrigir — uma lista curta com cara de
+           completa. */
+        setFalhou(r.incompleto);
       } else setFalhou(true);
     } catch {
       setFalhou(true);
@@ -72,7 +76,8 @@ export function ExamesRecebidos({ tokenFn }: { tokenFn: () => Promise<string> })
           possível vestida de boa. */}
       {falhou && (
         <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
-          📡 Não consegui ler os exames agora. Atualize antes de concluir que não há nenhum.
+          📡 Pode não estar tudo aqui — a leitura falhou ou foi cortada. Atualize antes de concluir
+          que não há mais nenhum.
         </p>
       )}
 

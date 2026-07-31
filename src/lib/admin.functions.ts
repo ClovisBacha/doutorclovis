@@ -913,6 +913,27 @@ export const getPatientReport = createServerFn({ method: "POST" })
     if (!(await assertOwnsRow(supabaseAdmin as any, "patient_profiles", data.userId, scope)))
       return { ok: false as const };
 
+    /* TRILHA. Esta é a leitura mais ampla do produto e a única que não deixava
+       rastro: `patient_profiles` inteiro, catorze dias de medidas, chutes,
+       perguntas, a última pré-consulta — e o CONTEÚDO do diário dela.
+
+       E `assertOwnsRow` devolve `true` incondicionalmente para a equipe
+       (ADMIN_EMAILS), o que é decisão de produto ("a equipe vê a instalação
+       inteira") mas torna esta a porta por onde o diário de qualquer paciente
+       da plataforma sai para quem não é o médico dela. Uma porta assim tem que
+       registrar quem passou. */
+    try {
+      const { writeAudit } = await import("./audit.server");
+      await writeAudit(
+        { id: scope.user.id, email: scope.user.email },
+        scope.isTeam ? "relatorio.ler.equipe" : "relatorio.ler",
+        data.userId,
+        null,
+      );
+    } catch {
+      /* trilha é auxiliar — o relatório não deixa de abrir por causa dela */
+    }
+
     const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const uid = data.userId;
 
