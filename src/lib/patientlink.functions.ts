@@ -15,6 +15,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { colunaAusente } from "./postgrest";
 
 /** Escapa texto da paciente que vai dentro de HTML de e-mail. */
 function escaparHtml(v: string): string {
@@ -695,7 +696,7 @@ export const setPatientQuizPremium = createServerFn({ method: "POST" })
       .eq("id", data.patientId)
       .eq("doctor_id", user.id) // tenancy: só as próprias pacientes
       .select("id"); // sem isto, zero linhas afetadas voltava como sucesso
-    if (error?.code === "42703") {
+    if (colunaAusente(error)) {
       return {
         ok: false as const,
         error: "Aplique a migração quiz_premium no Supabase (APLICAR_PENDENTES.sql).",
@@ -741,7 +742,7 @@ export const setPatientFetalBpm = createServerFn({ method: "POST" })
       .eq("doctor_id", user.id)
       .select("id");
 
-    if (error?.code === "42703") {
+    if (colunaAusente(error)) {
       return {
         ok: false as const,
         error: "Aplique a migração fetal_bpm no Supabase (APLICAR_PENDENTES.sql).",

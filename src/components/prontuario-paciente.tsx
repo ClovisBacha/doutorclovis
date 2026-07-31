@@ -508,9 +508,21 @@ function MudancasDesdeAConsulta({
         </p>
       )}
 
-      {nada ? (
-        /* Zero registros é informação — ela não abriu o app —, e é diferente de
-           "não consegui ler". A frase diz qual dos dois é. */
+      {nada && incompleto ? (
+        /* A LEITURA FALHOU — e isso não pode sair com cara de fato clínico.
+           A prop existia, estava documentada e era passada pelo pai; o corpo do
+           componente simplesmente nunca a lia, então a frase de baixo era
+           impressa idêntica nos dois casos. O médico via "ela não registrou
+           nada" e levava isso para dentro da consulta.
+
+           Zero registro é informação (ela não abriu o app). Zero LEITURA é
+           ausência de informação. Confundir os dois é o pior erro que uma tela
+           clínica pode cometer, porque parece que ela está funcionando. */
+        <p className="mt-2 rounded-2xl bg-amber-500/10 px-3 py-2 text-[13px] leading-snug text-amber-900 dark:text-amber-200">
+          <strong>Não consegui ler os registros dela agora.</strong> Isto não quer dizer que ela não
+          registrou nada — quer dizer que a leitura falhou. Recarregue antes de tirar conclusão.
+        </p>
+      ) : nada ? (
         <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
           Ela não registrou nada no app desde então. Vale combinar isso na consulta: sem registro, o
           acompanhamento entre as consultas fica cego.

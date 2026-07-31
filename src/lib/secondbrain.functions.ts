@@ -9,6 +9,7 @@
 import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { colunaAusente } from "./postgrest";
 
 // Quem é "o médico": e-mails autorizados, separados por vírgula em ADMIN_EMAILS.
 function adminEmails() {
@@ -503,7 +504,7 @@ export const answerAndTrain = createServerFn({ method: "POST" })
       .from("doctor_questions")
       .update({ answered: true, answer: data.answer, answered_at: new Date().toISOString() })
       .eq("id", data.questionId);
-    if (updateError?.code === "42703") {
+    if (colunaAusente(updateError)) {
       // Colunas answer/answered_at ainda não migradas: mantém o comportamento antigo.
       ({ error: updateError } = await (supabaseAdmin as any)
         .from("doctor_questions")

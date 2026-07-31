@@ -22,6 +22,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { computeGestation } from "./gestacao";
 import {
   piorSinal,
   sinalGlicemia,
@@ -480,16 +481,30 @@ const PERFIL_COLS =
  * é o erro clássico e desloca a idade gestacional em semanas.
  */
 function diasDeGestacao(p: Record<string, unknown>): number | null {
-  const ref = p.reference_date as string | null;
-  const rw = p.reference_weeks as number | null;
-  const rd = p.reference_days as number | null;
-  if (ref && rw != null) {
-    const passados = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
-    return rw * 7 + (rd ?? 0) + passados;
-  }
-  const dum = p.lmp_date as string | null;
-  if (!dum) return null;
-  return Math.floor((Date.now() - new Date(dum).getTime()) / 86400000);
+  /* DELEGA. Esta função tinha a própria aritmética, e ela divergia da do app da
+     paciente por UM DIA todo fim de tarde:
+
+       `new Date("2026-01-10")`             → 00:00 UTC   (o que estava aqui)
+       `new Date("2026-01-10T00:00:00")`    → 00:00 LOCAL (o que o app usa)
+
+     Em America/Sao_Paulo (UTC-3) a diferença é de 3 horas, então das 21h à
+     meia-noite a ficha do médico ficava um dia À FRENTE do app dela. Medido:
+     ficha 33s2d contra app 33s1d, e a fronteira do termo caindo em 37s0d de um
+     lado e 36s6d do outro.
+
+     O cabeçalho deste arquivo diz que "em obstetrícia os DIAS decidem conduta —
+     corticoide, viabilidade, 36+6 versus 37+0". Duas réguas para essa pergunta
+     é uma a mais, e alinhar os números não resolve: elas voltariam a divergir na
+     próxima edição. `computeGestation` (src/lib/gestacao.ts) é a régua do
+     produto — inclusive a precedência do ultrassom sobre a DUM, que era o
+     motivo desta função existir e que ela já implementa. */
+  const g = computeGestation({
+    lmp: p.lmp_date as string | null,
+    referenceDate: p.reference_date as string | null,
+    referenceWeeks: p.reference_weeks as number | null,
+    referenceDays: p.reference_days as number | null,
+  });
+  return g?.totalDays ?? null;
 }
 
 export const fichaClinica = createServerFn({ method: "POST" })
@@ -1126,7 +1141,13 @@ export const devolutivaDoExame = createServerFn({ method: "POST" })
         answered: true,
         answered_at: agora,
       });
-      if ((errIns as { code?: string } | null)?.code === "42703") {
+      /* `colunaAusente` cobre os DOIS códigos. Antes era só `42703`, que é o
+         que o Postgres devolve numa LEITURA — num INSERT o PostgREST devolve
+         `PGRST204` e nem chega ao banco. O recuo nunca rodava: o texto que o
+         médico escreveu para a paciente não era gravado, `escreveu` ficava
+         false, e a tela mostrava "Marcado como lido ✓" e fechava o modal. */
+      const { colunaAusente } = await import("./postgrest");
+      if (colunaAusente(errIns)) {
         // Banco sem as colunas de resposta: grava o que dá.
         ({ error: errIns } = await (supabaseAdmin as any).from("doctor_questions").insert({
           user_id: data.pacienteId,

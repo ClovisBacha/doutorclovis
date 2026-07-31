@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { colunaAusente } from "./postgrest";
 
 /** Escapa texto do usuário antes de interpolar em HTML de e-mail (anti-injeção). */
 function esc(s: string | null | undefined): string {
@@ -595,8 +596,10 @@ export const setQuestionAnswered = createServerFn({ method: "POST" })
        treinar a IA. Sem o carimbo, a resposta dele ficava invisível para
        qualquer contagem "deste mês", para sempre.
 
-       Mesmo recuo do `secondbrain.functions.ts`: banco sem a coluna devolve
-       42703 e a gente grava só a flag, como antes. */
+       Recuo por `colunaAusente`, que cobre `PGRST204` (payload de UPDATE) além
+       de `42703` (leitura). Só com `42703`, que é como estava, o recuo nunca
+       entrava no banco de produção de hoje — e o botão "marcar respondida"
+       falhava sempre, sem pista para o médico. */
     let { error } = await (supabaseAdmin as any)
       .from("doctor_questions")
       .update(
@@ -605,7 +608,7 @@ export const setQuestionAnswered = createServerFn({ method: "POST" })
           : { answered: false, answered_at: null },
       )
       .eq("id", data.id);
-    if ((error as { code?: string } | null)?.code === "42703") {
+    if (colunaAusente(error)) {
       ({ error } = await (supabaseAdmin as any)
         .from("doctor_questions")
         .update({ answered: data.answered })
