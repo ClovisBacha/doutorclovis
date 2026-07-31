@@ -38,6 +38,7 @@ import {
 import { AlertaSosMedico } from "@/components/alerta-sos-medico";
 import { ProntuarioPaciente } from "@/components/prontuario-paciente";
 import { RegistrarConsulta } from "@/components/registrar-consulta";
+import { ExamesRecebidos } from "@/components/exames-recebidos";
 import {
   consultasDaPaciente,
   fichaClinica,
@@ -197,6 +198,7 @@ const PANEL_TABS = [
   "Perguntas",
   "Cérebro 🧠",
   "Pré-consultas",
+  "Exames",
   "Teleconsultas",
   "Consultas Pagas",
   "Empresas",
@@ -218,6 +220,12 @@ const DOCTOR_TABS: readonly PanelTab[] = [
   "Agendamentos",
   "Perguntas",
   "Pré-consultas",
+  /* A caixa de entrada dos exames. Fica ao lado de Pré-consultas porque é onde
+     ele já procura o que a paciente mandou — e porque quatro abas deste arquivo
+     estão implementadas e INALCANÇÁVEIS por não terem sido listadas aqui,
+     inclusive a única tela de receituário do produto. Uma tela que existe e não
+     é renderizada é pior que uma que não existe: ninguém a procura. */
+  "Exames",
   "Teleconsultas",
   "Consultas Pagas",
   "Lives",
@@ -1118,6 +1126,7 @@ function PainelPage() {
         {tab === "Meu Perfil" && (
           <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
         )}
+        {tab === "Exames" && <ExamesRecebidos tokenFn={token} />}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
         )}

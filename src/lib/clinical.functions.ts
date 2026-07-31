@@ -855,3 +855,184 @@ export const minhasConsultas = createServerFn({ method: "POST" })
       return vazio;
     }
   });
+
+/* ════════════════════════════════════════════════════════════════════════════
+   EXAMES — o ciclo que estava aberto no meio
+
+   O painel tem "Solicitação de Exames". Ela fotografa o laudo do TOTG, do
+   Doppler, da urocultura, e sobe no app. E não existe UMA tela do médico que
+   leia `exam_files` — ele pede o exame e continua pedindo que ela leve
+   impresso, com o sistema já tendo o arquivo.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export type ExameRecebido = {
+  id: string;
+  user_id: string;
+  paciente: string | null;
+  nome: string;
+  categoria: string;
+  semana: number | null;
+  notas: string | null;
+  created_at: string;
+  /** Quando ele registrou que leu. `null` = ainda esperando. */
+  visto_em: string | null;
+};
+
+/**
+ * Exames que as pacientes dele enviaram.
+ *
+ * `image_data` fica DE FORA da listagem de propósito: é base64 de JPEG inteiro,
+ * e trinta exames numa resposta seriam dezenas de megabytes trafegados para
+ * desenhar uma lista de nomes. A imagem vem sob demanda, quando ele abre um.
+ */
+export const examesRecebidos = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        dias: z.number().int().min(1).max(400).default(120),
+        apenasNaoVistos: z.boolean().default(false),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const vazio = { ok: true as const, exames: [] as ExameRecebido[] };
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ...vazio, ok: false as const };
+    try {
+      const pacientes = await pacientesAtuais(user.id);
+      const ids = [...pacientes.keys()];
+      if (ids.length === 0) return vazio;
+
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const desde = new Date(Date.now() - data.dias * 86400000).toISOString();
+      const linhas: Record<string, unknown>[] = [];
+      // Lotes de 100: `.in()` viaja na URL e uma lista longa volta 414, que aqui
+      // viraria "nenhum exame" em silêncio.
+      for (let i = 0; i < ids.length; i += LOTE) {
+        const { data: rows, error } = await (supabaseAdmin as any)
+          .from("exam_files")
+          .select("id,user_id,name,category,week,notes,created_at")
+          .in("user_id", ids.slice(i, i + LOTE))
+          .gte("created_at", desde)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (error) return vazio;
+        linhas.push(...((rows ?? []) as Record<string, unknown>[]));
+      }
+
+      const vistos = await lerDesfechos(user.id);
+      const exames = linhas
+        .map((r) => ({
+          id: String(r.id),
+          user_id: String(r.user_id),
+          paciente: pacientes.get(String(r.user_id)) || null,
+          nome: String(r.name ?? ""),
+          categoria: String(r.category ?? "outros"),
+          semana: (r.week as number) ?? null,
+          notas: (r.notes as string) ?? null,
+          created_at: String(r.created_at),
+          visto_em: vistos.get(`${r.user_id}:exam_files:${r.id}`) ?? null,
+        }))
+        .filter((e) => !data.apenasNaoVistos || !e.visto_em)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return { ok: true as const, exames };
+    } catch {
+      return vazio;
+    }
+  });
+
+/** A imagem de UM exame. Separada da lista porque é o que pesa. */
+export const imagemDoExame = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), exameId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ok: false as const, imagem: null };
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: row, error } = await (supabaseAdmin as any)
+        .from("exam_files")
+        .select("user_id,image_data")
+        .eq("id", data.exameId)
+        .maybeSingle();
+      if (error || !row) return { ok: false as const, imagem: null };
+      /* Vínculo ATUAL depois de saber de quem é o exame: quem trocou de médico
+         não tem os laudos dela abertos para o consultório anterior. */
+      const pacientes = await pacientesAtuais(user.id);
+      if (!pacientes.has(String(row.user_id))) return { ok: false as const, imagem: null };
+      return { ok: true as const, imagem: (row.image_data as string) ?? null };
+    } catch {
+      return { ok: false as const, imagem: null };
+    }
+  });
+
+/**
+ * Devolutiva do exame: ele leu e conta a ela o que viu.
+ *
+ * Marca como visto E entrega o recado — as duas coisas juntas, porque marcar
+ * sem devolver deixa o ciclo aberto exatamente onde ele estava: ela mandou o
+ * laudo e nunca soube se alguém olhou.
+ *
+ * A entrega usa a aba Perguntas dela, que já sabe renderizar resposta do
+ * médico. Uma caixa de entrada nova seria outro lugar para ela ter de aprender
+ * a olhar.
+ */
+export const devolutivaDoExame = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        exameId: z.string().uuid(),
+        pacienteId: z.string().uuid(),
+        nomeDoExame: z.string().min(1).max(200),
+        recado: z.string().max(2000).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ok: false as const };
+    const pacientes = await pacientesAtuais(user.id);
+    if (!pacientes.has(data.pacienteId)) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const agora = new Date().toISOString();
+
+    const { error } = await (supabaseAdmin as any).from("clinical_acks").upsert(
+      {
+        doctor_id: user.id,
+        fonte: "exam_files",
+        fonte_id: data.exameId,
+        user_id: data.pacienteId,
+        visto_em: agora,
+        conduta: data.recado ?? null,
+      },
+      { onConflict: "doctor_id,fonte,fonte_id" },
+    );
+    if (error) return { ok: false as const };
+
+    const recado = (data.recado ?? "").trim();
+    if (!recado) return { ok: true as const, avisou: false as const };
+
+    try {
+      await (supabaseAdmin as any).from("doctor_questions").insert({
+        user_id: data.pacienteId,
+        doctor_id: user.id,
+        question: `Sobre o exame que você enviou: ${data.nomeDoExame}`,
+        answer: recado,
+        answered: true,
+        answered_at: agora,
+      });
+      const { sendPushToUser } = await import("./push.server");
+      await sendPushToUser(data.pacienteId, {
+        title: "Seu médico viu o seu exame",
+        body: recado.slice(0, 90),
+        url: "/minha-conta?tab=Consultas&sub=perguntas",
+      });
+    } catch {
+      /* O visto já está gravado; a devolutiva pode ser reenviada. */
+      return { ok: true as const, avisou: false as const };
+    }
+    return { ok: true as const, avisou: true as const };
+  });
