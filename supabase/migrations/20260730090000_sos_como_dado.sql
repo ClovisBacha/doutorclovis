@@ -32,6 +32,8 @@ CREATE INDEX IF NOT EXISTS idx_panic_user   ON public.panic_events(user_id, crea
 -- O MEDICO le e atualiza os acionamentos das PROPRIAS pacientes. Sem isto ele
 -- literalmente nao tem como saber que houve um SOS.
 DROP POLICY IF EXISTS "medico le panicos das suas pacientes" ON public.panic_events;
+/* Versao inicial: so o carimbo. Substituida por 20260731050000, que exige o
+   vinculo ATUAL — sem isso o ex-medico continuava lendo a geolocalizacao. */
 CREATE POLICY "medico le panicos das suas pacientes" ON public.panic_events
   FOR SELECT TO authenticated
   USING (doctor_id = auth.uid());

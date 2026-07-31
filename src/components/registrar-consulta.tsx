@@ -129,7 +129,12 @@ export function RegistrarConsulta({
   /* As faixas, do lado do FORMULÁRIO. Sem elas, o `inputValidator` do servidor
      lança e o `catch` dizia "Falha de conexão — a consulta não foi salva": um
      obstetra que digitou 18 em vez de 180 ia olhar a rede. */
-  const FAIXAS: Record<string, { min: number; max: number; nome: string }> = {
+  /* `Partial<Record<keyof Campos, …>>` e não `Record<string, …>`: com a chave
+     solta, trocar `pesoKg` por `pesoKG` compilava limpo (`noUnusedLocals` e
+     `no-unused-vars` estão desligados neste projeto) e o efeito de um typo
+     seria um TypeError dentro do `async salvar()` — botão sem reação, sem
+     toast, sem pista. */
+  const FAIXAS: Partial<Record<keyof Campos, { min: number; max: number; nome: string }>> = {
     systolic: { min: 50, max: 300, nome: "A sistólica" },
     diastolic: { min: 20, max: 200, nome: "A diastólica" },
     pesoKg: { min: 25, max: 350, nome: "O peso" },
@@ -139,6 +144,7 @@ export function RegistrarConsulta({
 
   function foraDeFaixa(): string | null {
     for (const [campo, faixa] of Object.entries(FAIXAS)) {
+      if (!faixa) continue;
       const v = num(f[campo as keyof Campos]);
       if (v == null) continue;
       if (v < faixa.min || v > faixa.max) {
@@ -158,6 +164,13 @@ export function RegistrarConsulta({
       toast.error("A pressão precisa dos dois números — sistólica e diastólica.");
       return;
     }
+    /* Hora sem data era descartada: ele digitava 14:30, deixava a data em
+       branco achando "hoje" implícito, e o servidor gravava a hora do REGISTRO
+       (22h) — escondendo justamente o que ela fez às 15h. */
+    if (!f.ocorridaEm && f.hora) {
+      toast.error("Preencha a data da consulta — só a hora não basta.");
+      return;
+    }
     const erroFaixa = foraDeFaixa();
     if (erroFaixa) {
       toast.error(erroFaixa);
@@ -167,6 +180,13 @@ export function RegistrarConsulta({
        142, escrevi para ela o que fazer" era recusado com "registre ao menos
        uma medida" — dizendo que ele não registrou nada tendo registrado três
        coisas, incluindo as duas medidas que só existem em consultório. */
+    if (f.ocorridaEm && f.ocorridaEm > new Date().toLocaleDateString("en-CA")) {
+      /* O `max` do input é decorativo: não há `<form>` e `salvar()` nunca
+         chamava `checkValidity()`. Uma data de 2027 cegava o bloco "desde a
+         última consulta" para sempre. */
+      toast.error("A data da consulta não pode estar no futuro.");
+      return;
+    }
     const vazio =
       !f.achados.trim() &&
       !f.conduta.trim() &&

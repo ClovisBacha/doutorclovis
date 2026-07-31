@@ -509,16 +509,22 @@ CREATE INDEX IF NOT EXISTS idx_panic_user   ON public.panic_events(user_id, crea
 
 -- O MEDICO le e atualiza os acionamentos das PROPRIAS pacientes. Sem isto ele
 -- literalmente nao tem como saber que houve um SOS.
-DROP POLICY IF EXISTS "medico le panicos das suas pacientes" ON public.panic_events;
-CREATE POLICY "medico le panicos das suas pacientes" ON public.panic_events
-  FOR SELECT TO authenticated
-  USING (doctor_id = auth.uid());
-
-DROP POLICY IF EXISTS "medico marca panico como atendido" ON public.panic_events;
-CREATE POLICY "medico marca panico como atendido" ON public.panic_events
-  FOR UPDATE TO authenticated
-  USING (doctor_id = auth.uid())
-  WITH CHECK (doctor_id = auth.uid());
+-- ATENCAO: as policies de panic_events NAO ficam mais aqui.
+--
+-- Elas viviam neste arquivo chaveadas so em `doctor_id = auth.uid()` — o
+-- carimbo HISTORICO da linha. Isso deixava o ex-medico lendo latitude,
+-- longitude e endereco do SOS depois de encerrado o acompanhamento, e ainda
+-- marcando o acionamento como atendido.
+--
+-- A versao corrigida esta em APLICAR_SOS_VINCULO.sql, e exige as DUAS
+-- condicoes: o carimbo E o vinculo de hoje.
+--
+-- Se as linhas antigas continuassem aqui, reaplicar este arquivo — que e
+-- documentado como idempotente e "pode rodar mais de uma vez" — faria o
+-- DROP POLICY derrubar a versao boa e recriar a furada. Um operador consertando
+-- o banco reabriria o vazamento sem saber.
+--
+-- >>> Rode APLICAR_SOS_VINCULO.sql depois deste arquivo. <<<
 
 -- Retroativo: os acionamentos que ja existem ganham o medico atual da paciente.
 -- E o melhor palpite disponivel — dali para frente o valor e congelado no

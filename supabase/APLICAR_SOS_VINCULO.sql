@@ -10,6 +10,7 @@
 -- ============================================================================
 
 -- ============================================================================
+-- ============================================================================
 -- O SOS SEGUE O VÍNCULO ATUAL — não o carimbo da linha
 -- ============================================================================
 --
@@ -53,10 +54,31 @@ SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.patient_profiles p
-     WHERE p.id = paciente AND p.doctor_id = medico
+     WHERE p.id = paciente
+       AND p.doctor_id = medico
+       /* AMARRADA AO CHAMADOR.
+       
+          Sem esta linha a função é um oráculo de vínculo alheio: qualquer
+          `authenticated` perguntava "a paciente X é do médico Y?" e recebia
+          `true`, mesmo sem enxergar uma única linha de `patient_profiles` pela
+          RLS. O ex-médico guarda o uuid da paciente de quando ela era dele — ele
+          leu esse uuid em toda abertura do painel — e ia descobrindo, um médico
+          por vez, para qual consultório ela foi.
+
+          A RLS de `patient_profiles` existe para esconder isso; `SECURITY
+          DEFINER` sem este filtro a contornava. Não quebra o uso nas policies:
+          elas sempre passam `auth.uid()`. */
+       AND medico = auth.uid()
   )
 $$;
 
+/* `FROM PUBLIC`, e não `FROM anon`.
+   
+   Toda função nasce com EXECUTE para PUBLIC, e `REVOKE ... FROM anon` não
+   remove isso — o `anon` continuava executando por herança. E como a função
+   vive em `public`, o PostgREST a expõe como `POST /rest/v1/rpc/e_paciente_atual`
+   com a chave anon que está no bundle do navegador. */
+REVOKE ALL ON FUNCTION public.e_paciente_atual(uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.e_paciente_atual(uuid, uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.e_paciente_atual(uuid, uuid) TO authenticated, service_role;
 
