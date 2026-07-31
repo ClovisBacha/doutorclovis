@@ -783,7 +783,15 @@ function MinhaContaPage() {
   /* Sub-aba pedida por quem navegou até aqui (o toque no bebê pede "semana",
      um marco pede "checklist"). Vale para QUALQUER hub com grade — antes era
      só das Consultas. */
-  const [consultasSub, setConsultasSub] = useState<string | null>(null);
+  /* Deep link também da SUB-aba: `?tab=Consultas&sub=perguntas`.
+  
+     Sem isto, o push "seu médico respondeu" levava a paciente para a grade de
+     Consultas e ela ainda tinha de achar Perguntas — e um aviso que não leva ao
+     que ele anuncia é pior que aviso nenhum, porque ensina a ignorá-lo. */
+  const [consultasSub, setConsultasSub] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("sub");
+  });
   const goToTab = (t: string, sub?: string) => {
     setTab(t as Tab);
     setMobileHome(false);

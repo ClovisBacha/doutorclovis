@@ -686,8 +686,97 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
       await sb.from("brain_entries").delete().eq("id", entry.id);
       return { ok: false as const };
     }
-    return { ok: true as const };
+
+    /* A RESPOSTA CHEGA A QUEM PERGUNTOU.
+    
+       Até aqui, responder uma lacuna só criava conhecimento para a IA — e a
+       paciente que perguntou, e a quem a IA disse "registrei aqui para ele
+       ver", nunca era avisada. A promessa era impossível de cumprir porque
+       `brain_gaps` não guardava quem perguntou.
+
+       O texto que ela recebe é `data.answer`, o que ele escreveu. A pergunta
+       que vai junto é a CRUA dela (`gap.question`), não a versão generalizada
+       que virou conhecimento: ela precisa reconhecer a própria dúvida.
+
+       Best-effort de propósito — a lacuna já está respondida e o conhecimento
+       já existe. Uma falha de entrega não pode desfazer isso. */
+    const avisadas = await entregarRespostaDaLacuna(sb, {
+      gapId: gap.id as string,
+      doctorId,
+      perguntaDela: gap.question as string,
+      resposta: data.answer,
+    });
+    return { ok: true as const, avisadas };
   });
+
+/**
+ * Entrega a resposta de uma lacuna a todas as pacientes que perguntaram.
+ *
+ * Grava na aba Perguntas dela — que já sabe renderizar resposta do médico — em
+ * vez de inventar uma caixa de entrada nova. E marca `avisada_em` para que
+ * reprocessar não mande o mesmo push de novo: aviso repetido sobre dúvida
+ * antiga é o que faz a paciente desligar as notificações.
+ */
+async function entregarRespostaDaLacuna(
+  sb: any,
+  args: { gapId: string; doctorId: string; perguntaDela: string; resposta: string },
+): Promise<number> {
+  try {
+    const { data: esperando } = await sb
+      .from("brain_gap_askers")
+      .select("user_id")
+      .eq("gap_id", args.gapId)
+      .is("avisada_em", null)
+      .limit(200);
+    const ids = ((esperando ?? []) as { user_id: string }[]).map((a) => a.user_id);
+    if (ids.length === 0) return 0;
+
+    /* Só quem AINDA é paciente dele. Alguém que trocou de médico no meio não
+       deve receber resposta do consultório anterior. */
+    const { data: atuais } = await sb
+      .from("patient_profiles")
+      .select("id")
+      .eq("doctor_id", args.doctorId)
+      .in("id", ids);
+    const destino = ((atuais ?? []) as { id: string }[]).map((p) => p.id);
+    if (destino.length === 0) return 0;
+
+    const agora = new Date().toISOString();
+    await sb.from("doctor_questions").insert(
+      destino.map((uid) => ({
+        user_id: uid,
+        doctor_id: args.doctorId,
+        question: args.perguntaDela,
+        answer: args.resposta,
+        answered: true,
+        answered_at: agora,
+      })),
+    );
+    await sb
+      .from("brain_gap_askers")
+      .update({ avisada_em: agora })
+      .eq("gap_id", args.gapId)
+      .in("user_id", destino);
+
+    try {
+      const { sendPushToUser } = await import("./push.server");
+      await Promise.allSettled(
+        destino.map((uid) =>
+          sendPushToUser(uid, {
+            title: "Seu médico respondeu",
+            body: args.perguntaDela.slice(0, 90),
+            url: "/minha-conta?tab=Consultas&sub=perguntas",
+          }),
+        ),
+      );
+    } catch {
+      /* sem push configurado: a resposta já está na aba dela */
+    }
+    return destino.length;
+  } catch {
+    return 0;
+  }
+}
 
 /** Ignora uma lacuna (não volta a aparecer; novo hit não reabre). */
 export const dismissBrainGap = createServerFn({ method: "POST" })

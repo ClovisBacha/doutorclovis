@@ -114,11 +114,64 @@ export function isSuporteDoApp(question: string): boolean {
   return TERMOS_SUPORTE.test(question);
 }
 
-export function logBrainGap(doctorId: string, question: string, channel: BrainChannel): void {
+/**
+ * Cortesia — agradecimento, despedida, confirmação.
+ *
+ * "obrigada!!" normaliza para "obrigada": oito caracteres, passa o piso de
+ * tamanho e virava lacuna na fila do médico. Isso já era ruído; virou defeito
+ * de verdade quando a lacuna passou a registrar QUEM perguntou — a paciente
+ * ficava esperando resposta para um "obrigada", e ganharia um push quando ele
+ * "respondesse".
+ *
+ * Comparação EXATA depois de normalizar, nunca substring: "obrigada, mas posso
+ * tomar dipirona?" é uma pergunta clínica de verdade e não pode cair aqui.
+ */
+const CORTESIAS = new Set([
+  "obrigada",
+  "obrigado",
+  "muito obrigada",
+  "muito obrigado",
+  "brigada",
+  "brigado",
+  "valeu",
+  "ta bom",
+  "tudo bem",
+  "entendi",
+  "entendido",
+  "certo",
+  "beleza",
+  "perfeito",
+  "otimo",
+  "ate mais",
+  "tchau",
+  "bom dia",
+  "boa tarde",
+  "boa noite",
+]);
+
+export function isCortesia(question: string): boolean {
+  return CORTESIAS.has(normalizeGapQuestion(question));
+}
+
+export function logBrainGap(
+  doctorId: string,
+  question: string,
+  channel: BrainChannel,
+  /**
+   * Quem perguntou.
+   *
+   * Opcional porque o painel também gera lacuna ao TESTAR a IA (canal
+   * "teste"), e ali não há paciente esperando resposta. Quando existe, é o que
+   * permite a IA cumprir o que ela promete a ela — "registrei aqui para ele
+   * ver" — em vez de a resposta morrer no treinamento.
+   */
+  patientId?: string,
+): void {
   const clean = question.trim().slice(0, 300);
   const norm = normalizeGapQuestion(clean);
   if (norm.length < 8) return; // "oi", "ok" etc. não são lacunas
   if (isSuporteDoApp(clean)) return; // suporte do app não vira fila do médico
+  if (isCortesia(clean)) return; // "obrigada" não é dúvida esperando resposta
   void (async () => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -129,6 +182,16 @@ export function logBrainGap(doctorId: string, question: string, channel: BrainCh
         .eq("doctor_id", doctorId)
         .eq("norm_question", norm)
         .maybeSingle();
+      /* Registra quem está esperando. Tabela separada de propósito: a lacuna é
+         deduplicada por `(médico, pergunta)` — é isso que faz cinquenta
+         pacientes com a mesma dúvida virarem UM item na fila dele. */
+      const anotaQuemPerguntou = async (gapId: string) => {
+        if (!patientId || !gapId) return;
+        await sb
+          .from("brain_gap_askers")
+          .upsert({ gap_id: gapId, user_id: patientId }, { onConflict: "gap_id,user_id" });
+      };
+
       if (existing) {
         // Reaparecer conta como novo hit; lacuna ignorada não reabre sozinha.
         await sb
@@ -139,13 +202,19 @@ export function logBrainGap(doctorId: string, question: string, channel: BrainCh
             ...(existing.status === "respondida" ? { status: "aberta" } : {}),
           })
           .eq("id", existing.id);
+        await anotaQuemPerguntou(existing.id);
       } else {
-        await sb.from("brain_gaps").insert({
-          doctor_id: doctorId,
-          question: clean,
-          norm_question: norm,
-          channel,
-        });
+        const { data: nova } = await sb
+          .from("brain_gaps")
+          .insert({
+            doctor_id: doctorId,
+            question: clean,
+            norm_question: norm,
+            channel,
+          })
+          .select("id")
+          .maybeSingle();
+        await anotaQuemPerguntou(nova?.id);
         // Fecha o ciclo em horas, não em dias: avisa o médico que a IA tem
         // pergunta sem resposta. No máximo 1 e-mail por dia por médico (o
         // primeiro gap do dia dispara; os demais só aparecem no painel).
@@ -229,6 +298,8 @@ export async function getBrainContext(
   userMessage: string,
   doctorId?: string,
   channel: BrainChannel = "app",
+  /** Quem está perguntando — vai junto para a lacuna saber quem espera. */
+  patientId?: string,
 ): Promise<BrainContext> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -317,7 +388,7 @@ export async function getBrainContext(
     }
 
     if (selected.length === 0 && channel !== "teste") {
-      logBrainGap(target, userMessage, channel);
+      logBrainGap(target, userMessage, channel, patientId);
     }
 
     // Montagem do bloco pelo núcleo DoctorThink (rótulos de domínio da
@@ -359,6 +430,7 @@ export async function getBrainContextResolved(
   userMessage: string,
   doctorId?: string,
   channel: BrainChannel = "app",
+  patientId?: string,
 ): Promise<BrainContext> {
   const url = process.env.DOCTORTHINK_API_URL;
   const apiKey = process.env.DOCTORTHINK_API_KEY;
@@ -388,7 +460,7 @@ export async function getBrainContextResolved(
       /* qualquer problema → cai no cérebro local */
     }
   }
-  return getBrainContext(userMessage, doctorId, channel);
+  return getBrainContext(userMessage, doctorId, channel, patientId);
 }
 
 /**

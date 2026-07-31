@@ -3,6 +3,7 @@ import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 import {
   getBrainContextResolved,
+  isCortesia,
   isSuporteDoApp,
   normalizeGapQuestion,
 } from "@/lib/secondbrain.server";
@@ -415,7 +416,7 @@ export const Route = createFileRoute("/api/chat")({
           const [brain, memorySummary, cicloBemEstar, medidas] = await Promise.all([
             // Fonte resolvida: local por padrão; DoctorThink remoto se ligado
             // (env + flag doctorthink_remote). Fallback local em qualquer falha.
-            getBrainContextResolved(userText, patient.doctorId, "app"),
+            getBrainContextResolved(userText, patient.doctorId, "app", patient.patientId),
             getChatMemory(patient.patientId, patient.doctorId),
             // Ciclo + humor DELA (fonte confiável): a IA conversa com sensibilidade
             // à fase do ciclo e a como ela vem se sentindo.
@@ -432,7 +433,9 @@ export const Route = createFileRoute("/api/chat")({
           // Espelha logBrainGap EXATAMENTE (tamanho + filtro de suporte): se a
           // pergunta não entrou na fila, a IA não pode dizer que entrou.
           const gapWasLogged =
-            normalizeGapQuestion(userText).length >= 8 && !isSuporteDoApp(userText);
+            normalizeGapQuestion(userText).length >= 8 &&
+            !isSuporteDoApp(userText) &&
+            !isCortesia(userText);
           const confianca =
             brain.enabledApp && brain.hadCoverage
               ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
