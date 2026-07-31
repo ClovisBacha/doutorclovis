@@ -55,7 +55,7 @@ import { subscribeToPush, vapidPublicKey } from "@/lib/push";
 import { sendTestPushToMe } from "@/lib/push.functions";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
-import { sinalGlicemia, sinalPressao, vozDaPaciente } from "@/lib/sinais-clinicos";
+import { sinalGlicemia, sinalPressao, validaRegistro, vozDaPaciente } from "@/lib/sinais-clinicos";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
   babyForWeek,
@@ -4842,20 +4842,44 @@ function HealthTab({
       toast.error("Preencha ao menos um campo para registrar.");
       return;
     }
+    /* VALIDAÇÃO ANTES DE GRAVAR — e agora o banco também recusa.
+
+       Marcar o número impossível na LEITURA conserta a tela; não conserta o
+       prontuário. E com os CHECKs aplicados, sem esta checagem aqui o insert
+       volta erro e a paciente lê "Erro ao salvar. Tente novamente." — conselho
+       errado, porque repetir o mesmo número falha para sempre. */
+    const erroFaixa = validaRegistro({
+      weight_kg: form.weight_kg,
+      systolic: form.systolic,
+      diastolic: form.diastolic,
+      glucose_mg_dl: form.glucose_mg_dl,
+      spo2: form.spo2,
+      heart_rate_bpm: form.heart_rate_bpm,
+      steps: form.steps,
+      sleep_hours: form.sleep_hours,
+    });
+    if (erroFaixa) {
+      toast.error(erroFaixa);
+      return;
+    }
+
     // Envia apenas os campos preenchidos (colunas extras podem não existir
     // no banco ainda sem as migrations pendentes) e a data local do navegador.
     const payload: Record<string, unknown> = {
       user_id: u.user.id,
       log_date: new Date().toLocaleDateString("en-CA"),
     };
-    if (form.weight_kg) payload.weight_kg = Number(form.weight_kg);
-    if (form.systolic) payload.systolic = Number(form.systolic);
-    if (form.diastolic) payload.diastolic = Number(form.diastolic);
-    if (form.glucose_mg_dl) payload.glucose_mg_dl = Number(form.glucose_mg_dl);
-    if (form.spo2) payload.spo2 = Number(form.spo2);
-    if (form.heart_rate_bpm) payload.heart_rate_bpm = Number(form.heart_rate_bpm);
-    if (form.steps) payload.steps = Number(form.steps);
-    if (form.sleep_hours) payload.sleep_hours = Number(form.sleep_hours);
+    if (form.weight_kg !== "") payload.weight_kg = Number(String(form.weight_kg).replace(",", "."));
+    if (form.systolic !== "") payload.systolic = Number(String(form.systolic).replace(",", "."));
+    if (form.diastolic !== "") payload.diastolic = Number(String(form.diastolic).replace(",", "."));
+    if (form.glucose_mg_dl !== "")
+      payload.glucose_mg_dl = Number(String(form.glucose_mg_dl).replace(",", "."));
+    if (form.spo2 !== "") payload.spo2 = Number(String(form.spo2).replace(",", "."));
+    if (form.heart_rate_bpm !== "")
+      payload.heart_rate_bpm = Number(String(form.heart_rate_bpm).replace(",", "."));
+    if (form.steps !== "") payload.steps = Number(String(form.steps).replace(",", "."));
+    if (form.sleep_hours !== "")
+      payload.sleep_hours = Number(String(form.sleep_hours).replace(",", "."));
     if (form.notes) payload.notes = form.notes;
     const { error } = await (supabase as any).from("health_logs").insert(payload);
     if (error) {

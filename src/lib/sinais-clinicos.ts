@@ -263,3 +263,77 @@ export function vozDaPaciente(
     orientacao: "Vale repetir mais tarde e comentar na próxima consulta.",
   };
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   VALIDAÇÃO NA ENTRADA
+
+   As guardas de implausibilidade acima existem porque números impossíveis
+   CHEGAVAM ao banco: o formulário testava `if (form.systolic)` e a string "0"
+   é truthy, então zero era gravado como pressão e depois lido como medida.
+   Marcar na leitura conserta a tela; não conserta o prontuário.
+
+   A régua é a MESMA das faixas de implausibilidade — e agora também a mesma dos
+   CHECKs do banco. Se divergirem, o banco recusa e a paciente lê "erro ao
+   salvar, tente novamente", que é conselho errado: repetir o mesmo número falha
+   para sempre.
+   ────────────────────────────────────────────────────────────────────────── */
+
+export type CampoClinico =
+  | "systolic"
+  | "diastolic"
+  | "glucose_mg_dl"
+  | "weight_kg"
+  | "spo2"
+  | "heart_rate_bpm"
+  | "sleep_hours"
+  | "steps";
+
+const FAIXAS: Record<CampoClinico, { min: number; max: number; nome: string; unidade: string }> = {
+  systolic: { min: 50, max: 300, nome: "A sistólica", unidade: "mmHg" },
+  diastolic: { min: 20, max: 200, nome: "A diastólica", unidade: "mmHg" },
+  glucose_mg_dl: { min: 20, max: 900, nome: "A glicemia", unidade: "mg/dL" },
+  weight_kg: { min: 25, max: 350, nome: "O peso", unidade: "kg" },
+  spo2: { min: 50, max: 100, nome: "A saturação", unidade: "%" },
+  heart_rate_bpm: { min: 30, max: 250, nome: "A frequência cardíaca", unidade: "bpm" },
+  sleep_hours: { min: 0, max: 24, nome: "O sono", unidade: "h" },
+  steps: { min: 0, max: 200000, nome: "Os passos", unidade: "" },
+};
+
+/** `null` quando está tudo bem; a frase para a paciente quando não está. */
+export function validaEntrada(campo: CampoClinico, bruto: string): string | null {
+  const texto = (bruto ?? "").trim();
+  if (texto === "") return null;
+  const n = Number(texto.replace(",", "."));
+  const f = FAIXAS[campo];
+  if (!Number.isFinite(n)) return `${f.nome} precisa ser um número.`;
+  /* O caso da glicemia em mmol/L merece frase própria: dizer "fora da faixa"
+     para quem digitou 5,4 num aparelho importado não explica nada, e ela vai
+     tentar de novo com o mesmo número. */
+  if (campo === "glucose_mg_dl" && n > 0 && n < 20) {
+    return "Esse valor parece estar em mmol/L. O app usa mg/dL — multiplique por 18 (ex.: 5,4 → 97).";
+  }
+  if (n < f.min || n > f.max) {
+    return `${f.nome} precisa ficar entre ${f.min} e ${f.max}${f.unidade ? ` ${f.unidade}` : ""}. Confira o número.`;
+  }
+  return null;
+}
+
+/**
+ * Valida um registro inteiro e devolve a PRIMEIRA frase a mostrar.
+ *
+ * Também cobre o que campo isolado não vê: pressão pela metade. O banco agora
+ * tem `num_nonnulls(systolic, diastolic) <> 1`, então sem esta checagem o
+ * insert seria recusado e a paciente leria o toast genérico.
+ */
+export function validaRegistro(campos: Partial<Record<CampoClinico, string>>): string | null {
+  const s = (campos.systolic ?? "").trim();
+  const d = (campos.diastolic ?? "").trim();
+  if ((s === "") !== (d === "")) {
+    return "A pressão precisa dos dois números — sistólica e diastólica.";
+  }
+  for (const [campo, valor] of Object.entries(campos) as [CampoClinico, string][]) {
+    const erro = validaEntrada(campo, valor);
+    if (erro) return erro;
+  }
+  return null;
+}

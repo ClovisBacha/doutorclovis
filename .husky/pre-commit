@@ -1,1 +1,12 @@
 bunx lint-staged
+
+# OS TESTES SÃO PORTÃO, não sugestão.
+#
+# Até hoje os únicos portões deste projeto eram tipo, estilo e compilação —
+# e todo defeito encontrado nas revisões foi de LÓGICA, que nenhum dos três vê:
+# um filtro que excluía justamente o que a tela existia para mostrar, um `catch`
+# que devolvia "está tudo limpo", uma faixa que chamava 35 mg/dL de normal.
+#
+# Regra de trabalho que acompanha isto: toda correção de defeito vira um teste
+# ANTES da correção. Um defeito sem teste volta.
+bun test src/
