@@ -18,6 +18,20 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
 
+  # Os testes são o portão de LÓGICA. `tsc` vê tipo, `eslint` vê estilo, o build
+  # vê compilação — e todo defeito que as revisões deste projeto encontraram foi
+  # de lógica. O hook de pre-commit pode ser pulado com `--no-verify`; este não.
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun test src/
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
