@@ -152,3 +152,21 @@ BEGIN
   REVOKE UPDATE, DELETE ON public.panic_events FROM anon, authenticated;
 END
 $revoga$;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 5. O ÍNDICE DA TRILHA DE AUDITORIA (pega carona aqui para você não ter que
+--    abrir mais um arquivo)
+--
+-- `audit_log` passou a registrar acesso clínico: quem abriu o prontuário, a
+-- ficha, o laudo, quem emitiu receita e quem encerrou o acompanhamento. A
+-- consulta que responde "quem abriu a ficha da paciente X" filtra por `target`
+-- — que não tinha índice nenhum. Sem isto, a tabela que mais cresce no banco é
+-- varrida inteira a cada pergunta, e a trilha custa sem servir.
+-- ────────────────────────────────────────────────────────────────────────────
+DO $trilha$
+BEGIN
+  IF to_regclass('public.audit_log') IS NULL THEN RETURN; END IF;
+  CREATE INDEX IF NOT EXISTS idx_audit_target
+    ON public.audit_log (target, created_at DESC);
+END
+$trilha$;
