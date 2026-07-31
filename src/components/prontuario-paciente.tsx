@@ -164,6 +164,7 @@ export function ProntuarioPaciente({
   onRegistrarDesfecho,
   registrando,
   consultas = [],
+  aoRegistrarConsulta,
 }: {
   ficha: FichaClinica | null;
   eventos: EventoClinico[];
@@ -174,6 +175,9 @@ export function ProntuarioPaciente({
   registrando: string | null;
   /** As consultas dela, mais recente primeiro. */
   consultas?: Consulta[];
+  /** O formulário de registro. Vem por prop para o prontuário não precisar
+      conhecer token nem server function — ele desenha, quem chama age. */
+  aoRegistrarConsulta?: React.ReactNode;
 }) {
   if (carregando) return <div className="skeleton h-72 rounded-3xl" />;
   if (!ficha) {
@@ -287,6 +291,7 @@ export function ProntuarioPaciente({
           não decide nada — o que decide é o que ele já sabia contra o que
           apareceu depois. */}
       <MudancasDesdeAConsulta eventos={eventos} consultas={consultas} />
+      {aoRegistrarConsulta}
 
       {/* 3. O QUE PEDE OLHAR AGORA */}
       {pendentes.length > 0 && (

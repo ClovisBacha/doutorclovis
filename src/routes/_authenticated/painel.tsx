@@ -37,6 +37,7 @@ import {
 } from "@/lib/acionamentos.functions";
 import { AlertaSosMedico } from "@/components/alerta-sos-medico";
 import { ProntuarioPaciente } from "@/components/prontuario-paciente";
+import { RegistrarConsulta } from "@/components/registrar-consulta";
 import {
   consultasDaPaciente,
   fichaClinica,
@@ -9738,6 +9739,25 @@ function PatientDetailModal({
             incompleto={prontuarioIncompleto}
             registrando={registrandoDesfecho}
             consultas={consultasDela}
+            aoRegistrarConsulta={
+              <RegistrarConsulta
+                pacienteId={p.id}
+                tokenFn={tokenFn}
+                onSalvou={async () => {
+                  /* Recarrega só as consultas: o resto da ficha não mudou, e
+                     recarregar tudo faria a tela piscar inteira depois de uma
+                     ação pequena. */
+                  try {
+                    const cs = await consultasDaPaciente({
+                      data: { accessToken: await tokenFn(), pacienteId: p.id },
+                    });
+                    if (cs.ok) setConsultasDela(cs.consultas);
+                  } catch {
+                    /* fica com a lista anterior; o registro já foi salvo */
+                  }
+                }}
+              />
+            }
             onRegistrarDesfecho={async (fonte, fonteId) => {
               const chave = `${fonte}:${fonteId}`;
               setRegistrandoDesfecho(chave);
