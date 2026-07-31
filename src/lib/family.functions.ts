@@ -252,9 +252,13 @@ export const getPublicNameSession = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ shareToken: z.string() }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    /* Sem `patient_user_id`: o `select("*")` entregava o uuid de `auth.users`
+       dela para qualquer anônimo com o link de votação. Não é explorável
+       sozinho — a RLS não aceita uuid como credencial —, mas é o identificador
+       que aparece em toda outra tabela, e não há motivo para ele sair daqui. */
     const { data: session } = await supabaseAdmin
       .from("baby_name_sessions")
-      .select("*")
+      .select("id,share_token,is_active,reveal_winner,created_at,patient_user_id")
       .eq("share_token", data.shareToken)
       .single();
     if (!session) return { ok: false as const, error: "Link inválido." };
@@ -275,9 +279,14 @@ export const getPublicNameSession = createServerFn({ method: "POST" })
       .select("display_name, baby_name")
       .eq("id", session.patient_user_id)
       .single();
+    /* `patient_user_id` é usado ACIMA para achar o nome dela, e sai do retorno.
+       O uuid de `auth.users` não tem por que chegar a um anônimo com o link de
+       votação — não é credencial, mas é o identificador que aparece em toda
+       outra tabela. */
+    const { patient_user_id: _uuidDela, ...sessaoPublica } = session as Record<string, unknown>;
     return {
       ok: true as const,
-      session: session as NameSession,
+      session: sessaoPublica as unknown as NameSession,
       entries: enriched as NameEntry[],
       motherName: (profile as any)?.display_name ?? null,
       babyName: (profile as any)?.baby_name ?? null,

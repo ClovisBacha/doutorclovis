@@ -174,14 +174,26 @@ export const getMyTeleconsultas = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
+    /* A NOTA CLÍNICA NÃO TRAFEGA PARA O NAVEGADOR DELA.
+    
+       `select("*")` levava `clinical_note` — a nota SOAP, muitas vezes gerada
+       por IA e ainda não revisada pelo médico — e `doctor_notes` para o cliente
+       dela. Não era renderizado, o que é pior: um vazamento à espera de um
+       `console.log`, de uma extensão ou de qualquer um abrindo a aba de rede.
+
+       `doctor_notes` FICA (é o recado que ele escreve para ela ao criar a
+       sessão). `clinical_note` sai. É a mesma decisão de `consultations`, onde
+       o prontuário nunca sai do servidor e só o resumo vai. */
     const { data: rows, error } = await supabaseAdmin
       .from("teleconsulta_sessions")
-      .select("*")
+      .select(
+        "id,patient_user_id,scheduled_for,room_name,status,doctor_notes,patient_notes,created_at,meet_url",
+      )
       .eq("patient_user_id", u.user.id)
       .neq("status", "encerrada")
       .order("scheduled_for", { ascending: true, nullsFirst: false });
     if (error) return { ok: false as const, error: error.message };
-    return { ok: true as const, sessions: (rows ?? []) as TeleconsultaSession[] };
+    return { ok: true as const, sessions: (rows ?? []) as unknown as TeleconsultaSession[] };
   });
 
 export const saveDoctorClinicalNote = createServerFn({ method: "POST" })
