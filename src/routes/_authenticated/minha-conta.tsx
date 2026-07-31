@@ -28,6 +28,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 import drPortrait from "@/assets/dr-clovis-portrait.jpg";
 import { ymdLocal } from "@/lib/utils";
 import { getMyDoctor } from "@/lib/doctors.functions";
+import { minhasConsultas, type ConsultaDaPaciente } from "@/lib/clinical.functions";
 import {
   getMyAppointments,
   respondToProposedTime,
@@ -9000,6 +9001,64 @@ function WaitlistCard() {
   );
 }
 
+/**
+ * O que o médico escreveu PARA ELA depois da consulta.
+ *
+ * Antes disto ela saía do consultório anotando à mão o que ele disse — e o que
+ * ela anota é o que ela lembrou. O texto aqui é o campo que ele escolheu
+ * escrever para ela; o prontuário (achados, conduta) fica com ele, e nunca
+ * trafega até este navegador.
+ */
+function ResumosDasConsultas() {
+  const [itens, setItens] = useState<ConsultaDaPaciente[]>([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const tk = sess.session?.access_token;
+        if (!tk) return;
+        const r = await minhasConsultas({ data: { accessToken: tk } });
+        if (r.ok) setItens(r.consultas);
+      } catch {
+        /* sem resumos; a agenda abaixo continua */
+      } finally {
+        setCarregando(false);
+      }
+    })();
+  }, []);
+
+  // Nada a mostrar não vira caixa vazia: ela ainda não teve consulta registrada.
+  if (carregando || itens.length === 0) return null;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <p className="font-serif text-lg">📋 Depois das suas consultas</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        O que o seu médico deixou escrito para você.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {itens.map((c) => (
+          <li key={c.id} className="rounded-2xl bg-secondary/50 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {new Date(c.occurred_at).toLocaleDateString("pt-BR", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+              })}
+              {c.medico ? ` · ${c.medico}` : ""}
+            </p>
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-foreground">
+              {c.resumo}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ConsultasTab() {
   const [appts, setAppts] = useState<MyAppointment[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(true);
@@ -9201,6 +9260,11 @@ function ConsultasTab() {
 
   return (
     <div className="space-y-6">
+      {/* O que ele escreveu para ela vem PRIMEIRO: é a única coisa nesta tela
+          que ela não podia saber sozinha. O status do agendamento ela já sabe —
+          foi ela que pediu. */}
+      <ResumosDasConsultas />
+
       {/* ── Minhas consultas: o ciclo médico→paciente fecha AQUI ────── */}
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

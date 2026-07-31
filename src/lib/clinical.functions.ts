@@ -785,3 +785,73 @@ export const salvarConsulta = createServerFn({ method: "POST" })
       return { ok: false as const, id: null };
     }
   });
+
+/**
+ * As consultas dela, do lado DELA.
+ *
+ * Devolve `occurred_at`, o tipo e SÓ o `resumo_paciente`. `achados` e `conduta`
+ * nunca saem daqui — são o prontuário, escrito para outro médico, e o que
+ * tranquiliza numa conversa de consultório pode assustar lido sozinho às onze
+ * da noite.
+ *
+ * É por isso que a paciente não tem policy de leitura em `consultations`: o
+ * Postgres não faz RLS por coluna, então uma policy entregaria o prontuário
+ * cru junto. O recorte acontece aqui, e a tabela fica fechada.
+ */
+export type ConsultaDaPaciente = {
+  id: string;
+  occurred_at: string;
+  kind: string;
+  resumo: string;
+  medico: string | null;
+};
+
+export const minhasConsultas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const vazio = { ok: true as const, consultas: [] as ConsultaDaPaciente[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (!u.user) return { ...vazio, ok: false as const };
+    try {
+      const { data: rows, error } = await (supabaseAdmin as any)
+        .from("consultations")
+        .select("id,occurred_at,kind,resumo_paciente,doctor_id")
+        .eq("user_id", u.user.id)
+        /* Só as que TÊM resumo. Uma consulta sem o campo preenchido não vira
+           uma linha vazia na tela dela: ele não escreveu nada para ela, e
+           mostrar a data sozinha só levantaria a pergunta "e o que ele disse?"
+           sem ter resposta. */
+        .not("resumo_paciente", "is", null)
+        .order("occurred_at", { ascending: false })
+        .limit(30);
+      if (error) return vazio;
+
+      const linhas = (rows ?? []) as Record<string, string>[];
+      const ids = Array.from(new Set(linhas.map((r) => r.doctor_id).filter(Boolean)));
+      const nomes = new Map<string, string>();
+      if (ids.length) {
+        const { data: docs } = await (supabaseAdmin as any)
+          .from("doctors")
+          .select("id,display_name")
+          .in("id", ids);
+        for (const d of (docs ?? []) as Record<string, string>[]) {
+          nomes.set(d.id, d.display_name ?? "");
+        }
+      }
+      return {
+        ok: true as const,
+        consultas: linhas
+          .filter((r) => (r.resumo_paciente ?? "").trim() !== "")
+          .map((r) => ({
+            id: r.id,
+            occurred_at: r.occurred_at,
+            kind: r.kind,
+            resumo: r.resumo_paciente,
+            medico: nomes.get(r.doctor_id) || null,
+          })),
+      };
+    } catch {
+      return vazio;
+    }
+  });
