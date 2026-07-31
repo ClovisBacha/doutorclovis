@@ -2473,11 +2473,25 @@ function AppointmentsSection({
                       {STATUS_LABEL[s]}
                     </button>
                   ))}
+                  {/* WhatsApp deixa de ser a ação PRINCIPAL desta linha.
+                  
+                      Ele estava com `bg-primary` — mais destaque que confirmar
+                      ou remarcar —, e o efeito era o produto empurrar a conversa
+                      clínica para fora de si mesmo: o que é dito ali não vira
+                      prontuário, não alimenta a IA, não fica com a paciente, e
+                      some quando ela troca de aparelho.
+                      
+                      O atalho continua, porque combinar horário por WhatsApp é
+                      legítimo e tirá-lo sem alternativa só mandaria o médico
+                      para o celular pessoal. O que muda é o peso visual: agora
+                      ele compete de igual para igual com o resto, e o caminho
+                      clínico (receita, orientação, resposta) tem tela própria. */}
                   <a
                     href={`https://wa.me/55${a.patient_phone.replace(/\D/g, "")}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                    title="Combinar horário. Orientação clínica tem registro no painel."
+                    className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
                   >
                     WhatsApp
                   </a>
