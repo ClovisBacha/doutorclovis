@@ -501,6 +501,15 @@ export const encerrarAcompanhamento = createServerFn({ method: "POST" })
       .select("id");
     if (error || !mexeu?.length) return { ok: false as const };
 
+    /* O encerramento é a ação que APAGA o rastro de todas as outras: sem
+       vínculo, `pacientesAtuais` deixa de listar a paciente e nenhuma leitura
+       posterior é sequer possível. Se ele não ficar registrado, o prontuário
+       fica órfão de história — ninguém consegue dizer quando o consultório
+       parou de responder por ela, que é exatamente a pergunta de uma disputa.
+       `writeAudit` nunca lança; o vínculo já caiu de qualquer forma. */
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit({ id: user.id, email: user.email }, "vinculo.encerrar", data.pacienteId, null);
+
     /* A solicitação antiga volta a "declined" e não some: sem isso, o par
        ficaria com um pedido "accepted" de um vínculo que não existe mais, e ela
        não conseguiria pedir de novo. */

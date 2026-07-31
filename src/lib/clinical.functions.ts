@@ -148,6 +148,42 @@ async function medicoDaSessao(accessToken: string) {
   return doc && doc.active !== false ? u.user : null;
 }
 
+/**
+ * Registra QUEM leu o prontuário de QUEM.
+ *
+ * Uma auditoria de dado clínico não começa perguntando se a RLS está certa —
+ * começa pedindo o log de acesso ao prontuário. `audit_log` existe neste
+ * produto desde sempre e era escrita só por ações de super-admin: nenhuma das
+ * funções clínicas passava por ela. Não havia como responder "quem abriu a
+ * ficha da paciente X em 12 de maio", nem como PROVAR que ninguém abriu.
+ *
+ * COM `await`, e isso é o ponto delicado. A primeira versão disparava um
+ * `void (async () => ...)()` para não custar latência à leitura do médico — e
+ * seria perda silenciosa: na Vercel a instância congela quando a resposta é
+ * devolvida, então uma promessa solta depois do `return` muitas vezes nunca
+ * chega a rodar. Uma trilha que some sob carga é PIOR que trilha nenhuma: ela
+ * responde "ninguém abriu a ficha dela" quando na verdade ninguém sabe.
+ *
+ * Esperar é seguro porque `writeAudit` já engole qualquer erro — tabela
+ * ausente, rede caída, RLS — e nunca lança. O custo é um insert a mais numa
+ * função que já faz quatro idas ao banco.
+ *
+ * O `meta` guarda só ids. O log de acesso não pode virar uma segunda cópia do
+ * prontuário — seria trocar um problema por outro maior.
+ */
+async function trilha(
+  user: { id: string; email?: string | null },
+  acao: string,
+  pacienteId: string,
+): Promise<void> {
+  try {
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit({ id: user.id, email: user.email }, acao, pacienteId, null);
+  } catch {
+    /* trilha é auxiliar */
+  }
+}
+
 /** Pacientes que são dele AGORA. O recorte de tudo neste arquivo. */
 async function pacientesAtuais(doctorId: string): Promise<Map<string, string>> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -342,6 +378,7 @@ export const prontuarioDaPaciente = createServerFn({ method: "POST" })
       if (!pacientes.has(data.pacienteId)) return { ...vazio, ok: false as const };
 
       const desde = new Date(Date.now() - data.dias * 86400000).toISOString();
+      await trilha(user, "prontuario.ler", data.pacienteId);
       const { linhas, incompleto } = await lerEventos([data.pacienteId], (q) =>
         q.gte("ocorrido_em", desde).order("ocorrido_em", { ascending: false }).limit(1000),
       );
@@ -465,6 +502,7 @@ export const fichaClinica = createServerFn({ method: "POST" })
     const pacientes = await pacientesAtuais(user.id);
     if (!pacientes.has(data.pacienteId)) return { ok: false as const, ficha: null };
 
+    await trilha(user, "ficha.ler", data.pacienteId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
     /* Escada de colunas: um banco sem as migrations de perfil rico devolve
@@ -1013,6 +1051,7 @@ export const imagemDoExame = createServerFn({ method: "POST" })
       if (!pacientes.has(String(row.user_id))) {
         return { ok: false as const, imagem: null, motivo: "nao_encontrado" as const };
       }
+      await trilha(user, "exame.imagem", String(row.user_id));
       const img = (row.image_data as string) ?? null;
       return {
         ok: true as const,
@@ -1182,6 +1221,7 @@ export const emitirParaPaciente = createServerFn({ method: "POST" })
     if (!pacientes.has(data.pacienteId)) return { ok: false as const };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await trilha(user, "emissao.criar", data.pacienteId);
     const { data: nova, error } = await (supabaseAdmin as any)
       .from("doctor_orders")
       .insert({
