@@ -61,6 +61,11 @@ function scopedBy(qb: any, scope: PanelScope) {
   return scope.isTeam ? qb : qb.eq("doctor_id", scope.doctorId);
 }
 
+/* O recorte por vínculo ATUAL — e por que o carimbo na linha não serve — está
+   em `./vinculo.server`. Aqui as duas listas clínicas já têm o conjunto certo à
+   mão: `profiles` vem de `patient_profiles` filtrado por `doctor_id`, que é o
+   vínculo de hoje. */
+
 /**
  * Verifica se o chamador PODE mutar a linha `id` da tabela `table`.
  * Fail-closed: a equipe sempre pode; o assinante só se o doctor_id da linha
@@ -176,21 +181,26 @@ export const getAdminData = createServerFn({ method: "POST" })
         p.display_name,
       ]),
     );
-    const questionsWithName: AdminQuestion[] = (questions.data ?? []).map(
-      (q: {
-        id: string;
-        user_id: string;
-        question: string;
-        answered: boolean;
-        created_at: string;
-      }) => ({
-        id: q.id,
-        question: q.question,
-        answered: q.answered,
-        created_at: q.created_at,
-        patient: nameById.get(q.user_id) ?? "Paciente",
-      }),
-    );
+    /* `respondQuestion` já exige vínculo ATUAL para responder. Sem este filtro
+       a fila mostrava perguntas que o médico LIA mas não conseguia responder —
+       a incoerência entre as duas metades é o próprio sintoma. */
+    const questionsWithName: AdminQuestion[] = (questions.data ?? [])
+      .filter((q: { user_id: string }) => scope.isTeam || nameById.has(q.user_id))
+      .map(
+        (q: {
+          id: string;
+          user_id: string;
+          question: string;
+          answered: boolean;
+          created_at: string;
+        }) => ({
+          id: q.id,
+          question: q.question,
+          answered: q.answered,
+          created_at: q.created_at,
+          patient: nameById.get(q.user_id) ?? "Paciente",
+        }),
+      );
 
     return {
       ok: true as const,
@@ -846,10 +856,16 @@ export const getPreConsultaForms = createServerFn({ method: "POST" })
       ]),
     );
 
-    const result: AdminPreConsulta[] = (forms ?? []).map((f: any) => ({
-      ...f,
-      patient_name: nameById.get(f.user_id) ?? "Paciente",
-    }));
+    /* `profiles` JÁ vem recortado por `doctor_id` de `patient_profiles`, que é
+       o vínculo ATUAL. O nome, portanto, sempre esteve certo — a ex-paciente
+       aparecia como "Paciente" genérica, com peso, pressão, sintomas e
+       medicações dela intactos ao lado. O rótulo caía; o dado clínico não. */
+    const result: AdminPreConsulta[] = (forms ?? [])
+      .filter((f: any) => scope.isTeam || nameById.has(f.user_id))
+      .map((f: any) => ({
+        ...f,
+        patient_name: nameById.get(f.user_id) ?? "Paciente",
+      }));
 
     return { ok: true as const, forms: result };
   });

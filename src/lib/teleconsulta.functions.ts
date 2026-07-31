@@ -139,7 +139,17 @@ export const getTeleconsultasAdmin = createServerFn({ method: "POST" })
       for (const p of (profiles ?? []) as { id: string; display_name: string | null }[])
         nameById.set(p.id, p.display_name);
     }
-    const sessions: TeleconsultaSession[] = (rows ?? []).map((r: any) => ({
+    /* Vínculo ATUAL, não o carimbo da linha: sem isto o médico anterior seguia
+       lendo `patient_notes` (o que ELA escreveu antes da consulta),
+       `clinical_note` e o `meet_url` da sala. Ver `./vinculo.server`. */
+    const { vinculadasAgora, soVinculadas } = await import("./vinculo.server");
+    const atuais = await vinculadasAgora(supabaseAdmin as any, scope);
+
+    const sessions: TeleconsultaSession[] = soVinculadas(
+      (rows ?? []) as any[],
+      atuais,
+      (r) => r.patient_user_id as string,
+    ).map((r: any) => ({
       ...r,
       patient_name: nameById.get(r.patient_user_id) ?? null,
     }));

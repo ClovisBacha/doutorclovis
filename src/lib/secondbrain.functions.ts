@@ -1239,13 +1239,22 @@ export const listBrainConversations = createServerFn({ method: "POST" })
       };
     if (error) return { ok: false as const, conversations: [] as BrainConversation[] };
 
+    /* Vínculo ATUAL antes de agrupar. `chat_messages.doctor_id` é carimbado no
+       envio e nunca revisitado — sem este filtro, encerrar o acompanhamento
+       deixava a transcrição INTEIRA das conversas dela com a IA aberta ao
+       médico anterior, com prévia de 120 caracteres já na listagem. É o dado
+       mais íntimo do produto: é para a IA que ela conta o que não conta a
+       ninguém. Ver `./vinculo.server`. */
+    const { vinculadasAgora, soVinculadas } = await import("./vinculo.server");
+    const atuais = await vinculadasAgora(sb, { isTeam: false, doctorId: target.doctorId });
+
     // Agrupa por paciente preservando a ordem (a 1ª ocorrência é a mais recente).
     const byPatient = new Map<string, { lastAt: string; lastPreview: string; count: number }>();
-    for (const m of (rows ?? []) as {
-      patient_id: string;
-      content: string;
-      created_at: string;
-    }[]) {
+    for (const m of soVinculadas(
+      (rows ?? []) as { patient_id: string; content: string; created_at: string }[],
+      atuais,
+      (m) => m.patient_id,
+    )) {
       const cur = byPatient.get(m.patient_id);
       if (cur) cur.count += 1;
       else
@@ -1295,8 +1304,21 @@ export const getBrainConversation = createServerFn({ method: "POST" })
     if (!target) return { ok: false as const, messages: [] as BrainChatMessage[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Duplo WHERE: só mensagens DESTA paciente COM ESTE médico — uma paciente
-    // que trocou de médico não expõe as conversas antigas ao médico novo.
+    /* Duplo WHERE: só mensagens DESTA paciente COM ESTE médico — uma paciente
+       que trocou de médico não expõe as conversas antigas ao médico NOVO.
+       Faltava a metade simétrica: o médico ANTIGO continuava lendo, porque o
+       carimbo `doctor_id` da mensagem é dele para sempre. As duas direções
+       precisam do vínculo de hoje. */
+    const { vinculadasAgora } = await import("./vinculo.server");
+    const atuais = await vinculadasAgora(supabaseAdmin as any, {
+      isTeam: false,
+      doctorId: target.doctorId,
+    });
+    /* Mesma resposta de "essa paciente não tem conversa": não é oráculo de
+       vínculo — ele já sabe o uuid, o que não pode saber é se ela ficou. */
+    if (atuais && !atuais.has(data.patientId))
+      return { ok: true as const, messages: [] as BrainChatMessage[] };
+
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("chat_messages")
       .select("role,content,created_at")
