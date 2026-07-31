@@ -115,17 +115,29 @@ BEGIN
   IF to_regclass('public.panic_events') IS NULL THEN RETURN; END IF;
 
   DROP POLICY IF EXISTS "Patient manages own panic events" ON public.panic_events;
+  /* `DROP ... IF EXISTS` antes de cada `CREATE`, e NENHUM bloco `EXCEPTION`.
 
+     A primeira versão disto tinha `EXCEPTION WHEN duplicate_object THEN NULL`
+     para tolerar reexecução — e o efeito foi o oposto do pretendido: na segunda
+     rodada o `CREATE POLICY` levantava a exceção, o bloco inteiro era abortado,
+     e o `REVOKE` no fim NUNCA rodava. O teste mostrou a paciente ainda apagando
+     o próprio acionamento de SOS depois de a migration ter aplicado "com
+     sucesso". Um `EXCEPTION` que engole erro esperado também engole o trabalho
+     que vinha depois dele. */
+  DROP POLICY IF EXISTS "paciente cria o proprio acionamento" ON public.panic_events;
   CREATE POLICY "paciente cria o proprio acionamento" ON public.panic_events
     FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
 
+  DROP POLICY IF EXISTS "paciente le os proprios acionamentos" ON public.panic_events;
   CREATE POLICY "paciente le os proprios acionamentos" ON public.panic_events
     FOR SELECT TO authenticated USING (user_id = auth.uid());
-
-  REVOKE UPDATE, DELETE ON public.panic_events FROM anon, authenticated;
-EXCEPTION
-  WHEN duplicate_object THEN
-    /* Rodar de novo: as policies já existem. */
-    NULL;
 END
 $panic$;
+
+/* Fora do bloco, para não depender de nada acima ter dado certo. */
+DO $revoga$
+BEGIN
+  IF to_regclass('public.panic_events') IS NULL THEN RETURN; END IF;
+  REVOKE UPDATE, DELETE ON public.panic_events FROM anon, authenticated;
+END
+$revoga$;
