@@ -9,6 +9,20 @@ export const Route = createFileRoute("/api/carta-semanal")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        /* O TERCEIRO PROXY ABERTO.
+           `api-auth.server.ts` foi criado para fechar `nutrition` e
+           `transcribe`, e o cabeçalho dele diz "estes dois ficaram para trás" —
+           mas eram TRÊS. Esta rota chamava o Gemini na chave do consultório para
+           qualquer POST da internet, e é a pior das três nesse aspecto:
+           `babyDesc` não tem teto de tamanho (não há zod aqui, só um cast) e
+           entra cru no prompt.
+
+           O limitador de taxa em memória não conta: na Vercel cada instância
+           tem o próprio Map, então N invocações concorrentes valem N × o
+           limite. É o que o próprio `api-auth.server.ts` já explica. */
+        const { naoAutorizado, usuarioDaRequisicao } = await import("@/lib/api-auth.server");
+        if (!(await usuarioDaRequisicao(request))) return naoAutorizado();
+
         const ip = clientIp(request);
 
         if (rateLimited(ip)) {

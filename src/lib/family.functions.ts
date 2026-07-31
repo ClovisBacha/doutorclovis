@@ -13,6 +13,15 @@ export type AlbumPost = {
   created_at: string;
 };
 
+/**
+ * O álbum visto por QUEM TEM O LINK — sem o uuid dela.
+ *
+ * `AlbumPost` carrega `patient_user_id` porque na tela dela isso é o próprio
+ * id. Na rota por token, o público é o grupo da família, e o id de
+ * `auth.users` não tem o que fazer ali.
+ */
+export type AlbumPostPublico = Omit<AlbumPost, "patient_user_id">;
+
 export const createAlbumPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -52,15 +61,23 @@ export const getAlbumByToken = createServerFn({ method: "POST" })
     if (!invite) return { ok: false as const, error: "Token inválido." };
     if (invite.expires_at && new Date(invite.expires_at) < new Date())
       return { ok: false as const, error: "Convite expirado." };
+    /* COLUNAS NOMEADAS, E SEM O uuid DELA.
+       `select("*")` trazia `patient_user_id` em CADA post, e o retorno o
+       repetia no topo — o uuid de `auth.users` dela entregue a quem tem o link
+       do álbum, que é o grupo da família inteiro. A tela do álbum
+       (`album.$token.tsx`) nunca usou esse campo: era dado morto viajando.
+
+       É exatamente o que foi removido de `getPublicNameSession`, com o
+       comentário certo, 190 linhas abaixo neste mesmo arquivo. A correção não
+       tinha sido propagada para o irmão. */
     const { data: posts } = await supabaseAdmin
       .from("family_album_posts")
-      .select("*")
+      .select("id, created_at, author_name, caption, image_data, emoji")
       .eq("patient_user_id", invite.user_id)
       .order("created_at", { ascending: false });
     return {
       ok: true as const,
-      posts: (posts ?? []) as AlbumPost[],
-      patientUserId: invite.user_id,
+      posts: (posts ?? []) as AlbumPostPublico[],
     };
   });
 

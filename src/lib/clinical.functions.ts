@@ -1424,7 +1424,13 @@ export const responderPergunta = createServerFn({ method: "POST" })
       const { sendPushToUser } = await import("./push.server");
       await sendPushToUser(String(pergunta.user_id), {
         title: "Seu médico respondeu",
-        body: String(pergunta.question).slice(0, 90),
+        /* NEUTRO, como os outros dois pushes deste arquivo. Este mandava o
+           TEXTO CRU da pergunta dela — e push aparece na tela bloqueada, para
+           quem estiver perto do celular. "Sangramento marrom é normal?" na
+           tela do aparelho dela, no ônibus, não é notificação: é a vida dela
+           exposta. Ela sabe o que perguntou; o que ela precisa saber é que
+           chegou resposta. */
+        body: "Toque para ler o que ele escreveu.",
         url: "/minha-conta?tab=Consultas&sub=perguntas",
       });
     } catch {

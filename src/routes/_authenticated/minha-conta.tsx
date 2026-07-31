@@ -10812,9 +10812,14 @@ function CartaBebêTab({
     setLoading(true);
     try {
       const baby = babyForWeek(week);
+      const { data: sess } = await supabase.auth.getSession();
       const res = await fetch("/api/carta-semanal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // O endpoint agora exige sessão: era proxy aberto para o Gemini.
+          Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
+        },
         body: JSON.stringify({
           week,
           babyName: profile?.baby_name ?? null,

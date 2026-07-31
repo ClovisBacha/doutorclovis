@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { getAlbumByToken, addAlbumPostPublic, type AlbumPost } from "@/lib/family.functions";
+import { getAlbumByToken, addAlbumPostPublic, type AlbumPostPublico } from "@/lib/family.functions";
 
 export const Route = createFileRoute("/album/$token")({
   head: () => ({
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/album/$token")({
 
 function AlbumPage() {
   const { token } = Route.useParams();
-  const [posts, setPosts] = useState<AlbumPost[]>([]);
+  const [posts, setPosts] = useState<AlbumPostPublico[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
