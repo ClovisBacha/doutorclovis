@@ -37,6 +37,39 @@
  * que é o defeito que a arte atual tem hoje (72% a 89% de ocupação).
  *
  * ─────────────────────────────────────────────────────────────────────────────
+ * A GORDURA DO BEBÊ — a correção que veio de olhar o resultado
+ *
+ * A primeira leva saiu MAGRA demais para o termo. Corrigi trocando por
+ * "maximum chubbiness — thick rolls of baby fat, soft double chin" — e corrigi
+ * DEMAIS: apliquei isso inclusive na semana 33, que não é termo. O resultado
+ * tinha corpo de bebê de uns quatro meses de vida. Errado por vinte semanas.
+ *
+ * A gordura fetal se acumula quase toda no 3º trimestre, e devagar:
+ *
+ *   28 sem  ~3%   ainda magrinho, pele fina
+ *   33 sem  ~8%   enchendo, SEM dobras
+ *   36 sem  ~12%  redondinho
+ *   40 sem  ~15%  cheio — mas NÃO é o "bebê Michelin"
+ *
+ * O bebê rechonchudo com dobras e papada que todo mundo imagina é um bebê de
+ * TRÊS A SEIS MESES DE VIDA, que engordou mamando. Recém-nascido de verdade é
+ * mais enxuto que a imagem popular.
+ *
+ * E aqui isso não é preciosismo: a paciente olha esta imagem por uma semana e
+ * depois vê o próprio filho nascer. Se a ilustração prometeu um bebê gordo e
+ * nasce um recém-nascido normal, ela pode achar que há algo errado com o dela.
+ * Num app de alto risco, plantar essa dúvida é o oposto do que o produto vende.
+ *
+ * A régua, por faixa:
+ *
+ *   28-32  membros enchendo, bochechas arredondando, SEM dobras
+ *   33-36  redondinho, dobra LEVE em punho e coxa, sem papada
+ *   37-42  cheio e macio, UMA dobrinha discreta — parando antes do exagero
+ *
+ * A referência visual é `baby-tardio.png`, a arte que já existia: gordinha o
+ * suficiente para ser fofa, realista o suficiente para ser verdade.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
  * ÂNCORAS
  *
  * 39 gerações independentes produzem 39 bebês diferentes — a criança trocaria
@@ -324,21 +357,23 @@ export const SEMANAS = [
     visivel: false,
     marco: "Sonha em REM. Início do 3º trimestre.",
     forma:
-      "a well-formed baby with soft hair, round cheeks, plumping arms and legs, smooth healthy skin",
+      "a well-formed baby, still slender, with fine soft hair, cheeks just beginning to round, slim arms and legs starting to fill out, smooth healthy skin — NO fat rolls, NO double chin",
     pose: "curled peacefully asleep, one hand near the cheek",
   },
   {
     s: 29,
     visivel: false,
     marco: "Músculos e pulmões amadurecem.",
-    forma: "a baby with firmer, fuller limbs, soft hair, round cheeks, healthy plump body",
+    forma:
+      "a baby with firmer limbs and gently rounding cheeks, fine soft hair, healthy but still slim — NO fat rolls, NO double chin",
     pose: "curled, arms drawn in, chest gently full",
   },
   {
     s: 30,
     visivel: false,
     marco: "Cérebro se desenvolve rapidamente.",
-    forma: "a baby with a well-rounded head, soft light-brown hair, chubby cheeks and limbs",
+    forma:
+      "a baby with a well-rounded head, fine soft light-brown hair, softly rounded cheeks and limbs — filling out, but still slim and NOT chubby",
     pose: "curled, one fist against the cheek, deeply asleep",
   },
   {
@@ -346,7 +381,8 @@ export const SEMANAS = [
     visivel: true,
     marco: "Pode girar a cabeça.",
     marcoEn: "it can turn its head",
-    forma: "a chubby healthy baby with soft hair, full cheeks, rounded limbs",
+    forma:
+      "a healthy baby with soft hair, softly full cheeks and gently rounded limbs — NO deep fat rolls, NO double chin",
     pose: "curled, head clearly turned to the side, mid-movement",
   },
   {
@@ -355,7 +391,7 @@ export const SEMANAS = [
     marco: "Unhas dos pés se formam.",
     marcoEn: "the toenails are forming",
     forma:
-      "a chubby baby with soft hair, plump rounded limbs, and tiny toes with delicate soft nails",
+      "a healthy rounding baby with soft hair, gently rounded limbs, and tiny toes with delicate soft nails — NO deep fat rolls, NO double chin",
     pose: "curled with one little foot lifted and visible, toes readable",
   },
   {
@@ -363,14 +399,15 @@ export const SEMANAS = [
     visivel: false,
     marco: "Sistema imunológico em desenvolvimento.",
     forma:
-      "a VERY chubby, round, healthy baby with deep rolls of baby fat on the arms, legs and wrists, full puffy cheeks, a soft double chin, a round full belly, and fine soft light-brown hair",
+      "a healthy, comfortably rounded baby with fine soft light-brown hair, full soft cheeks, and just the faintest single crease at the wrists and thighs — rounded but REALISTIC: NO deep fat rolls, NO double chin, NO exaggerated plumpness",
     pose: "curled tightly and peacefully, both hands near the face",
   },
   {
     s: 34,
     visivel: false,
     marco: "Pulmões quase prontos.",
-    forma: "a plump healthy baby, fuller chest, soft hair, round cheeks, smooth skin",
+    forma:
+      "a healthy baby with a fuller chest, soft hair, round soft cheeks and smooth skin — comfortably rounded, with only a faint crease at wrists and thighs, NO double chin",
     pose: "curled, chest full, one arm relaxed outward",
   },
   {
@@ -378,14 +415,16 @@ export const SEMANAS = [
     visivel: true,
     marco: "Posição cefálica se define.",
     marcoEn: "the head-down (cephalic) position is settling",
-    forma: "a plump full-term-looking baby with soft hair and round cheeks",
+    forma:
+      "a healthy, comfortably rounded baby with soft hair and full round cheeks — realistic newborn build, faint wrist and thigh creases only",
     pose: "HEAD-DOWN: the baby is oriented head-downward in the frame, curled, settled — the cephalic position, clearly readable",
   },
   {
     s: 36,
     visivel: false,
     marco: "Considerado a termo precoce em breve.",
-    forma: "a plump baby with fuller cheeks and limbs, soft light-brown hair, smooth healthy skin",
+    forma:
+      "a healthy rounded baby with full cheeks and softly filled limbs, soft light-brown hair, smooth skin — faint wrist and thigh creases only, NO double chin",
     pose: "head-down, curled compactly, less room to move",
   },
 
@@ -396,7 +435,7 @@ export const SEMANAS = [
     marco: "Termo precoce — pulmões prontos.",
     marcoEn: "early term — the lungs are ready",
     forma:
-      "a full-term newborn: very chubby and round, thick baby-fat rolls on arms and thighs, full puffy cheeks, soft double chin, well-defined sweet features, fine soft light-brown hair, smooth rosy peachy skin",
+      "a REAL full-term newborn: softly rounded and healthy, full cheeks, a single gentle crease at the wrists and thighs, sweet well-defined features, fine soft light-brown hair, smooth rosy skin — the build of an actual newborn, NOT the plump 4-month-old baby people picture: NO thick rolls, NO double chin",
     pose: "curled peacefully, one fist near the cheek",
   },
   {
@@ -404,7 +443,8 @@ export const SEMANAS = [
     visivel: true,
     marco: "Encaixe pélvico em muitos casos.",
     marcoEn: "the head has engaged in the pelvis",
-    forma: "a full-term chubby newborn with soft hair, full round cheeks and plump limbs",
+    forma:
+      "a real full-term newborn with soft hair, full round cheeks and softly rounded limbs — realistic newborn build, faint wrist and thigh creases only",
     pose: "head-down and settled low, curled compactly — engaged in the pelvis",
   },
   {
@@ -412,7 +452,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Termo completo!",
     forma:
-      "a full-term chubby newborn, rosy and healthy, soft light-brown hair, very plump rounded arms and legs, full cheeks",
+      "a real full-term newborn, rosy and healthy, soft light-brown hair, softly rounded arms and legs, full cheeks — realistic newborn build, faint creases only, NO double chin",
     pose: "curled peacefully, both hands tucked near the chin, serene",
   },
   {
@@ -420,7 +460,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Pronto para chegar a qualquer momento — no tempo dele.",
     forma:
-      "a FULL-TERM newborn at maximum chubbiness — noticeably rounder and plumper than earlier weeks: thick rolls of baby fat on arms, thighs and wrists, very full puffy cheeks, a soft double chin, a round belly, rosy healthy skin, fine soft light-brown hair, ready to be born",
+      "a REAL full-term newborn, ready to be born: softly rounded and healthy, full round cheeks, a rounded belly, a single gentle crease at the wrists and thighs, rosy healthy skin, fine soft light-brown hair — the build of an actual newborn, NOT the plump 4-month-old baby people picture: NO thick rolls, NO double chin",
     pose: "curled peacefully, one fist near the cheek, deeply serene and content",
   },
   {
@@ -428,7 +468,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Termo tardio — acompanhamento mais de pertinho, tudo sob cuidado.",
     forma:
-      "a full-term chubby newborn with slightly longer soft hair, very plump limbs, full cheeks, healthy rosy skin",
+      "a real full-term newborn with slightly longer soft hair, softly rounded limbs, full cheeks, healthy rosy skin — realistic build, faint creases only",
     pose: "curled snugly, both hands near the face, calm and safe",
   },
   {
@@ -436,7 +476,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Reta final — o bem-estar do bebê é acompanhado de perto pela sua equipe.",
     forma:
-      "a full-term chubby newborn, longer soft hair, very plump rounded limbs, full cheeks, serene and healthy",
+      "a real full-term newborn, longer soft hair, softly rounded limbs, full cheeks, serene and healthy — realistic newborn build, faint creases only",
     pose: "curled snugly, one hand open near the cheek, utterly peaceful",
   },
 ];
