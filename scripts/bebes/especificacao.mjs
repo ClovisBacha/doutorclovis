@@ -112,6 +112,7 @@ export const SEMANAS = [
     s: 4,
     visivel: true,
     marco: "Implantação no útero. Tubo neural começa a se formar.",
+    marcoEn: "the embryo has just implanted; the neural groove is forming along its back",
     forma:
       "a minuscule, endearing curved embryo, little more than a smooth comma-shaped bud with a faint groove along its back, no limbs yet, no face yet, softly glowing and translucent",
     pose: "gently curled, seen in profile",
@@ -120,6 +121,7 @@ export const SEMANAS = [
     s: 5,
     visivel: true,
     marco: "Coração começa a bater.",
+    marcoEn: "the heart has just begun to beat",
     forma:
       "a tiny curved embryo, comma-shaped, with a barely-there rounded head end and a soft swelling where the heart is forming, no limbs yet, translucent and delicate",
     pose: "curled in profile, the heart area catching a soft warm glow",
@@ -128,6 +130,7 @@ export const SEMANAS = [
     s: 6,
     visivel: true,
     marco: "Brotos de braços e pernas aparecem.",
+    marcoEn: "tiny arm and leg buds are appearing",
     forma:
       "a small curled embryo with a large rounded head, one big dark gentle eye spot, and four tiny soft nubs where the arms and legs are budding",
     pose: "curled in profile, tail-like lower end still visible",
@@ -136,6 +139,7 @@ export const SEMANAS = [
     s: 7,
     visivel: true,
     marco: "Rosto começa a se formar.",
+    marcoEn: "the face is beginning to form",
     forma:
       "a curled embryo with a proportionally large rounded head, a soft dark eye spot, the faintest suggestion of a nose and mouth beginning, small paddle-like limb buds",
     pose: "curled in profile",
@@ -144,6 +148,7 @@ export const SEMANAS = [
     s: 8,
     visivel: true,
     marco: "Dedinhos das mãos começam a se separar.",
+    marcoEn: "the fingers are beginning to separate",
     forma:
       "a curled embryo-to-fetus with a large rounded head, closed gentle eyes, a soft little face, and small paddle hands where individual fingers are just beginning to separate",
     pose: "curled, one tiny hand lifted near the face so the separating fingers read clearly",
@@ -152,6 +157,7 @@ export const SEMANAS = [
     s: 9,
     visivel: true,
     marco: "Já se chama feto. Movimentos pequenos.",
+    marcoEn: "it is now called a fetus and makes small movements",
     forma:
       "a small fetus, no longer embryo-like: rounded head, sweet closed eyes, a recognisable little face, distinct arms and legs with tiny fingers and toes",
     pose: "curled, limbs relaxed, one arm drifting as if moving gently",
@@ -168,6 +174,7 @@ export const SEMANAS = [
     s: 11,
     visivel: true,
     marco: "Unhas começam a crescer.",
+    marcoEn: "soft fingernails are beginning to grow",
     forma:
       "a small fetus, head still large, closed peaceful eyes, slender limbs, tiny fingers with the faintest suggestion of soft nails",
     pose: "curled, one hand open and visible near the face",
@@ -194,6 +201,7 @@ export const SEMANAS = [
     s: 14,
     visivel: true,
     marco: "Pode chupar o dedinho.",
+    marcoEn: "it can suck its thumb",
     forma:
       "a fetus with a softer, rounder face, closed peaceful eyes, smooth translucent skin, arms and legs well formed and slender",
     pose: "curled with the thumb gently at the mouth — sucking the thumb, clearly readable",
@@ -202,6 +210,7 @@ export const SEMANAS = [
     s: 15,
     visivel: true,
     marco: "Pode sentir a luz através das pálpebras.",
+    marcoEn: "it can sense light through its eyelids",
     forma:
       "a fetus with delicate closed eyelids that read clearly, a soft rounded face, smooth translucent skin",
     pose: "curled, face tilted slightly up as if toward a soft warm light",
@@ -210,6 +219,7 @@ export const SEMANAS = [
     s: 16,
     visivel: true,
     marco: "Movimentos coordenados de cabeça.",
+    marcoEn: "coordinated head movements",
     forma:
       "a fetus with a more balanced head-to-body proportion, closed peaceful eyes, smooth skin, limbs relaxed",
     pose: "curled, head turned gently to the side",
@@ -226,6 +236,7 @@ export const SEMANAS = [
     s: 18,
     visivel: true,
     marco: "Audição se desenvolvendo.",
+    marcoEn: "hearing is developing — the ears are formed",
     forma:
       "a fetus with small delicate ears now clearly formed and visible, closed peaceful eyes, smooth skin",
     pose: "curled in profile so one little ear reads clearly",
@@ -234,6 +245,7 @@ export const SEMANAS = [
     s: 19,
     visivel: true,
     marco: "Vernix caseoso cobre a pele.",
+    marcoEn: "vernix caseosa now covers the skin",
     forma:
       "a fetus whose skin carries a very soft, subtle creamy-white sheen — a gentle waxy bloom, tasteful and clean, never messy",
     pose: "curled, both hands near the face",
@@ -242,6 +254,7 @@ export const SEMANAS = [
     s: 20,
     visivel: true,
     marco: "Você já pode sentir os movimentos!",
+    marcoEn: "the mother can now feel the movements",
     forma:
       "a fetus with visibly better proportions, gently rounding limbs, closed peaceful eyes, a sweet calm face",
     pose: "mid-movement: one leg extended in a gentle kick, one arm reaching, alive and playful",
@@ -250,6 +263,7 @@ export const SEMANAS = [
     s: 21,
     visivel: true,
     marco: "Sobrancelhas e pálpebras formadas.",
+    marcoEn: "eyebrows and eyelids are fully formed",
     forma:
       "a fetus with fine delicate eyebrows now visible and clearly defined eyelids, a sweet rounded face",
     pose: "curled, face turned toward the viewer's left, eyebrows readable",
@@ -282,6 +296,7 @@ export const SEMANAS = [
     s: 25,
     visivel: true,
     marco: "Cabelo começa a ganhar cor.",
+    marcoEn: "the hair is starting to gain colour",
     forma:
       "a fetus with fine soft light-brown hair now visible on the head, rounded cheeks, delicate features",
     pose: "curled, head slightly forward so the hair reads clearly",
@@ -290,6 +305,7 @@ export const SEMANAS = [
     s: 26,
     visivel: true,
     marco: "Olhos começam a abrir.",
+    marcoEn: "the eyes are beginning to open",
     forma:
       "a fetus with soft light-brown hair, plumping cheeks, and eyes GENTLY OPENING — a soft, sleepy, tender half-open gaze, never staring, never startling",
     pose: "curled, face toward the viewer's left, eyes softly open",
@@ -329,6 +345,7 @@ export const SEMANAS = [
     s: 31,
     visivel: true,
     marco: "Pode girar a cabeça.",
+    marcoEn: "it can turn its head",
     forma: "a chubby healthy baby with soft hair, full cheeks, rounded limbs",
     pose: "curled, head clearly turned to the side, mid-movement",
   },
@@ -336,6 +353,7 @@ export const SEMANAS = [
     s: 32,
     visivel: true,
     marco: "Unhas dos pés se formam.",
+    marcoEn: "the toenails are forming",
     forma:
       "a chubby baby with soft hair, plump rounded limbs, and tiny toes with delicate soft nails",
     pose: "curled with one little foot lifted and visible, toes readable",
@@ -359,6 +377,7 @@ export const SEMANAS = [
     s: 35,
     visivel: true,
     marco: "Posição cefálica se define.",
+    marcoEn: "the head-down (cephalic) position is settling",
     forma: "a plump full-term-looking baby with soft hair and round cheeks",
     pose: "HEAD-DOWN: the baby is oriented head-downward in the frame, curled, settled — the cephalic position, clearly readable",
   },
@@ -375,6 +394,7 @@ export const SEMANAS = [
     s: 37,
     visivel: true,
     marco: "Termo precoce — pulmões prontos.",
+    marcoEn: "early term — the lungs are ready",
     forma:
       "a full-term newborn: very chubby and round, thick baby-fat rolls on arms and thighs, full puffy cheeks, soft double chin, well-defined sweet features, fine soft light-brown hair, smooth rosy peachy skin",
     pose: "curled peacefully, one fist near the cheek",
@@ -383,6 +403,7 @@ export const SEMANAS = [
     s: 38,
     visivel: true,
     marco: "Encaixe pélvico em muitos casos.",
+    marcoEn: "the head has engaged in the pelvis",
     forma: "a full-term chubby newborn with soft hair, full round cheeks and plump limbs",
     pose: "head-down and settled low, curled compactly — engaged in the pelvis",
   },
@@ -454,7 +475,7 @@ export function promptDa(semana) {
 
 Subject: ${e.forma}.
 Pose: ${e.pose}.
-Developmental week: ${e.s} of pregnancy${e.visivel ? ` — the visible milestone this week is: ${e.marco}` : ""}.
+Developmental week: ${e.s} of pregnancy${e.visivel ? ` — the visible milestone this week: ${e.marcoEn}` : ""}.
 
 The baby must be endearing and friendly — a mother will look at this every day for a week.`;
 }
