@@ -37,6 +37,23 @@ type Campos = {
   resumoPaciente: string;
 };
 
+/**
+ * A hora a usar quando o médico deixa o campo em branco.
+ *
+ * Hoje → agora. Data passada → meio-dia, que cai no dia certo em qualquer fuso.
+ *
+ * A comparação é feita em componentes de data LOCAIS (`getFullYear`/`getMonth`/
+ * `getDate`), e não com `toISOString().slice(0,10)`: em UTC-3, depois das 21h o
+ * ISO já está no dia seguinte, e a consulta registrada de noite cairia no ramo
+ * "data passada" justamente quando o padrão do agora é mais necessário.
+ */
+function horaPadrao(dataISO: string, agora: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  const hoje = `${agora.getFullYear()}-${p(agora.getMonth() + 1)}-${p(agora.getDate())}`;
+  if (dataISO !== hoje) return "12:00";
+  return `${p(agora.getHours())}:${p(agora.getMinutes())}`;
+}
+
 const VAZIO: Campos = {
   ocorridaEm: "",
   hora: "",
@@ -209,9 +226,22 @@ export function RegistrarConsulta({
              médico registra "a consulta de terça" e não a hora exata, e um
              timestamp à meia-noite cairia no dia anterior em fuso negativo. */
           /* Data + hora locais convertidas para UTC pelo próprio navegador.
-             Sem hora, meio-dia local — que cai no dia certo em qualquer fuso. */
+
+             Sem hora, o padrão era MEIO-DIA local, e isso reintroduzia em
+             miniatura o defeito que o `max` do campo de data existe para
+             impedir: o corte de "o que mudou desde a consulta" ia parar no
+             FUTURO toda manhã. Consulta das 8h30 registrada às 9h com a Hora em
+             branco → corte às 12h → a 176/112 que ela registrou às 10h30 fica
+             invisível no bloco até depois do almoço, e a tela diz "ela não
+             registrou nada".
+
+             Agora o padrão é o AGORA quando a data é hoje. O viés é de mostrar
+             a mais, não a menos: um registro feito pouco antes da consulta
+             aparecendo no bloco é um incômodo; uma pressão grave sumindo dele é
+             um achado clínico perdido. Para uma data passada, meio-dia continua
+             sendo o palpite razoável — o dia é o que o médico quis dizer. */
           ocorridaEm: f.ocorridaEm
-            ? new Date(`${f.ocorridaEm}T${f.hora || "12:00"}:00`).toISOString()
+            ? new Date(`${f.ocorridaEm}T${f.hora || horaPadrao(f.ocorridaEm)}:00`).toISOString()
             : undefined,
           tipo: f.tipo,
           achados: f.achados.trim() || undefined,

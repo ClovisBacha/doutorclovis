@@ -30,18 +30,11 @@ import {
   type Serie,
 } from "@/lib/clinical.functions";
 import { formataTelefone, linkTel } from "@/lib/telefone";
+import { quando } from "@/lib/quando";
 
 function idadeGestacional(dias: number | null): string {
   if (dias == null || dias < 0) return "—";
   return `${Math.floor(dias / 7)}s${dias % 7}d`;
-}
-
-function quando(iso: string): string {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (d <= 0) return "hoje";
-  if (d === 1) return "ontem";
-  if (d < 30) return `há ${d} dias`;
-  return new Date(iso).toLocaleDateString("pt-BR");
 }
 
 const ROTULO_ESPECIE: Record<string, string> = {
@@ -432,7 +425,17 @@ function resumo(e: EventoClinico): string {
   if (d.spo2 != null) partes.push(`SpO₂ ${d.spo2}%`);
   if (d.heart_rate_bpm != null) partes.push(`FC ${d.heart_rate_bpm} bpm`);
   if (d.sintomas?.length) partes.push(d.sintomas.join(", "));
-  if (d.nivel) partes.push(`triagem ${d.nivel}`);
+  /* `nivel` CARREGA DOIS VOCABULÁRIOS. A view projeta na mesma chave o `level`
+     de `triage_logs` (vermelho/amarelo/verde) e o de `epds_logs`
+     (baixo/moderado/alto/urgente) — e isto imprimia "triagem urgente" para um
+     rastreio de DEPRESSÃO, nome de outro instrumento. Um EPDS 21 com ideação
+     de autoagressão aparecia no prontuário rotulado como triagem de sintomas.
+
+     A gravidade em si sempre esteve certa (sai de `epds_q10`, não daqui); o que
+     mentia era o rótulo. A fonte desempata. */
+  if (d.nivel) {
+    partes.push(e.fonte === "epds_logs" ? `rastreio ${d.nivel}` : `triagem ${d.nivel}`);
+  }
   if (d.chutes != null) partes.push(`${d.chutes} movimentos`);
   if (d.intensidade != null) {
     partes.push(`intensidade ${d.intensidade}${d.duracao_seg ? ` · ${d.duracao_seg}s` : ""}`);

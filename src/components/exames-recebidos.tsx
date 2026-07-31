@@ -14,20 +14,13 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { quando } from "@/lib/quando";
 import {
   devolutivaDoExame,
   examesRecebidos,
   imagemDoExame,
   type ExameRecebido,
 } from "@/lib/clinical.functions";
-
-function quando(iso: string): string {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (d <= 0) return "hoje";
-  if (d === 1) return "ontem";
-  if (d < 30) return `há ${d} dias`;
-  return new Date(iso).toLocaleDateString("pt-BR");
-}
 
 export function ExamesRecebidos({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [exames, setExames] = useState<ExameRecebido[]>([]);
@@ -152,6 +145,15 @@ function VisorDoExame({
   onRespondeu: () => void;
 }) {
   const [imagem, setImagem] = useState<string | null>(null);
+  /* O SERVIDOR JÁ DIZ POR QUÊ, E A TELA JOGAVA FORA.
+     `imagemDoExame` devolve quatro `motivo` distintos — e existe um comentário
+     no servidor explicando que eles foram criados justamente porque "falha de
+     leitura", "não é sua paciente" e "a linha não tem imagem" colapsavam num
+     `null` só. O cliente fazia `r.ok ? r.imagem : null` e recolapsava tudo: uma
+     falha de rede continuava aparecendo como "ela não anexou laudo". */
+  const [motivo, setMotivo] = useState<"ok" | "sem_imagem" | "nao_encontrado" | "falha" | "sessao">(
+    "ok",
+  );
   const [carregando, setCarregando] = useState(true);
   const [recado, setRecado] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -163,8 +165,10 @@ function VisorDoExame({
           data: { accessToken: await tokenFn(), exameId: exame.id },
         });
         setImagem(r.ok ? r.imagem : null);
+        setMotivo(r.motivo);
       } catch {
         setImagem(null);
+        setMotivo("falha");
       } finally {
         setCarregando(false);
       }
@@ -228,9 +232,25 @@ function VisorDoExame({
               alt={`Exame: ${exame.nome}`}
               className="w-full rounded-2xl border border-border"
             />
-          ) : (
+          ) : motivo === "sem_imagem" ? (
             <p className="rounded-2xl border border-border bg-background p-4 text-center text-sm text-muted-foreground">
               Este registro não tem imagem anexada — só a anotação dela.
+            </p>
+          ) : motivo === "sessao" ? (
+            /* Sessão vencida é o único dos cinco em que a ação do médico é
+               diferente — recarregar não resolve, entrar de novo resolve. */
+            <p className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4 text-center text-sm leading-snug text-amber-900">
+              <strong>Sua sessão expirou.</strong> Entre de novo para ver a imagem.
+            </p>
+          ) : (
+            /* `falha` e `nao_encontrado` juntos, de propósito: o servidor
+               responde igual nos dois para não confirmar, com um uuid qualquer,
+               que existe um laudo de paciente de outro consultório. A tela não
+               tem como separar — e o que o médico precisa saber é o mesmo nos
+               dois casos: NÃO conclua que ela não anexou nada. */
+            <p className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4 text-center text-sm leading-snug text-amber-900">
+              <strong>Não consegui carregar a imagem.</strong> Isto não quer dizer que ela não
+              anexou o laudo — tente de novo em instantes.
             </p>
           )}
           {exame.notas && (

@@ -16,6 +16,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { colunaAusente } from "./postgrest";
+import { ymdBrasilia } from "./utils";
 
 /** Escapa texto da paciente que vai dentro de HTML de e-mail. */
 function escaparHtml(v: string): string {
@@ -736,7 +737,12 @@ export const setPatientFetalBpm = createServerFn({ method: "POST" })
       .from("patient_profiles")
       .update({
         fetal_bpm: data.bpm,
-        fetal_bpm_at: data.bpm === null ? null : new Date().toISOString().slice(0, 10),
+        /* `ymdBrasilia`, não `toISOString().slice(0,10)`: o servidor roda em UTC,
+           e numa teleconsulta das 21h15 o ISO já está no dia seguinte. O
+           cartão do batimento então calculava `days = -1` no aparelho dela e a
+           guarda `days >= 0` o escondia — na noite em que ele acabou de ouvir o
+           coração do bebê. */
+        fetal_bpm_at: data.bpm === null ? null : ymdBrasilia(),
       })
       .eq("id", data.patientId)
       .eq("doctor_id", user.id)
