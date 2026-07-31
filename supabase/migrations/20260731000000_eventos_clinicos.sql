@@ -270,10 +270,23 @@ BEGIN
 END
 $limpa$;
 
-DROP TRIGGER IF EXISTS trg_limpa_acks_da_conta ON auth.users;
-CREATE TRIGGER trg_limpa_acks_da_conta
-  AFTER DELETE ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.limpa_acks_da_conta();
+/* Guardado: em vários projetos Supabase o papel do SQL Editor não pode criar
+   gatilho em `auth`. Sem o `EXCEPTION`, o erro aborta o arquivo inteiro dentro
+   da transação implícita e derruba junto a view e as constraints — o operador
+   lê "Success" e não fica nada. A chave estrangeira de
+   `20260731040000_esquecimento_completo.sql` é quem garante a limpeza; este
+   gatilho é reforço. */
+DO $trg$
+BEGIN
+  DROP TRIGGER IF EXISTS trg_limpa_acks_da_conta ON auth.users;
+  CREATE TRIGGER trg_limpa_acks_da_conta
+    AFTER DELETE ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.limpa_acks_da_conta();
+EXCEPTION
+  WHEN insufficient_privilege OR undefined_table THEN
+    RAISE NOTICE 'sem permissao para o gatilho em auth.users — a FK de clinical_acks cobre a limpeza';
+END
+$trg$;
 
 ALTER TABLE public.clinical_acks ENABLE ROW LEVEL SECURITY;
 

@@ -703,10 +703,19 @@ export const consultasDaPaciente = createServerFn({ method: "POST" })
     if (!pacientes.has(data.pacienteId)) return { ...vazio, ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     try {
+      /* `doctor_id` NO FILTRO. Sem ele, no instante em que a paciente aceita
+         vínculo com outro consultório, o novo médico passava a ler `achados` e
+         `conduta` escritos pelo anterior — o prontuário privado dele, que a
+         própria migration descreve como "escrito para outro médico, com
+         hipótese que assustaria sem contexto". Prontuário não é dado da
+         plataforma: é documento de um profissional, e transferi-lo exige
+         consentimento, não um clique de vínculo. `emissoesDaPaciente` e
+         `lerDesfechos` já filtravam; aqui tinha escapado. */
       const { data: rows, error } = await (supabaseAdmin as any)
         .from("consultations")
         .select(CONSULTA_COLS)
         .eq("user_id", data.pacienteId)
+        .eq("doctor_id", user.id)
         .order("occurred_at", { ascending: false })
         .limit(data.limite);
       // Tabela ainda não criada: ficha sem consultas, não ficha quebrada.
@@ -993,12 +1002,16 @@ export const imagemDoExame = createServerFn({ method: "POST" })
         .eq("id", data.exameId)
         .maybeSingle();
       if (error) return { ok: false as const, imagem: null, motivo: "falha" as const };
-      if (!row) return { ok: false as const, imagem: null, motivo: "sumiu" as const };
+      /* "não existe" e "não é sua paciente" respondem IGUAL — as outras doze
+         funções já faziam assim. Distinguir permitia a um médico confirmar, com
+         um uuid qualquer, que ele é um laudo real de paciente de outro
+         consultório. Uuid não se adivinha, mas vaza por URL, log e screenshot. */
+      if (!row) return { ok: false as const, imagem: null, motivo: "nao_encontrado" as const };
       /* Vínculo ATUAL depois de saber de quem é o exame: quem trocou de médico
          não tem os laudos dela abertos para o consultório anterior. */
       const pacientes = await pacientesAtuais(user.id);
       if (!pacientes.has(String(row.user_id))) {
-        return { ok: false as const, imagem: null, motivo: "sem_vinculo" as const };
+        return { ok: false as const, imagem: null, motivo: "nao_encontrado" as const };
       }
       const img = (row.image_data as string) ?? null;
       return {
@@ -1300,6 +1313,17 @@ export const responderPergunta = createServerFn({ method: "POST" })
       .eq("doctor_id", user.id)
       .maybeSingle();
     if (!pergunta) return { ok: false as const };
+
+    /* VÍNCULO ATUAL — esta era a única função do médico sem esta checagem.
+
+       `.eq("doctor_id", user.id)` acima é o carimbo HISTÓRICO da linha, não a
+       relação de hoje. Sem o recorte, um médico de quem a paciente se
+       desvinculou — inclusive porque teve motivo — continuava lendo a pergunta
+       dela, gravando texto arbitrário na resposta e disparando push no celular
+       dela assinado "Seu médico respondeu". É um canal de mensagem para uma
+       ex-paciente, com a marca do produto por cima. */
+    const pacientesDele = await pacientesAtuais(user.id);
+    if (!pacientesDele.has(String(pergunta.user_id))) return { ok: false as const };
 
     const agora = new Date().toISOString();
     /* `.eq("answered", false)` no WHERE: duplo clique, duas abas ou um retry

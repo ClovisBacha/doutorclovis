@@ -33,6 +33,7 @@ declare module "bun:test" {
     toContain(trecho: unknown): void;
     toHaveLength(n: number): void;
     toThrow(esperado?: unknown): void;
+    toMatch(padrao: RegExp | string): void;
     /** `expect(x).not.toBe(y)` — a negação de tudo o que está acima. */
     not: Omit<Matchers, "not">;
   };
