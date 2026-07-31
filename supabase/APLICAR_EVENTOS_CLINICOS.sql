@@ -16,6 +16,7 @@
 -- ============================================================================
 
 -- ============================================================================
+-- ============================================================================
 -- FLUXO UNIFICADO DE EVENTOS CLÍNICOS
 -- ============================================================================
 --
@@ -70,18 +71,33 @@
 -- liderado por ele: toda leitura era varredura sequencial. Com o fluxo de
 -- eventos elas passam a ser consultadas em TODA abertura do painel.
 -- ────────────────────────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_contraction_logs_user
-    ON public.contraction_logs (user_id, started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_panic_events_user
-    ON public.panic_events (user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_preconsulta_forms_user
-    ON public.preconsulta_forms (user_id, submitted_at DESC);
-CREATE INDEX IF NOT EXISTS idx_ppd_screenings_user
-    ON public.ppd_screenings (user_id, screened_at DESC);
-CREATE INDEX IF NOT EXISTS idx_consultation_notes_user
-    ON public.consultation_notes (user_id, recorded_at DESC);
-CREATE INDEX IF NOT EXISTS idx_exam_files_user_created
-    ON public.exam_files (user_id, created_at DESC);
+DO $indices$
+DECLARE
+  alvo record;
+BEGIN
+  FOR alvo IN
+    SELECT * FROM (VALUES
+      ('contraction_logs',   'idx_contraction_logs_user',   'user_id, started_at DESC'),
+      ('preconsulta_forms',  'idx_preconsulta_forms_user',  'user_id, submitted_at DESC'),
+      ('ppd_screenings',     'idx_ppd_screenings_user',     'user_id, screened_at DESC'),
+      ('consultation_notes', 'idx_consultation_notes_user', 'user_id, recorded_at DESC')
+    ) AS t(tabela, indice, colunas)
+  LOOP
+    /* A GUARDA QUE FALTAVA. `IF NOT EXISTS` protege o índice, não a tabela — e
+       estas são todas de migrations pendentes. No SQL Editor do Supabase o lote
+       roda numa transação implícita: bastava a primeira não existir para NADA
+       ser commitado, nem a view, nem as constraints, nem o CASCADE. O arquivo
+       inteiro não aplicava no único banco onde precisava aplicar. */
+    CONTINUE WHEN to_regclass('public.' || alvo.tabela) IS NULL;
+    EXECUTE format('CREATE INDEX IF NOT EXISTS %I ON public.%I (%s)',
+                   alvo.indice, alvo.tabela, alvo.colunas);
+  END LOOP;
+END
+$indices$;
+
+/* `exam_files` e `panic_events` NÃO entram: já têm índice idêntico
+   (`idx_exam_files_user`, `idx_panic_user`). Criar o segundo dobrava o custo de
+   escrita e o espaço para ganho zero. */
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 2. FAIXAS PLAUSÍVEIS NO BANCO
@@ -143,8 +159,11 @@ $faixas$;
 -- interpretar — e a sistólica sozinha é justamente a que mais importa.
 DO $par_pa$
 BEGIN
-  IF to_regclass('public.health_logs') IS NOT NULL
-     AND NOT EXISTS (
+  /* IF aninhado, e não `AND`: em SQL o `AND` não faz curto-circuito, então o
+     cast `'public.health_logs'::regclass` era avaliado mesmo com a tabela
+     ausente — e estourava. */
+  IF to_regclass('public.health_logs') IS NULL THEN RETURN; END IF;
+  IF NOT EXISTS (
        SELECT 1 FROM pg_constraint
         WHERE conrelid = 'public.health_logs'::regclass
           AND conname = 'health_logs_pa_par'
@@ -180,7 +199,12 @@ BEGIN
       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
      WHERE c.contype = 'f'
        AND c.confrelid = 'auth.users'::regclass
-       AND c.confdeltype <> 'c'                    -- 'c' = CASCADE
+       /* SÓ `NO ACTION` ('a'), que é o default de quem esqueceu de escrever
+          `ON DELETE`. `SET NULL` ('n') é decisão de alguém: `doctor_accounts`
+          usa isso de propósito para que apagar o LOGIN do médico não apague a
+          conta comercial dele. "Tudo que não é CASCADE vira CASCADE" desfazia
+          essa decisão em silêncio. */
+       AND c.confdeltype = 'a'
        AND connamespace = 'public'::regnamespace
        AND array_length(c.conkey, 1) = 1
   LOOP
@@ -207,13 +231,16 @@ BEGIN
        WHERE conrelid = ('public.' || t)::regclass AND contype = 'f'
          AND confrelid = 'auth.users'::regclass
     );
-    -- Órfãs pré-existentes impediriam a criação da FK. Elas já são dado sem
-    -- dono: some com elas antes, senão a migration inteira falha aqui.
+    /* `NOT VALID`, e não um DELETE das órfãs.
+    
+       A primeira versão apagava as linhas sem dono antes de criar a FK — dado
+       clínico sumindo sem contagem, sem aviso e sem backup, num arquivo que
+       cem linhas acima argumenta o contrário ("apagar histórico ruim é pior
+       que marcá-lo"). `NOT VALID` dá a MESMA proteção: bloqueia órfã nova e
+       cascateia na exclusão, sem tocar no que já está lá. Quem quiser validar
+       o passado roda `VALIDATE CONSTRAINT` depois de olhar o que tem. */
     EXECUTE format(
-      'DELETE FROM public.%I x WHERE NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id = x.user_id)', t
-    );
-    EXECUTE format(
-      'ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE',
+      'ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE NOT VALID',
       t, t || '_user_id_fkey'
     );
   END LOOP;
@@ -245,6 +272,27 @@ CREATE TABLE IF NOT EXISTS public.clinical_acks (
 CREATE INDEX IF NOT EXISTS idx_clinical_acks_paciente
     ON public.clinical_acks (user_id, visto_em DESC);
 
+/* O ACK PRECISA MORRER COM A CONTA.
+   
+   `fonte_id` é polimórfico (aponta para onze tabelas diferentes), então não há
+   FK possível — e sem FK a linha sobrevivia ao `DELETE` da paciente. Numa seção
+   chamada "direito ao esquecimento" isso é o defeito mais constrangedor que dá
+   para ter: `conduta` é texto livre onde o médico escreve o que quiser,
+   inclusive nome e telefone dela, e ficava lá indexado por `user_id` depois da
+   exclusão. O gatilho fecha o que a FK não alcança. */
+CREATE OR REPLACE FUNCTION public.limpa_acks_da_conta()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $limpa$
+BEGIN
+  DELETE FROM public.clinical_acks WHERE user_id = OLD.id;
+  RETURN OLD;
+END
+$limpa$;
+
+DROP TRIGGER IF EXISTS trg_limpa_acks_da_conta ON auth.users;
+CREATE TRIGGER trg_limpa_acks_da_conta
+  AFTER DELETE ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.limpa_acks_da_conta();
+
 ALTER TABLE public.clinical_acks ENABLE ROW LEVEL SECURITY;
 
 -- Só o servidor escreve. O médico chega por server function com o token
@@ -271,32 +319,55 @@ GRANT ALL ON public.clinical_acks TO service_role;
 --   dados       jsonb com os números, nomes já normalizados entre as fontes
 --   texto       o que ela escreveu, quando escreveu algo
 -- ────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.tem_coluna(t text, c text) RETURNS boolean
+LANGUAGE sql STABLE AS $tc$
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = t AND column_name = c
+  )
+$tc$;
+
 DO $view$
 DECLARE
   partes text[] := ARRAY[]::text[];
+  pares  text[];
   sql    text;
 BEGIN
   IF to_regclass('public.health_logs') IS NOT NULL THEN
-    partes := array_append(partes, $sql$
-      SELECT 'health_logs'::text AS fonte, h.id AS fonte_id, h.user_id,
-             (h.log_date::timestamptz + interval '12 hours') AS ocorrido_em,
-             'medida'::text AS especie,
-             jsonb_strip_nulls(jsonb_build_object(
-               'systolic', h.systolic, 'diastolic', h.diastolic,
-               'glucose_mg_dl', h.glucose_mg_dl, 'weight_kg', h.weight_kg,
-               'spo2', h.spo2, 'heart_rate_bpm', h.heart_rate_bpm
-             )) AS dados,
-             h.notes AS texto
-        FROM public.health_logs h
-       WHERE h.systolic IS NOT NULL OR h.diastolic IS NOT NULL
-          OR h.glucose_mg_dl IS NOT NULL OR h.weight_kg IS NOT NULL
-          OR h.spo2 IS NOT NULL OR h.heart_rate_bpm IS NOT NULL
-    $sql$);
+    /* AS COLUNAS, UMA A UMA.
+    
+       `to_regclass` responde pela tabela e não pelas colunas dela — e
+       `glucose_mg_dl`, `spo2` e `heart_rate_bpm` vieram de migrations
+       pendentes. Num banco com as 8 tabelas originais a tabela EXISTE, o ramo
+       era montado, e a view inteira falhava em `column h.glucose_mg_dl does not
+       exist` — derrubando junto tudo o mais no mesmo lote. */
+    pares := ARRAY[]::text[];
+    IF public.tem_coluna('health_logs','systolic')       THEN pares := pares || ARRAY[$$'systolic', h.systolic$$]; END IF;
+    IF public.tem_coluna('health_logs','diastolic')      THEN pares := pares || ARRAY[$$'diastolic', h.diastolic$$]; END IF;
+    IF public.tem_coluna('health_logs','glucose_mg_dl')  THEN pares := pares || ARRAY[$$'glucose_mg_dl', h.glucose_mg_dl$$]; END IF;
+    IF public.tem_coluna('health_logs','weight_kg')      THEN pares := pares || ARRAY[$$'weight_kg', h.weight_kg$$]; END IF;
+    IF public.tem_coluna('health_logs','spo2')           THEN pares := pares || ARRAY[$$'spo2', h.spo2$$]; END IF;
+    IF public.tem_coluna('health_logs','heart_rate_bpm') THEN pares := pares || ARRAY[$$'heart_rate_bpm', h.heart_rate_bpm$$]; END IF;
+
+    IF array_length(pares, 1) IS NOT NULL THEN
+      partes := array_append(partes, format($sql$
+        SELECT 'health_logs'::text AS fonte, h.id AS fonte_id, h.user_id,
+               COALESCE(h.created_at, h.log_date::timestamptz + interval '12 hours') AS ocorrido_em,
+               'medida'::text AS especie,
+               jsonb_strip_nulls(jsonb_build_object(%s)) AS dados,
+               h.notes AS texto
+          FROM public.health_logs h
+         WHERE num_nonnulls(%s) > 0
+      $sql$,
+      array_to_string(pares, ', '),
+      array_to_string(ARRAY(SELECT 'h.' || c FROM unnest(ARRAY['systolic','diastolic','glucose_mg_dl','weight_kg','spo2','heart_rate_bpm']) c
+                             WHERE public.tem_coluna('health_logs', c)), ', ')));
+    END IF;
   END IF;
 
   IF to_regclass('public.triage_logs') IS NOT NULL THEN
     partes := array_append(partes, $sql$
-      SELECT 'triage_logs'::text, t.id, t.user_id, t.created_at,
+      SELECT 'triage_logs'::text AS fonte, t.id AS fonte_id, t.user_id, t.created_at AS ocorrido_em,
              'sintoma'::text,
              jsonb_strip_nulls(jsonb_build_object(
                'systolic', t.systolic, 'diastolic', t.diastolic,
@@ -434,10 +505,21 @@ BEGIN
   -- qualquer `authenticated` leria a plataforma inteira.
   EXECUTE 'ALTER VIEW public.clinical_events SET (security_invoker = true)';
 
-  REVOKE ALL ON public.clinical_events FROM anon;
-  GRANT SELECT ON public.clinical_events TO authenticated, service_role;
+  /* SÓ `service_role`. `security_invoker` faz a view exigir privilégio nas
+     tabelas-base, e `epds_logs` teve o SELECT revogado de `authenticated` num
+     hardening deliberado — então conceder a view a `authenticated` anunciava
+     uma capacidade que erraria em 100% das consultas ("permission denied for
+     table epds_logs"), inclusive filtrando a fonte, porque privilégio é checado
+     no plano e não na linha. Quem lê é o servidor. */
+  REVOKE ALL ON public.clinical_events FROM anon, authenticated;
+  GRANT SELECT ON public.clinical_events TO service_role;
+  EXECUTE 'COMMENT ON VIEW public.clinical_events IS ' || quote_literal(
+    'Fluxo unificado de eventos clinicos da paciente. Numeros CRUS — a gravidade e calculada em src/lib/sinais-clinicos.ts, uma regua so para medico e paciente. Montada dinamicamente: rode de novo depois de aplicar migrations para ampliar as fontes.');
 END
 $view$;
 
-COMMENT ON VIEW public.clinical_events IS
-  'Fluxo unificado de eventos clínicos da paciente. Números CRUS — a gravidade é calculada em src/lib/sinais-clinicos.ts, uma régua só para médico e paciente. Montada dinamicamente: rode de novo depois de aplicar migrations para ampliar as fontes.';
+-- (comentário aplicado dentro do bloco: fora dele, o caminho "nenhuma fonte
+-- existe" terminava em erro justamente onde deveria sair de fininho)
+SELECT 1 WHERE false; -- no-op
+COMMENT ON TABLE public.clinical_acks IS
+  'Desfecho que o medico registrou para um evento clinico. Guarda o que e DELE; a linha de origem pertence a paciente.';

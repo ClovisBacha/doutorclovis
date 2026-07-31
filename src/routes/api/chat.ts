@@ -196,14 +196,38 @@ async function buildMedidasBlock(patientId: string): Promise<string> {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { sinalGlicemia, sinalPressao } = await import("@/lib/sinais-clinicos");
     const desde = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
-    const { data, error } = await (supabaseAdmin as any)
-      .from("health_logs")
-      .select("log_date,systolic,diastolic,glucose_mg_dl,weight_kg")
-      .eq("user_id", patientId)
-      .gte("log_date", desde)
-      .order("log_date", { ascending: false })
-      .limit(30);
-    if (error || !data?.length) return "";
+    /* AS DUAS FONTES. O bloco lia só `health_logs`, e a paciente grava pressão
+       em três lugares — o cenário descrito no docstring acima é justamente o da
+       TRIAGEM: 23h, ela marca "dor de cabeça com visão turva", digita 175/115,
+       o app manda procurar atendimento, e dez minutos depois abre o chat. Sem
+       `triage_logs` aqui, a IA não recebia número nenhum exatamente no caso que
+       motivou o bloco. */
+    const [hl, tl] = await Promise.all([
+      (supabaseAdmin as any)
+        .from("health_logs")
+        .select("log_date,systolic,diastolic,glucose_mg_dl")
+        .eq("user_id", patientId)
+        .gte("log_date", desde)
+        .order("log_date", { ascending: false })
+        .limit(30),
+      (supabaseAdmin as any)
+        .from("triage_logs")
+        .select("created_at,systolic,diastolic")
+        .eq("user_id", patientId)
+        .gte("created_at", new Date(Date.now() - 14 * 86400000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]);
+    const data = [
+      ...((hl.data ?? []) as Record<string, unknown>[]),
+      ...((tl.data ?? []) as Record<string, unknown>[]).map((t) => ({
+        log_date: String(t.created_at).slice(0, 10),
+        systolic: t.systolic,
+        diastolic: t.diastolic,
+        glucose_mg_dl: null,
+      })),
+    ].sort((a, b) => String(b.log_date).localeCompare(String(a.log_date)));
+    if (!data.length) return "";
 
     const linhas: string[] = [];
     let ultimaPA: string | null = null;
@@ -224,12 +248,14 @@ async function buildMedidasBlock(patientId: string): Promise<string> {
       }
       /* Alterados dos últimos 14 dias, no máximo três: uma lista longa vira
          recitação, e três já mostram que não é medida isolada. */
-      if (linhas.length < 3) {
-        if (pa && pa.gravidade !== "normal") {
-          linhas.push(`- ${dia}: pressão ${l.systolic}/${l.diastolic} — ${pa.nota}`);
-        } else if (gl && gl.gravidade !== "normal") {
-          linhas.push(`- ${dia}: glicemia ${l.glucose_mg_dl} mg/dL — ${gl.nota}`);
-        }
+      /* Sem `else`: uma linha de `health_logs` carrega pressão E glicemia, e o
+         `else if` fazia a glicemia de 210 sumir porque a pressão do mesmo dia
+         também estava alterada. */
+      if (linhas.length < 3 && pa && pa.gravidade !== "normal") {
+        linhas.push(`- ${dia}: pressão ${l.systolic}/${l.diastolic} — ${pa.nota}`);
+      }
+      if (linhas.length < 3 && gl && gl.gravidade !== "normal") {
+        linhas.push(`- ${dia}: glicemia ${l.glucose_mg_dl} mg/dL — ${gl.nota}`);
       }
     }
 

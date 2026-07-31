@@ -66,16 +66,22 @@ function Medida({
   gravidade?: Gravidade;
   nota?: string;
 }) {
-  const marcado = gravidade && gravidade !== "normal";
+  /* A nota aparece SEMPRE que existe; a gravidade só decide a COR. Antes o
+     bloco inteiro estava atrás de `gravidade !== "normal"`, então "+14 kg na
+     gestação" — que o próprio código calcula e que é sinal de pré-eclâmpsia —
+     era computado e jogado fora. */
+  const alerta = gravidade && gravidade !== "normal";
   return (
     <div className="rounded-2xl border border-border bg-card p-3">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {rotulo}
       </p>
       <p className="mt-0.5 font-serif text-xl tabular-nums text-foreground">{valor}</p>
-      {marcado && (
+      {nota && (
         <span
-          className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${ESTILO_SINAL[gravidade]}`}
+          className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+            alerta ? ESTILO_SINAL[gravidade] : "bg-secondary text-muted-foreground"
+          }`}
         >
           {nota}
         </span>
@@ -178,7 +184,14 @@ export function ProntuarioPaciente({
   const peso = serieDe(eventos, "weight_kg", "Peso", "kg");
   const gli = serieDe(eventos, "glucose_mg_dl", "Glicemia", "mg/dL");
 
-  const sinalPA = sinalPressao(pa.ultimo, paD.ultimo);
+  /* O PAR VEM DO MESMO REGISTRO. Com duas séries independentes, uma sistólica
+     de 168 medida na triagem de hoje casava com uma diastólica de 78 medida no
+     diário de anteontem, e a tela exibia "168/78" com etiqueta de faixa grave —
+     um dado clínico inventado pela composição de duas leituras. */
+  const ultimaPA = eventos.find(
+    (e) => e.dados.systolic != null && e.dados.diastolic != null,
+  )?.dados;
+  const sinalPA = sinalPressao(ultimaPA?.systolic, ultimaPA?.diastolic);
   const sinalG = sinalGlicemia(gli.ultimo);
 
   const pendentes = eventos.filter((e) => e.gravidade !== "normal" && !e.tratado_em);
@@ -193,6 +206,14 @@ export function ProntuarioPaciente({
         <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
           📡 Não consegui ler todos os registros dela. O que está abaixo pode estar incompleto —
           atualize antes de tomar uma decisão a partir desta tela.
+        </p>
+      )}
+
+      {ficha.degradada && (
+        <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+          ⚠️ O banco ainda não tem as colunas do perfil completo. Alergias, medicações e a história
+          de risco desta paciente estão <strong>desconhecidas</strong> aqui — não vazias. Aplique o
+          SQL pendente antes de decidir a partir desta tela.
         </p>
       )}
 
@@ -307,7 +328,7 @@ export function ProntuarioPaciente({
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Medida
             rotulo="Última pressão"
-            valor={pa.ultimo != null && paD.ultimo != null ? `${pa.ultimo}/${paD.ultimo}` : "—"}
+            valor={ultimaPA ? `${ultimaPA.systolic}/${ultimaPA.diastolic}` : "—"}
             gravidade={sinalPA?.gravidade}
             nota={sinalPA?.nota}
           />
@@ -390,6 +411,8 @@ function resumo(e: EventoClinico): string {
     partes.push(`glicemia ${d.glucose_mg_dl}${d.momento ? ` (${d.momento})` : ""}`);
   }
   if (d.weight_kg != null) partes.push(`peso ${d.weight_kg} kg`);
+  if (d.spo2 != null) partes.push(`SpO₂ ${d.spo2}%`);
+  if (d.heart_rate_bpm != null) partes.push(`FC ${d.heart_rate_bpm} bpm`);
   if (d.sintomas?.length) partes.push(d.sintomas.join(", "));
   if (d.nivel) partes.push(`triagem ${d.nivel}`);
   if (d.chutes != null) partes.push(`${d.chutes} movimentos`);

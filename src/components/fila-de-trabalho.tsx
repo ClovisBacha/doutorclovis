@@ -91,14 +91,19 @@ export function FilaDeTrabalho({
   const ordenada = [...itens].sort((a, b) => {
     const p = PESO[a.nivel] - PESO[b.nivel];
     if (p !== 0) return p;
-    /* Dentro do mesmo nível, o MAIS ANTIGO primeiro. É o contrário da ordem
-       natural de feed, e de propósito: quem esperou mais tempo é quem está mais
-       perto de desistir.
+    /* EMERGÊNCIA ordena pelo MAIS RECENTE. O resto, pelo mais antigo.
+
+       A regra "quem esperou mais tempo primeiro" é certa para pedido de
+       consulta e catastrófica para emergência: uma pressão grave registrada há
+       dez dias ficava ACIMA de um SOS acionado agora, e com várias pacientes o
+       SOS ativo nascia em quinto lugar. Quem esperou mais está mais perto de
+       desistir; quem acionou agora pode estar em risco agora.
 
        Sem data vai para o FIM, e não para o começo. Com `?? 0` o item ia parar
        em 1970 e liderava o nível como "o mais antigo de todos" — a posição de
        maior urgência — sendo o único da lista sem o rótulo de idade que
        justificaria essa posição. */
+    if (a.nivel === "emergencia") return quando(b.em) - quando(a.em);
     return quando(a.em) - quando(b.em);
   });
 

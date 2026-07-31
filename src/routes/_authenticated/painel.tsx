@@ -304,6 +304,10 @@ function PainelPage() {
      fontes. É o que transforma a fila de "coisas administrativas" em "coisas
      clínicas". */
   const [eventosClinicos, setEventosClinicos] = useState<EventoClinico[]>([]);
+  /* Qual paciente a fila mandou abrir. Sem isto, "Ver ficha" num item de
+     EMERGÊNCIA trocava de aba e largava o médico numa lista sem busca — a
+     mesma queixa que o prontuário existe para resolver. */
+  const [abrirPaciente, setAbrirPaciente] = useState<string | null>(null);
   const [nomesPacientes, setNomesPacientes] = useState<Record<string, string>>({});
 
   const [triagens, setTriagens] = useState<
@@ -794,35 +798,17 @@ function PainelPage() {
         detalhe: [e.notas.slice(1).join(" · "), e.texto].filter(Boolean).join(" · ") || "Ver ficha",
         em: e.ocorrido_em,
         acao: "Ver ficha",
-        onAcao: () => setTab("Pacientes 👩‍🍼"),
+        onAcao: () => {
+          setTab("Pacientes 👩‍🍼");
+          setAbrirPaciente(e.user_id);
+        },
       };
     }),
-    /* TRIAGEM DE ALERTA — logo abaixo do SOS, e acima de tudo o mais.
-
-       É a paciente descrevendo sintomas e o app respondendo "procure
-       atendimento agora" com base em regra clínica determinística. Ficava só no
-       histórico dela: o médico não sabia nem na noite do episódio nem na
-       consulta seguinte. Vermelho entra como emergência; amarelo, como algo que
-       ele precisa ver antes da consulta. */
-    ...triagens.map((t) => ({
-      id: `tri-${t.id}`,
-      nivel: t.level === "vermelho" ? ("emergencia" as const) : ("espera" as const),
-      titulo:
-        t.level === "vermelho"
-          ? `${t.paciente ?? "Uma paciente"} — alerta VERMELHO nos sintomas`
-          : `${t.paciente ?? "Uma paciente"} relatou sintomas de atenção`,
-      detalhe: [
-        t.symptoms.length ? t.symptoms.join(", ") : "Sem sintomas listados",
-        t.systolic != null && t.diastolic != null
-          ? `PA ${t.systolic}/${t.diastolic}${sinalPressao(t.systolic, t.diastolic)?.nota ? ` · ${sinalPressao(t.systolic, t.diastolic)!.nota}` : ""}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join(" · "),
-      em: t.created_at,
-      acao: "Ver",
-      onAcao: () => setTab("Pacientes 👩‍🍼"),
-    })),
+    /* A triagem NÃO tem item próprio aqui: ela entra pelo fluxo de eventos
+       clínicos acima (`ev-triage_logs-`), que já traz a pressão junto e tem
+       desfecho registrável. Ter os dois fazia o mesmo episódio aparecer duas
+       vezes — e sumir de um lado sem sumir do outro, porque cada um usava um
+       marcador de resolução diferente. */
     ...pedidosVinculo.map((r) => ({
       id: `vinc-${r.id}`,
       nivel: "espera" as const,
@@ -1118,7 +1104,12 @@ function PainelPage() {
           />
         )}
         {tab === "Pacientes 👩‍🍼" && (
-          <PacientesSection tokenFn={token} onVinculoRespondido={loadPedidosVinculo} />
+          <PacientesSection
+            tokenFn={token}
+            onVinculoRespondido={loadPedidosVinculo}
+            abrirPacienteId={abrirPaciente}
+            onAbriu={() => setAbrirPaciente(null)}
+          />
         )}
         {tab === "Lives" && <LivesSection tokenFn={token} />}
         {tab === "Meu Perfil" && (
@@ -9028,6 +9019,8 @@ function LivesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
 function PacientesSection({
   tokenFn,
   onVinculoRespondido,
+  abrirPacienteId,
+  onAbriu,
 }: {
   tokenFn: () => Promise<string>;
   /**
@@ -9039,6 +9032,9 @@ function PacientesSection({
    * afirmações contraditórias ao mesmo tempo, e o fantasma só saía com F5.
    */
   onVinculoRespondido?: () => void;
+  /** Paciente que a fila de trabalho mandou abrir direto. */
+  abrirPacienteId?: string | null;
+  onAbriu?: () => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<PatientRequest[]>([]);
@@ -9048,6 +9044,19 @@ function PacientesSection({
   // Modal "+ adicionar paciente" (convite) e modal de detalhe da paciente
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selected, setSelected] = useState<LinkedPatient | null>(null);
+
+  /* A fila mandou abrir uma paciente. Espera a lista carregar — o efeito roda
+     de novo quando `patients` chega, então o item clicado durante o
+     carregamento não se perde. */
+  useEffect(() => {
+    if (!abrirPacienteId || patients.length === 0) return;
+    const alvo = patients.find((x) => x.id === abrirPacienteId);
+    if (alvo) {
+      setSelected(alvo);
+      onAbriu?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirPacienteId, patients]);
 
   async function loadPatients() {
     const tk = await tokenFn();

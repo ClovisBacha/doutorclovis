@@ -121,6 +121,28 @@ export function sinalGlicemia(valor?: number | null): Sinal | null {
 }
 
 /**
+ * Saturação de oxigênio.
+ *
+ * Existe porque o dado atravessava o sistema inteiro — a paciente registra, a
+ * view emite, o tipo declara — e chegava à tela do médico como a palavra
+ * "Medida", sem número: não havia régua, então saía `normal` e o resumo não
+ * imprimia nada. Uma gestante com pneumonia registrando 88% virava uma bolinha
+ * cinza.
+ *
+ * Na gestação a demanda de oxigênio sobe e a reserva cai: 94% já pede atenção
+ * onde em não-gestante passaria.
+ */
+export function sinalSaturacao(valor?: number | null): Sinal | null {
+  if (valor == null || !Number.isFinite(valor)) return null;
+  if (valor < 50 || valor > 100) {
+    return { gravidade: "atencao", nota: "Valor de saturação implausível" };
+  }
+  if (valor < 92) return { gravidade: "grave", nota: `Saturação ${valor}%` };
+  if (valor < 95) return { gravidade: "atencao", nota: `Saturação ${valor}%` };
+  return { gravidade: "normal", nota: "" };
+}
+
+/**
  * Silêncio: há quanto tempo ela não registra nada no app.
  *
  * Os cortes são de produto, não clínicos. Duas semanas é o intervalo em que uma

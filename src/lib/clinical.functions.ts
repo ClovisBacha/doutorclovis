@@ -26,6 +26,7 @@ import {
   piorSinal,
   sinalGlicemia,
   sinalPressao,
+  sinalSaturacao,
   type Gravidade,
   type Sinal,
 } from "./sinais-clinicos";
@@ -106,6 +107,7 @@ function avaliar(especie: EspecieEvento, d: DadosEvento): { g: Gravidade; notas:
   const sinais: (Sinal | null)[] = [
     sinalPressao(d.systolic, d.diastolic),
     sinalGlicemia(d.glucose_mg_dl),
+    sinalSaturacao(d.spo2),
   ];
 
   /* A triagem já vem classificada pelo motor de sintomas do app — o mesmo que
@@ -207,7 +209,7 @@ function montar(linhas: Record<string, unknown>[], tratados: Map<string, string>
       texto: (r.texto as string) ?? null,
       gravidade: g,
       notas,
-      tratado_em: tratados.get(`${r.fonte}:${r.fonte_id}`) ?? null,
+      tratado_em: tratados.get(`${r.user_id}:${r.fonte}:${r.fonte_id}`) ?? null,
     };
   });
 }
@@ -248,7 +250,20 @@ export const eventosQuePedemOlhar = createServerFn({ method: "POST" })
           /* Humor e movimento ficam de fora daqui de propósito: são sinais de
              engajamento, não de deterioração, e enchiam a fila de itens que
              não mudam conduta. Eles continuam na ficha da paciente. */
-          .in("especie", ["medida", "sintoma", "emergencia", "consulta", "contracao"])
+          /* `humor` ENTRA — é onde mora o EPDS, e a questão 10 é ideação de
+             autoagressão. O rótulo de humor do diário não vaza junto porque
+             não tem régua: sai `normal` e o filtro abaixo o descarta.
+
+             `contracao` SAI: não há régua para intensidade, então toda linha
+             saía normal — mas era buscada, e uma noite de trabalho de parto
+             grava centenas de linhas que consumiam o teto de 400 e empurravam
+             para fora a pressão alterada de outra paciente, sem nenhum sinal.
+
+             `emergencia` e `consulta` SAEM porque SOS e pré-consulta já têm
+             item próprio na fila, com marcador de resolução próprio
+             (`atendido_em`, `seen_by_doctor`). Mantendo os dois, o item que o
+             médico acabou de resolver de um lado continuava vivo do outro. */
+          .in("especie", ["medida", "sintoma", "humor"])
           .gte("ocorrido_em", desde)
           .order("ocorrido_em", { ascending: false })
           .limit(400),
@@ -273,7 +288,10 @@ export const eventosQuePedemOlhar = createServerFn({ method: "POST" })
         incompleto,
       };
     } catch {
-      return vazio;
+      /* `vazio` tem `incompleto: false`, e devolvê-lo aqui transformava uma
+         falha de leitura em "nada esperando por você" — a boa notícia que o
+         médico lê antes de fechar o painel. */
+      return { ...vazio, incompleto: true };
     }
   });
 
@@ -282,15 +300,14 @@ async function lerDesfechos(doctorId: string): Promise<Map<string, string>> {
   try {
     const { data } = await (supabaseAdmin as any)
       .from("clinical_acks")
-      .select("fonte,fonte_id,visto_em")
+      .select("fonte,fonte_id,user_id,visto_em")
       .eq("doctor_id", doctorId)
       .order("visto_em", { ascending: false })
       .limit(1000);
     return new Map(
-      ((data ?? []) as { fonte: string; fonte_id: string; visto_em: string }[]).map((a) => [
-        `${a.fonte}:${a.fonte_id}`,
-        a.visto_em,
-      ]),
+      (
+        (data ?? []) as { fonte: string; fonte_id: string; user_id: string; visto_em: string }[]
+      ).map((a) => [`${a.user_id}:${a.fonte}:${a.fonte_id}`, a.visto_em]),
     );
   } catch {
     return new Map();
@@ -331,7 +348,9 @@ export const prontuarioDaPaciente = createServerFn({ method: "POST" })
       const tratados = await lerDesfechos(user.id);
       return { ok: true as const, eventos: montar(linhas, tratados), incompleto };
     } catch {
-      return vazio;
+      // Idem: "nenhum registro dela no período" não pode ser o rosto de uma
+      // falha de rede — o modal diria que ela não usa o app.
+      return { ...vazio, incompleto: true };
     }
   });
 
@@ -405,13 +424,16 @@ export type FichaClinica = {
   riscos: string[];
   observacoesPrevias: string | null;
   modoCuidado: boolean;
+  /** O banco não tinha as colunas do perfil rico: campos ausentes são
+      DESCONHECIDOS, não vazios. */
+  degradada: boolean;
 };
 
 const PERFIL_COLS =
   "display_name,baby_name,lmp_date,due_date,reference_date,reference_weeks,reference_days," +
   "pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm," +
   "prior_cesarean,prior_notes,blood_type,allergies,medications,height_cm," +
-  "pre_pregnancy_weight_kg,emergency_contact,emergency_phone,care_mode";
+  "pre_pregnancy_weight_kg,emergency_contact,emergency_phone,care_mode,phone";
 
 /**
  * Dias de gestação hoje.
@@ -449,7 +471,9 @@ export const fichaClinica = createServerFn({ method: "POST" })
        42703 para a consulta INTEIRA, não só para a coluna que falta — então
        uma coluna ausente apagaria a ficha toda em vez de um campo. */
     let perfil: Record<string, unknown> | null = null;
+    let degradada = false;
     for (const cols of [PERFIL_COLS, "display_name,baby_name,lmp_date,due_date"]) {
+      if (cols !== PERFIL_COLS) degradada = true;
       const { data: row, error } = await sb
         .from("patient_profiles")
         .select(cols)
@@ -471,14 +495,11 @@ export const fichaClinica = createServerFn({ method: "POST" })
     if (perfil.prior_preterm) riscos.push("Parto prematuro anterior");
     if (perfil.prior_cesarean) riscos.push("Cesariana anterior");
 
-    // Telefone da paciente mora em `auth.users`, não no perfil.
-    let telefone: string | null = null;
-    try {
-      const { data: u } = await sb.auth.admin.getUserById(data.pacienteId);
-      telefone = (u?.user?.phone as string) || null;
-    } catch {
-      /* sem telefone; a ficha abre igual */
-    }
+    /* O telefone dela mora em `patient_profiles.phone`, e não em
+       `auth.users.phone`: as pacientes entram por e-mail, então a coluna do
+       Auth nunca é preenchida. Lendo de lá, o link de ligação da ficha — que
+       existe justamente para uma emergência — nunca apareceria. */
+    const telefone = (perfil.phone as string) || null;
 
     const ficha: FichaClinica = {
       nome: (perfil.display_name as string) ?? null,
@@ -497,6 +518,10 @@ export const fichaClinica = createServerFn({ method: "POST" })
       riscos,
       observacoesPrevias: (perfil.prior_notes as string) ?? null,
       modoCuidado: !!perfil.care_mode,
+      /* Sem isto a ficha reduzida era indistinguível de uma paciente sem
+         alergias e sem história de risco — a tela afirmando o oposto por
+         omissão, numa gestante com pré-eclâmpsia anterior. */
+      degradada,
     };
     return { ok: true as const, ficha };
   });
