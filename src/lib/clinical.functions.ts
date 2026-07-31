@@ -584,3 +584,204 @@ export function serieDe(
     ultimo: pontos.length ? pontos[pontos.length - 1].valor : null,
   };
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   A CONSULTA, E O QUE MUDOU DESDE ELA
+
+   "O que mudou desde a última consulta?" é a pergunta que o obstetra faz toda
+   vez, e o sistema não conseguia responder — não por falta de tela, por falta
+   de âncora. `appointment_requests` é um PEDIDO de horário e nem aponta para a
+   conta da paciente (identifica por e-mail digitado em formulário), e nota
+   clínica só existia em teleconsulta.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export type Consulta = {
+  id: string;
+  occurred_at: string;
+  kind: string;
+  achados: string | null;
+  conduta: string | null;
+  systolic: number | null;
+  diastolic: number | null;
+  weight_kg: number | null;
+  fundal_height_cm: number | null;
+  fetal_bpm: number | null;
+  resumo_paciente: string | null;
+};
+
+const CONSULTA_COLS =
+  "id,occurred_at,kind,achados,conduta,systolic,diastolic,weight_kg,fundal_height_cm,fetal_bpm,resumo_paciente";
+
+/**
+ * O que aconteceu com ela desde a última vez que ele a viu.
+ *
+ * Puro de propósito: recebe os eventos e a data-âncora e devolve o que a tela
+ * mostra. Dá para testar sem banco — e é justamente aqui que mora a lógica que
+ * erra em silêncio se ninguém olhar.
+ */
+export type Mudanca = {
+  /** Quantos registros ela fez no período. Zero é informação, não ausência. */
+  registros: number;
+  /** Os que pediram atenção, do pior para o mais recente. */
+  alteracoes: EventoClinico[];
+  /** Episódios: SOS, triagem de alerta, ida de urgência. */
+  episodios: EventoClinico[];
+  /** Perguntas dela ainda sem resposta. */
+  perguntasAbertas: EventoClinico[];
+  /** Exames enviados no período. */
+  exames: EventoClinico[];
+  /** Variação de peso desde a consulta, em kg. `null` sem os dois pontos. */
+  deltaPeso: number | null;
+};
+
+export function mudancasDesde(
+  eventos: EventoClinico[],
+  desde: string | null,
+  /** Peso aferido na consulta anterior — a base da comparação. */
+  pesoNaConsulta?: number | null,
+): Mudanca {
+  /* Sem consulta anterior, "desde" é o começo: tudo o que existe é novidade
+     para ele. É o caso da primeira consulta, e mostrar vazio ali seria esconder
+     justamente o histórico que ela trouxe. */
+  const corte = desde ? new Date(desde).getTime() : 0;
+  const depois = eventos.filter((e) => {
+    const t = new Date(e.ocorrido_em).getTime();
+    return Number.isFinite(t) && t >= corte;
+  });
+
+  const pesos = depois
+    .map((e) => e.dados.weight_kg)
+    .filter((v): v is number => typeof v === "number");
+  const deltaPeso =
+    pesoNaConsulta != null && pesos.length > 0
+      ? Math.round((pesos[0] - Number(pesoNaConsulta)) * 10) / 10
+      : null;
+
+  const peso = (g: Gravidade) => (g === "grave" ? 0 : g === "atencao" ? 1 : 2);
+  return {
+    registros: depois.length,
+    alteracoes: depois
+      .filter((e) => e.gravidade !== "normal" && e.especie !== "emergencia")
+      .sort(
+        (a, b) =>
+          peso(a.gravidade) - peso(b.gravidade) || b.ocorrido_em.localeCompare(a.ocorrido_em),
+      ),
+    episodios: depois.filter(
+      (e) => e.especie === "emergencia" || (e.especie === "sintoma" && e.gravidade !== "normal"),
+    ),
+    perguntasAbertas: depois.filter(
+      (e) => e.especie === "pergunta" && e.dados.respondida === false,
+    ),
+    exames: depois.filter((e) => e.especie === "exame"),
+    deltaPeso,
+  };
+}
+
+/** As consultas dela, mais recente primeiro. */
+export const consultasDaPaciente = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        pacienteId: z.string().uuid(),
+        limite: z.number().int().min(1).max(50).default(10),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const vazio = { ok: true as const, consultas: [] as Consulta[] };
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ...vazio, ok: false as const };
+    const pacientes = await pacientesAtuais(user.id);
+    if (!pacientes.has(data.pacienteId)) return { ...vazio, ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    try {
+      const { data: rows, error } = await (supabaseAdmin as any)
+        .from("consultations")
+        .select(CONSULTA_COLS)
+        .eq("user_id", data.pacienteId)
+        .order("occurred_at", { ascending: false })
+        .limit(data.limite);
+      // Tabela ainda não criada: ficha sem consultas, não ficha quebrada.
+      if (error) return vazio;
+      return { ok: true as const, consultas: (rows ?? []) as Consulta[] };
+    } catch {
+      return vazio;
+    }
+  });
+
+/** Registra (ou corrige) uma consulta. */
+export const salvarConsulta = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        id: z.string().uuid().optional(),
+        pacienteId: z.string().uuid(),
+        ocorridaEm: z.string().min(4).optional(),
+        tipo: z.enum(["presencial", "teleconsulta", "retorno", "urgencia"]).default("presencial"),
+        achados: z.string().max(8000).optional(),
+        conduta: z.string().max(8000).optional(),
+        resumoPaciente: z.string().max(4000).optional(),
+        /* As faixas repetem as de `sinais-clinicos.ts` e as do CHECK do banco.
+           Validar aqui é o que faz o médico ver "a diastólica precisa ficar
+           entre 20 e 200" em vez do erro genérico do Postgres. */
+        systolic: z.number().int().min(50).max(300).nullable().optional(),
+        diastolic: z.number().int().min(20).max(200).nullable().optional(),
+        pesoKg: z.number().min(25).max(350).nullable().optional(),
+        alturaUterinaCm: z.number().min(5).max(60).nullable().optional(),
+        bpmFetal: z.number().int().min(60).max(220).nullable().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ok: false as const, id: null };
+    const pacientes = await pacientesAtuais(user.id);
+    if (!pacientes.has(data.pacienteId)) return { ok: false as const, id: null };
+
+    // O par de pressão é tudo-ou-nada, igual ao CHECK do banco. Sem isto o
+    // insert volta erro cru e o médico perde o que digitou.
+    const temS = data.systolic != null;
+    const temD = data.diastolic != null;
+    if (temS !== temD) return { ok: false as const, id: null, motivo: "pa_incompleta" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const linha = {
+      doctor_id: user.id,
+      user_id: data.pacienteId,
+      occurred_at: data.ocorridaEm ?? new Date().toISOString(),
+      kind: data.tipo,
+      achados: data.achados ?? null,
+      conduta: data.conduta ?? null,
+      resumo_paciente: data.resumoPaciente ?? null,
+      systolic: data.systolic ?? null,
+      diastolic: data.diastolic ?? null,
+      weight_kg: data.pesoKg ?? null,
+      fundal_height_cm: data.alturaUterinaCm ?? null,
+      fetal_bpm: data.bpmFetal ?? null,
+    };
+    try {
+      if (data.id) {
+        /* `doctor_id` no WHERE: consulta de outro consultório não é afetada,
+           sem checagem separada que abriria corrida. */
+        const { data: mexeu, error } = await (supabaseAdmin as any)
+          .from("consultations")
+          .update(linha)
+          .eq("id", data.id)
+          .eq("doctor_id", user.id)
+          .select("id");
+        if (error || !mexeu?.length) return { ok: false as const, id: null };
+        return { ok: true as const, id: data.id };
+      }
+      const { data: nova, error } = await (supabaseAdmin as any)
+        .from("consultations")
+        .insert(linha)
+        .select("id")
+        .single();
+      if (error || !nova) return { ok: false as const, id: null };
+      return { ok: true as const, id: nova.id as string };
+    } catch {
+      return { ok: false as const, id: null };
+    }
+  });
