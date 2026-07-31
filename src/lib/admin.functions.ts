@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { colunaAusente } from "./postgrest";
+import { colunaAusente, faltaNoBanco } from "./postgrest";
 
 /** Escapa texto do usuário antes de interpolar em HTML de e-mail (anti-injeção). */
 function esc(s: string | null | undefined): string {
@@ -693,11 +693,20 @@ export const getEngagementData = createServerFn({ method: "POST" })
           .select(`user_id,${coluna}`)
           .in("user_id", idsDele.slice(i, i + LOTE))
           .gte(coluna, inicioJanela);
-        /* Tabela ainda não migrada (42703/42P01) é ausência esperada, não
-           falha: segue sem essa fonte de atividade, como antes. */
+        /* Tabela ainda não migrada é ausência ESPERADA, não falha: segue sem
+           essa fonte de atividade, como antes.
+
+           `faltaNoBanco` cobre `PGRST205` além de 42703/42P01 — e essa é a
+           diferença entre um alarme útil e um alarme inútil. Produção não tem
+           `contraction_logs`, `exam_files`, `panic_events` nem `triage_logs`, e
+           o PostgREST responde `PGRST205` (fora do schema cache), não `42P01`.
+           Sem isso, `atividadeIncompleta` ficava permanentemente true e a faixa
+           "📡 Não consegui ler todos os registros" aparecia em TODO
+           carregamento do painel. Um alarme que grita sempre é um alarme que se
+           aprende a ignorar — e o dia em que a leitura falhar de verdade, ele
+           não vai significar nada. */
         if (error) {
-          const code = (error as { code?: string }).code;
-          if (code !== "42703" && code !== "42P01") erro = true;
+          if (!faltaNoBanco(error)) erro = true;
           continue;
         }
         partes.push(...(linhas ?? []));

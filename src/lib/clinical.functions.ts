@@ -207,26 +207,62 @@ async function pacientesAtuais(doctorId: string): Promise<Map<string, string>> {
  */
 const LOTE = 100;
 
+/**
+ * Tetos de leitura da view — e o que acontece ao encostar neles.
+ *
+ * Não existe teto "seguro": qualquer número que eu escolha aqui é um número que
+ * uma paciente com uma noite de trabalho de parto ultrapassa. O que mudou é que
+ * encostar no teto agora ACENDE a faixa de leitura incompleta, em vez de
+ * devolver uma lista curta com cara de completa.
+ *
+ * Os valores subiram junto porque o custo de um evento a mais é uma linha de
+ * jsonb, e o custo de um evento a menos pode ser uma pressão grave que ninguém
+ * viu.
+ */
+const TETO_FILA = 1200;
+const TETO_PRONTUARIO = 2500;
+
 async function lerEventos(
   ids: string[],
   filtro: (q: any) => any,
+  teto: number,
 ): Promise<{ linhas: Record<string, unknown>[]; incompleto: boolean }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const linhas: Record<string, unknown>[] = [];
   let incompleto = false;
   for (let i = 0; i < ids.length; i += LOTE) {
+    /* O `.limit` mora AQUI, e não no filtro de quem chama, por um motivo: é a
+       única forma de saber se ele cortou. Enquanto o teto era aplicado lá fora,
+       esta função não tinha como comparar o tamanho da resposta com o limite —
+       e `incompleto` só era ligado por ERRO, nunca por truncamento. */
     const { data, error } = await filtro(
       (supabaseAdmin as any)
         .from("clinical_events")
         .select(COLS)
         .in("user_id", ids.slice(i, i + LOTE)),
-    );
+    ).limit(teto);
     if (error) {
       // View ainda não criada (SQL pendente): tela vazia, não painel quebrado.
       incompleto = true;
       continue;
     }
-    linhas.push(...((data ?? []) as Record<string, unknown>[]));
+    const lote = (data ?? []) as Record<string, unknown>[];
+    /* TETO ATINGIDO É DADO PERDIDO, E EM SILÊNCIO ERA PIOR QUE PERDIDO.
+
+       A ordem é `ocorrido_em DESC`, então o que o corte descarta são os eventos
+       MAIS ANTIGOS da janela — e a régua de gravidade roda depois, em
+       TypeScript, sobre o que sobrou. Uma pressão 168/104 do sexto dia de uma
+       janela de catorze não chegava a ser avaliada: ela não aparecia na fila, e
+       a tela seguia afirmando completude.
+
+       Uma noite de trabalho de parto grava centenas de contrações e consome o
+       teto sozinha — foi por isso que `contracao` saiu da fila. Mas o teto em si
+       continuou lá, e o prontuário nem filtra espécie.
+
+       Agora o corte ACENDE a faixa de "não consegui ler tudo". Não recupera o
+       que ficou de fora; impede que a ausência passe por ausência de fato. */
+    if (lote.length >= teto) incompleto = true;
+    linhas.push(...lote);
   }
   return { linhas, incompleto };
 }
@@ -282,12 +318,14 @@ export const eventosQuePedemOlhar = createServerFn({ method: "POST" })
       if (ids.length === 0) return vazio;
 
       const desde = new Date(Date.now() - data.dias * 86400000).toISOString();
-      const { linhas, incompleto } = await lerEventos(ids, (q) =>
-        q
-          /* Humor e movimento ficam de fora daqui de propósito: são sinais de
+      const { linhas, incompleto } = await lerEventos(
+        ids,
+        (q) =>
+          q
+            /* Humor e movimento ficam de fora daqui de propósito: são sinais de
              engajamento, não de deterioração, e enchiam a fila de itens que
              não mudam conduta. Eles continuam na ficha da paciente. */
-          /* `humor` ENTRA — é onde mora o EPDS, e a questão 10 é ideação de
+            /* `humor` ENTRA — é onde mora o EPDS, e a questão 10 é ideação de
              autoagressão. O rótulo de humor do diário não vaza junto porque
              não tem régua: sai `normal` e o filtro abaixo o descarta.
 
@@ -300,10 +338,10 @@ export const eventosQuePedemOlhar = createServerFn({ method: "POST" })
              item próprio na fila, com marcador de resolução próprio
              (`atendido_em`, `seen_by_doctor`). Mantendo os dois, o item que o
              médico acabou de resolver de um lado continuava vivo do outro. */
-          .in("especie", ["medida", "sintoma", "humor"])
-          .gte("ocorrido_em", desde)
-          .order("ocorrido_em", { ascending: false })
-          .limit(400),
+            .in("especie", ["medida", "sintoma", "humor"])
+            .gte("ocorrido_em", desde)
+            .order("ocorrido_em", { ascending: false }),
+        TETO_FILA,
       );
 
       const tratados = await lerDesfechos(user.id);
@@ -380,8 +418,10 @@ export const prontuarioDaPaciente = createServerFn({ method: "POST" })
 
       const desde = new Date(Date.now() - data.dias * 86400000).toISOString();
       await trilha(user, "prontuario.ler", data.pacienteId);
-      const { linhas, incompleto } = await lerEventos([data.pacienteId], (q) =>
-        q.gte("ocorrido_em", desde).order("ocorrido_em", { ascending: false }).limit(1000),
+      const { linhas, incompleto } = await lerEventos(
+        [data.pacienteId],
+        (q: any) => q.gte("ocorrido_em", desde).order("ocorrido_em", { ascending: false }),
+        TETO_PRONTUARIO,
       );
       const tratados = await lerDesfechos(user.id);
       return { ok: true as const, eventos: montar(linhas, tratados), incompleto };

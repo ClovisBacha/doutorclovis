@@ -181,6 +181,17 @@ export function ProntuarioPaciente({
     );
   }
 
+  /* ORDEM EXPLÍCITA, e não a que o servidor por acaso mandou.
+     `eventos.find(...)` para o par de pressão e `eventos[0]` para "quando foi o
+     último registro" leem o PRIMEIRO elemento e chamam isso de "o mais
+     recente" — o que só é verdade enquanto a lista chegar em ordem
+     decrescente. Hoje chega; a garantia não estava escrita em lugar nenhum.
+
+     É a mesma armadilha que fez `mudancasDesde` transformar +4,1 kg em +1,6 kg
+     com o array invertido, e que já foi fechada lá com uma ordenação própria.
+     Uma cópia do array custa nada e tira a tela da dependência. */
+  const emOrdem = [...eventos].sort((a, b) => b.ocorrido_em.localeCompare(a.ocorrido_em));
+
   const pa = serieDe(eventos, "systolic", "Pressão (sistólica)", "mmHg");
   const paD = serieDe(eventos, "diastolic", "Diastólica", "mmHg");
   const peso = serieDe(eventos, "weight_kg", "Peso", "kg");
@@ -190,7 +201,7 @@ export function ProntuarioPaciente({
      de 168 medida na triagem de hoje casava com uma diastólica de 78 medida no
      diário de anteontem, e a tela exibia "168/78" com etiqueta de faixa grave —
      um dado clínico inventado pela composição de duas leituras. */
-  const ultimaPA = eventos.find(
+  const ultimaPA = emOrdem.find(
     (e) => e.dados.systolic != null && e.dados.diastolic != null,
   )?.dados;
   const sinalPA = sinalPressao(ultimaPA?.systolic, ultimaPA?.diastolic);
@@ -358,7 +369,7 @@ export function ProntuarioPaciente({
           <Medida
             rotulo="Registros"
             valor={String(eventos.length)}
-            nota={eventos.length ? quando(eventos[0].ocorrido_em) : undefined}
+            nota={emOrdem.length ? quando(emOrdem[0].ocorrido_em) : undefined}
           />
         </div>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">

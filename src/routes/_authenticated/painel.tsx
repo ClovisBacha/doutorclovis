@@ -1130,6 +1130,15 @@ function PainelPage() {
             onVinculoRespondido={loadPedidosVinculo}
             abrirPacienteId={abrirPaciente}
             onAbriu={() => setAbrirPaciente(null)}
+            onDesfechoRegistrado={(fonte, fonteId) =>
+              setEventosClinicos((es) =>
+                es.map((e) =>
+                  e.fonte === fonte && e.fonte_id === fonteId
+                    ? { ...e, tratado_em: new Date().toISOString() }
+                    : e,
+                ),
+              )
+            }
           />
         )}
         {tab === "Lives" && <LivesSection tokenFn={token} />}
@@ -9249,6 +9258,7 @@ function PacientesSection({
   onVinculoRespondido,
   abrirPacienteId,
   onAbriu,
+  onDesfechoRegistrado,
 }: {
   tokenFn: () => Promise<string>;
   /**
@@ -9263,6 +9273,20 @@ function PacientesSection({
   /** Paciente que a fila de trabalho mandou abrir direto. */
   abrirPacienteId?: string | null;
   onAbriu?: () => void;
+  /**
+   * Avisa o painel que um evento clínico foi resolvido dentro do modal.
+   *
+   * Mesma história do `onVinculoRespondido` logo acima: o modal marcava o
+   * desfecho no estado INTERNO dele, e a fila de trabalho — que fica na mesma
+   * tela — continuava listando "Fulana · Pressão em faixa grave" depois de o
+   * médico ter registrado que cuidou. O item só sumia no tique de 3 minutos,
+   * ou com F5.
+   *
+   * Numa fila cujo propósito é dizer o que ainda precisa dele, um item
+   * resolvido que não sai é ruído — e ruído numa fila clínica é o começo de
+   * parar de olhar para ela.
+   */
+  onDesfechoRegistrado?: (fonte: string, fonteId: string) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<PatientRequest[]>([]);
@@ -9630,7 +9654,12 @@ function PacientesSection({
       {/* Modais: convite de paciente e detalhe (dados + conversa com a IA) */}
       {inviteOpen && <InvitePatientModal tokenFn={tokenFn} onClose={() => setInviteOpen(false)} />}
       {selected && (
-        <PatientDetailModal p={selected} tokenFn={tokenFn} onClose={() => setSelected(null)} />
+        <PatientDetailModal
+          p={selected}
+          tokenFn={tokenFn}
+          onClose={() => setSelected(null)}
+          onDesfechoRegistrado={onDesfechoRegistrado}
+        />
       )}
     </div>
   );
@@ -9794,10 +9823,13 @@ function PatientDetailModal({
   p,
   tokenFn,
   onClose,
+  onDesfechoRegistrado,
 }: {
   p: LinkedPatient;
   tokenFn: () => Promise<string>;
   onClose: () => void;
+  /** Sobe o desfecho para a fila de trabalho do painel. Ver PacientesSection. */
+  onDesfechoRegistrado?: (fonte: string, fonteId: string) => void;
 }) {
   const [messages, setMessages] = useState<BrainChatMessage[] | null>(null);
   /* A ficha clínica dela. O espelho do bebê já estava aqui, mas a aba
@@ -10000,6 +10032,9 @@ function PatientDetailModal({
                       : e,
                   ),
                 );
+                /* E na fila do painel também: os dois estados mostram o MESMO
+                   evento, e atualizar só um deixava a tela se contradizendo. */
+                onDesfechoRegistrado?.(fonte, fonteId);
               } catch {
                 toast.error("Não consegui registrar. Tente de novo.");
               } finally {

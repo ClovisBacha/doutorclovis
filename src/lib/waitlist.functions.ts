@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { instanteBrasilia } from "./utils";
 
 /**
  * Fila de espera por semana + cascata de ofertas.
@@ -109,9 +110,19 @@ async function offerNextForWeek(
   offerDate: string,
   offerTime: string,
 ): Promise<boolean> {
-  // Nunca oferta um horário que já passou (cascata lenta / cancelamento tardio):
-  // sem isto, dava pra "confirmar" consulta numa data no passado.
-  if (new Date(`${offerDate}T${offerTime}`).getTime() <= Date.now()) return false;
+  /* Nunca oferta um horário que já passou (cascata lenta / cancelamento
+     tardio): sem isto, dava pra "confirmar" consulta numa data no passado.
+
+     `instanteBrasilia`, e não `new Date(\`${data}T${hora}\`)`: sem offset, a
+     string é interpretada no fuso da MÁQUINA, e na Vercel isso é UTC. Uma vaga
+     das 09:00 do consultório era lida como 09:00Z = 06:00 daqui — a partir das
+     6h da manhã ela já parecia ter passado, e NENHUMA vaga da manhã liberada no
+     mesmo dia chegava a ser ofertada a quem estava na fila. A paciente que
+     esperava não recebia nada, e o horário ficava vago. */
+  const quando = instanteBrasilia(offerDate, offerTime);
+  /* NaN <= x é false, o que ofertaria um horário que não sei ler. Explícito e
+     fechado: dado ruim não vira oferta. */
+  if (Number.isNaN(quando) || quando <= Date.now()) return false;
   // O slot ainda está livre? (ninguém confirmou nesse horário)
   const { data: taken } = await scopeDoctor(
     (admin as any)

@@ -40,3 +40,48 @@ export function ymdBrasilia(d: Date = new Date()): string {
     day: "2-digit",
   }).format(d);
 }
+
+/** Quanto o horário de Brasília está à frente do UTC naquele instante, em ms. */
+function offsetBrasilia(d: Date): number {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      /* `h23`, e não `hour12: false`: em várias versões do ICU o segundo produz
+         "24" para a meia-noite, e `Date.UTC(..., 24, ...)` rola para o dia
+         seguinte — o offset sairia errado por 24 horas uma vez por dia. */
+      hourCycle: "h23",
+    })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  ) as Record<string, string>;
+  const paredeComoUTC = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  return paredeComoUTC - d.getTime();
+}
+
+/**
+ * "YYYY-MM-DD" + "HH:MM" do CONSULTÓRIO → o instante real (epoch em ms).
+ *
+ * `new Date("2026-08-01T09:00")` — sem offset — é interpretado no fuso da
+ * MÁQUINA, e na Vercel isso é UTC. A fila de espera comparava o horário do slot
+ * assim contra `Date.now()`, então uma vaga das 09:00 de Brasília era lida como
+ * 09:00 UTC = 06:00 daqui: a partir das 06h da manhã ela já parecia ter
+ * passado, e nenhuma vaga da manhã liberada no mesmo dia chegava a ser ofertada
+ * a quem estava na fila.
+ *
+ * Duas passadas: primeiro trata a parede como se fosse UTC, depois desconta o
+ * offset REAL daquele instante (que o Intl conhece, inclusive o histórico de
+ * horário de verão — este país já mudou de regra várias vezes).
+ */
+export function instanteBrasilia(data: string, hora: string): number {
+  const hm = /^(\d{2}):(\d{2})/.exec(hora);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !hm) return NaN;
+  const ingenuo = Date.parse(`${data}T${hm[1]}:${hm[2]}:00Z`);
+  if (Number.isNaN(ingenuo)) return NaN;
+  return ingenuo - offsetBrasilia(new Date(ingenuo));
+}
