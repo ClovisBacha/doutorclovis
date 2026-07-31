@@ -22,7 +22,9 @@
 
 import { ESTILO_SINAL, sinalGlicemia, sinalPressao, type Gravidade } from "@/lib/sinais-clinicos";
 import {
+  mudancasDesde,
   serieDe,
+  type Consulta,
   type EventoClinico,
   type FichaClinica,
   type Serie,
@@ -161,6 +163,7 @@ export function ProntuarioPaciente({
   incompleto,
   onRegistrarDesfecho,
   registrando,
+  consultas = [],
 }: {
   ficha: FichaClinica | null;
   eventos: EventoClinico[];
@@ -169,6 +172,8 @@ export function ProntuarioPaciente({
   incompleto: boolean;
   onRegistrarDesfecho: (fonte: string, fonteId: string) => void;
   registrando: string | null;
+  /** As consultas dela, mais recente primeiro. */
+  consultas?: Consulta[];
 }) {
   if (carregando) return <div className="skeleton h-72 rounded-3xl" />;
   if (!ficha) {
@@ -275,7 +280,15 @@ export function ProntuarioPaciente({
         )}
       </div>
 
-      {/* 2. O QUE PEDE OLHAR AGORA */}
+      {/* 2. O QUE MUDOU DESDE A ÚLTIMA VEZ QUE ELE A VIU.
+
+          É a pergunta das 13h50, e a que o sistema não conseguia responder por
+          falta de âncora. Vem ANTES dos números soltos porque um valor isolado
+          não decide nada — o que decide é o que ele já sabia contra o que
+          apareceu depois. */}
+      <MudancasDesdeAConsulta eventos={eventos} consultas={consultas} />
+
+      {/* 3. O QUE PEDE OLHAR AGORA */}
       {pendentes.length > 0 && (
         <div className="rounded-3xl border border-rose-200 bg-rose-50/60 p-4">
           <p className="text-sm font-bold text-rose-900">
@@ -318,7 +331,7 @@ export function ProntuarioPaciente({
         </div>
       )}
 
-      {/* 3. PARA ONDE OS NÚMEROS ESTÃO INDO */}
+      {/* 4. PARA ONDE OS NÚMEROS ESTÃO INDO */}
       <div>
         <h4 className="font-serif text-lg text-foreground">Números dela</h4>
         <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
@@ -357,7 +370,7 @@ export function ProntuarioPaciente({
         </div>
       </div>
 
-      {/* 4. O QUE ACONTECEU */}
+      {/* 5. O QUE ACONTECEU */}
       <div>
         <h4 className="font-serif text-lg text-foreground">Linha do tempo</h4>
         {eventos.length === 0 ? (
@@ -427,4 +440,132 @@ function resumo(e: EventoClinico): string {
   if (e.especie === "emergencia") partes.push("acionou o SOS");
   if (e.especie === "pergunta") partes.push(d.respondida ? "respondida" : "sem resposta");
   return partes.join(" · ") || (ROTULO_ESPECIE[e.especie] ?? "Registro");
+}
+
+/**
+ * O bloco das 13h50.
+ *
+ * Um valor isolado não decide nada: o que decide é o que ele já sabia contra o
+ * que apareceu depois. Sem consulta registrada, este bloco convida a registrar
+ * a primeira — porque a alternativa (não mostrar nada) esconde que a
+ * funcionalidade existe.
+ */
+function MudancasDesdeAConsulta({
+  eventos,
+  consultas,
+}: {
+  eventos: EventoClinico[];
+  consultas: Consulta[];
+}) {
+  const ultima = consultas[0] ?? null;
+  const m = mudancasDesde(eventos, ultima?.occurred_at ?? null, ultima?.weight_kg ?? null);
+
+  if (!ultima) {
+    return (
+      <div className="rounded-3xl border border-dashed border-border bg-card/50 p-4">
+        <p className="text-[13px] leading-snug text-muted-foreground">
+          Nenhuma consulta registrada ainda. Ao registrar a primeira, esta área passa a mostrar{" "}
+          <strong className="text-foreground">o que mudou desde então</strong> — pressões alteradas,
+          episódios, perguntas sem resposta e variação de peso.
+        </p>
+      </div>
+    );
+  }
+
+  const quandoFoi = new Date(ultima.occurred_at).toLocaleDateString("pt-BR");
+  const nada =
+    m.registros === 0 &&
+    m.alteracoes.length === 0 &&
+    m.episodios.length === 0 &&
+    m.perguntasAbertas.length === 0;
+
+  return (
+    <div className="rounded-3xl border border-primary/25 bg-primary/5 p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h4 className="font-serif text-lg text-foreground">Desde a última consulta</h4>
+        <span className="text-[11px] text-muted-foreground">
+          {quandoFoi}
+          {ultima.systolic != null && ultima.diastolic != null
+            ? ` · PA aferida ${ultima.systolic}/${ultima.diastolic}`
+            : ""}
+          {ultima.weight_kg != null ? ` · ${ultima.weight_kg} kg` : ""}
+        </span>
+      </div>
+
+      {ultima.conduta && (
+        <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+          <span className="font-semibold text-foreground">Conduta de então: </span>
+          {ultima.conduta}
+        </p>
+      )}
+
+      {nada ? (
+        /* Zero registros é informação — ela não abriu o app —, e é diferente de
+           "não consegui ler". A frase diz qual dos dois é. */
+        <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+          Ela não registrou nada no app desde então. Vale combinar isso na consulta: sem registro, o
+          acompanhamento entre as consultas fica cego.
+        </p>
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Contador n={m.episodios.length} rot="episódios" grave />
+          <Contador n={m.alteracoes.length} rot="fora de faixa" />
+          <Contador n={m.perguntasAbertas.length} rot="perguntas sem resposta" />
+          <Contador
+            n={m.exames.length}
+            rot="exames enviados"
+            extra={
+              m.deltaPeso != null
+                ? `${m.deltaPeso > 0 ? "+" : ""}${m.deltaPeso} kg no período`
+                : `${m.registros} registros`
+            }
+          />
+        </div>
+      )}
+
+      {(m.episodios.length > 0 || m.alteracoes.length > 0) && (
+        <ul className="mt-3 space-y-1">
+          {[...m.episodios, ...m.alteracoes].slice(0, 5).map((e) => (
+            <li key={`${e.fonte}-${e.fonte_id}`} className="text-[12.5px] leading-snug">
+              <span className="text-muted-foreground">{quando(e.ocorrido_em)} · </span>
+              <span className="text-foreground">{e.notas.join(" · ") || resumo(e)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {m.perguntasAbertas.length > 0 && (
+        <p className="mt-2 rounded-2xl bg-card px-3 py-2 text-[12.5px] leading-snug text-foreground">
+          <span className="font-semibold">Ela perguntou e ainda não foi respondida: </span>
+          {m.perguntasAbertas[0].texto}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Contador({
+  n,
+  rot,
+  grave,
+  extra,
+}: {
+  n: number;
+  rot: string;
+  grave?: boolean;
+  extra?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-card p-2.5">
+      <p
+        className={`font-serif text-xl tabular-nums ${
+          grave && n > 0 ? "text-rose-700" : "text-foreground"
+        }`}
+      >
+        {n}
+      </p>
+      <p className="text-[10px] leading-tight text-muted-foreground">{rot}</p>
+      {extra && <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{extra}</p>}
+    </div>
+  );
 }

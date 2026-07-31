@@ -38,9 +38,11 @@ import {
 import { AlertaSosMedico } from "@/components/alerta-sos-medico";
 import { ProntuarioPaciente } from "@/components/prontuario-paciente";
 import {
+  consultasDaPaciente,
   fichaClinica,
   prontuarioDaPaciente,
   registrarDesfecho,
+  type Consulta,
   type EventoClinico,
   type FichaClinica,
 } from "@/lib/clinical.functions";
@@ -9588,6 +9590,7 @@ function PatientDetailModal({
   const [carregandoProntuario, setCarregandoProntuario] = useState(true);
   const [prontuarioIncompleto, setProntuarioIncompleto] = useState(false);
   const [registrandoDesfecho, setRegistrandoDesfecho] = useState<string | null>(null);
+  const [consultasDela, setConsultasDela] = useState<Consulta[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -9614,13 +9617,15 @@ function PatientDetailModal({
         setSosDela([]);
       }
       try {
-        const [pr, fc] = await Promise.all([
+        const [pr, fc, cs] = await Promise.all([
           prontuarioDaPaciente({ data: { accessToken: tk, pacienteId: p.id } }),
           fichaClinica({ data: { accessToken: tk, pacienteId: p.id } }),
+          consultasDaPaciente({ data: { accessToken: tk, pacienteId: p.id } }),
         ]);
         setProntuario(pr.ok ? pr.eventos : []);
         setProntuarioIncompleto(!pr.ok || pr.incompleto);
         setFichaClin(fc.ok ? fc.ficha : null);
+        setConsultasDela(cs.ok ? cs.consultas : []);
       } catch {
         setProntuarioIncompleto(true);
       } finally {
@@ -9732,6 +9737,7 @@ function PatientDetailModal({
             carregando={carregandoProntuario}
             incompleto={prontuarioIncompleto}
             registrando={registrandoDesfecho}
+            consultas={consultasDela}
             onRegistrarDesfecho={async (fonte, fonteId) => {
               const chave = `${fonte}:${fonteId}`;
               setRegistrandoDesfecho(chave);
