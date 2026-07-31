@@ -37,7 +37,50 @@ const STAGE_IMG: Record<BabyStage, string> = {
   termo: babyTermo,
 };
 
-// embriao and termo images have white backgrounds — multiply blends white out on light bg
+/**
+ * A ARTE POR SEMANA — 39 arquivos, um para cada semana de 4 a 42.
+ *
+ * Antes eram cinco desenhos para 39 semanas: a mesma imagem ficava parada por
+ * até doze semanas seguidas (16 a 27). Numa tela que ela abre todo dia, "nada
+ * mudou" doze semanas seguidas é o oposto do que o produto promete.
+ *
+ * `import.meta.glob` com `eager` + `?url` devolve um MAPA de caminho para URL
+ * com hash de conteúdo. As 39 entram no manifesto do build, mas o navegador só
+ * baixa a que o `<image href>` apontar — a paciente carrega ~24 KB da semana
+ * dela, não 39 arquivos. Pôr as imagens em `public/` daria o mesmo download e
+ * perderia o hash (e com ele o cache eterno).
+ */
+const ARTE_POR_SEMANA: Record<number, string> = Object.fromEntries(
+  Object.entries(
+    import.meta.glob<string>("@/assets/bebes/semana-*.webp", {
+      eager: true,
+      query: "?url",
+      import: "default",
+    }),
+  ).map(([caminho, url]) => [Number(caminho.match(/semana-(\d+)\.webp$/)?.[1]), url]),
+);
+
+/**
+ * A arte da semana, com as cinco antigas como rede.
+ *
+ * A série de 39 é gerada em lotes, então em qualquer momento pode faltar
+ * semana. Faltando, cai no desenho do estágio — que é o comportamento de hoje.
+ * Nunca fica sem imagem: uma home sem bebê é pior que um bebê repetido.
+ */
+function arteDaSemana(week: number, stage: BabyStage): { src: string; nova: boolean } {
+  const w = Math.max(WEEK_MIN, Math.min(WEEK_MAX, Math.round(week)));
+  const propria = ARTE_POR_SEMANA[w];
+  return propria ? { src: propria, nova: true } : { src: STAGE_IMG[stage], nova: false };
+}
+
+/* FUNDO BRANCO CHAPADO — só na arte antiga.
+   `baby-embriao` e `baby-termo` não têm transparência: o branco está gravado no
+   PNG, e o `multiply` existe para apagá-lo sobre fundo claro. Sobre o céu
+   noturno da home isso nunca funcionou — a semana 6 mostra um QUADRICULADO de
+   transparência e a 40 uma CAIXA BRANCA, ambos em produção hoje.
+
+   A arte nova tem alfa de verdade e não passa por aqui. O `multiply` fica
+   restrito ao caminho de fallback, e some junto com a última imagem antiga. */
 const WHITE_BG_STAGES = new Set<BabyStage>(["embriao", "termo"]);
 
 /**
@@ -62,6 +105,36 @@ export function clampTone(tone: number | null | undefined): number {
 
 function growth(week: number) {
   return Math.max(0, Math.min(1, (week - WEEK_MIN) / (WEEK_MAX - WEEK_MIN)));
+}
+
+/**
+ * Quanto o corpo ocupa da caixa — DUAS RÉGUAS, porque são duas artes.
+ *
+ * ARTE NOVA (39 semanas): todas normalizadas para a mesma fração de tinta na
+ * caixa, então o tamanho na tela pode vir de UMA curva contínua da semana. Sem
+ * degrau: hoje o bebê SALTA ao cruzar a fronteira de um estágio, e o salto não
+ * é crescimento — é o enquadramento do arquivo mudando (a arte antiga vai de
+ * 72% a 89% de ocupação).
+ *
+ * O expoente 0,65 comprime a curva para a frente porque o crescimento real é
+ * assim: entre 4 e 20 semanas o bebê ganha proporcionalmente muito mais do que
+ * entre 30 e 42. Uma reta faria o primeiro trimestre parecer parado.
+ *
+ * ARTE ANTIGA (fallback): mantém o `STAGE_BASE_SCALE` em degraus. Ele foi
+ * calibrado contra aquelas imagens; trocar a régua aqui mudaria o tamanho do
+ * bebê nas semanas que ainda não têm arte própria.
+ */
+const ESCALA_MIN = 0.34;
+const ESCALA_MAX = 1;
+
+function escalaDoCorpo(week: number, stage: BabyStage, arteNova: boolean): number {
+  if (arteNova) {
+    return ESCALA_MIN + (ESCALA_MAX - ESCALA_MIN) * Math.pow(growth(week), 0.65);
+  }
+  const [sMin, sMax] = STAGE_RANGES[stage];
+  const t = Math.max(0, Math.min(1, (week - sMin) / (sMax - sMin)));
+  const base = STAGE_BASE_SCALE[stage];
+  return base + t * (1 - base);
 }
 
 export function BabyIllustration({
@@ -89,13 +162,12 @@ export function BabyIllustration({
   const sacR = 72 + g * 16;
   const info = babyForWeek(week);
 
-  const [sMin, sMax] = STAGE_RANGES[stage];
-  const t = Math.max(0, Math.min(1, (week - sMin) / (sMax - sMin)));
-  const baseScale = STAGE_BASE_SCALE[stage];
+  const arte = arteDaSemana(week, stage);
   const freeBoost = showSac ? 1 : 1.18;
-  const bodyScale = Math.min(1.1, (baseScale + t * (1 - baseScale)) * freeBoost);
+  const bodyScale = Math.min(1.1, escalaDoCorpo(week, stage, arte.nova) * freeBoost);
   const tx = 100 * (1 - bodyScale);
-  const isWhiteBg = WHITE_BG_STAGES.has(stage);
+  /* Só a arte antiga precisa do `multiply`: a nova tem alfa de verdade. */
+  const isWhiteBg = !arte.nova && WHITE_BG_STAGES.has(stage);
 
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center">
@@ -179,7 +251,7 @@ export function BabyIllustration({
           clipPath={showSac ? "url(#sac-clip)" : undefined}
         >
           <image
-            href={STAGE_IMG[stage]}
+            href={arte.src}
             x="0"
             y="0"
             width="200"
