@@ -87,14 +87,15 @@ NOT tint or desaturate the baby: the baby stays warm and rosy against it.
 Skin must stay LIGHT in value (a neutral light base that is digitally re-toned darker later) while
 still being warm and saturated in hue.
 
-ORIENTATION: the baby faces LEFT. The soft pale smooth umbilical cord curves away toward the LEFT
-and must CURVE AND END ENTIRELY INSIDE THE FRAME — it must never touch, cross or run off any edge.
+ORIENTATION: the baby faces LEFT. The umbilical cord is SHORT and COMPACT — it curves close to the
+body and ends in a soft rounded tip; it is NOT long, NOT trailing, and does NOT loop across the frame.
 
 BACKGROUND: a perfectly flat, uniform, NEUTRAL MID-GREY (#9a9a9a) filling the frame edge to edge —
 no floor, no cast shadow, no gradient, no vignette, no props, no text, no border.
 
-COMPOSITION: centered; the ENTIRE body and the whole cord inside the frame with generous even margin
-on all sides. Square 1:1.`;
+COMPOSITION: a SMALL subject in a LARGE empty frame. The baby and its short cord together occupy only
+about 55% of the frame, floating centered with a very wide band of empty grey on every side. Wide
+empty margins are REQUIRED — nothing may come near any edge. Square 1:1.`;
 
 /**
  * As 39 semanas.
