@@ -16,6 +16,13 @@
 -- Hoje a consulta presencial não deixa rastro nenhum. `appointment_requests` é
 -- um PEDIDO de horário — e nem sequer aponta para a conta da paciente: ela é
 -- identificada por `patient_email`, texto livre digitado num formulário. Nota
+-- ============================================================================
+-- A CONSULTA VIRA OBJETO DO SISTEMA
+-- ============================================================================
+--
+-- Hoje a consulta presencial não deixa rastro nenhum. `appointment_requests` é
+-- um PEDIDO de horário — e nem sequer aponta para a conta da paciente: ela é
+-- identificada por `patient_email`, texto livre digitado num formulário. Nota
 -- clínica só existe em teleconsulta, e mesmo essa nunca chega a ela.
 --
 -- A consequência é a pergunta que o obstetra faz toda vez e que o sistema não
@@ -141,3 +148,16 @@ GRANT ALL ON public.consultations TO service_role;
 
 COMMENT ON TABLE public.consultations IS
   'A consulta como objeto: data, achados, conduta e medidas AFERIDAS em consultorio (distintas das caseiras de health_logs). E a ancora de "o que mudou desde a ultima consulta".';
+
+/* ────────────────────────────────────────────────────────────────────────────
+   DUPLICATA NÃO ENTRA
+
+   Dois `INSERT` idênticos criavam duas consultas — e como o painel usa
+   `consultas[0]` para ancorar "o que mudou desde a última", com `occurred_at`
+   empatado o Postgres devolve em ordem arbitrária: a conduta exibida e o peso
+   base da comparação saíam de uma das duas, indeterminada.
+
+   Mesmo remédio já usado contra double-booking de horário (`appt_confirmed_slot`).
+   ──────────────────────────────────────────────────────────────────────────── */
+CREATE UNIQUE INDEX IF NOT EXISTS consultations_sem_duplicata
+    ON public.consultations (doctor_id, user_id, occurred_at);

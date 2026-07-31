@@ -22,6 +22,10 @@ import { sinalPressao } from "@/lib/sinais-clinicos";
 
 type Campos = {
   ocorridaEm: string;
+  /** A HORA da consulta. Sem ela, registrar às 22h a consulta das 14h punha o
+      corte às 22h — e o registro que ela fez às 15h, logo depois de ele mandá-la
+      para casa, sumia do "o que mudou". */
+  hora: string;
   tipo: "presencial" | "teleconsulta" | "retorno" | "urgencia";
   systolic: string;
   diastolic: string;
@@ -35,6 +39,7 @@ type Campos = {
 
 const VAZIO: Campos = {
   ocorridaEm: "",
+  hora: "",
   tipo: "presencial",
   systolic: "",
   diastolic: "",
@@ -61,6 +66,7 @@ function Campo({
   tipo = "text",
   sufixo,
   larg = "",
+  max,
 }: {
   rot: string;
   valor: string;
@@ -68,6 +74,7 @@ function Campo({
   tipo?: string;
   sufixo?: string;
   larg?: string;
+  max?: string;
 }) {
   return (
     <label className={`block ${larg}`}>
@@ -79,6 +86,7 @@ function Campo({
           type={tipo}
           inputMode={tipo === "number" ? "decimal" : undefined}
           value={valor}
+          max={max}
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-xl border border-border bg-background px-2.5 py-1.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         />
@@ -118,6 +126,28 @@ export function RegistrarConsulta({
     );
   }
 
+  /* As faixas, do lado do FORMULÁRIO. Sem elas, o `inputValidator` do servidor
+     lança e o `catch` dizia "Falha de conexão — a consulta não foi salva": um
+     obstetra que digitou 18 em vez de 180 ia olhar a rede. */
+  const FAIXAS: Record<string, { min: number; max: number; nome: string }> = {
+    systolic: { min: 50, max: 300, nome: "A sistólica" },
+    diastolic: { min: 20, max: 200, nome: "A diastólica" },
+    pesoKg: { min: 25, max: 350, nome: "O peso" },
+    alturaUterinaCm: { min: 5, max: 60, nome: "A altura uterina" },
+    bpmFetal: { min: 60, max: 220, nome: "O BCF" },
+  };
+
+  function foraDeFaixa(): string | null {
+    for (const [campo, faixa] of Object.entries(FAIXAS)) {
+      const v = num(f[campo as keyof Campos]);
+      if (v == null) continue;
+      if (v < faixa.min || v > faixa.max) {
+        return `${faixa.nome} precisa ficar entre ${faixa.min} e ${faixa.max}. Confira o número.`;
+      }
+    }
+    return null;
+  }
+
   async function salvar() {
     /* O par de pressão é tudo-ou-nada, igual ao CHECK do banco e à validação do
        servidor. Barrar aqui é o que faz ele ler a frase certa em vez de perder
@@ -128,7 +158,24 @@ export function RegistrarConsulta({
       toast.error("A pressão precisa dos dois números — sistólica e diastólica.");
       return;
     }
-    if (!f.achados.trim() && !f.conduta.trim() && s == null && num(f.pesoKg) == null) {
+    const erroFaixa = foraDeFaixa();
+    if (erroFaixa) {
+      toast.error(erroFaixa);
+      return;
+    }
+    /* Altura uterina, BCF e o resumo para ela CONTAM. Antes, "AU 32 cm, BCF
+       142, escrevi para ela o que fazer" era recusado com "registre ao menos
+       uma medida" — dizendo que ele não registrou nada tendo registrado três
+       coisas, incluindo as duas medidas que só existem em consultório. */
+    const vazio =
+      !f.achados.trim() &&
+      !f.conduta.trim() &&
+      !f.resumoPaciente.trim() &&
+      s == null &&
+      num(f.pesoKg) == null &&
+      num(f.alturaUterinaCm) == null &&
+      num(f.bpmFetal) == null;
+    if (vazio) {
       toast.error("Registre ao menos uma medida ou uma anotação.");
       return;
     }
@@ -141,7 +188,11 @@ export function RegistrarConsulta({
           /* Sem data digitada, agora. Com data, o meio-dia daquele dia: o
              médico registra "a consulta de terça" e não a hora exata, e um
              timestamp à meia-noite cairia no dia anterior em fuso negativo. */
-          ocorridaEm: f.ocorridaEm ? `${f.ocorridaEm}T12:00:00.000Z` : undefined,
+          /* Data + hora locais convertidas para UTC pelo próprio navegador.
+             Sem hora, meio-dia local — que cai no dia certo em qualquer fuso. */
+          ocorridaEm: f.ocorridaEm
+            ? new Date(`${f.ocorridaEm}T${f.hora || "12:00"}:00`).toISOString()
+            : undefined,
           tipo: f.tipo,
           achados: f.achados.trim() || undefined,
           conduta: f.conduta.trim() || undefined,
@@ -157,10 +208,15 @@ export function RegistrarConsulta({
         },
       });
       if (!r.ok) {
+        const motivo = "motivo" in r ? r.motivo : null;
         toast.error(
-          "motivo" in r && r.motivo === "pa_incompleta"
+          motivo === "pa_incompleta"
             ? "A pressão precisa dos dois números."
-            : "Não consegui salvar a consulta. Confira os valores e tente de novo.",
+            : motivo === "duplicada"
+              ? "Já existe uma consulta registrada nesta data e hora."
+              : motivo === "banco_desatualizado"
+                ? "Falta aplicar o SQL das consultas (APLICAR_CONSULTA.sql) no Supabase."
+                : "Não consegui salvar a consulta. Tente de novo.",
         );
         return;
       }
@@ -188,7 +244,18 @@ export function RegistrarConsulta({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Campo rot="Data" tipo="date" valor={f.ocorridaEm} onChange={set("ocorridaEm")} />
+        {/* `max` de hoje: uma data em 2027 fazia `consultas[0]` ser uma consulta
+            no futuro, o corte de "o que mudou" ficava no futuro, e o painel
+            passava a dizer "ela não registrou nada" para sempre — escondendo a
+            175/115 que ela registrou hoje de manhã. */}
+        <Campo
+          rot="Data"
+          tipo="date"
+          valor={f.ocorridaEm}
+          onChange={set("ocorridaEm")}
+          max={new Date().toLocaleDateString("en-CA")}
+        />
+        <Campo rot="Hora" tipo="time" valor={f.hora} onChange={set("hora")} />
         <label className="block">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             Tipo

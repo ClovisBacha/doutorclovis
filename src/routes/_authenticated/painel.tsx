@@ -1136,7 +1136,6 @@ function PainelPage() {
         {tab === "Meu Perfil" && (
           <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
         )}
-        {tab === "Ferramentas" && <FerramentasSection />}
         {tab === "Exames" && <ExamesRecebidos tokenFn={token} />}
         {tab === "Pré-consultas" && (
           <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
@@ -2586,7 +2585,13 @@ function CartaoDePergunta({
   /* Treinar vem LIGADO. É a alavanca: cada resposta que também vira
      conhecimento é uma pergunta que a IA responde sozinha da próxima vez, para
      outra paciente, às três da manhã. */
-  const [treinar, setTreinar] = useState(true);
+  /* DESLIGADO por padrão, e exigindo a pergunta reescrita.
+  
+     Ligado, a pergunta CRUA dela virava conhecimento reutilizável — com o nome
+     do marido, o diagnóstico que ela não contou, o remédio que toma escondido —
+     e entrava no contexto do assistente de OUTRA paciente com um clique. */
+  const [treinar, setTreinar] = useState(false);
+  const [perguntaGeral, setPerguntaGeral] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   async function responder() {
@@ -2603,14 +2608,26 @@ function CartaoDePergunta({
           perguntaId: q.id,
           resposta: texto.trim(),
           treinar,
+          perguntaGeneralizada: treinar ? perguntaGeral.trim() || undefined : undefined,
         },
       });
-      if (!r.ok) throw new Error("recusado");
-      toast.success(
-        "treinou" in r && r.treinou
-          ? "Respondida, avisada e a IA aprendeu ✓"
-          : "Respondida e avisada ✓",
-      );
+      if (!r.ok) {
+        toast.error(
+          "motivo" in r && r.motivo === "banco_desatualizado"
+            ? "Falta aplicar o SQL de resposta do médico (APLICAR_MEDICO, seção 15)."
+            : "Não consegui enviar. Tente de novo.",
+        );
+        return;
+      }
+      if ("jaEstava" in r && r.jaEstava) {
+        toast("Esta pergunta já tinha sido respondida.");
+      } else {
+        toast.success(
+          "treinou" in r && r.treinou
+            ? "Respondida, avisada e a IA aprendeu ✓"
+            : "Respondida e avisada ✓",
+        );
+      }
       setAberto(false);
       setTexto("");
       onRespondeu?.();
@@ -2663,16 +2680,37 @@ function CartaoDePergunta({
             <input
               type="checkbox"
               checked={treinar}
-              onChange={(e) => setTreinar(e.target.checked)}
+              onChange={(e) => {
+                setTreinar(e.target.checked);
+                if (e.target.checked && !perguntaGeral) setPerguntaGeral("");
+              }}
               className="mt-0.5"
             />
             <span>
-              Ensinar isto à minha IA — ela responde sozinha da próxima vez.{" "}
-              <span className="text-[11px]">
-                Desmarque se a resposta for específica desta gestação.
-              </span>
+              Ensinar isto à minha IA — ela responde sozinha da próxima vez, para outra paciente.
             </span>
           </label>
+          {treinar && (
+            <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50/60 p-2.5">
+              <p className="text-[11px] leading-snug text-amber-900">
+                A pergunta dela vai <strong>como você reescrever aqui</strong>. O texto original
+                pode ter nome, diagnóstico ou detalhe que ela não quer que apareça na conversa de
+                outra paciente — e o cérebro é lido por todas.
+              </p>
+              <input
+                value={perguntaGeral}
+                onChange={(e) => setPerguntaGeral(e.target.value)}
+                placeholder="Ex.: posso tomar dipirona na gravidez?"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              />
+              {perguntaGeral.trim().length > 0 && perguntaGeral.trim().length < 8 && (
+                <p className="mt-1 text-[11px] text-amber-900">
+                  Muito curta — sem isso a IA não aprende (a resposta chega a ela de qualquer
+                  jeito).
+                </p>
+              )}
+            </div>
+          )}
           <button
             onClick={responder}
             disabled={enviando}

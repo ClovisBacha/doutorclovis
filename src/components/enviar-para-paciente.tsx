@@ -40,6 +40,8 @@ export function EnviarParaPaciente({
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [alvo, setAlvo] = useState<string | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const [falhouLista, setFalhouLista] = useState(false);
   const [conteudo, setConteudo] = useState(conteudoInicial);
   const [nota, setNota] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -49,8 +51,11 @@ export function EnviarParaPaciente({
       try {
         const r = await listMyPatients({ data: { accessToken: await tokenFn() } });
         if (r.ok) setPacientes(r.patients);
+        else setFalhouLista(true);
       } catch {
-        /* lista vazia; o aviso abaixo cobre */
+        /* "Você ainda não tem pacientes vinculadas" seria uma afirmação FALSA
+           dita no meio da consulta — ele concluiria que perdeu o vínculo. */
+        setFalhouLista(true);
       } finally {
         setCarregando(false);
       }
@@ -60,11 +65,18 @@ export function EnviarParaPaciente({
 
   /* Busca por nome. O painel não tem busca de paciente em lugar nenhum, e uma
      lista de cinquenta nomes num seletor é onde o médico escolhe a errada. */
+  /* Paciente sem nome NÃO some ao digitar. Com o filtro só sobre
+     `display_name`, `("").includes(termo)` é false e ela desaparecia — quem
+     mais precisa ser encontrada com cuidado é justamente quem o painel não
+     sabe nomear. */
   const filtradas = busca.trim()
-    ? pacientes.filter((p) =>
-        (p.display_name ?? "").toLowerCase().includes(busca.trim().toLowerCase()),
+    ? pacientes.filter(
+        (p) =>
+          (p.display_name ?? "").toLowerCase().includes(busca.trim().toLowerCase()) ||
+          !(p.display_name ?? "").trim(),
       )
     : pacientes;
+  const escolhida = pacientes.find((p) => p.id === alvo) ?? null;
 
   async function enviar() {
     if (!alvo) {
@@ -125,6 +137,11 @@ export function EnviarParaPaciente({
             </span>
             {carregando ? (
               <div className="skeleton mt-1 h-9 rounded-xl" />
+            ) : falhouLista ? (
+              <p className="mt-1 rounded-xl border border-amber-300 bg-amber-50/70 p-3 text-[13px] leading-snug text-amber-900">
+                📡 Não consegui carregar a sua lista de pacientes agora. Atualize a página — isto
+                não quer dizer que você não tenha pacientes.
+              </p>
             ) : pacientes.length === 0 ? (
               <p className="mt-1 rounded-xl border border-border bg-background p-3 text-[13px] text-muted-foreground">
                 Você ainda não tem pacientes vinculadas.
@@ -153,7 +170,16 @@ export function EnviarParaPaciente({
                             : "hover:bg-secondary/60"
                         }`}
                       >
-                        {p.display_name ?? "Paciente"}
+                        {p.display_name?.trim() || "Sem nome"}
+                        {/* Semana e DPP porque duas pacientes de mesmo nome
+                            eram linhas idênticas — e o erro aqui é uma receita
+                            no celular de quem não devia recebê-la. */}
+                        <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                          {p.weeks != null ? `${p.weeks}s` : ""}
+                          {p.due_date
+                            ? ` · DPP ${new Date(`${p.due_date}T00:00:00`).toLocaleDateString("pt-BR")}`
+                            : ""}
+                        </span>
                       </button>
                     ))
                   )}

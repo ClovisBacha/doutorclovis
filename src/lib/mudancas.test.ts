@@ -178,6 +178,57 @@ describe("variação de peso", () => {
   });
 });
 
+describe("achados da revisão adversarial", () => {
+  /* DEFEITO REAL: a função é exportada e documentada como pura, mas `pesos[0]`
+     assumia "mais recente primeiro". Com a lista invertida, +4,1 kg virava
+     +1,6 kg — a diferença entre suspeitar e não suspeitar de pré-eclâmpsia. */
+  test("a variação de peso não depende da ordem de entrada", () => {
+    const eventos = [
+      ev({ ocorrido_em: "2026-07-20T00:00:00.000Z", dados: { weight_kg: 76.5 } }),
+      ev({ ocorrido_em: "2026-07-18T00:00:00.000Z", dados: { weight_kg: 74 } }),
+    ];
+    const desc = mudancasDesde(eventos, CONSULTA, 72.4);
+    const asc = mudancasDesde([...eventos].reverse(), CONSULTA, 72.4);
+    expect(desc.deltaPeso).toBe(4.1);
+    expect(asc.deltaPeso).toBe(4.1);
+  });
+
+  /* DEFEITO REAL: peso vindo como string do Postgres era descartado em
+     silêncio pelo `typeof === "number"`, e o delta sumia sem aviso. */
+  test("peso numérico em string ainda conta", () => {
+    const m = mudancasDesde(
+      [
+        ev({
+          ocorrido_em: "2026-07-20T00:00:00.000Z",
+          dados: { weight_kg: "76.5" as unknown as number },
+        }),
+      ],
+      CONSULTA,
+      72.4,
+    );
+    expect(m.deltaPeso).toBe(4.1);
+  });
+
+  /* DEFEITO REAL: a triagem vermelha contava como episódio E como alteração —
+     um evento inflando o alarme em dois contadores e aparecendo duas vezes na
+     lista. O teste de `emergencia` já existia; faltava o de `sintoma`. */
+  test("triagem de alerta é episódio e não se repete em alterações", () => {
+    const m = mudancasDesde(
+      [
+        ev({
+          ocorrido_em: "2026-07-20T00:00:00.000Z",
+          especie: "sintoma",
+          gravidade: "grave",
+          notas: ["Triagem vermelha"],
+        }),
+      ],
+      CONSULTA,
+    );
+    expect(m.episodios).toHaveLength(1);
+    expect(m.alteracoes).toHaveLength(0);
+  });
+});
+
 describe("período sem nada", () => {
   /* Zero registros é informação — quer dizer que ela não abriu o app desde a
      consulta —, e é diferente de "não consegui ler". A tela precisa poder

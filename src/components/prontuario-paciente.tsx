@@ -290,7 +290,7 @@ export function ProntuarioPaciente({
           falta de âncora. Vem ANTES dos números soltos porque um valor isolado
           não decide nada — o que decide é o que ele já sabia contra o que
           apareceu depois. */}
-      <MudancasDesdeAConsulta eventos={eventos} consultas={consultas} />
+      <MudancasDesdeAConsulta eventos={eventos} consultas={consultas} incompleto={incompleto} />
       {aoRegistrarConsulta}
 
       {/* 3. O QUE PEDE OLHAR AGORA */}
@@ -458,9 +458,13 @@ function resumo(e: EventoClinico): string {
 function MudancasDesdeAConsulta({
   eventos,
   consultas,
+  incompleto,
 }: {
   eventos: EventoClinico[];
   consultas: Consulta[];
+  /** A leitura dos registros dela falhou. Sem isto, "ela não registrou nada"
+      era impresso como FATO em cima de uma consulta que não aconteceu. */
+  incompleto: boolean;
 }) {
   const ultima = consultas[0] ?? null;
   const m = mudancasDesde(eventos, ultima?.occurred_at ?? null, ultima?.weight_kg ?? null);

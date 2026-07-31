@@ -649,9 +649,11 @@ export function mudancasDesde(
     return Number.isFinite(t) && t >= corte;
   });
 
-  const pesos = depois
-    .map((e) => e.dados.weight_kg)
-    .filter((v): v is number => typeof v === "number");
+  /* ORDENA AQUI. A função é exportada e documentada como pura — nada na
+     assinatura dizia que a ordem de entrada importava, e `pesos[0]` assumia
+     "mais recente primeiro". Com a lista invertida, +4,1 kg virava +1,6 kg. */
+  const porRecencia = [...depois].sort((a, b) => b.ocorrido_em.localeCompare(a.ocorrido_em));
+  const pesos = porRecencia.map((e) => Number(e.dados.weight_kg)).filter((v) => Number.isFinite(v));
   const deltaPeso =
     pesoNaConsulta != null && pesos.length > 0
       ? Math.round((pesos[0] - Number(pesoNaConsulta)) * 10) / 10
@@ -660,8 +662,13 @@ export function mudancasDesde(
   const peso = (g: Gravidade) => (g === "grave" ? 0 : g === "atencao" ? 1 : 2);
   return {
     registros: depois.length,
+    /* `sintoma` fora daqui também: a triagem vermelha já é episódio, e contá-la
+       nos dois lugares inflava o alarme com o mesmo evento — exatamente o que o
+       teste protege para `emergencia`. */
     alteracoes: depois
-      .filter((e) => e.gravidade !== "normal" && e.especie !== "emergencia")
+      .filter(
+        (e) => e.gravidade !== "normal" && e.especie !== "emergencia" && e.especie !== "sintoma",
+      )
       .sort(
         (a, b) =>
           peso(a.gravidade) - peso(b.gravidade) || b.ocorrido_em.localeCompare(a.ocorrido_em),
@@ -765,11 +772,16 @@ export const salvarConsulta = createServerFn({ method: "POST" })
       if (data.id) {
         /* `doctor_id` no WHERE: consulta de outro consultório não é afetada,
            sem checagem separada que abriria corrida. */
+        /* `user_id` também no WHERE: sem ele, um `id` da consulta da Ana com o
+           `pacienteId` da Bia transferia achados, conduta e o resumo que a Ana
+           já leu para o prontuário da Bia. Não há caminho de UI para isso hoje,
+           mas a server function é um endpoint HTTP. */
         const { data: mexeu, error } = await (supabaseAdmin as any)
           .from("consultations")
           .update(linha)
           .eq("id", data.id)
           .eq("doctor_id", user.id)
+          .eq("user_id", data.pacienteId)
           .select("id");
         if (error || !mexeu?.length) return { ok: false as const, id: null };
         return { ok: true as const, id: data.id };
@@ -779,7 +791,21 @@ export const salvarConsulta = createServerFn({ method: "POST" })
         .insert(linha)
         .select("id")
         .single();
-      if (error || !nova) return { ok: false as const, id: null };
+      if (error) {
+        const code = (error as { code?: string }).code;
+        /* A tela dizia "Confira os valores e tente de novo" quando o problema
+           era a tabela não existir. Ele conferia os valores, redigitava, tentava
+           de novo — e nada nunca ia dizer que faltava rodar o SQL. */
+        if (code === "42P01" || code === "PGRST205") {
+          return { ok: false as const, id: null, motivo: "banco_desatualizado" as const };
+        }
+        // Índice único: a mesma consulta já foi registrada.
+        if (code === "23505") {
+          return { ok: false as const, id: null, motivo: "duplicada" as const };
+        }
+        return { ok: false as const, id: null };
+      }
+      if (!nova) return { ok: false as const, id: null };
       return { ok: true as const, id: nova.id as string };
     } catch {
       return { ok: false as const, id: null };
@@ -896,7 +922,10 @@ export const examesRecebidos = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data }) => {
-    const vazio = { ok: true as const, exames: [] as ExameRecebido[] };
+    /* `incompleto` é o que separa "não há exame" de "não consegui ler". Sem
+       ele, uma falha de banco virava a tela dizendo "Nenhuma paciente enviou
+       exame" — o médico lendo que não há laudo quando há. */
+    const vazio = { ok: true as const, exames: [] as ExameRecebido[], incompleto: false };
     const user = await medicoDaSessao(data.accessToken);
     if (!user) return { ...vazio, ok: false as const };
     try {
@@ -917,7 +946,7 @@ export const examesRecebidos = createServerFn({ method: "POST" })
           .gte("created_at", desde)
           .order("created_at", { ascending: false })
           .limit(200);
-        if (error) return vazio;
+        if (error) return { ...vazio, incompleto: true };
         linhas.push(...((rows ?? []) as Record<string, unknown>[]));
       }
 
@@ -936,9 +965,9 @@ export const examesRecebidos = createServerFn({ method: "POST" })
         }))
         .filter((e) => !data.apenasNaoVistos || !e.visto_em)
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return { ok: true as const, exames };
+      return { ok: true as const, exames, incompleto: false };
     } catch {
-      return vazio;
+      return { ...vazio, incompleto: true };
     }
   });
 
@@ -948,8 +977,14 @@ export const imagemDoExame = createServerFn({ method: "POST" })
     z.object({ accessToken: z.string().min(10), exameId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data }) => {
+    /* TRÊS RESPOSTAS DIFERENTES, e não uma só.
+    
+       Antes, falha de leitura, "não é sua paciente" e "a linha não tem imagem"
+       colapsavam em `{ok:false, imagem:null}` — e a tela mostrava, para os
+       três, "Este registro não tem imagem anexada". Ela fotografou o laudo; ele
+       lia que não havia laudo, marcava como visto e seguia. */
     const user = await medicoDaSessao(data.accessToken);
-    if (!user) return { ok: false as const, imagem: null };
+    if (!user) return { ok: false as const, imagem: null, motivo: "sessao" as const };
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: row, error } = await (supabaseAdmin as any)
@@ -957,14 +992,22 @@ export const imagemDoExame = createServerFn({ method: "POST" })
         .select("user_id,image_data")
         .eq("id", data.exameId)
         .maybeSingle();
-      if (error || !row) return { ok: false as const, imagem: null };
+      if (error) return { ok: false as const, imagem: null, motivo: "falha" as const };
+      if (!row) return { ok: false as const, imagem: null, motivo: "sumiu" as const };
       /* Vínculo ATUAL depois de saber de quem é o exame: quem trocou de médico
          não tem os laudos dela abertos para o consultório anterior. */
       const pacientes = await pacientesAtuais(user.id);
-      if (!pacientes.has(String(row.user_id))) return { ok: false as const, imagem: null };
-      return { ok: true as const, imagem: (row.image_data as string) ?? null };
+      if (!pacientes.has(String(row.user_id))) {
+        return { ok: false as const, imagem: null, motivo: "sem_vinculo" as const };
+      }
+      const img = (row.image_data as string) ?? null;
+      return {
+        ok: true as const,
+        imagem: img,
+        motivo: img ? ("ok" as const) : ("sem_imagem" as const),
+      };
     } catch {
-      return { ok: false as const, imagem: null };
+      return { ok: false as const, imagem: null, motivo: "falha" as const };
     }
   });
 
@@ -1015,8 +1058,15 @@ export const devolutivaDoExame = createServerFn({ method: "POST" })
     const recado = (data.recado ?? "").trim();
     if (!recado) return { ok: true as const, avisou: false as const };
 
+    /* O ERRO DO INSERT PRECISA SER CHECADO.
+    
+       `supabase-js` não lança — devolve `{ error }`. Sem checar, o push saía
+       ("Seu médico viu o seu exame") sobre uma escrita que podia ter falhado,
+       e o painel dizia "Devolutiva enviada ✓". Ela recebia a notificação, abria
+       o app e não achava nada — e o texto não existia em lugar nenhum. */
+    let escreveu = false;
     try {
-      await (supabaseAdmin as any).from("doctor_questions").insert({
+      let { error: errIns } = await (supabaseAdmin as any).from("doctor_questions").insert({
         user_id: data.pacienteId,
         doctor_id: user.id,
         question: `Sobre o exame que você enviou: ${data.nomeDoExame}`,
@@ -1024,17 +1074,41 @@ export const devolutivaDoExame = createServerFn({ method: "POST" })
         answered: true,
         answered_at: agora,
       });
+      if ((errIns as { code?: string } | null)?.code === "42703") {
+        // Banco sem as colunas de resposta: grava o que dá.
+        ({ error: errIns } = await (supabaseAdmin as any).from("doctor_questions").insert({
+          user_id: data.pacienteId,
+          doctor_id: user.id,
+          question: `Sobre o exame que você enviou: ${data.nomeDoExame} — ${recado}`,
+          answered: true,
+        }));
+      }
+      escreveu = !errIns;
+    } catch {
+      escreveu = false;
+    }
+    // Sem escrita, sem aviso: notificar sobre um texto que não existe é pior
+    // que não notificar.
+    if (!escreveu) return { ok: true as const, avisou: false as const };
+
+    let entregue = 0;
+    try {
       const { sendPushToUser } = await import("./push.server");
-      await sendPushToUser(data.pacienteId, {
+      const r = await sendPushToUser(data.pacienteId, {
         title: "Seu médico viu o seu exame",
-        body: recado.slice(0, 90),
+        // Neutro: achado clínico não vai para a tela bloqueada dela.
+        body: "Toque para ler o que ele escreveu.",
         url: "/minha-conta?tab=Consultas&sub=perguntas",
       });
+      entregue = r?.sent ?? 0;
     } catch {
-      /* O visto já está gravado; a devolutiva pode ser reenviada. */
-      return { ok: true as const, avisou: false as const };
+      /* a devolutiva está na aba dela mesmo sem push */
     }
-    return { ok: true as const, avisou: true as const };
+    /* `avisou` passa a significar "chegou um aviso", e não "não deu exceção".
+       `sendPushToUser` devolve `{sent:0}` sem lançar quando o VAPID não está
+       configurado ou quando ela não tem inscrição — e o painel dizia "enviada"
+       do mesmo jeito. */
+    return { ok: true as const, avisou: entregue > 0, salvou: true as const };
   });
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1112,17 +1186,26 @@ export const emitirParaPaciente = createServerFn({ method: "POST" })
 
     /* Avisa. Best-effort: o documento já está gravado e ela o encontra na aba
        dela — uma falha de push não pode desfazer a emissão. */
+    let entregue = 0;
     try {
       const { sendPushToUser } = await import("./push.server");
-      await sendPushToUser(data.pacienteId, {
+      const r = await sendPushToUser(data.pacienteId, {
         title: `${ROTULO_EMISSAO[data.tipo]} do seu médico`,
-        body: data.titulo,
-        url: "/minha-conta?tab=Consultas&sub=perguntas",
+        /* NEUTRO. `titulo` é o nome do modelo — "Hipertensão gestacional /
+           pré-eclâmpsia", "Diabetes gestacional". Push aparece na tela
+           bloqueada, no relógio, no notebook pareado: é diagnóstico exposto a
+           quem estiver perto do celular dela, inclusive numa gravidez que ela
+           ainda não contou. Os outros avisos do produto já são neutros; este
+           tinha regredido. */
+        body: "Toque para ver o que ele enviou.",
+        // `agenda`, e não `perguntas`: é onde `MeusPedidos` é renderizado.
+        url: "/minha-conta?tab=Consultas&sub=agenda",
       });
+      entregue = r?.sent ?? 0;
     } catch {
       /* sem push; o documento está lá */
     }
-    return { ok: true as const, id: nova.id as string };
+    return { ok: true as const, id: nova.id as string, avisou: entregue > 0 };
   });
 
 /** O que ele emitiu para uma paciente. */
@@ -1189,7 +1272,16 @@ export const responderPergunta = createServerFn({ method: "POST" })
         accessToken: z.string().min(10),
         perguntaId: z.string().uuid(),
         resposta: z.string().min(2).max(4000),
-        treinar: z.boolean().default(true),
+        /* DESLIGADO por padrão. A pergunta da paciente pode conter o nome do
+           marido, um diagnóstico que ela não contou a ninguém, o remédio que
+           toma escondido. Ligado por padrão, isso virava contexto do assistente
+           de OUTRA paciente com um clique — e o caminho antigo
+           (`answerAndTrain`) protegia exatamente contra isso, obrigando o
+           médico a reescrever a pergunta antes. Eu tinha removido a proteção. */
+        treinar: z.boolean().default(false),
+        /* A pergunta GENERALIZADA. Sem ela, não treina: o que vira conhecimento
+           reutilizável nunca carrega o texto cru dela. */
+        perguntaGeneralizada: z.string().min(8).max(300).optional(),
       })
       .parse(i),
   )
@@ -1210,18 +1302,36 @@ export const responderPergunta = createServerFn({ method: "POST" })
     if (!pergunta) return { ok: false as const };
 
     const agora = new Date().toISOString();
-    let { error } = await sb
+    /* `.eq("answered", false)` no WHERE: duplo clique, duas abas ou um retry
+       depois de timeout não geram segunda resposta, segundo push e segunda
+       entrada no cérebro. O caminho antigo tinha essa guarda; a minha versão
+       não tinha. */
+    const { data: mexeu, error } = await sb
       .from("doctor_questions")
       .update({ answered: true, answer: data.resposta, answered_at: agora })
-      .eq("id", data.perguntaId);
-    if ((error as { code?: string } | null)?.code === "42703") {
-      // Banco sem as colunas de resposta: mantém o comportamento antigo.
-      ({ error } = await sb
-        .from("doctor_questions")
-        .update({ answered: true })
-        .eq("id", data.perguntaId));
+      .eq("id", data.perguntaId)
+      .eq("answered", false)
+      .select("id");
+
+    if (error) {
+      /* COLUNA AUSENTE NÃO PODE VIRAR SUCESSO.
+
+         O recuo antigo gravava só `{answered: true}` — descartando o TEXTO da
+         resposta — e mesmo assim disparava o push e devolvia ok. A paciente
+         recebia "Seu médico respondeu", abria a aba e encontrava a pergunta
+         marcada como respondida, sem resposta nenhuma.
+
+         E o código do PostgREST para coluna ausente no PAYLOAD é `PGRST204`,
+         não `42703` — então o recuo nem entrava: o médico lia "Não consegui
+         enviar" para sempre, que é o estado do banco de produção hoje. */
+      const code = (error as { code?: string } | null)?.code;
+      if (code === "PGRST204" || code === "42703") {
+        return { ok: false as const, motivo: "banco_desatualizado" as const };
+      }
+      return { ok: false as const };
     }
-    if (error) return { ok: false as const };
+    // Zero linhas: já estava respondida. Não é erro, e não avisa de novo.
+    if (!mexeu?.length) return { ok: true as const, treinou: false, jaEstava: true as const };
 
     /* O aviso. Sem ele, responder é escrever para uma gaveta: o produto conta
        com ela abrindo o app por acaso no dia certo. */
@@ -1238,13 +1348,17 @@ export const responderPergunta = createServerFn({ method: "POST" })
 
     // Vira conhecimento da IA. Best-effort: a paciente já foi respondida.
     let treinou = false;
-    if (data.treinar) {
+    /* Só treina com a pergunta REESCRITA. O texto cru dela fica em
+       `doctor_questions`, que é dela; o que entra no cérebro reutilizável é o
+       que o médico escreveu para ser reutilizado. */
+    const perguntaParaOCerebro = (data.perguntaGeneralizada ?? "").trim();
+    if (data.treinar && perguntaParaOCerebro.length >= 8) {
       try {
         const { data: entry } = await sb
           .from("brain_entries")
           .insert({
             doctor_id: user.id,
-            question: String(pergunta.question),
+            question: perguntaParaOCerebro,
             answer: data.resposta,
             source: "pergunta",
             approved: true,
@@ -1253,7 +1367,7 @@ export const responderPergunta = createServerFn({ method: "POST" })
           .single();
         if (entry) {
           const { embedBrainEntry } = await import("./embeddings.server");
-          await embedBrainEntry(entry.id, String(pergunta.question), data.resposta);
+          await embedBrainEntry(entry.id, perguntaParaOCerebro, data.resposta);
           treinou = true;
         }
       } catch {
