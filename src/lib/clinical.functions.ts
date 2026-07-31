@@ -1164,3 +1164,101 @@ export const emissoesDaPaciente = createServerFn({ method: "POST" })
       return vazio;
     }
   });
+
+/**
+ * Responder uma pergunta da paciente, ali mesmo.
+ *
+ * Hoje a aba Perguntas só tem um botão de "marcar respondida": para ESCREVER a
+ * resposta o médico precisa ir à aba Cérebro, achar o oitavo card do treinador
+ * de IA e responder lá. O ato clínico mais frequente do produto está enterrado
+ * dentro de uma tela de treinamento de modelo.
+ *
+ * E `answerAndTrain`, que é o caminho de lá, grava a resposta e **não avisa
+ * ninguém** — ela descobre se abrir o app por acaso.
+ *
+ * `treinar` vem ligado por padrão de propósito, e é a alavanca da estratégia:
+ * cada resposta que também vira conhecimento é uma pergunta que a IA responde
+ * sozinha da próxima vez, para outra paciente, às três da manhã. Desligar é
+ * possível — resposta muito específica de UMA gestação não deve virar conduta
+ * geral —, mas o padrão é acumular.
+ */
+export const responderPergunta = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        perguntaId: z.string().uuid(),
+        resposta: z.string().min(2).max(4000),
+        treinar: z.boolean().default(true),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await medicoDaSessao(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* `doctor_id` no próprio WHERE: pergunta de outro consultório não é
+       afetada, sem checagem separada que abriria corrida. */
+    const { data: pergunta } = await sb
+      .from("doctor_questions")
+      .select("id,user_id,question")
+      .eq("id", data.perguntaId)
+      .eq("doctor_id", user.id)
+      .maybeSingle();
+    if (!pergunta) return { ok: false as const };
+
+    const agora = new Date().toISOString();
+    let { error } = await sb
+      .from("doctor_questions")
+      .update({ answered: true, answer: data.resposta, answered_at: agora })
+      .eq("id", data.perguntaId);
+    if ((error as { code?: string } | null)?.code === "42703") {
+      // Banco sem as colunas de resposta: mantém o comportamento antigo.
+      ({ error } = await sb
+        .from("doctor_questions")
+        .update({ answered: true })
+        .eq("id", data.perguntaId));
+    }
+    if (error) return { ok: false as const };
+
+    /* O aviso. Sem ele, responder é escrever para uma gaveta: o produto conta
+       com ela abrindo o app por acaso no dia certo. */
+    try {
+      const { sendPushToUser } = await import("./push.server");
+      await sendPushToUser(String(pergunta.user_id), {
+        title: "Seu médico respondeu",
+        body: String(pergunta.question).slice(0, 90),
+        url: "/minha-conta?tab=Consultas&sub=perguntas",
+      });
+    } catch {
+      /* sem push; a resposta está na aba dela */
+    }
+
+    // Vira conhecimento da IA. Best-effort: a paciente já foi respondida.
+    let treinou = false;
+    if (data.treinar) {
+      try {
+        const { data: entry } = await sb
+          .from("brain_entries")
+          .insert({
+            doctor_id: user.id,
+            question: String(pergunta.question),
+            answer: data.resposta,
+            source: "pergunta",
+            approved: true,
+          })
+          .select("id")
+          .single();
+        if (entry) {
+          const { embedBrainEntry } = await import("./embeddings.server");
+          await embedBrainEntry(entry.id, String(pergunta.question), data.resposta);
+          treinou = true;
+        }
+      } catch {
+        /* sem treino desta vez; a resposta chegou */
+      }
+    }
+    return { ok: true as const, treinou };
+  });

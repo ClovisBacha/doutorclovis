@@ -1083,7 +1083,11 @@ function PainelPage() {
           </div>
         )}
         {tab === "Perguntas" && (
-          <QuestionsSection questions={questions} onToggle={toggleAnswered} />
+          <QuestionsSection
+            questions={questions}
+            onToggle={toggleAnswered}
+            onRespondeu={() => load(true).catch(() => {})}
+          />
         )}
         {tab === "Cérebro 🧠" && !podeIA && (
           <TrancadoCard
@@ -2520,37 +2524,148 @@ function AppointmentsSection({
 function QuestionsSection({
   questions,
   onToggle,
+  onRespondeu,
 }: {
   questions: AdminQuestion[];
   onToggle: (id: string, answered: boolean) => void;
+  onRespondeu?: () => void;
 }) {
+  const pendentes = questions.filter((q) => !q.answered);
+  const respondidas = questions.filter((q) => q.answered);
   return (
     <div>
       {questions.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhuma pergunta ainda.</p>
       ) : (
         <div className="space-y-3">
-          {questions.map((q) => (
-            <div
-              key={q.id}
-              className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]"
-            >
-              <div>
-                <p className="text-sm text-muted-foreground">{q.patient}</p>
-                <p className="mt-1 text-foreground">{q.question}</p>
-              </div>
-              <button
-                onClick={() => onToggle(q.id, !q.answered)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  q.answered
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "border border-border text-muted-foreground hover:text-primary"
-                }`}
-              >
-                {q.answered ? "Respondida ✓" : "Marcar respondida"}
-              </button>
-            </div>
+          {/* PENDENTES PRIMEIRO. A lista vinha misturada por data, então a
+              pergunta de ontem sem resposta ficava embaixo de dez já
+              respondidas — e o que ele veio fazer aqui é responder. */}
+          {pendentes.map((q) => (
+            <CartaoDePergunta key={q.id} q={q} onToggle={onToggle} onRespondeu={onRespondeu} />
           ))}
+          {respondidas.length > 0 && pendentes.length > 0 && (
+            <p className="pt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Já respondidas
+            </p>
+          )}
+          {respondidas.map((q) => (
+            <CartaoDePergunta key={q.id} q={q} onToggle={onToggle} onRespondeu={onRespondeu} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CartaoDePergunta({
+  q,
+  onToggle,
+  onRespondeu,
+}: {
+  q: AdminQuestion;
+  onToggle: (id: string, answered: boolean) => void;
+  onRespondeu?: () => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [texto, setTexto] = useState("");
+  /* Treinar vem LIGADO. É a alavanca: cada resposta que também vira
+     conhecimento é uma pergunta que a IA responde sozinha da próxima vez, para
+     outra paciente, às três da manhã. */
+  const [treinar, setTreinar] = useState(true);
+  const [enviando, setEnviando] = useState(false);
+
+  async function responder() {
+    if (texto.trim().length < 2) {
+      toast.error("Escreva a resposta.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      const { responderPergunta } = await import("@/lib/clinical.functions");
+      const r = await responderPergunta({
+        data: {
+          accessToken: await token(),
+          perguntaId: q.id,
+          resposta: texto.trim(),
+          treinar,
+        },
+      });
+      if (!r.ok) throw new Error("recusado");
+      toast.success(
+        "treinou" in r && r.treinou
+          ? "Respondida, avisada e a IA aprendeu ✓"
+          : "Respondida e avisada ✓",
+      );
+      setAberto(false);
+      setTexto("");
+      onRespondeu?.();
+    } catch {
+      toast.error("Não consegui enviar. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-muted-foreground">{q.patient}</p>
+          <p className="mt-1 text-foreground">{q.question}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {!q.answered && (
+            <button
+              onClick={() => setAberto((v) => !v)}
+              className="press rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              Responder
+            </button>
+          )}
+          <button
+            onClick={() => onToggle(q.id, !q.answered)}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              q.answered
+                ? "bg-emerald-100 text-emerald-800"
+                : "border border-border text-muted-foreground hover:text-primary"
+            }`}
+          >
+            {q.answered ? "Respondida ✓" : "Só marcar"}
+          </button>
+        </div>
+      </div>
+
+      {aberto && (
+        <div className="mt-3 border-t border-border pt-3">
+          <textarea
+            rows={3}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Ela recebe no app, com aviso."
+            className="w-full rounded-xl border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          />
+          <label className="mt-2 flex items-start gap-2 text-[12px] leading-snug text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={treinar}
+              onChange={(e) => setTreinar(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Ensinar isto à minha IA — ela responde sozinha da próxima vez.{" "}
+              <span className="text-[11px]">
+                Desmarque se a resposta for específica desta gestação.
+              </span>
+            </span>
+          </label>
+          <button
+            onClick={responder}
+            disabled={enviando}
+            className="press mt-2 w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {enviando ? "Enviando…" : "Enviar resposta"}
+          </button>
         </div>
       )}
     </div>
