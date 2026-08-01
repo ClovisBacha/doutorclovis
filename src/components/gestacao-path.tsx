@@ -4550,19 +4550,17 @@ function MeditationBlock({
   }, [etapa, fase, ciclo]);
 
   /**
-   * A faixa guiada do tema, uma vez, ao abrir a sessão.
+   * Quem COMEÇA a faixa guiada é o clique em `begin()`, por causa do bloqueio
+   * de autoplay. Aqui só cuidamos de calá-la: ao sair da sessão, e quando ela
+   * desliga a voz no meio.
    *
-   * Não é uma frase por ciclo. A voz gravada é contínua — ela guia, respira
-   * junto e o silêncio faz parte, como em qualquer meditação de verdade;
-   * frase-por-frase produzia voz picotada com silêncio seco no meio.
+   * A faixa é contínua, e não uma frase por ciclo. A voz gravada guia, respira
+   * junto, e o silêncio faz parte — como em qualquer meditação de verdade.
+   * Frase-por-frase produzia voz picotada com silêncio seco entre elas.
    */
   useEffect(() => {
-    if (etapa !== "sessao" || !voz) return;
-    const faixa = faixaDoTema(med.theme);
-    if (!faixa) return;
-    tocarVoz(faixa, { canal: "guia" });
-    return () => pararVoz("guia");
-  }, [etapa, voz, med.theme]);
+    if (etapa !== "sessao" || !voz) pararVoz("guia");
+  }, [etapa, voz]);
 
   /**
    * As três palavras da respiração, na virada de cada fase.
@@ -4634,6 +4632,20 @@ function MeditationBlock({
     audioRef.current?.stop();
     audioRef.current = createSoundscape(som);
     audioRef.current.start();
+    /**
+     * A faixa guiada começa AQUI, dentro do clique — não num efeito.
+     *
+     * O navegador só deixa tocar áudio a partir de um gesto do usuário, e um
+     * `useEffect` roda depois que o React pintou: para o Safari e o Chrome do
+     * celular isso já não é mais o gesto, e o `play()` volta rejeitado. O som
+     * ambiente ao lado sempre soube disso — nasce neste mesmo clique. A voz
+     * precisava do mesmo tratamento, senão a paciente abriria a meditação e
+     * ouviria apenas o ambiente, sem nunca entender por quê.
+     */
+    if (voz) {
+      const faixa = faixaDoTema(med.theme);
+      if (faixa) tocarVoz(faixa, { canal: "guia" });
+    }
     setEtapa("sessao");
   }
 
