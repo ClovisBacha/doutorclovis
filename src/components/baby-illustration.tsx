@@ -21,14 +21,6 @@ export const STAGE_RANGES: Record<BabyStage, [number, number]> = {
   termo: [37, 42],
 };
 
-const STAGE_BASE_SCALE: Record<BabyStage, number> = {
-  embriao: 0.38,
-  inicial: 0.5,
-  feto: 0.46,
-  tardio: 0.68,
-  termo: 0.84,
-};
-
 const STAGE_IMG: Record<BabyStage, string> = {
   embriao: babyEmbriao,
   inicial: babyInicial,
@@ -108,33 +100,57 @@ function growth(week: number) {
 }
 
 /**
- * Quanto o corpo ocupa da caixa — DUAS RÉGUAS, porque são duas artes.
+ * QUANTO DA CAIXA A TINTA DO BEBÊ OCUPA, em cada arte.
  *
- * ARTE NOVA (39 semanas): todas normalizadas para a mesma fração de tinta na
- * caixa, então o tamanho na tela pode vir de UMA curva contínua da semana. Sem
- * degrau: hoje o bebê SALTA ao cruzar a fronteira de um estágio, e o salto não
- * é crescimento — é o enquadramento do arquivo mudando (a arte antiga vai de
- * 72% a 89% de ocupação).
+ * Medido com bounding box do alfa, não estimado. A arte antiga nunca foi
+ * uniforme, e é essa variação que faz o bebê SALTAR de tamanho ao cruzar a
+ * fronteira de um estágio — o salto não é crescimento, é o enquadramento do
+ * arquivo mudando.
+ *
+ * A arte nova sai toda normalizada em 83% por `scripts/bebes/normalizar.mjs`.
+ */
+const TINTA_DA_ARTE: Record<BabyStage, number> = {
+  embriao: 0.873,
+  inicial: 0.721,
+  feto: 0.788,
+  tardio: 0.83,
+  termo: 0.887,
+};
+const TINTA_DA_ARTE_NOVA = 0.83;
+
+/**
+ * A ESCALA NASCE DA BOLHA, não de um número por estágio.
+ *
+ * O bebê estava SAINDO da bolha nas semanas finais — medido na tela: 312px de
+ * tinta contra 220px de bolha na semana 40, 42% maior. A caixa branca gravada
+ * no PNG escondia isso; quando ela foi removida, a geometria real apareceu.
+ *
+ * A causa: `scale-[1.43]` da home foi calibrado numa semana só (a 19, padrão do
+ * preview), onde a tinta dá ~55% da caixa. O comentário lá diz isso com todas
+ * as letras. Só que a escala interna sobe até 1,1 nas semanas finais e a tinta
+ * de `termo` é 88,7% do arquivo — o produto estoura a bolha.
+ *
+ * Agora a conta é direta e verificável. A bolha da home mede 220px numa caixa
+ * de 320px, ou seja 68,75% dela. Deixando 15% de folga para o bebê respirar
+ * dentro do vidro:
+ *
+ *   tinta máxima na caixa = 0,6875 × 0,85 ≈ 0,585
+ *
+ * `escalaDoCorpo` devolve quanto ESCALAR A IMAGEM para que a tinta atinja o
+ * alvo daquela semana — e por isso divide pela tinta da arte. Trocar a arte
+ * deixa de mexer no tamanho: quem manda é a semana, não o arquivo.
  *
  * O expoente 0,65 comprime a curva para a frente porque o crescimento real é
  * assim: entre 4 e 20 semanas o bebê ganha proporcionalmente muito mais do que
  * entre 30 e 42. Uma reta faria o primeiro trimestre parecer parado.
- *
- * ARTE ANTIGA (fallback): mantém o `STAGE_BASE_SCALE` em degraus. Ele foi
- * calibrado contra aquelas imagens; trocar a régua aqui mudaria o tamanho do
- * bebê nas semanas que ainda não têm arte própria.
  */
-const ESCALA_MIN = 0.34;
-const ESCALA_MAX = 1;
+const TINTA_ALVO_MIN = 0.14;
+const TINTA_ALVO_MAX = 0.585;
 
 function escalaDoCorpo(week: number, stage: BabyStage, arteNova: boolean): number {
-  if (arteNova) {
-    return ESCALA_MIN + (ESCALA_MAX - ESCALA_MIN) * Math.pow(growth(week), 0.65);
-  }
-  const [sMin, sMax] = STAGE_RANGES[stage];
-  const t = Math.max(0, Math.min(1, (week - sMin) / (sMax - sMin)));
-  const base = STAGE_BASE_SCALE[stage];
-  return base + t * (1 - base);
+  const alvo = TINTA_ALVO_MIN + (TINTA_ALVO_MAX - TINTA_ALVO_MIN) * Math.pow(growth(week), 0.65);
+  const tinta = arteNova ? TINTA_DA_ARTE_NOVA : TINTA_DA_ARTE[stage];
+  return alvo / tinta;
 }
 
 export function BabyIllustration({
@@ -163,8 +179,13 @@ export function BabyIllustration({
   const info = babyForWeek(week);
 
   const arte = arteDaSemana(week, stage);
-  const freeBoost = showSac ? 1 : 1.18;
-  const bodyScale = Math.min(1.1, escalaDoCorpo(week, stage, arte.nova) * freeBoost);
+  /* Sem `freeBoost`. Ele existia para inchar o bebê 18% quando o componente não
+     desenhava o próprio saco — um ajuste relativo, feito quando o tamanho vinha
+     de um número por estágio. Agora o alvo é ABSOLUTO (fração da caixa) e já
+     cabe nos dois casos: dentro da bolha da home (68,75% da caixa) e dentro do
+     saco que o próprio componente desenha (72% a 88%). Um alvo só, sem exceção
+     que precise ser lembrada. */
+  const bodyScale = Math.min(1.1, escalaDoCorpo(week, stage, arte.nova));
   const tx = 100 * (1 - bodyScale);
   /* Só a arte antiga precisa do `multiply`: a nova tem alfa de verdade. */
   const isWhiteBg = !arte.nova && WHITE_BG_STAGES.has(stage);
