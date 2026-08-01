@@ -1,12 +1,31 @@
 # "Nenhuma madrugada foi sozinha" — comercial Obstétrica
 
-Versão **2** do roteiro. A versão 1 tinha 8 planos e nota média 6,75. Esta tem
-**9 gerações + 1 cartela montada na edição**, e cada mudança abaixo existe para
-corrigir um defeito nomeado — não para enfeitar.
+Versão **3** do roteiro. A versão 1 tinha 8 planos e nota média 6,2. A versão 2
+consertou as transições e a conversão, mas **espremia beat demais dentro de cada
+plano**. Esta tem **12 gerações + 1 cartela montada na edição**, e cada mudança
+existe para corrigir um defeito nomeado — não para enfeitar.
 
 - **Formato:** 2.39:1 horizontal, 4K, Seedance 2.0
-- **Duração final:** ~62s (9 × 8s gerados, ~6,9s aproveitados por plano, + 6s de cartela)
+- **Duração final:** ~76s (12 × 8s gerados, ~5,9s aproveitados por plano, + 5s de cartela)
 - **Fluxo:** cada plano usa o **último quadro do plano anterior** como imagem base
+
+## A aritmética que a versão 2 não fechava
+
+Nove planos de 8s dão 72s de material bruto. Para caber nos ~56s que a montagem
+pedia, era preciso cortar **1,8s de cada plano** — e os timecodes punham o beat
+emocional nos últimos dois segundos (`0:06-0:08`). Aparar pelo fim matava
+exatamente o que importava em cada plano.
+
+A correção não é encurtar o filme. É **parar de pedir quatro estados emocionais
+em oito segundos.** Três planos foram divididos em dois, e um respiro foi
+acrescentado:
+
+| Antes                        | Depois                                       | Por quê                                                                     |
+| ---------------------------- | -------------------------------------------- | --------------------------------------------------------------------------- |
+| Plano 1 com 4 estados        | 3 estados, começando no sorriso já quebrando | quatro estados em 8s não é atuação, é careta                                |
+| Plano 4 (o susto) sozinho    | **4A · o instante** + **4B · o silêncio**    | o socorro chegava instantâneo, então não custava nada, então não valia nada |
+| Plano 7 (o pico) com 4 beats | **7A · o rosto** + **7B · a mão**            | é o pico emocional, e era o plano mais espremido do filme                   |
+| Nada entre 3 e 4             | **3B · o respiro**                           | dez semanas passavam sem sinal, e o filme não tinha um só segundo sem beat  |
 
 ---
 
@@ -20,31 +39,46 @@ corrigir um defeito nomeado — não para enfeitar.
 
 ## O arco do âmbar
 
-| Plano            | Âmbar                           | Por quê                               |
-| ---------------- | ------------------------------- | ------------------------------------- |
-| 1 · a notícia    | **0%** — manhã fria e azul      | o mundo antes de existir guardião     |
-| 2 · a madrugada  | **10%** — nasce                 | primeira vez que algo é quente        |
-| 3 · o florescer  | 0% (luz de mel, outro registro) | o dia não precisa de guardião         |
-| 4 · o susto      | **0% de propósito**             | o medo não tem guardião               |
-| 5 · o amparo     | **10%** — volta, vindo de baixo | o guardião responde                   |
-| 6 · a véspera    | 30% — cresce                    | ele já faz parte da casa              |
-| 7 · o encontro   | **60% — inunda**                | o guardião cumpriu                    |
-| 8 · o outro lado | **10% — a mesma qualidade**     | **a revelação: o âmbar é uma pessoa** |
-| 9 · a volta      | 10%                             | ela sabe, e agradece em silêncio      |
+| Plano               | Âmbar                           | Por quê                                  |
+| ------------------- | ------------------------------- | ---------------------------------------- |
+| 1 · a notícia       | **0%** — manhã fria e azul      | o mundo antes de existir guardião        |
+| 2 · a madrugada     | **10%** — nasce                 | primeira vez que algo é quente           |
+| 3 · o florescer     | 0% (luz de mel, outro registro) | o dia não precisa de guardião            |
+| **3B · o respiro**  | **10% — sozinho, sem ninguém**  | o âmbar existe mesmo quando ela não está |
+| 4A · o instante     | **0% de propósito**             | o medo não tem guardião                  |
+| **4B · o silêncio** | **0% — e agora dói**            | ninguém veio. O guardião ainda não sabe  |
+| 5 · o amparo        | **10%** — volta, vindo de baixo | o guardião responde                      |
+| 6 · a véspera       | 30% — cresce                    | ele já faz parte da casa                 |
+| 7A · o encontro     | **60% — inunda**                | o guardião cumpriu                       |
+| 7B · a mão          | 60%                             | o pico, agora com tempo de respirar      |
+| 8 · o outro lado    | **10% — a mesma qualidade**     | **a revelação: o âmbar é uma pessoa**    |
+| 9 · a volta         | 10%                             | ela sabe, e agradece em silêncio         |
+
+O **3B** é o plano mais barato do filme e faz um trabalho que nenhum outro faz:
+mostra a cozinha à noite, vazia, com o abajur âmbar aceso e chuva na janela.
+Logo depois, o **4A** mostra **a mesma cozinha** em luz cinzenta e chapada, com
+ela dentro — e sem o abajur. O espectador não sabe por que aquilo dá aflição.
+Dá porque a luz foi embora.
 
 ## O motivo da mão
 
 Uma única mão atravessa o filme e nunca é comentada:
 
-| Plano | Onde a mão está                 |
-| ----- | ------------------------------- |
-| 1     | segurando o teste               |
-| 2     | espalmada na barriga, no escuro |
-| 6     | espalmada na barriga, enorme    |
-| 9     | espalmada nas costas do bebê    |
+| Plano  | Onde a mão está                                                        |
+| ------ | ---------------------------------------------------------------------- |
+| 1      | segurando o teste                                                      |
+| 2      | espalmada na barriga, no escuro                                        |
+| **4B** | **procurando** — sai do quadro por baixo, e é a única vez que ela pede |
+| 6      | espalmada na barriga, enorme                                           |
+| 7B     | a mão **do bebê** fechando no dedo dela — a rima se inverte            |
+| 9      | espalmada nas costas do bebê                                           |
 
-Os cortes 1→2 e 6→7 são **match cuts nessa mão**. É a espinha da montagem e não
+Os cortes 1→2 e 6→7A são **match cuts nessa mão**. É a espinha da montagem e não
 custa um centavo a mais.
+
+No **4B** a mão faz uma coisa que não faz em nenhum outro plano: ela **procura**.
+É assim que o filme planta o aparelho sem nunca mostrá-lo — e é por isso que o
+âmbar do plano 5 chega como resposta, e não como acaso.
 
 ---
 
@@ -55,40 +89,52 @@ sequência é slideshow, não filme. Agora cada corte tem um mecanismo, e cada
 prompt traz uma seção **`LAST FRAME`** dizendo exatamente onde parar — é ela que
 alimenta a imagem-base do plano seguinte.
 
-| Corte           | Mecanismo                                                                    | O que o espectador sente                  |
-| --------------- | ---------------------------------------------------------------------------- | ----------------------------------------- |
-| **1 → 2**       | **match cut na mão** — a mão sai do teste e entra na barriga, no escuro      | o tempo passou sem avisar                 |
-| **2 → 3**       | **match cut nos olhos** — fecham no escuro, abrem no dia                     | o sono virou a transição                  |
-| **3 → 4**       | **corte seco de som** — o riso é cortado no meio da respiração               | o susto acontece no corte, não no plano   |
-| **4 → 5**       | **mesmo enquadramento, só a luz muda** — nada se move, o âmbar chega         | o socorro chega antes do entendimento     |
-| **5 → 6**       | elipse marcada — a bolsa da maternidade pronta ao lado da porta              | semanas passaram, e ela está pronta       |
-| **6 → 7**       | **match cut na mão** — da barriga para as costas do bebê                     | o parto acontece no corte                 |
-| **7 → 8**       | **corte de luz idêntica, pessoa diferente** — o rosto dela vira o rosto dele | _era uma pessoa o tempo todo_             |
-| **8 → 9**       | volta ao mesmo âmbar                                                         | ela nunca soube, e mesmo assim agradece   |
-| **9 → cartela** | o âmbar da tela dela **funde** no âmbar da logo                              | o produto nasce da emoção, não interrompe |
+| Corte           | Mecanismo                                                                            | O que o espectador sente                        |
+| --------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| **1 → 2**       | **match cut na mão** — a mão sai do teste e entra na barriga, no escuro              | o tempo passou sem avisar                       |
+| **2 → 3**       | **match cut nos olhos** — fecham no escuro, abrem no dia                             | o sono virou a transição                        |
+| **3 → 3B**      | **corte seco de som** — o riso é cortado no meio da respiração e cai numa sala vazia | algo acabou de acontecer, e ninguém disse o quê |
+| **3B → 4A**     | **mesma cozinha, a luz foi embora** — o abajur sumiu, o dia é chapado                | aflição sem causa nomeável                      |
+| **4A → 4B**     | **corte de MS para ECU, câmera travada nas duas**                                    | o tempo passou e nada mudou. Ninguém veio       |
+| **4B → 5**      | **mesmo enquadramento, só a luz muda** — nada se move, o âmbar chega                 | o socorro chega antes do entendimento           |
+| **5 → 6**       | elipse marcada — a bolsa da maternidade pronta ao lado da porta                      | semanas passaram, e ela está pronta             |
+| **6 → 7A**      | **match cut na mão** — da barriga para as costas do bebê                             | o parto acontece no corte                       |
+| **7A → 7B**     | continuidade — a única emenda invisível do filme                                     | o pico tem tempo de acontecer                   |
+| **7B → 8**      | **corte de luz idêntica, pessoa diferente** — o rosto dela vira o rosto dele         | _era uma pessoa o tempo todo_                   |
+| **8 → 9**       | volta ao mesmo âmbar                                                                 | ela nunca soube, e mesmo assim agradece         |
+| **9 → cartela** | o âmbar da tela dela **funde** no âmbar da logo                                      | o produto nasce da emoção, não interrompe       |
 
 **Ritmo da câmera** — a versão 1 usava push-in em 7 de 8 planos, e por isso
 nenhum corte tinha peso. Agora:
 
-| Plano | Movimento                        |
-| ----- | -------------------------------- |
-| 1     | push-in lento                    |
-| 2     | push-in lento                    |
-| 3     | handheld que circula             |
-| **4** | **travada. Não se mexe.**        |
-| **5** | **travada. Não se mexe.**        |
-| 6     | push-in lento                    |
-| 7     | push-in lento                    |
-| **8** | **travada**                      |
-| **9** | **dolly OUT — o único do filme** |
+| Plano  | Movimento                                      |
+| ------ | ---------------------------------------------- |
+| 1      | push-in lento                                  |
+| 2      | push-in lento                                  |
+| 3      | handheld que circula                           |
+| **3B** | **travada** — MS da cozinha vazia              |
+| **4A** | **travada** — MS                               |
+| **4B** | **travada** — ECU                              |
+| **5**  | **travada** — ECU, o mesmo enquadramento do 4B |
+| 6      | push-in lento                                  |
+| 7A     | push-in lento                                  |
+| 7B     | push-in lento, ECU                             |
+| **8**  | **travada** — ECU, o mesmo enquadramento do 5  |
+| **9**  | **dolly OUT — o único do filme**               |
 
-Os dois planos travados são exatamente o susto e o socorro. **A câmera para de
-respirar junto com ela.** E o único plano que se afasta é o último — porque é o
-único momento em que dá para se afastar.
+**Quatro planos travados em fila** (3B, 4A, 4B, 5) — cerca de 24 segundos em que
+a câmera se recusa a se mexer, ficando cada vez mais perto sem nunca andar. É o
+bloco do medo, e a única coisa que muda dentro dele é **a luz**: existe no 3B,
+some no 4A e no 4B, volta no 5. A câmera para de respirar junto com ela, e
+quando o socorro chega ela ainda não se mexe — porque o socorro não é um
+movimento, é uma luz.
+
+O único plano que se afasta é o último — porque é o único momento do filme em
+que dá para se afastar.
 
 ---
 
-# 🎬 OS 9 PLANOS
+# 🎬 OS 12 PLANOS
 
 **Bíblia da personagem** — idêntica em todos:
 
@@ -101,7 +147,7 @@ respirar junto com ela.** E o único plano que se afasta é o último — porque
 ## PLANO 1 · A NOTÍCIA
 
 **Referência:** mãe escolhida + cenário banheiro
-**Entra:** abertura do filme — o gancho está em **0:01**, não em 0:03
+**Entra:** abertura do filme — **o gancho está em 0:00**, chegamos com o rosto já quebrando
 **Sai para:** match cut na mão
 
 ```
@@ -126,11 +172,12 @@ SKIN: pore-level realism — fine peach-fuzz along the jaw, real catch-lights in
 the eyes, tear film gathering on the lower lid, a faint natural flush rising on
 the cheeks, no makeup sheen.
 
-ACTING: the whole shot happens on her face. She is already looking down when we
-arrive. At 0:01 her breath catches and her face breaks — lips parting, a
-trembling half-smile, eyes filling fast. Then at 0:04 the smile falters and
-something frightened crosses her eyes. She breathes it away. The smile that
-returns is smaller and much more real than the first one.
+ACTING: the whole shot happens on her face, and it holds only THREE states — not
+four. We arrive with the trembling smile ALREADY breaking across her face; do
+NOT show the moment she first reads the test. The smile grows and her eyes fill.
+Then it falters, and something frightened arrives in her eyes and STAYS there —
+this beat gets real time, it is not a flicker. Finally she breathes it away, and
+the smile that returns is smaller and much more real than the first one.
 
 PHYSICS: real breath moving her chest; a curl of hair falling forward; her hands
 trembling very slightly; the small white test held in both hands.
@@ -140,9 +187,10 @@ cold, softly lit bathroom, head bowed, holding a small white pregnancy test in
 both hands, already looking down at it, cool daylight from the LEFT.
 
 ACTION — ONE CONTINUOUS SHOT, 8 seconds, no cuts:
-0:00-0:01  She is already looking down. Her breath catches audibly.
-0:01-0:04  Her face breaks into a trembling, disbelieving smile. Eyes fill.
-0:04-0:05  The smile falters. Fear crosses her eyes for a single beat.
+0:00-0:02  We arrive mid-break. The trembling disbelieving smile is ALREADY on
+           her face and still growing. Her eyes fill.
+0:02-0:04  The smile falters. Fear arrives in her eyes.
+0:04-0:05  The fear STAYS. She does not fight it yet. She just holds it.
 0:05-0:07  She breathes it away. The smile returns, smaller, steadier, real.
 0:07-0:08  She lifts one hand off the test and lays it flat and open against
            her own stomach, and holds it there, completely still.
@@ -314,14 +362,77 @@ strobing.
 
 ---
 
-## PLANO 4 · O SUSTO
+## PLANO 3B · O RESPIRO ⭐ NOVO
+
+**Referências:** cenário cozinha (noite) — **sem gente**
+**Entra:** **o riso do plano 3 é cortado no meio** e cai numa sala vazia
+**Sai para:** a mesma cozinha, e a luz foi embora
+
+> **O plano mais barato do filme, e o que faz o trabalho que nenhum outro faz.**
+> Até aqui, todo segundo do filme é um beat. Emoção não se sente durante a cena
+> — se sente no silêncio depois dela, e o filme não tinha um só. Este plano é o
+> silêncio: nenhuma pessoa, nenhuma ação, dez semanas passando. E ele arma o
+> golpe do plano seguinte, que é a **mesma cozinha** sem a luz quente.
+
+```
+STYLE: 8K photorealistic, anamorphic 2.39:1, intimate character-drama grade,
+creamy highlight roll-off, fine 35mm grain. Original invented location, not
+based on any real place.
+
+LIGHTING: night. ONE small warm amber lamp on the kitchen counter is the only
+light source in the room, pooling on the wood. Cool blue night light on the rain
+outside the window at camera-LEFT. Everything else in soft darkness.
+
+COLOR: 60:30:10 — deep blue-grey darkness 60% / warm wood and counter 30% /
+warm amber lamp glow 10%. The amber is the ONLY warm thing, and it is alone.
+
+CAMERA: anamorphic cine optics, 40mm, shallow depth, LOCKED-OFF — the camera
+does not move at all. One continuous static take.
+
+OPTICS: MS 40°, fixed. The exact same framing and lens as the next shot.
+
+ACTING: none. There are NO people in this shot at all.
+
+PHYSICS: rain running down the outside of the window glass in real irregular
+rivulets; the amber lamplight refracting through the wet glass; a slow curl of
+steam rising from a mug left on the counter; the faintest movement of a curtain.
+
+FIRST FRAME: an empty kitchen at night. One warm amber lamp on the counter. Rain
+on the window at camera-LEFT. A mug of tea left half-finished, still steaming.
+Nobody in the room.
+
+ACTION — ONE CONTINUOUS SHOT, 8 seconds, no cuts:
+0:00-0:08  Nothing happens. Rain runs down the glass. Steam rises from the mug
+           and thins. The amber lamp holds steady. The room stays empty and the
+           camera never moves. This is a held breath, not an event.
+
+LAST FRAME: the empty kitchen, the amber lamp still on, rain on the glass.
+Perfectly still and clean — the next shot is this EXACT framing in daylight,
+with the lamp gone.
+
+AUDIO (NO MUSIC): rain on glass, steady and soft. A clock ticking far off.
+Nothing else. No voices, no music, no movement.
+
+POSITIVE LOCKS: NO people anywhere in the frame. The camera is LOCKED OFF and
+NEVER moves. Window on the LEFT. The amber lamp is the ONLY light source in the
+room. SAME kitchen, SAME lens and SAME framing as the next shot.
+
+NEGATIVE: no music, no people, no hands, no faces, no dialogue, no camera
+movement, no additional light sources, no stutter, no choppy or dropped frames,
+no strobing.
+```
+
+---
+
+## PLANO 4A · O INSTANTE
 
 **Referências:** mãe (sozinha) + cenário cozinha, dia nublado
-**Entra:** **o riso do plano 3 é cortado no meio** — corte seco, silêncio total
-**Sai para:** mesmo enquadramento, só a luz muda
+**Entra:** **a mesma cozinha do 3B, e a luz foi embora** — o abajur sumiu
+**Sai para:** corte de MS para ECU, câmera travada nas duas
 
-> Este plano **não** usa o quadro anterior como base. É o único corte duro do
-> filme, e ele tem que doer.
+> Não use o quadro anterior como imagem-base — mas **use o mesmo cenário, a
+> mesma lente e o mesmo enquadramento**. O espectador não vai saber por que
+> aquela cozinha dá aflição. Dá porque, oito segundos atrás, ela era quente.
 
 ```
 STYLE: 8K photorealistic, anamorphic 2.39:1, intimate character-drama grade,
@@ -364,9 +475,9 @@ ACTION — ONE CONTINUOUS SHOT, 8 seconds, no cuts:
            breathes carefully, eyes down. She does not move again. The camera
            does not move at all. Hold the stillness until the very last frame.
 
-LAST FRAME: her face, eyes down and unfocused, braced and still, in flat
-colourless light. Held perfectly still — the next shot is this exact face with
-only the light changed.
+LAST FRAME: the wide framing, her braced and still at the counter in flat
+colourless light. Held perfectly still — the next shot is the SAME woman in the
+SAME position, cut in much closer.
 
 AUDIO (NO MUSIC): the room goes almost silent the instant the shot begins — a
 tap dripping somewhere, one distant car. Her breathing becomes the loudest thing
@@ -383,13 +494,97 @@ no phone, no stutter, no choppy or dropped frames, no strobing.
 
 ---
 
+## PLANO 4B · O SILÊNCIO ⭐ NOVO
+
+**Referências:** **último quadro do plano 4A**
+**Entra:** corte de MS para ECU — a câmera não andou, só chegou mais perto
+**Sai para:** mesmo enquadramento, só a luz muda
+
+> **Por que este plano existe.** Na versão anterior, o susto cortava direto para
+> o socorro. O socorro chegava instantâneo — e por isso não custava nada, e por
+> isso não valia nada. Aqui o medo ganha oito segundos em que **ninguém vem**.
+> É esse silêncio que transforma o âmbar do plano seguinte de acaso em resposta.
+>
+> E é aqui que a mão faz a única coisa que ela não faz em nenhum outro plano do
+> filme: **procura**. É assim que o aparelho é plantado sem nunca aparecer.
+
+> **Na hora de gerar:** anexe o último quadro do plano 4A e acrescente:
+> `The attached image is the final frame of the previous shot. Same woman, same
+position, same kitchen, same flat grey light — but framed much closer, in
+extreme close-up on her face. Nothing about the light or the room changes.`
+
+```
+STYLE: 8K photorealistic, anamorphic 2.39:1, intimate character-drama grade,
+heavily desaturated, fine 35mm grain. Original invented character, not based on
+any real or public figure.
+
+LIGHTING: the SAME flat overcast daylight from camera-LEFT as the previous shot.
+No sun, no warmth, no rim, no bounce, no practical light. Identical light,
+closer framing.
+
+COLOR: 60:30:10 — desaturated cool grey-green 60% / muted skin 30% / dull
+neutral wood 10%. NOTHING warm. NO amber. Identical palette to the previous shot.
+
+CAMERA: anamorphic cine optics, 85mm portrait, extremely shallow depth,
+LOCKED-OFF and completely still. One continuous static take.
+
+OPTICS: ECU 18° on her face — the EXACT framing the next shot will open on.
+Fixed, no drift, no reframe.
+
+SKIN: pore-level realism — pale under flat light, cold sweat on the upper lip
+and hairline, every pore visible, eyes with almost no catch-light, the fine
+tremor of someone holding very still on purpose.
+
+ACTING: waiting, alone, and nobody comes. She holds the same braced expression
+the previous shot ended on. Her eyes flick ONCE toward the doorway — checking
+whether anyone is there — and come back. Nobody is. Her jaw sets harder. Then,
+slowly and without any drama, one hand rises into the bottom of the frame,
+reaching for something below, and leaves the frame again. She keeps breathing
+carefully the entire time. She never cries and never calls out.
+
+PHYSICS: the careful controlled rise and fall of her chest; one strand of hair
+stuck to the damp temple; the hand entering and leaving the bottom of the frame
+with real weight, unhurried.
+
+FIRST FRAME: extreme close-up of the same woman's face, same braced expression,
+same flat grey kitchen light as the end of the previous shot.
+
+ACTION — ONE CONTINUOUS SHOT, 8 seconds, no cuts:
+0:00-0:02  The same held expression. Careful breathing. Nothing happens.
+0:02-0:03  Her eyes flick once toward the doorway, and come back. Nobody.
+0:03-0:05  Her jaw sets harder. She keeps breathing carefully. Still nothing.
+0:05-0:07  One hand rises slowly into the bottom of the frame, reaching for
+           something below, then leaves the frame again.
+0:07-0:08  She holds absolutely still, eyes down, waiting. The camera has not
+           moved once.
+
+LAST FRAME: her face in ECU, eyes down, jaw set, waiting, in flat colourless
+light. Held perfectly still — the next shot is this EXACT face with ONLY the
+light changed.
+
+AUDIO (NO MUSIC): near-total silence — a tap dripping, one distant car. Her
+breathing is the loudest thing in the frame. Nothing else at all. No
+notification sound, no chime, no click.
+
+POSITIVE LOCKS: SAME woman, SAME face, SAME kitchen, SAME flat grey light as the
+previous shot. Window on the LEFT. The camera is LOCKED OFF and NEVER moves. NO
+warm light anywhere. NO amber. She stays COMPLETELY ALONE — nobody enters, and
+nobody is visible in the doorway. NOTHING she reaches for is ever visible.
+
+NEGATIVE: no music, no dialogue, no camera movement, no warm light, no amber, no
+other people, no visible phone, no visible screen, no notification sounds, no
+crying, no stutter, no choppy or dropped frames, no strobing.
+```
+
+---
+
 ## PLANO 5 · O AMPARO
 
-**Referências:** **último quadro do plano 4**
+**Referências:** **último quadro do plano 4B**
 **Entra:** o corte mais importante do filme — **nada se move, só a luz muda**
 **Sai para:** elipse marcada (a bolsa da maternidade)
 
-> **Na hora de gerar:** anexe o último quadro do plano 4 e acrescente:
+> **Na hora de gerar:** anexe o último quadro do plano 4B e acrescente:
 > `The attached image is the final frame of the previous shot. Keep the exact
 same face, the exact same angle, the exact same expression at 0:00. Change
 ONLY the light: the flat grey daylight is replaced by a single warm amber
@@ -527,11 +722,17 @@ no stutter, no choppy or dropped frames, no strobing.
 
 ---
 
-## PLANO 7 · O ENCONTRO
+## PLANO 7A · O ENCONTRO
 
 **Referências:** **último quadro do plano 6** + mãe + bebê recém-nascido
 **Entra:** match cut na mão — **o parto acontece no corte**
-**Sai para:** corte de luz idêntica, pessoa diferente
+**Sai para:** continuidade direta para o 7B
+
+> **Por que o pico foi dividido em dois.** Na versão anterior este plano pedia
+> quatro beats em oito segundos — olhar, a mão do bebê, o riso quebrado, a
+> cabeça baixando. É o ápice emocional do filme e era o plano mais espremido
+> dele. Agora o ápice tem **dezesseis segundos**, e o espectador tem tempo de
+> chegar junto.
 
 > **Na hora de gerar:** anexe o último quadro do plano 6 e acrescente:
 > `The attached image is the final frame of the previous shot — her open hand.
@@ -589,17 +790,19 @@ lamplight in the shadow. The man sits close, one arm around her.
 ACTION — ONE CONTINUOUS SHOT, 8 seconds, no cuts:
 0:00-0:02  The hand on the baby's back. The camera begins easing back to find
            her face.
-0:02-0:04  She looks down at the baby's face, crying and smiling, memorising it.
-0:04-0:06  The baby's tiny hand curls around her finger. She notices.
-0:06-0:07  She laughs through the tears — one small broken sound.
-0:07-0:08  She lowers her head and rests her cheek against the baby's head.
+0:02-0:04  She looks down at the baby's face, crying and smiling at once.
+0:04-0:06  She keeps looking. She is memorising the face. One silent sob moves
+           her chest and she does not look away.
+0:06-0:08  She breathes out, still crying, still smiling. Behind her, he looks
+           at the two of them and his own eyes fill. Nobody speaks.
 
-LAST FRAME: her face pressed against the baby's head, eyes closed, lit entirely
-in warm amber. Clean and still.
+LAST FRAME: her face looking down at the baby, tears on her cheeks and a small
+broken smile, lit entirely in warm amber. Clean and still — it is the base image
+for the next shot.
 
 AUDIO (NO MUSIC): a quiet room at night — the tiny snuffling breath of a
-newborn, the rustle of muslin, her one broken laugh at 0:06. Nothing else. NO
-monitors, NO beeping, NO hospital corridor sound.
+newborn, the rustle of muslin, her uneven breathing. Nothing else. NO monitors,
+NO beeping, NO hospital corridor sound.
 
 POSITIVE LOCKS: SAME woman, SAME face, SAME man. The room is entirely WARM — no
 cool light anywhere. Newborn proportions stay REALISTIC for a baby hours old.
@@ -615,14 +818,92 @@ no strobing.
 
 ---
 
+## PLANO 7B · A MÃO ⭐ NOVO
+
+**Referências:** **último quadro do plano 7A**
+**Entra:** continuidade — a única emenda invisível do filme
+**Sai para:** corte de luz idêntica, pessoa diferente
+
+> **A rima se inverte aqui.** O filme inteiro é a mão dela: no teste, na barriga
+> no escuro, na barriga enorme, nas costas do bebê. Neste plano, pela primeira e
+> única vez, é **a mão do bebê que segura a dela**. Não precisa ser dito.
+
+> **Na hora de gerar:** anexe o último quadro do plano 7A e acrescente:
+> `The attached image is the final frame of the previous shot. Same woman, same
+baby, same room, same warm light — but begin framed much closer, on the
+newborn's tiny hand resting open on her chest.`
+
+```
+STYLE: 8K photorealistic, anamorphic 2.39:1, intimate character-drama grade,
+deep warm grade, fine 35mm grain. Original invented characters, not based on any
+real or public figures.
+
+LIGHTING: the SAME single warm bedside lamp as the previous shot, close and
+soft. Everything beyond it in warm darkness. NO cool light anywhere.
+
+COLOR: 60:30:10 — warm amber and gold 60% / skin 30% / cream muslin 10%.
+Identical palette to the previous shot. The warmest moment in the film.
+
+CAMERA: anamorphic cine optics, 85mm, extremely shallow depth, ONE very slow
+push-in and gentle rise that never stops and never cuts.
+
+OPTICS: opens ECU 18° on the newborn's hand, easing up to MCU 29° on her face.
+
+SKIN: pore-level realism — REAL newborn skin at the closest possible range:
+translucent, faintly wrinkled, downy, with tiny thin fingers and perfect
+miniature fingernails. Hours old, NOT a plump four-month-old baby, no rolls, no
+chubby cheeks. On her: tear tracks catching lamplight, damp hair at the temples.
+
+ACTING: the moment the whole film has been walking toward. She is already crying
+and smiling when we arrive. When the baby's fingers close around her finger she
+goes completely still for one beat — caught — and then laughs, one small broken
+wet sound that is half a sob. She is not performing joy. She is undone by it.
+
+PHYSICS: the newborn's chest rising and falling with real breath; the tiny
+fingers closing with genuine grip strength around her finger; the muslin
+creasing; her chest jumping once with the broken laugh.
+
+FIRST FRAME: extreme close-up of a newborn's tiny open hand resting on her
+chest, lit in warm lamplight, her finger just beside it. Same room, same light,
+same warm darkness as the previous shot.
+
+ACTION — ONE CONTINUOUS SHOT, 8 seconds, no cuts:
+0:00-0:02  The tiny open hand on her chest. It moves once, searching.
+0:02-0:04  The fingers close around her finger and grip. Hold on this.
+0:04-0:05  The camera eases up to find her face. She has noticed.
+0:05-0:07  She laughs through the tears — one small broken wet sound.
+0:07-0:08  She lowers her head and rests her cheek against the baby's head, eyes
+           closing. The camera is still easing in as it ends.
+
+LAST FRAME: her face pressed against the baby's head, eyes closed, lit entirely
+in warm amber. Clean and still — the next shot opens on a DIFFERENT face in the
+SAME light.
+
+AUDIO (NO MUSIC): a quiet room at night — the tiny snuffling breath of a
+newborn, the rustle of muslin, her one broken laugh at 0:06. Nothing else. NO
+monitors, NO beeping, NO hospital corridor sound.
+
+POSITIVE LOCKS: SAME woman, SAME baby, SAME room and SAME warm light as the
+previous shot. The room is entirely WARM — no cool light anywhere. Newborn
+proportions and newborn hand proportions stay REALISTIC for a baby hours old.
+Camera NEVER cuts, NEVER stops.
+
+NEGATIVE: no music, no dialogue, no monitors, no beeping, no medical equipment,
+no IV lines, no cool or fluorescent light, no chubby or plump baby, no
+oversized or toddler-sized hand, no camera shake, no stutter, no choppy or
+dropped frames, no strobing.
+```
+
+---
+
 ## PLANO 8 · O OUTRO LADO ⭐ NOVO
 
 **Referências:** ator do médico + cenário escritório de casa, noite
 **Entra:** **corte de luz idêntica, pessoa diferente** — a virada do filme
 **Sai para:** volta ao mesmo âmbar
 
-> **Este plano é o filme.** Durante 55 segundos o espectador viu um brilho âmbar
-> chegar no rosto dela três vezes sem saber de onde vinha. Aqui ele descobre:
+> **Este plano é o filme.** Durante mais de um minuto o espectador viu um brilho
+> âmbar chegar no rosto dela sem nunca saber de onde vinha. Aqui ele descobre:
 > **não era uma tela. Era uma pessoa acordada.** É a única coisa que a
 > Obstétrica tem e que nenhum concorrente pode copiar — e a versão 1 não a
 > mostrava em nenhum quadro.
@@ -776,15 +1057,15 @@ strobing.
 O maior defeito de conversão da versão 1: o filme acabava e **não havia nome,
 logo, frase nem endereço**. O espectador emocionado não tinha para onde ir.
 
-**Montagem (6 segundos):**
+**Montagem (5 segundos, a partir de ~1:11):**
 
-1. **0:56–0:58** — o ponto de luz âmbar do último quadro do plano 9 permanece na
+1. **+0,0–1,5s** — o ponto de luz âmbar do último quadro do plano 9 permanece na
    tela enquanto todo o resto escurece por dissolve. Sobra só o âmbar no preto.
-2. **0:58–1:01** — sobre o preto, em branco quente, tipografia fina:
+2. **+1,5–3,0s** — sobre o preto, em branco quente, tipografia fina:
 
    > **Ninguém deveria atravessar isso sozinha.**
 
-3. **1:01–1:04** — o ponto âmbar cresce e vira a **logo da Obstétrica** (o mesmo
+3. **+3,0–5,0s** — o ponto âmbar cresce e vira a **logo da Obstétrica** (o mesmo
    nascimento-da-luz do prompt de abertura do app). Abaixo:
 
    > **Obstétrica**
@@ -799,16 +1080,61 @@ dela é gerado por IA (que erra letra).
 
 ---
 
+# UM FILME, TRÊS CORTES
+
+Trinta segundos **não dão** para este filme. O mecanismo inteiro é o arco do
+âmbar, e ele precisa de cinco momentos obrigatórios — nascer (2), sumir (4),
+voltar (5), inundar (7), e se revelar como pessoa (8). Com abertura e desfecho
+são sete planos no mínimo. Em 30s isso dá 4,3s por plano: **não é tempo
+suficiente para um rosto mudar de expressão de forma crível.** Um filme sobre
+respiração presa não cabe em respiração presa.
+
+Mas o filme de 76s também não é o que se posta no Instagram. A solução não é
+encurtar — é **cortar três versões da mesma matéria-prima**, sem gerar um quadro
+a mais.
+
+| Corte       | Duração | Onde                                                     | O que é                      |
+| ----------- | ------- | -------------------------------------------------------- | ---------------------------- |
+| **O filme** | ~76s    | site, YouTube, sala de espera, apresentação a investidor | a peça                       |
+| **Reels**   | ~30s    | Instagram, TikTok                                        | o filme do medo e do socorro |
+| **Anúncio** | ~15s    | tráfego pago                                             | só o gancho e a virada       |
+
+### Corte de 30s — quais planos sobrevivem
+
+`1` (4s) → `2` (5s) → `4A` (4s) → `4B` (4s) → `5` (5s) → `7B` (4s) → `8` (4s) → cartela (4s)
+
+Saem os planos de alegria (3, 3B, 6, 7A, 9). Perde-se a família e o respiro, e
+**ganha-se um filme mais duro** — que é exatamente o registro que funciona em
+feed. O arco do âmbar continua inteiro: nasce, some, volta, inunda, se revela.
+
+> ⚠️ Sem o plano 9, o corte de 30s não tem a gravação de tela real. Compense
+> pondo a tela no **fim da cartela**, 1,5s, com o horário 03:14.
+
+### Corte de 15s
+
+`4A` (3s) → `4B` (3s) → `5` (3s) → `8` (3s) → cartela (3s)
+
+Só o susto, o silêncio, o socorro e a revelação. Sem gravidez, sem bebê, sem
+parto. É quase um trailer de suspense — e é o que mais converte, porque abre no
+problema em vez de abrir na barriga.
+
+---
+
 # Checklist antes de gerar
 
-- [ ] Gerar as 3 variações da mãe e escolher **uma** — ela vai como referência em 1, 2, 3, 4, 5, 6, 7, 9
-- [ ] Gerar o parceiro (planos 3, 6, 7)
+- [ ] Gerar as 3 variações da mãe e escolher **uma** — ela vai como referência em 1, 2, 3, 4A, 4B, 5, 6, 7A, 7B, 9
+- [ ] Gerar o parceiro (planos 3, 6, 7A)
 - [ ] Gerar o **médico** (plano 8) — homem ~55 anos, cansado, óculos de leitura
 - [ ] Gerar os 3 cenários: banheiro frio, quarto, cozinha
-- [ ] Gerar o recém-nascido (planos 7 e 9) — **realista, horas de vida**
+- [ ] Gerar o recém-nascido (planos 7A, 7B e 9) — **realista, horas de vida**
 - [ ] Gravar a tela real do app às **03:14** para compor no plano 9
-- [ ] Gerar os 9 planos **em ordem**, sempre anexando o último quadro do anterior
-      (exceto o plano 4, que é corte duro de propósito)
+- [ ] Gerar os 12 planos **em ordem**, sempre anexando o último quadro do anterior
 
-**Ordem de geração importa.** Os planos 2, 3, 5 e 7 dependem do quadro final do
-anterior. Gerar fora de ordem quebra as transições.
+**Ordem de geração importa.** Os planos 2, 3, 4B, 5, 7A, 7B dependem do quadro
+final do anterior. Gerar fora de ordem quebra as transições.
+
+**As duas únicas exceções** — planos que **não** usam imagem-base:
+
+- **3B** (o respiro): não tem gente, mas tem que usar **o mesmo cenário, a mesma
+  lente e o mesmo enquadramento** do 4A. É essa igualdade que faz o golpe.
+- **4A** (o instante): é o único corte duro do filme, e ele tem que doer.
