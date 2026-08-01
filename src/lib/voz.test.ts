@@ -10,7 +10,15 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { faixaDoTema, temasComFaixa, RESPIRACAO, RECHAMADAS_AUDIO, FECHAMENTO } from "./voz";
+import {
+  faixaDoTema,
+  temasComFaixa,
+  faixaDoMovimento,
+  movimentosComFaixa,
+  RESPIRACAO,
+  RECHAMADAS_AUDIO,
+  FECHAMENTO,
+} from "./voz";
 
 // Os testes rodam a partir da raiz do repositório (`bun test src/`).
 const RAIZ = process.cwd();
@@ -51,5 +59,26 @@ describe("voz guiada", () => {
 
   test("tem faixa de fechamento", () => {
     expect(FECHAMENTO).toBeTruthy();
+  });
+
+  test("tem faixa para todos os nove movimentos", () => {
+    const s = readFileSync(join(RAIZ, "src", "components", "gestacao-path.tsx"), "utf8");
+    const bloco = s.slice(
+      s.indexOf("const MOVIMENTOS: Movimento[] = ["),
+      s.indexOf("/** 3 movimentos do dia"),
+    );
+    const ids = [...bloco.matchAll(/id:\s*"([^"]+)"/g)].map((m) => m[1]);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids.filter((i) => faixaDoMovimento(i) === null)).toEqual([]);
+  });
+
+  test("não tem faixa de movimento órfã", () => {
+    const s = readFileSync(join(RAIZ, "src", "components", "gestacao-path.tsx"), "utf8");
+    const bloco = s.slice(
+      s.indexOf("const MOVIMENTOS: Movimento[] = ["),
+      s.indexOf("/** 3 movimentos do dia"),
+    );
+    const ids = new Set([...bloco.matchAll(/id:\s*"([^"]+)"/g)].map((m) => m[1]));
+    expect(movimentosComFaixa().filter((i) => !ids.has(i))).toEqual([]);
   });
 });

@@ -27,15 +27,13 @@ import {
   parar as pararVoz,
   faixaDoTema,
   guiaTerminou,
+  faixaDoMovimento,
   decorrido as vozDecorrido,
   duracao as vozDuracao,
   RESPIRACAO,
   RECHAMADAS_AUDIO,
   FECHAMENTO as VOZ_FECHAMENTO,
 } from "@/lib/voz";
-// O bloco de Movimento continua na voz do sistema até os 9 comandos dele
-// virarem arquivo. Trocar agora o deixaria MUDO, que é pior que robótico.
-import { falar, calar, prepararVoz, temVozPt } from "@/lib/fala";
 import { FiguraMovimento, type PoseKey } from "@/components/figura-movimento";
 import {
   IconeCadeado,
@@ -3978,26 +3976,21 @@ function MovementBlock({
   const [idx, setIdx] = useState(0);
   const [secs, setSecs] = useState(aoSair ? seq[0].secs : 0);
   const [voz, setVoz] = useState(true);
-  const [vozDisponivel, setVozDisponivel] = useState(false);
   const [reward, setReward] = useState<number | null>(null);
   const grantedRef = useRef(false);
 
-  useEffect(() => {
-    prepararVoz();
-    setVozDisponivel(temVozPt());
-    const t = setTimeout(() => setVozDisponivel(temVozPt()), 600);
-    return () => {
-      clearTimeout(t);
-      calar();
-    };
-  }, []);
+  /* A voz desta tela é arquivo nosso, então o botão aparece sempre. Antes ele
+     sumia em quem não tinha voz pt-BR instalada no aparelho — no Android, muita
+     gente abria a tela sem sequer saber que existia voz. */
+  useEffect(() => () => pararVoz(), []);
 
   // A voz lê o nome e a dica ao ENTRAR em cada movimento — assim ela pode
   // olhar para o próprio corpo em vez de para o celular, que é justamente o
   // que um exercício pede e um texto na tela impede.
   useEffect(() => {
     if (phase !== "active" || !voz || !seq[idx]) return;
-    falar(`${seq[idx].name}. ${seq[idx].cue}`);
+    const faixa = faixaDoMovimento(seq[idx].id);
+    if (faixa) tocarVoz(faixa, { canal: "guia" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, idx, voz]);
 
@@ -4051,14 +4044,14 @@ function MovementBlock({
     buzz();
   }
   function close() {
-    calar();
+    pararVoz();
     if (aoSair) return aoSair();
     setOpen(false);
     setPhase("intro");
   }
   function alternarVoz() {
     setVoz((v) => {
-      if (v) calar();
+      if (v) pararVoz();
       return !v;
     });
   }
@@ -4108,7 +4101,7 @@ function MovementBlock({
             ) : (
               <span className="flex-1" />
             )}
-            {phase === "active" && vozDisponivel ? (
+            {phase === "active" ? (
               <button
                 onClick={alternarVoz}
                 aria-label={voz ? "Desligar voz" : "Ligar voz"}

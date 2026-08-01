@@ -28,6 +28,15 @@ import rech2 from "@/assets/audio/rechamada-2.mp3";
 import rech3 from "@/assets/audio/rechamada-3.mp3";
 import rech4 from "@/assets/audio/rechamada-4.mp3";
 import rech5 from "@/assets/audio/rechamada-5.mp3";
+import mov0 from "@/assets/audio/mov-ombros.mp3";
+import mov1 from "@/assets/audio/mov-pescoco.mp3";
+import mov2 from "@/assets/audio/mov-gatocamelo.mp3";
+import mov3 from "@/assets/audio/mov-quadril.mp3";
+import mov4 from "@/assets/audio/mov-tornozelo.mp3";
+import mov5 from "@/assets/audio/mov-pelve.mp3";
+import mov6 from "@/assets/audio/mov-bracos.mp3";
+import mov7 from "@/assets/audio/mov-torcao.mp3";
+import mov8 from "@/assets/audio/mov-balanco.mp3";
 
 /**
  * As faixas guiadas, na ordem em que os temas aparecem em `MEDITACOES`.
@@ -75,6 +84,36 @@ export const FECHAMENTO = fechamento;
  * dela já foi embora, o que não acontece no primeiro minuto.
  */
 export const RECHAMADAS_AUDIO = [rech1, rech2, rech3, rech4, rech5];
+
+/**
+ * Os nove movimentos, pela `id` de cada um em `MOVIMENTOS`.
+ *
+ * A chave é a `id`, não o nome. O nome é texto de tela e alguém vai reescrevê-lo
+ * um dia; a `id` é identidade e não muda por motivo de redação.
+ *
+ * Aqui a voz importa tanto quanto na meditação, e pelo mesmo motivo: ela está
+ * olhando para o próprio corpo enquanto se move, não para o celular.
+ */
+const MOVIMENTOS_AUDIO: Record<string, string> = {
+  ombros: mov0,
+  pescoco: mov1,
+  gatocamelo: mov2,
+  quadril: mov3,
+  tornozelo: mov4,
+  pelve: mov5,
+  bracos: mov6,
+  torcao: mov7,
+  balanco: mov8,
+};
+
+export function faixaDoMovimento(id: string): string | null {
+  return MOVIMENTOS_AUDIO[id] ?? null;
+}
+
+/** As ids que têm faixa — o teste compara com as do componente. */
+export function movimentosComFaixa(): string[] {
+  return Object.keys(MOVIMENTOS_AUDIO);
+}
 
 /** Existe faixa para todos os temas? Usado no teste que trava o descasamento. */
 export function temasComFaixa(): string[] {
