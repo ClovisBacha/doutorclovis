@@ -82,20 +82,29 @@ export function temasComFaixa(): string[] {
 }
 
 /**
- * Um tocador só, para o app inteiro.
+ * DOIS canais, não um.
  *
- * Duas falas sobrepostas viram ruído — e numa tela de meditação isso é o
- * oposto do que ela veio buscar. Como só existe uma instância, começar uma
- * faixa necessariamente para a anterior.
+ * A primeira versão tinha um tocador só, e ela estava errada de um jeito que
+ * só apareceu ao ligar na tela: a palavra "Inspire" toca a cada quatro
+ * segundos, e um canal único faria cada uma dessas palavras MATAR a meditação
+ * guiada que está correndo por baixo. A voz longa nunca passaria da terceira
+ * frase.
+ *
+ * `guia` é a faixa longa do tema — uma por sessão, e começar outra para esta.
+ * `pulso` são as palavras curtas e as rechamadas, que se atropelam entre si
+ * (duas ao mesmo tempo viram ruído) mas nunca encostam na guia.
  */
-let atual: HTMLAudioElement | null = null;
+type Canal = "guia" | "pulso";
+
+const tocando: Record<Canal, HTMLAudioElement | null> = { guia: null, pulso: null };
 
 export function tocar(
   src: string,
-  opts?: { volume?: number; aoTerminar?: () => void },
+  opts?: { canal?: Canal; volume?: number; aoTerminar?: () => void },
 ): HTMLAudioElement | null {
   if (typeof window === "undefined") return null;
-  parar();
+  const canal = opts?.canal ?? "guia";
+  parar(canal);
   try {
     const a = new Audio(src);
     a.volume = opts?.volume ?? 1;
@@ -104,31 +113,42 @@ export function tocar(
     // depois que ela tocou em "começar", então a promessa costuma resolver —
     // mas se falhar, falha em silêncio em vez de derrubar a sessão.
     void a.play().catch(() => {});
-    atual = a;
+    tocando[canal] = a;
     return a;
   } catch {
     return null;
   }
 }
 
-export function parar() {
-  if (!atual) return;
-  try {
-    atual.pause();
-    atual.currentTime = 0;
-  } catch {
-    /* ignore */
+/** Sem argumento, silencia tudo — é o que a tela chama ao fechar. */
+export function parar(canal?: Canal) {
+  const alvos: Canal[] = canal ? [canal] : ["guia", "pulso"];
+  for (const c of alvos) {
+    const a = tocando[c];
+    if (!a) continue;
+    try {
+      a.pause();
+      a.currentTime = 0;
+    } catch {
+      /* ignore */
+    }
+    tocando[c] = null;
   }
-  atual = null;
 }
 
-/** Quanto já tocou da faixa atual, em segundos. */
+/** Quanto já tocou da faixa guiada, em segundos. */
 export function decorrido(): number {
-  return atual?.currentTime ?? 0;
+  return tocando.guia?.currentTime ?? 0;
 }
 
-/** Duração total da faixa atual — 0 enquanto os metadados não chegaram. */
+/** Duração da faixa guiada — 0 enquanto os metadados não chegaram. */
 export function duracao(): number {
-  const d = atual?.duration;
+  const d = tocando.guia?.duration;
   return Number.isFinite(d) ? (d as number) : 0;
+}
+
+/** A faixa guiada já terminou? É o que libera as rechamadas. */
+export function guiaTerminou(): boolean {
+  const a = tocando.guia;
+  return !a || a.ended;
 }

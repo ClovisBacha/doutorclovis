@@ -22,6 +22,19 @@ import {
   type Soundscape,
   type SoundscapeKey,
 } from "@/lib/soundscapes";
+import {
+  tocar as tocarVoz,
+  parar as pararVoz,
+  faixaDoTema,
+  guiaTerminou,
+  decorrido as vozDecorrido,
+  duracao as vozDuracao,
+  RESPIRACAO,
+  RECHAMADAS_AUDIO,
+  FECHAMENTO as VOZ_FECHAMENTO,
+} from "@/lib/voz";
+// O bloco de Movimento continua na voz do sistema até os 9 comandos dele
+// virarem arquivo. Trocar agora o deixaria MUDO, que é pior que robótico.
 import { falar, calar, prepararVoz, temVozPt } from "@/lib/fala";
 import { FiguraMovimento, type PoseKey } from "@/components/figura-movimento";
 import {
@@ -4495,21 +4508,15 @@ function MeditationBlock({
     if (open) setLog(lsGet<MedLog>(MED_LOG_KEY, MED_LOG_VAZIO));
   }, [open, etapa]);
   const seq = sequenciaDeDias(log.dias ?? []);
-  const [vozDisponivel, setVozDisponivel] = useState(false);
 
-  useEffect(() => {
-    prepararVoz();
-    // A lista de vozes do Chrome chega assíncrona: uma segunda olhada logo
-    // depois evita esconder o botão de voz em quem tem voz instalada.
-    setVozDisponivel(temVozPt());
-    const t = setTimeout(() => setVozDisponivel(temVozPt()), 600);
-    return () => clearTimeout(t);
-  }, []);
+  /* Não há mais o que preparar: a voz desta tela é arquivo nosso, então o
+     botão aparece sempre. Antes ele ficava escondido em quem não tinha voz
+     pt-BR instalada no aparelho — o que, no Android, é bastante gente. */
 
   useEffect(
     () => () => {
       audioRef.current?.stop();
-      calar();
+      pararVoz();
     },
     [],
   );
@@ -4549,13 +4556,57 @@ function MeditationBlock({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa, fase, ciclo]);
 
-  // A voz fala a frase do ciclo — uma vez, na virada. Falar a cada fase
-  // atropelaria a própria frase no meio.
+  /**
+   * A faixa guiada do tema, uma vez, ao abrir a sessão.
+   *
+   * Não é uma frase por ciclo. A voz gravada é contínua — ela guia, respira
+   * junto e o silêncio faz parte, como em qualquer meditação de verdade;
+   * frase-por-frase produzia voz picotada com silêncio seco no meio.
+   */
   useEffect(() => {
-    if (etapa !== "sessao" || !voz || !frase) return;
-    falar(frase);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etapa, ciclo, voz]);
+    if (etapa !== "sessao" || !voz) return;
+    const faixa = faixaDoTema(med.theme);
+    if (!faixa) return;
+    tocarVoz(faixa, { canal: "guia" });
+    return () => pararVoz("guia");
+  }, [etapa, voz, med.theme]);
+
+  /**
+   * As três palavras da respiração, na virada de cada fase.
+   *
+   * Só entram DEPOIS que a guia terminou. Durante a faixa longa elas seriam
+   * uma interrupção a cada quatro segundos — e a guia já está dizendo o que
+   * fazer. Depois dela, são a única coisa que orienta quem está de olhos
+   * fechados, que é o estado em que a tela pede que ela fique.
+   */
+  useEffect(() => {
+    if (etapa !== "sessao" || !voz || !guiaTerminou()) return;
+    const palavra =
+      fase === "in" ? RESPIRACAO.in : fase === "hold" ? RESPIRACAO.hold : RESPIRACAO.out;
+    tocarVoz(palavra, { canal: "pulso", volume: 0.85 });
+  }, [etapa, fase, voz]);
+
+  /**
+   * As rechamadas, a cada cinco ciclos, depois que a guia acabou.
+   *
+   * `frase` continua sendo a fonte da verdade do que está escrito na tela; aqui
+   * só se procura o áudio correspondente àquele texto. Se um dia alguém
+   * acrescentar uma rechamada escrita sem gravar a faixa, esta busca devolve
+   * nada e a tela segue muda — nunca com a frase errada na boca.
+   */
+  useEffect(() => {
+    if (etapa !== "sessao" || !voz || !frase || !guiaTerminou()) return;
+    const i = RECHAMADAS.indexOf(frase);
+    if (i < 0 || !RECHAMADAS_AUDIO[i]) return;
+    tocarVoz(RECHAMADAS_AUDIO[i], { canal: "pulso" });
+  }, [etapa, frase, voz]);
+
+  /** O fim ganha voz. Antes a sessão simplesmente parava. */
+  useEffect(() => {
+    if (etapa !== "reflexo" || !voz) return;
+    pararVoz("guia");
+    tocarVoz(VOZ_FECHAMENTO, { canal: "pulso" });
+  }, [etapa, voz]);
 
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
@@ -4596,7 +4647,7 @@ function MeditationBlock({
   function close() {
     audioRef.current?.stop();
     audioRef.current = null;
-    calar();
+    pararVoz();
     if (aoSair) return aoSair();
     setOpen(false);
     setEtapa("escolha");
@@ -4613,7 +4664,7 @@ function MeditationBlock({
 
   function alternarVoz() {
     setVoz((v) => {
-      if (v) calar();
+      if (v) pararVoz();
       return !v;
     });
   }
@@ -4675,7 +4726,7 @@ function MeditationBlock({
             )}
             {etapa === "sessao" && (
               <div className="flex items-center gap-3">
-                {vozDisponivel && (
+                {
                   <button
                     onClick={alternarVoz}
                     aria-label={voz ? "Desligar voz" : "Ligar voz"}
@@ -4683,7 +4734,7 @@ function MeditationBlock({
                   >
                     🗣️
                   </button>
-                )}
+                }
                 <button
                   onClick={() => trocarSom(som === "silencio" ? "pad" : "silencio")}
                   aria-label={som === "silencio" ? "Ligar som" : "Desligar som"}
@@ -4784,7 +4835,7 @@ function MeditationBlock({
                 ))}
               </div>
 
-              {vozDisponivel && (
+              {
                 <button
                   onClick={alternarVoz}
                   className={`press mt-4 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
@@ -4805,7 +4856,7 @@ function MeditationBlock({
                     </span>
                   </span>
                 </button>
-              )}
+              }
             </div>
           )}
 
