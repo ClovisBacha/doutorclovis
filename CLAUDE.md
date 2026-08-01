@@ -248,3 +248,24 @@ validado contra a lib `web-push` como oráculo. Cliente inscreve em
   `CRON_SECRET`). Stateless — notifica quem tem `gest.days === 0`.
 - **Envio manual**: `sendDoctorBroadcast` (painel → aba Agendamentos), escopado
   por `doctor_id`.
+
+## Voz do app (DECIDIDO — ago/2026)
+
+A voz guiada da meditação e da respiração é **Isabella no motor ElevenLabs**
+(`text2speech_v2`, `variant: elevenlabs`, `voice_id`
+`80924413-1ea8-4e64-9719-e00b86796f05`). Use essa mesma voz em tudo que precisar
+falar — meditação, respiração, movimento, qualquer narração futura. Voz que muda
+entre telas soa como outro produto.
+
+Foram testados quatro caminhos antes: `seed_audio` (ByteDance) em duas vozes, e
+`text2speech_v2` nos motores ElevenLabs e MiniMax. As 57 vozes do catálogo têm
+nome inglês e nenhuma é pt-BR nativa, então **o sotaque vem do motor, não da
+voz** — o `seed_audio` trata português como língua secundária e sai soando
+europeu. A comparação que decidiu foi a mesma voz (Isabella) em dois motores.
+
+O `speechSynthesis` do navegador (`src/lib/fala.ts`) **está para sair**. Ele só
+toca vozes instaladas no sistema da paciente: não dá para escolher, não dá para
+instalar, e no Android padrão é justamente a robótica. Como os textos de
+meditação e respiração são fixos, o caminho é gerar os áudios uma vez e embarcar
+os arquivos — igual às ilustrações. Ganha qualidade, fica previsível e funciona
+offline.
