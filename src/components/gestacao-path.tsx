@@ -24,6 +24,13 @@ import {
 } from "@/lib/soundscapes";
 import { falar, calar, prepararVoz, temVozPt } from "@/lib/fala";
 import { FiguraMovimento, type PoseKey } from "@/components/figura-movimento";
+import {
+  IconeCadeado,
+  IconeCalendario,
+  IconeChama,
+  IconeLoja,
+  IconeTrofeu,
+} from "@/components/icones-jogo";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 
 /**
@@ -2075,7 +2082,9 @@ export function GestacaoPath({
         {!careMode && (
           <>
             <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
-              <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
+              <IconeChama
+                className={`h-[22px] w-[22px] ${streak > 0 ? "text-amber-500" : "text-slate-300"}`}
+              />
               <span className="text-lg font-extrabold text-amber-500">{streak}</span>
               <span className="text-xs font-medium text-muted-foreground">
                 {streak === 1 ? "dia" : "dias"}
@@ -2085,13 +2094,13 @@ export function GestacaoPath({
           </>
         )}
         <div className="flex items-center gap-1.5" title="Dia da sua jornada">
-          <span className="text-xl">📅</span>
+          <IconeCalendario className="h-[22px] w-[22px] text-sky-500" />
           <span className="text-lg font-extrabold text-sky-500">{journeyDayNum}º</span>
           <span className="text-xs font-medium text-muted-foreground">dia</span>
         </div>
         <div className="h-6 w-px bg-slate-200" />
         <div className="flex items-center gap-1.5" title="Figurinhas coletadas">
-          <span className="text-xl">🏆</span>
+          <IconeTrofeu className="h-[22px] w-[22px] text-violet-500" />
           <span className="text-lg font-extrabold text-violet-500">{stickers.length}</span>
         </div>
         {saldo != null && (
@@ -2134,10 +2143,10 @@ export function GestacaoPath({
               onClick={onOpenShop}
               aria-label="Abrir o Cantinho"
               title="Cantinho"
-              className="dc-shop-fab press fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-xl ring-1 ring-emerald-300 md:bottom-8"
+              className="dc-shop-fab press fixed bottom-24 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 ring-1 ring-emerald-300 md:bottom-8"
               style={{ animation: "dc-shop-glow 2.2s ease-in-out infinite" }}
             >
-              🛍️
+              <IconeLoja className="h-6 w-6 text-emerald-600" />
               {saldo != null && (
                 <span className="absolute -right-1.5 -top-1.5 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-black leading-none text-emerald-700 shadow-sm ring-1 ring-emerald-200">
                   {saldo}
@@ -2361,7 +2370,7 @@ export function GestacaoPath({
                     <p className="mt-0.5 text-xl font-extrabold">{p.name}</p>
                   </div>
                   <div className={`text-4xl ${locked ? "opacity-50 grayscale" : ""}`}>
-                    {locked ? "🔒" : p.emoji}
+                    {locked ? <IconeCadeado className="h-5 w-5 text-slate-400" /> : p.emoji}
                   </div>
                 </div>
               </div>
