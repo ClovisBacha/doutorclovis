@@ -8,10 +8,10 @@
  * devolve o mesmo pixel.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { COR, pilarDoDia } from "./marca.mjs";
+import { COR, PILARES, pilarDoDia } from "./marca.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = join(AQUI, "..", "..");
@@ -19,6 +19,31 @@ const RAIZ = join(AQUI, "..", "..");
 const b64 = (caminho) => readFileSync(caminho).toString("base64");
 const FONTE = b64(join(AQUI, "fontes", "nunito.woff2"));
 const LOGO = b64(join(RAIZ, "src", "assets", "logo-obstetrica.png"));
+
+/**
+ * Uma ilustração por pilar, escolhida sozinha pelo dia gestacional.
+ *
+ * São sete imagens servindo os ~450 carrosséis que o estoque de conteúdo
+ * comporta: geradas uma vez, reusadas para sempre. É o oposto de gerar arte a
+ * cada post — que custaria crédito toda vez e, pior, devolveria um desenho
+ * diferente por dia, que é justamente o que dissolve a identidade de quem
+ * publica com frequência.
+ *
+ * Pilar sem imagem simplesmente não desenha nada. Assim o gerador continua
+ * rodando enquanto uma ilustração ainda está sendo refeita, em vez de quebrar
+ * ou estampar um quadrado vazio.
+ */
+const ILUSTRACOES = Object.fromEntries(
+  PILARES.map(({ chave }) => {
+    const caminho = join(RAIZ, "src", "assets", "social", `${chave}.webp`);
+    return [chave, existsSync(caminho) ? `data:image/webp;base64,${b64(caminho)}` : null];
+  }),
+);
+
+const ilustra = (chave, classe) => {
+  const src = ILUSTRACOES[chave];
+  return src ? `<img class="${classe}" src="${src}" alt="">` : "";
+};
 
 const escapar = (s) =>
   String(s).replace(
@@ -117,6 +142,18 @@ h2{font-size:66px;line-height:1.14;font-weight:800;letter-spacing:-.01em;text-wr
   letter-spacing:-.04em;
 }
 .logo{width:420px;height:auto;display:block}
+/* A ilustração é recortada em círculo e sangra o próprio fundo creme na cor
+   da tela — assim ela pousa na peça em vez de virar um quadrado colado. */
+.arte-capa{
+  width:440px;height:440px;border-radius:999px;align-self:center;
+  object-fit:cover;mix-blend-mode:multiply;
+}
+.linha-fato{display:flex;align-items:center;gap:44px}
+.linha-fato .numero{flex:none}
+.arte-fato{
+  flex:none;width:260px;height:260px;border-radius:999px;margin-left:auto;
+  object-fit:cover;mix-blend-mode:multiply;
+}
 .cta-lista{display:flex;flex-direction:column;gap:26px;font-size:40px;font-weight:600}
 .cta-lista li{display:flex;align-items:center;gap:22px;list-style:none}
 .bolinha{
@@ -153,9 +190,10 @@ export function telasQuiz(perguntas, tela) {
       selo: "quiz da gestação",
       passo: passo(),
       meio: `
+${ilustra(pilarDoDia(perguntas[0].D).chave, "arte-capa")}
 <div class="tag">👶 ${perguntas.length} perguntas</div>
-<h1>Você<br>acerta<br>as ${perguntas.length}?</h1>
-<div class="sub">São perguntas reais da jornada do Obstétrica. A resposta vem sempre na tela seguinte — com o porquê.</div>`,
+<h1>Você acerta<br>as ${perguntas.length}?</h1>
+<div class="sub">Perguntas reais da jornada do Obstétrica. A resposta vem sempre na tela seguinte — com o porquê.</div>`,
     }),
   });
 
@@ -221,8 +259,9 @@ export function telasFatos(fatos, tela) {
       selo: "você sabia?",
       passo: passo(),
       meio: `
+${ilustra("bebe", "arte-capa")}
 <div class="tag">✨ ${fatos.length} coisas</div>
-<h1>${fatos.length} coisas<br>que quase<br>ninguém<br>te conta</h1>
+<h1>${fatos.length} coisas que<br>quase ninguém<br>te conta</h1>
 <div class="sub">Sobre o que acontece de verdade em cada semana da gestação.</div>`,
     }),
   });
@@ -237,7 +276,10 @@ export function telasFatos(fatos, tela) {
         selo: `${pilar.emoji} semana ${f.semana}`,
         passo: passo(),
         meio: `
-<div class="numero">${i + 1}</div>
+<div class="linha-fato">
+  <div class="numero">${i + 1}</div>
+  ${ilustra(pilar.chave, "arte-fato")}
+</div>
 <div class="fato">${escapar(f.fato)}</div>`,
       }),
     });
