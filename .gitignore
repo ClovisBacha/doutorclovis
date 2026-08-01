@@ -39,3 +39,8 @@ dist-ssr
 
 # Originais guardados antes da limpeza de fundo — materia-prima, nao entram no build.
 src/assets/*.png.original
+
+# Carrosseis gerados para as redes — dezenas de PNGs por dia, refazíveis com
+# `bun run social`. O que precisa versionar é o gerador, não a saída dele.
+saida/
+scripts/social/.usado.json
