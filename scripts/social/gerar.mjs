@@ -12,18 +12,22 @@
  */
 
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { chromium } from "playwright";
 import { TELAS } from "./marca.mjs";
 import { montarQuiz, montarFatos, estoque } from "./conteudo.mjs";
 import { telasQuiz, telasFatos } from "./telas.mjs";
+import { CAMINHOS } from "./caminhos.mjs";
 
-const AQUI = dirname(fileURLToPath(import.meta.url));
-const RAIZ = join(AQUI, "..", "..");
-
-/** O Chromium do ambiente. Baixar outro é proibido e desnecessário. */
-const CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+/**
+ * Onde está o Chromium.
+ *
+ * Cada ambiente guarda o dele num lugar: aqui vem de `/opt/pw-browsers`, num
+ * sandbox de terceiro costuma vir de `/ms-playwright`, e numa máquina comum o
+ * próprio Playwright sabe achar sozinho. Cravar o caminho de um deles quebra
+ * nos outros — então o caminho é opcional e só entra quando alguém o informa.
+ */
+const CHROMIUM = process.env.CHROMIUM_PATH || undefined;
 
 const args = process.argv.slice(2);
 const opcao = (nome, padrao = null) => {
@@ -52,7 +56,7 @@ const semente = opcao("semente", hoje);
 const espiar = tem("espiar");
 const so = opcao("so");
 
-const destino = join(RAIZ, "saida", "social", hoje);
+const destino = join(CAMINHOS.saida, hoje);
 rmSync(destino, { recursive: true, force: true });
 mkdirSync(destino, { recursive: true });
 

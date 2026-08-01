@@ -19,12 +19,10 @@
 
 import { chromium } from "playwright";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { CAMINHOS } from "./caminhos.mjs";
 
-const AQUI = dirname(fileURLToPath(import.meta.url));
-const PASTA = join(AQUI, "..", "..", "src", "assets", "social");
-const CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const PASTA = CAMINHOS.arte;
+const CHROMIUM = process.env.CHROMIUM_PATH || undefined;
 
 /** Quanto do quadro final o desenho deve ocupar. */
 const OCUPACAO_ALVO = 0.78;

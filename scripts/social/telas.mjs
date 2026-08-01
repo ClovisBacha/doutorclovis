@@ -9,16 +9,13 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { COR, PILARES, pilarDoDia } from "./marca.mjs";
-
-const AQUI = dirname(fileURLToPath(import.meta.url));
-const RAIZ = join(AQUI, "..", "..");
+import { CAMINHOS } from "./caminhos.mjs";
 
 const b64 = (caminho) => readFileSync(caminho).toString("base64");
-const FONTE = b64(join(AQUI, "fontes", "nunito.woff2"));
-const LOGO = b64(join(RAIZ, "src", "assets", "logo-obstetrica.png"));
+const FONTE = b64(CAMINHOS.fonte);
+const LOGO = b64(CAMINHOS.logo);
 
 /**
  * Uma ilustração por pilar, escolhida sozinha pelo dia gestacional.
@@ -35,7 +32,7 @@ const LOGO = b64(join(RAIZ, "src", "assets", "logo-obstetrica.png"));
  */
 const ILUSTRACOES = Object.fromEntries(
   PILARES.map(({ chave }) => {
-    const caminho = join(RAIZ, "src", "assets", "social", `${chave}.webp`);
+    const caminho = join(CAMINHOS.arte, `${chave}.webp`);
     return [chave, existsSync(caminho) ? `data:image/webp;base64,${b64(caminho)}` : null];
   }),
 );

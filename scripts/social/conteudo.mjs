@@ -11,13 +11,11 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+import { CAMINHOS } from "./caminhos.mjs";
 
-const AQUI = dirname(fileURLToPath(import.meta.url));
-const RAIZ = join(AQUI, "..", "..");
-const QUIZZES = join(RAIZ, "src", "lib", "daily-quizzes.data.json");
-const ESTADO = join(AQUI, ".usado.json");
+const QUIZZES = CAMINHOS.quizzes;
+const ESTADO = CAMINHOS.estado;
 
 /** D = semana × 7 + dia. A semana gestacional que o dia representa. */
 export const semanaDoDia = (D) => Math.floor(Number(D) / 7);
