@@ -23,6 +23,7 @@ import { Route as PreviewHomeRouteImport } from './routes/preview-home'
 import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
+import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
 import { Route as MitosRouteImport } from './routes/mitos'
@@ -135,6 +136,11 @@ const PreviewContaRoute = PreviewContaRouteImport.update({
 const PreviewChatRoute = PreviewChatRouteImport.update({
   id: '/preview-chat',
   path: '/preview-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewBolhaRoute = PreviewBolhaRouteImport.update({
+  id: '/preview-bolha',
+  path: '/preview-bolha',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MuralRoute = MuralRouteImport.update({
@@ -375,6 +381,7 @@ export interface FileRoutesByFullPath {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-grades': typeof PreviewGradesRoute
@@ -433,6 +440,7 @@ export interface FileRoutesByTo {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-grades': typeof PreviewGradesRoute
@@ -493,6 +501,7 @@ export interface FileRoutesById {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-grades': typeof PreviewGradesRoute
@@ -553,6 +562,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-bolha'
     | '/preview-chat'
     | '/preview-conta'
     | '/preview-grades'
@@ -611,6 +621,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-bolha'
     | '/preview-chat'
     | '/preview-conta'
     | '/preview-grades'
@@ -670,6 +681,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-bolha'
     | '/preview-chat'
     | '/preview-conta'
     | '/preview-grades'
@@ -730,6 +742,7 @@ export interface RootRouteChildren {
   MitosRoute: typeof MitosRoute
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
+  PreviewBolhaRoute: typeof PreviewBolhaRoute
   PreviewChatRoute: typeof PreviewChatRoute
   PreviewContaRoute: typeof PreviewContaRoute
   PreviewGradesRoute: typeof PreviewGradesRoute
@@ -861,6 +874,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-chat'
       fullPath: '/preview-chat'
       preLoaderRoute: typeof PreviewChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-bolha': {
+      id: '/preview-bolha'
+      path: '/preview-bolha'
+      fullPath: '/preview-bolha'
+      preLoaderRoute: typeof PreviewBolhaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mural': {
@@ -1206,6 +1226,7 @@ const rootRouteChildren: RootRouteChildren = {
   MitosRoute: MitosRoute,
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
+  PreviewBolhaRoute: PreviewBolhaRoute,
   PreviewChatRoute: PreviewChatRoute,
   PreviewContaRoute: PreviewContaRoute,
   PreviewGradesRoute: PreviewGradesRoute,
