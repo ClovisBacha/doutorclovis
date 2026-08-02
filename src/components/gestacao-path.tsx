@@ -226,6 +226,7 @@ import {
 } from "@/lib/daily-quizzes";
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
+import { Bolha, humorDaJornada } from "@/components/bolha";
 /* Arte própria desta tela, feita a partir do desenho de referência. Ela mora
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
    cenário fixo da tela de atividades. */
@@ -2515,12 +2516,27 @@ export function GestacaoPath({
                 aria-label={`Dia ${dayOfWeek} da semana ${week}`}
               >
                 {isToday && (
-                  <div className="duo-bubble absolute -top-11 z-20 whitespace-nowrap">
-                    <div className="relative rounded-xl bg-white px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-pink-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
-                      {done ? "Desafio completo ✓" : "Desafio de hoje 🎁"}
-                      <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-white" />
+                  <>
+                    <div className="duo-bubble absolute -top-11 z-20 whitespace-nowrap">
+                      <div className="relative rounded-xl bg-white px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-pink-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
+                        {done ? "Desafio completo ✓" : "Desafio de hoje"}
+                        <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-white" />
+                      </div>
                     </div>
-                  </div>
+                    {/* O mascote fica AO LADO do dia de hoje, não em cima dele:
+                        quem tem que ser tocado é a bolinha do dia, e um
+                        personagem por cima roubaria o toque. */}
+                    <span className="pointer-events-none absolute -right-12 -top-6 z-20">
+                      <Bolha
+                        tamanho={52}
+                        humor={humorDaJornada({
+                          comemorando: done,
+                          diaFeito: done,
+                          sequenciaPerdida: streak === 0 && journeyDayNum > 1,
+                        })}
+                      />
+                    </span>
+                  </>
                 )}
                 <div className="relative">
                   {/* Halo pulsante convida o toque (opacity-only, zero repaint) */}

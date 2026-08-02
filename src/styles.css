@@ -2361,3 +2361,95 @@ button:active > .duo3d {
     animation: none !important;
   }
 }
+/* ── O MASCOTE ────────────────────────────────────────────────────────────
+   A sensação de "app muito bem feito" que se atribui a 3D não vem de 3D. O
+   Duolingo é vetor chapado e o Candy Crush usa 3D pré-renderizado achatado em
+   sprite — nenhum dos dois roda motor 3D no celular. O que produz a sensação
+   são mola, peso e deformação, e as três cabem aqui. */
+
+.bolha-viva {
+  position: relative;
+  display: inline-block;
+  /* A bolha deforma a partir da BASE. Escalar pelo centro faz o objeto
+     atravessar o próprio chão quando encolhe — o olho lê como flutuando, não
+     como pousando. */
+  transform-origin: 50% 100%;
+}
+
+.bolha-corpo {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: 50% 100%;
+}
+
+/* A sombra vive FORA do corpo: precisa encolher enquanto ele estica, e dentro
+   dele herdaria a mesma deformação — que é o oposto do que dá peso. */
+.bolha-sombra {
+  position: absolute;
+  left: 50%;
+  bottom: -6%;
+  width: 62%;
+  height: 10%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: radial-gradient(ellipse, rgba(90, 60, 55, 0.26), transparent 72%);
+  transition:
+    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 220ms ease;
+}
+
+/* SQUASH: no toque ela achata e alarga, e a sombra ESPALHA e escurece — é o
+   instante em que o peso encosta no chão. */
+.bolha-apertada .bolha-corpo {
+  transform: scale(1.1, 0.86);
+}
+.bolha-apertada .bolha-sombra {
+  transform: translateX(-50%) scale(1.22, 1);
+  opacity: 1;
+}
+
+/* Flutuar de leve: sobe pouco, e ao subir a sombra encolhe e clareia. É essa
+   troca — e não o deslocamento — que o cérebro lê como massa suspensa. */
+.bolha-flutua .bolha-corpo {
+  animation: bolhaSobe 3.6s ease-in-out infinite;
+}
+.bolha-flutua .bolha-sombra {
+  animation: bolhaSombra 3.6s ease-in-out infinite;
+}
+
+@keyframes bolhaSobe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(-9%) scale(0.985, 1.015);
+  }
+}
+
+@keyframes bolhaSombra {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateX(-50%) scale(0.76, 0.8);
+    opacity: 0.5;
+  }
+}
+
+/* Quem liga a preferência de menos movimento tem enxaqueca ou labirintite, e
+   uma boa parte das pacientes tem. A bolha para de flutuar; o retorno do
+   toque fica, porque ele é resposta a uma ação dela, não animação ambiente. */
+@media (prefers-reduced-motion: reduce) {
+  .bolha-flutua .bolha-corpo,
+  .bolha-flutua .bolha-sombra {
+    animation: none;
+  }
+}
