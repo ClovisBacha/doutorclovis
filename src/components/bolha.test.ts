@@ -141,6 +141,27 @@ describe("VOLUME CONSTANTE — achatar alarga, esticar afina", () => {
   }
 });
 
+/**
+ * Razão entre oscilações consecutivas.
+ *
+ * "Cada uma menor que a anterior" é fraco demais: uma lista de números que
+ * descem passa, e descer não é amortecer. Corpo perdendo energia tem
+ * coeficiente de restituição FIXO, então a razão entre amplitudes consecutivas
+ * é constante — decaimento exponencial. A auditoria mediu razões variando até
+ * 7,5x e o olho lia "movimentos deliberados e depois um desligamento", não uma
+ * coisa perdendo energia.
+ */
+function razoes(amplitudes: number[]): number[] {
+  const r: number[] = [];
+  for (let i = 1; i < amplitudes.length; i++) r.push(amplitudes[i] / amplitudes[i - 1]);
+  return r;
+}
+
+/** Dispersão das razões: max/min. 1,0 é decaimento exponencial perfeito. */
+function dispersao(rs: number[]): number {
+  return Math.max(...rs) / Math.min(...rs);
+}
+
 describe("AMORTECIMENTO — cada oscilação menor que a anterior", () => {
   test("o toque assenta em quiques decrescentes", () => {
     const desvios = quadros("bolhaToque")
@@ -303,5 +324,67 @@ describe("MENOS MOVIMENTO nao pode virar SALTO", () => {
     );
     expect(fator).toBeGreaterThan(0.15); // some = exercicio sem guia visual
     expect(fator).toBeLessThan(0.5); // inteira = enjoo
+  });
+});
+
+describe("AMORTECIMENTO é EXPONENCIAL, não só decrescente", () => {
+  /* O limite de 1,25 de dispersão é folgado de propósito: os keyframes moram em
+     porcentagens inteiras do tempo, então o arredondamento sozinho já move a
+     razão. O que ele proíbe é o que estava lá — 0,173 seguido de 0,333, que é
+     o primeiro quique perdendo energia demais e o segundo de menos. */
+  test("o pulo quica com restituição fixa", () => {
+    const alturas = quadros("bolhaPulo")
+      .map(([, c]) => transY(c))
+      .filter((v): v is number => v !== null && v < 0)
+      .map(Math.abs);
+    expect(alturas.length).toBeGreaterThanOrEqual(3);
+    expect(dispersao(razoes(alturas))).toBeLessThan(1.25);
+  });
+
+  test("o negar perde energia a taxa constante", () => {
+    const graus = quadros("bolhaNao")
+      .map(([, c]) => giro(c))
+      .filter((g): g is number => g !== null && g !== 0)
+      .slice(1)
+      .map(Math.abs);
+    expect(graus.length).toBeGreaterThanOrEqual(3);
+    expect(dispersao(razoes(graus))).toBeLessThan(1.25);
+  });
+
+  test("o toque assenta a taxa constante", () => {
+    const desvios = quadros("bolhaToque")
+      .map(([, c]) => escala(c))
+      .filter(Boolean)
+      .map((e) => Math.abs(e!.y - 1))
+      .filter((d) => d > 0.001);
+    expect(desvios.length).toBeGreaterThanOrEqual(3);
+    expect(dispersao(razoes(desvios))).toBeLessThan(1.25);
+  });
+});
+
+describe("ARCO — nenhum corpo salta em linha reta aprumado", () => {
+  test("o pulo inclina, e a inclinação alterna de lado", () => {
+    /* Tres das quatro acoes percorriam uma reta vertical perfeita com o corpo
+       em 0,00° do primeiro ao ultimo quadro — o mais mecanico do conjunto. E a
+       camada que gira ficava OCIOSA justo no pulo, porque o React tira o
+       flutuar durante a acao. */
+    const g = quadros("bolhaPuloGiro")
+      .map(([, c]) => giro(c))
+      .filter((v): v is number => v !== null);
+    expect(Math.max(...g.map(Math.abs))).toBeGreaterThan(2);
+    const sinais = g.filter((v) => v !== 0).map(Math.sign);
+    expect(new Set(sinais).size).toBe(2); // inclina para os DOIS lados
+  });
+});
+
+describe("SOBREPOSIÇÃO — nada se move em bloco perfeito", () => {
+  test("a sombra do pulo sai atrasada do corpo", () => {
+    /* Defasagem medida entre as camadas era 0ms em todos os casos. Nenhuma
+       parte da personagem chegava atrasada — e e isso, mais que qualquer outra
+       coisa, que separa um personagem de um adesivo. */
+    const bloco = css.match(/\.bolha-pulo \.bolha-sombra \{[^}]*\}/)![0];
+    const atraso = Number(bloco.match(/animation-delay:\s*(\d+)ms/)![1]);
+    expect(atraso).toBeGreaterThan(20);
+    expect(atraso).toBeLessThan(DURACAO_ACAO.pulo / 8); // atraso demais descola
   });
 });

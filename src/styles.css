@@ -2478,13 +2478,13 @@ button:active > .duo3d {
     transform: scale(1.12, 0.85);
   }
   38% {
-    transform: scale(0.95, 1.07);
+    transform: scale(0.937, 1.0675);
   }
   58% {
-    transform: scale(1.04, 0.97);
+    transform: scale(1.03, 0.9696);
   }
   78% {
-    transform: scale(0.99, 1.02);
+    transform: scale(0.9865, 1.0137);
   }
   100% {
     transform: scale(1, 1);
@@ -2582,14 +2582,27 @@ button:active > .duo3d {
 
    A sombra faz o caminho inverso o tempo todo: aperta quando ela agacha,
    some quase toda no ápice, e espalha forte no impacto. */
+/* A camada `.bolha-viva` fica livre durante o pulo (o flutuar sai), e era
+   justamente a acao que mais precisava dela: o corpo subia e descia numa reta
+   vertical perfeita, aprumado em 0,00° do primeiro ao ultimo quadro. Nenhum
+   corpo salta assim. Inclina na decolagem, contra-inclina no ar, endireita no
+   pouso. */
+.bolha-pulo {
+  animation: bolhaPuloGiro 900ms cubic-bezier(0.33, 0, 0.28, 1);
+}
 .bolha-pulo .bolha-palco {
   animation: bolhaPulo 900ms cubic-bezier(0.33, 0, 0.28, 1);
 }
 .bolha-pulo .bolha-corpo {
   animation: bolhaPuloCorpo 900ms cubic-bezier(0.33, 0, 0.28, 1);
 }
+/* A sombra sai 45ms ATRASADA. Todas as camadas atingindo o keyframe no mesmo
+   quadro e o que mais faz um personagem parecer adesivo: nada na natureza se
+   move em bloco perfeito. `animation-delay` nao muda a duracao, so a fase —
+   o teste que cobra durações iguais continua valendo. */
 .bolha-pulo .bolha-sombra {
   animation: bolhaPuloSombra 900ms cubic-bezier(0.33, 0, 0.28, 1);
+  animation-delay: 45ms;
 }
 
 @keyframes bolhaPulo {
@@ -2606,16 +2619,38 @@ button:active > .duo3d {
     transform: translateY(0);
   } /* aterrissa */
   80% {
-    transform: translateY(-9%);
-  } /* quique 1 */
+    transform: translateY(-15.6%);
+  } /* quique 1 — 0,30 do apice */
   90% {
     transform: translateY(0);
   }
   95% {
-    transform: translateY(-3%);
-  } /* quique 2 */
+    transform: translateY(-4.7%);
+  } /* quique 2 — 0,30 do quique 1 */
   100% {
     transform: translateY(0);
+  }
+}
+
+@keyframes bolhaPuloGiro {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  12% {
+    transform: rotate(1.5deg);
+  } /* agachada: pesa para tras */
+  26% {
+    transform: rotate(-5deg);
+  } /* decolagem: joga para a frente */
+  46% {
+    transform: rotate(3.5deg);
+  } /* no ar: contra-inclina */
+  70% {
+    transform: rotate(-2deg);
+  } /* pouso */
+  86% {
+    transform: rotate(1deg);
   }
 }
 
@@ -2696,13 +2731,13 @@ button:active > .duo3d {
     transform: rotate(-9deg);
   }
   46% {
-    transform: rotate(7deg);
+    transform: rotate(5.4deg);
   }
   64% {
-    transform: rotate(-4deg);
+    transform: rotate(-3.24deg);
   }
   82% {
-    transform: rotate(2deg);
+    transform: rotate(1.94deg);
   }
 }
 
