@@ -130,6 +130,7 @@ import { searchDoctors as buscarDiretorio, type DirectoryDoctor } from "@/lib/do
 import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
 import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
+import { Bolha } from "@/components/bolha";
 import { useWeatherSky } from "@/components/weather-sky";
 import { SKIN_KEY } from "@/lib/trilha-skins";
 import { useSkyNow } from "@/components/app-mobile-shell";
@@ -10570,10 +10571,12 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
               de tela recebe o tempo, que é o único dado real aqui. */}
           {decorrido !== null && (
             <div className="my-6 flex flex-col items-center gap-3">
-              <div
-                aria-hidden
-                className="h-20 w-20 rounded-full bg-primary/20 motion-safe:animate-[pulse_6s_ease-in-out_infinite]"
-              />
+              {/* Ela, de olhos fechados — a mesma companhia da respiração no
+                  Caminho. Aqui NÃO respira em compasso de propósito: quem
+                  manda o ritmo é a voz, e uma bolha inflando no relógio dela
+                  seria o mesmo erro do círculo 4-4-6 que acabou de sair.
+                  Ela só flutua devagar: presença, não instrução. */}
+              <Bolha tamanho={88} humor="dormindo" />
               <p className="text-2xl font-light tabular-nums text-primary" aria-live="off">
                 {relogio}
               </p>
