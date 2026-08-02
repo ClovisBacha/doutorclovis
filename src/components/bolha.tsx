@@ -35,7 +35,7 @@
  *     Laço perfeito o olho decora em segundos, e aí passa a ler "GIF".
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * POR QUE TRÊS CAMADAS DE ELEMENTO
+ * POR QUE QUATRO CAMADAS DE ELEMENTO
  *
  * CSS aplica UMA animação por propriedade: duas animações escrevendo
  * `transform` no mesmo elemento fazem a última declarada vencer, e a outra
@@ -46,12 +46,19 @@
  * Então cada camada carrega UMA transformação, e elas se compõem pela árvore —
  * que é o que um rig de ossos faz num software de animação:
  *
- *   .bolha-viva          gira      (inclinação ociosa · negar)
- *     └ .bolha-palco     translada (flutuar · pular · atenção)
- *         └ .bolha-corpo escala    (tocar · respirar · chegar)
+ *   .bolha-viva            gira      (inclinação ociosa · negar)
+ *     └ .bolha-palco       translada (flutuar · pular · atenção)
+ *         └ .bolha-brilho  filtra    (iridescência)
+ *             └ .bolha-corpo escala  (tocar · respirar · chegar)
  *
- * A sombra fica FORA das três: ela precisa encolher enquanto o corpo estica, e
- * dentro dele herdaria a mesma deformação — o oposto do que dá peso.
+ * A iridescência ganhou camada própria depois de uma medição: `animation:`
+ * substitui a lista inteira MESMO quando as duas animam propriedades
+ * diferentes, então ela morria toda vez que uma ação escrevia `animation` no
+ * corpo. `getAnimations()` durante o `chegar` não a encontrava — o princípio
+ * nº 5 estava desligado em três das cinco interações, em silêncio.
+ *
+ * A sombra fica FORA das quatro: ela precisa encolher enquanto o corpo estica,
+ * e dentro dele herdaria a mesma deformação — o oposto do que dá peso.
  */
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -77,7 +84,20 @@ export function humorDaJornada(o: {
   diaFeito?: boolean;
   sequenciaPerdida?: boolean;
   noite?: boolean;
+  /**
+   * Modo Cuidado — a paciente perdeu a gestação.
+   *
+   * Entra na ASSINATURA, e não só nos pontos de uso, porque sem ele nenhum
+   * chamador *pode* estar certo: quem esquecer de filtrar não recebe erro
+   * nenhum, e o sintoma aparece no pior lugar imaginável. Com o campo aqui, o
+   * tipo obriga a decisão a ser tomada.
+   */
+  careMode?: boolean;
 }): Humor {
+  /* No luto, festa e cobrança somem juntas. "preocupada" seria pior ainda que
+     "comemorando": cara triste por sequência quebrada, para quem parou de
+     abrir o app porque enterrou um filho. */
+  if (o.careMode) return o.noite && o.diaFeito ? "dormindo" : "feliz";
   if (o.comemorando) return "comemorando";
   if (o.sequenciaPerdida) return "preocupada";
   if (o.noite && o.diaFeito) return "dormindo";
@@ -159,6 +179,26 @@ type Props = {
    * uma tela de vitória com a personagem parada.
    */
   entrada?: Acao;
+  /**
+   * Modo Cuidado — a paciente perdeu a gestação.
+   *
+   * O portão mora AQUI, no componente, e não em cada ponto de uso. A versão
+   * anterior confiava no chamador, e o chamador esqueceu: a tela de fim da
+   * respiração escrevia `{!careMode && <ConfettiBurst />}` numa linha e
+   * `<Bolha humor="comemorando" entrada="pulo" />` na linha seguinte. O app
+   * respeitava o luto em oito lugares e falhava no único que tem rosto.
+   *
+   * Com Modo Cuidado ligado:
+   *  · `comemorando` vira `feliz` — e isso importa duas vezes, porque a arte
+   *    de comemorar tem CONFETE PINTADO DENTRO DELA. Suprimir o confete do DOM
+   *    e desenhá-lo no PNG é o mesmo defeito duas vezes.
+   *  · o `pulo` não sai, nem por `entrada` nem pelo `ref`.
+   *
+   * O que continua: negar, chegar, chamar, o toque, o flutuar. Nada disso é
+   * festa — tirar tudo deixaria a personagem morta justamente para quem mais
+   * precisa de companhia.
+   */
+  careMode?: boolean;
   className?: string;
 };
 
@@ -170,6 +210,7 @@ export const Bolha = forwardRef<BolhaHandle, Props>(function Bolha(
     respiro,
     semIris = false,
     entrada,
+    careMode = false,
     className = "",
   },
   ref,
@@ -197,14 +238,20 @@ export const Bolha = forwardRef<BolhaHandle, Props>(function Bolha(
    * Tirar a classe, deixar o navegador desenhar um quadro, e pôr de volta é o
    * que força o reinício.
    */
-  const disparar = useCallback((qual: Acao) => {
-    if (fimAcao.current) clearTimeout(fimAcao.current);
-    setAcao(null);
-    requestAnimationFrame(() => {
-      setAcao(qual);
-      fimAcao.current = window.setTimeout(() => setAcao(null), DURACAO_ACAO[qual] + 40);
-    });
-  }, []);
+  const disparar = useCallback(
+    (qual: Acao) => {
+      /* O pulo é a comemoração. No luto ele não sai — nem por `entrada`, nem
+         pelo `ref`, nem por um ponto de uso novo que ninguém revisou. */
+      if (careMode && qual === "pulo") return;
+      if (fimAcao.current) clearTimeout(fimAcao.current);
+      setAcao(null);
+      requestAnimationFrame(() => {
+        setAcao(qual);
+        fimAcao.current = window.setTimeout(() => setAcao(null), DURACAO_ACAO[qual] + 40);
+      });
+    },
+    [careMode],
+  );
 
   /* Só na montagem. A dependência é `[]` de propósito: trocar `entrada` no meio
      da vida do componente não deve redisparar — quem quer disparar de novo tem
@@ -234,6 +281,10 @@ export const Bolha = forwardRef<BolhaHandle, Props>(function Bolha(
 
   /* Respirando, o flutuar SAI: os dois transladam, e o compasso tem que mandar.
      Pulo e atenção também transladam, então tiram o flutuar enquanto duram. */
+  /* A arte de comemorar tem confete DESENHADO nela. No Modo Cuidado ela não
+     pode aparecer nem parada — não é a animação que ofende, é a imagem. */
+  const humorSeguro: Humor = careMode && humor === "comemorando" ? "feliz" : humor;
+
   const respirando = !!respiro;
   const escala = respiro ? ESCALA[respiro.fase] : 1;
   const flutuando = flutua && !respirando && acao !== "pulo" && acao !== "atencao";
@@ -253,49 +304,61 @@ export const Bolha = forwardRef<BolhaHandle, Props>(function Bolha(
     .filter(Boolean)
     .join(" ");
 
+  /**
+   * A respiração sai por VARIÁVEIS, não por `transform` inline.
+   *
+   * O motivo é um defeito medido. `styles.css` tem uma regra universal
+   * `*{ transition-duration: 0.001ms !important }` sob
+   * `prefers-reduced-motion`, e estilo inline NÃO vence `!important` de folha.
+   * Com a preferência ligada, a escala de 0,9 a 1,16 continuava acontecendo
+   * POR INTEIRO — só que num quadro só: 27 px de salto seco numa bolha de
+   * 104 px, três vezes por ciclo, cinco ciclos = 15 cortes por sessão.
+   *
+   * Ou seja: quem ligou "menos movimento" por causa de enjoo recebia o
+   * ESTÍMULO MAIS AGRESSIVO da tela inteira. Perdia a guia (o inchar contínuo
+   * que ela acompanha) e ganhava um susto.
+   *
+   * Com o valor numa variável, a folha decide — e pode reafirmar a duração com
+   * `!important` e trocar a amplitude por uma menor. A respiração guiada é
+   * CONTEÚDO, não enfeite: ela tem que sobreviver ao "menos movimento" com
+   * amplitude reduzida, não sumir nem virar corte.
+   */
+  const varsRespiro = respiro
+    ? ({
+        "--respiro-ms": `${respiro.duracaoMs}ms`,
+        "--respiro-escala": escala,
+        /* 35% do curso: ~9px em 4s numa bolha de 104. Legível como respiração,
+           invisível como movimento. */
+        "--respiro-escala-suave": 1 + (escala - 1) * 0.35,
+        /* A sombra acompanha MENOS que o corpo (0,45 do excesso). Uma sombra
+           que cresce igual ao objeto lê como zoom da câmera; crescer menos lê
+           como o objeto inchando sobre o mesmo chão. */
+        "--respiro-sombra": 1 + (escala - 1) * 0.45,
+        "--respiro-sombra-op": 0.5 + (escala - 0.9) * 0.5,
+      } as React.CSSProperties)
+    : undefined;
+
   return (
     <span
       className={classes}
-      style={{ width: tamanho, height: tamanho }}
+      style={{ width: tamanho, height: tamanho, ...varsRespiro }}
       onPointerDown={tocar}
       aria-hidden
     >
       {/* A sombra é irmã das três camadas, não filha: precisa encolher enquanto
           o corpo estica, e dentro dele herdaria a mesma deformação. */}
-      <span
-        className="bolha-sombra"
-        style={
-          respiro
-            ? {
-                transitionDuration: `${respiro.duracaoMs}ms`,
-                /* A sombra acompanha MENOS que o corpo (0,45 do excesso). Uma
-                   sombra que cresce igual ao objeto lê como zoom da câmera;
-                   crescer menos lê como o objeto inchando sobre o mesmo chão. */
-                transform: `translateX(-50%) scale(${1 + (escala - 1) * 0.45}, 1)`,
-                opacity: 0.5 + (escala - 0.9) * 0.5,
-              }
-            : undefined
-        }
-      />
+      <span className="bolha-sombra" />
       <span className="bolha-palco">
-        <img
-          className="bolha-corpo"
-          src={ARTE[humor]}
-          alt=""
-          draggable={false}
-          style={
-            respiro
-              ? {
-                  transform: `scale(${escala})`,
-                  transitionDuration: `${respiro.duracaoMs}ms`,
-                  /* Linear, não `ease`. A respiração precisa ser previsível:
-                     uma curva que acelera no meio faria a paciente encher o
-                     pulmão depressa e ficar esperando — o oposto de guiar. */
-                  transitionTimingFunction: "linear",
-                }
-              : undefined
-          }
-        />
+        {/* Quarta camada, só para a iridescência.
+            `animation:` substitui a LISTA INTEIRA, mesmo quando as duas animam
+            propriedades diferentes — então a iridescência (que anima `filter`)
+            morria toda vez que uma ação escrevia `animation` no corpo. Medido
+            com `getAnimations()`: durante o `chegar` ela simplesmente não
+            estava lá. Uma camada própria é a única forma de as duas coexistirem,
+            e é a mesma regra das outras três: uma animação por elemento. */}
+        <span className="bolha-brilho">
+          <img className="bolha-corpo" src={ARTE[humorSeguro]} alt="" draggable={false} />
+        </span>
       </span>
     </span>
   );

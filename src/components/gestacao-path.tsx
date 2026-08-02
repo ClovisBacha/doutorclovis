@@ -3809,10 +3809,17 @@ function BreathingBlock({
               {!careMode && <ConfettiBurst />}
               {/* A flor emoji saiu: cada celular desenha uma flor diferente, e
                   o instante que a paciente veio buscar era o único da sessão
-                  sem a personagem nele. */}
-              <span className="dc-result-in">
-                <Bolha tamanho={96} humor="comemorando" entrada="pulo" />
-              </span>
+                  sem a personagem nele.
+
+                  E o `dc-result-in` que embrulhava isto saiu junto: ele é
+                  `scale(0.4→1.18→1)` mais `rotate(-8°→3°)` em 620ms, então os
+                  primeiros 620 dos 900ms do pulo — a antecipação inteira e
+                  toda a subida — rodavam MULTIPLICADOS por um pop-in que gira.
+                  Medido: no instante do agachamento o embrulho estava em
+                  scale 0,80. O único uso do salto no produto era justamente o
+                  que anulava o princípio que ele existe para mostrar. A bolha
+                  já tem a própria entrada. */}
+              <Bolha tamanho={96} humor="comemorando" entrada="pulo" careMode={careMode} />
               <h3 className="mt-3 text-2xl font-extrabold text-sky-900">Que calma boa 💙</h3>
               <p className="mt-1 text-sm text-sky-800/80">
                 Você respirou com seu bebê. Guarde essa sensação.
@@ -6439,6 +6446,7 @@ function WellnessScreen({
                   humor={humorDaJornada({
                     comemorando: halves >= 6,
                     diaFeito: halves >= 6,
+                    careMode,
                   })}
                 />
               </span>

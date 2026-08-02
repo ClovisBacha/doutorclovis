@@ -33,7 +33,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { DURACAO_ACAO, type Acao } from "./bolha";
+import { DURACAO_ACAO, humorDaJornada, type Acao } from "./bolha";
 
 const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 
@@ -124,11 +124,13 @@ describe("ANTECIPAÇÃO — todo movimento começa para o lado contrário", () =
 });
 
 describe("VOLUME CONSTANTE — achatar alarga, esticar afina", () => {
-  for (const nome of ["bolhaToque", "bolhaPuloCorpo"]) {
+  for (const nome of ["bolhaToque", "bolhaPuloCorpo", "bolhaChega"]) {
     test(nome, () => {
       for (const [p, corpo] of quadros(nome)) {
         const e = escala(corpo);
-        if (!e || (e.x === 1 && e.y === 1)) continue;
+        /* A entrada em cena parte do nada — `scale(0.2, 0.2)` uniforme e
+           chegada, nao deformacao. So os quadros ja "presentes" contam. */
+        if (!e || (e.x === 1 && e.y === 1) || (e.x < 0.6 && e.y < 0.6)) continue;
         /* O produto x·y perto de 1 é o volume se conservando. Achatar nos dois
            eixos ao mesmo tempo leria como encolher, não como amassar. */
         expect(Math.abs(e.x * e.y - 1)).toBeLessThan(0.06);
@@ -226,5 +228,80 @@ describe("MENOS MOVIMENTO desliga o ambiente e preserva a resposta", () => {
       .map(([, c]) => transY(c))
       .filter((v): v is number => v !== null);
     expect(Math.abs(Math.min(...suave))).toBeLessThan(Math.abs(Math.min(...bravo)) / 3);
+  });
+});
+
+describe("MODO CUIDADO — no luto, festa e cobranca somem", () => {
+  /* O pior defeito possivel deste app: a paciente perdeu a gestacao, ligou o
+     Modo Cuidado exatamente para nao levar tapa na cara, e ao terminar a
+     respiracao uma bolha com cara de bebe pula de alegria. Aconteceu: o ponto
+     de uso escrevia `{!careMode && <ConfettiBurst />}` numa linha e
+     `<Bolha humor="comemorando" entrada="pulo" />` na linha seguinte. */
+
+  test("nunca comemora", () => {
+    expect(humorDaJornada({ comemorando: true, careMode: true })).not.toBe("comemorando");
+  });
+
+  test("nunca cobra", () => {
+    /* Cara preocupada por sequencia quebrada, para quem parou de abrir o app
+       porque enterrou um filho, e o mesmo defeito com o sinal trocado. */
+    expect(humorDaJornada({ sequenciaPerdida: true, careMode: true })).not.toBe("preocupada");
+  });
+
+  test("dormir continua — nao e festa, e companhia", () => {
+    expect(humorDaJornada({ noite: true, diaFeito: true, careMode: true })).toBe("dormindo");
+  });
+
+  test("sem Modo Cuidado nada muda", () => {
+    expect(humorDaJornada({ comemorando: true })).toBe("comemorando");
+    expect(humorDaJornada({ sequenciaPerdida: true })).toBe("preocupada");
+  });
+
+  test("o portao mora no componente, nao no ponto de uso", () => {
+    const fonte = readFileSync(new URL("./bolha.tsx", import.meta.url), "utf8");
+    /* Confiar no chamador ja falhou uma vez. Estas duas linhas sao o backstop:
+       a arte de comemorar rebaixada e o pulo engolido, dentro do componente. */
+    expect(fonte).toMatch(/careMode && humor === "comemorando"/);
+    expect(fonte).toMatch(/careMode && qual === "pulo"/);
+  });
+
+  test("todo ponto de uso que pode comemorar passa careMode", () => {
+    const jogo = readFileSync(new URL("./gestacao-path.tsx", import.meta.url), "utf8");
+    for (const m of jogo.matchAll(/<Bolha[^>]*>/g)) {
+      const tag = m[0];
+      /* `humor="comemorando"` literal ou qualquer `entrada=`. O cabecalho usa
+         `humorDaJornada`, que recebe `careMode` por dentro — outro caminho, e
+         coberto pelos testes de cima. */
+      if (/humor="comemorando"|entrada=/.test(tag)) expect(tag).toContain("careMode");
+    }
+  });
+});
+
+describe("MENOS MOVIMENTO nao pode virar SALTO", () => {
+  /* `styles.css` tem uma regra universal que zera TODA transicao com
+     `!important` sob prefers-reduced-motion. Estilo inline nao vence
+     `!important` de folha, entao a escala da respiracao acontecia por inteiro
+     num quadro so: 27px de corte seco numa bolha de 104, 15 vezes por sessao.
+     Quem pediu menos movimento recebia o estimulo mais agressivo da tela.
+
+     Medido no navegador depois do conserto: duracao 4s preservada e amplitude
+     1,056 em vez de 1,16. */
+
+  test("a duracao da respiracao e reafirmada com !important", () => {
+    const bloco = css.match(
+      /\.bolha-respira \.bolha-corpo,\n\.bolha-respira \.bolha-sombra \{[^}]*\}/,
+    )!;
+    expect(bloco[0]).toMatch(/transition-duration:\s*var\(--respiro-ms[^)]*\)\s*!important/);
+  });
+
+  test("a amplitude cai, mas nao some", () => {
+    const reduce = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(reduce).toContain("--respiro-escala-suave");
+    const fonte = readFileSync(new URL("./bolha.tsx", import.meta.url), "utf8");
+    const fator = Number(
+      fonte.match(/--respiro-escala-suave":\s*1 \+ \(escala - 1\) \* ([\d.]+)/)![1],
+    );
+    expect(fator).toBeGreaterThan(0.15); // some = exercicio sem guia visual
+    expect(fator).toBeLessThan(0.5); // inteira = enjoo
   });
 });

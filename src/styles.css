@@ -2429,7 +2429,14 @@ button:active > .duo3d {
    e fica perfeitamente recortado porque é filtro sobre a própria imagem.
 
    13,7s: mais um período que não é múltiplo de nenhum outro daqui. */
-.bolha-iris .bolha-corpo {
+.bolha-brilho {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+}
+
+.bolha-iris .bolha-brilho {
   animation: bolhaIris 13.7s ease-in-out infinite;
 }
 
@@ -2704,10 +2711,10 @@ button:active > .duo3d {
    primeira lê como um elemento sendo montado; passar do ponto lê como algo
    que chegou com impulso próprio. */
 .bolha-chega .bolha-corpo {
-  animation: bolhaChega 720ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: bolhaChega 720ms ease-out;
 }
 .bolha-chega .bolha-sombra {
-  animation: bolhaChegaSombra 720ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: bolhaChegaSombra 720ms ease-out;
 }
 
 @keyframes bolhaChega {
@@ -2719,13 +2726,13 @@ button:active > .duo3d {
     opacity: 1;
   }
   55% {
-    transform: scale(1.14, 1.1);
+    transform: scale(1.12, 0.9);
   }
   74% {
-    transform: scale(0.94, 0.97);
+    transform: scale(0.95, 1.06);
   }
   88% {
-    transform: scale(1.04, 1.02);
+    transform: scale(1.03, 0.97);
   }
   100% {
     transform: scale(1, 1);
@@ -2739,7 +2746,7 @@ button:active > .duo3d {
     opacity: 0;
   }
   55% {
-    transform: translateX(-50%) scale(1.2, 1);
+    transform: translateX(-50%) scale(1.05, 1);
     opacity: 1;
   }
   100% {
@@ -2804,10 +2811,23 @@ button:active > .duo3d {
    Quem manda no `transform` do corpo é o React, por estilo inline, com a
    duração da fase em curso. Aqui só entra a transição — sem ela, o inline
    trocaria de valor sem interpolar e a bolha saltaria de tamanho. */
+.bolha-respira .bolha-corpo {
+  transform: scale(var(--respiro-escala, 1));
+}
+.bolha-respira .bolha-sombra {
+  transform: translateX(-50%) scale(var(--respiro-sombra, 1), 1);
+  opacity: var(--respiro-sombra-op, 0.85);
+}
 .bolha-respira .bolha-corpo,
 .bolha-respira .bolha-sombra {
   transition-property: transform, opacity;
-  transition-timing-function: linear;
+  /* `!important` porque a regra universal de `prefers-reduced-motion` lá em
+     cima zera TODA transicao com `!important`, e a respiracao guiada e
+     conteudo: sem duracao ela nao vira "parada", vira SALTO de 27px num quadro
+     so — o estimulo mais agressivo da tela indo justamente para quem pediu
+     menos movimento. */
+  transition-duration: var(--respiro-ms, 0ms) !important;
+  transition-timing-function: linear !important;
 }
 
 /* ── MENOS MOVIMENTO ───────────────────────────────────────────────────────
@@ -2820,10 +2840,15 @@ button:active > .duo3d {
    gesto — a tela pareceria travada, que é pior. Amplitude reduzida resolve o
    enjoo sem tirar a resposta. */
 @media (prefers-reduced-motion: reduce) {
+  /* A respiracao continua respirando, com 35% do curso. Some-la deixaria o
+     exercicio sem referencia visual; mante-la inteira enjoaria. */
+  .bolha-respira .bolha-corpo {
+    transform: scale(var(--respiro-escala-suave, 1));
+  }
   .bolha-flutua,
   .bolha-flutua .bolha-palco,
   .bolha-flutua .bolha-sombra,
-  .bolha-iris .bolha-corpo {
+  .bolha-iris .bolha-brilho {
     animation: none;
   }
   .bolha-pulo .bolha-palco,
