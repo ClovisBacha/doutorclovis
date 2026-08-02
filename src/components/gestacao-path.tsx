@@ -3094,7 +3094,18 @@ function LessonSheet({
    consultório ativa o acesso (toggle no painel do médico). */
 
 const QUIZ_PRICE_MONTHLY = 19.9;
-const QUIZ_PRICE_ANNUAL_MONTH = 9.9; // 12x — cobrado anualmente (R$ 118,80/ano)
+const QUIZ_PRICE_ANNUAL_MONTH = 9.9;
+/**
+ * O total do plano anual, cobrado DE UMA VEZ.
+ *
+ * Este número existia só num comentário. A tela mostrava "R$ 9,90 · por mês ·
+ * no anual" e a paciente era debitada em R$ 118,80 na fatura — o preço por
+ * mês é verdadeiro, mas não é o que sai do cartão dela. Preço mensal com
+ * cobrança anual sem o total à vista é exatamente o que o Código de Defesa do
+ * Consumidor chama de informação incompleta, e a primeira coisa que vira
+ * estorno.
+ */
+const QUIZ_PRICE_ANNUAL_TOTAL = QUIZ_PRICE_ANNUAL_MONTH * 12;
 
 function QuizPaywall({
   week,
@@ -3245,10 +3256,15 @@ function QuizPaywall({
             <>
               <p className="text-sm font-extrabold text-amber-900">Gostou de aprender hoje? 🌟</p>
               <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
+                {/* "faça" saiu. As Sementinhas e a estrela só são concedidas no
+                    dia corrente — no servidor, não só na tela — então a aula de
+                    ontem é releitura, e prometer que ela "faz" é prometer um
+                    ganho que não vem. Entrou no lugar o benefício maior e que o
+                    texto escondia: 20 dos 34 enfeites do Cantinho e a Coroa da
+                    Coleção são exclusivos do premium, e nada disso era dito. */}
                 No plano grátis você faz <strong>só a aula de hoje</strong>. Com o{" "}
-                <strong>Obstétrica Premium</strong> você libera{" "}
-                <strong>todas as aulas já disponíveis</strong> — faça e revise as de qualquer dia
-                que já passou, quando quiser. 💛
+                <strong>Obstétrica Premium</strong> você <strong>revê todas as aulas</strong> que já
+                passaram e libera <strong>20 enfeites exclusivos</strong> do seu Cantinho. 💛
               </p>
             </>
           ) : (
@@ -3256,8 +3272,9 @@ function QuizPaywall({
               <p className="text-sm font-extrabold text-amber-900">Aula premium 🔒</p>
               <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
                 Essa aula é de um dia que já passou. No plano grátis você faz{" "}
-                <strong>a aula de cada dia</strong> no próprio dia. Com o premium, você desbloqueia{" "}
-                <strong>todas as aulas já liberadas</strong> para fazer e revisar quando quiser.
+                <strong>a aula de cada dia</strong> no próprio dia. Com o premium, você{" "}
+                <strong>revê todas as aulas já liberadas</strong> quando quiser — e libera{" "}
+                <strong>20 enfeites exclusivos</strong> do seu Cantinho.
               </p>
             </>
           )}
@@ -3306,7 +3323,7 @@ function QuizPaywall({
           id="annual"
           label="Anual"
           price={`R$ ${QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}`}
-          sub="por mês · no anual"
+          sub={`por mês · R$ ${QUIZ_PRICE_ANNUAL_TOTAL.toFixed(2).replace(".", ",")} por ano`}
           badge="ECONOMIZE 50%"
         />
       </div>
