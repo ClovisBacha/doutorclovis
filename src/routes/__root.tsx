@@ -15,7 +15,6 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ChatbotWidget } from "@/components/chatbot-widget";
-import { WhatsAppFloating } from "@/components/whatsapp-button";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Toaster } from "@/components/ui/sonner";
 import { ScrollProgress } from "@/components/motion-fx";
@@ -362,7 +361,13 @@ function SiteShell() {
         <ChatbotWidget />
       </div>
       <div className="print:hidden">
-        <WhatsAppFloating />
+        {/* O botão flutuante de WhatsApp saiu.
+            Ele levava TODO visitante da plataforma para o número pessoal de um
+            médico específico, cravado no código — numa página onde a paciente
+            deveria estar escolhendo o obstetra dela no diretório. Além disso,
+            a medição no iPhone mostrou o botão inteiramente atrás do banner de
+            instalação: inclicável desde sempre. O contato de cada médico vive
+            no perfil dele. */}
       </div>
       <div className="print:hidden">
         <PublicBottomNav />
@@ -416,10 +421,25 @@ function PWAInstallBanner() {
 
   if (!visible) return null;
 
+  /**
+   * O banner sobe para cima da barra "Entrar no app" em vez de flutuar sobre
+   * o conteúdo.
+   *
+   * A medição no iPhone mostrou três camadas fixas ocupando de 678 a 844 —
+   * 19,7% da tela, permanentemente. O botão do WhatsApp ficava INTEIRO atrás
+   * deste banner, inclicável, e a legenda do hero era cortada ao meio. Ao
+   * longo da rolagem o par decapitava títulos e um CTA por completo.
+   */
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-50 mx-auto max-w-sm animate-[slideUp_0.4s_ease-out] rounded-2xl bg-primary p-4 shadow-[0_8px_32px_rgba(0,0,0,0.25)] md:bottom-6">
+    <div className="fixed bottom-24 left-4 right-4 z-50 mx-auto max-w-sm animate-[slideUp_0.4s_ease-out] rounded-2xl bg-primary p-4 shadow-[0_8px_32px_rgba(0,0,0,0.25)] md:bottom-6">
       <div className="flex items-start gap-3">
-        <img src="/icon-192.png" alt="" className="h-12 w-12 shrink-0 rounded-xl" />
+        <img
+          src="/icon-192.png"
+          alt=""
+          width={48}
+          height={48}
+          className="h-12 w-12 shrink-0 rounded-xl"
+        />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-primary-foreground">Instalar o app</p>
           {isIOS ? (

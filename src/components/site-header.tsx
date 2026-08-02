@@ -63,7 +63,14 @@ export function SiteHeader() {
         <div className="flex items-center gap-6">
           <button
             onClick={() => setOpen((o) => !o)}
-            className="press relative rounded-md p-2 text-foreground md:hidden"
+            className={`press relative rounded-md p-2 md:hidden ${
+              /* Sobre o céu noturno do hero, `text-foreground` fixo dava
+                 1,03:1 de contraste — a norma pede 3:1 para controle de
+                 interface, e este é a ÚNICA navegação do celular. A logo
+                 ao lado já trocava para a versão branca; o botão tinha
+                 ficado para trás. */
+              overDark ? "text-white" : "text-foreground"
+            }`}
             aria-label={open ? "Fechar menu" : "Abrir menu"}
             aria-expanded={open}
           >

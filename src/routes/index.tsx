@@ -1,167 +1,150 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
-import { Fragment, useEffect, useState } from "react";
-import {
-  Activity,
-  Baby,
-  BookOpen,
-  BrainCircuit,
-  Calendar,
-  CloudSun,
-  ShieldCheck,
-  Smartphone,
-  Sparkles,
-  Users,
-  Video,
-} from "lucide-react";
-import portrait from "@/assets/dr-clovis-portrait.jpg";
-import { AnimatedCounter } from "@/components/animated-counter";
-import { BabyEvolution } from "@/components/baby-evolution";
+/**
+ * A homepage.
+ *
+ * A versão anterior abria com um recurso — "A gestação inteira no seu bolso" —
+ * e listava quatro categorias de produto para alguém que chegou com medo. Esta
+ * abre com uma cena, e o botão só aparece depois que a visitante se reconheceu.
+ *
+ * Três coisas saíram de propósito, e vale saber por quê antes de recolocá-las:
+ *
+ *  · Os DEPOIMENTOS eram inventados, com fotos de `randomuser.me`. Existe um
+ *    sistema de depoimentos reais e moderados (`listApprovedTestimonials`); ou
+ *    a seção mostra os de verdade, ou não existe.
+ *  · Os NÚMEROS (4.000 partos, 98% de satisfação) são de um médico, não da
+ *    plataforma, e o de satisfação não tem fonte em lugar nenhum.
+ *  · O RETRATO DO FUNDADOR contradiz o modelo: o Obstétrica deixou de ser o
+ *    consultório de um médico e virou plataforma onde a paciente escolhe o
+ *    dela. Uma home que mostra o rosto de um obstetra desfaz isso na primeira
+ *    rolagem.
+ *
+ * Toda promessa aqui tem lastro num arquivo do repositório. Onde o lastro é
+ * fraco — a arte semanal do bebê, o mural, a impressão 3D — a frase não existe,
+ * por mais bonita que fosse.
+ */
+
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Reveal } from "@/components/reveal";
-import { Magnetic, SpotlightCard } from "@/components/motion-fx";
-import { ShimmerText } from "@/components/tech-fx";
-import { TestimonialsSection } from "@/components/testimonials-section";
 import { SkyCanvas, useWeatherSky } from "@/components/weather-sky";
-import {
-  AppChatMockupScreen,
-  AppHomeMockupScreen,
-  AppJogoMockupScreen,
-  AppSaudeMockupScreen,
-  PhoneFrame,
-} from "@/components/app-phone-mockup";
-import { FootprintTrail } from "@/components/footprint-trail";
-import { BrainShowcase } from "@/components/brain-showcase";
+import { PhoneFrame, AppChatMockupScreen } from "@/components/app-phone-mockup";
 import { setHeroDark } from "@/components/hero-theme";
+import bolhaFeliz from "@/assets/bolha/feliz.webp";
+import arteVinculo from "@/assets/social/vinculo.webp";
 
 export const Route = createFileRoute("/")({
-  head: () => {
-    return {
-      meta: [
-        { title: "Obstétrica — App de Gestação e Saúde da Mulher" },
-        {
-          name: "description",
-          content:
-            "O app que acompanha sua gestação semana a semana: clima em tempo real, IA obstétrica 24h, monitoramento de saúde, teleconsulta e o cuidado do seu médico.",
-        },
-        { property: "og:title", content: "Obstétrica — o app da sua gestação" },
-        {
-          property: "og:description",
-          content: "O app completo para acompanhar sua gestação com segurança e cuidado.",
-        },
-      ],
-    };
-  },
+  head: () => ({
+    meta: [
+      { title: "Obstétrica — alguém acordado às três da manhã" },
+      {
+        name: "description",
+        content:
+          "A dúvida da gestação não aparece às três da tarde. O Obstétrica responde com as orientações que o seu obstetra validou, e diz quando a resposta é com ele. Gestação de alto risco, do positivo ao pós-parto.",
+      },
+      { property: "og:title", content: "Obstétrica — ninguém deveria atravessar isso sozinha" },
+      {
+        property: "og:description",
+        content:
+          "294 dias de conteúdo, contrações que dizem se é hora de ir, SOS que avisa o seu médico. Você escolhe o obstetra.",
+      },
+    ],
+  }),
   component: Index,
 });
 
-const APP_FEATURES = [
-  {
-    icon: Baby,
-    title: "Gestação semana a semana",
-    text: "Desenvolvimento do bebê, tamanho, peso e os exames de cada fase — atualizado todo dia.",
-  },
-  {
-    icon: CloudSun,
-    title: "Clima em tempo real",
-    text: "A tela do app muda com o céu da sua cidade e sugere cuidados para gestantes conforme o tempo.",
-  },
-  {
-    icon: BrainCircuit,
-    title: "IA obstétrica 24h",
-    text: "Dúvida às 3h da manhã? A IA treinada em obstetrícia responde na hora, com triagem de sintomas.",
-  },
-  {
-    icon: Video,
-    title: "Teleconsulta integrada",
-    text: "Consultas por vídeo com o seu médico sem sair do app — link automático no seu e-mail.",
-  },
-  {
-    icon: Activity,
-    title: "Monitoramento completo",
-    text: "Peso, pressão, chutes do bebê e sintomas em gráficos que o médico acompanha de perto.",
-  },
-  {
-    icon: Calendar,
-    title: "Agendamento integrado",
-    text: "Solicite consultas, receba confirmação e lembretes direto no app.",
-  },
-  {
-    icon: Users,
-    title: "Modo acompanhante",
-    text: "Inclua parceiro ou familiar para que todos vivam a gestação junto com você.",
-  },
-  {
-    icon: BookOpen,
-    title: "Escola do bebê",
-    text: "Módulos sobre amamentação, cuidados neonatais, parto e pós-parto.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Alertas de segurança",
-    text: "Triagem inteligente avisa quando um sintoma merece atenção médica urgente.",
-  },
-];
+/** O rodapé legal que se repete — a mesma frase em todo lugar, de propósito. */
+const AVISO = "Conteúdo educativo — não substitui a consulta médica.";
 
-const SHOWCASE = [
-  {
-    badge: "Chat IA",
-    title: "Fale a qualquer hora com a IA do seu médico",
-    text: "Dúvida às 3h da manhã? Converse a qualquer momento com uma inteligência artificial treinada nas respostas que o seu próprio obstetra já validou — como se ele respondesse por você, na hora, sem esperar a próxima consulta.",
-    bullets: [
-      "Disponível 24h, todos os dias",
-      "Respostas no estilo e nas condutas do seu médico",
-      "Triagem de sintomas e alerta quando é sério",
-    ],
-    screen: "chat" as const,
-  },
-  {
-    badge: "Jornada diária",
-    title: "Cuidar virou um jogo que ela quer jogar todo dia",
-    text: "As 40 semanas viram um caminho de fases com desafios diários: abrir o baú do dia, colecionar a figurinha da fruta, manter a chama acesa. Cada desafio é uma orientação médica real — beber água, contar os chutes, agendar o exame da semana.",
-    bullets: [
-      "Desafios diários com orientação médica",
-      "Álbum de figurinhas semana a semana",
-      "Sequência de dias estilo Duolingo",
-    ],
-    screen: "jogo" as const,
-  },
-  {
-    badge: "Saúde",
-    title: "Seus números, acompanhados de perto",
-    text: "Registre peso, pressão e os chutes do bebê. O app monta os gráficos e o seu médico acompanha tudo do painel — sua consulta começa antes de você chegar.",
-    bullets: [
-      "Gráficos de evolução automáticos",
-      "Contador de chutes do bebê",
-      "Médico vê tudo antes da consulta",
-    ],
-    screen: "saude" as const,
-  },
-];
+/* ── Peças pequenas ────────────────────────────────────────────────────── */
 
-const PERIODS = [
-  { key: "manha", label: "Amanhecer", emoji: "🌅" },
-  { key: "dia", label: "Tarde", emoji: "☀️" },
-  { key: "entardecer", label: "Entardecer", emoji: "🌇" },
-  { key: "noite", label: "Noite", emoji: "🌙" },
-] as const;
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">{children}</p>
+  );
+}
+
+function Secao({
+  children,
+  fundo,
+  id,
+}: {
+  children: React.ReactNode;
+  fundo?: "creme" | "secundario";
+  id?: string;
+}) {
+  return (
+    <section
+      id={id}
+      className={`px-5 py-16 md:py-24 ${fundo === "secundario" ? "border-y border-border/60 bg-secondary/40" : ""}`}
+    >
+      <div className="mx-auto max-w-5xl">{children}</div>
+    </section>
+  );
+}
+
+function Titulo({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mt-3 font-serif text-[28px] font-extrabold leading-[1.12] tracking-tight md:text-[42px]">
+      {children}
+    </h2>
+  );
+}
+
+function Corpo({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-muted-foreground md:text-lg">
+      {children}
+    </p>
+  );
+}
+
+function Botao({
+  to,
+  children,
+  variante = "primario",
+}: {
+  to: string;
+  children: React.ReactNode;
+  variante?: "primario" | "secundario";
+}) {
+  const base =
+    "press inline-flex items-center justify-center rounded-full px-6 py-3.5 text-[15px] font-extrabold transition-colors";
+  return (
+    <Link
+      to={to}
+      className={
+        variante === "primario"
+          ? `${base} bg-primary text-primary-foreground hover:bg-primary/90`
+          : `${base} border-2 border-primary/25 text-primary hover:bg-primary/5`
+      }
+    >
+      {children}
+    </Link>
+  );
+}
+
+/* ── A página ──────────────────────────────────────────────────────────── */
 
 function Index() {
-  const [periodOverride, setPeriodOverride] = useState<
-    "manha" | "dia" | "entardecer" | "noite" | null
-  >(null);
-  const sky = useWeatherSky(periodOverride);
-  const heroText = sky.isDark ? "text-white" : "text-foreground";
-  const heroMuted = sky.isDark ? "text-white/70" : "text-muted-foreground";
+  /**
+   * O céu do hero é FIXO em madrugada, e isso é escolha.
+   *
+   * A seção é uma cena — três da manhã, todo mundo dormindo — e um céu que
+   * muda com a hora real destruiria a cena para quem abre de tarde. O céu ao
+   * vivo continua no app e ganha demonstração própria mais abaixo, onde ele é
+   * o assunto e não o cenário.
+   */
+  const sky = useWeatherSky("noite");
+  const [demo, setDemo] = useState<"manha" | "dia" | "entardecer" | "noite">("dia");
+  const ceuDemo = useWeatherSky(demo);
 
-  // Publica se o hero está escuro → header troca a logo (branca no escuro).
   useEffect(() => {
-    setHeroDark(sky.isDark);
+    setHeroDark(true);
     return () => setHeroDark(false);
-  }, [sky.isDark]);
+  }, []);
 
   return (
     <>
-      {/* ── Hero: céu dinâmico + telefone ─────────────────────────── */}
+      {/* ── 1 · A madrugada ─────────────────────────────────────────── */}
       <section
         className="relative overflow-hidden"
         style={{
@@ -170,361 +153,476 @@ function Index() {
         }}
       >
         <SkyCanvas sky={sky} />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-8 px-5 pt-6 pb-24 md:gap-10 md:grid-cols-[1.1fr_1fr] md:pt-20 md:pb-32">
-          {/* Painel Liquid Glass atrás do texto do hero: refrata o céu vivo e
-              garante contraste do texto em qualquer clima/hora do dia. */}
+        <div className="relative mx-auto grid max-w-6xl items-center gap-8 px-5 pt-6 pb-20 md:grid-cols-[1.1fr_1fr] md:gap-10 md:pt-20 md:pb-28">
+          {/* O TEXTO vem primeiro no celular.
+              A versão anterior punha o telefone em `order-first`, e a medição
+              mostrou o estrago: no iPhone, 100% da primeira tela era mockup —
+              o H1 começava 3px antes do fim do viewport, e ainda por baixo da
+              barra fixa. Era preciso rolar 1,3 tela para ver o botão. No
+              desktop a ordem se inverte, onde as duas colunas cabem juntas. */}
           <div className="liquid-glass rounded-[2rem] p-6 md:p-9">
             <Reveal variant="blur">
-              <p
-                className={`glass-chip text-[11px] font-bold uppercase tracking-[0.22em] ${
-                  sky.isDark ? "text-white" : "text-primary"
-                }`}
-              >
-                <Sparkles className="h-3 w-3 animate-[sparkle_2.4s_ease-in-out_infinite]" />O app da
-                sua gestação
+              <p className="glass-chip text-[11px] font-bold uppercase tracking-[0.22em] text-white">
+                Boa madrugada
               </p>
             </Reveal>
             <Reveal variant="up" delay={120}>
-              <h1
-                className={`mt-4 font-serif text-3xl font-extrabold leading-[1.08] tracking-tight md:text-6xl ${heroText}`}
-              >
-                A gestação inteira <ShimmerText className="not-italic">no seu bolso</ShimmerText>.
+              <h1 className="mt-4 font-serif text-[30px] font-extrabold leading-[1.06] tracking-tight text-white md:text-[56px]">
+                A dúvida nunca aparece às três da tarde.
               </h1>
             </Reveal>
-            <Reveal variant="up" delay={240}>
-              <p
-                className={`mt-4 max-w-lg text-base leading-relaxed md:mt-6 md:text-lg ${heroMuted}`}
-              >
-                Acompanhamento semana a semana, IA obstétrica 24h, teleconsulta e monitoramento de
-                saúde — criado por especialistas em gestação de alto risco.
+            <Reveal variant="up" delay={220}>
+              <p className="mt-5 max-w-lg text-base leading-relaxed text-white/75 md:text-lg">
+                Aparece às três da manhã, no escuro, com todo mundo dormindo. O Obstétrica é onde
+                tem alguém acordado — respondendo com as orientações que o seu obstetra já validou,
+                e dizendo com todas as letras quando a resposta é com ele.
               </p>
             </Reveal>
-            <Reveal variant="up" delay={360}>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Magnetic>
-                  <Link
-                    to="/auth"
-                    className="press group relative block overflow-hidden rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-float)]"
-                  >
-                    <span className="relative z-10 flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" /> Criar meu perfil grátis
-                    </span>
-                    <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                  </Link>
-                </Magnetic>
+            <Reveal variant="up" delay={320}>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Botao to="/auth">Criar minha conta</Botao>
                 <Link
-                  to="/agendamento"
-                  className={`press rounded-full px-6 py-3.5 text-sm font-medium backdrop-blur-md transition-colors ${
-                    sky.isDark
-                      ? "border border-white/25 bg-white/10 text-white hover:bg-white/20"
-                      : "border border-border bg-white/70 text-foreground hover:border-primary hover:text-primary"
-                  }`}
+                  to="/encontrar-medico"
+                  className="press inline-flex items-center justify-center rounded-full border-2 border-white/25 px-6 py-3.5 text-[15px] font-extrabold text-white transition-colors hover:bg-white/10"
                 >
-                  Agendar consulta
+                  Ver os obstetras do app
                 </Link>
               </div>
-            </Reveal>
-            {/* selo de clima ao vivo — prova do diferencial (desktop) */}
-            <Reveal variant="fade" delay={500} className="hidden md:block">
-              <div
-                className={`mt-8 inline-flex items-center gap-2.5 rounded-full px-4 py-2 text-sm backdrop-blur-md ${
-                  sky.isDark
-                    ? "border border-white/20 bg-white/10 text-white/90"
-                    : "border border-border/60 bg-white/70 text-foreground"
-                }`}
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                </span>
-                {sky.weather ? (
-                  <span>
-                    {sky.weather.emoji} {sky.weather.temp}°C · {sky.weather.condition} — este céu é
-                    o clima real de agora, como no app
-                  </span>
-                ) : (
-                  <span>☁️ Este céu muda com o clima real — como dentro do app</span>
-                )}
-              </div>
-            </Reveal>
-            {/* Seletor dos 4 períodos — experimente o céu de cada hora do dia (desktop) */}
-            <Reveal variant="fade" delay={620} className="hidden md:block">
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className={`text-xs ${heroMuted}`}>Experimente:</span>
-                {PERIODS.map((p) => {
-                  const active = periodOverride === p.key;
-                  return (
-                    <button
-                      key={p.key}
-                      onClick={() => setPeriodOverride(active ? null : p.key)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-medium backdrop-blur-md transition-all ${
-                        active
-                          ? "bg-primary text-primary-foreground shadow-[var(--shadow-soft)] scale-105"
-                          : sky.isDark
-                            ? "border border-white/20 bg-white/10 text-white/80 hover:bg-white/20"
-                            : "border border-border/60 bg-white/60 text-muted-foreground hover:text-primary"
-                      }`}
-                    >
-                      {p.emoji} {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </Reveal>
-          </div>
-
-          {/* Telefone flutuante — o app dentro dele acompanha o céu do site.
-              No celular ele vem PRIMEIRO: a visitante vê o perfil da gestante
-              antes de qualquer texto, com a chamada para criar o dela. */}
-          <Reveal
-            variant="scale"
-            delay={250}
-            className="order-first relative flex flex-col items-center md:order-none"
-          >
-            <div className="animate-[phoneFloat_7s_ease-in-out_infinite] scale-[0.88] -mb-2 md:scale-100 md:mb-0">
-              <PhoneFrame>
-                <AppHomeMockupScreen period={sky.period} />
-              </PhoneFrame>
-            </div>
-            <p
-              className={`mt-1 text-center text-sm font-medium md:hidden ${
-                sky.isDark ? "text-white/85" : "text-foreground/75"
-              }`}
-            >
-              👆 Assim é o seu perfil de gestação — crie o seu em 1 minuto
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── Segundo Cérebro: o produto mais forte, em destaque ──────── */}
-      <BrainShowcase />
-
-      {/* ── Por dentro do app: 3 telas em destaque ─────────────────── */}
-      <section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
-        <Reveal variant="up">
-          <div className="mx-auto mb-16 max-w-2xl text-center">
-            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
-              Por dentro do app
-            </p>
-            <h2 className="mt-3 font-serif text-3xl md:text-5xl">
-              Tecnologia que sente o seu momento.
-            </h2>
-            <p className="mt-4 text-muted-foreground">
-              Cada tela foi desenhada com médicos obstetras para a rotina real de uma gestante — do
-              positivo ao pós-parto.
-            </p>
-          </div>
-        </Reveal>
-
-        <div className="space-y-8 md:space-y-12">
-          {SHOWCASE.map((item, i) => (
-            <Fragment key={item.badge}>
-              {i > 0 && <FootprintTrail dir={i % 2 === 1 ? "ltr" : "rtl"} count={8} />}
-              <div
-                className={`grid items-center gap-10 md:grid-cols-2 ${
-                  i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
-                }`}
-              >
-                <Reveal variant={i % 2 === 1 ? "left" : "up"} className="flex justify-center">
-                  <PhoneFrame tilt={i % 2 === 1 ? "right" : "left"}>
-                    {item.screen === "chat" && <AppChatMockupScreen />}
-                    {item.screen === "jogo" && <AppJogoMockupScreen />}
-                    {item.screen === "saude" && <AppSaudeMockupScreen />}
-                  </PhoneFrame>
-                </Reveal>
-                <Reveal variant="up" delay={120}>
-                  <span className="glass-chip text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-                    {item.badge}
-                  </span>
-                  <h3 className="mt-4 font-serif text-2xl md:text-4xl">{item.title}</h3>
-                  <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-                    {item.text}
-                  </p>
-                  <ul className="mt-6 space-y-2.5">
-                    {item.bullets.map((b) => (
-                      <li key={b} className="flex items-center gap-2.5 text-sm text-foreground">
-                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                          ✓
-                        </span>
-                        {b}
-                      </li>
-                    ))}
-                  </ul>
-                </Reveal>
-              </div>
-            </Fragment>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Funcionalidades em grade ───────────────────────────────── */}
-      <section className="border-y border-border/60 bg-secondary/40">
-        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
-          <Reveal variant="up">
-            <div className="mb-10 max-w-2xl">
-              <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
-                Tudo que o app faz
+              <p className="mt-5 text-xs leading-relaxed text-white/55">
+                Criar conta é grátis. {AVISO} Em urgência, ligue 192 (SAMU).
               </p>
-              <h2 className="mt-3 font-serif text-3xl md:text-4xl">
-                Um pré-natal completo, na palma da mão.
-              </h2>
-            </div>
-          </Reveal>
-          <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3">
-            {APP_FEATURES.map(({ icon: Icon, title, text }, i) => (
-              <Reveal key={title} variant="up" delay={(i % 3) * 80}>
-                <SpotlightCard className="group h-full rounded-2xl border border-border bg-card p-5 transition-all duration-500 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-1 hover:border-primary/40 hover:shadow-[var(--shadow-card)]">
-                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20 transition-transform duration-500 [transition-timing-function:var(--ease-spring)] group-hover:scale-110 group-hover:-rotate-3">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <p className="mt-3 font-medium text-foreground">{title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{text}</p>
-                </SpotlightCard>
-              </Reveal>
-            ))}
+            </Reveal>
           </div>
-          <Reveal variant="up" delay={200}>
-            <div className="mt-10 text-center">
-              <Magnetic>
-                <Link
-                  to="/auth"
-                  className="press inline-flex items-center gap-2 rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)]"
-                >
-                  <Smartphone className="h-4 w-4" /> Criar conta gratuita
-                </Link>
-              </Magnetic>
-            </div>
-          </Reveal>
+          <div className="flex justify-center md:order-first">
+            <PhoneFrame>
+              <AppChatMockupScreen />
+            </PhoneFrame>
+          </div>
         </div>
       </section>
 
-      {/* ── Números ─────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-5 py-16 md:py-20">
+      {/* ── 2 · O que ela se recusa a responder ─────────────────────── */}
+      <Secao>
         <Reveal variant="up">
-          <div className="max-w-2xl">
-            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
-              Em números
-            </p>
-            <h2 className="mt-3 font-serif text-3xl md:text-4xl">A experiência por trás do app.</h2>
-          </div>
+          <Eyebrow>A resposta das 3h</Eyebrow>
+          <Titulo>Ela não improvisa. E te diz quando não sabe.</Titulo>
+          <Corpo>
+            A maioria dos apps responde qualquer coisa. Aqui a resposta passa por um filtro: se a
+            sua dúvida cai no que o seu obstetra já validou, ela responde no nome dele. Se não cai,
+            ela não inventa conduta — registra a pergunta para ele responder e te devolve só o que é
+            seguro dizer.
+          </Corpo>
         </Reveal>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 md:grid-cols-4">
+
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
           {[
-            { v: 4000, s: "+", l: "partos acompanhados" },
-            { v: 20, s: "+", l: "anos de experiência" },
-            { v: 1200, s: "+", l: "casos de alto risco" },
-            { v: 98, s: "%", l: "de satisfação" },
-          ].map((n, i) => (
-            <Reveal key={n.l} variant="scale" delay={i * 110}>
-              <div className="shine relative overflow-hidden rounded-2xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)] hover-lift">
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/10" />
-                <p className="relative font-serif text-5xl text-primary">
-                  <AnimatedCounter value={n.v} suffix={n.s} />
-                </p>
-                <p className="relative mt-2 text-sm text-muted-foreground">{n.l}</p>
+            {
+              classe: "glass-pink",
+              titulo: "Coberto pelo seu médico",
+              texto:
+                "A orientação sai com a assinatura de quem a validou — “Dr(a). ___ orienta que…”.",
+            },
+            {
+              classe: "glass-amber",
+              titulo: "Fora do que ele validou",
+              texto:
+                "“Essa é uma dúvida que ele prefere responder pessoalmente. Registrei aqui para ele ver.”",
+            },
+            {
+              classe: "glass-teal",
+              titulo: "Dúvida do aplicativo",
+              texto:
+                "Onde fica uma aba, como registrar uma contração, como marcar consulta — isso ela resolve na hora.",
+            },
+          ].map((c, i) => (
+            <Reveal key={c.titulo} variant="up" delay={i * 90}>
+              <div className={`card-3d ${c.classe} h-full rounded-3xl p-6`}>
+                <h3 className="font-serif text-lg font-extrabold">{c.titulo}</h3>
+                <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{c.texto}</p>
               </div>
             </Reveal>
           ))}
         </div>
-      </section>
 
-      {/* Evolução do bebê — feature demo */}
-      <BabyEvolution />
+        <Reveal variant="up" delay={280}>
+          <p className="mt-8 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Ela nunca dá diagnóstico, prescrição ou dose. Em sangramento, dor intensa, queda de
+            movimentos do bebê ou pressão muito alta, ela manda você para o pronto-socorro ou para o
+            192.
+          </p>
+        </Reveal>
+      </Secao>
 
-      {/* ── O médico por trás do app ───────────────────────────────── */}
-      <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 md:grid-cols-[1fr_1.1fr]">
-        <Reveal variant="left">
-          <div className="relative">
-            <div className="absolute -inset-3 rounded-[2.3rem] bg-gradient-to-tr from-primary/20 via-transparent to-accent/30 blur-lg" />
-            <img
-              src={portrait}
-              alt="O obstetra fundador da plataforma"
-              loading="lazy"
-              width={1024}
-              height={1024}
-              className="relative aspect-square w-full rounded-[2rem] object-cover shadow-[var(--shadow-card)]"
-            />
+      {/* ── 3 · De quem é essa voz ──────────────────────────────────── */}
+      <Secao fundo="secundario">
+        <Reveal variant="up">
+          <Eyebrow>O seu obstetra</Eyebrow>
+          <Titulo>A voz é de um médico de verdade. Você escolhe qual.</Titulo>
+          <Corpo>
+            O Obstétrica não tem um médico dono. Tem um diretório: você filtra por cidade, anos de
+            experiência, mestrado, doutorado, convênio ou particular, e lê a abordagem de cada um
+            antes de decidir. O obstetra que você escolher passa a te acompanhar por aqui — e é a
+            conduta dele, não a de um manual genérico, que a IA usa para te responder.
+          </Corpo>
+          <Corpo>
+            Já tem obstetra e ele não está aqui? Você pode convidá-lo pelo seu link: ele ganha 15%
+            de desconto em qualquer plano e, quando assinar, você ganha um ano de Premium.
+          </Corpo>
+          <div className="mt-7">
+            <Botao to="/encontrar-medico">Ver os obstetras do app</Botao>
           </div>
         </Reveal>
-        <div>
+      </Secao>
+
+      {/* ── 4 · Quando o corpo dá sinal ─────────────────────────────── */}
+      <Secao>
+        <Reveal variant="up">
+          <Eyebrow>Nos minutos que importam</Eyebrow>
+          <Titulo>Duas telas para quando não dá para esperar amanhã.</Titulo>
+        </Reveal>
+
+        <div className="mt-10 grid gap-5 md:grid-cols-2">
           <Reveal variant="up">
-            <p className="glass-chip text-xs font-bold uppercase tracking-[0.22em] text-primary">
-              O especialista
-            </p>
-            <h2 className="mt-3 font-serif text-3xl md:text-4xl">
-              Feito por quem vive a obstetrícia todos os dias.
-            </h2>
-          </Reveal>
-          <Reveal variant="up" delay={120}>
-            <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-              Criado por um ginecologista e obstetra com mais de 20 anos de prática em gestações
-              complexas — diabetes gestacional, hipertensão, gemelaridade e malformações fetais —
-              para que cada paciente tenha ao seu lado o mesmo cuidado que recebe no consultório do
-              seu médico, a qualquer momento.
-            </p>
-          </Reveal>
-          <Reveal variant="up" delay={220}>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {["CRM-MG ativo", "FEBRASGO", "Medicina Fetal", "Ultrassonografia Obstétrica"].map(
-                (tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground transition-colors duration-300 hover:border-primary/40 hover:text-primary"
-                  >
-                    {tag}
-                  </span>
-                ),
-              )}
+            <div className="card-3d glass-rose h-full rounded-3xl p-7">
+              <h3 className="font-serif text-xl font-extrabold">Contrações</h3>
+              <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
+                Você toca quando começa e quando passa. O app calcula o intervalo e a duração e diz
+                em que ponto você está — sem tabela para interpretar às três da manhã.
+              </p>
+              <ul className="mt-5 space-y-2 text-sm font-semibold">
+                {[
+                  "Padrão normal",
+                  "Atenção — padrão irregular",
+                  "Trabalho de parto ativo",
+                  "Vá para a maternidade agora",
+                ].map((v) => (
+                  <li key={v} className="flex items-center gap-2.5">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                    {v}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <Link
-              to="/sobre"
-              className="group mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary underline underline-offset-4"
-            >
-              Conhecer nossa história{" "}
-              <span className="transition-transform duration-300 [transition-timing-function:var(--ease-out-expo)] group-hover:translate-x-1">
-                →
-              </span>
-            </Link>
+          </Reveal>
+
+          <Reveal variant="up" delay={110}>
+            <div className="card-3d h-full rounded-3xl border-2 border-destructive/15 bg-card p-7">
+              <h3 className="font-serif text-xl font-extrabold">SOS</h3>
+              <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
+                Um toque avisa o seu obstetra e o seu contato de emergência de uma vez, com a sua
+                localização quando o aparelho permitir, e com a sua ficha junto: semana, tipo
+                sanguíneo, alergias, medicamentos.
+              </p>
+              <p className="mt-4 text-[15px] leading-relaxed text-foreground">
+                E então a tela mostra <strong>quais avisos saíram de fato</strong>, com o e-mail e o
+                telefone de quem recebeu. Se alguém ficou de fora, ela diz quem — em vez de escrever
+                “enviado” e deixar você achando que o seu marido já sabe.
+              </p>
+            </div>
           </Reveal>
         </div>
-      </section>
+      </Secao>
 
-      {/* Depoimentos */}
-      <TestimonialsSection />
-
-      {/* ── CTA final ──────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-[var(--gradient-primary)] text-primary-foreground">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-24 right-[10%] h-64 w-64 rounded-full bg-white/10 blur-3xl animate-[floatY_10s_ease-in-out_infinite]"
-        />
-        <div className="relative mx-auto flex max-w-6xl flex-col items-start gap-6 px-5 py-16 md:flex-row md:items-center md:justify-between">
+      {/* ── 5 · Os trinta dias ──────────────────────────────────────── */}
+      <Secao fundo="secundario">
+        <div className="grid items-center gap-10 md:grid-cols-[1.1fr_0.9fr]">
           <Reveal variant="up">
-            <h2 className="font-serif text-3xl md:text-4xl">Pronta para começar?</h2>
-            <p className="mt-2 max-w-xl opacity-90">
-              Crie sua conta gratuitamente e tenha acesso imediato a todas as funcionalidades do
-              app.
+            <Eyebrow>Todo dia</Eyebrow>
+            <Titulo>Você vê o obstetra vinte minutos por mês. Sobram trinta dias.</Titulo>
+            <Corpo>
+              É neles que o app vive. Cada dia da sua gestação tem uma aula curta sobre o que está
+              acontecendo com você e com o bebê <em>naquele dia</em>, e um desafio pequeno: beber
+              água, anotar um sintoma, caminhar quinze minutos.
+            </Corpo>
+            <Corpo>
+              Não é um blog por semana: é uma trilha, e você vê o caminho inteiro para trás e para a
+              frente. A semana tem seu ritmo — bebê, corpo, nutrição, sinais, exames, vínculo — e
+              domingo fecha com a revisão do que você aprendeu.
+            </Corpo>
+            <div className="mt-7 flex flex-wrap gap-x-8 gap-y-4">
+              {[
+                ["294", "dias de aula"],
+                ["1.331", "perguntas"],
+                ["378", "desafios"],
+              ].map(([n, l]) => (
+                <div key={l}>
+                  <p className="font-serif text-3xl font-extrabold text-primary">{n}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {l}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Da semana 4 até a 42, e mais doze semanas depois do parto.
             </p>
           </Reveal>
+
           <Reveal variant="up" delay={140}>
-            <div className="flex flex-wrap gap-3">
-              <Magnetic>
-                <Link
-                  to="/auth"
-                  className="press glow-cta flex items-center gap-2 rounded-full bg-background px-6 py-3 text-sm font-medium text-primary shadow-lg shadow-black/10"
-                >
-                  <Smartphone className="h-4 w-4" /> Entrar no App
-                </Link>
-              </Magnetic>
-              <Link
-                to="/agendamento"
-                className="press rounded-full border border-primary-foreground/30 px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-white/10"
-              >
-                Agendar consulta
-              </Link>
+            <div className="flex items-center justify-center gap-5">
+              <div className="flex flex-col items-center gap-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <span
+                    key={i}
+                    className="duo3d flex h-14 w-14 items-center justify-center rounded-full"
+                    style={
+                      {
+                        background: i === 1 ? "var(--primary)" : "var(--accent)",
+                        "--lip": i === 1 ? "oklch(0.44 0.1 22)" : "oklch(0.82 0.05 26)",
+                        marginLeft: i % 2 ? "2.5rem" : 0,
+                      } as React.CSSProperties
+                    }
+                  />
+                ))}
+              </div>
+              <img
+                src={bolhaFeliz}
+                alt=""
+                aria-hidden
+                className="h-24 w-24 self-end"
+                loading="lazy"
+              />
             </div>
           </Reveal>
+        </div>
+      </Secao>
+
+      {/* ── 6 · As noites em que não dá para dormir ─────────────────── */}
+      <Secao>
+        <Reveal variant="up">
+          <Eyebrow>Quando o sono não vem</Eyebrow>
+          <Titulo>Sete meditações com voz humana. E som que toca sem internet.</Titulo>
+          <Corpo>
+            As meditações foram gravadas em estúdio, com voz de gente — não a voz sintética do seu
+            celular. São sete temas e nove movimentos narrados para o corpo que dói de carregar.
+          </Corpo>
+          <Corpo>
+            Chuva, mar, batimento e um pad calmo são gerados dentro do próprio navegador. Tocam no
+            primeiro segundo, funcionam com o avião ligado e não ocupam espaço nenhum no seu
+            telefone.
+          </Corpo>
+        </Reveal>
+
+        {/* O céu ao vivo é DEMONSTRADO aqui, e não escondido no desktop como
+            antes: quem mais navega é justamente quem estava sem ele. */}
+        <Reveal variant="up" delay={120}>
+          <div className="mt-9 overflow-hidden rounded-3xl border border-border/60">
+            <div className="relative h-52 md:h-72">
+              <SkyCanvas sky={ceuDemo} />
+              <div className="absolute inset-x-0 bottom-0 flex flex-wrap justify-center gap-2 p-4">
+                {(
+                  [
+                    ["manha", "Manhã"],
+                    ["dia", "Meio-dia"],
+                    ["entardecer", "Entardecer"],
+                    ["noite", "Madrugada"],
+                  ] as const
+                ).map(([k, rotulo]) => (
+                  <button
+                    key={k}
+                    onClick={() => setDemo(k)}
+                    className={`press rounded-full px-4 py-2 text-xs font-extrabold backdrop-blur-xl transition-colors ${
+                      demo === k
+                        ? "bg-white text-foreground"
+                        : "bg-white/25 text-white hover:bg-white/40"
+                    }`}
+                  >
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="bg-card px-5 py-3.5 text-sm text-muted-foreground">
+              No app, o céu é o da <strong>sua cidade agora</strong> — a hora certa e o tempo que
+              está fazendo lá fora.
+            </p>
+          </div>
+        </Reveal>
+      </Secao>
+
+      {/* ── 7 · A parte chata também ────────────────────────────────── */}
+      <Secao fundo="secundario">
+        <div className="grid gap-10 md:grid-cols-2">
+          <Reveal variant="up">
+            <Eyebrow>Consulta</Eyebrow>
+            <Titulo>Sem horário não significa esperar até o mês que vem.</Titulo>
+            <Corpo>
+              Você pede a consulta pelo app. Se o médico precisar de outro horário, ele propõe, e
+              você aceita ou recusa — a conversa não vira quinze mensagens no WhatsApp.
+            </Corpo>
+            <Corpo>
+              Se a semana estiver cheia, você entra na fila daquela semana. Quando alguém desmarca,
+              a vaga é oferecida à primeira da fila, que tem quatro horas para responder. Sem
+              resposta, ela passa para a próxima.
+            </Corpo>
+          </Reveal>
+
+          <Reveal variant="up" delay={120}>
+            <div className="card-3d rounded-3xl bg-card p-7">
+              <h3 className="font-serif text-lg font-extrabold">Depois da consulta</h3>
+              <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
+                Você grava a conversa no seu celular e recebe por escrito o que foi dito. Ninguém
+                mais sai do consultório lembrando metade.
+              </p>
+              <ul className="mt-5 space-y-2.5">
+                {["As orientações", "Os medicamentos", "Os exames pedidos", "Quando voltar"].map(
+                  (x) => (
+                    <li key={x} className="flex items-center gap-2.5 text-sm font-semibold">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                      {x}
+                    </li>
+                  ),
+                )}
+              </ul>
+              <p className="mt-5 text-xs text-muted-foreground">
+                A gravação é sua e fica na sua conta.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </Secao>
+
+      {/* ── 8 · Não acaba no parto ──────────────────────────────────── */}
+      <Secao>
+        <div className="mx-auto max-w-2xl text-center">
+          <Reveal variant="up">
+            <img
+              src={arteVinculo}
+              alt=""
+              aria-hidden
+              className="mx-auto h-32 w-32"
+              loading="lazy"
+            />
+            <div className="mt-2">
+              <Eyebrow>Depois</Eyebrow>
+            </div>
+            <Titulo>O app não fecha quando o bebê nasce.</Titulo>
+            <p className="mx-auto mt-4 text-[15px] leading-relaxed text-muted-foreground md:text-lg">
+              São mais doze semanas de conteúdo diário, agora contadas pela idade dele: o sono que
+              não existe, a mamada que dói, o corpo que ainda está voltando.
+            </p>
+            <p className="mx-auto mt-4 text-[15px] leading-relaxed text-muted-foreground md:text-lg">
+              E tem o rastreio de depressão pós-parto — a Escala de Edinburgh, dez perguntas,
+              resultado na hora. Quando o resultado pede atenção, o seu obstetra é avisado. Você não
+              precisa ter coragem de contar sozinha.
+            </p>
+            <div className="mt-7 flex justify-center">
+              <Botao to="/epds" variante="secundario">
+                Fazer o teste — é gratuito e não precisa de conta
+              </Botao>
+            </div>
+          </Reveal>
+        </div>
+      </Secao>
+
+      {/* ── 9 · Quem estiver com você ───────────────────────────────── */}
+      <Secao fundo="secundario">
+        <Reveal variant="up">
+          <Eyebrow>Acompanhante</Eyebrow>
+          <Titulo>Ele acompanha por um link. Sem entrar na sua conta.</Titulo>
+          <Corpo>
+            Você manda um link para o seu parceiro, sua mãe, sua irmã. Ele abre no navegador, sem
+            instalar nada, e vê a semana, a data prevista e o batimento que o médico registrou na
+            última consulta — e um guia do que fazer naquele trimestre, escrito para ele.
+          </Corpo>
+        </Reveal>
+
+        {/* O desenho mais persuasivo aqui é o da AUSÊNCIA: o que ele não vê. */}
+        <Reveal variant="up" delay={120}>
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            <div className="rounded-3xl bg-card p-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-primary">Ele vê</p>
+              <ul className="mt-3 space-y-2 text-sm font-semibold">
+                {[
+                  "A semana e a data prevista",
+                  "O batimento da última consulta",
+                  "O guia dele",
+                ].map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-3xl bg-card p-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Ele não vê
+              </p>
+              <ul className="mt-3 space-y-2 text-sm font-semibold text-muted-foreground">
+                {["O seu diário", "Os seus exames", "Nada que ele possa mexer"].map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <p className="mt-5 text-sm text-muted-foreground">
+            Você tira o acesso quando quiser. Tem também o álbum da família e a votação do nome, que
+            qualquer um da lista abre pelo link.
+          </p>
+        </Reveal>
+      </Secao>
+
+      {/* ── 10 · O que ele não faz ──────────────────────────────────── */}
+      <Secao>
+        <div className="mx-auto max-w-xl">
+          <Reveal variant="up">
+            <Titulo>O que ele não faz.</Titulo>
+            <ul className="mt-6 space-y-4">
+              {[
+                "Não substitui a sua consulta. Ele existe para os trinta dias entre uma e outra.",
+                "Não dá diagnóstico, prescrição nem dose de remédio.",
+                "Não promete gestação tranquila. Ninguém pode prometer isso.",
+                "Não inventa conduta que o seu médico não validou. Quando não sabe, encaminha.",
+              ].map((x) => (
+                <li
+                  key={x}
+                  className="border-l-2 border-border pl-4 text-[15px] leading-relaxed text-muted-foreground"
+                >
+                  {x}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-7 text-sm text-muted-foreground">
+              {AVISO} Em urgência, ligue 192 (SAMU) ou vá ao pronto-socorro.
+            </p>
+          </Reveal>
+        </div>
+      </Secao>
+
+      {/* ── 11 · O convite ──────────────────────────────────────────── */}
+      <section className="px-5 pb-20">
+        <div
+          className="relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] px-7 py-14 text-primary-foreground md:px-14"
+          style={{ background: "var(--gradient-primary)" }}
+        >
+          <div className="relative">
+            <Reveal variant="up">
+              <h2 className="font-serif text-[26px] font-extrabold leading-tight md:text-[38px]">
+                Ninguém deveria atravessar isso sozinha.
+              </h2>
+              <p className="mt-4 max-w-lg text-[15px] leading-relaxed opacity-90 md:text-lg">
+                Crie a sua conta e escolha o seu obstetra. Leva um minuto, e é grátis para começar.
+              </p>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  to="/auth"
+                  className="press inline-flex items-center justify-center rounded-full bg-white px-6 py-3.5 text-[15px] font-extrabold text-primary"
+                >
+                  Criar minha conta
+                </Link>
+                <Link
+                  to="/encontrar-medico"
+                  className="press inline-flex items-center justify-center rounded-full border-2 border-white/35 px-6 py-3.5 text-[15px] font-extrabold"
+                >
+                  Ver os obstetras do app
+                </Link>
+              </div>
+              <p className="mt-7 text-xs opacity-75">
+                É médico?{" "}
+                <Link to="/medicos" className="underline underline-offset-2">
+                  Conheça o Obstétrica para consultórios.
+                </Link>
+              </p>
+            </Reveal>
+          </div>
         </div>
       </section>
     </>
