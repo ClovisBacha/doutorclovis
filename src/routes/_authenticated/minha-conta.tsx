@@ -10400,23 +10400,63 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
   const [rate, setRate] = useState(0.9);
   const [topicFilter, setTopicFilter] = useState<string>("todos");
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const [breathPhase, setBreathPhase] = useState<"inhale" | "hold" | "exhale" | null>(null);
-  const breathRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [decorrido, setDecorrido] = useState<number | null>(null);
+  const breathRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /**
+   * ───────────────────────────────────────────────────────────────────────────
+   * POR QUE AQUI NÃO TEM MAIS BOLINHA DE RESPIRAÇÃO
+   *
+   * Havia um círculo 4-4-6 que animava do play até o fim, com "Inspire… /
+   * Segure… / Expire…" escrito embaixo. Três problemas, e os três vinham do
+   * mesmo lugar — a tela instruindo por cima da voz:
+   *
+   *  1. A PRIMEIRA FRASE DE TODO ROTEIRO manda fechar os olhos. E aí a tela
+   *     pedia para olhá-la por dez minutos. O app dava duas ordens opostas.
+   *
+   *  2. O RITMO ERA OUTRO. Os roteiros contam o próprio compasso — "inspire
+   *     contando até quatro e expire contando até seis" — enquanto o círculo
+   *     rodava num `setTimeout` paralelo, iniciado no clique do play. Os dois
+   *     nunca se alinhavam. Quem tentasse seguir os dois recebia instruções
+   *     contraditórias, e o exercício de acalmar virava exercício de decidir
+   *     em quem obedecer.
+   *
+   *  3. O CÍRCULO PROMETIA UM GUIA QUE NÃO EXISTIA. `speechSynthesis` não
+   *     informa onde está na fala, então não havia como sincronizar nem
+   *     querendo. Sincronizar de verdade exige áudio gravado com marcações —
+   *     o caminho da Isabella, que ainda não está aqui.
+   *
+   * O que fica é o mínimo que serve a quem está de olhos fechados: o tempo
+   * decorrido, para quem abrir o olho saber quanto falta. Nenhuma palavra a
+   * seguir, nenhum compasso a acompanhar.
+   *
+   * A respiração com compasso continua existindo — no Caminho, onde ela é o
+   * exercício em si, com som e vibração que duram a fase inteira e não pedem
+   * a tela. Ali o ritmo é o produto; aqui, ele era ruído.
+   */
+  /**
+   * Começa a contar, ou RETOMA de onde parou.
+   *
+   * `togglePlay` chama isto no play e no resume. Zerar aqui faria o resume
+   * mandar a paciente de volta ao 0:00 no meio da meditação — um número que
+   * seria mentira, e o único número da tela.
+   */
   function startBreathing() {
-    // 4-4-6: cada fase reagenda a próxima com a duração correta (setInterval fixaria 4s para tudo)
-    const durations = { inhale: 4000, hold: 4000, exhale: 6000 };
-    const nextOf = { inhale: "hold", hold: "exhale", exhale: "inhale" } as const;
-    function tick(phase: "inhale" | "hold" | "exhale") {
-      setBreathPhase(phase);
-      breathRef.current = setTimeout(() => tick(nextOf[phase]), durations[phase]);
-    }
-    tick("inhale");
+    if (breathRef.current) clearInterval(breathRef.current);
+    setDecorrido((s) => s ?? 0);
+    breathRef.current = setInterval(() => setDecorrido((s) => (s ?? 0) + 1), 1000);
   }
 
+  /** Pausa: o relógio para, o número fica. */
+  function pauseClock() {
+    if (breathRef.current) clearInterval(breathRef.current);
+    breathRef.current = null;
+  }
+
+  /** Fim de verdade: some o relógio. */
   function stopBreathing() {
-    if (breathRef.current) clearTimeout(breathRef.current);
-    setBreathPhase(null);
+    pauseClock();
+    setDecorrido(null);
   }
 
   function speak(med: Meditation) {
@@ -10449,7 +10489,7 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
     if (playing) {
       window.speechSynthesis.pause();
       setPlaying(false);
-      stopBreathing();
+      pauseClock();
     } else if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
       setPlaying(true);
@@ -10468,7 +10508,7 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
   useEffect(() => {
     return () => {
       window.speechSynthesis?.cancel();
-      if (breathRef.current) clearTimeout(breathRef.current);
+      if (breathRef.current) clearInterval(breathRef.current);
     };
   }, []);
 
@@ -10477,8 +10517,10 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
     return matchesTopic;
   });
 
-  const breathLabel = { inhale: "Inspire...", hold: "Segure...", exhale: "Expire..." };
-  const breathScale = { inhale: "scale-125", hold: "scale-125", exhale: "scale-75" };
+  const relogio =
+    decorrido === null
+      ? ""
+      : `${Math.floor(decorrido / 60)}:${String(decorrido % 60).padStart(2, "0")}`;
 
   return (
     <div className="space-y-6">
@@ -10522,14 +10564,21 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
             {selected.topic} · {selected.duration}
           </p>
 
-          {/* Breathing animation */}
-          {breathPhase && (
+          {/* De olhos fechados: nada a seguir, só onde ela está.
+              O `aria-hidden` no anel é de propósito — para o leitor de tela ele
+              não existe, porque não carrega informação nenhuma; quem usa leitor
+              de tela recebe o tempo, que é o único dado real aqui. */}
+          {decorrido !== null && (
             <div className="my-6 flex flex-col items-center gap-3">
               <div
-                className={`h-20 w-20 rounded-full bg-primary/30 transition-transform duration-[4000ms] ease-in-out ${breathScale[breathPhase]}`}
+                aria-hidden
+                className="h-20 w-20 rounded-full bg-primary/20 motion-safe:animate-[pulse_6s_ease-in-out_infinite]"
               />
-              <p className="text-sm font-medium text-primary animate-pulse">
-                {breathLabel[breathPhase]}
+              <p className="text-2xl font-light tabular-nums text-primary" aria-live="off">
+                {relogio}
+              </p>
+              <p className="max-w-[240px] text-center text-xs text-muted-foreground">
+                Pode fechar os olhos e apoiar o celular. A voz conduz sozinha.
               </p>
             </div>
           )}
