@@ -5,6 +5,33 @@ OLHE quando deveria pedir que ela SINTA.**
 
 ---
 
+## Estado (2 de agosto)
+
+| #                                                  | estado    | onde                              |
+| -------------------------------------------------- | --------- | --------------------------------- |
+| Vibração derivada da duração da fase               | **feito** | `breath-audio.ts` + 32 testes     |
+| Meditação para de instruir por cima da voz         | **feito** | `minha-conta.tsx`                 |
+| A bolha conduz a respiração (infla/segura/esvazia) | **feito** | `bolha.tsx` + `gestacao-path.tsx` |
+| Ociosidade que não se repete (dois períodos)       | **feito** | `styles.css`                      |
+| `dormindo` e `comemorando` saem do código morto    | **feito** | respiração e meditação            |
+| Unificar as 4 respirações num componente só        | aberto    | —                                 |
+| Trocar `speechSynthesis` pela Isabella embarcada   | aberto    | depende de gerar os áudios        |
+| `preocupada` — **decisão de produto, ver abaixo**  | parado    | —                                 |
+| Piscar / micro-animação por sprite                 | aberto    | precisa de arte nova              |
+
+### `preocupada` está parada de propósito
+
+É a única das quatro artes que continua sem aparecer, e não é esquecimento. Ela
+só faria sentido quando a sequência morre — ou seja, mostrar uma carinha
+**preocupada para quem faltou**. Numa gestação de alto risco isso é cobrança
+para quem já tem cobrança demais, e o próprio `bolha.tsx` anota que ela "nunca
+como cobrança de quem está em dia".
+
+Antes de ligar, alguém precisa decidir se o app quer isso. Minha opinião: não —
+e se quiser, que seja saudade ("senti sua falta"), não decepção.
+
+---
+
 ## Parte 0 — O estado de hoje, medido
 
 ### A bolha aparece em UM lugar
@@ -236,3 +263,62 @@ dos três.
 **Minha recomendação:** (a). E só considerar (b) depois que os passos 1 a 4
 estiverem no ar e a bolha for algo que a paciente encontra várias vezes por dia.
 Personagem vive de presença, não de polígono.
+
+---
+
+## Parte 4 — O próximo passo concreto: ela pisca
+
+O que foi feito até aqui deu **presença** e **compasso**. O que ainda falta para
+ela cruzar de "adesivo bem feito" para "bicho" é uma coisa só, e é a mesma coisa
+que o Duo faz o tempo todo: **piscar**.
+
+Piscar é o sinal mais barato de vida que existe. É involuntário, acontece a cada
+poucos segundos, e a ausência dele é o que faz um rosto parado parecer morto —
+manequim, não personagem.
+
+### Por que ainda não foi feito
+
+Precisa de **arte nova**: a bolha é um WebP por humor, sem camadas. Não dá para
+fechar os olhos dela por CSS — o que dá para fazer (achatar o corpo) lê como
+pulinho, não como piscada.
+
+### O que exatamente pedir ao Higgsfield
+
+Um quadro por humor, idêntico ao existente **exceto pelos olhos fechados**:
+
+| arquivo                     | base          | mudança            | custo |
+| --------------------------- | ------------- | ------------------ | ----- |
+| `feliz-piscando.webp`       | `feliz`       | olhos em traço `‿` | 2 cr  |
+| `comemorando-piscando.webp` | `comemorando` | olhos em traço     | 2 cr  |
+| `preocupada-piscando.webp`  | `preocupada`  | olhos em traço     | 2 cr  |
+
+`dormindo` não precisa: os olhos já estão fechados.
+
+**A exigência que decide se presta:** o quadro tem que ser a MESMA imagem com
+outra boca de olho. Qualquer deriva de forma, cor ou posição vira um salto ao
+alternar — e alternar é o ponto. Por isso é geração com a arte atual anexada
+como referência, e a conferência é sobrepor os dois e olhar o que se mexeu além
+dos olhos.
+
+Vale registrar o risco: **a referência anexada copia demais** — foi o que
+aconteceu com as ilustrações do bebê, onde a âncora carregou a pose junto com a
+identidade. Aqui isso é bom (queremos cópia quase total), mas o defeito espelhado
+é o modelo copiar TAMBÉM os olhos abertos e não fechar nada. Se acontecer, o
+caminho é editar por `nano_banana` com instrução de edição em vez de geração.
+
+### Como tocar
+
+```
+0s ─────────── 4,7s ─┬─ 120ms fechado ─┬─────────── 9,4s ─┬─ …
+                     └ troca o src ────┘
+```
+
+Um intervalo de ~4,7 s (não múltiplo de 3,6 s nem de 8,3 s, pelo mesmo motivo do
+resto) troca o `src` por 120 ms e volta. Sem CSS de sprite, sem `steps()`, sem
+dependência: é `useState` e um `setTimeout`.
+
+Peso: +36 KB no total, e só a imagem do humor em cena baixa.
+
+**Depois disso eu pararia.** Uma bolha que respira no compasso, flutua sem
+repetir, afunda no toque e pisca sozinha já entrega tudo que "3D" queria
+significar — e nada disso custa bateria ou bundle.
