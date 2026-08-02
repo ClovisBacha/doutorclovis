@@ -49,15 +49,35 @@ export function humorDaJornada(o: {
   return "feliz";
 }
 
+/**
+ * Ela respirando junto com a paciente.
+ *
+ * `fase` é a fase do ciclo e `duracaoMs` é quanto aquela fase dura — a mesma
+ * duração que move o som e a vibração. Passar isso faz a bolha inflar e
+ * esvaziar NO COMPASSO, em vez de flutuar num laço próprio.
+ *
+ * O papel dela aqui é CONFIRMAR, não instruir. Quem conduz de olhos fechados é
+ * o som (e a vibração, onde existe); ela é o que a paciente encontra quando
+ * abre o olho para conferir se ainda está junto. Por isso não há texto nenhum
+ * grudado nela — a palavra "Inspire" na tela é exatamente o que faz a pessoa
+ * parar de fechar os olhos.
+ */
+export type Respiro = { fase: "in" | "hold" | "out"; duracaoMs: number };
+
+/** Quanto ela cresce em cada fase. Cheia no ápice, murcha no fim da expiração. */
+const ESCALA: Record<Respiro["fase"], number> = { in: 1.16, hold: 1.16, out: 0.9 };
+
 export function Bolha({
   humor = "feliz",
   tamanho = 64,
   flutua = true,
+  respiro,
   className = "",
 }: {
   humor?: Humor;
   tamanho?: number;
   flutua?: boolean;
+  respiro?: Respiro;
   className?: string;
 }) {
   const [apertada, setApertada] = useState(false);
@@ -72,17 +92,54 @@ export function Bolha({
     solta.current = window.setTimeout(() => setApertada(false), 220);
   }
 
+  /* Respirando, o flutuar SAI. As duas animações escrevem no mesmo `transform`
+     do corpo, e a última a rodar ganharia — o resultado seria a bolha ora
+     respirando ora subindo, sem regra visível. Quando há compasso, ele manda. */
+  const respirando = !!respiro;
+  const escala = respiro ? ESCALA[respiro.fase] : 1;
+
   return (
     <span
-      className={`bolha-viva ${flutua ? "bolha-flutua" : ""} ${apertada ? "bolha-apertada" : ""} ${className}`}
+      className={`bolha-viva ${flutua && !respirando ? "bolha-flutua" : ""} ${respirando ? "bolha-respira" : ""} ${apertada ? "bolha-apertada" : ""} ${className}`}
       style={{ width: tamanho, height: tamanho }}
       onPointerDown={tocar}
       aria-hidden
     >
       {/* A sombra é irmã, não filha: precisa encolher enquanto o corpo estica,
           e uma sombra dentro do elemento herdaria a mesma deformação. */}
-      <span className="bolha-sombra" />
-      <img className="bolha-corpo" src={ARTE[humor]} alt="" draggable={false} />
+      <span
+        className="bolha-sombra"
+        style={
+          respiro
+            ? {
+                transitionDuration: `${respiro.duracaoMs}ms`,
+                /* A sombra acompanha MENOS que o corpo (0,45 do excesso). Uma
+                   sombra que cresce igual ao objeto lê como zoom da câmera;
+                   crescer menos lê como o objeto inchando sobre o mesmo chão. */
+                transform: `translateX(-50%) scale(${1 + (escala - 1) * 0.45}, 1)`,
+                opacity: 0.5 + (escala - 0.9) * 0.5,
+              }
+            : undefined
+        }
+      />
+      <img
+        className="bolha-corpo"
+        src={ARTE[humor]}
+        alt=""
+        draggable={false}
+        style={
+          respiro
+            ? {
+                transform: `scale(${escala})`,
+                transitionDuration: `${respiro.duracaoMs}ms`,
+                /* Linear, não `ease`. A respiração precisa ser previsível: uma
+                   curva que acelera no meio faria a paciente encher o pulmão
+                   depressa e ficar esperando — o oposto de guiar. */
+                transitionTimingFunction: "linear",
+              }
+            : undefined
+        }
+      />
     </span>
   );
 }

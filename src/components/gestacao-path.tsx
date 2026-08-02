@@ -3649,6 +3649,15 @@ function BreathingBlock({
   // encolhe ao expirar — igual ao "Respirar" do iPhone/Apple Watch.
   const scale = phase === "in" || phase === "hold" ? 1 : phase === "out" ? 0.5 : 0.5;
   const scaleDur = phase === "in" ? BREATH_PATTERN.in : phase === "out" ? BREATH_PATTERN.out : 0;
+  /* Duração da fase em curso — a MESMA que move o som, a vibração e a bolha.
+     `scaleDur` não serve: ele é 0 no "segure" porque os anéis não mudam de
+     tamanho ali, e uma transição de 0ms faria a bolha saltar. */
+  const faseDur =
+    phase === "hold"
+      ? BREATH_PATTERN.hold
+      : phase === "out"
+        ? BREATH_PATTERN.out
+        : BREATH_PATTERN.in;
 
   return (
     <>
@@ -3752,20 +3761,35 @@ function BreathingBlock({
                   }}
                   aria-hidden
                 />
-                <div
-                  className="flex h-32 w-32 flex-col items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-cyan-500 text-white shadow-lg"
-                  style={{
-                    transform: `scale(${scale})`,
-                    transitionProperty: "transform",
-                    transitionDuration: `${scaleDur}ms`,
-                    transitionTimingFunction: "cubic-bezier(0.4,0,0.4,1)",
-                  }}
-                >
-                  <span className="text-base font-extrabold">{label}</span>
-                  <span className="tabular-nums text-2xl font-black leading-none">{tick}</span>
+                {/* No centro, ELA — inflando e esvaziando no compasso.
+                    Duas coisas de propósito:
+
+                    · O humor é `dormindo`, de olhos fechados. O personagem
+                      DEMONSTRA o que se pede à paciente, em vez de a tela
+                      mandar. É o que o Duo faz no Duolingo: ele não explica o
+                      exercício, ele faz junto.
+
+                    · Ela escala sozinha, pelo `respiro`. Pôr um `scale` no
+                      contêiner multiplicaria com o dela e a bolha estouraria o
+                      anel — os anéis atrás continuam com o seu próprio. */}
+                <div className="relative z-10 flex flex-col items-center gap-3">
+                  <Bolha
+                    tamanho={104}
+                    humor="dormindo"
+                    flutua={false}
+                    respiro={{ fase: phase, duracaoMs: faseDur }}
+                  />
+                  <span className="tabular-nums text-2xl font-black leading-none text-sky-700">
+                    {tick}
+                  </span>
                 </div>
               </div>
+              {/* O rótulo aparecia DUAS vezes — dentro do círculo e aqui. Ficou
+                  só este: um comando repetido na mesma tela não reforça, cansa. */}
               <p className="mt-8 text-lg font-bold text-sky-800">{label}…</p>
+              <p className="mt-1 max-w-[230px] text-center text-xs text-sky-700/70">
+                Pode fechar os olhos — o som conduz o compasso.
+              </p>
               {/* Bolinhas dos ciclos — enchem conforme respira */}
               <div className="mt-3 flex gap-1.5">
                 {Array.from({ length: BREATH_CYCLES }, (_, i) => (
@@ -3783,7 +3807,12 @@ function BreathingBlock({
           {phase === "done" && (
             <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
               {!careMode && <ConfettiBurst />}
-              <span className="dc-result-in text-6xl">🌸</span>
+              {/* A flor emoji saiu: cada celular desenha uma flor diferente, e
+                  o instante que a paciente veio buscar era o único da sessão
+                  sem a personagem nele. */}
+              <span className="dc-result-in">
+                <Bolha tamanho={96} humor="comemorando" />
+              </span>
               <h3 className="mt-3 text-2xl font-extrabold text-sky-900">Que calma boa 💙</h3>
               <p className="mt-1 text-sm text-sky-800/80">
                 Você respirou com seu bebê. Guarde essa sensação.

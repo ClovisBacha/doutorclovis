@@ -2444,10 +2444,59 @@ button:active > .duo3d {
   }
 }
 
+/* A OCIOSIDADE PRECISA NÃO SE REPETIR.
+
+   O flutuar sozinho é um laço PERFEITO de 3,6s, e o olho decora um laço
+   perfeito em poucos segundos. A partir daí ele para de ler "bicho" e passa a
+   ler "GIF" — que é justamente a diferença entre o Duo do Duolingo e um adesivo
+   animado.
+
+   O truque não é animar mais: é ter um SEGUNDO ciclo cujo período não é
+   múltiplo do primeiro. 8,3s contra 3,6s só coincidem de novo depois de ~299
+   segundos, então cada volta do flutuar pega a inclinação num ponto diferente e
+   nenhuma volta sai igual à anterior. Custo: uma regra de CSS.
+
+   A inclinação mora no ENVOLTÓRIO, não no corpo. O corpo já anima `transform`
+   no `bolhaSobe`, e duas animações disputando a mesma propriedade fazem a
+   última declarada vencer — a bolha ora subiria, ora inclinaria, sem regra
+   visível. */
+.bolha-flutua {
+  animation: bolhaOlha 8.3s ease-in-out infinite;
+}
+
+@keyframes bolhaOlha {
+  0%,
+  62%,
+  100% {
+    transform: rotate(0deg);
+  }
+  70% {
+    transform: rotate(-3.5deg);
+  }
+  84% {
+    transform: rotate(2deg);
+  }
+}
+
+/* RESPIRANDO: quem manda no `transform` do corpo é o React, por estilo inline,
+   com a duração da fase em curso. Aqui só some a transição curta do toque —
+   220ms de mola no meio de uma inspiração de 4s daria um solavanco. */
+.bolha-respira .bolha-corpo,
+.bolha-respira .bolha-sombra {
+  transition-timing-function: linear;
+}
+
+/* Durante o compasso o toque NÃO deforma, e é de propósito: um squash de 220ms
+   por cima de uma inspiração de 4s quebraria a única referência visual que a
+   paciente tem quando abre o olho para conferir. O estilo inline já ganha da
+   regra de `.bolha-apertada` por especificidade; esta nota existe para que
+   isso não pareça descuido. */
+
 /* Quem liga a preferência de menos movimento tem enxaqueca ou labirintite, e
    uma boa parte das pacientes tem. A bolha para de flutuar; o retorno do
    toque fica, porque ele é resposta a uma ação dela, não animação ambiente. */
 @media (prefers-reduced-motion: reduce) {
+  .bolha-flutua,
   .bolha-flutua .bolha-corpo,
   .bolha-flutua .bolha-sombra {
     animation: none;
