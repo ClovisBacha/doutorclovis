@@ -21,7 +21,27 @@ function prefersReducedMotion(): boolean {
 }
 
 /** Explosão de confete no viewport inteiro. Some sozinha em ~2,2s. */
-export function fireConfetti(): void {
+/**
+ * O tamanho da festa cresce com a sequência.
+ *
+ * Antes o dia 3 e o dia 30 disparavam exatamente a mesma coisa — 140 confetes,
+ * quatro notas, uma vibração. Recompensa que não cresce ensina que continuar
+ * não vale nada, e é justamente na terceira semana que a paciente decide se o
+ * app faz parte da rotina ou não.
+ *
+ * Os degraus não são lineares: o salto grande está no 7 e no 30, que são as
+ * marcas que ela conta sozinha ("uma semana seguida", "um mês seguido"). Entre
+ * elas o crescimento é discreto, para o degrau seguinte ainda surpreender.
+ */
+export function nivelDaSequencia(streak: number): 1 | 2 | 3 | 4 | 5 {
+  if (streak >= 30) return 5;
+  if (streak >= 14) return 4;
+  if (streak >= 7) return 3;
+  if (streak >= 3) return 2;
+  return 1;
+}
+
+export function fireConfetti(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (prefersReducedMotion()) return;
 
@@ -44,7 +64,7 @@ export function fireConfetti(): void {
   ctx.scale(dpr, dpr);
 
   const colors = ["#f43f5e", "#fb7185", "#f59e0b", "#34d399", "#a855f7", "#fbbf24"];
-  const N = 140;
+  const N = 90 + nivel * 55;
   const parts = Array.from({ length: N }, () => ({
     x: W / 2 + (Math.random() - 0.5) * W * 0.35,
     y: H * 0.32 + (Math.random() - 0.5) * 40,
@@ -58,7 +78,7 @@ export function fireConfetti(): void {
   }));
 
   const gravity = 0.32;
-  const DURATION = 2200;
+  const DURATION = 1900 + nivel * 340;
   const start = performance.now();
 
   function frame(now: number) {
@@ -92,7 +112,7 @@ export function fireConfetti(): void {
 }
 
 /** Toque sonoro alegre (arpejo C-E-G-C). Precisa de gesto do usuário. */
-export function celebrateChime(): void {
+export function celebrateChime(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
   if (typeof window === "undefined") return;
   try {
     const AC =
@@ -100,7 +120,10 @@ export function celebrateChime(): void {
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     const ctx = new AC();
-    const notes = [523.25, 659.25, 783.99, 1046.5];
+    /* Dó–mi–sol–dó sempre; do nível 3 em diante a escala continua subindo,
+       e é a ALTURA que o ouvido lê como "foi maior", não o volume. */
+    const escala = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
+    const notes = escala.slice(0, Math.min(escala.length, 3 + nivel));
     const now = ctx.currentTime;
     notes.forEach((f, i) => {
       const osc = ctx.createOscillator();
@@ -125,10 +148,16 @@ export function celebrateChime(): void {
 }
 
 /** Vibração curta e festiva (Android; iOS PWA não tem Vibration API). */
-export function celebrateHaptic(): void {
+export function celebrateHaptic(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
   if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
   try {
-    navigator.vibrate([30, 40, 30, 40, 70]);
+    /* Um par de batidas por nível, e a última mais longa. O padrão fica
+       reconhecível pelo COMPRIMENTO — no bolso ela sente que hoje foi maior
+       sem precisar olhar a tela. */
+    const padrao: number[] = [];
+    for (let i = 0; i < 1 + nivel; i++) padrao.push(30, 40);
+    padrao.push(40 + nivel * 30);
+    navigator.vibrate(padrao);
   } catch {
     /* sem vibração */
   }

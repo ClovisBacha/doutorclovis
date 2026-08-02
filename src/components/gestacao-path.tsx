@@ -42,7 +42,7 @@ import {
   IconeLoja,
   IconeTrofeu,
 } from "@/components/icones-jogo";
-import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
+import { fireConfetti, celebrateChime, celebrateHaptic, nivelDaSequencia } from "@/lib/celebrate";
 
 /**
  * Comemora o bônus por VARIAR as atividades (a "sequência" da semana): confete
@@ -1564,9 +1564,14 @@ export function GestacaoPath({
       collectSticker(Math.floor(D / 7), false);
       // 3 estrelas fechadas hoje (fora do Modo Cuidado): bônus + celebração.
       if (D === todayD && !careMode) {
-        fireConfetti();
-        celebrateChime();
-        celebrateHaptic();
+        /* A festa cresce com a sequência: `streak` já conta os dias seguidos,
+           e é ele que decide quantos confetes, quantas notas e quanta
+           vibração. Somo 1 porque HOJE ainda não entrou na conta quando esta
+           linha roda. */
+        const nivel = nivelDaSequencia(streak + 1);
+        fireConfetti(nivel);
+        celebrateChime(nivel);
+        celebrateHaptic(nivel);
         (async () => {
           try {
             const { supabase } = await import("@/integrations/supabase/client");
