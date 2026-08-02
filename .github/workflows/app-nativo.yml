@@ -52,12 +52,25 @@ jobs:
         with:
           bun-version: latest
 
-      # `--frozen-lockfile` sai por enquanto: as dependencias do Capacitor
-      # foram declaradas no package.json com versoes resolvidas do registro,
-      # mas o lockfile NAO foi regenerado — a rede do conteiner onde elas foram
-      # escritas derrubou os tarballs tres vezes. O primeiro `bun install` aqui
-      # gera o lock. Depois disso, DEVOLVER o `--frozen-lockfile`, que e o que
-      # impede o CI de instalar uma versao diferente da testada.
+      # As dependencias do Capacitor NAO estao no package.json.
+      #
+      # Eu as declarei uma vez, com versoes resolvidas do registro, e isso
+      # QUEBROU o CI principal: `ci.yml` usa `bun install --frozen-lockfile` nos
+      # tres jobs, e `--frozen-lockfile` falha em qualquer divergencia entre
+      # package.json e lockfile. Declarar sem instalar deixou os dois fora de
+      # sincronia e derrubou Lint, TypeScript e Testes de uma vez.
+      #
+      # A instalacao tem que acontecer com rede que funcione, gerando o lock
+      # junto. Versoes verificadas no registro em 2 de agosto de 2026:
+      #
+      #   bun add @capacitor/core@8.5.0 @capacitor/ios@8.5.0 \
+      #           @capacitor/android@8.5.0 @capacitor/status-bar@8.0.3 \
+      #           @capacitor/haptics@8.0.2 @capacitor/app@8.1.1 \
+      #           @capacitor/keyboard@8.0.5 @capacitor/splash-screen@8.0.2
+      #   bun add -d @capacitor/cli@8.5.0
+      #
+      # Feito isso, commitar package.json E bun.lock juntos, e trocar a linha
+      # abaixo por `bun install --frozen-lockfile`.
       - run: bun install
 
       # `cap sync` copia a `webDir` e reinstala os pods dos plugins. É aqui que
@@ -108,12 +121,25 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # `--frozen-lockfile` sai por enquanto: as dependencias do Capacitor
-      # foram declaradas no package.json com versoes resolvidas do registro,
-      # mas o lockfile NAO foi regenerado — a rede do conteiner onde elas foram
-      # escritas derrubou os tarballs tres vezes. O primeiro `bun install` aqui
-      # gera o lock. Depois disso, DEVOLVER o `--frozen-lockfile`, que e o que
-      # impede o CI de instalar uma versao diferente da testada.
+      # As dependencias do Capacitor NAO estao no package.json.
+      #
+      # Eu as declarei uma vez, com versoes resolvidas do registro, e isso
+      # QUEBROU o CI principal: `ci.yml` usa `bun install --frozen-lockfile` nos
+      # tres jobs, e `--frozen-lockfile` falha em qualquer divergencia entre
+      # package.json e lockfile. Declarar sem instalar deixou os dois fora de
+      # sincronia e derrubou Lint, TypeScript e Testes de uma vez.
+      #
+      # A instalacao tem que acontecer com rede que funcione, gerando o lock
+      # junto. Versoes verificadas no registro em 2 de agosto de 2026:
+      #
+      #   bun add @capacitor/core@8.5.0 @capacitor/ios@8.5.0 \
+      #           @capacitor/android@8.5.0 @capacitor/status-bar@8.0.3 \
+      #           @capacitor/haptics@8.0.2 @capacitor/app@8.1.1 \
+      #           @capacitor/keyboard@8.0.5 @capacitor/splash-screen@8.0.2
+      #   bun add -d @capacitor/cli@8.5.0
+      #
+      # Feito isso, commitar package.json E bun.lock juntos, e trocar a linha
+      # abaixo por `bun install --frozen-lockfile`.
       - run: bun install
 
       # Mesma nota do iOS: `add` aqui e temporario, ate o `android/` ser
