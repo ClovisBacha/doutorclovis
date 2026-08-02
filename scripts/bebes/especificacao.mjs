@@ -98,10 +98,37 @@
  * 39 gerações independentes produzem 39 bebês diferentes — a criança trocaria
  * de rosto toda semana, o que numa tela aberta diariamente é pior que ter 5
  * imagens. Seis âncoras são geradas primeiro e com cuidado; da semana 12 em
- * diante, cada semana usa a âncora mais próxima como imagem de referência, e a
- * deriva fica contida em blocos de ~6 semanas em vez de acumular por 39.
+ * diante, `ancoraDe` diz qual delas é a vizinha mais próxima.
  *
  * Antes da 12 não se encadeia — ver `PRIMEIRA_SEMANA_ENCADEADA`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ANEXAR A ÂNCORA COMO IMAGEM DE REFERÊNCIA NÃO FUNCIONA — MEDIDO, NÃO SUPOSTO
+ *
+ * A ideia original era mandar a âncora junto, como `medias[role=image]`. Doze
+ * semanas foram geradas assim e o resultado foi o contrário do pretendido: a
+ * referência carregou a POSE, não só a identidade. As semanas 10 a 16 saíram
+ * como a MESMA imagem seis vezes — a 12 pedia "uma perna chutando para fora", a
+ * 13 "queixo encaixado no peito", a 15 "rosto inclinado para a luz", a 16
+ * "cabeça virada de lado", e nenhuma aconteceu. Semelhança medida entre
+ * vizinhas: 0,904 · 0,977 · 0,953. O enquadramento também travou: folga de
+ * exatamente 305px e ocupação de 68,x% em quase todas.
+ *
+ * Tentei consertar por texto, com um bloco explícito ("copie rosto, pele e
+ * proporção; NÃO copie a pose; a pose TEM que sair visivelmente diferente").
+ * Duas semanas foram regeradas com ele — 12 e 16 — e saíram idênticas às
+ * anteriores. O bloco foi removido: código que não faz o que promete é pior que
+ * código ausente, porque o próximo a ler acredita nele.
+ *
+ * A prova do contrário estava do lado: as SEIS âncoras foram geradas SEM
+ * referência e cada uma acertou a sua pose — a 14 chupando o dedo, a 20
+ * chutando, a 26 com a pálpebra entreaberta, a 33 e a 40 dormindo. Com imagem
+ * anexada o modelo copia; sem ela, ele lê.
+ *
+ * Então a consistência vem do bloco de ESTILO, que é idêntico nas 39 — e ele
+ * basta: as seis âncoras, geradas independentemente, parecem a mesma obra. A
+ * âncora continua existindo como referência de APROVAÇÃO (é o que se olha para
+ * decidir se a faixa está certa), não como entrada da geração.
  */
 
 /**
