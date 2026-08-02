@@ -52,12 +52,28 @@ jobs:
         with:
           bun-version: latest
 
-      - run: bun install --frozen-lockfile
+      # `--frozen-lockfile` sai por enquanto: as dependencias do Capacitor
+      # foram declaradas no package.json com versoes resolvidas do registro,
+      # mas o lockfile NAO foi regenerado — a rede do conteiner onde elas foram
+      # escritas derrubou os tarballs tres vezes. O primeiro `bun install` aqui
+      # gera o lock. Depois disso, DEVOLVER o `--frozen-lockfile`, que e o que
+      # impede o CI de instalar uma versao diferente da testada.
+      - run: bun install
 
       # `cap sync` copia a `webDir` e reinstala os pods dos plugins. É aqui que
       # aparece plugin declarado no package.json e ausente do projeto nativo.
-      - name: Sincronizar Capacitor
-        run: bunx cap sync ios
+      # `cap add` cria o projeto Xcode. Ele nao existe no repositorio porque
+      # gerar exige o CLI instalado, e a instalacao nao passou no conteiner onde
+      # esta casca foi escrita.
+      #
+      # Rodar `add` no CI e temporario e tem um custo: qualquer coisa que se
+      # personalize no projeto nativo (Info.plist, icones, permissoes) se perde
+      # a cada execucao. Assim que o primeiro build passar, o `ios/` deve ser
+      # gerado UMA vez, personalizado e COMMITADO — e este passo vira so `sync`.
+      - name: Preparar projeto iOS
+        run: |
+          [ -d ios ] || bunx cap add ios
+          bunx cap sync ios
 
       - name: Compilar para o simulador
         # `CODE_SIGNING_ALLOWED=NO` é o que dispensa a conta: sem assinatura o
@@ -92,10 +108,20 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - run: bun install --frozen-lockfile
+      # `--frozen-lockfile` sai por enquanto: as dependencias do Capacitor
+      # foram declaradas no package.json com versoes resolvidas do registro,
+      # mas o lockfile NAO foi regenerado — a rede do conteiner onde elas foram
+      # escritas derrubou os tarballs tres vezes. O primeiro `bun install` aqui
+      # gera o lock. Depois disso, DEVOLVER o `--frozen-lockfile`, que e o que
+      # impede o CI de instalar uma versao diferente da testada.
+      - run: bun install
 
-      - name: Sincronizar Capacitor
-        run: bunx cap sync android
+      # Mesma nota do iOS: `add` aqui e temporario, ate o `android/` ser
+      # gerado, personalizado e commitado.
+      - name: Preparar projeto Android
+        run: |
+          [ -d android ] || bunx cap add android
+          bunx cap sync android
 
       - name: Compilar o APK de debug
         run: cd android && ./gradlew assembleDebug --no-daemon
