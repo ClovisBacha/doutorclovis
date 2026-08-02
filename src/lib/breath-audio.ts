@@ -5,6 +5,8 @@
  * Também serve de fundo calmo pra meditação. Tudo com guardas: se o navegador
  * não suportar, simplesmente não toca (nunca quebra a tela).
  */
+import { tocarPadrao } from "./nativo";
+
 export type BreathPhase = "in" | "hold" | "out";
 
 export function createBreathAudio() {
@@ -104,16 +106,21 @@ export function createBreathAudio() {
  *    e aí só a tela resolveria, que é exatamente o que se quer evitar.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * O QUE NÃO DÁ PARA CONSERTAR AQUI
+ * O IPHONE — o que mudou, e o que continua valendo
  *
- * O Safari nunca implementou a Vibration API. No iPhone pela web isto é um
- * no-op — não é bug, não tem polyfill, não tem contorno. Vale no Android e
- * dentro de um app nativo.
+ * O Safari nunca implementou a Vibration API: pela web, no iPhone, isto é um
+ * no-op. Não é bug, não tem polyfill.
  *
- * Por isso a vibração é REFORÇO, nunca o único condutor: quem guia de olhos
- * fechados nos dois sistemas é o som (`setPhase` acima, que incha ao inspirar e
- * afina ao expirar). Se algum dia a vibração virar o guia principal, metade das
- * pacientes fica sem guia nenhum.
+ * Dentro do app nativo tem. Mas não do mesmo jeito: o Haptics do iOS NÃO aceita
+ * padrão — aceita impactos individuais, com intensidade. Quem faz essa tradução
+ * é `tocarPadrao`, em `nativo.ts`, e ela é melhor do que a original: o motor
+ * táptico tem `light`, `medium` e `heavy`, que é exatamente a forma que este
+ * crescendo já tinha.
+ *
+ * O que NÃO muda: a vibração continua sendo REFORÇO, nunca o único condutor.
+ * Quem guia de olhos fechados nos dois sistemas é o som (`setPhase` acima, que
+ * incha ao inspirar e afina ao expirar) — porque pelo navegador, que é como a
+ * maioria ainda abre, o iPhone continua mudo.
  */
 
 /**
@@ -164,11 +171,7 @@ export function padraoDaFase(fase: BreathPhase, durMs: number): number[] {
  * sem ela o padrão não teria como durar o que precisa durar.
  */
 export function vibratePhase(phase: BreathPhase, durMs: number) {
-  try {
-    if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
-    const padrao = padraoDaFase(phase, durMs);
-    if (padrao.length) navigator.vibrate(padrao);
-  } catch {
-    /* sem haptics */
-  }
+  /* A escolha do canal — impactos no iPhone nativo, padrão inteiro no Android,
+     silêncio onde não há nada — mora em `tocarPadrao`. Aqui só entra a forma. */
+  tocarPadrao(padraoDaFase(phase, durMs));
 }
