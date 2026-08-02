@@ -31,6 +31,9 @@ export const Route = createFileRoute("/preview-jogo")({
     // foto — e é justamente a metade (quatro apoios, borboleta) que o desenho
     // precisa provar que desenha certo.
     dia: Number(q.dia ?? 139),
+    /* `?premium=1` só para fotografar a tela liberada. Fora disso a bancada
+       mostra o que uma visitante sem assinatura veria. */
+    premium: q.premium === "1" || q.premium === true,
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -39,7 +42,7 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
-  const { tela, bebe, pele, dia } = Route.useSearch();
+  const { tela, bebe, pele, dia, premium } = Route.useSearch();
   useEffect(() => {
     if (!pele) return;
     lsSet(SKIN_KEY, pele);
@@ -57,7 +60,19 @@ function PreviewJogo() {
       <GestacaoPath
         profile={{ baby_name: bebe }}
         gest={{ weeks: Math.floor(dia / 7), days: dia % 7, totalDays: dia }}
-        quizPremium
+        /**
+         * A bancada NÃO libera o conteúdo pago.
+         *
+         * Esta rota é pública — não está sob `_authenticated` e o robots.txt
+         * não a bloqueia; a única proteção era a meta `noindex`. Com
+         * `quizPremium` cravado, qualquer pessoa com o link abria as 294 aulas
+         * variando `?dia=`, que é exatamente o que a assinatura vende.
+         *
+         * Para conferir o visual do portão de premium, use `?premium=1` — o
+         * que a bancada precisa mostrar é a TELA, e o padrão passa a ser o que
+         * uma visitante de verdade veria.
+         */
+        quizPremium={premium}
         careMode={false}
         onOpenShop={() => {}}
         bancada={

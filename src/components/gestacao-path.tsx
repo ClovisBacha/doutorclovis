@@ -3961,20 +3961,57 @@ const MOVIMENTOS: Movimento[] = [
   },
 ];
 
-/** 3 movimentos do dia (rotação determinística por dia). */
-function movimentosForDay(day: number): Movimento[] {
-  const start = day % MOVIMENTOS.length;
-  return [0, 1, 2].map((k) => MOVIMENTOS[(start + k) % MOVIMENTOS.length]);
+/**
+ * Movimentos que NÃO servem para todo mundo.
+ *
+ * Quatro apoios e borboleta no chão são seguros e até úteis em boa parte da
+ * gestação, mas deixam de ser em dois momentos:
+ *
+ *  · No PÓS-PARTO recente. A rotação antiga não sabia disso, e uma mulher com
+ *    três dias de puérpera recebia gato-camelo em quatro apoios — três dias
+ *    depois de uma cesárea, se tiver sido cesárea.
+ *  · No FIM da gestação, quando a sínfise púbica dói, abrir o quadril sentada
+ *    no chão e ficar de quatro deixam de ser alívio e viram esforço.
+ *
+ * Não é uma regra de conduta clínica: é o mínimo de bom senso para não
+ * oferecer o movimento errado no dia errado. Quem decide o que ela pode fazer
+ * continua sendo o obstetra dela.
+ */
+const CHAO = new Set(["gatocamelo", "balanco", "quadril"]);
+
+/**
+ * Os 3 movimentos do dia.
+ *
+ * `semana` é opcional só porque o pós-parto chama sem ela — mas quando vem, é
+ * ela que decide quais movimentos entram no sorteio. Antes a função recebia
+ * apenas o dia e girava os nove por `day % 9`: uma gestante de 6 semanas e
+ * outra de 40 recebiam exatamente o mesmo trio, e a semana estava disponível
+ * no escopo de quem chamava, sem ser passada.
+ */
+function movimentosForDay(day: number, semana?: number, posParto = false): Movimento[] {
+  const elegiveis =
+    posParto || (semana != null && semana >= 37)
+      ? MOVIMENTOS.filter((m) => !CHAO.has(m.id))
+      : MOVIMENTOS;
+  // Sobram 6 movimentos no filtro — ainda dá os 3 do dia sem repetir.
+  const start = day % elegiveis.length;
+  return [0, 1, 2].map((k) => elegiveis[(start + k) % elegiveis.length]);
 }
 
 function MovementBlock({
   day,
+  semana,
+  posParto = false,
   canEarn,
   careMode = false,
   alreadyDone,
   onEarn,
   aoSair,
 }: {
+  /** Semana gestacional — decide quais movimentos entram no sorteio. */
+  semana?: number;
+  /** No pós-parto os movimentos de chão saem, qualquer que seja o dia. */
+  posParto?: boolean;
   day: number;
   canEarn: boolean;
   careMode?: boolean;
@@ -3992,7 +4029,7 @@ function MovementBlock({
    */
   aoSair?: () => void;
 }) {
-  const seq = useMemo(() => movimentosForDay(day), [day]);
+  const seq = useMemo(() => movimentosForDay(day, semana, posParto), [day, semana, posParto]);
   const [open, setOpen] = useState(!!aoSair);
   // Aberto pela lista, o exercício começa NO exercício. A telinha "Movimento
   // do dia / Começar" só repetia o nome do card que ela acabou de tocar; o
@@ -5960,6 +5997,7 @@ function AtividadeIcone({ chave }: { chave: string }) {
  */
 function WellnessScreen({
   day,
+  ehPosParto = false,
   canEarn,
   careMode,
   halves,
@@ -5974,6 +6012,14 @@ function WellnessScreen({
   onClose,
 }: {
   day: number;
+  /**
+   * O caminho pós-parto entra aqui com `D = idade do bebê + 7`.
+   *
+   * Sem esta bandeira, um `D` de 10 (três dias de puérpera) pareceria semana 1
+   * de gestação, e os movimentos de chão — gato-camelo, borboleta, balanço em
+   * quatro apoios — sairiam normalmente. Três dias depois de uma cesárea.
+   */
+  ehPosParto?: boolean;
   canEarn: boolean;
   careMode?: boolean;
   /** Meias estrelas do dia (0–6): aula + 5 jogos de bem-estar. */
@@ -6221,6 +6267,10 @@ function WellnessScreen({
             </p>
             <Chosen
               day={day}
+              /* A semana sai do dia gestacional, como em todo o arquivo. Só o
+                 bloco de Movimento lê — os outros ignoram a prop extra. */
+              semana={Math.floor(day / 7)}
+              posParto={ehPosParto}
               canEarn={canEarn}
               careMode={careMode}
               alreadyDone={done.has(activity.key)}

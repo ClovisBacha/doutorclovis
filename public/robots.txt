@@ -8,3 +8,7 @@ Disallow: /painel
 Disallow: /minha-conta
 
 Sitemap: https://www.obstetrica.com.br/sitemap.xml
+
+# Bancadas visuais internas. A meta noindex de cada rota ja pede isso, mas
+# ela so vale para quem executa JavaScript.
+Disallow: /preview-

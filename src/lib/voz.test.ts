@@ -65,7 +65,10 @@ describe("voz guiada", () => {
     const s = readFileSync(join(RAIZ, "src", "components", "gestacao-path.tsx"), "utf8");
     const bloco = s.slice(
       s.indexOf("const MOVIMENTOS: Movimento[] = ["),
-      s.indexOf("/** 3 movimentos do dia"),
+      // Âncora no CÓDIGO, não num comentário: a primeira versão terminava
+      // a fatia num texto de comentário, e bastou reescrevê-lo para o teste
+      // varrer o arquivo inteiro e achar `id:` de outras coisas.
+      s.indexOf("function movimentosForDay"),
     );
     const ids = [...bloco.matchAll(/id:\s*"([^"]+)"/g)].map((m) => m[1]);
     expect(ids.length).toBeGreaterThan(0);
@@ -76,7 +79,10 @@ describe("voz guiada", () => {
     const s = readFileSync(join(RAIZ, "src", "components", "gestacao-path.tsx"), "utf8");
     const bloco = s.slice(
       s.indexOf("const MOVIMENTOS: Movimento[] = ["),
-      s.indexOf("/** 3 movimentos do dia"),
+      // Âncora no CÓDIGO, não num comentário: a primeira versão terminava
+      // a fatia num texto de comentário, e bastou reescrevê-lo para o teste
+      // varrer o arquivo inteiro e achar `id:` de outras coisas.
+      s.indexOf("function movimentosForDay"),
     );
     const ids = new Set([...bloco.matchAll(/id:\s*"([^"]+)"/g)].map((m) => m[1]));
     expect(movimentosComFaixa().filter((i) => !ids.has(i))).toEqual([]);
