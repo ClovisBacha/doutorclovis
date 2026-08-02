@@ -377,14 +377,46 @@ describe("ARCO — nenhum corpo salta em linha reta aprumado", () => {
   });
 });
 
-describe("SOBREPOSIÇÃO — nada se move em bloco perfeito", () => {
-  test("a sombra do pulo sai atrasada do corpo", () => {
-    /* Defasagem medida entre as camadas era 0ms em todos os casos. Nenhuma
-       parte da personagem chegava atrasada — e e isso, mais que qualquer outra
-       coisa, que separa um personagem de um adesivo. */
+describe("SOBREPOSIÇÃO — vem dos extremos escalonados, não de atraso de fase", () => {
+  test("a sombra de contato NÃO atrasa", () => {
+    /* Eu tinha posto 45ms de `animation-delay` achando que era sobreposição.
+       Sobreposição vale para apêndice com INÉRCIA — orelha, cauda, cabelo.
+       Sombra de contato é projeção geométrica: não tem massa, não pode chegar
+       depois. Os 45ms eram o chão informando por 2,7 quadros uma altura que o
+       corpo já não tinha. */
     const bloco = css.match(/\.bolha-pulo \.bolha-sombra \{[^}]*\}/)![0];
-    const atraso = Number(bloco.match(/animation-delay:\s*(\d+)ms/)![1]);
-    expect(atraso).toBeGreaterThan(20);
-    expect(atraso).toBeLessThan(DURACAO_ACAO.pulo / 8); // atraso demais descola
+    expect(bloco).not.toContain("animation-delay");
+  });
+
+  test("os extremos das camadas do pulo caem em quadros diferentes", () => {
+    /* A sobreposição real: rotação, translação, escala e sombra atingem seus
+       picos em porcentagens distintas do mesmo intervalo. */
+    const pico = (nome: string, ler: (c: string) => number | null) => {
+      const q = quadros(nome)
+        .map(([p, c]) => [p, ler(c)] as const)
+        .filter(([, v]) => v !== null && v !== 0);
+      return q.reduce((a, b) => (Math.abs(b[1]!) > Math.abs(a[1]!) ? b : a))[0];
+    };
+    const picos = [
+      pico("bolhaPuloGiro", giro),
+      pico("bolhaPulo", transY),
+      pico("bolhaPuloCorpo", (c) => {
+        const e = escala(c);
+        return e ? e.y - 1 : null;
+      }),
+    ];
+    expect(new Set(picos).size).toBe(picos.length); // nenhum coincide
+  });
+});
+
+describe("MENOS MOVIMENTO nao pode deixar a acao INERTE", () => {
+  test("as acoes reafirmam a duracao com !important", () => {
+    /* A regra universal poe `animation-duration: 0.001ms !important`, que vence
+       um `animation-name` sozinho. Medido antes do conserto: 1 quadro distinto
+       em 300ms nas quatro acoes. Os keyframes suaves eram codigo morto e o
+       comentario afirmava o contrario do que o navegador fazia. */
+    const reduce = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+    const comDuracao = [...reduce.matchAll(/animation-duration:\s*\d+ms\s*!important/g)];
+    expect(comDuracao.length).toBeGreaterThanOrEqual(3);
   });
 });

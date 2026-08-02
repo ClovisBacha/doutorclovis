@@ -2418,6 +2418,11 @@ button:active > .duo3d {
   transform: translateX(-50%);
   border-radius: 999px;
   background: radial-gradient(ellipse, rgba(90, 60, 55, 0.26), transparent 72%);
+  /* Todo keyframe de repouso vale 0,85, e a base valia 1. A classe da acao sai
+     40ms DEPOIS da animacao terminar (`DURACAO_ACAO + 40`), e nessa janela a
+     base reaparecia: medido um flash de +17,6% por 1-2 quadros no fim do
+     `atencao` e do `chegar`. O `pulo` escapava por 5ms de sorte. */
+  opacity: 0.85;
   transition:
     transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
     opacity 220ms ease;
@@ -2466,7 +2471,11 @@ button:active > .duo3d {
 .bolha-apertada .bolha-corpo {
   animation: bolhaToque 520ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.bolha-apertada .bolha-sombra {
+/* Especificidade subida de proposito. `.bolha-flutua .bolha-sombra` tem o mesmo
+   peso e vem DEPOIS na folha, entao a sombra do toque nunca rodava — e
+   `flutua` e o padrao de todos os usos do app. A interacao mais frequente era a
+   unica sem resposta de chao, por acidente de ordem de arquivo. */
+.bolha-viva.bolha-apertada .bolha-sombra {
   animation: bolhaToqueSombra 520ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -2596,13 +2605,14 @@ button:active > .duo3d {
 .bolha-pulo .bolha-corpo {
   animation: bolhaPuloCorpo 900ms cubic-bezier(0.33, 0, 0.28, 1);
 }
-/* A sombra sai 45ms ATRASADA. Todas as camadas atingindo o keyframe no mesmo
-   quadro e o que mais faz um personagem parecer adesivo: nada na natureza se
-   move em bloco perfeito. `animation-delay` nao muda a duracao, so a fase —
-   o teste que cobra durações iguais continua valendo. */
+/* Sem atraso. Eu tinha posto 45ms achando que era sobreposicao — e sobreposicao
+   vale para apendice com INERCIA (orelha, cauda, cabelo). Sombra de contato e
+   projecao geometrica: nao tem massa, nao pode chegar depois. Medido, os 45ms
+   eram o chao informando por 2,7 quadros uma altura que o corpo ja nao tinha.
+   A sobreposicao real do pulo vem das quatro camadas atingindo seus extremos
+   em 234 / 414 / 458 / 630ms — 396ms de espalhamento, sem truque de fase. */
 .bolha-pulo .bolha-sombra {
   animation: bolhaPuloSombra 900ms cubic-bezier(0.33, 0, 0.28, 1);
-  animation-delay: 45ms;
 }
 
 @keyframes bolhaPulo {
@@ -2886,12 +2896,23 @@ button:active > .duo3d {
   .bolha-iris .bolha-brilho {
     animation: none;
   }
+  /* `animation-name` sozinho nao basta: a regra universal la em cima poe
+     `animation-duration: 0.001ms !important`, que vence. Medido: as quatro
+     acoes rodavam 1 quadro distinto em 300ms — inertes. Os keyframes suaves
+     eram codigo morto, e o comentario acima afirmava o contrario do que o
+     navegador fazia. A duracao precisa voltar com o mesmo peso. */
   .bolha-pulo .bolha-palco,
   .bolha-atencao .bolha-palco {
     animation-name: bolhaPuloSuave;
+    animation-duration: 620ms !important;
   }
   .bolha-nao {
     animation-name: bolhaNaoSuave;
+    animation-duration: 420ms !important;
+  }
+  .bolha-apertada .bolha-corpo,
+  .bolha-viva.bolha-apertada .bolha-sombra {
+    animation-duration: 320ms !important;
   }
 }
 
