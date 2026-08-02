@@ -276,7 +276,7 @@ export const SEMANAS = [
     marco: "Cordas vocais se formam.",
     forma:
       "a small fetus, head large but body lengthening, closed peaceful eyes, soft rounding cheeks, translucent pink skin",
-    pose: "curled, chin gently tucked toward the chest",
+    pose: "curled up tight into a small ball: both knees drawn right up against the chest and both arms wrapped around them, eyes closed",
   },
 
   // ── 2º TRIMESTRE — proporção, pele, cabelo. Muda de verdade, mais devagar ──
@@ -331,7 +331,7 @@ export const SEMANAS = [
     marcoEn: "vernix caseosa now covers the skin",
     forma:
       "a fetus whose skin carries a very soft, subtle creamy-white sheen — a gentle waxy bloom, tasteful and clean, never messy",
-    pose: "curled, eyes closed, both hands near the face",
+    pose: "STRETCHED OUT, not curled: the body uncurled and long, one arm reaching up above the head, the other resting on the belly, eyes closed",
   },
   {
     s: 20,
@@ -349,7 +349,7 @@ export const SEMANAS = [
     marcoEn: "eyebrows and eyelids are fully formed",
     forma:
       "a slender fetus with fine delicate eyebrows now visible and clearly defined eyelids, a sweet little face — the body still thin and delicate: NO chubbiness, NO fat rolls, NO double chin",
-    pose: "curled, face turned toward the viewer's left, eyebrows readable, eyes closed",
+    pose: "head tipped back so the forehead and the fine eyebrows catch the light from above, one open hand resting flat against the cheek, eyes closed",
   },
   {
     s: 22,
@@ -398,7 +398,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Reconhece sua voz.",
     forma:
-      "a slim fetus with soft hair, softly rounded cheeks and gently closed eyes again, the limbs only starting to fill out — still lean: NO chubbiness, NO fat rolls, NO double chin",
+      "a slim fetus with soft LIGHT-BROWN hair, softly rounded cheeks and gently closed eyes again, the limbs only starting to fill out — still lean: NO chubbiness, NO fat rolls, NO double chin",
     pose: "curled, head turned as if toward a familiar sound, eyes closed",
   },
 
@@ -408,7 +408,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Sonha em REM. Início do 3º trimestre.",
     forma:
-      "a well-formed baby, still slender, with fine soft hair, cheeks just beginning to round, slim arms and legs starting to fill out, smooth healthy skin — NO fat rolls, NO double chin",
+      "a well-formed baby, still slender, with a covering of fine LIGHT-BROWN HAIR clearly visible over the whole scalp, cheeks just beginning to round, slim arms and legs starting to fill out, smooth healthy skin — NO fat rolls, NO double chin",
     pose: "curled peacefully asleep, one hand near the cheek",
   },
   {
@@ -416,7 +416,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Músculos e pulmões amadurecem.",
     forma:
-      "a baby with firmer limbs and gently rounding cheeks, fine soft hair, healthy but still slim — NO fat rolls, NO double chin",
+      "a baby with firmer limbs and gently rounding cheeks, a covering of fine LIGHT-BROWN HAIR clearly visible over the whole scalp, healthy but still slim — NO fat rolls, NO double chin",
     pose: "curled asleep with the eyes closed, arms drawn in, chest gently full",
   },
   {
@@ -424,7 +424,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Cérebro se desenvolve rapidamente.",
     forma:
-      "a baby with a well-rounded head, fine soft light-brown hair, softly rounded cheeks and limbs — filling out, but still slim and NOT chubby",
+      "a baby with a well-rounded head under a covering of fine LIGHT-BROWN HAIR clearly visible over the whole scalp, softly rounded cheeks and limbs — filling out, but still slim and NOT chubby",
     pose: "curled, one fist against the cheek, deeply asleep",
   },
   {
@@ -433,7 +433,7 @@ export const SEMANAS = [
     marco: "Pode girar a cabeça.",
     marcoEn: "it can turn its head",
     forma:
-      "a healthy baby with soft hair, softly full cheeks and gently rounded limbs — NO deep fat rolls, NO double chin",
+      "a healthy baby with a covering of fine LIGHT-BROWN HAIR clearly visible over the whole scalp, softly full cheeks and gently rounded limbs — NO deep fat rolls, NO double chin",
     pose: "curled, eyes closed, head clearly turned to the side, mid-movement",
   },
   {
@@ -442,7 +442,7 @@ export const SEMANAS = [
     marco: "Unhas dos pés se formam.",
     marcoEn: "the toenails are forming",
     forma:
-      "a healthy rounding baby with soft hair, gently rounded limbs, and tiny toes with delicate soft nails — NO deep fat rolls, NO double chin",
+      "a healthy rounding baby with a covering of fine LIGHT-BROWN HAIR clearly visible over the whole scalp, gently rounded limbs, and tiny toes with delicate soft nails — NO deep fat rolls, NO double chin",
     pose: "curled with the eyes closed and one little foot lifted and visible, toes readable",
   },
   {
@@ -458,7 +458,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Pulmões quase prontos.",
     forma:
-      "a healthy baby with a fuller chest, soft hair, round soft cheeks and smooth skin — comfortably rounded, with only a faint crease at wrists and thighs, NO double chin",
+      "a healthy baby with a fuller chest, soft LIGHT-BROWN hair, round soft cheeks and smooth skin — comfortably rounded, with only a faint crease at wrists and thighs, NO double chin",
     pose: "curled asleep with the eyes closed, chest full, one arm relaxed outward",
   },
   {
@@ -467,8 +467,8 @@ export const SEMANAS = [
     marco: "Posição cefálica se define.",
     marcoEn: "the head-down (cephalic) position is settling",
     forma:
-      "a healthy, comfortably rounded baby with soft hair and full round cheeks — realistic newborn build, faint wrist and thigh creases only",
-    pose: "HEAD-DOWN: the baby is oriented head-downward in the frame, curled and settled with the eyes closed — the cephalic position, clearly readable",
+      "a healthy, comfortably rounded baby with fine soft LIGHT-BROWN hair and full round cheeks — realistic newborn build, faint wrist and thigh creases only",
+    pose: "UPSIDE DOWN IN THE FRAME: the head is at the BOTTOM of the picture and the feet at the TOP. The whole body is rotated 180 degrees — still seen in profile, still facing left, but inverted, so the crown of the head points at the bottom edge, curled and settled with the eyes closed — the cephalic position, unmistakable",
   },
   {
     s: 36,
@@ -476,7 +476,7 @@ export const SEMANAS = [
     marco: "Considerado a termo precoce em breve.",
     forma:
       "a healthy rounded baby with full cheeks and softly filled limbs, soft light-brown hair, smooth skin — faint wrist and thigh creases only, NO double chin",
-    pose: "head-down, curled compactly with the eyes closed, less room to move",
+    pose: "UPSIDE DOWN IN THE FRAME: the head is at the BOTTOM of the picture and the feet at the TOP. The whole body is rotated 180 degrees — still seen in profile, still facing left, but inverted, so the crown of the head points at the bottom edge, curled compactly with the eyes closed, less room to move",
   },
 
   // ── TERMO — muda pouco, mas é onde ela mais olha ──────────────────────────
@@ -495,8 +495,8 @@ export const SEMANAS = [
     marco: "Encaixe pélvico em muitos casos.",
     marcoEn: "the head has engaged in the pelvis",
     forma:
-      "a real full-term newborn with soft hair, full round cheeks and softly rounded limbs — realistic newborn build, faint wrist and thigh creases only",
-    pose: "head-down and settled low, curled compactly with the eyes closed — engaged in the pelvis",
+      "a real full-term newborn with fine soft LIGHT-BROWN hair, full round cheeks and softly rounded limbs — realistic newborn build, faint wrist and thigh creases only",
+    pose: "UPSIDE DOWN IN THE FRAME: the head is at the BOTTOM of the picture and the feet at the TOP. The whole body is rotated 180 degrees — still seen in profile, still facing left, but inverted, so the crown of the head points at the bottom edge, curled compactly with the eyes closed and drawn low toward the bottom edge — engaged in the pelvis",
   },
   {
     s: 39,
@@ -519,7 +519,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Termo tardio — acompanhamento mais de pertinho, tudo sob cuidado.",
     forma:
-      "a real full-term newborn with slightly longer soft hair, softly rounded limbs, full cheeks, healthy rosy skin — realistic build, faint creases only",
+      "a real full-term newborn with slightly longer soft LIGHT-BROWN hair, softly rounded limbs, full cheeks, healthy rosy skin — realistic build, faint creases only",
     pose: "curled snugly, fast asleep with the eyes closed, both hands near the face, calm and safe",
   },
   {
@@ -527,7 +527,7 @@ export const SEMANAS = [
     visivel: false,
     marco: "Reta final — o bem-estar do bebê é acompanhado de perto pela sua equipe.",
     forma:
-      "a real full-term newborn, longer soft hair, softly rounded limbs, full cheeks, serene and healthy — realistic newborn build, faint creases only",
+      "a real full-term newborn, longer soft LIGHT-BROWN hair, softly rounded limbs, full cheeks, serene and healthy — realistic newborn build, faint creases only",
     pose: "curled snugly, fast asleep with the eyes closed, one hand open near the cheek, utterly peaceful",
   },
 ];
