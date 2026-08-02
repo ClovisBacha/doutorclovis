@@ -3547,7 +3547,7 @@ function BreathingBlock({
         : phase === "hold"
           ? BREATH_PATTERN.hold
           : BREATH_PATTERN.out;
-    vibratePhase(phase);
+    vibratePhase(phase, dur);
     audioRef.current?.setPhase(phase, dur);
     let cancelled = false;
     const t = setTimeout(() => {
@@ -4644,7 +4644,11 @@ function MeditationBlock({
         setFase("in");
       }
     }, dur * 1000);
-    vibratePhase(fase);
+    /* `RESPIRO` guarda SEGUNDOS, e `vibratePhase` quer milissegundos. O outro
+       ponto de chamada (BreathingBlock) já usa ms, então a mesma variável `dur`
+       significa coisas diferentes nos dois — passar cru aqui daria um padrão de
+       4 ms, imperceptível, e o defeito pareceria "vibração não funciona". */
+    vibratePhase(fase, dur * 1000);
     return () => {
       clearInterval(iv);
       clearTimeout(t);
