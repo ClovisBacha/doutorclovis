@@ -1,0 +1,109 @@
+name: App nativo
+
+# Existe porque NÃO HÁ como compilar para iOS sem macOS — é regra da Apple, não
+# escolha nossa. Quem escreve o código aqui (inclusive eu, o Claude) roda em
+# Linux e não consegue gerar o app. Este runner é a única prova de que a casca
+# compila.
+#
+# E ele roda SEM conta de desenvolvedor: build para SIMULADOR não exige
+# assinatura. Isso separa duas perguntas que costumam vir emboladas —
+# "o projeto compila?" (respondida aqui, de graça, a cada push) e
+# "o app pode ir para a loja?" (que aí sim precisa dos US$ 99).
+#
+# Enquanto a conta não existe, este workflow já pega o que mais quebra: um
+# `cap sync` mal configurado, um plugin sem a permissão declarada, um Info.plist
+# faltando chave.
+
+on:
+  # ATENÇÃO — o gatilho por `push` está DESLIGADO de propósito.
+  #
+  # Este workflow depende de `@capacitor/cli` no package.json, e a instalação
+  # não passou: a rede do contêiner derrubou tarballs em duas tentativas
+  # (`ConnectionClosed downloading tarball`). Sem as dependências, `cap sync`
+  # falha e o CI ficaria vermelho por um motivo que não é do código.
+  #
+  # Assim que `bun add -d @capacitor/cli @capacitor/core` e os plugins entrarem
+  # no package.json, DEVOLVER o bloco abaixo:
+  #
+  #   push:
+  #     paths:
+  #       - "capacitor.config.ts"
+  #       - "native/**"
+  #       - "ios/**"
+  #       - "android/**"
+  #       - "package.json"
+  #       - ".github/workflows/app-nativo.yml"
+  #
+  # Até lá, roda só na mão — o que já serve para a primeira prova de que
+  # compila.
+  workflow_dispatch:
+
+jobs:
+  ios:
+    name: iOS — compila no simulador
+    # `macos-latest` é o único runner com Xcode. É mais caro em minutos que o
+    # Linux, e por isso o `paths:` acima existe: sem ele, todo commit de CSS
+    # gastaria cota de macOS à toa.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      # `cap sync` copia a `webDir` e reinstala os pods dos plugins. É aqui que
+      # aparece plugin declarado no package.json e ausente do projeto nativo.
+      - name: Sincronizar Capacitor
+        run: bunx cap sync ios
+
+      - name: Compilar para o simulador
+        # `CODE_SIGNING_ALLOWED=NO` é o que dispensa a conta: sem assinatura o
+        # binário não roda em aparelho de verdade, mas compila — e compilar é o
+        # que este job responde.
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build | xcpretty && exit ${PIPESTATUS[0]}
+
+  android:
+    name: Android — gera o APK de debug
+    # Android compila em Linux, então este job é barato e pode rodar sempre.
+    # Ele também é a rede de segurança do outro: quando os dois quebram junto, o
+    # problema é da configuração compartilhada; quando só o iOS quebra, é do
+    # Xcode.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Sincronizar Capacitor
+        run: bunx cap sync android
+
+      - name: Compilar o APK de debug
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      # O APK sai como artefato: dá para instalar num Android de verdade sem
+      # loja nenhuma, o que adianta o teste de campo em semanas.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: obstetrica-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14

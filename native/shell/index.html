@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Obstétrica</title>
+    <!--
+      A tela que aparece quando não há rede.
+
+      Enquanto a casca carrega o site publicado (ver `capacitor.config.ts`), esta
+      é a única coisa que existe dentro do aparelho. Ela precisa dar conta de um
+      caso concreto: a paciente abre o app no elevador do hospital, sem sinal.
+
+      Por isso ela NÃO é uma tela de erro. Ela dá o telefone do consultório e o
+      do SAMU em texto puro, que funciona sem rede nenhuma — e é a única coisa
+      útil que um app sem conexão pode oferecer a uma gestante de alto risco.
+
+      Quando a migração para bundle local acontecer, este arquivo some e o app
+      inteiro passa a viver aqui.
+    -->
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        min-height: 100svh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.75rem;
+        padding: calc(env(safe-area-inset-top, 0px) + 2rem) 1.75rem
+          calc(env(safe-area-inset-bottom, 0px) + 2rem);
+        background: linear-gradient(180deg, #0b0b17 0%, #241a33 55%, #3d2a52 100%);
+        color: #f4f0f8;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        text-align: center;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1 {
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      p {
+        max-width: 22rem;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        color: rgba(244, 240, 248, 0.72);
+      }
+      .telefones {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+        max-width: 20rem;
+      }
+      a {
+        display: block;
+        padding: 0.9rem 1rem;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+      .samu {
+        background: #e0384a;
+        color: #fff;
+      }
+      .consultorio {
+        background: rgba(255, 255, 255, 0.12);
+        color: #f4f0f8;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+      }
+      .nota {
+        font-size: 0.75rem;
+        color: rgba(244, 240, 248, 0.45);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sem conexão</h1>
+    <p>
+      O app precisa de internet para carregar a sua gestação. Se for urgente, os telefones abaixo
+      funcionam sem rede.
+    </p>
+
+    <div class="telefones">
+      <a class="samu" href="tel:192">Ligar para o SAMU · 192</a>
+      <a class="consultorio" href="tel:+5531986342903">Consultório · (31) 98634-2903</a>
+    </div>
+
+    <p class="nota">Assim que houver sinal, feche e abra o app.</p>
+  </body>
+</html>
