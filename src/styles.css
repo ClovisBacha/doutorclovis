@@ -2367,6 +2367,20 @@ button:active > .duo3d {
    sprite — nenhum dos dois roda motor 3D no celular. O que produz a sensação
    são mola, peso e deformação, e as três cabem aqui. */
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   A BOLHA VIVA
+
+   Três camadas, uma transformação em cada. CSS aplica UMA animação por
+   propriedade: duas escrevendo `transform` no mesmo elemento fazem a última
+   declarada vencer e a outra some. Como flutuar, tocar, pular e respirar todos
+   querem `transform`, empilhar num elemento só é impossível — e era por isso
+   que cada animação nova exigia desligar outra.
+
+     .bolha-viva          gira      (inclinação ociosa · negar)
+       └ .bolha-palco     translada (flutuar · pular · atenção)
+           └ .bolha-corpo escala    (tocar · respirar · chegar)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 .bolha-viva {
   position: relative;
   display: inline-block;
@@ -2376,19 +2390,25 @@ button:active > .duo3d {
   transform-origin: 50% 100%;
 }
 
-.bolha-corpo {
+.bolha-palco {
   position: relative;
   z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: 50% 100%;
 }
 
-/* A sombra vive FORA do corpo: precisa encolher enquanto ele estica, e dentro
-   dele herdaria a mesma deformação — que é o oposto do que dá peso. */
+.bolha-corpo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: 50% 100%;
+}
+
+/* A sombra vive FORA das três camadas: precisa encolher enquanto o corpo
+   estica, e dentro dele herdaria a mesma deformação — o oposto do que dá peso. */
 .bolha-sombra {
   position: absolute;
   left: 50%;
@@ -2403,19 +2423,90 @@ button:active > .duo3d {
     opacity 220ms ease;
 }
 
-/* SQUASH: no toque ela achata e alarga, e a sombra ESPALHA e escurece — é o
-   instante em que o peso encosta no chão. */
-.bolha-apertada .bolha-corpo {
-  transform: scale(1.1, 0.86);
-}
-.bolha-apertada .bolha-sombra {
-  transform: translateX(-50%) scale(1.22, 1);
-  opacity: 1;
+/* ── AÇÃO SECUNDÁRIA: a iridescência viva ──────────────────────────────────
+   O que faz uma bolha de sabão ser reconhecível não é a forma — é a cor que
+   escorrega pela superfície. Um `hue-rotate` lento devolve isso sem arte nova,
+   e fica perfeitamente recortado porque é filtro sobre a própria imagem.
+
+   13,7s: mais um período que não é múltiplo de nenhum outro daqui. */
+.bolha-iris .bolha-corpo {
+  animation: bolhaIris 13.7s ease-in-out infinite;
 }
 
-/* Flutuar de leve: sobe pouco, e ao subir a sombra encolhe e clareia. É essa
-   troca — e não o deslocamento — que o cérebro lê como massa suspensa. */
-.bolha-flutua .bolha-corpo {
+@keyframes bolhaIris {
+  0%,
+  100% {
+    filter: hue-rotate(0deg) saturate(1);
+  }
+  34% {
+    filter: hue-rotate(-8deg) saturate(1.07);
+  }
+  67% {
+    filter: hue-rotate(10deg) saturate(0.96);
+  }
+}
+
+/* ── TOQUE: esmaga e assenta AMORTECIDO ────────────────────────────────────
+   Era uma transição só, com mola na curva: ia, voltava passando do ponto, e
+   parava. Uma oscilação única lê como interpolação de software.
+
+   Agora são três quiques, cada um MENOR que o anterior — 12%, 5%, 2%. É a
+   progressão decrescente que o olho lê como matéria perdendo energia; sem ela
+   o movimento é correto e mesmo assim parece falso.
+
+   E o volume se conserva: quando achata em Y, alarga em X. Achatar nos dois
+   eixos leria como encolher, não como amassar. */
+.bolha-apertada .bolha-corpo {
+  animation: bolhaToque 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bolha-apertada .bolha-sombra {
+  animation: bolhaToqueSombra 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes bolhaToque {
+  0% {
+    transform: scale(1, 1);
+  }
+  18% {
+    transform: scale(1.12, 0.85);
+  }
+  38% {
+    transform: scale(0.95, 1.07);
+  }
+  58% {
+    transform: scale(1.04, 0.97);
+  }
+  78% {
+    transform: scale(0.99, 1.02);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes bolhaToqueSombra {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+  18% {
+    transform: translateX(-50%) scale(1.24, 1);
+    opacity: 1;
+  }
+  38% {
+    transform: translateX(-50%) scale(0.9, 1);
+    opacity: 0.72;
+  }
+  58% {
+    transform: translateX(-50%) scale(1.08, 1);
+    opacity: 0.92;
+  }
+}
+
+/* ── FLUTUAR: sobe pouco, e ao subir a sombra encolhe e clareia ────────────
+   É essa troca — e não o deslocamento — que o cérebro lê como massa suspensa. */
+.bolha-flutua .bolha-palco {
   animation: bolhaSobe 3.6s ease-in-out infinite;
 }
 .bolha-flutua .bolha-sombra {
@@ -2444,22 +2535,16 @@ button:active > .duo3d {
   }
 }
 
-/* A OCIOSIDADE PRECISA NÃO SE REPETIR.
-
+/* ── OCIOSIDADE QUE NÃO SE REPETE ──────────────────────────────────────────
    O flutuar sozinho é um laço PERFEITO de 3,6s, e o olho decora um laço
    perfeito em poucos segundos. A partir daí ele para de ler "bicho" e passa a
-   ler "GIF" — que é justamente a diferença entre o Duo do Duolingo e um adesivo
-   animado.
+   ler "GIF" — que é a diferença entre o Duo e um adesivo animado.
 
-   O truque não é animar mais: é ter um SEGUNDO ciclo cujo período não é
-   múltiplo do primeiro. 8,3s contra 3,6s só coincidem de novo depois de ~299
-   segundos, então cada volta do flutuar pega a inclinação num ponto diferente e
-   nenhuma volta sai igual à anterior. Custo: uma regra de CSS.
-
-   A inclinação mora no ENVOLTÓRIO, não no corpo. O corpo já anima `transform`
-   no `bolhaSobe`, e duas animações disputando a mesma propriedade fazem a
-   última declarada vencer — a bolha ora subiria, ora inclinaria, sem regra
-   visível. */
+   O truque não é animar mais: é um SEGUNDO ciclo cujo período não é múltiplo
+   do primeiro. 8,3s contra 3,6s só coincidem de novo depois de ~299 segundos,
+   então cada volta do flutuar pega a inclinação num ponto diferente e nenhuma
+   volta sai igual à anterior. Com a iridescência de 13,7s entrando, o padrão
+   composto passa de uma hora. */
 .bolha-flutua {
   animation: bolhaOlha 8.3s ease-in-out infinite;
 }
@@ -2478,27 +2563,297 @@ button:active > .duo3d {
   }
 }
 
-/* RESPIRANDO: quem manda no `transform` do corpo é o React, por estilo inline,
-   com a duração da fase em curso. Aqui só some a transição curta do toque —
-   220ms de mola no meio de uma inspiração de 4s daria um solavanco. */
+/* ── PULO: o princípio que faltava em tudo ─────────────────────────────────
+   ANTECIPAÇÃO. Antes de subir ela AGACHA — um movimento contrário, curto, que
+   mostra de onde vem a força. Sem ele o objeto some do chão e reaparece no ar:
+   correto na física, e mesmo assim lido como teletransporte, porque nenhum
+   corpo salta sem primeiro dobrar.
+
+   Depois: estica ao subir (volume conservado, afina em X), relaxa no ápice
+   (no ar não há força atuando), ACHATA na aterrissagem, e assenta em dois
+   quiques cada vez menores.
+
+   A sombra faz o caminho inverso o tempo todo: aperta quando ela agacha,
+   some quase toda no ápice, e espalha forte no impacto. */
+.bolha-pulo .bolha-palco {
+  animation: bolhaPulo 900ms cubic-bezier(0.33, 0, 0.28, 1);
+}
+.bolha-pulo .bolha-corpo {
+  animation: bolhaPuloCorpo 900ms cubic-bezier(0.33, 0, 0.28, 1);
+}
+.bolha-pulo .bolha-sombra {
+  animation: bolhaPuloSombra 900ms cubic-bezier(0.33, 0, 0.28, 1);
+}
+
+@keyframes bolhaPulo {
+  0% {
+    transform: translateY(0);
+  }
+  12% {
+    transform: translateY(2%);
+  } /* agacha */
+  46% {
+    transform: translateY(-52%);
+  } /* ápice */
+  68% {
+    transform: translateY(0);
+  } /* aterrissa */
+  80% {
+    transform: translateY(-9%);
+  } /* quique 1 */
+  90% {
+    transform: translateY(0);
+  }
+  95% {
+    transform: translateY(-3%);
+  } /* quique 2 */
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes bolhaPuloCorpo {
+  0% {
+    transform: scale(1, 1);
+  }
+  12% {
+    transform: scale(1.1, 0.86);
+  } /* agachada: larga e baixa */
+  26% {
+    transform: scale(0.9, 1.16);
+  } /* impulso: fina e alta */
+  46% {
+    transform: scale(1, 1);
+  } /* ápice: relaxada */
+  62% {
+    transform: scale(0.94, 1.08);
+  } /* caindo: estica de novo */
+  70% {
+    transform: scale(1.16, 0.82);
+  } /* impacto */
+  82% {
+    transform: scale(0.97, 1.04);
+  }
+  92% {
+    transform: scale(1.03, 0.98);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes bolhaPuloSombra {
+  0% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+  12% {
+    transform: translateX(-50%) scale(1.16, 1);
+    opacity: 1;
+  }
+  46% {
+    transform: translateX(-50%) scale(0.5, 0.6);
+    opacity: 0.28;
+  }
+  70% {
+    transform: translateX(-50%) scale(1.3, 1);
+    opacity: 1;
+  }
+  80% {
+    transform: translateX(-50%) scale(0.86, 0.9);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+}
+
+/* ── NEGAR: o "ainda não" ──────────────────────────────────────────────────
+   Balanço de cabeça amortecido: 9°, 7°, 4°, 2°. A antecipação aqui é o
+   primeiro giro ser para o lado CONTRÁRIO ao que o olho espera de uma negativa
+   — ela recua antes de negar, pelo mesmo motivo do agachar. */
+.bolha-nao {
+  animation: bolhaNao 620ms ease-out;
+}
+
+@keyframes bolhaNao {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(3deg);
+  } /* antecipação */
+  28% {
+    transform: rotate(-9deg);
+  }
+  46% {
+    transform: rotate(7deg);
+  }
+  64% {
+    transform: rotate(-4deg);
+  }
+  82% {
+    transform: rotate(2deg);
+  }
+}
+
+/* ── CHEGAR: entrada em cena ───────────────────────────────────────────────
+   Surge pequena, PASSA do tamanho final e volta. Chegar no tamanho certo de
+   primeira lê como um elemento sendo montado; passar do ponto lê como algo
+   que chegou com impulso próprio. */
+.bolha-chega .bolha-corpo {
+  animation: bolhaChega 720ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bolha-chega .bolha-sombra {
+  animation: bolhaChegaSombra 720ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes bolhaChega {
+  0% {
+    transform: scale(0.2, 0.2);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  55% {
+    transform: scale(1.14, 1.1);
+  }
+  74% {
+    transform: scale(0.94, 0.97);
+  }
+  88% {
+    transform: scale(1.04, 1.02);
+  }
+  100% {
+    transform: scale(1, 1);
+    opacity: 1;
+  }
+}
+
+@keyframes bolhaChegaSombra {
+  0% {
+    transform: translateX(-50%) scale(0.2, 1);
+    opacity: 0;
+  }
+  55% {
+    transform: translateX(-50%) scale(1.2, 1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+}
+
+/* ── ATENÇÃO: o cutucão ────────────────────────────────────────────────────
+   Dois saltinhos curtos, do tamanho de um "psiu". Discreto de propósito: o app
+   é de uma gestante de alto risco, e um mascote que pula pedindo toque a cada
+   pausa vira mais uma coisa cobrando atenção de quem já tem demais. */
+.bolha-atencao .bolha-palco {
+  animation: bolhaAtencao 800ms ease-in-out;
+}
+.bolha-atencao .bolha-sombra {
+  animation: bolhaAtencaoSombra 800ms ease-in-out;
+}
+
+@keyframes bolhaAtencao {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  8% {
+    transform: translateY(1.5%);
+  } /* antecipação */
+  24% {
+    transform: translateY(-16%);
+  }
+  40% {
+    transform: translateY(0);
+  }
+  46% {
+    transform: translateY(1%);
+  }
+  60% {
+    transform: translateY(-9%);
+  }
+  76% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes bolhaAtencaoSombra {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+  24% {
+    transform: translateX(-50%) scale(0.78, 0.82);
+    opacity: 0.52;
+  }
+  60% {
+    transform: translateX(-50%) scale(0.88, 0.9);
+    opacity: 0.68;
+  }
+}
+
+/* ── RESPIRANDO ────────────────────────────────────────────────────────────
+   Quem manda no `transform` do corpo é o React, por estilo inline, com a
+   duração da fase em curso. Aqui só entra a transição — sem ela, o inline
+   trocaria de valor sem interpolar e a bolha saltaria de tamanho. */
 .bolha-respira .bolha-corpo,
 .bolha-respira .bolha-sombra {
+  transition-property: transform, opacity;
   transition-timing-function: linear;
 }
 
-/* Durante o compasso o toque NÃO deforma, e é de propósito: um squash de 220ms
-   por cima de uma inspiração de 4s quebraria a única referência visual que a
-   paciente tem quando abre o olho para conferir. O estilo inline já ganha da
-   regra de `.bolha-apertada` por especificidade; esta nota existe para que
-   isso não pareça descuido. */
+/* ── MENOS MOVIMENTO ───────────────────────────────────────────────────────
+   Quem liga esta preferência tem enxaqueca ou labirintite, e uma boa parte das
+   pacientes tem. Some tudo que é AMBIENTE — flutuar, inclinar, iridescência —
+   porque isso acontece sem ela pedir e é o que provoca enjoo.
 
-/* Quem liga a preferência de menos movimento tem enxaqueca ou labirintite, e
-   uma boa parte das pacientes tem. A bolha para de flutuar; o retorno do
-   toque fica, porque ele é resposta a uma ação dela, não animação ambiente. */
+   O que RESPONDE a uma ação dela fica: o toque, o pulo da comemoração, o negar
+   de um erro. Esses ela causou, e sumir com eles tiraria a resposta do próprio
+   gesto — a tela pareceria travada, que é pior. Amplitude reduzida resolve o
+   enjoo sem tirar a resposta. */
 @media (prefers-reduced-motion: reduce) {
   .bolha-flutua,
-  .bolha-flutua .bolha-corpo,
-  .bolha-flutua .bolha-sombra {
+  .bolha-flutua .bolha-palco,
+  .bolha-flutua .bolha-sombra,
+  .bolha-iris .bolha-corpo {
     animation: none;
+  }
+  .bolha-pulo .bolha-palco,
+  .bolha-atencao .bolha-palco {
+    animation-name: bolhaPuloSuave;
+  }
+  .bolha-nao {
+    animation-name: bolhaNaoSuave;
+  }
+}
+
+@keyframes bolhaPuloSuave {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  46% {
+    transform: translateY(-10%);
+  }
+}
+
+@keyframes bolhaNaoSuave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-2.5deg);
+  }
+  65% {
+    transform: rotate(1.5deg);
   }
 }

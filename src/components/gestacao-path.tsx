@@ -3811,7 +3811,7 @@ function BreathingBlock({
                   o instante que a paciente veio buscar era o único da sessão
                   sem a personagem nele. */}
               <span className="dc-result-in">
-                <Bolha tamanho={96} humor="comemorando" />
+                <Bolha tamanho={96} humor="comemorando" entrada="pulo" />
               </span>
               <h3 className="mt-3 text-2xl font-extrabold text-sky-900">Que calma boa 💙</h3>
               <p className="mt-1 text-sm text-sky-800/80">
