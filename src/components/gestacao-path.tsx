@@ -3561,6 +3561,21 @@ function BreathingBlock({
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
     grantedRef.current = true;
+    /**
+     * A meia-estrela acende ANTES de falar com o servidor, e de propósito.
+     *
+     * Ela é progresso local: quem a ganhou foi a paciente, fazendo a atividade
+     * inteira. Antes o `onEarn()` vivia dentro do `if (r.ok)` — então uma
+     * queda de rede, um token expirado ou a tabela de Sementinhas ainda não
+     * criada no banco faziam a tela dizer "concluído" e a estrela não acender.
+     * E como `grantedRef` já estava marcado, não havia segunda chance sem
+     * reabrir a atividade. Sem estrela o dia não fecha, a sequência quebra e a
+     * figurinha da semana não vem — perde-se muito mais que a moeda.
+     *
+     * A Sementinha continua dependendo do servidor, que é quem tem o direito
+     * de conceder. Essa parte pode falhar em silêncio; a estrela não.
+     */
+    onEarn();
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
@@ -3572,10 +3587,7 @@ function BreathingBlock({
       // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
       // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
       // isso não pode apagar o progresso da estrela.
-      if (r.ok) {
-        if (r.granted > 0) setReward(r.granted);
-        onEarn();
-      }
+      if (r.ok && r.granted > 0) setReward(r.granted);
     } catch {
       /* recompensa é secundária */
     }
@@ -4077,6 +4089,21 @@ function MovementBlock({
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
     grantedRef.current = true;
+    /**
+     * A meia-estrela acende ANTES de falar com o servidor, e de propósito.
+     *
+     * Ela é progresso local: quem a ganhou foi a paciente, fazendo a atividade
+     * inteira. Antes o `onEarn()` vivia dentro do `if (r.ok)` — então uma
+     * queda de rede, um token expirado ou a tabela de Sementinhas ainda não
+     * criada no banco faziam a tela dizer "concluído" e a estrela não acender.
+     * E como `grantedRef` já estava marcado, não havia segunda chance sem
+     * reabrir a atividade. Sem estrela o dia não fecha, a sequência quebra e a
+     * figurinha da semana não vem — perde-se muito mais que a moeda.
+     *
+     * A Sementinha continua dependendo do servidor, que é quem tem o direito
+     * de conceder. Essa parte pode falhar em silêncio; a estrela não.
+     */
+    onEarn();
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
@@ -4088,10 +4115,7 @@ function MovementBlock({
       // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
       // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
       // isso não pode apagar o progresso da estrela.
-      if (r.ok) {
-        if (r.granted > 0) setReward(r.granted);
-        onEarn();
-      }
+      if (r.ok && r.granted > 0) setReward(r.granted);
     } catch {
       /* recompensa é secundária */
     }
@@ -4664,6 +4688,21 @@ function MeditationBlock({
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
     grantedRef.current = true;
+    /**
+     * A meia-estrela acende ANTES de falar com o servidor, e de propósito.
+     *
+     * Ela é progresso local: quem a ganhou foi a paciente, fazendo a atividade
+     * inteira. Antes o `onEarn()` vivia dentro do `if (r.ok)` — então uma
+     * queda de rede, um token expirado ou a tabela de Sementinhas ainda não
+     * criada no banco faziam a tela dizer "concluído" e a estrela não acender.
+     * E como `grantedRef` já estava marcado, não havia segunda chance sem
+     * reabrir a atividade. Sem estrela o dia não fecha, a sequência quebra e a
+     * figurinha da semana não vem — perde-se muito mais que a moeda.
+     *
+     * A Sementinha continua dependendo do servidor, que é quem tem o direito
+     * de conceder. Essa parte pode falhar em silêncio; a estrela não.
+     */
+    onEarn();
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
@@ -4675,10 +4714,7 @@ function MeditationBlock({
       // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
       // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
       // isso não pode apagar o progresso da estrela.
-      if (r.ok) {
-        if (r.granted > 0) setReward(r.granted);
-        onEarn();
-      }
+      if (r.ok && r.granted > 0) setReward(r.granted);
     } catch {
       /* recompensa é secundária */
     }
@@ -5281,6 +5317,21 @@ function BondingBlock({
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
     grantedRef.current = true;
+    /**
+     * A meia-estrela acende ANTES de falar com o servidor, e de propósito.
+     *
+     * Ela é progresso local: quem a ganhou foi a paciente, fazendo a atividade
+     * inteira. Antes o `onEarn()` vivia dentro do `if (r.ok)` — então uma
+     * queda de rede, um token expirado ou a tabela de Sementinhas ainda não
+     * criada no banco faziam a tela dizer "concluído" e a estrela não acender.
+     * E como `grantedRef` já estava marcado, não havia segunda chance sem
+     * reabrir a atividade. Sem estrela o dia não fecha, a sequência quebra e a
+     * figurinha da semana não vem — perde-se muito mais que a moeda.
+     *
+     * A Sementinha continua dependendo do servidor, que é quem tem o direito
+     * de conceder. Essa parte pode falhar em silêncio; a estrela não.
+     */
+    onEarn();
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
@@ -5292,10 +5343,7 @@ function BondingBlock({
       // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
       // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
       // isso não pode apagar o progresso da estrela.
-      if (r.ok) {
-        if (r.granted > 0) setReward(r.granted);
-        onEarn();
-      }
+      if (r.ok && r.granted > 0) setReward(r.granted);
     } catch {
       /* recompensa é secundária */
     }
@@ -5539,11 +5587,14 @@ function GratitudeBlock({
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) {
+        // Antes isto era um `return` mudo: ela tocava "Guardar" e a tela
+        // simplesmente não mudava, para sempre, sem explicação nenhuma.
+        toast.error("Sua sessão expirou. Entre de novo para guardar.");
         setSaving(false);
         return;
       }
       // Guarda no diário (registro da paciente).
-      await (
+      const { error: erro } = await (
         supabase as unknown as {
           from: (t: string) => {
             insert: (v: Record<string, unknown>) => Promise<{ error: unknown }>;
@@ -5552,7 +5603,24 @@ function GratitudeBlock({
       )
         .from("journal_entries")
         .insert({ user_id: u.user.id, content: `Gratidão: ${text.trim()}`, mood: "🙏" });
+
+      /**
+       * O erro do insert precisa ser lido.
+       *
+       * Ele era descartado, e a tela avançava para "Guardado 💛 — anotei no
+       * seu diário" de qualquer jeito: RLS negada, rede caída, tabela ausente
+       * no banco. O texto que ela escreveu sumia junto com a tela, e ela saía
+       * acreditando que estava guardado. Dizer que salvou sem ter salvo é o
+       * pior tipo de defeito num diário — ela só descobre quando for reler.
+       */
+      if (erro) {
+        toast.error("Não consegui guardar agora. O texto continua aqui — tente de novo.");
+        return;
+      }
+
       // Recompensa (uma por dia, como as outras atividades de bem-estar).
+      // A meia-estrela vem primeiro: ela escreveu, e isso já aconteceu.
+      onEarn();
       if (canEarn && !careMode) {
         const { data: s } = await supabase.auth.getSession();
         const token = s.session?.access_token;
@@ -5560,15 +5628,12 @@ function GratitudeBlock({
           const r = await grantWellnessReward({
             data: { accessToken: token, day, activity: "gratitude" },
           });
-          if (r.ok) {
-            if (r.granted > 0) setReward(r.granted);
-            onEarn();
-          }
+          if (r.ok && r.granted > 0) setReward(r.granted);
         }
       }
       setPhase("done");
     } catch {
-      /* ignore */
+      toast.error("Não consegui guardar agora. O texto continua aqui — tente de novo.");
     } finally {
       setSaving(false);
     }
