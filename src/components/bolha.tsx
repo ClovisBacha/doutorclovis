@@ -165,9 +165,25 @@ type Props = {
   /**
    * Desliga a iridescência viva.
    *
-   * Ela é um `filter` animado, e `filter` não roda na thread de composição em
-   * todo navegador. Numa bolha só o custo é irrelevante; numa lista com dezenas
-   * delas, não. Existe para esse caso, não como preferência estética.
+   * MEDIDO, porque a versão anterior deste comentário estava errada: eu tinha
+   * escrito que `filter` não é composto. É — o Chrome e o Safari compõem
+   * animação de filtro quando a lista tem a mesma estrutura em todos os
+   * quadros, e `hue-rotate()+saturate()` tem. (O Firefox não, mas é ~1% no
+   * Android brasileiro.)
+   *
+   * O custo é real e é OUTRO: `filter` animado exige uma render surface, então
+   * a camada é desenhada fora da tela e a matriz de cor é aplicada a cada
+   * quadro. Isso é fill-rate de GPU, não trabalho de main thread — e é caro:
+   * medido em 2,2x o custo da bolha inteira sem ele. Com 6 bolhas, +34% de CPU
+   * do processo de GPU.
+   *
+   * O motivo certo importa porque leva à decisão certa: como o gargalo é GPU e
+   * não main thread, estrangular a CPU não revela o problema, e o limite não é
+   * "aparelho lento" e sim "muitas bolhas". Medido a 6x: com iris cabem ~12–16
+   * numa tela, sem iris ~24–32.
+   *
+   * O app nunca põe mais de duas bolhas na mesma tela, então hoje isto é uma
+   * válvula fechada — existe para o dia em que uma lista aparecer.
    */
   semIris?: boolean;
   /**
@@ -219,11 +235,13 @@ export const Bolha = forwardRef<BolhaHandle, Props>(function Bolha(
   const [acao, setAcao] = useState<Acao | null>(null);
   const solta = useRef<number | null>(null);
   const fimAcao = useRef<number | null>(null);
+  const quadro = useRef<number | null>(null);
 
   useEffect(
     () => () => {
       if (solta.current) clearTimeout(solta.current);
       if (fimAcao.current) clearTimeout(fimAcao.current);
+      if (quadro.current) cancelAnimationFrame(quadro.current);
     },
     [],
   );
@@ -244,8 +262,19 @@ export const Bolha = forwardRef<BolhaHandle, Props>(function Bolha(
          pelo `ref`, nem por um ponto de uso novo que ninguém revisou. */
       if (careMode && qual === "pulo") return;
       if (fimAcao.current) clearTimeout(fimAcao.current);
+      /* Cancelar o QUADRO pendente, e não só o timer.
+         `fimAcao.current` só é escrito dentro do `rAF`. Numa rajada síncrona —
+         toques rápidos, que é o que se faz com um personagem que responde — os
+         N `clearTimeout` rodam antes de qualquer quadro e não cancelam nada;
+         depois os N callbacks criam N timers dos quais só o último fica
+         rastreado. Medido: 200 cliques numa tarefa só deixaram 201 timers
+         órfãos, cada um disparando um `setState` na sequência. Não vazava (todos
+         morriam em ~940ms) mas engasgava celular fraco, e a limpeza de
+         desmontagem cancelava só um. */
+      if (quadro.current) cancelAnimationFrame(quadro.current);
       setAcao(null);
-      requestAnimationFrame(() => {
+      quadro.current = requestAnimationFrame(() => {
+        quadro.current = null;
         setAcao(qual);
         fimAcao.current = window.setTimeout(() => setAcao(null), DURACAO_ACAO[qual] + 40);
       });
