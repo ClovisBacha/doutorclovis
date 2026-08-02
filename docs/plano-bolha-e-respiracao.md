@@ -7,17 +7,17 @@ OLHE quando deveria pedir que ela SINTA.**
 
 ## Estado (2 de agosto)
 
-| #                                                  | estado    | onde                              |
-| -------------------------------------------------- | --------- | --------------------------------- |
-| Vibração derivada da duração da fase               | **feito** | `breath-audio.ts` + 32 testes     |
-| Meditação para de instruir por cima da voz         | **feito** | `minha-conta.tsx`                 |
-| A bolha conduz a respiração (infla/segura/esvazia) | **feito** | `bolha.tsx` + `gestacao-path.tsx` |
-| Ociosidade que não se repete (dois períodos)       | **feito** | `styles.css`                      |
-| `dormindo` e `comemorando` saem do código morto    | **feito** | respiração e meditação            |
-| Unificar as 4 respirações num componente só        | aberto    | —                                 |
-| Trocar `speechSynthesis` pela Isabella embarcada   | aberto    | depende de gerar os áudios        |
-| `preocupada` — **decisão de produto, ver abaixo**  | parado    | —                                 |
-| Piscar / micro-animação por sprite                 | aberto    | precisa de arte nova              |
+| #                                                  | estado    | onde                                 |
+| -------------------------------------------------- | --------- | ------------------------------------ |
+| Vibração derivada da duração da fase               | **feito** | `breath-audio.ts` + 32 testes        |
+| Meditação para de instruir por cima da voz         | **feito** | `minha-conta.tsx`                    |
+| A bolha conduz a respiração (infla/segura/esvazia) | **feito** | `bolha.tsx` + `gestacao-path.tsx`    |
+| Ociosidade que não se repete (dois períodos)       | **feito** | `styles.css`                         |
+| `dormindo` e `comemorando` saem do código morto    | **feito** | respiração e meditação               |
+| Unificar as 4 respirações num componente só        | aberto    | —                                    |
+| Trocar `speechSynthesis` pela Isabella embarcada   | aberto    | depende de gerar os áudios           |
+| `preocupada` — **decisão de produto, ver abaixo**  | parado    | —                                    |
+| Piscar — TESTADO, nao se aplica (ver Parte 4)      | fechado   | o rosto padrao ja tem olhos fechados |
 
 ### `preocupada` está parada de propósito
 
@@ -266,59 +266,49 @@ Personagem vive de presença, não de polígono.
 
 ---
 
-## Parte 4 — O próximo passo concreto: ela pisca
+## Parte 4 — A piscada não se aplica a esta personagem
 
-O que foi feito até aqui deu **presença** e **compasso**. O que ainda falta para
-ela cruzar de "adesivo bem feito" para "bicho" é uma coisa só, e é a mesma coisa
-que o Duo faz o tempo todo: **piscar**.
+Eu escrevi aqui que o próximo passo era ela piscar: o sinal mais barato de vida
+que existe, e o que o Duo faz o tempo todo. Gerei o primeiro quadro para testar
+e o teste **derrubou a ideia**. Fica registrado, com o motivo, para ninguém
+gastar de novo.
 
-Piscar é o sinal mais barato de vida que existe. É involuntário, acontece a cada
-poucos segundos, e a ausência dele é o que faz um rosto parado parecer morto —
-manequim, não personagem.
+### O rosto padrão não tem olho aberto para fechar
 
-### Por que ainda não foi feito
+Ampliando os olhos das quatro artes:
 
-Precisa de **arte nova**: a bolha é um WebP por humor, sem camadas. Não dá para
-fechar os olhos dela por CSS — o que dá para fazer (achatar o corpo) lê como
-pulinho, não como piscada.
+| humor         | olhos                             | pisca? |
+| ------------- | --------------------------------- | ------ |
+| `feliz`       | `^ ^` — **já fechados**, sorrindo | não    |
+| `comemorando` | abertos, redondos                 | sim    |
+| `dormindo`    | fechados                          | não    |
+| `preocupada`  | abertos, preocupados              | sim    |
 
-### O que exatamente pedir ao Higgsfield
+`feliz` é a cara que a paciente vê em quase todo momento — e ela já está de
+olhos fechados. Piscar exige olho aberto; a personagem foi desenhada serena, de
+olhinhos apertados de contentamento. Não é falha da arte: é a linguagem dela.
 
-Um quadro por humor, idêntico ao existente **exceto pelos olhos fechados**:
+Sobram `comemorando` (um instante por dia) e `preocupada` (parada por decisão de
+produto). Dois quadros de piscada para estados que quase não aparecem não pagam
+nem os 4 créditos nem o peso.
 
-| arquivo                     | base          | mudança            | custo |
-| --------------------------- | ------------- | ------------------ | ----- |
-| `feliz-piscando.webp`       | `feliz`       | olhos em traço `‿` | 2 cr  |
-| `comemorando-piscando.webp` | `comemorando` | olhos em traço     | 2 cr  |
-| `preocupada-piscando.webp`  | `preocupada`  | olhos em traço     | 2 cr  |
+### O outro defeito, que valeria saber de qualquer jeito
 
-`dormindo` não precisa: os olhos já estão fechados.
+A geração voltou **opaca, com o quadriculado de transparência desenhado dentro
+dos pixels** — exatamente o defeito que o `limpar-fundo-antigo.mjs` existe para
+consertar no `baby-embriao.png`. O modelo interpretou o xadrez do fundo como
+parte do desenho.
 
-**A exigência que decide se presta:** o quadro tem que ser a MESMA imagem com
-outra boca de olho. Qualquer deriva de forma, cor ou posição vira um salto ao
-alternar — e alternar é o ponto. Por isso é geração com a arte atual anexada
-como referência, e a conferência é sobrepor os dois e olhar o que se mexeu além
-dos olhos.
+Ou seja: mesmo que a piscada fizesse sentido, cada quadro precisaria de recorte,
+e o `recortar.mjs` não serve — ele espera fundo CHAPADO, e o xadrez tem duas
+cores alternadas. Seria um terceiro script.
 
-Vale registrar o risco: **a referência anexada copia demais** — foi o que
-aconteceu com as ilustrações do bebê, onde a âncora carregou a pose junto com a
-identidade. Aqui isso é bom (queremos cópia quase total), mas o defeito espelhado
-é o modelo copiar TAMBÉM os olhos abertos e não fechar nada. Se acontecer, o
-caminho é editar por `nano_banana` com instrução de edição em vez de geração.
+### O que realmente falta, então
 
-### Como tocar
+Nada de animação. Se um dia a personagem precisar de mais vida, o caminho é
+**uma expressão nova com olhos abertos como padrão** — e isso é redesenho de
+personagem, decisão de quem manda na marca, não de quem escreve o CSS.
 
-```
-0s ─────────── 4,7s ─┬─ 120ms fechado ─┬─────────── 9,4s ─┬─ …
-                     └ troca o src ────┘
-```
-
-Um intervalo de ~4,7 s (não múltiplo de 3,6 s nem de 8,3 s, pelo mesmo motivo do
-resto) troca o `src` por 120 ms e volta. Sem CSS de sprite, sem `steps()`, sem
-dependência: é `useState` e um `setTimeout`.
-
-Peso: +36 KB no total, e só a imagem do humor em cena baixa.
-
-**Depois disso eu pararia.** Uma bolha que respira no compasso, flutua sem
-repetir, afunda no toque e pisca sozinha já entrega tudo que "3D" queria
-significar — e nada disso custa bateria ou bundle.
+**Onde a coisa está boa o suficiente:** ela respira no compasso, flutua sem se
+repetir, afunda no toque e agora aparece em três telas em vez de uma. Isso é o
+que "3D" queria dizer, e nada disso custa bateria nem bundle.
