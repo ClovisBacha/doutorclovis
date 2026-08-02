@@ -859,10 +859,8 @@ const LESSON_BY_WEEK = new Map<number, CourseModule>(COURSE_MODULES.map((m) => [
 type JourneyNode =
   | PathNode
   | { kind: "phase-banner"; phase: Phase; y: number }
-  | { kind: "mascot"; emoji: string; y: number; x: number }
+  | { kind: "mascot"; humor: "feliz" | "dormindo"; y: number; x: number }
   | { kind: "lesson"; week: number; y: number; x: number; row: number };
-
-const MASCOTS = ["🧸", "🦢", "🌷", "🍼", "🐘", "🌈", "🐥", "🧦"];
 
 /** Uma página só: banners de seção entre as fases, dias grandes, mascotes ao lado. */
 /**
@@ -885,7 +883,11 @@ function buildFullJourney(
     if (row % 5 !== 2) return;
     nodes.push({
       kind: "mascot",
-      emoji: MASCOTS[mascotIdx++ % MASCOTS.length],
+      // Uma personagem só, alternando entre acordada e cochilando. Antes eram
+      // oito emoji sorteados — oito bichos sem relação entre si, e cada um
+      // desenhado de um jeito por fabricante de celular. Repetir a MESMA cara
+      // é o que constrói personagem; variedade aqui só dispersa.
+      humor: mascotIdx++ % 3 === 1 ? "dormindo" : "feliz",
       y: rowY + rowH / 2,
       x: x < 50 ? Math.min(x + 44, 82) : Math.max(x - 44, 18),
     });
@@ -2391,7 +2393,24 @@ export function GestacaoPath({
 
           // Tela limpa: sem decorações grátis. Só os itens do Cantinho que a
           // paciente COMPROU aparecem (renderizados acima, via `decor`).
-          if (node.kind === "mascot") return null;
+          if (node.kind === "mascot") {
+            /* O mascote ao lado do caminho estava construído e DESLIGADO — o
+               `return null` vinha de quando ele era um emoji sorteado, que
+               poluía mais do que povoava. Com uma personagem própria ele passa
+               a fazer o trabalho que a trilha precisava: preencher os vãos de
+               creme entre uma semana e outra, que era o que fazia o caminho
+               parecer uma lista vertical em vez de um mundo. */
+            return (
+              <span
+                key={`m-${node.y}`}
+                className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 opacity-90"
+                style={{ left: `${node.x}%`, top: `${node.y}px` }}
+                aria-hidden
+              >
+                <Bolha tamanho={44} humor={node.humor} />
+              </span>
+            );
+          }
 
           if (node.kind === "week-header") {
             const ms = MILESTONES[node.week];
