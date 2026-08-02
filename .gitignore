@@ -47,3 +47,6 @@ scripts/social/.usado.json
 # Ilustracoes dos carrosseis: versiona o .webp, nao o PNG de 1,2 MB que sai do
 # gerador. O PNG e materia-prima descartavel; o WebP e o que o build usa.
 src/assets/social/*.png
+
+# Rascunho dos agentes de auditoria — some quando eles terminam.
+.tmp-audit/

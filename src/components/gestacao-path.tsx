@@ -2398,24 +2398,24 @@ export function GestacaoPath({
 
           // Tela limpa: sem decorações grátis. Só os itens do Cantinho que a
           // paciente COMPROU aparecem (renderizados acima, via `decor`).
-          if (node.kind === "mascot") {
-            /* O mascote ao lado do caminho estava construído e DESLIGADO — o
-               `return null` vinha de quando ele era um emoji sorteado, que
-               poluía mais do que povoava. Com uma personagem própria ele passa
-               a fazer o trabalho que a trilha precisava: preencher os vãos de
-               creme entre uma semana e outra, que era o que fazia o caminho
-               parecer uma lista vertical em vez de um mundo. */
-            return (
-              <span
-                key={`m-${node.y}`}
-                className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 opacity-90"
-                style={{ left: `${node.x}%`, top: `${node.y}px` }}
-                aria-hidden
-              >
-                <Bolha tamanho={44} humor={node.humor} />
-              </span>
-            );
-          }
+          /**
+           * O mascote NÃO entra na trilha. É regra de produto, não descuido.
+           *
+           * Esta tela é inteiramente personalizada — o céu muda com a hora
+           * real, a decoração é a que a paciente comprou, e a bolinha do dia é
+           * a única coisa que pede o toque dela. Um personagem espalhado por
+           * aqui compete com tudo isso: é o único elemento que ela não
+           * escolheu e não pode tirar.
+           *
+           * O lugar dele é DENTRO do jogo — nas telas de bem-estar, na
+           * celebração, no fim do quiz — e, no futuro, como item comprável no
+           * Cantinho, aí sim com a posição definida por ela.
+           *
+           * Os nós continuam sendo montados de propósito: o cálculo de altura
+           * da trilha depende deles, e removê-los da montagem deslocaria todo
+           * o caminho.
+           */
+          if (node.kind === "mascot") return null;
 
           if (node.kind === "week-header") {
             const ms = MILESTONES[node.week];
@@ -2540,27 +2540,12 @@ export function GestacaoPath({
                 aria-label={`Dia ${dayOfWeek} da semana ${week}`}
               >
                 {isToday && (
-                  <>
-                    <div className="duo-bubble absolute -top-11 z-20 whitespace-nowrap">
-                      <div className="relative rounded-xl bg-white px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-pink-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
-                        {done ? "Desafio completo ✓" : "Desafio de hoje"}
-                        <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-white" />
-                      </div>
+                  <div className="duo-bubble absolute -top-11 z-20 whitespace-nowrap">
+                    <div className="relative rounded-xl bg-white px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-pink-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
+                      {done ? "Desafio completo ✓" : "Desafio de hoje 🎁"}
+                      <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-white" />
                     </div>
-                    {/* O mascote fica AO LADO do dia de hoje, não em cima dele:
-                        quem tem que ser tocado é a bolinha do dia, e um
-                        personagem por cima roubaria o toque. */}
-                    <span className="pointer-events-none absolute -right-12 -top-6 z-20">
-                      <Bolha
-                        tamanho={52}
-                        humor={humorDaJornada({
-                          comemorando: done,
-                          diaFeito: done,
-                          sequenciaPerdida: streak === 0 && journeyDayNum > 1,
-                        })}
-                      />
-                    </span>
-                  </>
+                  </div>
                 )}
                 <div className="relative">
                   {/* Halo pulsante convida o toque (opacity-only, zero repaint) */}
@@ -6275,6 +6260,23 @@ function WellnessScreen({
 
             {/* ── Saudação + anel de progresso ──────────────────────── */}
             <div className="mt-3.5 flex items-start gap-3">
+              {/* O mascote mora AQUI, e não na trilha.
+                  O Caminho é a tela que a paciente personaliza — o céu segue a
+                  hora dela, a decoração é a que ela comprou, e a bolinha do dia
+                  é a única coisa que pede o toque. Um personagem espalhado por
+                  lá seria o único elemento que ela não escolheu e não pode
+                  tirar. Aqui, no lugar onde ela vem trabalhar, ele faz o
+                  oposto: dá companhia a uma tela que antes só cobrava tarefa.
+                  A cara vem do progresso do próprio dia. */}
+              <span className="mt-0.5 shrink-0">
+                <Bolha
+                  tamanho={44}
+                  humor={humorDaJornada({
+                    comemorando: halves >= 6,
+                    diaFeito: halves >= 6,
+                  })}
+                />
+              </span>
               <div className="min-w-0 flex-1">
                 <h2
                   className="font-serif text-[21px] leading-tight"
