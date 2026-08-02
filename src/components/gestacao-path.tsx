@@ -7045,9 +7045,27 @@ function DailyQuizBlock({
             {phase === "done" && (
               <div className="mt-8 flex flex-col items-center text-center">
                 {!careMode && score > 0 && <ConfettiBurst big={score === total} />}
-                <p className="dc-result-in text-6xl">
-                  {score === total ? "🏆" : score >= total - 1 ? "🎉" : score > 0 ? "👏" : "💪"}
-                </p>
+                {/* A personagem no lugar do emoji, com o TOM que o Clóvis
+                    definiu: neutro, sem empurrar.
+
+                    Acertando, ela comemora e pula — e o portão do Modo Cuidado
+                    mora dentro do componente, então nem a cara nem o salto
+                    saem no luto.
+
+                    Zerando, ela fica FELIZ e PARADA. Não entra a cara de
+                    saudade: saudade é para quem sumiu, não para quem apareceu e
+                    errou. E não entra animação nenhuma, porque qualquer reação
+                    ali vira comentário sobre o desempenho dela — que é
+                    exatamente o peso que se pediu para tirar. Ela só está
+                    junto. */}
+                <span className="dc-result-in">
+                  <Bolha
+                    tamanho={84}
+                    humor={score > 0 ? "comemorando" : "feliz"}
+                    entrada={score > 0 ? "pulo" : undefined}
+                    careMode={careMode}
+                  />
+                </span>
                 <h3 className="mt-3 text-2xl font-extrabold">
                   {score === total
                     ? "Acertou tudo!"
