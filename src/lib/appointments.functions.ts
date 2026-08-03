@@ -159,6 +159,27 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
       console.error("appointment email failed", e);
     }
 
+    /* Push para o MÉDICO. Este pedido só ia por e-mail — e "marcar consulta"
+       é justamente o que ele resolve pelo celular, entre uma paciente e
+       outra. E-mail ele lê quando senta no computador; o pedido esfria até lá.
+
+       Bloco próprio, depois do try dos e-mails: falha de e-mail não pode
+       engolir o push, e falha de push não pode derrubar o pedido — do ponto de
+       vista da paciente, o agendamento JÁ foi aceito quando chegou aqui. */
+    if (doctorId) {
+      try {
+        const { sendPushToUser } = await import("@/lib/push.server");
+        const dataBr = new Date(data.preferred_date + "T00:00:00").toLocaleDateString("pt-BR");
+        await sendPushToUser(doctorId, {
+          title: `📅 ${data.patient_name.split(" ")[0]} pediu uma consulta`,
+          body: `${dataBr} às ${data.preferred_time} · ${data.reason}`,
+          url: "/painel",
+        });
+      } catch (e) {
+        console.error("appointment push failed", e);
+      }
+    }
+
     return { ok: true as const };
   });
 

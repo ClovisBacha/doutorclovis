@@ -1088,6 +1088,17 @@ function PainelPage() {
         </div>
       )}
 
+      {/* Os avisos ficam na primeira aba, no APP E NO COMPUTADOR — cada
+          aparelho se inscreve separado, e pôr o interruptor só no celular
+          apenas mudaria o defeito de lugar: ele continuaria sem receber SOS
+          na máquina onde passa o dia. Não vai para "Meu Perfil" porque o SOS
+          não pode depender de ele ter passeado pelas abas até achar. */}
+      {tab === "Painel 📊" && (
+        <div className="mt-6">
+          <NotificacoesDoMedico />
+        </div>
+      )}
+
       <div className="mt-8">
         {tab === "Painel 📊" && (
           <DashboardSection
@@ -6961,6 +6972,7 @@ function ClinicaSection({
 /* ---------- Receipt Modal ---------- */
 import { DOCTOR } from "@/lib/doctor.config";
 import { PainelNoApp } from "@/components/painel-no-app";
+import { NotificacoesDoMedico } from "@/components/notificacoes-do-medico";
 
 function ReceiptModal({
   appt,
