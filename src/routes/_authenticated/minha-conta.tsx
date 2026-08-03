@@ -14432,8 +14432,12 @@ function ConquistasTab() {
             </div>
             <div className="text-4xl">🌱</div>
           </div>
+          {/* Dizia "Em breve você vai poder usar suas Sementinhas para montar o
+              seu Cantinho" — sobre uma tela que já existe, pronta, na pílula ao
+              lado desta. O app anunciava como futuro o que estava a um toque. */}
           <p className="mt-3 rounded-2xl bg-white/60 px-3 py-2 text-[11px] text-emerald-800/80">
-            Em breve você vai poder usar suas Sementinhas para montar o seu Cantinho. 💛
+            Gaste no <strong>Meu Cantinho</strong>, aqui do lado — plantinhas, bichinhos e cenários
+            pro seu Caminho. 💛
           </p>
         </div>
       )}
@@ -14521,14 +14525,26 @@ function ConquistasTab() {
    Feature 13 — Loja Curada
 ───────────────────────────────────────────────────────── */
 
+/**
+ * Produto da curadoria do consultório.
+ *
+ * NÃO tem preço, nem preço antigo, nem desconto — e isso é deliberado. Tinha
+ * os três, escritos à mão no arquivo, e os três eram ficção: `link` aponta
+ * para uma BUSCA da Amazon (`/s?k=...`), não para um produto. A paciente lia
+ * "R$ 18,00 · 25% OFF · Envio grátis", tocava, e caía numa lista com preços
+ * completamente outros. Preço inventado ao lado do selo "recomendado pelo seu
+ * médico" não é só feio: é publicidade enganosa, e o consultório é quem
+ * responde por ela.
+ *
+ * Enquanto os links forem buscas, o preço mora na Amazon. Se um dia entrarem
+ * links de produto de verdade (com tag de afiliado), o preço volta VINDO DE
+ * LÁ — nunca digitado aqui.
+ */
 type ShopProduct = {
   id: string;
   name: string;
   description: string;
   category: "suplementos" | "conforto" | "amamentacao" | "enxoval" | "livros";
-  price: string;
-  originalPrice: string;
-  discount: number;
   link: string;
   weeks_min?: number;
   weeks_max?: number;
@@ -14541,9 +14557,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Ácido Fólico 5mg",
     description: "Essencial no 1º trimestre para prevenção de defeitos do tubo neural.",
     category: "suplementos",
-    originalPrice: "R$ 24,00",
-    price: "R$ 18,00",
-    discount: 25,
     link: "https://www.amazon.com.br/s?k=acido+folico+gestante",
     weeks_min: 1,
     weeks_max: 20,
@@ -14554,9 +14567,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Sulfato Ferroso + Vitamina C",
     description: "Combo para absorção ideal do ferro, prevenindo anemia gestacional.",
     category: "suplementos",
-    originalPrice: "R$ 28,00",
-    price: "R$ 22,00",
-    discount: 21,
     link: "https://www.amazon.com.br/s?k=sulfato+ferroso+vitamina+c",
     weeks_min: 16,
   },
@@ -14565,9 +14575,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "DHA / Ômega-3 Gestante",
     description: "Desenvolvimento cerebral do bebê. 200mg/dia de DHA recomendado.",
     category: "suplementos",
-    originalPrice: "R$ 55,00",
-    price: "R$ 45,00",
-    discount: 18,
     link: "https://www.amazon.com.br/s?k=dha+omega3+gestante",
   },
   {
@@ -14575,9 +14582,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Travesseiro de Gestante Formato U",
     description: "Apoio lombar, pélvico e para os joelhos. Fundamental após a semana 20.",
     category: "conforto",
-    originalPrice: "R$ 159,00",
-    price: "R$ 130,00",
-    discount: 18,
     link: "https://www.amazon.com.br/s?k=travesseiro+gestante+formato+u",
     weeks_min: 20,
     badge: "MAIS VENDIDO",
@@ -14587,9 +14591,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Cinta de Suporte Gestacional",
     description: "Alivia dores lombares e suporta o abdômen no 3º trimestre.",
     category: "conforto",
-    originalPrice: "R$ 75,00",
-    price: "R$ 60,00",
-    discount: 20,
     link: "https://www.amazon.com.br/s?k=cinta+abdominal+gestante",
     weeks_min: 28,
   },
@@ -14598,9 +14599,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Meias de Compressão Gestante",
     description: "Previnem varizes e edemas — problema comum na gravidez.",
     category: "conforto",
-    originalPrice: "R$ 45,00",
-    price: "R$ 35,00",
-    discount: 22,
     link: "https://www.amazon.com.br/s?k=meias+compressao+gestante",
     weeks_min: 14,
   },
@@ -14609,9 +14607,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Sutiã de Amamentação",
     description: "Alças largas, abertura fácil e tecido respirável para o pós-parto.",
     category: "amamentacao",
-    originalPrice: "R$ 57,00",
-    price: "R$ 45,00",
-    discount: 21,
     link: "https://www.amazon.com.br/s?k=sutia+amamentacao+confortavel",
     weeks_min: 30,
   },
@@ -14620,9 +14615,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Almofada de Amamentação",
     description: "Posiciona o bebê corretamente durante a mamada, aliviando tensão.",
     category: "amamentacao",
-    originalPrice: "R$ 88,00",
-    price: "R$ 70,00",
-    discount: 20,
     link: "https://www.amazon.com.br/s?k=almofada+amamentacao",
     weeks_min: 30,
   },
@@ -14631,9 +14623,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Absorvente para Seios Lavável",
     description: "Para vazamentos de colostro no final da gestação e na amamentação.",
     category: "amamentacao",
-    originalPrice: "R$ 25,00",
-    price: "R$ 20,00",
-    discount: 20,
     link: "https://www.amazon.com.br/s?k=absorvente+seios+amamentacao+lavavel",
     weeks_min: 34,
   },
@@ -14642,9 +14631,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Kit Enxoval Recém-nascido",
     description: "Body, mijão e macacão em algodão orgânico para o RN.",
     category: "enxoval",
-    originalPrice: "R$ 99,00",
-    price: "R$ 80,00",
-    discount: 19,
     link: "https://www.amazon.com.br/s?k=kit+enxoval+recem+nascido+algodao",
     weeks_min: 20,
     badge: "PREPARE-SE",
@@ -14654,32 +14640,31 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Banheirinha Dobrável para Bebê",
     description: "Ergonômica, anti-escorregante, economiza espaço.",
     category: "enxoval",
-    originalPrice: "R$ 112,00",
-    price: "R$ 90,00",
-    discount: 20,
     link: "https://www.amazon.com.br/s?k=banheira+bebe+dobravel",
     weeks_min: 24,
   },
-  {
-    id: "p12",
-    name: "Monitor Doppler Fetal",
-    description: "Ouça o coração do seu bebê em casa entre as consultas.",
-    category: "enxoval",
-    originalPrice: "R$ 189,00",
-    price: "R$ 150,00",
-    discount: 21,
-    link: "https://www.amazon.com.br/s?k=doppler+fetal+caseiro",
-    weeks_min: 12,
-    badge: "OFERTA",
-  },
+  /* Aqui havia um "Monitor Doppler Fetal" — sonar doméstico, com o texto
+     "Ouça o coração do seu bebê em casa entre as consultas", exibido sob o
+     cabeçalho "Por que seu médico recomenda".
+
+     Saiu, e não volta. O doppler caseiro é o aparelho classicamente associado
+     à FALSA TRANQUILIZAÇÃO: a mãe percebe menos movimento, encosta o sonar,
+     escuta um batimento — que pode ser o dela, a placenta, ou um foco que não
+     diz nada sobre vitalidade — e deixa de procurar o pronto-socorro. O
+     conselho obstétrico é o oposto: redução de movimento fetal se avalia com
+     cardiotocografia, hoje, no serviço. Perder horas é o que muda desfecho.
+
+     Num app de gestação de ALTO RISCO, vender isso já seria ruim. Vender com
+     o selo do médico transforma o aviso clínico do app no seu contrário — a
+     paciente confia no aparelho justamente porque veio daqui.
+
+     Se um dia algum item de monitoramento fetal for reconsiderado, ele passa
+     antes pelo Dr. Clóvis, por escrito. Não é decisão de catálogo. */
   {
     id: "p13",
     name: "Gravidez Semana a Semana — Livro",
     description: "O guia mais completo em português, com fotos e explicações médicas.",
     category: "livros",
-    originalPrice: "R$ 69,00",
-    price: "R$ 55,00",
-    discount: 20,
     link: "https://www.amazon.com.br/s?k=gravidez+semana+a+semana+livro",
   },
   {
@@ -14687,9 +14672,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "O Bebê da Barriga — Livro",
     description: "Leitura afetiva sobre desenvolvimento fetal, ideal para o casal.",
     category: "livros",
-    originalPrice: "R$ 50,00",
-    price: "R$ 40,00",
-    discount: 20,
     link: "https://www.amazon.com.br/s?k=bebe+da+barriga+livro+gestacao",
   },
   {
@@ -14697,9 +14679,6 @@ const CURATED_PRODUCTS: ShopProduct[] = [
     name: "Protetor Solar FPS 50+ Gestante",
     description: "Fórmula sem oxi-benzona, segura para a gestação e contra melasma.",
     category: "suplementos",
-    originalPrice: "R$ 44,00",
-    price: "R$ 35,00",
-    discount: 20,
     link: "https://www.amazon.com.br/s?k=protetor+solar+gestante+fps50",
   },
 ];
@@ -14815,30 +14794,17 @@ function ProductSheet({
                   {product.badge}
                 </span>
               )}
-              <span className="absolute bottom-3 left-3 bg-[#00a650] text-white text-[12px] font-bold px-2 py-1 rounded-sm leading-none">
-                {product.discount}% OFF
-              </span>
             </div>
 
             {/* Conteúdo */}
             <div className="p-4 space-y-4 pb-8">
-              {/* Nome + preços */}
+              {/* Nome. Sem preço, sem "% OFF", sem "Envio grátis" — ver a nota
+                  em CURATED_PRODUCTS: o link vai para uma BUSCA da Amazon, e
+                  nenhum desses três números poderia ser verdade. */}
               <div>
                 <h2 className="text-[18px] font-semibold text-gray-900 leading-snug">
                   {product.name}
                 </h2>
-                <div className="flex items-baseline gap-2 mt-2">
-                  <span className="text-[13px] text-gray-400 line-through">
-                    {product.originalPrice}
-                  </span>
-                  <span className="text-[26px] font-bold text-gray-900 leading-none">
-                    {product.price}
-                  </span>
-                  <span className="text-[12px] font-bold text-[#00a650]">
-                    {product.discount}% OFF
-                  </span>
-                </div>
-                <p className="text-[11px] font-medium text-[#00a650] mt-1">Envio grátis</p>
               </div>
 
               {/* Recomendação médica */}
@@ -14909,24 +14875,11 @@ function ProductSheet({
                             >
                               {rv.emoji}
                             </span>
-                            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/50 to-transparent px-2 pt-4 pb-1.5">
-                              <span className="text-white text-[10px] font-bold">
-                                −{r.discount}%
-                              </span>
-                            </div>
                           </div>
                           <div className="px-2 pt-2 pb-2.5">
                             <p className="text-[10px] font-medium line-clamp-2 text-gray-800 leading-snug">
                               {r.name}
                             </p>
-                            <div className="flex items-baseline gap-1 mt-1.5">
-                              <span className="text-[10px] text-gray-400 line-through">
-                                {r.originalPrice}
-                              </span>
-                              <span className="text-[13px] font-bold text-gray-900 leading-none">
-                                {r.price}
-                              </span>
-                            </div>
                           </div>
                         </button>
                       );
@@ -15515,7 +15468,8 @@ function CantinhoTab({
         toast(res.error ?? "Não foi possível comprar");
         if (typeof res.balance === "number") setSaldo(res.balance);
         // Já possuído (ex.: comprado em outro aparelho): reflete na hora.
-        if (res.error === "Você já tem este item")
+        // Compara o CÓDIGO, não a frase — a frase tem emoji e nunca casava.
+        if ("motivo" in res && res.motivo === "ja_possui")
           setOwned((o) => (o.includes(itemId) ? o : [...o, itemId]));
       }
     } catch (e) {
@@ -15803,12 +15757,6 @@ function LojaTab({ gest }: { gest: Gest }) {
                   <p className="text-[11px] font-medium leading-tight line-clamp-2 text-gray-800">
                     {p.name}
                   </p>
-                  <div className="flex items-baseline gap-1.5 mt-1.5">
-                    <span className="text-[10px] text-gray-400 line-through">
-                      {p.originalPrice}
-                    </span>
-                    <span className="text-[14px] font-bold text-gray-900">{p.price}</span>
-                  </div>
                 </div>
               </button>
             );
@@ -15885,11 +15833,6 @@ function LojaTab({ gest }: { gest: Gest }) {
                       {product.badge}
                     </span>
                   )}
-
-                  {/* Faixa de desconto no rodapé da imagem */}
-                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-2.5 pt-6 pb-2">
-                    <span className="text-white text-[12px] font-bold">−{product.discount}%</span>
-                  </div>
                 </div>
 
                 {/* Info */}
@@ -15897,16 +15840,7 @@ function LojaTab({ gest }: { gest: Gest }) {
                   <p className="text-[12px] font-medium leading-snug line-clamp-2 text-gray-800">
                     {product.name}
                   </p>
-                  <div className="flex items-baseline gap-1.5 mt-2">
-                    <span className="text-[10px] text-gray-400 line-through leading-none">
-                      {product.originalPrice}
-                    </span>
-                    <span className="text-[17px] font-bold text-gray-900 leading-none">
-                      {product.price}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-[10px] font-medium text-[#00a650]">Envio grátis</span>
+                  <div className="mt-2 flex items-center justify-end">
                     <span className="text-[10px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
                       ✓ Recomendado
                     </span>
@@ -15918,8 +15852,12 @@ function LojaTab({ gest }: { gest: Gest }) {
         </div>
       )}
 
+      {/* Dizia "comprar pelo link apoia o portal". Não apoiava: nenhum dos 15
+          links carrega tag de afiliado, então ninguém era remunerado por
+          nenhuma compra. Enquanto não houver programa de afiliados de fato, a
+          linha diz só o que é verdade. */}
       <p className="text-center text-[10px] text-gray-400 pb-4">
-        Seleção curada · comprar pelo link apoia o portal
+        Seleção do consultório · os preços você confere na Amazon
       </p>
 
       <ProductSheet

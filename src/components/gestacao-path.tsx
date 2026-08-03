@@ -1357,7 +1357,11 @@ export function GestacaoPath({
           CANTINHO_BY_ID[id].type !== "fundo" &&
           /* Pele veste a bolinha; se entrasse aqui, o 🌱 dela também sairia
              boiando pela trilha como se fosse uma plantinha comprada. */
-          CANTINHO_BY_ID[id].type !== "trilha",
+          CANTINHO_BY_ID[id].type !== "trilha" &&
+          /* Tema veste o CÉU DA HOME, que nem é esta tela. Ele faltava nesta
+             lista: quem comprava o Céu Clássico (150 🌱) ganhava de brinde um
+             🌅 vagando pela trilha, como se fosse um enfeite. */
+          CANTINHO_BY_ID[id].type !== "tema",
       ),
     [decor],
   );

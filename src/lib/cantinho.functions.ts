@@ -144,7 +144,13 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
             : r.error === "ja_possui"
               ? "Você já tem este item 💛"
               : `Não foi possível comprar (${r.error ?? "motivo desconhecido"})`;
-        return { ok: false as const, error: msg, balance: r.balance ?? 0 };
+        /* `motivo` é o código CRU da RPC, e existe porque o cliente precisava
+           reagir a "já possui" (item comprado noutro aparelho → basta
+           sincronizar, não é erro). Ele fazia isso comparando a frase, e a
+           frase tem emoji: `error === "Você já tem este item"` nunca casava
+           com `"Você já tem este item 💛"`, então o auto-conserto jamais rodou.
+           Texto de tela é para gente ler; decisão de código se toma por código. */
+        return { ok: false as const, error: msg, motivo: r.error ?? null, balance: r.balance ?? 0 };
       }
       return { ok: true as const, balance: r.balance ?? 0, itemId: item.id };
     } catch (e) {
