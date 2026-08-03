@@ -20,6 +20,7 @@ import {
   ECONOMIA_CENTAVOS,
   JANELA_MS,
   PROMO_CENTAVOS,
+  PROMO_MENSAL_CENTAVOS,
   REFERENCIA_CENTAVOS,
 } from "@/lib/promo";
 
@@ -37,6 +38,7 @@ function Preview() {
     referenciaCentavos: REFERENCIA_CENTAVOS,
     promoCentavos: PROMO_CENTAVOS,
     economiaCentavos: ECONOMIA_CENTAVOS,
+    promoMensalCentavos: PROMO_MENSAL_CENTAVOS,
     listaCentavos: ANUAL_LISTA_CENTAVOS,
   };
   return (

@@ -7157,6 +7157,21 @@ function DoctorBilling({
   }, []);
 
   async function checkout(planKey: "starter" | "pro" | "elite" | "black") {
+    /* O médico USA o app, mas não ASSINA nele — plano de médico se contrata
+       no site. Duas razões, e as duas contam:
+       · a loja da Apple/Google cobra comissão sobre assinatura vendida dentro
+         do app, e plano de médico é B2B vendido fora dele;
+       · e abrir o Stripe dentro do app é reprovação na revisão (3.1.1).
+       Ontem eu deixei estas portas abertas de propósito, escrevendo que "o app
+       nativo é da paciente". Estava errado: o médico também vai usar o app. */
+    const { ehNativo } = await import("@/lib/nativo");
+    if (ehNativo()) {
+      toast(
+        "Os planos são contratados no site, no navegador — não pelo aplicativo. Entre em obstetrica.com.br com esta mesma conta.",
+        { duration: 6000 },
+      );
+      return;
+    }
     setBusy(planKey);
     try {
       const tk = await tokenFn();
@@ -7187,6 +7202,17 @@ function DoctorBilling({
   }
 
   async function portal() {
+    /* O portal do Stripe também troca de plano e de cartão — ou seja, também
+       é compra. Fica no site, pelo mesmo motivo do checkout. Cancelar continua
+       possível lá, sem passar pelo app. */
+    const { ehNativo } = await import("@/lib/nativo");
+    if (ehNativo()) {
+      toast(
+        "A cobrança se gerencia no site, no navegador — obstetrica.com.br, com esta mesma conta.",
+        { duration: 6000 },
+      );
+      return;
+    }
     setBusy("portal");
     try {
       const tk = await tokenFn();

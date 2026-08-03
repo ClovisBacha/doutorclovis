@@ -305,6 +305,15 @@ export function OfertaPremium({
               <p className="mt-0.5 whitespace-nowrap font-serif text-[30px] leading-none">
                 {brl(oferta.promoCentavos)}
               </p>
+              {/* "equivale a", nunca "×12": R$ 7,49 × 12 = R$ 89,88, dois
+                  centavos abaixo do que ela paga. Quem fizer a conta encontra
+                  o texto certo em vez de uma diferença inexplicada. */}
+              <p className="mt-0.5 text-[12px] text-white/85">
+                no primeiro ano · equivale a{" "}
+                <span className="whitespace-nowrap font-semibold">
+                  {brl(oferta.promoMensalCentavos)}/mês
+                </span>
+              </p>
               <p className="mt-1.5 text-[12px] font-semibold text-white/95">
                 você economiza{" "}
                 <span className="whitespace-nowrap">{brl(oferta.economiaCentavos)}</span> no
@@ -387,10 +396,8 @@ export function OfertaPremium({
                   {brl(oferta.promoCentavos)}
                 </span>
                 <span className="block text-[11px] text-muted-foreground">
-                  no 1º ano ·{" "}
-                  <span className="whitespace-nowrap">
-                    {brl(Math.round(oferta.promoCentavos / 12))}/mês
-                  </span>
+                  no 1º ano · equivale a{" "}
+                  <span className="whitespace-nowrap">{brl(oferta.promoMensalCentavos)}/mês</span>
                 </span>
                 <span className="mt-1 block text-[10px] text-muted-foreground">
                   depois <span className="whitespace-nowrap">{brl(oferta.listaCentavos)}/ano</span>

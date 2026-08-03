@@ -17,6 +17,7 @@ import {
   ECONOMIA_CENTAVOS,
   JANELA_MS,
   PROMO_CENTAVOS,
+  PROMO_MENSAL_CENTAVOS,
   REFERENCIA_CENTAVOS,
   estaAberta,
   restanteMs,
@@ -39,6 +40,11 @@ export type OfertaBoasVindas = {
   /** Quanto deixa de pagar, em centavos. */
   economiaCentavos: number;
   /**
+   * Equivalente mensal do primeiro ano, em centavos.
+   * "Equivalente" é literal: ×12 dá dois centavos a menos que o cobrado.
+   */
+  promoMensalCentavos: number;
+  /**
    * Preço de lista do plano anual — para onde a renovação volta.
    * Vai junto para a tela nunca poder omitir esta terceira informação.
    */
@@ -52,6 +58,7 @@ const FECHADA: OfertaBoasVindas = {
   referenciaCentavos: REFERENCIA_CENTAVOS,
   promoCentavos: PROMO_CENTAVOS,
   economiaCentavos: ECONOMIA_CENTAVOS,
+  promoMensalCentavos: PROMO_MENSAL_CENTAVOS,
   listaCentavos: ANUAL_LISTA_CENTAVOS,
 };
 
