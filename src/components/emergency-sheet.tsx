@@ -7,6 +7,7 @@ import type { DoctorContato } from "@/lib/patientlink.functions";
 import { dispararEmergencia, type CanaisAviso } from "@/lib/emergencia.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useVoltar } from "@/lib/use-voltar";
+import { localizacaoAgora, localizacaoNegada } from "@/lib/localizacao";
 
 type Info = {
   name?: string | null;
@@ -97,22 +98,28 @@ export function EmergencySheet({
   const [posicaoNegada, setPosicaoNegada] = useState(false);
 
   useEffect(() => {
-    if (!navigator?.geolocation) return;
     let vivo = true;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
+    /* Por `localizacaoAgora` e não por `navigator.geolocation` direto: dentro
+       da casca nativa o WebView só entrega coordenada se o APLICATIVO tiver a
+       permissão do sistema, e a chamada da web não pede nenhuma. Ver
+       `src/lib/localizacao.ts`.
+
+       Aqui pode esperar mais: ninguém está travado numa tela. 10s dá tempo do
+       aparelho responder até com sinal ruim, e o resultado fica guardado. */
+    void localizacaoAgora({ timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }).then(
+      async (c) => {
         if (!vivo) return;
-        setPosicao({ lat: pos.coords.latitude, lng: pos.coords.longitude, em: Date.now() });
-        setPosicaoNegada(false);
+        if (c) {
+          setPosicao({ lat: c.lat, lng: c.lng, em: Date.now() });
+          setPosicaoNegada(false);
+          return;
+        }
+        /* Sem coordenada pode ser "ela disse não" ou problema técnico, e a tela
+           diz coisas diferentes nos dois casos. Perguntar ao sistema é o único
+           jeito de saber — o `code === 1` da API da web não existe no plugin. */
+        const negada = await localizacaoNegada();
+        if (vivo) setPosicaoNegada(negada);
       },
-      (err) => {
-        if (!vivo) return;
-        // 1 = PERMISSION_DENIED. Só isso é "ela disse não"; o resto é técnico.
-        setPosicaoNegada(err?.code === 1);
-      },
-      /* Aqui pode esperar mais: ninguém está travado numa tela. 10s dá tempo do
-         aparelho responder até com sinal ruim, e o resultado fica guardado. */
-      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false },
     );
     return () => {
       vivo = false;
@@ -200,34 +207,30 @@ export function EmergencySheet({
       lng = fresca.lng;
     }
     try {
-      if (!fresca && navigator?.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-            /* Três escolhas, e nenhuma é sobre "ser rápido por ser rápido":
-               
-               `enableHighAccuracy: false` — alta precisão espera o GPS travar
-               nos satélites, o que leva 10s ou mais e FALHA dentro de casa,
-               que é onde a maioria das emergências acontece. Sem ela, a
-               posição vem da rede em ~1s, com erro de algumas dezenas de
-               metros. Para uma ambulância te achar, 50m é o mesmo que 5m; a
-               diferença entre 1s e 12s não é.
-               
-               `maximumAge: 120000` — aceita uma leitura de até 2 minutos
-               atrás. O aparelho quase sempre tem uma, e ela é boa: em dois
-               minutos ninguém foi longe.
-               
-               `timeout: 5000` — o limite para desistir. Cinco segundos e o
-               ponto em que esperar mais custa mais do que a coordenada vale:
-               depois disso a tela de espera do WhatsApp começa a incomodar e o
-               socorro atrasa. Passou, o aviso sai sem ela em vez de não sair. */
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 5000,
-              maximumAge: 120000,
-              enableHighAccuracy: false,
-            }),
-          );
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
+      if (!fresca) {
+        const coord = await localizacaoAgora(
+          /* Três escolhas, e nenhuma é sobre "ser rápido por ser rápido":
+
+             `enableHighAccuracy: false` — alta precisão espera o GPS travar
+             nos satélites, o que leva 10s ou mais e FALHA dentro de casa, que
+             é onde a maioria das emergências acontece. Sem ela, a posição vem
+             da rede em ~1s, com erro de algumas dezenas de metros. Para uma
+             ambulância te achar, 50m é o mesmo que 5m; a diferença entre 1s e
+             12s não é.
+
+             `maximumAge: 120000` — aceita uma leitura de até 2 minutos atrás.
+             O aparelho quase sempre tem uma, e ela é boa: em dois minutos
+             ninguém foi longe.
+
+             `timeout: 5000` — o limite para desistir. Cinco segundos é o ponto
+             em que esperar mais custa mais do que a coordenada vale: depois
+             disso a tela de espera do WhatsApp começa a incomodar e o socorro
+             atrasa. Passou, o aviso sai sem ela em vez de não sair. */
+          { timeout: 5000, maximumAge: 120000, enableHighAccuracy: false },
+        );
+        if (coord) {
+          lat = coord.lat;
+          lng = coord.lng;
           try {
             /* TETO OBRIGATÓRIO aqui. Este `fetch` é opcional — só traduz a
                coordenada em "Rua tal, bairro tal" — e estava entre a
@@ -252,26 +255,19 @@ export function EmergencySheet({
           } catch {
             /* nome do local é opcional — o link do mapa já resolve */
           }
-        } catch (e) {
+        } else {
           /* Antes esta falha era engolida em silêncio e o aviso saía dizendo
              "não foi possível obter a localização" sem que ninguém soubesse
              POR QUÊ. Numa emergência a coordenada é o dado mais útil da
              mensagem inteira: se ela não vai, a pessoa precisa saber na hora
              que precisa liberar — e não descobrir depois, lendo o WhatsApp. */
-          const cod = (e as GeolocationPositionError | undefined)?.code;
           toast.error(
-            cod === 1
-              ? "Sem permissão de localização — o aviso vai sem ela. Libere nos ajustes do navegador."
+            (await localizacaoNegada())
+              ? "Sem permissão de localização — o aviso vai sem ela. Libere nos ajustes do aparelho."
               : "Não consegui pegar a sua localização a tempo — o aviso vai sem ela.",
             { duration: 6000 },
           );
         }
-      } else {
-        /* Sem API de localização (contexto não seguro, WebView antiga): a tela
-           prometia "com a sua localização" e o aviso saía sem ela, calado. */
-        toast.error("Este aparelho não compartilha localização — o aviso vai sem ela.", {
-          duration: 6000,
-        });
       }
 
       const { data: s } = await supabase.auth.getSession();

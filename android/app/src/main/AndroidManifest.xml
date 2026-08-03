@@ -38,4 +38,17 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- SOS: sem estas duas o WebView NAO entrega coordenada nenhuma, e o
+         `navigator.geolocation` da pagina chama o callback de erro. Como o SOS
+         trata erro de localizacao como "sai sem a coordenada" (que e o certo
+         numa emergencia), a falha ficava INVISIVEL: o aviso chegava ao medico
+         dizendo "sem localizacao" e ninguem desconfiava de que o aparelho
+         nunca teve chance de responder. Ver `src/lib/localizacao.ts`. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Push: o Android 13+ exige permissao para MOSTRAR notificacao. Sem ela o
+         token e registrado, a mensagem chega, e nada aparece na tela. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

@@ -66,5 +66,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- SOS: sem esta chave o WKWebView NAO entrega coordenada, e o iOS encerra
+	     o app se algo pedir localizacao. O texto e o que a paciente le no
+	     alerta do sistema: precisa dizer PARA QUE, nao "o app quer sua
+	     localizacao". A revisao da Apple reprova texto generico. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Sua localização é enviada junto com o SOS, para que seu médico e seus contatos de emergência saibam onde te encontrar.</string>
 </dict>
 </plist>
