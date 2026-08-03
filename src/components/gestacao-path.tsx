@@ -1612,7 +1612,9 @@ export function GestacaoPath({
           }
         })();
       } else {
-        toast.success(`🎉 Dia ${D - journeyStartD + 1} da jornada completo!`);
+        /* Sem festa no luto. Alcançável para quem já tinha meias-estrelas
+           antes de entrar no Modo Cuidado e volta ao app depois. */
+        if (!careMode) toast.success(`🎉 Dia ${D - journeyStartD + 1} da jornada completo!`);
       }
     }
   }
@@ -1627,7 +1629,8 @@ export function GestacaoPath({
       setRevealing(true);
       setTimeout(() => setRevealing(false), 1800);
     }
-    toast.success(`${fruitEmojiForWeek(week)} Figurinha coletada: ${baby.fruit}!`);
+    /* Idem: a figurinha da semana é comemoração de bebê crescendo. */
+    if (!careMode) toast.success(`${fruitEmojiForWeek(week)} Figurinha coletada: ${baby.fruit}!`);
   }
 
   // Intro imersiva (Duolingo) antes do sheet da aula
@@ -6484,7 +6487,7 @@ function WellnessScreen({
                   className="mt-1.5 max-w-[220px] text-[12px] leading-snug"
                   style={{ color: tintaSec }}
                 >
-                  6 momentos especiais esperando por vocês.
+                  {careMode ? "No seu tempo." : "6 momentos especiais esperando por vocês."}
                 </p>
               </div>
               <AnelDoDia feitos={halves} total={6} escuro={ceuEscuro} />

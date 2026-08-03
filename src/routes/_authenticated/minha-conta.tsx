@@ -1707,12 +1707,16 @@ function MinhaContaPage() {
                     consultasSub={consultasSub}
                   />
                 )}
-                {tab === "Registros" && <RegistrosHub profile={profile} gest={gest} />}
+                {tab === "Registros" && (
+                  <RegistrosHub profile={profile} gest={gest} careMode={careMode} />
+                )}
                 {tab === "Saúde" && (
                   <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />
                 )}
                 {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
-                {tab === "Bem-estar" && <BemEstarHub gest={gest} onNavigate={goToTab} />}
+                {tab === "Bem-estar" && (
+                  <BemEstarHub gest={gest} onNavigate={goToTab} careMode={careMode} />
+                )}
                 {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
                 {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
                 {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
@@ -2276,7 +2280,15 @@ export const BEMESTAR_SUBTABS = [
   },
 ] as const;
 
-function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) => void }) {
+function BemEstarHub({
+  gest,
+  onNavigate,
+  careMode = false,
+}: {
+  gest: Gest;
+  onNavigate: (tab: string) => void;
+  careMode?: boolean;
+}) {
   const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"] | null>(null);
   const atual = BEMESTAR_SUBTABS.find((s) => s.key === sub);
   if (!sub || !atual) {
@@ -2292,7 +2304,7 @@ function BemEstarHub({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: strin
       <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "meditacoes" && <MeditacoesTab gest={gest} />}
-        {sub === "sons" && <SonsBebêTab gest={gest} />}
+        {sub === "sons" && <SonsBebêTab gest={gest} careMode={careMode} />}
         {sub === "exercicios" && <ExerciciosTab gest={gest} />}
         {sub === "humor" && <HumorTab />}
         {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
@@ -2340,7 +2352,15 @@ export const REGISTROS_SUBTABS = [
   },
 ] as const;
 
-function RegistrosHub({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function RegistrosHub({
+  profile,
+  gest,
+  careMode = false,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  careMode?: boolean;
+}) {
   const [sub, setSub] = useState<(typeof REGISTROS_SUBTABS)[number]["key"] | null>(null);
   const atual = REGISTROS_SUBTABS.find((s) => s.key === sub);
   if (!sub || !atual) {
@@ -2357,7 +2377,11 @@ function RegistrosHub({ profile, gest }: { profile: Profile | null; gest: Gest }
       <Fade key={sub}>
         {sub === "diario" && <JournalTab profile={profile} gest={gest} />}
         {sub === "chutes" && (
-          <KicksTab weeks={gest?.weeks ?? null} babyName={profile?.baby_name ?? null} />
+          <KicksTab
+            weeks={gest?.weeks ?? null}
+            babyName={profile?.baby_name ?? null}
+            careMode={careMode}
+          />
         )}
         {sub === "contracoes" && <ContracoesTab weeks={gest?.weeks ?? null} />}
         {sub === "timeline" && <TimelineTab profile={profile} gest={gest} />}
@@ -3256,7 +3280,15 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
 }
 
 /* ---------- Chutes ---------- */
-function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string | null }) {
+function KicksTab({
+  weeks,
+  babyName,
+  careMode = false,
+}: {
+  weeks: number | null;
+  babyName: string | null;
+  careMode?: boolean;
+}) {
   const [active, setActive] = useState<KickSession | null>(null);
   const [count, setCount] = useState(0);
   const [history, setHistory] = useState<KickSession[]>([]);
@@ -3346,6 +3378,10 @@ function KicksTab({ weeks, babyName }: { weeks: number | null; babyName: string 
         )
       : null;
 
+  /* Modo Cuidado: a aba inteira se cala. Ela oferecia "conte 10
+     movimentos de {nome do bebê}" — o convite mais doloroso possível para
+     quem acabou de perder a gestação. */
+  if (careMode) return <SilencioDoCuidado />;
   return (
     <div className="space-y-6">
       {/* Context banner */}
@@ -11127,7 +11163,7 @@ const SOUND_INFO: Record<
   },
 };
 
-function SonsBebêTab({ gest }: { gest: Gest }) {
+function SonsBebêTab({ gest, careMode = false }: { gest: Gest; careMode?: boolean }) {
   const currentWeek = gest?.weeks ?? 0;
   const [playing, setPlaying] = useState<SoundType | null>(null);
   const [volume, setVolume] = useState(0.5);
@@ -11345,6 +11381,9 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
     (a, b) => (playCount[b] ?? 0) - (playCount[a] ?? 0),
   );
 
+  /* Modo Cuidado: cala. A aba diz "o bebê pode reconhecê-los após o
+     nascimento". */
+  if (careMode) return <SilencioDoCuidado />;
   return (
     <div className="space-y-6">
       {/* Info */}
@@ -14412,14 +14451,52 @@ function RecompensasHub({
             onSkyChange={onSkyChange}
           />
         )}
-        {sub === "conquistas" && <ConquistasTab />}
+        {sub === "conquistas" && <ConquistasTab careMode={careMode} onNavigate={onNavigate} />}
         {sub === "loja" && <LojaTab gest={gest} />}
       </Fade>
     </div>
   );
 }
 
-function ConquistasTab() {
+/**
+ * O que uma aba de bebê mostra em Modo Cuidado.
+ *
+ * O app já tinha a regra ("nunca celebrar no luto") e o transporte
+ * (`isCareModeActive`), mas cinco telas não a aplicavam: Conquistas exibia
+ * "Bebê chegou! 🔒 bloqueada"; Chutes oferecia "conte 10 movimentos de
+ * {nome}"; Sons dizia "o bebê pode reconhecê-los após o nascimento"; a loja
+ * mostrava Berço com preço. Para quem perdeu o bebê, essas são as telas mais
+ * duras do aplicativo, e a paciente em luto é justamente quem menos consegue
+ * fugir delas.
+ *
+ * A resposta certa não é uma versão suavizada: é silêncio, e uma porta de
+ * saída. Nada de emoji, nada de cor, nada de "continue firme".
+ */
+function SilencioDoCuidado({ onNavigate }: { onNavigate?: (t: Tab) => void }) {
+  return (
+    <div className="rounded-3xl border border-border bg-card p-8 text-center">
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Esta parte do aplicativo está em pausa enquanto o Modo Cuidado estiver ligado.
+      </p>
+      {onNavigate && (
+        <button
+          onClick={() => onNavigate("Perfil")}
+          className="press mt-4 rounded-full border border-border px-5 py-2 text-xs font-semibold text-foreground"
+        >
+          Ajustes do Modo Cuidado
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ConquistasTab({
+  careMode = false,
+  onNavigate,
+}: {
+  careMode?: boolean;
+  onNavigate?: (t: Tab) => void;
+}) {
   const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [newBadges, setNewBadges] = useState<string[]>([]);
@@ -14490,6 +14567,7 @@ function ConquistasTab() {
     })();
   }, []);
 
+  if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
   if (loading) return <TabSkeleton />;
 
   const unlockedKeys = new Set(unlocked.map((u) => u.achievement_key));
@@ -15598,6 +15676,12 @@ function CantinhoTab({
       active ? "bg-emerald-100 text-emerald-700" : "text-foreground/45 hover:text-foreground/70"
     }`;
 
+  /* Modo Cuidado: a prateleira inteira se cala, não só o saldo.
+     `getCantinho` já devolvia saldo 0 e nada possuído, mas a paciente
+     continuava vendo o catálogo com "Berço (opcional) — 250 🌱" e o
+     cabeçalho "Um cantinho que cresce com você". O conserto anterior tinha
+     fechado metade da porta. */
+  if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
   return (
     <div className="space-y-6">
       {/* Cabeçalho + saldo */}
@@ -15631,10 +15715,21 @@ function CantinhoTab({
           nunca foram as de lá. Esta aba volta a ser o que ela é: saldo, como
           ganhar mais e a loja. O cantinho em si mora no Caminho. */}
       {ownedItems.length === 0 && (
-        <p className="px-1 text-sm text-muted-foreground">
-          Ganhe Sementinhas cuidando de você e traga vida pro seu Caminho — uma plantinha de cada
-          vez. 💛
-        </p>
+        <div className="space-y-2 px-1">
+          <p className="text-sm text-muted-foreground">
+            Ganhe Sementinhas cuidando de você e traga vida pro seu Caminho — uma plantinha de cada
+            vez. 💛
+          </p>
+          {/* A frase mandava ela "trazer vida pro Caminho" e não havia UM
+              botão levando ao Caminho em toda a aba. O `onNavigate` já chegava
+              aqui por prop e nunca era usado. */}
+          <button
+            onClick={() => onNavigate?.("Caminho")}
+            className="press rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-bold text-white"
+          >
+            Ver o meu Caminho →
+          </button>
+        </div>
       )}
 
       {/* Ganhe mais Sementinhas — um bloco só, recolhido, no lugar de 4 cards
@@ -15784,6 +15879,15 @@ function CantinhoTab({
                   >
                     🌱 {i.price}
                   </button>
+                )}
+                {/* Quantas faltam. O tile cinza dizia só o preço, e a paciente
+                    tinha de fazer a subtração de cabeça para saber se estava
+                    perto ou longe — a diferença entre "amanhã eu compro" e
+                    "isso não é pra mim". */}
+                {!has && !locked && cant && saldo !== null && (
+                  <span className="mt-1 text-[9px] font-medium text-slate-400">
+                    faltam {i.price - saldo} 🌱
+                  </span>
                 )}
               </div>
             );
