@@ -24,6 +24,9 @@ import {
 } from "@/lib/pacotes-sementinhas";
 import { ehNativo } from "@/lib/nativo";
 
+/** Uma linha do extrato: o que entrou ou saiu, e quando. */
+type Lancamento = { amount: number; reason: string | null; created_at: string };
+
 export function LojaSementinhas({
   aberto,
   onFechar,
@@ -34,6 +37,11 @@ export function LojaSementinhas({
   saldo: number | null;
 }) {
   const [indo, setIndo] = useState<string | null>(null);
+  /* Extrato. O servidor já devolvia os últimos 20 lançamentos com motivo e
+     data (`walletPayload`), e o app jogava fora: a paciente via o número mudar
+     e nunca sabia por quê. Uma moeda cujo saldo se move sem explicação é a
+     receita para ela achar que perdeu alguma coisa. */
+  const [extrato, setExtrato] = useState<Lancamento[] | null>(null);
   /* `ehNativo()` lê um global do Capacitor, então só vale no cliente — no SSR
      ele devolveria `false` e a folha renderizaria o caminho errado por um
      frame. O `useState` inicial + efeito resolvem sem hidratação divergente. */
@@ -51,6 +59,24 @@ export function LojaSementinhas({
       window.removeEventListener("keydown", h);
     };
   }, [aberto, onFechar]);
+
+  /* `getWallet` (só lê, não concede) já existia exportada e não era chamada em
+     lugar nenhum do app. Aqui é o lugar dela. */
+  useEffect(() => {
+    if (!aberto || extrato !== null) return;
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return setExtrato([]);
+        const { getWallet } = await import("@/lib/sementinhas.functions");
+        const w = await getWallet({ data: { accessToken: s.session.access_token } });
+        setExtrato(w.ok ? ((w.recent ?? []) as Lancamento[]) : []);
+      } catch {
+        setExtrato([]);
+      }
+    })();
+  }, [aberto, extrato]);
 
   if (!aberto) return null;
 
@@ -172,6 +198,38 @@ export function LojaSementinhas({
             <p className="mt-2 text-[13px] font-medium text-emerald-800">
               Jogando, você continua ganhando normalmente. 💛
             </p>
+          </div>
+        )}
+
+        {/* Extrato — de onde vieram as que ela já tem. */}
+        {extrato !== null && extrato.length > 0 && (
+          <div className="mt-5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Últimas movimentações
+            </p>
+            <ul className="mt-2 divide-y divide-border/60 rounded-2xl border border-border bg-background">
+              {extrato.slice(0, 8).map((l, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+                    {l.reason ?? "Movimentação"}
+                  </span>
+                  <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                    {new Date(l.created_at).toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}
+                  </span>
+                  <span
+                    className={`shrink-0 text-[12px] font-bold tabular-nums ${
+                      l.amount >= 0 ? "text-emerald-600" : "text-muted-foreground"
+                    }`}
+                  >
+                    {l.amount >= 0 ? "+" : ""}
+                    {l.amount}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
