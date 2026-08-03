@@ -6,11 +6,14 @@
  *
  * Cada item tem um `type` que define ONDE aparece no Caminho:
  *  - fundo   → papel de parede (equipa 1)
- *  - ceu     → faixa do topo (sol/lua/estrelas...) — decoração acumulável
+ *  - ceu     → faixa do topo (sol/lua/estrelas...) — decoração acumulável,
+ *              espalhada sozinha por `seedDecor` na faixa acima do 1º nó
  *  - planta  → laterais da trilha
  *  - objeto  → objetos aconchegantes ao longo do caminho
  *  - bicho   → criaturas que passeiam
- *  - especial→ peça central animada (premium)
+ *  - luz     → luzinhas que acendem e apagam
+ *  - agua    → coisas que boiam
+ *  - especial→ peça de destaque, com halo
  *
  * `premium: true` → só quem assina o Premium compra (ainda paga com Sementinhas;
  * nunca dinheiro real por item = sem pay-to-win). Item comprado fica pra sempre.
@@ -32,7 +35,15 @@ export type CantinhoType =
   | "especial"
   | "tema"
   /** Pele das bolinhas do Caminho — três estados, ver `trilha-skins.ts`. */
-  | "trilha";
+  | "trilha"
+  /**
+   * Luzes — acendem e apagam devagar (`dcTwinkle`). Categoria nova, e ela só
+   * existe porque TEM COMPORTAMENTO PRÓPRIO: um tipo que se comporta igual a
+   * `objeto` seria só um rótulo a mais na loja.
+   */
+  | "luz"
+  /** Águas — sobem e descem com um balanço curto (`dcRipple`). */
+  | "agua";
 
 export type CantinhoItem = {
   id: string;
@@ -50,6 +61,8 @@ export const CANTINHO_CATEGORIES: { key: CantinhoType; label: string }[] = [
   { key: "fundo", label: "Cenários" },
   { key: "ceu", label: "Céu" },
   { key: "planta", label: "Plantas" },
+  { key: "luz", label: "Luzes" },
+  { key: "agua", label: "Águas" },
   { key: "objeto", label: "Objetos" },
   { key: "bicho", label: "Bichinhos" },
   { key: "especial", label: "Especiais" },
@@ -60,8 +73,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
      Preço alto (280) porque ela troca a tela inteira do jogo, não um canto
      dela — e porque é o tipo de item que a paciente vê a cada dia da jornada,
      não uma vez. Não é premium: quem junta Sementinhas alcança.
-     Por enquanto só o Jardim tem arte; as outras sete entram uma linha por
-     vez conforme as imagens ficarem prontas (ver `trilha-skins.ts`). */
+     As oito têm arte (ago/2026). Três são alcançáveis sem assinatura. */
   {
     id: "trilha-jardim",
     name: "Bolinhas Jardim",
@@ -283,8 +295,238 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   },
   { id: "especial-natal", name: "Natal", emoji: "🎄", price: 180, type: "especial", premium: true },
 
-  // ── Troféu de coleção — NÃO se compra; desbloqueia ao ter todos os itens
-  // normais (os 10 da loja comum). Recompensa da paciente mais dedicada. ─────
+  /* ══════════════════════════════════════════════════════════════════════
+     AMPLIAÇÃO — ago/2026
+
+     Regra que vale para tudo daqui pra baixo: item novo só entra se APARECE.
+     A auditoria da loja encontrou cinco itens de `ceu` que não apareciam em
+     lugar nenhum até a paciente descobrir sozinha o modo Arrumar — dinheiro
+     em troca de nada. Antes de somar item, `seedDecor` passou a espalhar o
+     céu na faixa do alto, e as duas categorias novas ganharam animação
+     própria. Nada aqui é rótulo sem comportamento.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  // ── Peles do Caminho (+7) ──────────────────────────────────────────────
+  // A arte das sete existia como prompt em `docs/prompts-skins.md` e parou por
+  // falta de créditos, não por decisão. Agora existe. É o item de maior
+  // impacto do catálogo: troca a tela que a paciente abre todo dia, e conta o
+  // progresso na FORMA (dorme · desperta · floresce).
+  {
+    id: "trilha-lotus",
+    name: "Bolinhas Lótus",
+    emoji: "🪷",
+    price: 300,
+    type: "trilha",
+    premium: false,
+  },
+  {
+    id: "trilha-origami",
+    name: "Bolinhas Origami",
+    emoji: "🐦‍⬛",
+    price: 320,
+    type: "trilha",
+    premium: false,
+  },
+  {
+    id: "trilha-perolas",
+    name: "Bolinhas Pérolas",
+    emoji: "🦪",
+    price: 340,
+    type: "trilha",
+    premium: true,
+  },
+  {
+    id: "trilha-constelacao",
+    name: "Bolinhas Constelação",
+    emoji: "✨",
+    price: 360,
+    type: "trilha",
+    premium: true,
+  },
+  {
+    id: "trilha-cristais",
+    name: "Bolinhas Cristais",
+    emoji: "💎",
+    price: 360,
+    type: "trilha",
+    premium: true,
+  },
+  {
+    id: "trilha-planetas",
+    name: "Bolinhas Planetas",
+    emoji: "🪐",
+    price: 380,
+    type: "trilha",
+    premium: true,
+  },
+  {
+    id: "trilha-coracao",
+    name: "Bolinhas Coração",
+    emoji: "💗",
+    price: 400,
+    type: "trilha",
+    premium: true,
+  },
+
+  // ── Luzes (+5) — categoria nova, animação `dcTwinkle` ──────────────────
+  { id: "luz-vela", name: "Velinha", emoji: "🕯️", price: 45, type: "luz", premium: false },
+  { id: "luz-lampiao", name: "Lampião", emoji: "🏮", price: 70, type: "luz", premium: false },
+  { id: "luz-pisca", name: "Pisca-pisca", emoji: "🎇", price: 95, type: "luz", premium: false },
+  { id: "luz-lanterna", name: "Lanterninha", emoji: "🔦", price: 110, type: "luz", premium: true },
+  {
+    id: "luz-estrela-cadente",
+    name: "Estrela cadente",
+    emoji: "🌠",
+    price: 160,
+    type: "luz",
+    premium: true,
+  },
+
+  // ── Águas (+5) — categoria nova, animação `dcRipple` ───────────────────
+  { id: "agua-poca", name: "Pocinha", emoji: "💧", price: 55, type: "agua", premium: false },
+  { id: "agua-fonte", name: "Fontinha", emoji: "⛲", price: 90, type: "agua", premium: false },
+  { id: "agua-peixinho", name: "Peixinho", emoji: "🐠", price: 120, type: "agua", premium: false },
+  { id: "agua-concha", name: "Conchinha", emoji: "🐚", price: 140, type: "agua", premium: true },
+  { id: "agua-golfinho", name: "Golfinho", emoji: "🐬", price: 180, type: "agua", premium: true },
+
+  // ── Céu (+4) — agora eles APARECEM sozinhos, na faixa do alto ──────────
+  {
+    id: "ceu-passarinhos",
+    name: "Bando de passarinhos",
+    emoji: "🕊️",
+    price: 60,
+    type: "ceu",
+    premium: false,
+  },
+  { id: "ceu-pipa", name: "Pipa", emoji: "🪁", price: 80, type: "ceu", premium: false },
+  { id: "ceu-balao-ar", name: "Balãozinho", emoji: "🎈", price: 100, type: "ceu", premium: false },
+  { id: "ceu-cometa", name: "Cometa", emoji: "☄️", price: 160, type: "ceu", premium: true },
+
+  // ── Plantas (+4) ───────────────────────────────────────────────────────
+  { id: "planta-trevo", name: "Trevo", emoji: "🍀", price: 35, type: "planta", premium: false },
+  { id: "planta-tulipa", name: "Tulipa", emoji: "🌷", price: 50, type: "planta", premium: false },
+  {
+    id: "planta-cerejeira",
+    name: "Cerejeira",
+    emoji: "🌸",
+    price: 75,
+    type: "planta",
+    premium: false,
+  },
+  { id: "planta-bonsai", name: "Bonsai", emoji: "🎍", price: 90, type: "planta", premium: true },
+
+  // ── Objetos (+4) ───────────────────────────────────────────────────────
+  {
+    id: "objeto-livrinho",
+    name: "Livrinho de história",
+    emoji: "📖",
+    price: 40,
+    type: "objeto",
+    premium: false,
+  },
+  {
+    id: "objeto-chaleira",
+    name: "Chá quentinho",
+    emoji: "🫖",
+    price: 55,
+    type: "objeto",
+    premium: false,
+  },
+  {
+    id: "objeto-almofada",
+    name: "Almofadinha",
+    emoji: "🛋️",
+    price: 70,
+    type: "objeto",
+    premium: false,
+  },
+  {
+    id: "objeto-caixinha",
+    name: "Caixinha de música",
+    emoji: "🎵",
+    price: 110,
+    type: "objeto",
+    premium: true,
+  },
+
+  // ── Bichinhos (+4) ─────────────────────────────────────────────────────
+  { id: "bicho-joaninha", name: "Joaninha", emoji: "🐞", price: 45, type: "bicho", premium: false },
+  { id: "bicho-abelha", name: "Abelhinha", emoji: "🐝", price: 55, type: "bicho", premium: false },
+  {
+    id: "bicho-tartaruga",
+    name: "Tartaruguinha",
+    emoji: "🐢",
+    price: 90,
+    type: "bicho",
+    premium: false,
+  },
+  { id: "bicho-raposa", name: "Raposinha", emoji: "🦊", price: 200, type: "bicho", premium: true },
+
+  // ── Cenários (+4) — cada um tem gradiente em CANTINHO_FUNDO_BG ─────────
+  {
+    id: "fundo-bosque",
+    name: "Bosque tranquilo",
+    emoji: "🌲",
+    price: 140,
+    type: "fundo",
+    premium: false,
+  },
+  {
+    id: "fundo-lavanda",
+    name: "Campo de lavanda",
+    emoji: "💜",
+    price: 180,
+    type: "fundo",
+    premium: false,
+  },
+  {
+    id: "fundo-deserto",
+    name: "Fim de tarde no deserto",
+    emoji: "🏜️",
+    price: 240,
+    type: "fundo",
+    premium: true,
+  },
+  {
+    id: "fundo-neve",
+    name: "Manhã de neve",
+    emoji: "❄️",
+    price: 260,
+    type: "fundo",
+    premium: true,
+  },
+
+  // ── Especiais (+3) ─────────────────────────────────────────────────────
+  /* Não-premium de propósito: era a única categoria sem NENHUM item pago
+     alcançável sem assinatura, e isso deixava a Coroa fora do alcance de quem
+     é do plano grátis — o defeito que esta ampliação veio corrigir. */
+  {
+    id: "especial-primavera",
+    name: "Primavera",
+    emoji: "🌺",
+    price: 170,
+    type: "especial",
+    premium: false,
+  },
+  {
+    id: "especial-chuva",
+    name: "Chuva mansa",
+    emoji: "🌧️",
+    price: 200,
+    type: "especial",
+    premium: true,
+  },
+  {
+    id: "especial-arcoiris-duplo",
+    name: "Arco-íris duplo",
+    emoji: "🌈",
+    price: 320,
+    type: "especial",
+    premium: true,
+  },
+
+  // ── Troféu de coleção — NÃO se compra; desbloqueia sozinho.
+  // O requisito está em CANTINHO_COMPLETION_REQUIRED, logo abaixo. ─────────
   {
     id: "especial-colecao",
     name: "Coroa da Coleção",
@@ -299,27 +541,73 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
 export const CANTINHO_COMPLETIONIST_ID = "especial-colecao";
 
 /**
- * Itens exigidos pra desbloquear o troféu: TODOS os que se compram — premium
- * incluído, tema incluído. Coleção completa é coleção completa; com os premium
- * de fora a coroa aparecia "Conquistado! 👑" ao lado de seis vitrines ainda
- * cinzentas, e um troféu que convive com item faltando não é troféu.
+ * A Coroa pede UM item pago de CADA categoria — não o catálogo inteiro.
  *
- * A consequência é intencional: como item premium só se compra com assinatura
- * (o portão fica no servidor, em `buyCantinhoItem`), a coroa passa a ser
- * alcançável só por quem tem Premium.
+ * Pedia todos os itens pagos. Com 32 itens isso já eram 5.350 🌱, uns 76 dias
+ * de jogo perfeito; com os 40 novos passaria de 15.000, mais dias do que dura
+ * uma gestação. Meta que não cabe na jornada da paciente não é meta, é enfeite
+ * inalcançável — e ela ficava sinalizada por uma linha de 9px no último tile
+ * de uma grade de 34.
  *
- * Ficam de fora apenas os itens de preço 0 — grátis, já são de todo mundo
- * desde o primeiro acesso, então exigi-los não pediria esforço nenhum — e a
- * própria coroa.
+ * "Um de cada" também diz uma coisa melhor: você passeou pelo cantinho
+ * inteiro. E escala sozinho — categoria nova entra na conta sem ninguém
+ * lembrar de mexer aqui.
+ *
+ * Ninguém perde nada na troca: quem tinha a coleção antiga completa
+ * necessariamente tem um de cada categoria, então continua com a coroa.
+ *
+ * Fica de fora o que tem preço 0 (grátis desde o primeiro acesso, exigir não
+ * pediria esforço) e a própria coroa.
  */
-export const CANTINHO_COMPLETION_REQUIRED: string[] = CANTINHO_ITEMS.filter(
-  (i) => i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID,
-).map((i) => i.id);
+export const CANTINHO_COMPLETION_CATEGORIES: CantinhoType[] = [
+  ...new Set(
+    CANTINHO_ITEMS.filter((i) => i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID).map(
+      (i) => i.type,
+    ),
+  ),
+];
 
-/** True quando a paciente possui todos os itens exigidos pra coleção. */
-export function isCantinhoCollectionComplete(ownedIds: Iterable<string>): boolean {
+/**
+ * Um id representativo por categoria — usado só pelo contador "X de Y" da
+ * tela. O requisito de verdade é por CATEGORIA (ver a função abaixo).
+ */
+export const CANTINHO_COMPLETION_REQUIRED: string[] = CANTINHO_COMPLETION_CATEGORIES.map(
+  (t) =>
+    CANTINHO_ITEMS.find((i) => i.type === t && i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID)!
+      .id,
+);
+
+/**
+ * Quantas categorias a Coroa exige.
+ *
+ * É um PISO fixo (8), não `CANTINHO_COMPLETION_CATEGORIES.length`, e a
+ * diferença é a coisa mais importante deste arquivo:
+ *
+ * O app não pode tirar de volta um troféu que já deu. Se o requisito fosse
+ * "todas as categorias", cada categoria nova revogaria a Coroa de quem já a
+ * tinha — e Luzes e Águas nasceram nesta mesma ampliação, então a paciente
+ * que fechou a coleção antiga abriria o app amanhã sem a coroa que conquistou
+ * ontem. Nenhuma explicação conserta isso.
+ *
+ * Oito era o número de categorias quando a Coroa foi desenhada. Continua
+ * pedindo passeio pelo cantinho inteiro (hoje são dez), e sobe só se um dia
+ * alguém decidir, de propósito, que deve subir.
+ */
+export const CANTINHO_COMPLETION_MIN = 8;
+
+/** Quantas categorias já têm ao menos um item pago comprado. */
+export function cantinhoCategoriasCompletas(ownedIds: Iterable<string>): number {
   const owned = ownedIds instanceof Set ? ownedIds : new Set(ownedIds);
-  return CANTINHO_COMPLETION_REQUIRED.every((id) => owned.has(id));
+  return CANTINHO_COMPLETION_CATEGORIES.filter((t) =>
+    CANTINHO_ITEMS.some(
+      (i) => i.type === t && i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID && owned.has(i.id),
+    ),
+  ).length;
+}
+
+/** True quando a paciente tem item pago em pelo menos 8 categorias. */
+export function isCantinhoCollectionComplete(ownedIds: Iterable<string>): boolean {
+  return cantinhoCategoriasCompletas(ownedIds) >= CANTINHO_COMPLETION_MIN;
 }
 
 export const CANTINHO_BY_ID: Record<string, CantinhoItem> = Object.fromEntries(
@@ -333,6 +621,10 @@ export const CANTINHO_FUNDO_BG: Record<string, string> = {
   "fundo-mar": "linear-gradient(180deg,#cdeffd 0%,#8fd3f4 55%,#e6f7ff 100%)",
   "fundo-estrelas": "linear-gradient(180deg,#1e2a5a 0%,#39306b 55%,#5b4b8a 100%)",
   "fundo-aurora": "linear-gradient(180deg,#0b2f3a 0%,#12664f 45%,#1f8a6b 80%,#0b2f3a 100%)",
+  "fundo-bosque": "linear-gradient(180deg,#e8f3e6 0%,#bcd9b6 45%,#8fbf94 100%)",
+  "fundo-lavanda": "linear-gradient(180deg,#f3eefc 0%,#d9c9f2 45%,#b9a3e3 100%)",
+  "fundo-deserto": "linear-gradient(180deg,#ffd9a0 0%,#f2a765 45%,#c9714a 100%)",
+  "fundo-neve": "linear-gradient(180deg,#eef5fb 0%,#d6e6f3 50%,#c2d6e8 100%)",
 };
 
 /**

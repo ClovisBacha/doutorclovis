@@ -5,7 +5,8 @@ import {
   CANTINHO_BY_ID,
   CANTINHO_ITEMS,
   CANTINHO_COMPLETIONIST_ID,
-  CANTINHO_COMPLETION_REQUIRED,
+  CANTINHO_COMPLETION_MIN,
+  cantinhoCategoriasCompletas,
   isCantinhoCollectionComplete,
 } from "@/lib/cantinho";
 
@@ -64,7 +65,10 @@ export const getCantinho = createServerFn({ method: "POST" })
     // Troféu da coleção: concedido (virtual) assim que tem todos os itens comuns.
     const collectionComplete = isCantinhoCollectionComplete(ownedIds);
     if (collectionComplete) ownedIds.add(CANTINHO_COMPLETIONIST_ID);
-    const collectionOwned = CANTINHO_COMPLETION_REQUIRED.filter((id) => ownedIds.has(id)).length;
+    /* Conta CATEGORIAS com item pago, não itens de uma lista fixa. O contador
+       antigo somava ids representativos e, com a regra por categoria, diria
+       "2 de 10" para quem tem oito categorias fechadas. */
+    const collectionOwned = cantinhoCategoriasCompletas(ownedIds);
     return {
       ok: true as const,
       balance,
@@ -75,7 +79,7 @@ export const getCantinho = createServerFn({ method: "POST" })
       equippedFundo: p?.cantinho_fundo ?? null,
       collectionComplete,
       collectionOwned,
-      collectionTotal: CANTINHO_COMPLETION_REQUIRED.length,
+      collectionTotal: CANTINHO_COMPLETION_MIN,
     };
   });
 

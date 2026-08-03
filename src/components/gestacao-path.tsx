@@ -157,12 +157,24 @@ function seedDecor(ids: string[], height: number, offset: number): PlacedDecor[]
     const especial = item.type === "especial";
     const copies = especial ? 1 : 2;
     for (let e = 0; e < copies; e++) {
-      const y = 130 + (((h % 400) + e * 880 + idx * 270) % span);
+      /* Céu mora no ALTO, e por isso não usa o `span` da trilha inteira: uma
+         nuvem no meio do caminho, entre uma suculenta e um cestinho, não lê
+         como céu — lê como enfeite fora do lugar. A faixa vai de 40 a ~240px,
+         acima do primeiro nó, e as duas cópias se afastam uma da outra. */
+      const y =
+        item.type === "ceu"
+          ? 40 + (((h % 90) + e * 110 + idx * 37) % 200)
+          : 130 + (((h % 400) + e * 880 + idx * 270) % span);
       const side = (e + idx) % 2;
       // `>>>` (não `>>`): hash acima de 2^31 vira NEGATIVO no shift com sinal e
       // o resto sai negativo — item nascia fora da tela ou em cima das lições.
       const jitter = (h >>> (e + 2)) % 10;
-      const x = side === 0 ? 8 + jitter : 82 + jitter;
+      /* Os de chão vivem nas calhas (8–18 e 82–92) porque o meio é da trilha.
+         Acima do primeiro nó não há trilha nenhuma, então o céu pode usar a
+         largura toda — e precisa, senão sol, lua e arco-íris se empilham nas
+         duas beiradas. */
+      const x =
+        item.type === "ceu" ? 12 + ((h >>> (e + 5)) % 76) : side === 0 ? 8 + jitter : 82 + jitter;
       out.push({
         k: `s${idx}-${e}-${id}`,
         id,
@@ -187,7 +199,11 @@ function DecorSprite({ p, still = false }: { p: PlacedDecor; still?: boolean }) 
       ? "dcWander 7s ease-in-out infinite"
       : item.type === "planta"
         ? "dcSway 5.5s ease-in-out infinite"
-        : "dcHover 4s ease-in-out infinite";
+        : item.type === "luz"
+          ? "dcTwinkle 5.3s ease-in-out infinite"
+          : item.type === "agua"
+            ? "dcRipple 4.7s ease-in-out infinite"
+            : "dcHover 4s ease-in-out infinite";
   return (
     <>
       {especial && (
@@ -1366,11 +1382,14 @@ export function GestacaoPath({
       ),
     [decor],
   );
-  // Espalhados sozinhos: só os de chão (o céu já se vira sozinho lá em cima).
-  const seedables = useMemo(
-    () => trayItems.filter((id) => CANTINHO_BY_ID[id].type !== "ceu"),
-    [trayItems],
-  );
+  /* TUDO se espalha sozinho, inclusive o céu.
+     Antes o `ceu` era excluído daqui com o comentário "o céu já se vira
+     sozinho lá em cima" — e não havia código nenhum fazendo isso. Quem
+     comprava Estrelinhas (40 🌱) ou Arco-íris (150 🌱) não via absolutamente
+     nada até descobrir, por conta própria, o botão ✏️ de Arrumar e arrastar o
+     item para o lugar. Cinco itens do catálogo eram dinheiro em troca de nada.
+     `seedDecor` agora coloca os de céu na faixa do alto (ver lá). */
+  const seedables = trayItems;
   // Só desenha o que ela REALMENTE possui (e nada em Modo Cuidado). Enquanto a
   // lista de itens não chegou do servidor, confia no layout salvo — evita a
   // trilha piscar vazia a cada abertura.

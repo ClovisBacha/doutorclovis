@@ -2086,6 +2086,45 @@ button:active > .duo3d {
     transform: scale(1.3);
   }
 }
+
+/* ── Luzes: acendem e apagam, sem sair do lugar ──────────────────────────
+   Mexe em `opacity` e numa escala mínima. Luz que se DESLOCA vira vaga-lume
+   — e vaga-lume já existe, é outro item. O período (5,3s) é primo com os
+   demais (7s do bicho, 5,5s da planta, 4s do hover) de propósito: períodos
+   parecidos sincronizam depois de alguns ciclos, e a tela inteira passa a
+   pulsar junto como um alarme. */
+@keyframes dcTwinkle {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  70% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+}
+
+/* ── Águas: sobem e descem, com um leve estica-encolhe ───────────────────
+   O ponto é o PESO. A planta balança presa pelo pé (`transform-origin` em
+   50% 90%); a água não tem pé — ela boia. Por isso o movimento é vertical e
+   o corpo se deforma um pouco no topo do curso, como coisa que flutua. */
+@keyframes dcRipple {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  30% {
+    transform: translateY(-6px) scale(0.97, 1.04);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.03, 0.98);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .dc-decor,
   .dc-decor * {

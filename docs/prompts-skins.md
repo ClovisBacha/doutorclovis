@@ -1,4 +1,12 @@
-# Peles das bolinhas — as sete que faltam
+# Peles das bolinhas — FEITO (ago/2026)
+
+> As sete foram geradas e estão no app: Constelação, Pérolas, Cristais,
+> Planetas, Lótus, Coração e Origami, somadas ao Jardim que já existia.
+> Os prompts ficam aqui como registro do que gerou cada arte — se alguma
+> precisar ser refeita, é este o texto. As duas que você pediu para não fazer
+> continuam de fora.
+
+## Registro original
 
 O **Jardim** já está no app. As outras sete pararam por falta de créditos no
 workspace de geração, não por decisão de projeto.

@@ -27,6 +27,27 @@
 import jardimFuturo from "@/assets/skins/jardim-futuro.webp";
 import jardimAtual from "@/assets/skins/jardim-atual.webp";
 import jardimFeito from "@/assets/skins/jardim-feito.webp";
+import lotusFuturo from "@/assets/skins/lotus-futuro.webp";
+import lotusAtual from "@/assets/skins/lotus-atual.webp";
+import lotusFeito from "@/assets/skins/lotus-feito.webp";
+import origamiFuturo from "@/assets/skins/origami-futuro.webp";
+import origamiAtual from "@/assets/skins/origami-atual.webp";
+import origamiFeito from "@/assets/skins/origami-feito.webp";
+import perolasFuturo from "@/assets/skins/perolas-futuro.webp";
+import perolasAtual from "@/assets/skins/perolas-atual.webp";
+import perolasFeito from "@/assets/skins/perolas-feito.webp";
+import constelacaoFuturo from "@/assets/skins/constelacao-futuro.webp";
+import constelacaoAtual from "@/assets/skins/constelacao-atual.webp";
+import constelacaoFeito from "@/assets/skins/constelacao-feito.webp";
+import cristaisFuturo from "@/assets/skins/cristais-futuro.webp";
+import cristaisAtual from "@/assets/skins/cristais-atual.webp";
+import cristaisFeito from "@/assets/skins/cristais-feito.webp";
+import planetasFuturo from "@/assets/skins/planetas-futuro.webp";
+import planetasAtual from "@/assets/skins/planetas-atual.webp";
+import planetasFeito from "@/assets/skins/planetas-feito.webp";
+import coracaoFuturo from "@/assets/skins/coracao-futuro.webp";
+import coracaoAtual from "@/assets/skins/coracao-atual.webp";
+import coracaoFeito from "@/assets/skins/coracao-feito.webp";
 
 export type EstadoNo = "futuro" | "atual" | "feito";
 
@@ -42,6 +63,41 @@ export const TRILHA_SKINS: Record<string, TrilhaSkin> = {
     id: "trilha-jardim",
     nome: "Jardim",
     arte: { futuro: jardimFuturo, atual: jardimAtual, feito: jardimFeito },
+  },
+  "trilha-lotus": {
+    id: "trilha-lotus",
+    nome: "Lótus",
+    arte: { futuro: lotusFuturo, atual: lotusAtual, feito: lotusFeito },
+  },
+  "trilha-origami": {
+    id: "trilha-origami",
+    nome: "Origami",
+    arte: { futuro: origamiFuturo, atual: origamiAtual, feito: origamiFeito },
+  },
+  "trilha-perolas": {
+    id: "trilha-perolas",
+    nome: "Pérolas",
+    arte: { futuro: perolasFuturo, atual: perolasAtual, feito: perolasFeito },
+  },
+  "trilha-constelacao": {
+    id: "trilha-constelacao",
+    nome: "Constelação",
+    arte: { futuro: constelacaoFuturo, atual: constelacaoAtual, feito: constelacaoFeito },
+  },
+  "trilha-cristais": {
+    id: "trilha-cristais",
+    nome: "Cristais",
+    arte: { futuro: cristaisFuturo, atual: cristaisAtual, feito: cristaisFeito },
+  },
+  "trilha-planetas": {
+    id: "trilha-planetas",
+    nome: "Planetas",
+    arte: { futuro: planetasFuturo, atual: planetasAtual, feito: planetasFeito },
+  },
+  "trilha-coracao": {
+    id: "trilha-coracao",
+    nome: "Coração",
+    arte: { futuro: coracaoFuturo, atual: coracaoAtual, feito: coracaoFeito },
   },
 };
 
