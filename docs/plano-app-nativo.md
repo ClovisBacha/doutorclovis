@@ -111,10 +111,42 @@ de ouro passa a ser: **casca nativa muda pouco, conteúdo muda sempre.**
 
 ## A ordem que eu faria
 
-### Fase 1 — a casca (1 a 2 dias de trabalho meu)
+### Fase 1 — a casca ✅ FEITA
 
 Instalar Capacitor, configurar iOS e Android, e um build que gere o app. Nada de
 funcionalidade nova. O objetivo é só ter o app abrindo no simulador.
+
+**O que existe no repositório agora:**
+
+| item                  | estado                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| `@capacitor/*`        | 8.5.0 — `core`, `cli`, `ios`, `android` + `app`, `haptics`, `splash-screen`, `status-bar` |
+| `ios/`                | projeto Xcode gerado, 4 plugins registrados                                               |
+| `android/`            | projeto Gradle gerado, 4 plugins registrados                                              |
+| `capacitor.config.ts` | `appId: br.com.obstetrica.app`, carrega o site publicado                                  |
+| `native/shell/`       | a tela que aparece quando não há rede                                                     |
+
+**Como se constrói, na sua máquina:**
+
+```bash
+bun install
+bun run build      # o site — o app carrega a versão PUBLICADA, mas o build valida
+bun run app:sync   # copia a casca e registra os plugins nos dois projetos
+bun run app:ios      # abre no Xcode  (só macOS)
+bun run app:android  # abre no Android Studio
+```
+
+**O que eu verifiquei aqui, e o que não dá para verificar:** `cap sync` roda e
+registra os quatro plugins nas duas plataformas; `tsc`, lint, os 309 testes e o
+build de produção passam; `bun install --frozen-lockfile` passa (era o que
+quebrava a CI). O que **não** foi verificado é o app abrindo: não há macOS,
+Xcode, Android SDK nem simulador neste ambiente. O primeiro `Run` é seu.
+
+**Uma armadilha que ficou fechada:** o `SplashScreen` estava configurado com
+`launchAutoHide: false`. Isso deixa a tela de abertura na tela até o JavaScript
+mandar escondê-la — e se ele não rodar (rede caída, bundle que não carregou), o
+app fica congelado na marca **para sempre**, sem erro nenhum no log. Agora o
+lado nativo esconde sozinho em 6s e `esconderSplash()` só antecipa.
 
 ### Fase 2 — os três bugs que te incomodam hoje
 

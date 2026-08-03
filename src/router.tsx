@@ -1,6 +1,14 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { esconderSplash } from "@/lib/nativo";
+
+/* A tela de abertura do app nativo sai aqui, e não num `useEffect` do
+   `__root.tsx`, de propósito: este módulo é o começo do lado cliente e roda
+   ANTES de qualquer componente montar. Se a splash dependesse de uma árvore
+   React renderizar, um erro de hidratação a deixaria na tela.
+   No servidor e no navegador é no-op — a função checa se há ponte nativa. */
+esconderSplash();
 
 export const getRouter = () => {
   const queryClient = new QueryClient();

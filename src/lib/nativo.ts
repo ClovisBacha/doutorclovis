@@ -44,6 +44,9 @@ type PonteCapacitor = {
       setStyle?: (o: { style: "DARK" | "LIGHT" }) => Promise<void>;
       setOverlaysWebView?: (o: { overlay: boolean }) => Promise<void>;
     };
+    SplashScreen?: {
+      hide?: (o?: { fadeOutDuration?: number }) => Promise<void>;
+    };
   };
 };
 
@@ -67,6 +70,45 @@ export function ehNativo(): boolean {
 /** `"ios"`, `"android"` ou `"web"`. */
 export function plataforma(): string {
   return ponte()?.getPlatform?.() ?? "web";
+}
+
+/**
+ * Antecipa a saída da tela de abertura, assim que a página remota respondeu.
+ *
+ * A casca carrega o SITE, então há uma espera de rede antes do primeiro pixel
+ * útil. Escondendo a splash por tempo fixo, essa espera vira tela branca;
+ * escondendo quando a página carregou, vira a marca até o conteúdo existir.
+ *
+ * **Isto NÃO é a única saída da splash, e não pode ser.** O
+ * `capacitor.config.ts` mantém `launchAutoHide: true` com teto de 6 segundos:
+ * o lado nativo esconde sozinho, sem depender da página. Um app congelado na
+ * marca é pior que um app mostrando erro — a paciente não sabe sequer que houve
+ * erro —, e é exatamente isso que acontece quando quem esconde é só o
+ * JavaScript e o JavaScript não roda.
+ *
+ * O plugin é procurado **na hora de esconder**, não agora: a página remota não
+ * empacota `@capacitor/splash-screen` (ver o cabeçalho deste arquivo), então
+ * quem publica `Capacitor.Plugins.SplashScreen` é a ponte injetada — e ela pode
+ * chegar depois deste módulo.
+ *
+ * No navegador é no-op silencioso — não há splash nenhuma.
+ */
+export function esconderSplash(): void {
+  if (!ehNativo() || typeof window === "undefined") return;
+  let feito = false;
+  const some = () => {
+    if (feito) return;
+    feito = true;
+    try {
+      void ponte()
+        ?.Plugins?.SplashScreen?.hide?.({ fadeOutDuration: 220 })
+        ?.catch(() => {});
+    } catch {
+      /* melhor esforço — o auto-hide nativo continua valendo */
+    }
+  };
+  if (typeof document === "undefined" || document.readyState === "complete") return some();
+  window.addEventListener("load", some, { once: true });
 }
 
 /**

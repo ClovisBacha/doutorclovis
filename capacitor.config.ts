@@ -86,10 +86,18 @@ const config: CapacitorConfig = {
   },
 
   plugins: {
-    /* A splash sai no primeiro quadro útil em vez de tempo fixo: tempo fixo ou
-       corta cedo (tela em branco) ou demora à toa. */
+    /* A splash sai no primeiro quadro útil — quem esconde é `esconderSplash()`
+       em `src/lib/nativo.ts`, assim que a página remota responde. Tempo fixo ou
+       corta cedo (tela em branco) ou demora à toa.
+       Mas `launchAutoHide: false` sozinho é armadilha: se o JavaScript que
+       esconde não rodar — rede caída, bundle que não carregou, plugin que não
+       respondeu —, a splash fica PARA SEMPRE e o app parece travado no primeiro
+       uso. Por isso o auto-hide fica LIGADO com um teto de 6s: o lado nativo
+       esconde sozinho, sem depender de nada da página. O JavaScript só antecipa
+       — ele deixou de ser a única saída. */
     SplashScreen: {
-      launchAutoHide: false,
+      launchAutoHide: true,
+      launchShowDuration: 6000,
       backgroundColor: "#0b0b17",
       showSpinner: false,
     },

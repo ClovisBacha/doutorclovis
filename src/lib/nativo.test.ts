@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { agendaDeImpactos, forcaDoPulso } from "./nativo";
 import { padraoDaFase } from "./breath-audio";
 
@@ -104,5 +105,54 @@ describe("sem ponte, o app continua sendo web", () => {
     const { ehNativo, plataforma } = await import("./nativo");
     expect(ehNativo()).toBe(false);
     expect(plataforma()).toBe("web");
+  });
+});
+
+/**
+ * A splash é o único ponto do app que pode CONGELAR sem dar erro: se ninguém a
+ * esconde, ela fica na tela para sempre e o app parece travado no primeiro uso.
+ * O que estes testes cobram é que ela nunca dependa de uma coisa só.
+ */
+describe("a tela de abertura sempre tem saída", () => {
+  const config = readFileSync("capacitor.config.ts", "utf8");
+  const fonte = readFileSync("src/lib/nativo.ts", "utf8");
+
+  test("o lado NATIVO esconde sozinho, sem depender da página", () => {
+    /* Com `launchAutoHide: false` o JavaScript vira a única saída — e uma rede
+       caída passa a ser um app congelado. */
+    expect(config).toContain("launchAutoHide: true");
+    expect(config).toMatch(/launchShowDuration:\s*6000/);
+  });
+
+  test("no navegador é no-op — não há splash para esconder", async () => {
+    const { esconderSplash } = await import("./nativo");
+    expect(() => esconderSplash()).not.toThrow();
+  });
+
+  test("o plugin é procurado na hora de esconder, não no carregamento", () => {
+    /* A página remota não empacota `@capacitor/splash-screen`: quem publica o
+       plugin é a ponte injetada, e ela pode chegar depois deste módulo. Guardar
+       a referência agora seria guardar `undefined` para sempre. */
+    expect(fonte).toMatch(/ponte\(\)\s*\?\.Plugins\?\.SplashScreen\?\.hide/);
+    /* E não guardada numa variável antes do agendamento. */
+    expect(fonte).not.toMatch(/const\s+splash\s*=/);
+  });
+
+  test("esconder duas vezes não é esconder duas vezes", () => {
+    expect(fonte).toContain("if (feito) return;");
+  });
+});
+
+describe("a splash sai antes de qualquer componente montar", () => {
+  const router = readFileSync("src/router.tsx", "utf8");
+
+  test("a chamada mora no começo do cliente, não num useEffect", () => {
+    /* Num `useEffect` do `__root.tsx`, um erro de hidratação deixaria a marca
+       na tela até o teto nativo estourar. */
+    const chamada = router.indexOf("\nesconderSplash();");
+    expect(chamada).toBeGreaterThan(0);
+    /* No escopo do módulo — antes da primeira função. Dentro de `getRouter` ela
+       só rodaria quando o router fosse montado. */
+    expect(chamada).toBeLessThan(router.indexOf("export const getRouter"));
   });
 });
