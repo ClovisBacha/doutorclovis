@@ -121,11 +121,15 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
         const { lerOferta } = await import("@/lib/promo.functions");
         const oferta = await lerOferta(u.user.id);
         if (oferta.ativa) {
-          const { CUPOM_ID, DESCONTO_PCT } = await import("@/lib/promo");
-          discountCoupon = await ensurePercentCoupon(
+          const { ABATIMENTO_CENTAVOS, CUPOM_ID, DESCONTO_PCT } = await import("@/lib/promo");
+          const { ensureAmountCoupon } = await import("@/lib/stripe.server");
+          /* Valor FIXO, não porcentagem: os 61% incidem sobre o preço de
+             pagar mês a mês (R$ 238,80), e o que o Stripe cobra é o Price do
+             anual (R$ 118,80). Abater R$ 25,67 fecha a fatura exatamente nos
+             R$ 93,13 que a tela promete — sem arredondamento no meio. */
+          discountCoupon = await ensureAmountCoupon(
             CUPOM_ID,
-            DESCONTO_PCT,
-            "once",
+            ABATIMENTO_CENTAVOS,
             `Boas-vindas (-${DESCONTO_PCT}% no 1º ano)`,
           );
         }

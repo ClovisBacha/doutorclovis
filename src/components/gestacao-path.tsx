@@ -3399,6 +3399,18 @@ function QuizPaywall({
               Oferta de boas-vindas
             </p>
             <p className="font-serif text-xl leading-tight">{oferta.descontoPct}% no 1º ano</p>
+            {/* O riscado com legenda: R$ 238,80 é o plano mensal por doze
+                meses, não um preço anual inflado. Sem a legenda, comparação
+                vira propaganda enganosa. */}
+            <p className="mt-0.5 text-[11px] leading-tight text-white/80">
+              <span className="whitespace-nowrap line-through">
+                {brlPromo(oferta.referenciaCentavos)}
+              </span>{" "}
+              mês a mês →{" "}
+              <span className="whitespace-nowrap font-bold text-white">
+                {brlPromo(oferta.promoCentavos)}
+              </span>
+            </p>
           </div>
           <div className="shrink-0 rounded-lg bg-black/25 px-2.5 py-1.5 text-center">
             <p className="text-[8px] font-bold uppercase tracking-wide text-white/80">termina em</p>
@@ -3430,7 +3442,7 @@ function QuizPaywall({
           }
           sub={
             promoViva && oferta
-              ? `no 1º ano · depois ${brlPromo(oferta.cheioCentavos)}/ano`
+              ? `no 1º ano · depois ${brlPromo(oferta.listaCentavos)}/ano`
               : `por mês · R$ ${QUIZ_PRICE_ANNUAL_TOTAL.toFixed(2).replace(".", ",")} por ano`
           }
           badge={promoViva && oferta ? `−${oferta.descontoPct}%` : "ECONOMIZE 50%"}

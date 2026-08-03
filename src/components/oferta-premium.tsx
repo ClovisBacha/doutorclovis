@@ -285,15 +285,26 @@ export function OfertaPremium({
                 outra — e preço partido é o tipo de coisa que faz a paciente
                 desconfiar do número. `whitespace-nowrap` em cada valor
                 garante que nenhum se parta em nenhuma largura de tela. */}
+            {/* O riscado EM CIMA, o preço da promoção EMBAIXO — o olho lê de
+                cima para baixo, e é nessa ordem que a queda de preço se
+                percebe.
+
+                E o riscado vem com legenda. R$ 238,80 é um preço REAL (o
+                plano mensal por doze meses), mas o anual normal custa
+                R$ 118,80 — riscar 238,80 sem dizer o que é faria parecer que
+                o anual foi inflado para a promoção, que é o "preço de
+                referência" que o CDC proíbe. Com a legenda é comparação
+                verdadeira; sem ela é propaganda enganosa. */}
             <div className="mt-3 rounded-xl bg-white/15 px-3 py-2.5">
-              <div className="flex items-baseline gap-2">
-                <span className="whitespace-nowrap text-[13px] text-white/70 line-through">
-                  {brl(oferta.cheioCentavos)}
-                </span>
-                <span className="whitespace-nowrap font-serif text-[28px] leading-none">
-                  {brl(oferta.promoCentavos)}
-                </span>
-              </div>
+              <p className="text-[12px] leading-tight text-white/75">
+                <span className="whitespace-nowrap line-through">
+                  {brl(oferta.referenciaCentavos)}
+                </span>{" "}
+                pagando mês a mês
+              </p>
+              <p className="mt-0.5 whitespace-nowrap font-serif text-[30px] leading-none">
+                {brl(oferta.promoCentavos)}
+              </p>
               <p className="mt-1.5 text-[12px] font-semibold text-white/95">
                 você economiza{" "}
                 <span className="whitespace-nowrap">{brl(oferta.economiaCentavos)}</span> no
@@ -312,10 +323,35 @@ export function OfertaPremium({
           o item.
         </p>
 
-        {/* Escolha do plano. O total do anual aparece à vista: preço por mês
-            com cobrança anual, sem dizer quanto sai do cartão, é informação
-            incompleta — e é a primeira coisa que vira estorno. */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        {/* Empilhados, e o MAIS CARO em cima. Lado a lado, os dois planos
+            pesavam igual e o olho comparava dois números soltos; um embaixo do
+            outro, ela lê primeiro o que custa mais (mês a mês) e depois o
+            anual — que é a ordem em que a diferença aparece.
+
+            O total do anual continua à vista: preço por mês com cobrança
+            anual, sem dizer quanto sai do cartão, é informação incompleta pelo
+            CDC e é a primeira coisa que vira estorno. */}
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            onClick={() => setPlano("monthly")}
+            aria-pressed={plano === "monthly"}
+            className={`rounded-2xl border p-3 text-left transition ${
+              plano === "monthly"
+                ? "border-primary bg-primary/8 ring-1 ring-primary/30"
+                : "border-border bg-background"
+            }`}
+          >
+            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Mensal
+            </span>
+            <span className="mt-0.5 block font-serif text-lg tabular-nums">
+              {reaisBRL(PRECO_MENSAL)}
+            </span>
+            <span className="block text-[11px] text-muted-foreground">por mês</span>
+            <span className="mt-1 block text-[10px] text-muted-foreground">
+              cancela quando quiser
+            </span>
+          </button>
           <button
             onClick={() => setPlano("annual")}
             aria-pressed={plano === "annual"}
@@ -341,10 +377,13 @@ export function OfertaPremium({
                     mensal, e a renovação aparece por extenso: o desconto
                     acaba, e esconder isso é a mentira que este arquivo
                     inteiro existe para não cometer. */}
-                <span className="mt-0.5 block whitespace-nowrap text-[11px] text-muted-foreground line-through">
-                  {brl(oferta.cheioCentavos)}
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  <span className="whitespace-nowrap line-through">
+                    {brl(oferta.referenciaCentavos)}
+                  </span>{" "}
+                  mês a mês
                 </span>
-                <span className="block whitespace-nowrap font-serif text-xl leading-tight tabular-nums text-violet-700">
+                <span className="block whitespace-nowrap font-serif text-2xl leading-tight tabular-nums text-violet-700">
                   {brl(oferta.promoCentavos)}
                 </span>
                 <span className="block text-[11px] text-muted-foreground">
@@ -354,7 +393,7 @@ export function OfertaPremium({
                   </span>
                 </span>
                 <span className="mt-1 block text-[10px] text-muted-foreground">
-                  depois <span className="whitespace-nowrap">{brl(oferta.cheioCentavos)}/ano</span>
+                  depois <span className="whitespace-nowrap">{brl(oferta.listaCentavos)}/ano</span>
                 </span>
               </>
             ) : (
@@ -368,26 +407,6 @@ export function OfertaPremium({
                 </span>
               </>
             )}
-          </button>
-          <button
-            onClick={() => setPlano("monthly")}
-            aria-pressed={plano === "monthly"}
-            className={`rounded-2xl border p-3 text-left transition ${
-              plano === "monthly"
-                ? "border-primary bg-primary/8 ring-1 ring-primary/30"
-                : "border-border bg-background"
-            }`}
-          >
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Mensal
-            </span>
-            <span className="mt-0.5 block font-serif text-lg tabular-nums">
-              {reaisBRL(PRECO_MENSAL)}
-            </span>
-            <span className="block text-[11px] text-muted-foreground">por mês</span>
-            <span className="mt-1 block text-[10px] text-muted-foreground">
-              cancela quando quiser
-            </span>
           </button>
         </div>
 
@@ -428,8 +447,8 @@ export function OfertaPremium({
             estorno de daqui a doze meses. */}
         {promoViva && oferta && plano === "annual" && (
           <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
-            O desconto vale para o primeiro ano. A renovação, daqui a 12 meses, volta para{" "}
-            {brl(oferta.cheioCentavos)} — e você pode cancelar antes, quando quiser.
+            O desconto vale para o primeiro ano. Daqui a 12 meses a renovação é o preço normal do
+            plano anual, {brl(oferta.listaCentavos)} — e você pode cancelar antes, quando quiser.
           </p>
         )}
 

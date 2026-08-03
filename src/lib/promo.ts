@@ -1,60 +1,92 @@
 /**
  * Oferta de boas-vindas — 61% no primeiro ano do Premium, por 2h59.
  *
- * ─── As regras que fazem esta oferta ser honesta ────────────────────────
+ * ─── Sobre o que os 61% incidem ─────────────────────────────────────────
  *
- * Contador regressivo em tela de preço é, na maioria dos apps, mentira: ele
- * zera e volta na próxima visita, ou reinicia quando a pessoa limpa os dados.
- * Isso tem nome no Código de Defesa do Consumidor e é o tipo de coisa que
- * derruba a reputação de uma clínica junto com a do app. O Clóvis foi
+ * Sobre o que ela pagaria ASSINANDO MÊS A MÊS durante um ano: R$ 19,90 × 12 =
+ * R$ 238,80. Com o desconto, o primeiro ano sai por R$ 93,13.
+ *
+ * Isso obriga a tela a fazer uma coisa, e ela faz: **dizer o que é o preço
+ * riscado**. O plano anual normal custa R$ 118,80 — riscar R$ 238,80 sem
+ * legenda faria parecer que o anual foi inflado para a promoção, que é
+ * exatamente o "preço de referência" que o Código de Defesa do Consumidor
+ * proíbe. Riscado com a legenda "pagando mês a mês" é comparação verdadeira;
+ * riscado sozinho é propaganda enganosa. A letra miúda também diz que a
+ * renovação volta para R$ 118,80.
+ *
+ * ─── Sobre o relógio ────────────────────────────────────────────────────
+ *
+ * Contador em tela de preço é, na maioria dos apps, mentira: zera e volta na
+ * próxima visita, ou reinicia quando a pessoa limpa os dados. O Clóvis foi
  * explícito: *"isso vai ser de verdade… depois que passar, passou"*. Então:
  *
- * 1. **O relógio nasce no SERVIDOR e mora no banco.** O cliente não escolhe
- *    quando começa nem quanto falta — ele pergunta. Limpar o app, trocar de
+ * 1. O relógio nasce no SERVIDOR e mora no banco. Limpar o app, trocar de
  *    celular ou reinstalar não devolve a promoção.
- * 2. **Expirou, acabou.** Não há segunda janela, não há "última chance".
- * 3. **O desconto é aplicado no SERVIDOR**, na hora de criar o checkout, e só
- *    se o servidor concordar que a janela está aberta. O cliente pedir não
- *    basta.
- * 4. **O primeiro ano, e a tela diz isso.** O cupom vale para a primeira
- *    cobrança; a renovação volta ao preço cheio. Esconder isso seria a mesma
- *    mentira, só adiada em doze meses.
+ * 2. Expirou, acabou. Não há segunda janela.
+ * 3. O desconto é aplicado no SERVIDOR, e só se o servidor concordar que a
+ *    janela está aberta. O cliente pedir não basta.
  *
- * Este arquivo é só a conta — sem rede, sem banco, sem React. É o que permite
- * testar preço, que é a parte do app que a paciente confere com o extrato do
- * cartão.
+ * ─── Sobre o desconto no Stripe ─────────────────────────────────────────
+ *
+ * O que o Stripe cobra é o Price do plano anual (R$ 118,80). Para a fatura
+ * fechar em R$ 93,13, o cupom desconta um VALOR FIXO (R$ 25,67), não uma
+ * porcentagem: 21,61% sobre 11.880 centavos daria 2.567,268, e quem arredonda
+ * isso é o Stripe, não este arquivo. Um centavo de diferença entre a tela e a
+ * fatura é uma reclamação — e com valor fixo não existe arredondamento.
+ *
+ * Este arquivo é só a conta. Sem rede, sem banco, sem React.
  */
 
 /** Quanto dura a janela: 2h59. */
 export const JANELA_MS = (2 * 60 + 59) * 60 * 1000;
 
-/** O desconto, em porcentagem inteira. */
+/** O desconto anunciado, em porcentagem inteira. */
 export const DESCONTO_PCT = 61;
 
-/** Id do cupom no Stripe — estável, para não criar um cupom por checkout. */
-export const CUPOM_ID = `boasvindas${DESCONTO_PCT}`;
-
-/** Preço cheio do plano anual, em CENTAVOS (R$ 9,90 × 12). */
-export const ANUAL_CENTAVOS = 11_880;
+/** Preço do plano mensal, em centavos. */
+export const MENSAL_CENTAVOS = 1_990;
 
 /**
- * O que a paciente paga no primeiro ano com o desconto.
+ * A base do desconto: um ano pagando mês a mês.
  *
- * Arredonda no fim, uma vez só, e em centavos — é assim que o Stripe calcula
- * (`percent_off` sobre o total da fatura). Fazer a conta em reais e arredondar
- * depois dá um centavo de diferença em alguns valores, e um centavo de
- * diferença entre a tela e a fatura é uma reclamação.
+ * É um preço REAL — é o que ela paga se escolher o plano mensal e ficar doze
+ * meses. Por isso pode ser riscado, desde que a tela diga que é isso.
  */
+export const REFERENCIA_CENTAVOS = MENSAL_CENTAVOS * 12;
+
+/**
+ * O preço de LISTA do plano anual, em centavos.
+ *
+ * É o que o Stripe cobra fora da promoção, e é para onde a renovação volta
+ * depois do primeiro ano. Não é a base do desconto — é a terceira informação
+ * que a tela precisa dar para não esconder nada.
+ */
+export const ANUAL_LISTA_CENTAVOS = 11_880;
+
+/** Cupom no Stripe — id estável, para não criar um cupom por checkout. */
+export const CUPOM_ID = `boasvindas${DESCONTO_PCT}`;
+
+/** Arredonda uma vez, no fim, e em centavos. */
 export function comDesconto(centavos: number, pct = DESCONTO_PCT): number {
   return Math.round((centavos * (100 - pct)) / 100);
 }
 
-/** Quanto ela deixa de pagar. */
-export function economia(centavos: number, pct = DESCONTO_PCT): number {
-  return centavos - comDesconto(centavos, pct);
-}
+/** O que ela paga no primeiro ano. */
+export const PROMO_CENTAVOS = comDesconto(REFERENCIA_CENTAVOS);
 
-/** "R$ 46,33" */
+/** Quanto ela deixa de pagar, comparado a assinar mês a mês por um ano. */
+export const ECONOMIA_CENTAVOS = REFERENCIA_CENTAVOS - PROMO_CENTAVOS;
+
+/**
+ * Quanto o cupom do Stripe tem de abater do preço de lista, em centavos.
+ *
+ * Positivo por construção — se algum dia o preço promocional passar do de
+ * lista, isto vira 0 e o checkout segue sem desconto em vez de cobrar mais
+ * caro do que o normal.
+ */
+export const ABATIMENTO_CENTAVOS = Math.max(0, ANUAL_LISTA_CENTAVOS - PROMO_CENTAVOS);
+
+/** "R$ 93,13" */
 export function brl(centavos: number): string {
   return `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 }
@@ -62,9 +94,8 @@ export function brl(centavos: number): string {
 /**
  * Quanto falta, em milissegundos, a partir do instante em que a janela abriu.
  *
- * `agora` entra por parâmetro em vez de vir de `Date.now()` para esta conta
- * ser testável — e porque quem manda no relógio é o servidor, não o aparelho
- * dela (adiantar o relógio do celular não estende promoção nenhuma).
+ * `agora` entra por parâmetro para esta conta ser testável — e porque quem
+ * manda no relógio é o servidor, não o aparelho dela.
  */
 export function restanteMs(abertaEm: number, agora: number, janela = JANELA_MS): number {
   if (!Number.isFinite(abertaEm) || !Number.isFinite(agora)) return 0;
@@ -77,10 +108,8 @@ export function estaAberta(abertaEm: number, agora: number, janela = JANELA_MS):
 }
 
 /**
- * "2:59:00" — o formato do contador.
- *
- * Sempre com dois dígitos em minutos e segundos: sem isso o número muda de
- * LARGURA a cada segundo e o texto ao lado dança na tela.
+ * "2:59:00" — sempre com dois dígitos em minutos e segundos, senão o número
+ * muda de LARGURA a cada segundo e o texto ao lado dança na tela.
  */
 export function formataRestante(ms: number): string {
   const t = Math.max(0, Math.floor(ms / 1000));

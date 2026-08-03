@@ -180,6 +180,42 @@ export async function createOneTimeCheckout(opts: {
  * Garante que o cupom de porcentagem existe no Stripe (idempotente por id).
  * Usado no "+15% convite de paciente" — criado uma vez, reutilizado sempre.
  */
+/**
+ * Cupom de VALOR FIXO, em centavos.
+ *
+ * Existe porque a oferta de boas-vindas precisa fechar a fatura num número
+ * exato: a tela promete R$ 93,13, e o Price do plano anual é R$ 118,80. Como
+ * porcentagem isso seria 21,61%, e 11.880 × 21,61% = 2.567,268 — quem
+ * arredondaria seria o Stripe, não o app. Um centavo de diferença entre a
+ * tela e a fatura é uma reclamação; com valor fixo não existe arredondamento.
+ *
+ * `duration: "once"` porque o desconto é do PRIMEIRO ano. A renovação volta
+ * ao preço de lista, e a tela diz isso.
+ */
+export async function ensureAmountCoupon(
+  id: string,
+  amountOffCentavos: number,
+  nome: string,
+): Promise<string | null> {
+  try {
+    await stripeFetch<{ id: string }>(`/coupons/${id}`, "GET");
+    return id;
+  } catch {
+    try {
+      const c = await stripeFetch<{ id: string }>("/coupons", "POST", {
+        id,
+        amount_off: amountOffCentavos,
+        currency: "brl",
+        duration: "once",
+        name: nome,
+      });
+      return c.id;
+    } catch {
+      return null; // sem cupom, o checkout segue sem desconto (nunca bloqueia)
+    }
+  }
+}
+
 export async function ensurePercentCoupon(
   id: string,
   percentOff: number,

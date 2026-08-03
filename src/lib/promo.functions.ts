@@ -12,11 +12,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
-  ANUAL_CENTAVOS,
+  ANUAL_LISTA_CENTAVOS,
   DESCONTO_PCT,
+  ECONOMIA_CENTAVOS,
   JANELA_MS,
-  comDesconto,
-  economia,
+  PROMO_CENTAVOS,
+  REFERENCIA_CENTAVOS,
   estaAberta,
   restanteMs,
 } from "@/lib/promo";
@@ -27,21 +28,31 @@ export type OfertaBoasVindas = {
   /** Quanto falta, em ms. 0 quando fechada. */
   restanteMs: number;
   descontoPct: number;
-  /** Preço cheio do anual, em centavos. */
-  cheioCentavos: number;
+  /**
+   * O preço RISCADO: um ano pagando mês a mês (R$ 19,90 × 12 = R$ 238,80).
+   * É a base dos 61% e um preço REAL — por isso pode ser riscado, desde que a
+   * tela diga o que ele é.
+   */
+  referenciaCentavos: number;
   /** O que ela paga no primeiro ano, em centavos. */
   promoCentavos: number;
   /** Quanto deixa de pagar, em centavos. */
   economiaCentavos: number;
+  /**
+   * Preço de lista do plano anual — para onde a renovação volta.
+   * Vai junto para a tela nunca poder omitir esta terceira informação.
+   */
+  listaCentavos: number;
 };
 
 const FECHADA: OfertaBoasVindas = {
   ativa: false,
   restanteMs: 0,
   descontoPct: DESCONTO_PCT,
-  cheioCentavos: ANUAL_CENTAVOS,
-  promoCentavos: comDesconto(ANUAL_CENTAVOS),
-  economiaCentavos: economia(ANUAL_CENTAVOS),
+  referenciaCentavos: REFERENCIA_CENTAVOS,
+  promoCentavos: PROMO_CENTAVOS,
+  economiaCentavos: ECONOMIA_CENTAVOS,
+  listaCentavos: ANUAL_LISTA_CENTAVOS,
 };
 
 /**
@@ -111,12 +122,9 @@ export async function lerOferta(uid: string): Promise<OfertaBoasVindas> {
 
 function montar(abertaEm: number, agora: number): OfertaBoasVindas {
   return {
+    ...FECHADA,
     ativa: estaAberta(abertaEm, agora, JANELA_MS),
     restanteMs: restanteMs(abertaEm, agora, JANELA_MS),
-    descontoPct: DESCONTO_PCT,
-    cheioCentavos: ANUAL_CENTAVOS,
-    promoCentavos: comDesconto(ANUAL_CENTAVOS),
-    economiaCentavos: economia(ANUAL_CENTAVOS),
   };
 }
 

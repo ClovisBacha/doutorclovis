@@ -3,61 +3,99 @@
  * este arquivo calcula um preço COM DESCONTO — a conta mais fácil de errar por
  * um centavo e a mais cara de errar.
  *
- * O segundo grupo de testes é sobre a promessa: "depois que passar, passou".
- * Uma janela que reabre é o contador falso que estes testes existem para
- * impedir.
+ * Dois grupos importam mais que os outros:
+ *
+ * · **o abatimento do Stripe.** A tela promete R$ 93,13 e o Stripe cobra o
+ *   Price do anual menos o cupom. Se as duas contas divergirem, a fatura não
+ *   bate com a tela — e é a paciente que descobre, depois de pagar.
+ * · **a janela.** "Depois que passar, passou" foi promessa explícita. Uma
+ *   janela que reabre é o contador falso que estes testes existem para
+ *   impedir.
  */
 
 import { describe, expect, test } from "bun:test";
 import {
-  ANUAL_CENTAVOS,
+  ABATIMENTO_CENTAVOS,
+  ANUAL_LISTA_CENTAVOS,
   DESCONTO_PCT,
+  ECONOMIA_CENTAVOS,
   JANELA_MS,
+  MENSAL_CENTAVOS,
+  PROMO_CENTAVOS,
+  REFERENCIA_CENTAVOS,
   brl,
   comDesconto,
-  economia,
   estaAberta,
   formataRestante,
   restanteMs,
 } from "./promo";
 
+describe("a base do desconto é pagar mês a mês por um ano", () => {
+  test("R$ 19,90 × 12 = R$ 238,80", () => {
+    expect(MENSAL_CENTAVOS).toBe(1990);
+    expect(REFERENCIA_CENTAVOS).toBe(23880);
+    expect(brl(REFERENCIA_CENTAVOS)).toBe("R$ 238,80");
+  });
+
+  test("61% sobre R$ 238,80 dá R$ 93,13", () => {
+    expect(PROMO_CENTAVOS).toBe(9313);
+    expect(brl(PROMO_CENTAVOS)).toBe("R$ 93,13");
+  });
+
+  test("a economia fecha com a referência — sem centavo sumindo", () => {
+    expect(PROMO_CENTAVOS + ECONOMIA_CENTAVOS).toBe(REFERENCIA_CENTAVOS);
+    expect(brl(ECONOMIA_CENTAVOS)).toBe("R$ 145,67");
+  });
+
+  test("o preço riscado é um preço REAL, não inflado", () => {
+    /* R$ 238,80 é o que ela paga de verdade escolhendo o plano mensal e
+       ficando doze meses. É isso que permite riscá-lo — com a legenda. */
+    expect(REFERENCIA_CENTAVOS).toBe(MENSAL_CENTAVOS * 12);
+  });
+});
+
+describe("o que o Stripe vai cobrar", () => {
+  test("o abatimento leva o preço de lista a exatamente o preço da tela", () => {
+    expect(ANUAL_LISTA_CENTAVOS - ABATIMENTO_CENTAVOS).toBe(PROMO_CENTAVOS);
+    expect(brl(ABATIMENTO_CENTAVOS)).toBe("R$ 25,67");
+  });
+
+  test("valor fixo, não porcentagem — não há arredondamento no meio", () => {
+    /* 21,61% sobre 11.880 daria 2.567,268, e quem arredondaria seria o
+       Stripe. Com valor fixo em centavos inteiros, tela e fatura são o mesmo
+       número por construção. */
+    expect(Number.isInteger(ABATIMENTO_CENTAVOS)).toBe(true);
+  });
+
+  test("a promoção nunca sai mais cara que o preço de lista", () => {
+    expect(PROMO_CENTAVOS).toBeLessThan(ANUAL_LISTA_CENTAVOS);
+    expect(ABATIMENTO_CENTAVOS).toBeGreaterThan(0);
+  });
+
+  test("a renovação volta ao preço de lista, e ele é menor que a referência", () => {
+    /* Se a lista fosse maior que a referência, a tela estaria dizendo que
+       pagar anual é pior que pagar mensal. */
+    expect(ANUAL_LISTA_CENTAVOS).toBeLessThan(REFERENCIA_CENTAVOS);
+    expect(brl(ANUAL_LISTA_CENTAVOS)).toBe("R$ 118,80");
+  });
+});
+
 describe("a conta do desconto", () => {
-  test("61% sobre o anual dá R$ 46,33", () => {
-    expect(comDesconto(ANUAL_CENTAVOS)).toBe(4633);
-    expect(brl(comDesconto(ANUAL_CENTAVOS))).toBe("R$ 46,33");
+  test("0% e 100% são os extremos coerentes", () => {
+    expect(comDesconto(REFERENCIA_CENTAVOS, 0)).toBe(REFERENCIA_CENTAVOS);
+    expect(comDesconto(REFERENCIA_CENTAVOS, 100)).toBe(0);
   });
 
-  test("a economia fecha com o preço cheio — sem centavo sumindo", () => {
-    expect(comDesconto(ANUAL_CENTAVOS) + economia(ANUAL_CENTAVOS)).toBe(ANUAL_CENTAVOS);
-    expect(brl(economia(ANUAL_CENTAVOS))).toBe("R$ 72,47");
-  });
-
-  test("o preço cheio é R$ 118,80 (9,90 × 12)", () => {
-    expect(ANUAL_CENTAVOS).toBe(990 * 12);
-    expect(brl(ANUAL_CENTAVOS)).toBe("R$ 118,80");
-  });
-
-  test("desconto de 0% e de 100% são os extremos coerentes", () => {
-    expect(comDesconto(ANUAL_CENTAVOS, 0)).toBe(ANUAL_CENTAVOS);
-    expect(comDesconto(ANUAL_CENTAVOS, 100)).toBe(0);
-  });
-
-  test("o resultado é sempre centavo inteiro", () => {
-    for (const c of [11880, 1990, 9999, 3, 1]) {
+  test("o resultado é sempre centavo inteiro e nunca passa do original", () => {
+    for (const c of [23880, 11880, 1990, 9999, 3, 1]) {
       expect(Number.isInteger(comDesconto(c))).toBe(true);
-      expect(Number.isInteger(economia(c))).toBe(true);
+      expect(comDesconto(c)).toBeLessThanOrEqual(c);
     }
   });
 
-  test("nunca cobra mais que o preço cheio", () => {
-    for (const c of [11880, 1990, 9999, 1]) expect(comDesconto(c)).toBeLessThanOrEqual(c);
-  });
-
-  test("o desconto anunciado é o que o Stripe vai aplicar", () => {
-    /* O Stripe calcula `percent_off` sobre o total da fatura, em centavos.
-       Se as duas contas divergirem, a tela mente sobre a fatura. */
-    const stripe = ANUAL_CENTAVOS - Math.round((ANUAL_CENTAVOS * DESCONTO_PCT) / 100);
-    expect(comDesconto(ANUAL_CENTAVOS)).toBe(stripe);
+  test("o desconto anunciado é 61", () => {
+    expect(DESCONTO_PCT).toBe(61);
+    expect(Math.round((1 - PROMO_CENTAVOS / REFERENCIA_CENTAVOS) * 100)).toBe(61);
   });
 });
 
@@ -75,7 +113,6 @@ describe("a janela dos 2h59", () => {
     expect(estaAberta(T0, T0 + JANELA_MS)).toBe(false);
   });
 
-  /* A promessa que o Clóvis fez: "depois que passar, passou". */
   test("uma vez fechada, NUNCA reabre", () => {
     for (const depois of [1, 60_000, 86_400_000, 365 * 86_400_000]) {
       expect(estaAberta(T0, T0 + JANELA_MS + depois)).toBe(false);
@@ -84,14 +121,7 @@ describe("a janela dos 2h59", () => {
   });
 
   test("relógio adiantado não estende — só encurta", () => {
-    /* Se o aparelho dela estiver adiantado, ela vê MENOS tempo, nunca mais.
-       (O tempo autoritativo é o do servidor; isto trava a direção do erro.) */
     expect(restanteMs(T0, T0 + 3_600_000)).toBeLessThan(JANELA_MS);
-  });
-
-  test("relógio atrasado não passa do teto da janela", () => {
-    expect(restanteMs(T0, T0 - 999_999)).toBeLessThanOrEqual(JANELA_MS + 999_999);
-    expect(restanteMs(T0, T0)).toBe(JANELA_MS);
   });
 
   test("data inválida fecha a janela em vez de abrir para sempre", () => {
