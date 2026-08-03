@@ -1,5 +1,5 @@
 /**
- * Oferta de boas-vindas — 62% no primeiro ano do Premium, por 2h59.
+ * Oferta de boas-vindas — 62% no primeiro ano do Premium, para quem nunca assinou.
  *
  * ─── Sobre o que os 61% incidem ─────────────────────────────────────────
  *
@@ -15,17 +15,20 @@
  * riscado sozinho é propaganda enganosa. A letra miúda também diz que a
  * renovação volta para R$ 118,80.
  *
- * ─── Sobre o relógio ────────────────────────────────────────────────────
+ * ─── Quem tem direito ───────────────────────────────────────────────────
  *
- * Contador em tela de preço é, na maioria dos apps, mentira: zera e volta na
- * próxima visita, ou reinicia quando a pessoa limpa os dados. O Clóvis foi
- * explícito: *"isso vai ser de verdade… depois que passar, passou"*. Então:
+ * Quem nunca assinou o Premium, e só. Sem contador, sem janela de horas.
  *
- * 1. O relógio nasce no SERVIDOR e mora no banco. Limpar o app, trocar de
- *    celular ou reinstalar não devolve a promoção.
- * 2. Expirou, acabou. Não há segunda janela.
- * 3. O desconto é aplicado no SERVIDOR, e só se o servidor concordar que a
- *    janela está aberta. O cliente pedir não basta.
+ * Havia um relógio de 2h59 aqui, com o instante gravado no banco. Ele saiu
+ * por decisão do Clóvis, e a decisão é coerente com o rumo: a paciente vai
+ * assinar DENTRO do app, e o molde que a loja oferece para "desconto de
+ * primeira assinatura" é a oferta introdutória — que vale para quem nunca
+ * assinou e **não tem janela por pessoa**. Manter um contador aqui criaria
+ * uma promessa que a loja não consegue cumprir depois.
+ *
+ * O que não mudou: **quem decide é o servidor**. A elegibilidade é conferida
+ * de novo na hora de criar o checkout, então uma requisição forjada não
+ * compra com desconto. Ver `promo.functions.ts`.
  *
  * ─── Sobre o desconto no Stripe ─────────────────────────────────────────
  *
@@ -41,9 +44,6 @@
  *
  * Este arquivo é só a conta. Sem rede, sem banco, sem React.
  */
-
-/** Quanto dura a janela: 2h59. */
-export const JANELA_MS = (2 * 60 + 59) * 60 * 1000;
 
 /**
  * O PREÇO é a fonte da verdade; a porcentagem é derivada dele.
@@ -126,32 +126,4 @@ export const ABATIMENTO_CENTAVOS = Math.max(0, ANUAL_LISTA_CENTAVOS - PROMO_CENT
 /** "R$ 89,90" */
 export function brl(centavos: number): string {
   return `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
-}
-
-/**
- * Quanto falta, em milissegundos, a partir do instante em que a janela abriu.
- *
- * `agora` entra por parâmetro para esta conta ser testável — e porque quem
- * manda no relógio é o servidor, não o aparelho dela.
- */
-export function restanteMs(abertaEm: number, agora: number, janela = JANELA_MS): number {
-  if (!Number.isFinite(abertaEm) || !Number.isFinite(agora)) return 0;
-  return Math.max(0, abertaEm + janela - agora);
-}
-
-/** A janela ainda está aberta? */
-export function estaAberta(abertaEm: number, agora: number, janela = JANELA_MS): boolean {
-  return restanteMs(abertaEm, agora, janela) > 0;
-}
-
-/**
- * "2:59:00" — sempre com dois dígitos em minutos e segundos, senão o número
- * muda de LARGURA a cada segundo e o texto ao lado dança na tela.
- */
-export function formataRestante(ms: number): string {
-  const t = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(t / 3600);
-  const m = Math.floor((t % 3600) / 60);
-  const s = t % 60;
-  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }

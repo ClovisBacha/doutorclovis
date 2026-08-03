@@ -44,27 +44,21 @@ disponível no Brasil — confira antes de prometer o número na tela. Se a faix
 mais próxima for R$ 89,90, ótimo; se não, o preço da promoção muda e
 `promo.ts` tem de acompanhar (o preço é a constante lá justamente para isso).
 
-### 2. A promoção dos 2h59, no molde da loja
+### 2. A promoção, no molde da loja — **decidido: introdutória**
 
-Aqui o desenho atual **não se traduz direto**. Há dois moldes:
+O Clóvis escolheu tirar o contador, e com isso a oferta virou exatamente o que
+a loja oferece de fábrica:
 
-**Oferta introdutória** — automática para quem nunca assinou. Simples de
-cadastrar, não exige servidor. Mas **não tem janela por paciente**: não existe
-"2h59 a partir do primeiro acesso dela". Ou todo mundo novo tem, ou ninguém.
+**Oferta introdutória** — automática para quem nunca assinou, sem prazo por
+pessoa. Não exige chave de assinatura, nem JWS, nem uma nova superfície de erro
+em cima de dinheiro. É o que o app já implementa hoje no lado web: o servidor
+confere se existe assinatura anterior em `subscriptions` e libera o desconto se
+não existir — a mesma regra que a loja aplica sozinha.
 
-**Oferta promocional** — o servidor assina um token para _aquela_ paciente e o
-app apresenta a compra com o desconto. É a única que preserva os 2h59, porque
-a elegibilidade é decidida por nós, com o `promo_started_at` que já está no
-banco.
-
-> **Recomendação:** começar com a **introdutória**. Ela entrega o essencial —
-> "quem chega novo paga menos no primeiro ano" — sem chave de assinatura, sem
-> JWS, sem uma nova superfície de erro em cima de dinheiro. A promocional entra
-> depois, se o contador provar que vale.
->
-> Se for a introdutória, o contador **sai da tela**. Deixá-lo lá seria dizer que
-> a oferta acaba em 2h59 quando ela não acaba — a mesma mentira que o
-> `promo.ts` inteiro foi escrito para evitar.
+A **oferta promocional** (token assinado pelo servidor, elegibilidade por
+pessoa, com prazo) fica disponível se um dia a janela de horas voltar. Não é
+o caso agora, e o contador e a coluna `promo_started_at` foram removidos em
+vez de ficarem no código sem uso.
 
 ### 3. Validação de recibo no servidor
 

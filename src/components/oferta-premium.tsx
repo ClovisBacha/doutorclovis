@@ -13,15 +13,19 @@
  * pouco chamativa". A oferta de boas-vindas dá 61% no primeiro ano do anual,
  * por 2h59.
  *
- * O que NÃO mudou é a honestidade, e é o que separa isto de um contador
- * falso: o relógio nasce no servidor, mora no banco, e depois que fecha não
- * reabre — nem limpando os dados do app, nem reinstalando, nem trocando de
- * celular. O desconto é aplicado no servidor, conferindo a janela de novo na
- * hora de criar o checkout. E a tela diz, com todas as letras, que o desconto
- * vale para o PRIMEIRO ANO e quanto custa a renovação. Ver `promo.ts`.
+ * Não há contador: quem tem direito é quem nunca assinou, e isso não tem
+ * prazo. O relógio de 2h59 existiu e saiu — a paciente vai assinar dentro do
+ * app, e o molde que a loja oferece para desconto de primeira assinatura vale
+ * para quem nunca assinou, sem janela por pessoa. Prometer um prazo que a
+ * loja não consegue honrar depois seria pior que não prometer nada.
  *
- * O que continua proibido aqui: dizer que a promoção volta, reabrir a janela,
- * ou usar frase que faça a paciente se sentir devendo alguma coisa.
+ * O que não mudou é a honestidade: quem decide o desconto é o SERVIDOR, que
+ * confere a elegibilidade de novo na hora de criar o checkout; o preço riscado
+ * vem com legenda dizendo o que ele é; e a tela diz, com todas as letras, que
+ * o desconto vale para o PRIMEIRO ANO e para quanto a renovação volta.
+ *
+ * O que continua proibido aqui: urgência inventada, "última chance", ou frase
+ * que faça a paciente se sentir devendo alguma coisa.
  *
  * Ela NÃO concede nada: o acesso só é liberado pelo webhook depois do
  * pagamento confirmado, ou pelo código do médico — as duas portas que já
@@ -30,7 +34,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ehNativo } from "@/lib/nativo";
-import { brl, formataRestante } from "@/lib/promo";
+import { brl } from "@/lib/promo";
 import type { OfertaBoasVindas } from "@/lib/promo.functions";
 
 const PRECO_MENSAL = 19.9;
@@ -78,17 +82,14 @@ export function OfertaPremium({
   const [nativo, setNativo] = useState(false);
   useEffect(() => setNativo(ehNativo()), []);
 
-  /* A oferta e o contador. `restante` é milissegundos e vem do SERVIDOR — o
-     relógio do aparelho só serve para descontar o tempo que passa com a tela
-     aberta. Adiantar o celular não estende nada. */
+  /* A oferta. Sem contador: quem tem direito é quem nunca assinou, e isso não
+     tem prazo — ver `promo.functions.ts`. */
   const [oferta, setOferta] = useState<OfertaBoasVindas | null>(null);
-  const [restante, setRestante] = useState(0);
 
   useEffect(() => {
     if (!aberto) return;
     if (ofertaDeProva) {
       setOferta(ofertaDeProva);
-      setRestante(ofertaDeProva.restanteMs);
       if (ofertaDeProva.ativa) setPlano("annual");
       return;
     }
@@ -104,7 +105,6 @@ export function OfertaPremium({
         });
         if (!vivo) return;
         setOferta(o);
-        setRestante(o.restanteMs);
         /* Oferta ativa pré-seleciona o anual: é o único plano com desconto, e
            deixar o mensal marcado enquanto o cartaz fala do anual faria ela
            pagar cheio achando que pegou a promoção. */
@@ -118,14 +118,7 @@ export function OfertaPremium({
     };
   }, [aberto, ofertaDeProva]);
 
-  /* O contador anda de segundo em segundo enquanto a folha está aberta. */
-  useEffect(() => {
-    if (!aberto || restante <= 0) return;
-    const t = setInterval(() => setRestante((r) => Math.max(0, r - 1000)), 1000);
-    return () => clearInterval(t);
-  }, [aberto, restante]);
-
-  const promoViva = Boolean(oferta?.ativa) && restante > 0;
+  const promoViva = Boolean(oferta?.ativa);
 
   /* Trava o fundo enquanto a folha está aberta — sem isso, o dedo arrasta a
      lista de trás e a folha parece descolada da tela. */
@@ -248,13 +241,15 @@ export function OfertaPremium({
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border sm:hidden" />
 
         {/* ── O cartaz da oferta ────────────────────────────────────────
-            Só aparece com a janela aberta. Três coisas ficam ditas aqui, e as
-            três de propósito:
+            Só aparece para quem tem direito — quem nunca assinou. Três coisas
+            ficam ditas aqui, e as três de propósito:
               · o desconto e o preço que ela vai pagar;
-              · que vale para o PRIMEIRO ANO (a renovação volta ao cheio);
-              · quanto tempo falta, de verdade.
-            Nada de "última chance", nada de "só hoje", nada que sugira que a
-            oferta volta. */}
+              · sobre o quê incide (pagar mês a mês), com o riscado legendado;
+              · que vale para o PRIMEIRO ANO, e para quanto a renovação volta.
+            Havia um contador de 2h59 aqui. Saiu junto com a janela: a paciente
+            vai assinar dentro do app, e o molde da loja para "desconto de
+            primeira assinatura" não tem prazo por pessoa. Contador que a loja
+            não consegue honrar depois é promessa que vira reclamação. */}
         {promoViva && oferta && (
           <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-rose-500 p-4 text-white shadow-lg">
             <div className="flex items-start justify-between gap-3">
@@ -265,26 +260,7 @@ export function OfertaPremium({
                 <p className="mt-0.5 font-serif text-3xl leading-none">{oferta.descontoPct}% OFF</p>
                 <p className="mt-1 text-[12px] text-white/90">no primeiro ano do plano anual</p>
               </div>
-              <div className="shrink-0 rounded-xl bg-black/25 px-3 py-2 text-center">
-                <p className="text-[9px] font-bold uppercase tracking-wide text-white/80">
-                  termina em
-                </p>
-                {/* `tabular-nums` para o contador não mudar de largura a cada
-                    segundo e empurrar o cartaz. */}
-                <p
-                  className="font-mono text-lg font-bold tabular-nums"
-                  role="timer"
-                  aria-live="off"
-                >
-                  {formataRestante(restante)}
-                </p>
-              </div>
             </div>
-            {/* Duas linhas, não três colunas espremidas. Com tudo lado a lado
-                cada preço quebrava no meio — "R$" numa linha, "46,33" na
-                outra — e preço partido é o tipo de coisa que faz a paciente
-                desconfiar do número. `whitespace-nowrap` em cada valor
-                garante que nenhum se parta em nenhuma largura de tela. */}
             {/* O riscado EM CIMA, o preço da promoção EMBAIXO — o olho lê de
                 cima para baixo, e é nessa ordem que a queda de preço se
                 percebe.

@@ -8,9 +8,9 @@
  * · **o abatimento do Stripe.** A tela promete R$ 93,13 e o Stripe cobra o
  *   Price do anual menos o cupom. Se as duas contas divergirem, a fatura não
  *   bate com a tela — e é a paciente que descobre, depois de pagar.
- * · **a janela.** "Depois que passar, passou" foi promessa explícita. Uma
- *   janela que reabre é o contador falso que estes testes existem para
- *   impedir.
+ * · **o arredondamento do desconto anunciado.** Anunciar mais desconto do que
+ *   se dá é propaganda enganosa ainda que por centavos, e é um erro de uma
+ *   linha só.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -20,16 +20,12 @@ import {
   CUPOM_ID,
   DESCONTO_PCT,
   ECONOMIA_CENTAVOS,
-  JANELA_MS,
   MENSAL_CENTAVOS,
   PROMO_CENTAVOS,
   PROMO_MENSAL_CENTAVOS,
   REFERENCIA_CENTAVOS,
   brl,
   comDesconto,
-  estaAberta,
-  formataRestante,
-  restanteMs,
 } from "./promo";
 
 describe("a base do desconto é pagar mês a mês por um ano", () => {
@@ -121,50 +117,5 @@ describe("a conta do desconto", () => {
     /* O real é 62,35% — arredondar para cima daria 62 também aqui, mas a
        regra é `floor` e o teste guarda a regra, não a coincidência. */
     expect(DESCONTO_PCT).toBeLessThanOrEqual((1 - PROMO_CENTAVOS / REFERENCIA_CENTAVOS) * 100);
-  });
-});
-
-describe("a janela dos 2h59", () => {
-  const T0 = 1_700_000_000_000;
-
-  test("dura exatamente 2h59", () => {
-    expect(JANELA_MS).toBe(10_740_000);
-    expect(formataRestante(JANELA_MS)).toBe("2:59:00");
-  });
-
-  test("aberta no começo, fechada no fim", () => {
-    expect(estaAberta(T0, T0)).toBe(true);
-    expect(estaAberta(T0, T0 + JANELA_MS - 1)).toBe(true);
-    expect(estaAberta(T0, T0 + JANELA_MS)).toBe(false);
-  });
-
-  test("uma vez fechada, NUNCA reabre", () => {
-    for (const depois of [1, 60_000, 86_400_000, 365 * 86_400_000]) {
-      expect(estaAberta(T0, T0 + JANELA_MS + depois)).toBe(false);
-      expect(restanteMs(T0, T0 + JANELA_MS + depois)).toBe(0);
-    }
-  });
-
-  test("relógio adiantado não estende — só encurta", () => {
-    expect(restanteMs(T0, T0 + 3_600_000)).toBeLessThan(JANELA_MS);
-  });
-
-  test("data inválida fecha a janela em vez de abrir para sempre", () => {
-    expect(estaAberta(NaN, T0)).toBe(false);
-    expect(estaAberta(T0, NaN)).toBe(false);
-    expect(restanteMs(NaN, NaN)).toBe(0);
-  });
-});
-
-describe("o contador não dança na tela", () => {
-  test("minutos e segundos sempre com dois dígitos", () => {
-    expect(formataRestante(3_600_000)).toBe("1:00:00");
-    expect(formataRestante(61_000)).toBe("0:01:01");
-    expect(formataRestante(9_000)).toBe("0:00:09");
-  });
-
-  test("zero e negativo mostram zero, não texto quebrado", () => {
-    expect(formataRestante(0)).toBe("0:00:00");
-    expect(formataRestante(-5000)).toBe("0:00:00");
   });
 });

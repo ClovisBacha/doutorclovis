@@ -12,13 +12,12 @@
  * `noindex`, e coberta pelo `Disallow: /preview-` do robots.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { OfertaPremium } from "@/components/oferta-premium";
 import {
   ANUAL_LISTA_CENTAVOS,
   DESCONTO_PCT,
   ECONOMIA_CENTAVOS,
-  JANELA_MS,
   PROMO_CENTAVOS,
   PROMO_MENSAL_CENTAVOS,
   REFERENCIA_CENTAVOS,
@@ -31,16 +30,23 @@ export const Route = createFileRoute("/preview-oferta")({
 
 function Preview() {
   const [comPromo, setComPromo] = useState(true);
-  const oferta = {
-    ativa: comPromo,
-    restanteMs: comPromo ? JANELA_MS : 0,
-    descontoPct: DESCONTO_PCT,
-    referenciaCentavos: REFERENCIA_CENTAVOS,
-    promoCentavos: PROMO_CENTAVOS,
-    economiaCentavos: ECONOMIA_CENTAVOS,
-    promoMensalCentavos: PROMO_MENSAL_CENTAVOS,
-    listaCentavos: ANUAL_LISTA_CENTAVOS,
-  };
+  /* `useMemo` porque `ofertaDeProva` está na lista de dependências do efeito
+     que lê a oferta: um objeto novo a cada render faria o efeito rodar a cada
+     render, e o `setOferta` dentro dele voltaria a disparar o render. Não
+     explodiu na tela, mas é laço — e laço que não aparece é o que sobra para
+     alguém achar daqui a três meses. */
+  const oferta = useMemo(
+    () => ({
+      ativa: comPromo,
+      descontoPct: DESCONTO_PCT,
+      referenciaCentavos: REFERENCIA_CENTAVOS,
+      promoCentavos: PROMO_CENTAVOS,
+      economiaCentavos: ECONOMIA_CENTAVOS,
+      promoMensalCentavos: PROMO_MENSAL_CENTAVOS,
+      listaCentavos: ANUAL_LISTA_CENTAVOS,
+    }),
+    [comPromo],
+  );
   return (
     <div className="min-h-screen bg-neutral-300">
       <button

@@ -250,7 +250,7 @@ import jogoBolha from "@/assets/jogo/bolha.webp";
 import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { ehNativo, tocarPadrao } from "@/lib/nativo";
-import { brl as brlPromo, formataRestante } from "@/lib/promo";
+import { brl as brlPromo } from "@/lib/promo";
 import type { OfertaBoasVindas } from "@/lib/promo.functions";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
 
@@ -3173,7 +3173,6 @@ function QuizPaywall({
      seria aplicado no checkout de qualquer jeito, porque quem decide é o
      servidor. Melhor ela saber o que está levando. */
   const [oferta, setOferta] = useState<OfertaBoasVindas | null>(null);
-  const [restante, setRestante] = useState(0);
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -3185,7 +3184,6 @@ function QuizPaywall({
         const o = await getOfertaBoasVindas({ data: { accessToken: s.session.access_token } });
         if (!vivo) return;
         setOferta(o);
-        setRestante(o.restanteMs);
         if (o.ativa) setPlan("annual");
       } catch {
         /* sem oferta: preços normais */
@@ -3195,12 +3193,7 @@ function QuizPaywall({
       vivo = false;
     };
   }, []);
-  useEffect(() => {
-    if (restante <= 0) return;
-    const t = setInterval(() => setRestante((r) => Math.max(0, r - 1000)), 1000);
-    return () => clearInterval(t);
-  }, [restante]);
-  const promoViva = Boolean(oferta?.ativa) && restante > 0;
+  const promoViva = Boolean(oferta?.ativa);
 
   // Código do médico Elite: a paciente digita e ganha o premium na hora.
   async function redeem() {
@@ -3410,16 +3403,6 @@ function QuizPaywall({
               <span className="whitespace-nowrap font-bold text-white">
                 {brlPromo(oferta.promoCentavos)}
               </span>
-            </p>
-          </div>
-          <div className="shrink-0 rounded-lg bg-black/25 px-2.5 py-1.5 text-center">
-            <p className="text-[8px] font-bold uppercase tracking-wide text-white/80">termina em</p>
-            <p
-              className="font-mono text-[15px] font-bold tabular-nums"
-              role="timer"
-              aria-live="off"
-            >
-              {formataRestante(restante)}
             </p>
           </div>
         </div>
