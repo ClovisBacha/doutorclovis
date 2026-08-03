@@ -225,6 +225,18 @@ export function PremiumUpsellModal({
   async function checkout(plan: "annual" | "monthly") {
     setBusy(plan);
     try {
+      /* Portão da loja: assinatura digital dentro do app nativo tem de passar
+         pela Apple/Google (diretriz 3.1.1). Abrir o Stripe aqui reprova o app
+         na revisão. Mesma regra da OfertaPremium, do QuizPaywall e da
+         LojaSementinhas — esta era a última porta de pagamento da área da
+         paciente que ainda estava aberta. */
+      const { ehNativo } = await import("@/lib/nativo");
+      if (ehNativo()) {
+        toast(
+          "Pelo aplicativo, a assinatura tem que passar pela loja da Apple ou do Google. Dá pra assinar pelo site — vale para a mesma conta.",
+        );
+        return;
+      }
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
       if (!s.session) {

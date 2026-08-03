@@ -3014,3 +3014,29 @@ button:active > .duo3d {
     transform: rotate(1.5deg);
   }
 }
+
+/* ══════════ Círculos guiados: respiração e meditação ══════════════════════
+   Mesmo problema que a Bolha já resolvia, nos dois lugares onde ele dói mais.
+
+   A regra universal de `prefers-reduced-motion` (bem no alto deste arquivo)
+   zera TODA transição com `!important`. Estilo inline não vence `!important`
+   de folha — então os anéis do Respirar e o círculo do Meditar, que escrevem
+   `transitionDuration` inline, perdiam a duração e passavam a SALTAR de
+   `scale(0.5)` para `scale(1)` num quadro só. Quinze saltos numa respiração,
+   uns cinquenta numa meditação de dez minutos.
+
+   Quem liga "menos movimento" tem enxaqueca ou labirintite, e recebia
+   exatamente o estímulo mais agressivo da tela. A duração vem da variável que
+   o componente escreve; o `!important` é o que a faz sobreviver. */
+.dc-guiado {
+  transition-property: transform !important;
+  transition-duration: var(--guiado-ms, 0ms) !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.4, 1) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* A amplitude também cai: o movimento continua legível como compasso, sem
+     um círculo de 288px dobrando de tamanho. */
+  .dc-guiado {
+    transform: scale(calc(1 + (var(--guiado-escala, 1) - 1) * 0.35)) !important;
+  }
+}

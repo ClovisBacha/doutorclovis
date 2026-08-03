@@ -18,6 +18,7 @@
  */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ehNativo } from "@/lib/nativo";
 
 const PRECO_MENSAL = 19.9;
 const PRECO_ANUAL_MES = 9.9;
@@ -45,6 +46,12 @@ export function OfertaPremium({
   const [codigoAberto, setCodigoAberto] = useState(false);
   const [codigo, setCodigo] = useState("");
   const [resgatando, setResgatando] = useState(false);
+  /* Mesma regra da LojaSementinhas: assinatura digital dentro do app nativo
+     tem de passar pela loja da Apple/Google (diretriz 3.1.1). Abrir o Stripe
+     aqui reprova o app na revisão. Lido em efeito porque `ehNativo()` olha um
+     global do Capacitor, que não existe no SSR. */
+  const [nativo, setNativo] = useState(false);
+  useEffect(() => setNativo(ehNativo()), []);
 
   /* Trava o fundo enquanto a folha está aberta — sem isso, o dedo arrasta a
      lista de trás e a folha parece descolada da tela. */
@@ -221,13 +228,26 @@ export function OfertaPremium({
           </button>
         </div>
 
-        <button
-          onClick={assinar}
-          disabled={indo}
-          className="press mt-4 w-full rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
-        >
-          {indo ? "Abrindo…" : "Assinar o Premium"}
-        </button>
+        {nativo ? (
+          <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-4">
+            <p className="text-sm font-semibold text-foreground">
+              A assinatura ainda não está disponível no aplicativo
+            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              Pelo aplicativo, a assinatura tem que passar pela loja da Apple ou do Google, e ela
+              ainda está sendo preparada. Dá pra assinar pelo site, no navegador — vale para a mesma
+              conta. Se o seu médico te deu um código, ele funciona aqui mesmo.
+            </p>
+          </div>
+        ) : (
+          <button
+            onClick={assinar}
+            disabled={indo}
+            className="press mt-4 w-full rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
+          >
+            {indo ? "Abrindo…" : "Assinar o Premium"}
+          </button>
+        )}
 
         {/* Código do médico: existe e é grátis, então fica visível — não
             escondido atrás do pagamento. */}

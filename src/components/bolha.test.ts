@@ -230,8 +230,28 @@ describe("OCIOSIDADE que não se repete", () => {
   });
 });
 
+/**
+ * O bloco de `prefers-reduced-motion` QUE GOVERNA A BOLHA.
+ *
+ * Antes isto era `css.lastIndexOf(...)` — "o último do arquivo" — e funcionava
+ * só enquanto a Bolha fosse a última coisa do styles.css. No dia em que outra
+ * tela ganhou o próprio bloco de menos-movimento (os círculos guiados da
+ * respiração e da meditação), os quatro testes daqui passaram a ler o bloco
+ * errado e falharam sem que nada da Bolha tivesse mudado.
+ * Ancorar na regra da própria Bolha é mais preciso, não mais frouxo.
+ */
+function blocoMenosMovimentoDaBolha(): string {
+  let i = -1;
+  for (const m of css.matchAll(/@media \(prefers-reduced-motion: reduce\)/g)) {
+    const trecho = css.slice(m.index!, m.index! + 2000);
+    if (trecho.includes("bolha-")) i = m.index!;
+  }
+  if (i < 0) throw new Error("nenhum bloco de prefers-reduced-motion menciona .bolha-");
+  return css.slice(i);
+}
+
 describe("MENOS MOVIMENTO desliga o ambiente e preserva a resposta", () => {
-  const bloco = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+  const bloco = blocoMenosMovimentoDaBolha();
 
   test("o que é ambiente some", () => {
     for (const alvo of ["bolha-flutua", "bolha-iris"]) expect(bloco).toContain(alvo);
@@ -316,7 +336,7 @@ describe("MENOS MOVIMENTO nao pode virar SALTO", () => {
   });
 
   test("a amplitude cai, mas nao some", () => {
-    const reduce = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+    const reduce = blocoMenosMovimentoDaBolha();
     expect(reduce).toContain("--respiro-escala-suave");
     const fonte = readFileSync(new URL("./bolha.tsx", import.meta.url), "utf8");
     const fator = Number(
@@ -415,7 +435,7 @@ describe("MENOS MOVIMENTO nao pode deixar a acao INERTE", () => {
        um `animation-name` sozinho. Medido antes do conserto: 1 quadro distinto
        em 300ms nas quatro acoes. Os keyframes suaves eram codigo morto e o
        comentario afirmava o contrario do que o navegador fazia. */
-    const reduce = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+    const reduce = blocoMenosMovimentoDaBolha();
     const comDuracao = [...reduce.matchAll(/animation-duration:\s*\d+ms\s*!important/g)];
     expect(comDuracao.length).toBeGreaterThanOrEqual(3);
   });

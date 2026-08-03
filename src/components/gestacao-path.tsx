@@ -249,7 +249,7 @@ import { Bolha, humorDaJornada } from "@/components/bolha";
 import jogoBolha from "@/assets/jogo/bolha.webp";
 import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
-import { tocarPadrao } from "@/lib/nativo";
+import { ehNativo, tocarPadrao } from "@/lib/nativo";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -3149,6 +3149,11 @@ function QuizPaywall({
   const [codeOpen, setCodeOpen] = useState(false);
   const [code, setCode] = useState("");
   const [redeeming, setRedeeming] = useState(false);
+  /* Mesmo portão da OfertaPremium e da LojaSementinhas: assinatura digital
+     dentro do app nativo tem de passar pela loja da Apple/Google (3.1.1).
+     Este paywall era o único dos três que ainda abria o Stripe direto. */
+  const [nativo, setNativo] = useState(false);
+  useEffect(() => setNativo(ehNativo()), []);
 
   // Código do médico Elite: a paciente digita e ganha o premium na hora.
   async function redeem() {
@@ -3355,14 +3360,27 @@ function QuizPaywall({
         />
       </div>
 
-      <button
-        onClick={subscribe}
-        disabled={loading}
-        className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-60"
-        style={{ boxShadow: "0 4px 0 #b45309" }}
-      >
-        {loading ? "Abrindo pagamento seguro…" : "✨ Assinar e liberar as aulas"}
-      </button>
+      {nativo ? (
+        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
+          <p className="text-[13px] font-bold text-amber-900">
+            A assinatura ainda não está disponível no aplicativo
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed text-amber-800/90">
+            Pelo aplicativo, ela tem que passar pela loja da Apple ou do Google. Dá pra assinar pelo
+            site, no navegador — vale para a mesma conta. Se o seu médico te deu um código, ele
+            funciona aqui mesmo.
+          </p>
+        </div>
+      ) : (
+        <button
+          onClick={subscribe}
+          disabled={loading}
+          className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-60"
+          style={{ boxShadow: "0 4px 0 #b45309" }}
+        >
+          {loading ? "Abrindo pagamento seguro…" : "✨ Assinar e liberar as aulas"}
+        </button>
+      )}
 
       <p className="mt-2 text-center text-[10px] leading-relaxed text-amber-700/80">
         Pagamento seguro por cartão · acesso na hora · cancele quando quiser.
@@ -3576,6 +3594,18 @@ function BreathingBlock({
           : BREATH_PATTERN.out;
     vibratePhase(phase, dur);
     audioRef.current?.setPhase(phase, dur);
+    /* A VOZ da fase — "inspire", "segure", "solte".
+       As três faixas existem em `voz.ts` desde que a Isabella foi gravada, e
+       só o MeditationBlock as usava. Esta tela escreve "pode fechar os olhos —
+       o som conduz o compasso" e guiava com um drone de volume variável: de
+       olhos fechados não dá para saber se está no "segure" ou no "solte".
+       O primeiro disparo sai de dentro do clique (`begin`), então a política
+       de autoplay libera os seguintes. */
+    if (sound) {
+      const palavra =
+        phase === "in" ? RESPIRACAO.in : phase === "hold" ? RESPIRACAO.hold : RESPIRACAO.out;
+      tocarVoz(palavra, { canal: "pulso", volume: 0.85 });
+    }
     let cancelled = false;
     const t = setTimeout(() => {
       if (cancelled) return;
@@ -3641,6 +3671,11 @@ function BreathingBlock({
     setCycle(0);
     setReward(null);
     grantedRef.current = false;
+    /* Primeira palavra DENTRO do clique: o efeito da fase roda depois do
+       React pintar, e aí o Safari e o Chrome do celular já não consideram
+       mais o gesto — o `play()` volta rejeitado e a sessão inteira sai muda.
+       Mesmo motivo documentado no MeditationBlock. */
+    if (sound) tocarVoz(RESPIRACAO.in, { canal: "pulso", volume: 0.85 });
     if (sound) {
       audioRef.current = createBreathAudio();
       audioRef.current.start();
@@ -3769,23 +3804,25 @@ function BreathingBlock({
                   aria-hidden
                 />
                 <div
-                  className="absolute inset-0 rounded-full bg-sky-300/30"
-                  style={{
-                    transform: `scale(${scale})`,
-                    transitionProperty: "transform",
-                    transitionDuration: `${scaleDur}ms`,
-                    transitionTimingFunction: "cubic-bezier(0.4,0,0.4,1)",
-                  }}
+                  className="dc-guiado absolute inset-0 rounded-full bg-sky-300/30"
+                  style={
+                    {
+                      transform: `scale(${scale})`,
+                      "--guiado-ms": `${scaleDur}ms`,
+                      "--guiado-escala": scale,
+                    } as React.CSSProperties
+                  }
                   aria-hidden
                 />
                 <div
-                  className="absolute inset-6 rounded-full bg-sky-400/40"
-                  style={{
-                    transform: `scale(${scale})`,
-                    transitionProperty: "transform",
-                    transitionDuration: `${scaleDur}ms`,
-                    transitionTimingFunction: "cubic-bezier(0.4,0,0.4,1)",
-                  }}
+                  className="dc-guiado absolute inset-6 rounded-full bg-sky-400/40"
+                  style={
+                    {
+                      transform: `scale(${scale})`,
+                      "--guiado-ms": `${scaleDur}ms`,
+                      "--guiado-escala": scale,
+                    } as React.CSSProperties
+                  }
                   aria-hidden
                 />
                 {/* No centro, ELA — inflando e esvaziando no compasso.
@@ -5069,20 +5106,26 @@ function MeditationBlock({
             <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
               <div className="relative flex h-56 w-56 items-center justify-center">
                 <div
-                  className="absolute h-40 w-40 rounded-full bg-fuchsia-200/40 blur-2xl"
-                  style={{
-                    transform: `scale(${escala})`,
-                    transition: `transform ${RESPIRO[fase]}s cubic-bezier(.37,0,.2,1)`,
-                  }}
+                  className="dc-guiado absolute h-40 w-40 rounded-full bg-fuchsia-200/40 blur-2xl"
+                  style={
+                    {
+                      transform: `scale(${escala})`,
+                      "--guiado-ms": `${RESPIRO[fase] * 1000}ms`,
+                      "--guiado-escala": escala,
+                    } as React.CSSProperties
+                  }
                   aria-hidden
                 />
                 <div
-                  className="absolute h-40 w-40 rounded-full border-2 border-violet-400/50 bg-gradient-to-br from-white/95 to-violet-300/70"
-                  style={{
-                    transform: `scale(${escala})`,
-                    transition: `transform ${RESPIRO[fase]}s cubic-bezier(.37,0,.2,1)`,
-                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)",
-                  }}
+                  className="dc-guiado absolute h-40 w-40 rounded-full border-2 border-violet-400/50 bg-gradient-to-br from-white/95 to-violet-300/70"
+                  style={
+                    {
+                      transform: `scale(${escala})`,
+                      "--guiado-ms": `${RESPIRO[fase] * 1000}ms`,
+                      "--guiado-escala": escala,
+                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)",
+                    } as React.CSSProperties
+                  }
                   aria-hidden
                 />
                 <div className="relative flex flex-col items-center">
