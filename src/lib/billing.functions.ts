@@ -104,6 +104,37 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
       }
     }
 
+    /* ── Oferta de boas-vindas ────────────────────────────────────────
+       61% no PRIMEIRO ANO do plano anual, e só enquanto a janela de 2h59
+       estiver aberta — conferida AQUI, no servidor, relendo o instante do
+       banco. Se a decisão morasse no cliente, bastaria uma requisição forjada
+       para comprar com desconto meses depois de a promoção ter acabado.
+
+       Só o anual: o desconto existe para trocar o compromisso de um ano por
+       um preço melhor, e num plano mensal ele viraria um mês barato seguido
+       de onze cheios — que é a versão que gera estorno.
+
+       O cupom de convite tem prioridade: ele é `duration: forever` e vale
+       mais para ela do que 61% numa cobrança só. */
+    if (!discountCoupon && data.product === "quiz_premium" && data.plan === "annual") {
+      try {
+        const { lerOferta } = await import("@/lib/promo.functions");
+        const oferta = await lerOferta(u.user.id);
+        if (oferta.ativa) {
+          const { CUPOM_ID, DESCONTO_PCT } = await import("@/lib/promo");
+          discountCoupon = await ensurePercentCoupon(
+            CUPOM_ID,
+            DESCONTO_PCT,
+            "once",
+            `Boas-vindas (-${DESCONTO_PCT}% no 1º ano)`,
+          );
+        }
+      } catch {
+        /* Falhou? Segue SEM desconto. Preferir não descontar a descontar
+           errado: o checkout nunca é bloqueado por causa da promoção. */
+      }
+    }
+
     // Reaproveita o customer do Stripe se o usuário já assinou algo antes.
     const { data: existing } = await (supabaseAdmin as any)
       .from("subscriptions")

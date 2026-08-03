@@ -180,7 +180,17 @@ export async function createOneTimeCheckout(opts: {
  * Garante que o cupom de porcentagem existe no Stripe (idempotente por id).
  * Usado no "+15% convite de paciente" — criado uma vez, reutilizado sempre.
  */
-export async function ensurePercentCoupon(id: string, percentOff: number): Promise<string | null> {
+export async function ensurePercentCoupon(
+  id: string,
+  percentOff: number,
+  /* `forever` = vale em toda renovação (é o do convite de paciente).
+     `once` = só a primeira cobrança — é o da oferta de boas-vindas, que
+     desconta o primeiro ano e depois volta ao preço cheio. A duração faz
+     parte da IDENTIDADE do cupom no Stripe: id igual com duração diferente
+     não se corrige sozinho, por isso cada oferta tem o seu id. */
+  duration: "forever" | "once" = "forever",
+  nome?: string,
+): Promise<string | null> {
   try {
     await stripeFetch<{ id: string }>(`/coupons/${id}`, "GET");
     return id;
@@ -189,8 +199,8 @@ export async function ensurePercentCoupon(id: string, percentOff: number): Promi
       const c = await stripeFetch<{ id: string }>("/coupons", "POST", {
         id,
         percent_off: percentOff,
-        duration: "forever",
-        name: `Convite de paciente (-${percentOff}%)`,
+        duration,
+        name: nome ?? `Convite de paciente (-${percentOff}%)`,
       });
       return c.id;
     } catch {
