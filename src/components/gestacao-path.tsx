@@ -7209,7 +7209,29 @@ function DailyQuizBlock({
             )}
             {phase === "quiz" && !checked && (
               <button
-                onClick={() => setChecked(true)}
+                onClick={() => {
+                  setChecked(true);
+                  /* Som e toque no momento de verificar. A referência declarada
+                     desta tela é o Duolingo, e lá verificar uma resposta tem
+                     som e vibração — aqui acertar não fazia barulho nenhum, o
+                     que deixa a aula com cara de formulário.
+                     Sai de dentro do CLIQUE de propósito: é o gesto que a
+                     política de autoplay exige para deixar o áudio tocar.
+                     Nada disso no Modo Cuidado. */
+                  if (!careMode) {
+                    const acertou = isAnswerCorrect(q, cur);
+                    if (acertou) {
+                      celebrateChime(1);
+                      tocarPadrao([18]);
+                    } else {
+                      /* Erro NÃO tem som. Ele tem um toque curto, que serve de
+                         confirmação de que o botão respondeu — não de punição.
+                         Som de erro num app de gestação de alto risco é o tipo
+                         de coisa que faz a paciente parar de estudar. */
+                      tocarPadrao([10]);
+                    }
+                  }
+                }}
                 disabled={!canVerify}
                 className="press w-full rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white disabled:opacity-40"
               >
