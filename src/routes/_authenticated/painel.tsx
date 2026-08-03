@@ -256,6 +256,15 @@ function PainelPage() {
      Numa plataforma multi-médico isso não é um detalhe de layout: é dinheiro
      indo para a conta errada e documento assinado por quem não atendeu. */
   const [euMedico, setEuMedico] = useState<DoctorProfile | null>(null);
+  /* Está dentro do app nativo? Lido em efeito porque `ehNativo()` olha um
+     global do Capacitor, que não existe no SSR. */
+  const [noApp, setNoApp] = useState(false);
+  useEffect(() => {
+    void (async () => {
+      const { ehNativo } = await import("@/lib/nativo");
+      setNoApp(ehNativo());
+    })();
+  }, []);
   /** Perfil de médico existe mas está inativo: entra, com aviso, em Meu Perfil. */
   const [inativo, setInativo] = useState(false);
   /* O que o plano libera. Ficava disponível em `getMyDoctor` e não era lido:
@@ -1055,6 +1064,27 @@ function PainelPage() {
             Enquanto estiver assim, as pacientes não encontram você na busca e as listas do painel
             ficam vazias. Ative a assinatura em Meu Perfil, abaixo.
           </p>
+        </div>
+      )}
+
+      {/* No APP, o médico entra por um resumo em vez do painel inteiro: catorze
+          abas desenhadas para tela de computador não encolhem para 390px, e
+          receituário digitado no celular entre duas consultas é receita
+          errada. Nada some — as abas continuam logo abaixo. */}
+      {noApp && tab === "Painel 📊" && (
+        <div className="mt-6">
+          <PainelNoApp
+            nomeDoMedico={euMedico?.display_name ?? null}
+            resumo={{
+              sosAbertos: sosNaoAtendidos,
+              perguntasPendentes: pendingQs,
+              agendamentosPendentes: pendingAppts,
+              preConsultasNovas: unseenForms,
+              salasAbertas: teleconsultas.filter((s) => s.status === "sala_aberta").length,
+              proxima: null,
+            }}
+            onIr={(aba) => setTab(aba as PanelTab)}
+          />
         </div>
       )}
 
@@ -6930,6 +6960,7 @@ function ClinicaSection({
 
 /* ---------- Receipt Modal ---------- */
 import { DOCTOR } from "@/lib/doctor.config";
+import { PainelNoApp } from "@/components/painel-no-app";
 
 function ReceiptModal({
   appt,
