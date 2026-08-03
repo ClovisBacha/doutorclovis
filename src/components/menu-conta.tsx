@@ -107,6 +107,7 @@ export function MenuDaConta({
   naoLidas,
   perfilPendente = false,
   mostrarPainel,
+  ehDono = false,
   onNotificacoes,
   onNavegar,
   onSair,
@@ -126,6 +127,14 @@ export function MenuDaConta({
       aqui precisa de você. */
   perfilPendente?: boolean;
   mostrarPainel: boolean;
+  /**
+   * O dono da plataforma, não o médico.
+   *
+   * Sem isto os dois viam o mesmo item — "Painel do médico" — e o dono chegava
+   * na agenda de um consultório em vez do console dele. São identidades
+   * diferentes e o menu precisa dizer qual é qual.
+   */
+  ehDono?: boolean;
   onNotificacoes: () => void;
   onNavegar: (t: AppTab, subAba?: string) => void;
   onSair: () => void;
@@ -242,14 +251,14 @@ export function MenuDaConta({
 
           {mostrarPainel && (
             <Link
-              to="/painel"
+              to={ehDono ? "/admin" : "/painel"}
               onClick={onFechar}
               className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-primary/8"
             >
               <span className="flex h-6 w-6 shrink-0 items-center justify-center">
                 <LayoutDashboard className="h-[19px] w-[19px] text-primary" strokeWidth={1.9} />
               </span>
-              Painel do médico
+              {ehDono ? "Painel Admin" : "Painel do médico"}
             </Link>
           )}
           <button

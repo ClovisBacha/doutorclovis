@@ -244,7 +244,10 @@ function AdminConsole() {
       </section>
     );
 
-  const activeLabel = NAV_GROUPS.flatMap((g) => g.items).find((i) => i.key === tab)?.label ?? "";
+  const ativo = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, grupo: g.group }))).find(
+    (i) => i.key === tab,
+  );
+  const activeLabel = ativo?.label ?? "";
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-12">
@@ -283,25 +286,41 @@ function AdminConsole() {
       </div>
 
       <div className="mt-6 flex gap-8">
-        {/* Sidebar desktop: grupos */}
-        <nav className="hidden w-52 shrink-0 md:block">
+        {/* ── Barra lateral do PC ─────────────────────────────────────────
+            `sticky` com rolagem própria, e isso conserta um defeito que só
+            aparece no computador: são 17 abas e páginas longas — Financeiro,
+            Médicos, Auditoria têm tabelas que passam de várias telas. A barra
+            rolava junto e sumia, então quem descia numa tabela ficava sem
+            navegação nenhuma e tinha que voltar ao topo para trocar de aba.
+
+            `max-h` + `overflow-y-auto` porque a própria lista pode não caber:
+            num notebook de 768px de altura, 17 itens com títulos de grupo
+            estouram a tela. Sem isso, os últimos ficariam inalcançáveis. */}
+        <nav
+          aria-label="Seções do console"
+          className="hidden w-56 shrink-0 md:block md:sticky md:top-6 md:max-h-[calc(100vh-3rem)] md:overflow-y-auto md:pr-1"
+        >
           {NAV_GROUPS.map((g) => (
             <div key={g.group} className="mb-5">
               <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {g.group}
               </p>
+              {/* `aria-current` além da cor: quem usa leitor de tela não
+                  enxerga o realce, e sem ele a lista soa como 17 botões
+                  iguais. */}
               <div className="space-y-0.5">
                 {g.items.map((i) => (
                   <button
                     key={i.key}
                     onClick={() => setTab(i.key)}
+                    aria-current={tab === i.key ? "page" : undefined}
                     className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
                       tab === i.key
                         ? "bg-primary/10 font-medium text-primary"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                     }`}
                   >
-                    <span>{i.icon}</span>
+                    <span aria-hidden>{i.icon}</span>
                     {i.label}
                   </button>
                 ))}
@@ -312,7 +331,17 @@ function AdminConsole() {
 
         {/* Conteúdo */}
         <div className="min-w-0 flex-1">
-          <h2 className="mb-5 hidden font-serif text-2xl md:block">{activeLabel}</h2>
+          {/* O grupo antes do nome — "Financeiro · Reembolsos". Com 17 abas em
+              seis grupos, o nome sozinho não diz onde se está: "Alertas" pode
+              ser de crescimento ou de sistema, e a barra lateral já rolou. */}
+          <div className="mb-5 hidden md:block">
+            {ativo && (
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {ativo.grupo}
+              </p>
+            )}
+            <h2 className="font-serif text-2xl">{activeLabel}</h2>
+          </div>
           {tab === "visao" && data && <OverviewTab data={data} />}
           {tab === "consultor" && <ConsultorTab />}
           {tab === "crescimento" && <CrescimentoTab />}

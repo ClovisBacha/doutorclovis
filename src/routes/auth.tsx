@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyDoctor } from "@/lib/doctors.functions";
+import { checkIsAdmin } from "@/lib/admin.functions";
 import { GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/auth")({
@@ -74,6 +75,27 @@ function AuthPage() {
     if (isRecoveryLink) return;
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
+      /* ADMIN PRIMEIRO, antes de qualquer outra pergunta.
+
+         O dono da plataforma caía no app da GESTANTE — 18 mil linhas de jornada
+         de gravidez — e o console dele, com faturamento, médicos e cupons, só
+         era alcançável digitando /admin na barra de endereço. Nenhum link
+         levava lá.
+
+         A ordem importa e não é detalhe: o e-mail do dono também está em
+         ADMIN_EMAILS como "equipe do consultório", então a pergunta "é médico?"
+         respondia sim e o mandava para o painel do consultório. Perguntar
+         "é dono?" primeiro é o que separa as duas identidades. */
+      try {
+        const adm = await checkIsAdmin({ data: { accessToken: data.session.access_token } });
+        if (adm.isAdmin) {
+          navigate({ to: "/admin" });
+          return;
+        }
+      } catch {
+        /* sem rede: segue o fluxo normal */
+      }
+
       // Conta com perfil de médico ATIVO vai para o painel;
       // as demais, para o app da paciente.
       try {
@@ -147,6 +169,23 @@ function AuthPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+
+        /* Mesma regra do mount, e pelo mesmo motivo: o dono entra e vai para o
+           console, sem passar pelo app da gestante nem pelo painel do
+           consultório. O seletor "sou médico(a)" nem entra em jogo. */
+        try {
+          const { data: s } = await supabase.auth.getSession();
+          if (s.session) {
+            const adm = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
+            if (adm.isAdmin) {
+              navigate({ to: "/admin" });
+              return;
+            }
+          }
+        } catch {
+          /* sem rede: segue o fluxo normal */
+        }
+
         if (role === "medico") {
           // Médico: painel se o perfil profissional existe e está ativo;
           // senão, completar o cadastro (o fluxo reconhece a sessão).

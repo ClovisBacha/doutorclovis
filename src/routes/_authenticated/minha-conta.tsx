@@ -1410,14 +1410,32 @@ function MinhaContaPage() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              {(isAdmin || isDoctor) && (
+              {/* DONO e MÉDICO são identidades diferentes, e o botão precisa
+                  dizer qual é qual.
+
+                  Antes os dois caíam no mesmo link: o dono da plataforma via
+                  "Painel do médico" e chegava no consultório — a tela de agenda
+                  e prontuário —, enquanto o console dele, com faturamento e
+                  cupons, não tinha link nenhum no app inteiro.
+
+                  O `isAdmin` vem primeiro de propósito: o e-mail do dono também
+                  está em ADMIN_EMAILS como equipe do consultório, então testar
+                  `isDoctor` antes o mandaria para o lugar errado. */}
+              {isAdmin ? (
+                <Link
+                  to="/admin"
+                  className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
+                >
+                  Painel Admin
+                </Link>
+              ) : isDoctor ? (
                 <Link
                   to="/painel"
                   className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90"
                 >
                   Painel do médico
                 </Link>
-              )}
+              ) : null}
               <button
                 onClick={signOut}
                 className="rounded-full border border-border/70 px-4 py-2 text-xs text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
@@ -1541,6 +1559,7 @@ function MinhaContaPage() {
                   naoLidas={naoLidas}
                   perfilPendente={perfilPendente}
                   mostrarPainel={isAdmin || isDoctor}
+                  ehDono={isAdmin}
                   onNotificacoes={abrirNotificacoes}
                   onNavegar={(t, subAba) => {
                     setHomeMenu(false);
