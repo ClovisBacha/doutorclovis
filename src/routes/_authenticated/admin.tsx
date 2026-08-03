@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { voltouDepoisDoResgate } from "@/lib/cupons";
 import {
   getPlatformOverview,
   getPlatformInsights,
@@ -10,11 +11,13 @@ import {
   listPlatformCoupons,
   createPlatformCoupon,
   togglePlatformCoupon,
+  listCouponRedemptions,
   type PlatformOverview,
   type PlatformDoctor,
   type PlatformInsights,
   type RetentionMetrics,
   type PlatformCoupon,
+  type CouponRedeemer,
 } from "@/lib/platform.functions";
 import {
   listAffiliates,
@@ -1005,6 +1008,35 @@ function CuponsTab() {
   const [note, setNote] = useState("");
   const [maxUses, setMaxUses] = useState("");
   const [creating, setCreating] = useState(false);
+  /* Detalhe de quem resgatou. `null` na entrada = carregando; o cache por id
+     evita refazer a consulta (e o log de auditoria) a cada abre-e-fecha. */
+  const [aberto, setAberto] = useState<string | null>(null);
+  const [detalhe, setDetalhe] = useState<
+    Record<string, { redeemers: CouponRedeemer[]; total: number } | null>
+  >({});
+
+  async function abrir(c: PlatformCoupon) {
+    if (aberto === c.id) {
+      setAberto(null);
+      return;
+    }
+    setAberto(c.id);
+    if (detalhe[c.id] !== undefined) return;
+    setDetalhe((d) => ({ ...d, [c.id]: null }));
+    try {
+      const res = await listCouponRedemptions({
+        data: { accessToken: await token(), couponId: c.id },
+      });
+      setDetalhe((d) => ({
+        ...d,
+        [c.id]: res.ok
+          ? { redeemers: res.redeemers, total: res.total }
+          : { redeemers: [], total: 0 },
+      }));
+    } catch {
+      setDetalhe((d) => ({ ...d, [c.id]: { redeemers: [], total: 0 } }));
+    }
+  }
 
   async function load() {
     try {
@@ -1145,30 +1177,134 @@ function CuponsTab() {
             </thead>
             <tbody>
               {coupons.map((c) => (
-                <tr key={c.id} className="border-b border-border/60 last:border-0">
-                  <td className="px-4 py-2.5 font-mono font-semibold">{c.code}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{c.note ?? "—"}</td>
-                  <td className="px-4 py-2.5 tabular-nums">
-                    {c.redemptions}
-                    {c.max_redemptions != null ? ` / ${c.max_redemptions}` : " / ∞"}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => toggle(c)}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        c.active
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-secondary text-muted-foreground"
-                      }`}
-                    >
-                      {c.active ? "Ativo" : "Inativo"}
-                    </button>
-                  </td>
-                </tr>
+                <Fragment key={c.id}>
+                  <tr className="border-b border-border/60 last:border-0">
+                    <td className="px-4 py-2.5 font-mono font-semibold">{c.code}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{c.note ?? "—"}</td>
+                    <td className="px-4 py-2.5 tabular-nums">
+                      {c.redemptions > 0 ? (
+                        <button
+                          onClick={() => abrir(c)}
+                          aria-expanded={aberto === c.id}
+                          className="rounded-md px-1.5 py-0.5 font-semibold text-primary underline-offset-2 hover:underline"
+                        >
+                          {c.redemptions}
+                          {c.max_redemptions != null ? ` / ${c.max_redemptions}` : " / ∞"}
+                          <span aria-hidden className="ml-1 text-xs">
+                            {aberto === c.id ? "▾" : "▸"}
+                          </span>
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          0{c.max_redemptions != null ? ` / ${c.max_redemptions}` : " / ∞"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => toggle(c)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          c.active
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        {c.active ? "Ativo" : "Inativo"}
+                      </button>
+                    </td>
+                  </tr>
+                  {aberto === c.id && (
+                    <tr className="border-b border-border/60 last:border-0">
+                      <td colSpan={4} className="bg-secondary/30 px-4 py-3">
+                        <CouponRedeemers dados={detalhe[c.id]} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Quem usou um cupom — a linha que abre debaixo do contador de usos.
+ *
+ * Sobre a coluna "Último login": ela vem do `last_sign_in_at` do Supabase e
+ * responde à pergunta que interessa numa campanha — a pessoa voltou depois de
+ * pegar o Premium, ou resgatou e sumiu? Mas ela só se move quando há um login
+ * NOVO, e a sessão do app se renova sozinha por semanas. Então "voltou" é
+ * prova de que voltou; a ausência de "voltou" não é prova de que não voltou.
+ * Está escrito na tela porque um número que o dono interpreta ao contrário é
+ * pior que número nenhum.
+ */
+function CouponRedeemers({
+  dados,
+}: {
+  dados: { redeemers: CouponRedeemer[]; total: number } | null | undefined;
+}) {
+  if (dados === undefined || dados === null) return <div className="skeleton h-16 rounded-xl" />;
+  if (dados.redeemers.length === 0)
+    return <p className="text-sm text-muted-foreground">Ninguém resgatou este cupom ainda.</p>;
+
+  const dia = (s: string) => new Date(s).toLocaleDateString("pt-BR");
+  const voltou = (r: CouponRedeemer) => voltouDepoisDoResgate(r.resgatadoEm, r.ultimoAcesso);
+  const quantosVoltaram = dados.redeemers.filter(voltou).length;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">
+        <strong className="text-foreground">{quantosVoltaram}</strong> de {dados.redeemers.length}{" "}
+        voltaram ao app depois de resgatar. Quem não aparece como "voltou" pode ter continuado na
+        mesma sessão — o login só se repete quando a sessão expira.
+      </p>
+      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <th className="px-3 py-2">Paciente</th>
+              <th className="px-3 py-2">Resgatou</th>
+              <th className="px-3 py-2">Premium</th>
+              <th className="px-3 py-2">Último login</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dados.redeemers.map((r) => (
+              <tr key={r.userId} className="border-b border-border/60 last:border-0">
+                <td className="px-3 py-2">
+                  <span className="font-medium">{r.nome ?? "(sem nome)"}</span>
+                  {r.email && <span className="ml-2 text-xs text-muted-foreground">{r.email}</span>}
+                </td>
+                <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                  {dia(r.resgatadoEm)}
+                </td>
+                <td className="px-3 py-2">
+                  {r.premium ? (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                      ativo
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">perdido</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                  {r.ultimoAcesso ? dia(r.ultimoAcesso) : "—"}
+                  {voltou(r) && (
+                    <span className="ml-1.5 text-xs font-semibold text-emerald-700">voltou</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {dados.total > dados.redeemers.length && (
+        <p className="text-xs text-muted-foreground">
+          Mostrando os {dados.redeemers.length} resgates mais recentes de {dados.total}.
+        </p>
       )}
     </div>
   );

@@ -872,6 +872,112 @@ export const createPlatformCoupon = createServerFn({ method: "POST" })
     return { ok: false as const };
   });
 
+/* ── Quem resgatou cada cupom ──────────────────────────────────────────
+   A lista de cupons responde "quantos usaram". Esta responde "quem, quando,
+   e adiantou alguma coisa" — que é a pergunta que decide se vale repetir a
+   campanha.
+
+   Não existe "converteu" no sentido de pagamento: o cupom DÁ o Premium, não
+   vende. A conversão aqui é de uso — a pessoa voltou depois de resgatar? Por
+   isso as duas colunas que importam são `premium` (ainda tem o benefício, ou
+   perdeu por algum outro caminho) e `ultimoAcesso`, que vem do
+   `last_sign_in_at` do próprio Supabase Auth: sem coluna nova, sem migração.
+   Um cupom com 40 resgates e 38 últimos acessos no dia do resgate distribuiu
+   Premium para ninguém.
+
+   LGPD: isto expõe nome e e-mail de paciente para o dono da plataforma, então
+   a leitura é auditada como qualquer outra ação sensível do super-admin. */
+export type CouponRedeemer = {
+  userId: string;
+  nome: string | null;
+  email: string | null;
+  resgatadoEm: string;
+  premium: boolean;
+  ultimoAcesso: string | null;
+};
+
+export const listCouponRedemptions = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), couponId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const vazio = { ok: false as const, redeemers: [] as CouponRedeemer[], total: 0 };
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return vazio;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    // `count: exact` no total e só as 200 mais recentes na lista: um cupom de
+    // campanha pode ter dezenas de milhares de resgates, e a tela não é lugar
+    // de carregar todos — mas o rodapé precisa dizer a verdade sobre quantos
+    // ficaram de fora.
+    const {
+      data: reds,
+      count,
+      error,
+    } = await sb
+      .from("platform_coupon_redemptions")
+      .select("user_id,redeemed_at", { count: "exact" })
+      .eq("coupon_id", data.couponId)
+      .order("redeemed_at", { ascending: false })
+      .limit(200);
+    if (error) return vazio;
+
+    const linhas = (reds ?? []) as { user_id: string; redeemed_at: string }[];
+    const ids = linhas.map((r) => r.user_id);
+    if (ids.length === 0) return { ok: true as const, redeemers: [], total: 0 };
+
+    // Nome e Premium saem de uma consulta só. O e-mail e o último acesso moram
+    // em `auth.users`, que não dá join — daí uma chamada por pessoa, em lotes
+    // de 20 para não abrir 200 conexões de uma vez.
+    const perfilPor = await safe<Map<string, { nome: string | null; premium: boolean }>>(
+      async () => {
+        const m = new Map<string, { nome: string | null; premium: boolean }>();
+        const { data: ps } = await sb
+          .from("patient_profiles")
+          .select("id,display_name,quiz_premium")
+          .in("id", ids);
+        for (const p of (ps ?? []) as any[])
+          m.set(p.id, { nome: p.display_name ?? null, premium: !!p.quiz_premium });
+        return m;
+      },
+      new Map(),
+    );
+
+    const authPor = new Map<string, { email: string | null; ultimoAcesso: string | null }>();
+    for (let i = 0; i < ids.length; i += 20) {
+      const lote = ids.slice(i, i + 20);
+      await Promise.all(
+        lote.map(async (id) => {
+          try {
+            const { data: u } = await supabaseAdmin.auth.admin.getUserById(id);
+            if (u?.user)
+              authPor.set(id, {
+                email: u.user.email ?? null,
+                ultimoAcesso: u.user.last_sign_in_at ?? null,
+              });
+          } catch {
+            /* conta apagada ou erro de rede → a linha sai sem e-mail */
+          }
+        }),
+      );
+    }
+
+    const redeemers: CouponRedeemer[] = linhas.map((r) => ({
+      userId: r.user_id,
+      nome: perfilPor.get(r.user_id)?.nome ?? null,
+      email: authPor.get(r.user_id)?.email ?? null,
+      resgatadoEm: r.redeemed_at,
+      premium: perfilPor.get(r.user_id)?.premium ?? false,
+      ultimoAcesso: authPor.get(r.user_id)?.ultimoAcesso ?? null,
+    }));
+
+    await writeAudit({ id: user.id, email: user.email }, "coupon.redemptions.read", data.couponId, {
+      linhas: redeemers.length,
+    });
+    return { ok: true as const, redeemers, total: count ?? redeemers.length };
+  });
+
 /** Ativa/desativa um cupom (inativo não resgata mais). */
 export const togglePlatformCoupon = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
