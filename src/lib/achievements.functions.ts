@@ -11,7 +11,21 @@ export type AchievementDef = {
   description: string;
   emoji: string;
   category: "saude" | "diario" | "bebe" | "educacao" | "familia";
+  /**
+   * Só acontece DEPOIS do parto.
+   *
+   * Cinco das dezoito são assim, e sem marcá-las a gestante via "3 de 18" com
+   * um anel de progresso que nunca chegava perto de 100% — o teto real dela é
+   * 13. Não havia nenhuma indicação disso na tela: parecia que ela estava
+   * falhando em conquistas que ainda nem eram possíveis.
+   */
+  posParto?: true;
 };
+
+/** As que só existem depois do parto — usado para separar na tela. */
+export function ehPosParto(key: string): boolean {
+  return ACHIEVEMENT_DEFS.some((d) => d.key === key && d.posParto);
+}
 
 export const ACHIEVEMENT_DEFS: AchievementDef[] = [
   {
@@ -111,6 +125,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     description: "Checklist completo — parabéns!",
     emoji: "🥇",
     category: "bebe",
+    posParto: true,
   },
   // ── Pós-parto ──────────────────────────────────────────────
   {
@@ -119,6 +134,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     description: "Registrou a primeira amamentação",
     emoji: "🤱",
     category: "bebe",
+    posParto: true,
   },
   {
     key: "first_baby_weight",
@@ -126,6 +142,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     description: "Registrou o primeiro peso do bebê",
     emoji: "⚖️",
     category: "saude",
+    posParto: true,
   },
   {
     key: "first_vaccine",
@@ -133,6 +150,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     description: "Primeira vacina do bebê registrada",
     emoji: "💉",
     category: "saude",
+    posParto: true,
   },
   {
     key: "first_baby_milestone",
@@ -140,6 +158,7 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     description: "Registrou o primeiro marco do bebê",
     emoji: "🌟",
     category: "bebe",
+    posParto: true,
   },
 ];
 

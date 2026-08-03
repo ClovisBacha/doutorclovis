@@ -14436,19 +14436,46 @@ function ConquistasTab() {
       const res = await checkAndAwardAchievements({ data: { accessToken: token } });
       if (res.ok) {
         setUnlocked(res.unlocked);
-        // Modo Cuidado: não acende o banner "🎉 Nova conquista".
-        const recent = res.careMode
-          ? []
-          : res.unlocked
-              .filter((a) => Date.now() - new Date(a.unlocked_at).getTime() < 30000)
-              .map((a) => a.achievement_key);
-        setNewBadges(recent);
-        // Comemora conquista nova (confete + som + vibração). `recent` já vem
-        // vazio no Modo Cuidado, então a celebração respeita o luto.
-        if (recent.length > 0) {
-          fireConfetti();
-          celebrateChime();
-          celebrateHaptic();
+        /* Quais conquistas ainda NÃO foram comemoradas para esta paciente.
+           Antes a régua era "desbloqueada nos últimos 30 segundos", calculada
+           ao montar esta aba, e ela errava dos dois lados:
+             · a conquista concedida em outro ponto do app (o
+               `triggerAchievementsCheck`, que só mostra um toast) já tinha
+               mais de 30s quando ela chegava aqui — a badge simplesmente
+               aparecia colorida, sem festa nenhuma;
+             · e sair e voltar dentro dos 30s disparava o confete de novo,
+               quantas vezes ela quisesse.
+           Agora a memória é de QUAIS, não de QUANDO: cada conquista comemora
+           uma vez, no dia em que ela vier ver — mesmo que tenha sido dada há
+           uma semana. */
+        const JA = "dc-conquistas-comemoradas";
+        let comemoradas: string[] = [];
+        try {
+          comemoradas = JSON.parse(localStorage.getItem(JA) ?? "[]");
+          if (!Array.isArray(comemoradas)) comemoradas = [];
+        } catch {
+          comemoradas = [];
+        }
+        const todas = res.unlocked.map((a) => a.achievement_key);
+        // Modo Cuidado: não acende o banner nem comemora — respeita o luto.
+        const novas = res.careMode ? [] : todas.filter((k) => !comemoradas.includes(k));
+        setNewBadges(novas);
+        if (novas.length > 0) {
+          /* A festa cresce com quantas vieram de uma vez. Antes eram sempre os
+             mesmos confetes: desbloquear uma e desbloquear seis davam
+             exatamente a mesma comemoração. */
+          const nivel = Math.min(5, novas.length) as 1 | 2 | 3 | 4 | 5;
+          fireConfetti(nivel);
+          celebrateChime(nivel);
+          celebrateHaptic(nivel);
+        }
+        /* Grava SEMPRE (inclusive em Modo Cuidado): quem sai do Modo Cuidado
+           não deve levar de uma vez o confete de tudo que acumulou durante o
+           luto. */
+        try {
+          localStorage.setItem(JA, JSON.stringify(todas));
+        } catch {
+          /* armazenamento bloqueado: no pior caso comemora de novo */
         }
       }
       // Concede o check-in do dia (idempotente) e lê o saldo já com conquistas
@@ -14469,6 +14496,16 @@ function ConquistasTab() {
   const unlockedCount = ACHIEVEMENT_DEFS.filter((d) => unlockedKeys.has(d.key)).length;
   const totalCount = ACHIEVEMENT_DEFS.length;
   const pct = Math.round((unlockedCount / totalCount) * 100);
+
+  /* Cinco das dezoito só acontecem depois do parto. O contador dizia "3 de 18"
+     e o anel nunca chegava perto de 100% — a gestante tem teto real de 13, e
+     nada na tela dizia isso. Parecia falha dela em conquistas que ainda nem
+     eram possíveis. Agora a linha embaixo do anel explica o teto. */
+  const posPartoTotal = ACHIEVEMENT_DEFS.filter((d) => d.posParto).length;
+  const posPartoFeitas = ACHIEVEMENT_DEFS.filter(
+    (d) => d.posParto && unlockedKeys.has(d.key),
+  ).length;
+  const aindaNaoNasceu = posPartoFeitas === 0;
 
   const categories = [
     { key: "bebe", label: "Bebê", emoji: "👶" },
@@ -14526,6 +14563,12 @@ function ConquistasTab() {
             style={{ width: `${pct}%` }}
           />
         </div>
+        {aindaNaoNasceu && posPartoTotal > 0 && (
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            {posPartoTotal} destas só acontecem depois que o bebê nascer — na gestação, o caminho
+            completo são {totalCount - posPartoTotal}.
+          </p>
+        )}
       </div>
 
       {newBadges.length > 0 && (
