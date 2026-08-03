@@ -798,7 +798,28 @@ function MinhaContaPage() {
     if (typeof window === "undefined") return null;
     return new URLSearchParams(window.location.search).get("sub");
   });
+  /**
+   * De onde a paciente veio — um nível só de histórico.
+   *
+   * A seta de voltar fazia sempre `setMobileHome(true)`: caía no Bebê viesse
+   * de onde viesse. Quem estava no Caminho, abria a lojinha e voltava, era
+   * despejado noutra tela — perdia o lugar na trilha e tinha de navegar de
+   * novo até onde estava.
+   *
+   * Um nível basta, e é o que ela espera: entra numa tela a partir de outra e
+   * volta para aquela. Pilha maior cria o problema oposto — apertar voltar
+   * cinco vezes sem sair do lugar.
+   *
+   * `null` = veio da home (ou de um destino da barra de baixo), e aí voltar é
+   * mesmo ir para a home.
+   */
+  const [origem, setOrigem] = useState<Tab | null>(null);
+
   const goToTab = (t: string, sub?: string) => {
+    /* Só guarda origem quando existe uma: na home mobile não há "tela
+       anterior", e guardar a aba que estava por baixo faria o voltar pular
+       para um lugar que ela não estava vendo. E nunca guarda a si mesma. */
+    setOrigem(!mobileHome && tab !== (t as Tab) ? (tab as Tab) : null);
     setTab(t as Tab);
     setMobileHome(false);
     setHubAberto(null);
@@ -1172,6 +1193,10 @@ function MinhaContaPage() {
   }
 
   function handleBottomNav(section: BottomSection) {
+    /* A barra de baixo é destino, não aprofundamento: ir para "Jogo" por ela
+       apaga a origem, senão o voltar levaria de volta a uma tela que a
+       paciente já abandonou por outro caminho. */
+    setOrigem(null);
     if (section === "home") {
       setMobileHome(true);
       return;
@@ -1188,14 +1213,27 @@ function MinhaContaPage() {
     setHubAberto(section === "saude" ? "saude" : null);
   }
 
-  /* A seta da barra de cima. Dentro de uma aba da Saúde ela volta para o hub
-     da seção — antes pulava dois níveis de uma vez e caía na home. */
+  /* A seta da barra de cima.
+     Três níveis, do mais específico para o mais genérico:
+       1. dentro de uma aba da Saúde → volta para o hub da seção (antes pulava
+          dois níveis de uma vez e caía na home);
+       2. veio de outra aba → volta para ELA. Era o que faltava: a seta fazia
+          sempre `setMobileHome(true)`, então quem estava no Caminho, abria a
+          lojinha e voltava, era despejado na tela do Bebê e perdia o lugar na
+          trilha;
+       3. não veio de lugar nenhum → home. */
   function voltarDaBarra() {
     if (!hubAberto && tabToSection(tab as AppTab) === "saude") {
       setHubAberto("saude");
       return;
     }
     setHubAberto(null);
+    if (origem) {
+      setTab(origem);
+      setOrigem(null);
+      setConsultasSub(null);
+      return;
+    }
     setMobileHome(true);
   }
 
@@ -1465,7 +1503,7 @@ function MinhaContaPage() {
             <div className="flex min-w-0 items-center gap-2.5">
               <button
                 onClick={voltarDaBarra}
-                aria-label="Voltar"
+                aria-label={origem ? `Voltar para ${origem}` : "Voltar"}
                 className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-colors hover:bg-primary/15"
               >
                 <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2} />
@@ -15658,7 +15696,35 @@ function CantinhoTab({
   const ownedItems = CANTINHO_ITEMS.filter(
     (i) => ownedSet.has(i.id) && i.type !== "fundo" && i.type !== "tema",
   );
-  const shopItems = CANTINHO_ITEMS.filter((i) => cat === "all" || i.type === cat);
+  /**
+   * A ordem da vitrine.
+   *
+   * Era a ordem do ARQUIVO: a paciente abria a loja e via, em sequência,
+   * 280 · grátis · 150 · 30. Nada dizia o que ela alcança hoje, e o primeiro
+   * tile — o mais caro da prateleira comum — era justamente o que ela não
+   * pode comprar.
+   *
+   * Agora é preço crescente: o que ela alcança primeiro vem primeiro, e a
+   * grade vira uma escada. Quem NÃO tem Premium leva os bloqueados para o
+   * fim, também em ordem — eles continuam visíveis (é assim que ela descobre
+   * que existem), mas param de atravessar a lista do que dá para comprar
+   * hoje. Quem TEM Premium vê tudo numa escada só: para ela não há prateleira
+   * separada, todos os itens são compráveis.
+   *
+   * A Coroa fica sempre por último: é troféu, não item.
+   *
+   * Sem `useMemo` de propósito — esta linha vem depois de um `return`
+   * antecipado, e hook atrás de return quebra a ordem dos hooks entre
+   * renders. São 74 itens; ordenar a cada render custa menos que o risco.
+   */
+  const shopItems = (() => {
+    const daCategoria = CANTINHO_ITEMS.filter((i) => cat === "all" || i.type === cat);
+    const peso = (i: (typeof CANTINHO_ITEMS)[number]) =>
+      i.id === CANTINHO_COMPLETIONIST_ID ? 2 : !premium && i.premium ? 1 : 0;
+    return [...daCategoria].sort(
+      (a, b) => peso(a) - peso(b) || a.price - b.price || a.name.localeCompare(b.name, "pt-BR"),
+    );
+  })();
 
   async function buy(itemId: string, price: number) {
     if (buying) return;
@@ -15830,11 +15896,21 @@ function CantinhoTab({
                 className={`relative flex flex-col items-center rounded-2xl border p-4 text-center ${
                   isTrophy
                     ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white"
-                    : "border-border bg-card"
+                    : i.premium
+                      ? /* Fundo roxo no item premium. O único sinal era um selo
+                           de 9px no canto, do mesmo amarelo do troféu da
+                           Coleção — e numa grade de 74 tiles brancos iguais,
+                           selo não separa nada. Roxo é a cor do Premium no
+                           resto do app, então o tile diz a que prateleira
+                           pertence antes de ela ler qualquer palavra. Só o
+                           FUNDO muda: preço, botão e emoji seguem com o mesmo
+                           peso dos outros, senão a grade vira propaganda. */
+                        "border-violet-200 bg-gradient-to-b from-violet-100/70 via-violet-50/40 to-white"
+                      : "border-border bg-card"
                 }`}
               >
                 {i.premium && (
-                  <span className="absolute right-2 top-2 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                  <span className="absolute right-2 top-2 rounded-full bg-violet-200/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800">
                     {locked ? "🔒 Premium" : "Premium"}
                   </span>
                 )}
@@ -15910,7 +15986,7 @@ function CantinhoTab({
                      metade da loja era parede muda. Agora abre a oferta. */
                   <button
                     onClick={() => setOferta(i.name)}
-                    className="press mt-2 flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700"
+                    className="press mt-2 flex items-center gap-1 rounded-full bg-violet-500 px-3 py-1 text-[11px] font-bold text-white"
                   >
                     💎 Ver o Premium
                   </button>

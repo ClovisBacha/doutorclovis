@@ -2597,18 +2597,13 @@ export function GestacaoPath({
                       style={{ boxShadow: `0 0 30px 6px ${tm.main}55` }}
                     />
                   )}
-                  {/* Faísca orbitando a bolinha de hoje — juice de "é aqui!" */}
-                  {isToday && !done && (
-                    <span
-                      className="pointer-events-none absolute -inset-4"
-                      style={{ animation: "orbitSpin 8s linear infinite" }}
-                      aria-hidden
-                    >
-                      <span className="absolute -top-1 left-1/2 -translate-x-1/2 text-lg drop-shadow-sm">
-                        ✨
-                      </span>
-                    </span>
-                  )}
+                  {/* Aqui orbitava uma faísca ✨ em volta da bolinha de hoje.
+                      Saiu a pedido do Clóvis: o nó de hoje já é o maior da
+                      trilha, já tem halo, já tem o balão "DESAFIO DE HOJE" e
+                      já tem o anel de tarefas. A faísca era o quinto sinal
+                      apontando para a mesma coisa — e o único que se MEXE o
+                      tempo todo, no canto do olho de quem só quer ler o que
+                      tem para fazer hoje. */}
                   {/* Anel segmentado: 3 segmentos = as 3 tarefas de hoje */}
                   {isToday && <TaskRing done={done ? 6 : halvesToday} total={6} color={tm.main} />}
                   {peleAtiva ? (
