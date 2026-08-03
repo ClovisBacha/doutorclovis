@@ -10417,6 +10417,10 @@ const TOPICS = [...new Set(MEDITATIONS.map((m) => m.topic))];
 
 function MeditacoesTab({ gest }: { gest: Gest }) {
   const currentTrimester = gest ? trimesterForWeek(gest.weeks) : null;
+  /* Suporte à voz só se sabe no CLIENTE. Lido no render, `window` não existe
+     no SSR do TanStack Start e a página inteira caía no servidor. */
+  const [semVoz, setSemVoz] = useState(false);
+  useEffect(() => setSemVoz(!("speechSynthesis" in window)), []);
   const [selected, setSelected] = useState<Meditation | null>(null);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(0.9);
@@ -10482,10 +10486,12 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
   }
 
   function speak(med: Meditation) {
-    if (!("speechSynthesis" in window)) {
-      alert(
-        "Seu navegador não suporta síntese de voz. Use Chrome ou Edge para a melhor experiência.",
-      );
+    /* Era um `alert()` do sistema. Num app instalado, isso é um diálogo modal
+       do iOS/Android surgindo no meio de uma meditação — a coisa mais oposta
+       possível ao que a tela está tentando fazer. E o texto mandava "usar
+       Chrome ou Edge", conselho que dentro do app nativo não significa nada. */
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      toast("Este aparelho não tem voz guiada. O texto da meditação está logo abaixo. 💛");
       return;
     }
     window.speechSynthesis.cancel();
@@ -10493,17 +10499,49 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
     utter.lang = "pt-BR";
     utter.rate = rate;
     utter.pitch = 0.95;
-    const voices = window.speechSynthesis.getVoices();
-    const ptVoice = voices.find((v) => v.lang.startsWith("pt")) || null;
-    if (ptVoice) utter.voice = ptVoice;
+
+    /* `getVoices()` é ASSÍNCRONO no Chrome: na primeira reprodução depois de
+       uma carga fria ele devolve lista VAZIA, `utter.voice` nunca era
+       definido, e o sistema lia o português com a voz padrão — em inglês.
+       O `voiceschanged` é a única forma de saber que a lista chegou; sem ele,
+       a primeira meditação do dia soava errada e a segunda soava certa, o que
+       ninguém consegue reportar como bug. */
+    const escolherVoz = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const pt = voices.find((v) => v.lang?.toLowerCase().startsWith("pt-br"));
+      const qualquerPt = voices.find((v) => v.lang?.toLowerCase().startsWith("pt"));
+      const voz = pt ?? qualquerPt ?? null;
+      if (voz) utter.voice = voz;
+      return Boolean(voz) || voices.length > 0;
+    };
+
     utter.onend = () => {
       setPlaying(false);
       stopBreathing();
     };
     utterRef.current = utter;
-    window.speechSynthesis.speak(utter);
-    setPlaying(true);
-    startBreathing();
+
+    const falar = () => {
+      window.speechSynthesis.speak(utter);
+      setPlaying(true);
+      startBreathing();
+    };
+    if (escolherVoz()) falar();
+    else {
+      /* Lista ainda não chegou: espera o evento, com teto de 400ms para o
+         botão nunca ficar sem resposta num navegador que não dispara o
+         evento. */
+      let disparou = false;
+      const uma = () => {
+        if (disparou) return;
+        disparou = true;
+        window.speechSynthesis.removeEventListener("voiceschanged", uma);
+        escolherVoz();
+        falar();
+      };
+      window.speechSynthesis.addEventListener("voiceschanged", uma);
+      setTimeout(uma, 400);
+    }
   }
 
   function togglePlay() {
@@ -10550,13 +10588,30 @@ function MeditacoesTab({ gest }: { gest: Gest }) {
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Meditações Guiadas</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Sessões de meditação narradas por voz, específicas para cada fase da gestação.
+          Sessões de meditação para ler ou ouvir, específicas para cada fase da gestação.
           {currentTrimester &&
             ` No ${currentTrimester}º trimestre, recomendamos as meditações destacadas.`}
         </p>
-        {!("speechSynthesis" in window) && (
+
+        {/* O app tem DUAS meditações, e esta é a pior das duas.
+            A do Caminho tem voz gravada (Isabella, 25 faixas embarcadas), som
+            de fundo, vibração por fase, pergunta de fechamento, sequência de
+            dias e meia-estrela. Esta aqui lê o texto com a voz do SISTEMA — a
+            que estiver instalada no aparelho, que no Android costuma ser a
+            robótica, e que ninguém consegue escolher nem instalar.
+            Enquanto as duas convivem, quem chega aqui pela navegação de
+            Saúde ao menos fica sabendo que a outra existe. */}
+        <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900">
+          A meditação do <strong>Caminho</strong> tem voz gravada, som de fundo e conta ponto do
+          dia. Esta aqui é a versão de leitura, com a voz do próprio aparelho.
+        </p>
+
+        {/* `semVoz` vem de efeito, não do render: `window` não existe no SSR e
+            ler `"speechSynthesis" in window` aqui derrubava a página inteira
+            no servidor. */}
+        {semVoz && (
           <p className="mt-2 rounded-xl bg-primary/6 px-3 py-2 text-xs text-primary">
-            Use Chrome, Edge ou Safari para narração em voz. Outros navegadores podem não suportar.
+            Este aparelho não tem voz guiada — o texto completo de cada meditação está logo abaixo.
           </p>
         )}
       </div>
@@ -11089,7 +11144,15 @@ function SonsBebêTab({ gest }: { gest: Gest }) {
 
   function getCtx() {
     if (!ctxRef.current || ctxRef.current.state === "closed") {
-      ctxRef.current = new AudioContext();
+      /* `webkitAudioContext` como reserva: o Safari mais antigo (e alguns
+         WebViews de iOS) só expõem a versão com prefixo, e sem isto o
+         `new AudioContext()` LANÇA — os cinco sons do bebê morriam de uma vez.
+         `breath-audio.ts` e `celebrate.ts` já faziam esse desvio; só esta
+         tela não fazia. */
+      const AC =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      ctxRef.current = new AC();
     }
     if (ctxRef.current.state === "suspended") ctxRef.current.resume();
     return ctxRef.current;

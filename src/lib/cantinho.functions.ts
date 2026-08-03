@@ -59,6 +59,28 @@ export const getCantinho = createServerFn({ method: "POST" })
       .eq("id", uid)
       .single();
     const p = prof as { quiz_premium?: boolean; cantinho_fundo?: string | null } | null;
+
+    /* Modo Cuidado: a loja inteira se cala.
+       `claimDailyAndGetWallet` e `getWellnessProgress` já respeitavam o Modo
+       Cuidado; esta função não. O resultado é o pior que este app pode
+       produzir: uma paciente que perdeu o bebê abre "Recompensas" e encontra
+       um saldo em destaque e um "Berço (opcional)" à venda por 250 🌱.
+       Devolve saldo zerado e nada possuído — a aba mostra o estado vazio, que
+       é silêncio. */
+    const { isCareModeActive } = await import("@/lib/care-mode.functions");
+    if (await isCareModeActive(supabaseAdmin, uid)) {
+      return {
+        ok: true as const,
+        balance: 0,
+        owned: [] as string[],
+        premium: Boolean(p?.quiz_premium),
+        equippedFundo: null,
+        collectionComplete: false,
+        collectionOwned: 0,
+        collectionTotal: CANTINHO_COMPLETION_MIN,
+        careMode: true as const,
+      };
+    }
     // Itens grátis entram como possuídos sempre (sem linha na tabela de compras).
     const ownedIds = new Set(((owned ?? []) as { item_id: string }[]).map((r) => r.item_id));
     for (const id of FREE_ITEM_IDS) ownedIds.add(id);
