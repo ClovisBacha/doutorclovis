@@ -136,11 +136,26 @@ bun run app:ios      # abre no Xcode  (só macOS)
 bun run app:android  # abre no Android Studio
 ```
 
-**O que eu verifiquei aqui, e o que não dá para verificar:** `cap sync` roda e
-registra os quatro plugins nas duas plataformas; `tsc`, lint, os 309 testes e o
-build de produção passam; `bun install --frozen-lockfile` passa (era o que
-quebrava a CI). O que **não** foi verificado é o app abrindo: não há macOS,
-Xcode, Android SDK nem simulador neste ambiente. O primeiro `Run` é seu.
+**O que está verificado, e o que não está.**
+
+O workflow **App nativo** rodou no commit `9f31a71` e **passou nos dois jobs**:
+
+| job     | runner        | resultado                                        |
+| ------- | ------------- | ------------------------------------------------ |
+| Android | ubuntu-latest | ✅ `./gradlew assembleDebug` — APK como artefato |
+| iOS     | macos-latest  | ✅ `xcodebuild` para o simulador, sem assinatura |
+
+Então **o app compila nas duas plataformas** — isso deixou de ser suposição. E
+há um **APK de debug baixável** na aba Actions do GitHub: dá para instalar num
+Android de verdade agora, sem loja e sem conta nenhuma. É o teste de campo mais
+barato disponível hoje.
+
+Aqui no contêiner também passam: `tsc`, lint, os testes, o build de produção e
+`bun install --frozen-lockfile`.
+
+**O que continua NÃO verificado:** o app na mão de alguém. Nada aqui prova que a
+barra de status ficou legível, que o botão de voltar fecha a folha certa, que o
+push chega ou que a coordenada do SOS sai. Isso é aparelho, e aparelho é seu.
 
 **Uma armadilha que ficou fechada:** o `SplashScreen` estava configurado com
 `launchAutoHide: false`. Isso deixa a tela de abertura na tela até o JavaScript
