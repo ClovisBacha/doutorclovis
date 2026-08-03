@@ -148,15 +148,49 @@ mandar escondê-la — e se ele não rodar (rede caída, bundle que não carrego
 app fica congelado na marca **para sempre**, sem erro nenhum no log. Agora o
 lado nativo esconde sozinho em 6s e `esconderSplash()` só antecipa.
 
-### Fase 2 — os três bugs que te incomodam hoje
+### Fase 2 — os três bugs que te incomodam hoje ✅ FEITA
 
-Com a casca no lugar, eles deixam de ser negociação com o navegador:
+Com a casca no lugar, eles deixaram de ser negociação com o navegador:
 
-- `StatusBar.setStyle` e `setOverlaysWebView` — a faixa branca acaba
-- safe-area passa a vir do sistema, não de `env()` — os ícones sobem
-- o botão de baixo centraliza na área real
+- ✅ `StatusBar.setStyle` e `setOverlaysWebView` — a faixa branca acaba
+- ✅ safe-area passa a vir do sistema, não de `env()` — os ícones sobem
+- ✅ o botão de baixo centraliza na área real
 
-**Isto sozinho resolve o que você me mostrou nos dois prints.**
+**A barra de status segue o céu.** O topo do app é o céu do momento, e ele vai
+de azul claro ao meio-dia a quase preto de madrugada. Cor fixa de barra acerta
+metade do dia: de madrugada os ícones escuros somem no céu escuro, ao meio-dia
+os claros somem no azul. Quem manda é `darkSky` — a mesma variável que já decide
+a cor do texto do hero.
+
+**Cuidado ao mexer:** no Capacitor, `"DARK"` quer dizer **texto claro**. Quem
+"corrigir" para o que parece intuitivo deixa a barra ilegível à noite, e isso
+não aparece em revisão de código nenhuma. A conversão é função pura com teste.
+
+#### Duas coisas que apareceram no caminho e eram mais graves
+
+**1. A ponte nativa não falava com ninguém.** Ela lia
+`window.Capacitor.Plugins.X` em vez de importar os pacotes. `Capacitor.Plugins`
+**não** é preenchido pela ponte injetada — quem escreve ali é o `registerPlugin`
+do `@capacitor/core`, e ele só roda quando a página importa o pacote. Resultado:
+`Plugins.Haptics` era `undefined`, o `?.` engolia a chamada, nada dava erro, e a
+paciente de iPhone continuava sem sentir a respiração guiada — que era a única
+razão de a ponte existir. Agora os plugins vêm de `import()` dinâmico; conferi
+no build que o bundle da web continua sem uma linha de código nativo.
+
+**2. O botão de voltar do Android fechava o app.** De qualquer tela, inclusive
+com a folha de compra ou o SOS aberto. As telas do app não são rotas (não há um
+`pushState` no projeto inteiro), então não há histórico para o sistema desfazer:
+ou alguém responde, ou o app sai. Agora existe uma pilha
+(`src/lib/voltar.ts`) — a folha de cima fecha primeiro, e sem ninguém na pilha o
+app **minimiza** em vez de sair, porque a casca carrega o site e reabrir custaria
+uma página inteira pela rede. A tecla Escape entra na mesma pilha, o que conserta
+o teclado de graça e torna o mecanismo testável sem aparelho.
+
+**O médico abria o app na área da paciente.** `server.url` apontava para
+`/minha-conta`. Agora aponta para `/auth`, que já despacha dono → `/admin`,
+médico → `/painel`, paciente → `/minha-conta`. Com isso o login virou a primeira
+tela do app — e ela mostrava o cabeçalho e o menu do **site**. A classe `.nativo`
+no `<html>` (posta antes de o React hidratar, para não piscar) esconde isso.
 
 ### Fase 3 — o que a web não podia dar
 
