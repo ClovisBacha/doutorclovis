@@ -192,15 +192,59 @@ médico → `/painel`, paciente → `/minha-conta`. Com isso o login virou a pri
 tela do app — e ela mostrava o cabeçalho e o menu do **site**. A classe `.nativo`
 no `<html>` (posta antes de o React hidratar, para não piscar) esconde isso.
 
-### Fase 3 — o que a web não podia dar
+### Fase 3 — o que a web não podia dar ✅ FEITA
 
-1. **Haptics** — a respiração guiada finalmente vibra no iPhone. Todo o trabalho
-   do padrão por duração passa a valer para as suas pacientes de iPhone, que
-   hoje não sentem nada.
-2. **Push nativo** — sem exigir "adicionar à Tela de Início". Hoje quem não
-   instalou não recebe aviso de consulta.
-3. **SOS com localização em segundo plano** — o item que está no seu backlog
-   desde que a gente descobriu que a web não entrega.
+1. ✅ **Haptics** — não precisou de código novo. O que faltava era a ponte
+   funcionar, e isso foi consertado na Fase 2. `hapticTap`, `hapticKick`, a
+   respiração guiada e a celebração já passavam todos por `tocarPadrao`.
+2. ✅ **Push nativo** — sem exigir "adicionar à Tela de Início".
+3. ✅ **SOS com localização** — e o item era mais grave do que o nome sugeria.
+
+#### Push: APNs e FCM sem dependência
+
+Dentro da casca, o `WKWebView` do iPhone **não tem Web Push**. Não é questão de
+instalar: não existe. Quem entrega é a Apple e o Google, e o que se registra não
+é um endpoint de navegador — é um **token do aparelho**.
+
+Passam a ser duas rotas para a mesma pergunta, e o servidor tenta as duas.
+Nenhum dos quatro gatilhos foi tocado: SOS, consulta, vaga liberada e paciente
+nova continuam chamando `sendPushToUser`.
+
+**Três armadilhas fechadas no caminho:**
+
+- `sendPushToUser` começava com `if (!pushConfigured()) return` — e isso fala só
+  do VAPID. Um servidor com APNs e sem VAPID devolveria "0 enviados" sem nunca
+  ter tentado.
+- `UNIQUE (token)`, e não `(user_id, token)`. O token é do **aparelho**. Com a
+  chave composta, outra conta entrando no mesmo celular conviveria com a linha
+  antiga e os avisos da primeira continuariam chegando ali.
+- O `AppDelegate.swift` não repassava o token. Sem as duas funções de registro,
+  `register()` roda sem erro e o evento `registration` nunca chega.
+
+#### SOS: a coordenada nunca sairia, e ninguém perceberia
+
+O Android só entrega coordenada se o app tiver `ACCESS_FINE_LOCATION`; o iOS, se
+o `Info.plist` declarar o uso. **Nenhum dos dois tinha.** E o SOS trata falha de
+localização como "manda o aviso assim mesmo" — o que é certo numa emergência e é
+justamente o que tornava a falha invisível.
+
+**Sobre "segundo plano":** era o nome errado. O SOS é disparado por ela tocando
+num botão — o app está na frente. Rastrear com o app fechado exigiria permissão
+"sempre" e justificativa na revisão, e seria seguir uma gestante o dia inteiro
+para um evento que ela mesma dispara. Há teste cobrando que **não** pedimos.
+
+#### O que falta para isto sair do papel
+
+| item                                                        | quem faz |
+| ----------------------------------------------------------- | -------- |
+| `supabase/APLICAR_PUSH_NATIVO.sql` no SQL Editor            | você     |
+| Conta Apple Developer (US$ 99/ano) + chave APNs `.p8`       | você     |
+| Projeto Firebase + `google-services.json` em `android/app/` | você     |
+| As env vars `APNS_*` e `FCM_*` (ver `.env.example`)         | você     |
+| Capability "Push Notifications" no Xcode                    | você     |
+
+Sem isso tudo o app funciona e o envio vira silêncio — de propósito, igual ao
+VAPID.
 
 ### Fase 4 — loja
 
