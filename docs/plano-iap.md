@@ -14,11 +14,22 @@
 | Portas de pagamento no app | **Todas fechadas**, com o motivo em português                                 |
 | Chaves do Stripe           | vazias                                                                        |
 
-As quatro portas da paciente (`OfertaPremium`, `QuizPaywall`, `LojaSementinhas`,
-`baby-journey`) e as duas do médico (checkout e portal) checam `ehNativo()`.
-Isso evita a reprovação — e, com a decisão acima, significa que **hoje a
-paciente não tem como assinar**. O IAP não é melhoria; é o que destrava a
-receita.
+**A divisão mora num arquivo só: `src/lib/canal-de-venda.ts`.** Ele diz que
+`premium_paciente` e `sementinhas` se vendem no canal "app", `plano_medico` no
+canal "site", e `consulta` em qualquer um (serviço do mundo real, isento). As
+seis telas leem de lá — a regra e o texto que a paciente ou o médico lê.
+
+A regra vale **também no servidor**, e é aí que ela fica à prova de burla: um
+checkout do Stripe _é_ o canal "site" por definição, então
+`createSubscriptionCheckout` e `createSementinhasCheckout` recusam os produtos
+de canal "app" sem depender de nenhum campo que o cliente informe.
+
+Enquanto `IAP_ATIVO` for `false`, a compra da paciente aparece como
+indisponível, com o motivo em português. Ligar o IAP é mudar **essa constante**
+— nenhuma tela precisa ser tocada.
+
+Consequência de hoje: **a paciente não tem como assinar**, e isso é esperado.
+O IAP não é melhoria; é o que destrava a receita dela.
 
 ---
 
@@ -97,7 +108,8 @@ está no mesmo caminho crítico.
 1. Instalar o Capacitor e gerar `ios/` e `android/` — hoje não existem.
 2. Cadastrar os seis produtos nas duas lojas.
 3. Validação de recibo no servidor, com as notificações.
-4. Ligar as compras no app, tirando os portões de `ehNativo()` um a um.
+4. Virar `IAP_ATIVO` para `true` em `canal-de-venda.ts` e ligar a compra da
+   loja nas telas da paciente.
 5. Restaurar compras + excluir conta.
 6. Só então a oferta introdutória.
 

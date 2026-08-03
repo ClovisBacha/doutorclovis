@@ -51,6 +51,23 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { stripeConfigured, priceIdFor, createCheckoutSession, ensurePercentCoupon } =
       await import("@/lib/stripe.server");
+    /* ── A divisão, aplicada no servidor ──────────────────────────────
+       Um checkout do Stripe É o canal "site", por definição — não há como
+       criar um a partir do app. Então esta checagem não depende de nenhum
+       campo que o cliente mande, e não há requisição forjada que a contorne:
+       `premium_paciente` tem canal "app" e é recusado aqui, ponto.
+
+       É o que garante que a compra da paciente não escape para o Stripe
+       enquanto o app estiver em revisão — que é o cenário que reprova. */
+    const { podeComprar } = await import("@/lib/canal-de-venda");
+    const veredito = podeComprar(
+      data.product === "doctor_plan" ? "plano_medico" : "premium_paciente",
+      "site",
+    );
+    if (!veredito.pode) {
+      return { ok: false as const, error: "canal_errado" as const, texto: veredito.texto };
+    }
+
     if (!stripeConfigured()) {
       return { ok: false as const, error: "pagamento_indisponivel" };
     }

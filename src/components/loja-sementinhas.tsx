@@ -17,11 +17,11 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   PACOTES,
-  podeComprarAqui,
   precoBRL,
   vantagemSobreMenor,
   type PacoteSementinhas,
 } from "@/lib/pacotes-sementinhas";
+import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { ehNativo } from "@/lib/nativo";
 
 /** Uma linha do extrato: o que entrou ou saiu, e quando. */
@@ -80,7 +80,8 @@ export function LojaSementinhas({
 
   if (!aberto) return null;
 
-  const podeComprar = podeComprarAqui(nativo);
+  const veredito = podeComprarAqui("sementinhas", nativo);
+  const podeComprar = veredito.pode;
 
   async function comprar(p: PacoteSementinhas) {
     if (indo) return;
@@ -187,13 +188,12 @@ export function LojaSementinhas({
              revisão — então a tela diz o motivo, em vez de oferecer um botão
              que não deveria existir. */
           <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-4">
-            <p className="text-sm font-semibold text-foreground">
-              A compra ainda não está disponível no aplicativo
-            </p>
+            <p className="text-sm font-semibold text-foreground">Ainda não dá para comprar aqui</p>
+            {/* Texto vindo de `canal-de-venda.ts`: a regra e a frase moram no
+                mesmo lugar, senão uma tela diverge da outra — que foi o que já
+                aconteceu quando cada uma tinha a sua cópia. */}
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              Pelo aplicativo, a compra tem que passar pela loja da Apple ou do Google, e ela ainda
-              está sendo preparada. Enquanto isso dá pra comprar pelo site, no navegador — as
-              Sementinhas caem na mesma conta.
+              {!veredito.pode && veredito.texto}
             </p>
             <p className="mt-2 text-[13px] font-medium text-emerald-800">
               Jogando, você continua ganhando normalmente. 💛

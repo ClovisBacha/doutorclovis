@@ -34,6 +34,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ehNativo } from "@/lib/nativo";
+import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { brl } from "@/lib/promo";
 import type { OfertaBoasVindas } from "@/lib/promo.functions";
 
@@ -81,6 +82,7 @@ export function OfertaPremium({
      global do Capacitor, que não existe no SSR. */
   const [nativo, setNativo] = useState(false);
   useEffect(() => setNativo(ehNativo()), []);
+  const veredito = podeComprarAqui("premium_paciente", nativo);
 
   /* A oferta. Sem contador: quem tem direito é quem nunca assinou, e isso não
      tem prazo — ver `promo.functions.ts`. */
@@ -393,15 +395,18 @@ export function OfertaPremium({
           </button>
         </div>
 
-        {nativo ? (
+        {!veredito.pode ? (
           <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-4">
-            <p className="text-sm font-semibold text-foreground">
-              A assinatura ainda não está disponível no aplicativo
-            </p>
+            <p className="text-sm font-semibold text-foreground">Ainda não dá para assinar aqui</p>
+            {/* A frase vem de `canal-de-venda.ts` — regra e texto no mesmo
+                lugar. Repare que ela NÃO manda a paciente comprar pelo site:
+                sugerir caminho de pagamento fora do app é o que a loja
+                proíbe, e era o que a versão anterior desta tela fazia. */}
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              Pelo aplicativo, a assinatura tem que passar pela loja da Apple ou do Google, e ela
-              ainda está sendo preparada. Dá pra assinar pelo site, no navegador — vale para a mesma
-              conta. Se o seu médico te deu um código, ele funciona aqui mesmo.
+              {veredito.texto}
+            </p>
+            <p className="mt-2 text-[13px] text-muted-foreground">
+              Se o seu médico te deu um código, ele funciona aqui mesmo.
             </p>
           </div>
         ) : (

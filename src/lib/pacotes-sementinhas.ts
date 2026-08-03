@@ -24,14 +24,13 @@
  * grande (10.000) NÃO compra tudo — de propósito: um pacote que zera o jogo
  * mata o jogo.
  *
- * ─── iOS e Android ──────────────────────────────────────────────────────
+ * ─── Onde se compra ─────────────────────────────────────────────────────
  *
- * Moeda virtual consumível dentro de app nativo exige In-App Purchase (Apple,
- * diretriz 3.1.1; Google, Play Billing). Mandar a paciente para o Checkout do
- * Stripe DENTRO do app é reprovação certa na revisão. Por isso
- * `podeComprarAqui()` existe e a tela respeita: no app nativo a compra fica
- * indisponível até haver IAP de verdade, e o texto diz isso em português em
- * vez de abrir um caminho que a loja derruba.
+ * Sementinhas são moeda virtual consumida dentro do app, então a compra passa
+ * pela loja da Apple/Google — nunca pelo Stripe. Quem decide isso é
+ * `canal-de-venda.ts`, inclusive no servidor: um checkout do Stripe É o canal
+ * "site", e `sementinhas` tem canal "app", então a recusa não depende de nada
+ * que o cliente informe.
  */
 
 export type PacoteSementinhas = {
@@ -82,17 +81,8 @@ export function vantagemSobreMenor(p: PacoteSementinhas): number {
   return Math.round((porReal(p) / base - 1) * 100);
 }
 
-/**
- * A compra com cartão pode acontecer NESTE aparelho?
- *
- * `false` dentro do app nativo: Apple e Google exigem a compra pela loja
- * deles para moeda virtual, e um botão que abre o Stripe ali dentro reprova o
- * app na revisão. Enquanto o IAP não existir, a tela mostra o motivo em vez de
- * um botão que não deveria estar lá.
- *
- * Recebe `ehNativo` por parâmetro (em vez de importar `nativo.ts`) para esta
- * regra continuar sendo lógica pura e testável dos dois lados.
- */
-export function podeComprarAqui(ehNativo: boolean): boolean {
-  return !ehNativo;
-}
+/* A pergunta "esta compra pode acontecer aqui?" NÃO mora mais neste arquivo.
+   Havia um `podeComprarAqui` aqui, e a mesma regra vivia noutras cinco telas
+   com o texto escrito à mão em cada uma — foi assim que as portas da paciente
+   e as do médico acabaram com comportamentos diferentes.
+   A regra e a frase moram agora em `canal-de-venda.ts`, uma vez só. */

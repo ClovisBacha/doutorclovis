@@ -93,25 +93,35 @@ escrever alternativa clínica e isso é trabalho do médico, não de script:
   certo para risco habitual); entrou a ressalva de que tubo neural prévio,
   anticonvulsivante, diabetes, obesidade ou bariátrica pedem dose bem maior.
 
-### O que a amostragem clínica encontrou e eu NÃO consertei
+### O que a amostragem clínica encontrou — e por que NÃO vira aula
 
-O conteúdo é de gestação de **risco habitual**, não de alto risco. Em 294 dias:
+A varredura mostrou zero menções a AAS para pré-eclâmpsia, colo curto,
+corticoide antenatal, CIUR, Rh negativo, trombofilia e colestase. Eu registrei
+isso aqui como "a lacuna mais séria do app" e **recomendei preencher**.
 
-| tema                                          | dias  |
-| --------------------------------------------- | ----- |
-| AAS / aspirina — profilaxia de pré-eclâmpsia  | **0** |
-| colo curto / progesterona vaginal / cerclagem | **0** |
-| corticoide antenatal                          | **0** |
-| restrição de crescimento / Doppler            | **0** |
-| trombofilia / heparina                        | **0** |
-| Rh negativo / imunoglobulina anti-D           | **0** |
-| colestase gestacional                         | **0** |
+**A recomendação estava errada, e o Clóvis corrigiu.** A paciente não chegou a
+esta plataforma por ter esses problemas — ela chegou ao **médico dela**, e o
+app é a plataforma de muitos médicos. O jogo é educação genérica, e é isso que
+ele tem de ser: uma aula diária que prescrevesse conduta estaria prescrevendo
+em nome de um médico que não escreveu aquilo, para uma paciente cujo caso ele
+não conhece.
 
-A profilaxia com AAS a partir de 12–16 semanas é a intervenção mais
-estabelecida do pré-natal de alto risco e não é mencionada uma vez. **Isto é
-autoria clínica, não conserto de código** — precisa do Dr. Clóvis.
+Conduta específica tem lugar próprio no produto, e ele já existe: o **cérebro
+do médico** (`brain_entries`), onde cada médico escreve as próprias
+orientações e a IA responde com elas. É lá que AAS, corticoide e colestase
+entram — com o nome de quem assumiu a responsabilidade.
 
----
+Medido depois da correção, o conteúdo genérico já está no molde certo: as
+únicas "prescrições" que a varredura encontra são limites de saúde pública
+(cafeína até ~200 mg/dia, fólico 400 mcg) e frases do tipo _"nunca use
+antibiótico por conta própria"_. **76 dos 294 dias remetem explicitamente ao
+médico dela.**
+
+Os dois consertos clínicos que ficaram (D102 e a ressalva do fólico) seguem
+válidos sob essa regra, e por motivos diferentes: o D102 era **erro de fato**
+— mandava correr para um exame cuja janela já havia fechado naquele dia —, e a
+ressalva do fólico não prescreve nada, ela **aponta para o médico**, que é
+exatamente a forma certa.
 
 ## O iPhone não sentia o app
 
@@ -177,11 +187,9 @@ já deu. Há um teste só para isso.
 
 ### Precisa do Dr. Clóvis
 
-1. **Conteúdo de alto risco** (AAS, colo curto, corticoide, CIUR, Rh, trombofilia,
-   colestase) — a lacuna mais séria do app hoje.
-2. **Segundos distratores** nos "marque todas", e distratores mais longos nas
+1. **Segundos distratores** nos "marque todas", e distratores mais longos nas
    escolhas únicas.
-3. **Protocolo do GBS**: 11 dias cravam 35–37 semanas; o ACOG revisou para
+2. **Protocolo do GBS**: 11 dias cravam 35–37 semanas; o ACOG revisou para
    36s0d–37s6d, a FEBRASGO mantém 35–37. É decisão de protocolo.
 
 ### Precisa de decisão de produto

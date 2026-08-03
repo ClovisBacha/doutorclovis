@@ -38,6 +38,15 @@ export const createSementinhasCheckout = createServerFn({ method: "POST" })
     const pacote = PACOTE_POR_ID[data.pacoteId];
     if (!pacote) return { ok: false as const, error: "pacote_inexistente" };
 
+    /* Mesma regra do Premium: Sementinhas são moeda virtual consumida dentro
+       do app, e um checkout do Stripe é o canal "site". Recusado aqui, sem
+       depender de nada que o cliente informe. */
+    const { podeComprar } = await import("@/lib/canal-de-venda");
+    const veredito = podeComprar("sementinhas", "site");
+    if (!veredito.pode) {
+      return { ok: false as const, error: "canal_errado" as const, texto: veredito.texto };
+    }
+
     const { stripeConfigured, createOneTimeCheckout } = await import("@/lib/stripe.server");
     if (!stripeConfigured()) return { ok: false as const, error: "pagamento_indisponivel" };
 

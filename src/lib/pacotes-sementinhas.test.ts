@@ -12,7 +12,6 @@ import { describe, expect, test } from "bun:test";
 import {
   PACOTES,
   PACOTE_POR_ID,
-  podeComprarAqui,
   porReal,
   precoBRL,
   vantagemSobreMenor,
@@ -77,17 +76,5 @@ describe("o pacote maior não zera o jogo", () => {
       (i) => i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID,
     ).reduce((s, i) => s + i.price, 0);
     expect(PACOTES.at(-1)!.quantidade).toBeLessThan(total);
-  });
-});
-
-describe("loja de app nativo", () => {
-  /* Apple 3.1.1 e Play Billing: moeda virtual consumível vai pela loja. Um
-     botão que abre o Stripe dentro do app reprova na revisão. */
-  test("no app nativo a compra por cartão fica indisponível", () => {
-    expect(podeComprarAqui(true)).toBe(false);
-  });
-
-  test("no navegador a compra é permitida", () => {
-    expect(podeComprarAqui(false)).toBe(true);
   });
 });

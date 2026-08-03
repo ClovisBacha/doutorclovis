@@ -250,6 +250,7 @@ import jogoBolha from "@/assets/jogo/bolha.webp";
 import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { ehNativo, tocarPadrao } from "@/lib/nativo";
+import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { brl as brlPromo } from "@/lib/promo";
 import type { OfertaBoasVindas } from "@/lib/promo.functions";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
@@ -3166,6 +3167,7 @@ function QuizPaywall({
      Este paywall era o único dos três que ainda abria o Stripe direto. */
   const [nativo, setNativo] = useState(false);
   useEffect(() => setNativo(ehNativo()), []);
+  const veredito = podeComprarAqui("premium_paciente", nativo);
 
   /* A mesma oferta de boas-vindas da folha do Cantinho.
      Precisa estar nos DOIS lugares: a paciente que visse 61% num paywall e o
@@ -3432,15 +3434,15 @@ function QuizPaywall({
         />
       </div>
 
-      {nativo ? (
+      {!veredito.pode ? (
         <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
-          <p className="text-[13px] font-bold text-amber-900">
-            A assinatura ainda não está disponível no aplicativo
-          </p>
-          <p className="mt-1 text-[12px] leading-relaxed text-amber-800/90">
-            Pelo aplicativo, ela tem que passar pela loja da Apple ou do Google. Dá pra assinar pelo
-            site, no navegador — vale para a mesma conta. Se o seu médico te deu um código, ele
-            funciona aqui mesmo.
+          <p className="text-[13px] font-bold text-amber-900">Ainda não dá para assinar aqui</p>
+          {/* Frase vinda de `canal-de-venda.ts` — a mesma que a folha do
+              Cantinho usa. Duas telas de preço com textos diferentes sobre a
+              mesma regra é como a divergência começa. */}
+          <p className="mt-1 text-[12px] leading-relaxed text-amber-800/90">{veredito.texto}</p>
+          <p className="mt-1 text-[12px] text-amber-800/90">
+            Se o seu médico te deu um código, ele funciona aqui mesmo.
           </p>
         </div>
       ) : (

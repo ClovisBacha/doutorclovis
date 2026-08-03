@@ -7165,11 +7165,10 @@ function DoctorBilling({
        Ontem eu deixei estas portas abertas de propósito, escrevendo que "o app
        nativo é da paciente". Estava errado: o médico também vai usar o app. */
     const { ehNativo } = await import("@/lib/nativo");
-    if (ehNativo()) {
-      toast(
-        "Os planos são contratados no site, no navegador — não pelo aplicativo. Entre em obstetrica.com.br com esta mesma conta.",
-        { duration: 6000 },
-      );
+    const { podeComprarAqui } = await import("@/lib/canal-de-venda");
+    const veredito = podeComprarAqui("plano_medico", ehNativo());
+    if (!veredito.pode) {
+      toast(veredito.texto, { duration: 6000 });
       return;
     }
     setBusy(planKey);
@@ -7206,11 +7205,10 @@ function DoctorBilling({
        é compra. Fica no site, pelo mesmo motivo do checkout. Cancelar continua
        possível lá, sem passar pelo app. */
     const { ehNativo } = await import("@/lib/nativo");
-    if (ehNativo()) {
-      toast(
-        "A cobrança se gerencia no site, no navegador — obstetrica.com.br, com esta mesma conta.",
-        { duration: 6000 },
-      );
+    const { podeComprarAqui } = await import("@/lib/canal-de-venda");
+    const veredito = podeComprarAqui("plano_medico", ehNativo());
+    if (!veredito.pode) {
+      toast(veredito.texto, { duration: 6000 });
       return;
     }
     setBusy("portal");

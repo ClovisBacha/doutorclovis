@@ -230,11 +230,14 @@ export function PremiumUpsellModal({
          na revisão. Mesma regra da OfertaPremium, do QuizPaywall e da
          LojaSementinhas — esta era a última porta de pagamento da área da
          paciente que ainda estava aberta. */
+      /* A regra vem de `canal-de-venda.ts`, com a frase junto. A versão
+         anterior desta mensagem mandava assinar pelo site — sugerir caminho
+         de pagamento fora do app é justamente o que a loja proíbe. */
       const { ehNativo } = await import("@/lib/nativo");
-      if (ehNativo()) {
-        toast(
-          "Pelo aplicativo, a assinatura tem que passar pela loja da Apple ou do Google. Dá pra assinar pelo site — vale para a mesma conta.",
-        );
+      const { podeComprarAqui } = await import("@/lib/canal-de-venda");
+      const veredito = podeComprarAqui("premium_paciente", ehNativo());
+      if (!veredito.pode) {
+        toast(veredito.texto, { duration: 6000 });
         return;
       }
       const { supabase } = await import("@/integrations/supabase/client");
