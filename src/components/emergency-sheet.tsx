@@ -6,6 +6,7 @@ import { linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
 import { dispararEmergencia, type CanaisAviso } from "@/lib/emergencia.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { useVoltar } from "@/lib/use-voltar";
 
 type Info = {
   name?: string | null;
@@ -51,6 +52,11 @@ export function EmergencySheet({
   /** Abre a carteirinha completa (QR grande, copiar, imprimir) fora do SOS. */
   onOpenCard?: () => void;
 }) {
+  /* Voltar (Android) e Escape fecham o SOS. Sem isto, o botão que o Android
+     inteiro usa para "cancelar isto aqui" fechava o APP — com a tela de
+     emergência aberta. */
+  useVoltar(true, onClose);
+
   /* Quem é "o médico" desta tela — tudo ou nada, nunca uma mistura.
      
      Se a paciente TEM médico vinculado, valem só os dados dele. Se ele não

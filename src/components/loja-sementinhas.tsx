@@ -23,6 +23,7 @@ import {
 } from "@/lib/pacotes-sementinhas";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { ehNativo } from "@/lib/nativo";
+import { useVoltar } from "@/lib/use-voltar";
 
 /** Uma linha do extrato: o que entrou ou saiu, e quando. */
 type Lancamento = { amount: number; reason: string | null; created_at: string };
@@ -36,6 +37,10 @@ export function LojaSementinhas({
   onFechar: () => void;
   saldo: number | null;
 }) {
+  /* O botão de voltar do Android fecha a folha em vez de fechar o app.
+     Ver `src/lib/voltar.ts`. */
+  useVoltar(aberto, onFechar);
+
   const [indo, setIndo] = useState<string | null>(null);
   /* Extrato. O servidor já devolvia os últimos 20 lançamentos com motivo e
      data (`walletPayload`), e o app jogava fora: a paciente via o número mudar

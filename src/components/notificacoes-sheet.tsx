@@ -1,5 +1,6 @@
 import { Bell, ChevronRight, X } from "lucide-react";
 import type { Notificacao } from "@/lib/notificacoes";
+import { useVoltar } from "@/lib/use-voltar";
 
 /**
  * A caixa de entrada do app.
@@ -22,6 +23,8 @@ export function NotificacoesSheet({
   lidas: Set<string>;
   onFechar: () => void;
 }) {
+  /* Voltar (Android) e Escape fecham a folha, não o app. */
+  useVoltar(true, onFechar);
   return (
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-black/35 backdrop-blur-sm sm:items-center"

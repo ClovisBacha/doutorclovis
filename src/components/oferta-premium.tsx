@@ -37,6 +37,7 @@ import { ehNativo } from "@/lib/nativo";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { brl } from "@/lib/promo";
 import type { OfertaBoasVindas } from "@/lib/promo.functions";
+import { useVoltar } from "@/lib/use-voltar";
 
 const PRECO_MENSAL = 19.9;
 const PRECO_ANUAL_MES = 9.9;
@@ -83,6 +84,11 @@ export function OfertaPremium({
   const [nativo, setNativo] = useState(false);
   useEffect(() => setNativo(ehNativo()), []);
   const veredito = podeComprarAqui("premium_paciente", nativo);
+
+  /* O botão de voltar do Android fecha a oferta em vez de fechar o app.
+     Numa folha de COMPRA isso importa duas vezes: sair sem querer no meio de
+     um pagamento é a pior hora possível. */
+  useVoltar(aberto, onFechar);
 
   /* A oferta. Sem contador: quem tem direito é quem nunca assinou, e isso não
      tem prazo — ver `promo.functions.ts`. */

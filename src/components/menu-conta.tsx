@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AppTab } from "@/components/app-mobile-shell";
+import { useVoltar } from "@/lib/use-voltar";
 
 /**
  * O menu da conta — o que se abre na silhueta do topo da home.
@@ -140,6 +141,8 @@ export function MenuDaConta({
   onSair: () => void;
   onFechar: () => void;
 }) {
+  /* Voltar (Android) e Escape fecham o menu, não o app. */
+  useVoltar(true, onFechar);
   return (
     <div
       className="fixed inset-0 z-[70] flex items-start justify-center bg-black/30 backdrop-blur-sm"

@@ -52,6 +52,7 @@ import type { HapticsPlugin } from "@capacitor/haptics";
 import type { SplashScreenPlugin } from "@capacitor/splash-screen";
 import type { StatusBarPlugin } from "@capacitor/status-bar";
 import type { AppPlugin } from "@capacitor/app";
+import { voltarAgora } from "@/lib/voltar";
 
 /** O que a ponte injetada publica de fato — sem `Plugins`, ver o cabeçalho. */
 type PonteCapacitor = {
@@ -143,9 +144,38 @@ export function prepararNativo(): void {
      Como `prepararNativo` roda no escopo do módulo do `router.tsx`, isto
      acontece antes de o React hidratar: nenhum quadro com o menu errado. */
   document.documentElement.classList.add("nativo");
-  void carregar().then(() => {
+  void carregar().then(({ App }) => {
     esconderSplash();
+    ligarBotaoVoltar(App);
   });
+}
+
+/**
+ * O botão de voltar do Android, ligado à pilha de `src/lib/voltar.ts`.
+ *
+ * Sem listener nenhum, o Capacitor faz o padrão dele e FECHA O APP — de
+ * qualquer tela, inclusive com uma folha de compra aberta por cima. As telas
+ * deste app não são rotas (são estado do React sobre uma URL só), então não há
+ * histórico para o sistema desfazer sozinho: alguém tem que responder.
+ *
+ * Quando ninguém na pilha assume, a saída é **minimizar, não sair**. Os dois
+ * tiram o app da frente; a diferença aparece na volta. `exitApp()` encerra a
+ * WebView, e como a casca carrega o SITE, reabrir custa uma página inteira pela
+ * rede — a paciente que saiu sem querer paga uma tela de carregamento e perde
+ * onde estava. `minimizeApp()` mantém tudo quente e a volta é instantânea.
+ */
+function ligarBotaoVoltar(App?: AppPlugin): void {
+  if (!App) return;
+  void App.addListener("backButton", ({ canGoBack }) => {
+    if (voltarAgora() === "consumido") return;
+    /* Ninguém quis. Se houver histórico de verdade (uma navegação de rota, não
+       uma troca de aba), desfaz. Senão, minimiza. */
+    if (canGoBack) {
+      window.history.back();
+      return;
+    }
+    void App.minimizeApp().catch(() => {});
+  }).catch(() => {});
 }
 
 /**
