@@ -11,6 +11,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
+    // MARK: - Push (APNs)
+    //
+    // O token do aparelho chega AQUI, no delegate do sistema — não no
+    // JavaScript. Estas duas funções repassam o resultado para a ponte do
+    // Capacitor, que então dispara os eventos `registration` e
+    // `registrationError` que `src/lib/push-nativo.ts` escuta.
+    //
+    // Sem elas, `PushNotifications.register()` roda sem erro nenhum e o evento
+    // `registration` NUNCA chega: o app espera os 15 segundos do prazo e
+    // conclui "sem token". É falha muda, do mesmo tipo que já custou caro
+    // neste projeto.
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.

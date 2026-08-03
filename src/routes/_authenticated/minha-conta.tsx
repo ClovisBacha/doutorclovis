@@ -52,7 +52,7 @@ import { createBreathAudio } from "@/lib/breath-audio";
 import { shareMilestoneCard } from "@/lib/share-card";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
-import { subscribeToPush, vapidPublicKey } from "@/lib/push";
+import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
 import { sendTestPushToMe } from "@/lib/push.functions";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
@@ -4038,12 +4038,14 @@ function ProfileTab({
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
       setNotifPermission(Notification.permission);
-      // Já autorizou antes? Garante que existe uma inscrição de push salva no
-      // banco (silencioso — não abre prompt quando a permissão já é "granted").
-      if (Notification.permission === "granted" && vapidPublicKey()) {
-        subscribeToPush().catch(() => {});
-      }
     }
+    /* Já autorizou antes? Garante que o registro existe no banco — permissão
+       concedida com banco vazio não entrega nada, e é um estado comum (trocar
+       de aparelho, limpar dados, reinstalar o app).
+       Passa por `renovarAvisosSeJaAutorizado` e não por `subscribeToPush` para
+       cobrir também o app nativo, onde não existe `Notification.permission`
+       nem chave VAPID: quem sabe da permissão ali é o sistema. */
+    void renovarAvisosSeJaAutorizado();
   }, []);
 
   // Completion percentage
@@ -4606,8 +4608,10 @@ function ProfileTab({
           ) : (
             <button
               onClick={async () => {
-                if (!("Notification" in window)) return;
-                const res = await subscribeToPush();
+                /* Sem o `Notification in window` como porteiro: dentro da
+                   casca nativa quem entrega é o sistema, e essa API pode nem
+                   existir. `ativarAvisos` escolhe o caminho. */
+                const res = await ativarAvisos();
                 if (res.ok) {
                   setNotifPermission("granted");
                   toast.success("Lembretes ativados 🔔");

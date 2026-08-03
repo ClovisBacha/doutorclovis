@@ -26,7 +26,8 @@
  */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { pushSupport, subscribeToPush, vapidPublicKey } from "@/lib/push";
+import { ativarAvisos, renovarAvisosSeJaAutorizado, suporteAAvisos } from "@/lib/avisos";
+import { ehNativo } from "@/lib/nativo";
 
 type Estado = "carregando" | "ligado" | "desligado" | "negado" | "indisponivel";
 
@@ -36,15 +37,20 @@ export function NotificacoesDoMedico() {
   const [ligando, setLigando] = useState(false);
 
   useEffect(() => {
-    const sup = pushSupport();
+    const sup = suporteAAvisos();
     if (!sup.ok) {
       setEstado("indisponivel");
       setMotivo(sup.reason);
       return;
     }
-    if (!vapidPublicKey()) {
-      setEstado("indisponivel");
-      setMotivo("no-key");
+    /* Dentro da casca nativa não existe `Notification.permission`: quem sabe da
+       permissão é o sistema, e perguntar a ele custa uma chamada assíncrona.
+       O cartão nasce em "desligado" e a renovação corrige em silêncio se a
+       permissão já estava dada — o pior que acontece é o médico ver o botão de
+       ativar por um instante em algo que já está ativo. */
+    if (ehNativo()) {
+      setEstado("desligado");
+      void renovarAvisosSeJaAutorizado();
       return;
     }
     if (Notification.permission === "denied") return setEstado("negado");
@@ -52,7 +58,7 @@ export function NotificacoesDoMedico() {
       /* Já autorizou antes: garante que a inscrição existe no banco. Sem isto,
          trocar de aparelho ou limpar dados deixa a permissão concedida e o
          banco vazio — permissão sem inscrição não entrega nada. */
-      subscribeToPush()
+      ativarAvisos()
         .then((r) => setEstado(r.ok ? "ligado" : "desligado"))
         .catch(() => setEstado("desligado"));
       return;
@@ -64,7 +70,7 @@ export function NotificacoesDoMedico() {
     if (ligando) return;
     setLigando(true);
     try {
-      const r = await subscribeToPush();
+      const r = await ativarAvisos();
       if (r.ok) {
         setEstado("ligado");
         toast.success("Pronto — os avisos chegam neste aparelho.");
@@ -135,6 +141,12 @@ function textoDoMotivo(motivo?: string): string {
       return "No iPhone, os avisos só funcionam com o app instalado na Tela de Início: toque em Compartilhar e depois em “Adicionar à Tela de Início”.";
     case "no-key":
       return "O envio de avisos ainda está sendo configurado no servidor.";
+    case "sem-token":
+      /* No app, "sem token" quase sempre é rede: o aparelho precisa falar com
+         a Apple ou com o Google antes de existir para onde enviar. */
+      return "O aparelho não conseguiu se registrar agora. Confira a conexão e tente de novo.";
+    case "indisponivel":
+      return "Não consegui guardar o registro deste aparelho. Tente de novo em instantes.";
     case "no-sw":
     case "no-push":
     case "no-notif":

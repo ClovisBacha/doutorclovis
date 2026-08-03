@@ -97,9 +97,32 @@ function vapidKeys() {
   return vapidCache;
 }
 
-/** Diz se o push está configurado no servidor (chaves presentes). */
+/** Diz se o Web Push está configurado no servidor (chaves VAPID presentes). */
 export function pushConfigured(): boolean {
   return vapidKeys() !== null;
+}
+
+/** Há chaves de APNs ou FCM? Carregado sob demanda para o bundle não crescer. */
+async function temPushNativo(): Promise<boolean> {
+  try {
+    const { pushNativoConfigurado } = await import("./push-nativo.server");
+    return pushNativoConfigurado();
+  } catch {
+    return false;
+  }
+}
+
+/** Entrega pelo aparelho. Nunca lança — um aviso não derruba o fluxo. */
+async function enviarNativo(
+  userId: string,
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number }> {
+  try {
+    const { enviarPushNativo } = await import("./push-nativo.server");
+    return await enviarPushNativo(userId, payload);
+  } catch {
+    return { sent: 0, failed: 0 };
+  }
 }
 
 type SubRow = { endpoint: string; p256dh: string; auth_key: string };
@@ -131,7 +154,11 @@ async function sendOne(sub: SubRow, payload: Buffer): Promise<number> {
  * seguro pra chamar no meio de um fluxo (confirmação de consulta etc.).
  */
 export async function sendPushToEmail(email: string, payload: PushPayload): Promise<void> {
-  if (!pushConfigured()) return;
+  /* `pushConfigured()` fala só do VAPID. Testar aqui excluiria o push NATIVO,
+     que tem chaves próprias — e daria o pior resultado possível: um servidor
+     com APNs configurado e VAPID não, que devolve "0 enviados" sem nunca ter
+     tentado. Quem decide se há para onde enviar é `sendPushToUser`. */
+  if (!pushConfigured() && !(await temPushNativo())) return;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: uid } = await (supabaseAdmin as any).rpc("get_user_id_by_email", {
@@ -152,7 +179,14 @@ export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
 ): Promise<{ sent: number; failed: number }> {
-  if (!pushConfigured()) return { sent: 0, failed: 0 };
+  /* Duas rotas para a mesma pergunta: o navegador (Web Push, aqui) e o aparelho
+     (APNs/FCM, em `push-nativo.server.ts`). A mesma pessoa pode ter as duas — o
+     site no computador e o app no celular — e as duas têm chaves próprias.
+     Somar em vez de escolher é o que faz "avise esta pessoa" continuar
+     significando a mesma coisa nos quatro pontos do servidor que chamam isto. */
+  const nativo = await enviarNativo(userId, payload);
+  if (!pushConfigured()) return nativo;
+
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const { data: subs } = await (supabaseAdmin as any)
@@ -160,7 +194,7 @@ export async function sendPushToUser(
     .select("endpoint, p256dh, auth_key")
     .eq("user_id", userId);
   const rows = (subs ?? []) as SubRow[];
-  if (!rows.length) return { sent: 0, failed: 0 };
+  if (!rows.length) return nativo;
 
   const bodyBytes = Buffer.from(JSON.stringify(payload));
   const dead: string[] = [];
@@ -190,5 +224,5 @@ export async function sendPushToUser(
       .in("endpoint", dead);
   }
 
-  return { sent, failed };
+  return { sent: sent + nativo.sent, failed: failed + nativo.failed };
 }
