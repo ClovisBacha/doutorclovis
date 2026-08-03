@@ -220,6 +220,7 @@ import {
 } from "@/lib/saudefeminina.functions";
 import { joinCorporate } from "@/lib/corporativo.functions";
 import { OfertaPremium } from "@/components/oferta-premium";
+import { LojaSementinhas } from "@/components/loja-sementinhas";
 import {
   savePpdScreening,
   getMyPpdScreenings,
@@ -15344,6 +15345,7 @@ function CantinhoTab({
   const [buying, setBuying] = useState<string | null>(null);
   /* Nome do item que ela tentou pegar; `null` = folha fechada. */
   const [oferta, setOferta] = useState<string | null>(null);
+  const [lojaSementinhas, setLojaSementinhas] = useState(false);
   const [collection, setCollection] = useState({ owned: 0, total: 0, complete: false });
   /* Pele equipada das bolinhas do Caminho. Lida no cliente (localStorage
      dentro do blob da jornada), então começa nula e se corrige ao montar. */
@@ -15498,10 +15500,20 @@ function CantinhoTab({
           <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">Meu Cantinho</p>
           <p className="mt-0.5 text-sm text-emerald-800/80">Um cantinho que cresce com você.</p>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5">
+        {/* O saldo era um <div> mudo. Virou botão: é o lugar óbvio onde a
+            paciente vai tocar querendo saber como se ganha (e agora, como se
+            compra) Sementinhas. */}
+        <button
+          onClick={() => setLojaSementinhas(true)}
+          aria-label="Ver como ganhar e comprar Sementinhas"
+          className="press flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5"
+        >
           <span className="text-lg">🌱</span>
           <span className="tabular-nums font-extrabold text-emerald-600">{saldo}</span>
-        </div>
+          <span aria-hidden className="text-[10px] font-bold text-emerald-500">
+            +
+          </span>
+        </button>
       </div>
 
       {/* A VITRINE SAIU.
@@ -15678,6 +15690,12 @@ function CantinhoTab({
         onFechar={() => setOferta(null)}
         motivo="item"
         itemNome={oferta ?? undefined}
+      />
+
+      <LojaSementinhas
+        aberto={lojaSementinhas}
+        onFechar={() => setLojaSementinhas(false)}
+        saldo={saldo}
       />
     </div>
   );

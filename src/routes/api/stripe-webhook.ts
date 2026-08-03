@@ -43,6 +43,9 @@ export const Route = createFileRoute("/api/stripe-webhook")({
           if (type === "checkout.session.completed") {
             const session = event.data?.object ?? {};
             if (session.subscription) await applySubscription(String(session.subscription));
+            /* Cobrança única: hoje só pacote de Sementinhas. Vem sem
+               `subscription`, então não passa por `applySubscription`. */
+            if (session.metadata?.product === "sementinhas") await creditarSementinhas(session);
           } else if (
             type === "customer.subscription.created" ||
             type === "customer.subscription.updated" ||
@@ -141,6 +144,66 @@ async function recordPaymentIncident(
 }
 
 /** Lê a assinatura autoritativa no Stripe e sincroniza acesso + tabela. */
+/**
+ * Credita um pacote de Sementinhas comprado.
+ *
+ * ─── Por que a idempotência importa MAIS aqui do que na assinatura ──────
+ *
+ * O resto deste arquivo é idempotente por ESTADO: `upsert` com chave natural,
+ * `UPDATE ... WHERE ainda_nao_premiado`. Reprocessar um evento reescreve o
+ * mesmo estado e não faz mal. Saldo não funciona assim — é acumulativo, e
+ * processar duas vezes credita duas vezes.
+ *
+ * E este webhook PROVADAMENTE roda o mesmo pagamento duas vezes: o comentário
+ * de `applySubscription` explica que `checkout.session.completed` e
+ * `customer.subscription.created` chegam quase juntos no primeiro pagamento.
+ * Não há tabela de eventos processados em lugar nenhum do projeto.
+ *
+ * A proteção vem de graça do ledger: `UNIQUE (user_id, dedupe_key)`, e
+ * `grantSementinhas` usa `upsert(..., { ignoreDuplicates: true })`. Com a
+ * `dedupeKey` amarrada ao id da SESSÃO do Stripe, o segundo processamento é um
+ * no-op — não importa quantas vezes o Stripe reenvie.
+ *
+ * A quantidade vem do CATÁLOGO DO SERVIDOR pelo `sku`, nunca do metadata: um
+ * campo de metadata é texto que viajou pela internet, e creditar por ele seria
+ * confiar no que voltou em vez do que foi vendido.
+ */
+async function creditarSementinhas(session: {
+  id?: string;
+  payment_status?: string;
+  metadata?: { user_id?: string; sku?: string };
+}): Promise<void> {
+  const sessionId = session.id;
+  const userId = session.metadata?.user_id;
+  const sku = session.metadata?.sku;
+  if (!sessionId || !userId || !sku) {
+    console.error("[sementinhas] sessão sem id/user/sku — nada creditado", { sessionId, sku });
+    return;
+  }
+  /* `paid` é o único estado que credita. Boleto e PIX pelo Stripe podem
+     completar a sessão AINDA sem pagamento confirmado; creditar ali seria dar
+     a moeda antes de receber o dinheiro. */
+  if (session.payment_status && session.payment_status !== "paid") return;
+
+  const { PACOTE_POR_ID } = await import("@/lib/pacotes-sementinhas");
+  const pacote = PACOTE_POR_ID[sku];
+  if (!pacote) {
+    console.error("[sementinhas] sku fora do catálogo — nada creditado:", sku);
+    return;
+  }
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { typedDb } = await import("@/integrations/supabase/types.extended");
+  const { grantSementinhas } = await import("@/lib/sementinhas.functions");
+  await grantSementinhas(typedDb(supabaseAdmin), userId, [
+    {
+      amount: pacote.quantidade,
+      reason: `Pacote de ${pacote.quantidade.toLocaleString("pt-BR")} Sementinhas 🌱`,
+      dedupeKey: `compra:${sessionId}`,
+    },
+  ]);
+}
+
 async function applySubscription(subscriptionId: string): Promise<void> {
   const { getSubscription, statusGrantsAccess } = await import("@/lib/stripe.server");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

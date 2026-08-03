@@ -15,6 +15,15 @@ import { computeGestation } from "@/lib/gestacao";
  * - Sem streak punitivo, sem aleatoriedade, sem FOMO.
  * - O ganho é concedido SÓ no servidor; o cliente jamais escreve no ledger
  *   (a tabela é server-only), pra ninguém "imprimir" moeda.
+ *
+ * Desde ago/2026 existe uma SEGUNDA porta de entrada: os pacotes pagos
+ * (`pacotes-sementinhas.ts`, creditados pelo webhook do Stripe). Isso não
+ * revoga nada acima — o ganho por jogar continua inteiro e o pacote é atalho,
+ * nunca condição. O limite que sustenta as duas portas convivendo é um só, e
+ * ele é inegociável: **a Sementinha compra enfeite, nunca cuidado**. Nenhuma
+ * aula, exame, alerta ou conduta clínica pode passar a depender dela. No dia
+ * em que isso acontecer, o app terá começado a cobrar por saúde — que é outro
+ * negócio, e não este.
  */
 
 /** Valores de ganho — transparentes e calibráveis sem migração. */

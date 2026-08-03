@@ -127,6 +127,56 @@ export async function createCheckoutSession(opts: {
 }
 
 /**
+ * Checkout de COBRANÇA ÚNICA (`mode: "payment"`) — hoje só os pacotes de
+ * Sementinhas.
+ *
+ * Usa `price_data` inline em vez de um Price cadastrado: o preço do pacote
+ * mora em `pacotes-sementinhas.ts`, e ter também um `STRIPE_PRICE_SEM_*` por
+ * pacote criaria uma segunda fonte de verdade que diverge no dia em que
+ * alguém mudar um e esquecer o outro. O encoder de `stripeFetch` é recursivo,
+ * então o objeto aninhado vai como form-encoded sem trabalho extra.
+ *
+ * `metadata` carrega o que o webhook precisa para creditar: quem, qual pacote,
+ * e QUANTAS Sementinhas. O valor creditado é revalidado no servidor contra o
+ * catálogo — o metadata é pista, não autoridade.
+ */
+export async function createOneTimeCheckout(opts: {
+  userId: string;
+  email?: string | null;
+  customerId?: string | null;
+  /** Identificador do pacote no catálogo do app. */
+  sku: string;
+  /** Rótulo mostrado no checkout do Stripe. */
+  nome: string;
+  centavos: number;
+  successUrl: string;
+  cancelUrl: string;
+}): Promise<{ url: string | null }> {
+  const params: Record<string, unknown> = {
+    mode: "payment",
+    "line_items[0][price_data][currency]": "brl",
+    "line_items[0][price_data][unit_amount]": opts.centavos,
+    "line_items[0][price_data][product_data][name]": opts.nome,
+    "line_items[0][quantity]": 1,
+    success_url: opts.successUrl,
+    cancel_url: opts.cancelUrl,
+    client_reference_id: opts.userId,
+    "metadata[user_id]": opts.userId,
+    "metadata[product]": "sementinhas",
+    "metadata[sku]": opts.sku,
+    /* Consumível não aceita cupom: o pacote já é a promoção, e cupom sobre
+       moeda virtual é o caminho mais curto para arbitragem. */
+    "payment_intent_data[metadata][user_id]": opts.userId,
+    "payment_intent_data[metadata][product]": "sementinhas",
+    "payment_intent_data[metadata][sku]": opts.sku,
+  };
+  if (opts.customerId) params.customer = opts.customerId;
+  else if (opts.email) params.customer_email = opts.email;
+  const session = await stripeFetch<{ url?: string }>("/checkout/sessions", "POST", params);
+  return { url: session.url ?? null };
+}
+
+/**
  * Garante que o cupom de porcentagem existe no Stripe (idempotente por id).
  * Usado no "+15% convite de paciente" — criado uma vez, reutilizado sempre.
  */
