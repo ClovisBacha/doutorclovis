@@ -388,10 +388,15 @@ export function SkyAmbience({ slot, careMode }: SkyAmbienceProps) {
               animationDelay: `${v.delay}s`,
               background:
                 "radial-gradient(circle, #fff6c2 0%, #fbe08a 55%, rgba(251,224,138,0) 100%)",
-              // Halo forte: a arte das 21–24h não é noite fechada, é um
-              // crepúsculo lavanda com nuvens acesas. O lampejo precisa
-              // vencer um fundo claro nas calhas.
-              boxShadow: "0 0 14px 5px rgba(253,224,120,0.75)",
+              // Halo médio. Era 14px/5px/0.75 de quando as 21–24h mostravam
+              // um crepúsculo lavanda: o lampejo tinha de vencer nuvens
+              // acesas nas calhas. Desde que o slot passou a usar a arte de
+              // madrugada esse fundo não existe mais — a luminância média
+              // caiu de 69 para 15, e as calhas claras (p90) de 132 para 30.
+              // Naquele tamanho o vaga-lume virava poste: um borrão amarelo
+              // que apagava as estrelas à volta. Menor que isto ele se perde
+              // entre elas e deixa de parecer bicho.
+              boxShadow: "0 0 9px 2px rgba(253,224,120,0.55)",
             }}
           />
         ))}
