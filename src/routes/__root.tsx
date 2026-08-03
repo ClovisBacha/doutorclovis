@@ -344,7 +344,7 @@ function SiteShell() {
       </a>
       <CanonicalLink />
       {!semChromePublico && (
-        <div className="print:hidden">
+        <div className="chrome-publico print:hidden">
           <ScrollProgress />
           <SiteHeader />
         </div>
@@ -353,11 +353,11 @@ function SiteShell() {
         <Outlet />
       </main>
       {!semChromePublico && (
-        <div className="print:hidden">
+        <div className="chrome-publico print:hidden">
           <SiteFooter />
         </div>
       )}
-      <div className="print:hidden">
+      <div className="chrome-publico print:hidden">
         <ChatbotWidget />
       </div>
       <div className="print:hidden">
@@ -369,7 +369,7 @@ function SiteShell() {
             instalação: inclicável desde sempre. O contato de cada médico vive
             no perfil dele. */}
       </div>
-      <div className="print:hidden">
+      <div className="chrome-publico print:hidden">
         <PublicBottomNav />
       </div>
       <Toaster position="bottom-right" richColors mobileOffset={{ bottom: 96 }} />

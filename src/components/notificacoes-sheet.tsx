@@ -32,7 +32,7 @@ export function NotificacoesSheet({
         aria-label="Notificações"
         onClick={(e) => e.stopPropagation()}
         className="tab-enter max-h-[82vh] w-full overflow-hidden rounded-t-3xl border border-white/70 bg-card/97 shadow-[var(--shadow-float)] backdrop-blur-xl sm:max-w-md sm:rounded-3xl"
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        style={{ paddingBottom: "var(--safe-bottom)" }}
       >
         <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
           <Bell className="h-5 w-5 shrink-0 text-primary" strokeWidth={1.9} />

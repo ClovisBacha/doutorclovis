@@ -2,23 +2,40 @@
  * A ponte para o app nativo.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * POR QUE NÃO IMPORTA `@capacitor/haptics`
+ * A CORREÇÃO QUE ESTE ARQUIVO CARREGA — leia antes de mexer
  *
- * O Capacitor injeta um objeto global na página — `window.Capacitor` — com os
- * plugins já prontos. Falar com ele por esse global, em vez de importar o
- * pacote, tem três consequências que valem a feiura de um `any` controlado:
+ * A primeira versão desta ponte falava com `window.Capacitor.Plugins.X` em vez
+ * de importar os pacotes. A ideia era boa e o resultado era **nada**:
  *
- *  · Este arquivo COMPILA E RODA hoje, sem o Capacitor instalado. A instalação
- *    ficou travada pela rede do contêiner, e sem isso a ponte não poderia nem
- *    ser escrita.
- *  · O bundle da web não engorda um byte. Quem abre pelo navegador não baixa
- *    código nativo que nunca vai usar.
- *  · A casca carrega o site PUBLICADO (ver `capacitor.config.ts`), então o
- *    mesmo JavaScript roda nos dois lugares. Ele precisa descobrir onde está em
- *    tempo de execução — não em tempo de build.
+ *   `Capacitor.Plugins` NÃO é preenchido pela ponte nativa injetada.
+ *
+ * Quem escreve `Plugins[nome]` é o `registerPlugin` do `@capacitor/core`, que
+ * roda quando a PÁGINA importa o pacote do plugin. A ponte injetada só publica
+ * `Capacitor.PluginHeaders` (a lista do que existe do lado nativo) e um
+ * `nativeCallback`. Está no próprio `native-bridge.js`: quando ele precisa do
+ * plugin App, ele testa `if (!cap.Plugins?.App)` e avisa `"App plugin not
+ * installed"` — ou seja, ele mesmo conta com a possibilidade de não estar lá.
+ *
+ * Consequência: sem importar, `Plugins.Haptics` era `undefined`, o `?.` engolia
+ * a chamada, nada dava erro e **a paciente de iPhone continuava não sentindo
+ * nada** — exatamente o defeito que a ponte existia para consertar.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * O PROBLEMA QUE ISTO RESOLVE DE VERDADE
+ * POR QUE `import()` DINÂMICO, E NÃO IMPORT NORMAL
+ *
+ * Os pacotes precisam ser importados; o site inteiro não precisa carregá-los. O
+ * `import()` dentro de `carregar()` faz o Vite separar tudo num pedaço próprio,
+ * que só é buscado quando `ehNativo()` é verdade. Quem abre pelo navegador não
+ * baixa um byte de código nativo — que era o único ganho real do desenho
+ * anterior, e ele fica.
+ *
+ * A casca carrega o site PUBLICADO (ver `capacitor.config.ts`), então o mesmo
+ * JavaScript roda nos dois lugares e precisa descobrir onde está em tempo de
+ * execução. `ehNativo()` e `plataforma()` continuam lendo o global, porque
+ * esses dois a ponte injetada de fato publica.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * O PROBLEMA DE VIBRAÇÃO QUE ISTO RESOLVE
  *
  * `navigator.vibrate` recebe um padrão inteiro: `[liga, desliga, liga, …]`. O
  * Haptics do iOS NÃO TEM padrão — tem impactos individuais, disparados um a um,
@@ -31,23 +48,15 @@
  * ele existe e é mais preciso que uma sequência de timers.
  */
 
-/** O que o Capacitor injeta na página. Só o que este arquivo usa. */
+import type { HapticsPlugin } from "@capacitor/haptics";
+import type { SplashScreenPlugin } from "@capacitor/splash-screen";
+import type { StatusBarPlugin } from "@capacitor/status-bar";
+import type { AppPlugin } from "@capacitor/app";
+
+/** O que a ponte injetada publica de fato — sem `Plugins`, ver o cabeçalho. */
 type PonteCapacitor = {
   isNativePlatform?: () => boolean;
   getPlatform?: () => string;
-  Plugins?: {
-    Haptics?: {
-      impact?: (o: { style: "LIGHT" | "MEDIUM" | "HEAVY" }) => Promise<void>;
-      vibrate?: (o: { duration: number }) => Promise<void>;
-    };
-    StatusBar?: {
-      setStyle?: (o: { style: "DARK" | "LIGHT" }) => Promise<void>;
-      setOverlaysWebView?: (o: { overlay: boolean }) => Promise<void>;
-    };
-    SplashScreen?: {
-      hide?: (o?: { fadeOutDuration?: number }) => Promise<void>;
-    };
-  };
 };
 
 function ponte(): PonteCapacitor | null {
@@ -72,6 +81,73 @@ export function plataforma(): string {
   return ponte()?.getPlatform?.() ?? "web";
 }
 
+/* ── Os plugins, carregados uma vez ──────────────────────────────────────── */
+
+type Plugins = {
+  Haptics?: HapticsPlugin;
+  SplashScreen?: SplashScreenPlugin;
+  StatusBar?: StatusBarPlugin;
+  App?: AppPlugin;
+};
+
+/**
+ * O cache SÍNCRONO, para `tocarPadrao` não virar `async`.
+ *
+ * A vibração é chamada de dentro do compasso da respiração: transformá-la em
+ * promessa colocaria um `await` entre o quadro e o pulso, e o crescendo depende
+ * de o pulso cair na hora. Então quem carrega é o boot (`prepararNativo`), e
+ * quem toca lê o que já está aqui. Se ainda não chegou, o Android cai no
+ * `navigator.vibrate` e o iPhone fica sem — que é o comportamento de hoje, não
+ * uma regressão.
+ */
+let carregados: Plugins = {};
+let carga: Promise<Plugins> | null = null;
+
+function carregar(): Promise<Plugins> {
+  if (!ehNativo()) return Promise.resolve({});
+  carga ??= (async () => {
+    /* Um `catch` por pacote: um plugin que falte não pode derrubar os outros.
+       `Promise.all` com `.catch(() => null)` em cada ramo faz isso. */
+    const [h, s, b, a] = await Promise.all([
+      import("@capacitor/haptics").catch(() => null),
+      import("@capacitor/splash-screen").catch(() => null),
+      import("@capacitor/status-bar").catch(() => null),
+      import("@capacitor/app").catch(() => null),
+    ]);
+    carregados = {
+      Haptics: h?.Haptics,
+      SplashScreen: s?.SplashScreen,
+      StatusBar: b?.StatusBar,
+      App: a?.App,
+    };
+    return carregados;
+  })();
+  return carga;
+}
+
+/**
+ * O boot do lado nativo. Chamado uma vez, em `src/router.tsx`.
+ *
+ * Faz três coisas nesta ordem: carrega os plugins, tira a tela de abertura e
+ * deixa a barra de status combinando com o topo da tela.
+ *
+ * No navegador é no-op silencioso e nem busca o pedaço de código nativo.
+ */
+export function prepararNativo(): void {
+  if (!ehNativo()) return;
+  /* SÍNCRONO, antes de qualquer `await`: esta classe é o que esconde o
+     cabeçalho e o rodapé do SITE dentro do app (ver `.nativo` em `styles.css`).
+     Feito num `useEffect`, o menu do site apareceria por um quadro na tela de
+     login — que é justamente a primeira coisa que o revisor da Apple vê, e a
+     primeira coisa que denuncia "isto é um site embrulhado".
+     Como `prepararNativo` roda no escopo do módulo do `router.tsx`, isto
+     acontece antes de o React hidratar: nenhum quadro com o menu errado. */
+  document.documentElement.classList.add("nativo");
+  void carregar().then(() => {
+    esconderSplash();
+  });
+}
+
 /**
  * Antecipa a saída da tela de abertura, assim que a página remota respondeu.
  *
@@ -84,14 +160,9 @@ export function plataforma(): string {
  * o lado nativo esconde sozinho, sem depender da página. Um app congelado na
  * marca é pior que um app mostrando erro — a paciente não sabe sequer que houve
  * erro —, e é exatamente isso que acontece quando quem esconde é só o
- * JavaScript e o JavaScript não roda.
- *
- * O plugin é procurado **na hora de esconder**, não agora: a página remota não
- * empacota `@capacitor/splash-screen` (ver o cabeçalho deste arquivo), então
- * quem publica `Capacitor.Plugins.SplashScreen` é a ponte injetada — e ela pode
- * chegar depois deste módulo.
- *
- * No navegador é no-op silencioso — não há splash nenhuma.
+ * JavaScript e o JavaScript não roda. Aqui isso deixou de ser hipótese: o
+ * pedaço de código dos plugins vem pela REDE, da mesma origem que pode estar
+ * fora do ar.
  */
 export function esconderSplash(): void {
   if (!ehNativo() || typeof window === "undefined") return;
@@ -100,9 +171,7 @@ export function esconderSplash(): void {
     if (feito) return;
     feito = true;
     try {
-      void ponte()
-        ?.Plugins?.SplashScreen?.hide?.({ fadeOutDuration: 220 })
-        ?.catch(() => {});
+      void carregados.SplashScreen?.hide({ fadeOutDuration: 220 })?.catch(() => {});
     } catch {
       /* melhor esforço — o auto-hide nativo continua valendo */
     }
@@ -110,6 +179,49 @@ export function esconderSplash(): void {
   if (typeof document === "undefined" || document.readyState === "complete") return some();
   window.addEventListener("load", some, { once: true });
 }
+
+/* ── Barra de status ─────────────────────────────────────────────────────── */
+
+/** O último estado pedido, para não conversar com o nativo a cada quadro. */
+let barraEscura: boolean | null = null;
+
+/**
+ * Deixa o relógio e os ícones do sistema legíveis sobre o topo da tela.
+ *
+ * O topo do app da paciente é o CÉU, e o céu muda com a hora: azul claro ao
+ * meio-dia, quase preto de madrugada. Uma cor fixa de barra de status acerta
+ * metade do dia e some na outra metade — de madrugada, ícones escuros somem no
+ * céu escuro; ao meio-dia, ícones claros somem no azul claro. Por isso quem
+ * manda aqui é `isDark` de `useWeatherSky`, a MESMA variável que o hero já usa
+ * para decidir a cor do próprio texto. Um sinal só, dois consumidores.
+ *
+ * Cuidado com o nome do estilo, que é invertido em relação à intuição: no
+ * Capacitor, `"DARK"` quer dizer **texto claro** (para fundo escuro) e
+ * `"LIGHT"` quer dizer **texto escuro**. Por isso o parâmetro aqui é o FUNDO,
+ * não o texto — errar isso deixa a barra ilegível, e é um erro que passa
+ * despercebido em quem revisa o código sem rodar.
+ */
+export function estiloDaBarra(fundoEscuro: boolean): "DARK" | "LIGHT" {
+  return fundoEscuro ? "DARK" : "LIGHT";
+}
+
+export function barraDeStatus(fundoEscuro: boolean): void {
+  if (!ehNativo() || barraEscura === fundoEscuro) return;
+  barraEscura = fundoEscuro;
+  void carregar().then(({ StatusBar }) => {
+    if (!StatusBar) return;
+    /* `Style` vem do pacote como enum; os valores são estas strings. Passar a
+       string evita carregar o enum só para isso. */
+    void StatusBar.setStyle({ style: estiloDaBarra(fundoEscuro) as never }).catch(() => {});
+    /* A página desenha SOB a barra — é o que apaga a faixa clara do topo. No
+       iOS quem garante isso é `contentInset: "never"`; no Android 15+ o sistema
+       já força a borda-a-borda e esta chamada não existe mais, então o `catch`
+       é o caminho normal, não exceção. */
+    void StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+  });
+}
+
+/* ── Vibração ────────────────────────────────────────────────────────────── */
 
 /**
  * A intensidade de um pulso, a partir da duração que o padrão pediu.
@@ -174,20 +286,16 @@ export function tocarPadrao(padrao: number[]): void {
   if (!padrao.length) return;
   cancelar();
 
-  const p = ponte();
-  const haptics = p?.Plugins?.Haptics;
+  const haptics = carregados.Haptics;
 
   /* iOS: impacto por impacto. O Android também tem Haptics no Capacitor, mas
      ali o `navigator.vibrate` continua sendo melhor — ele recebe o padrão
      inteiro e o sistema cuida do compasso, sem depender do event loop. */
-  if (ehNativo() && plataforma() === "ios" && haptics?.impact) {
+  if (ehNativo() && plataforma() === "ios" && haptics) {
     for (const { em, forca } of agendaDeImpactos(padrao)) {
       pendentes.push(
         window.setTimeout(
-          () =>
-            void haptics
-              .impact?.({ style: forca as "LIGHT" | "MEDIUM" | "HEAVY" })
-              ?.catch(() => {}),
+          () => void haptics.impact({ style: forca as never })?.catch(() => {}),
           em,
         ),
       );

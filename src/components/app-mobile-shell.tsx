@@ -36,6 +36,7 @@ import skyAmanhecer from "@/assets/sky/amanhecer.webp";
 import skyAnoitecer from "@/assets/sky/anoitecer.webp";
 import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
+import { barraDeStatus } from "@/lib/nativo";
 import { getApproxLocation } from "@/lib/local.functions";
 
 /* ================================================================
@@ -1023,10 +1024,18 @@ export function AppHomeScreen({
     const grad = gradientFor(period, weather?.code ?? 1);
     const primeira = grad.match(/(#[0-9a-f]{3,8}|rgba?\([^)]+\)|oklch\([^)]+\)|hsla?\([^)]+\))/i);
     if (primeira) raiz.style.backgroundColor = primeira[0];
+    /* No app nativo, o relógio e a bateria do SISTEMA ficam sobre este mesmo
+       céu — e o céu muda com a hora. Ícones escuros somem no céu de madrugada;
+       ícones claros somem no azul do meio-dia. Então quem decide a barra é a
+       MESMA variável que decide a cor do texto do hero, e não uma cor fixa.
+       Ao sair da home a barra volta ao padrão: as outras telas têm fundo claro
+       de propósito. */
+    barraDeStatus(darkSky);
     return () => {
       raiz.style.backgroundColor = antes;
+      barraDeStatus(false);
     };
-  }, [period, weather?.code]);
+  }, [period, weather?.code, darkSky]);
 
   return (
     /* Sem `pb` aqui: a página que renderiza esta tela (minha-conta) já reserva

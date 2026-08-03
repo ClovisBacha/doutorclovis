@@ -56,7 +56,19 @@ const config: CapacitorConfig = {
   webDir: "native/shell",
 
   server: {
-    url: "https://www.obstetrica.com.br/minha-conta",
+    /* `/auth`, e não `/minha-conta`, por causa do médico.
+
+       Uma URL fixa serve enquanto existe um tipo de usuário só, e aqui existem
+       três: dona da plataforma, médico e paciente. Apontando para
+       `/minha-conta`, o médico abria o app e caía na ÁREA DA PACIENTE, com um
+       botão "Painel do médico" para se corrigir sozinho — toda vez.
+
+       `/auth` já resolve isso sem código novo: com sessão viva ele despacha
+       dono → `/admin`, médico → `/painel`, paciente → `/minha-conta`; sem
+       sessão, mostra o login, que é exatamente onde `/minha-conta` também
+       terminava. É a mesma árvore de decisão do site, e ela é a única — escrever
+       uma segunda só para a casca seria criar duas verdades sobre quem é quem. */
+    url: "https://www.obstetrica.com.br/auth",
     /* Só HTTPS. `cleartext: true` abriria o app para conteúdo sem criptografia,
        e isto carrega dado de saúde de gestante. */
     cleartext: false,

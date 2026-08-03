@@ -2242,7 +2242,7 @@ export function GestacaoPath({
           </div>
           <div
             className="flex gap-2 overflow-x-auto pb-1 pt-2"
-            style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+            style={{ paddingBottom: "max(0.5rem, var(--safe-bottom))" }}
           >
             {trayItems.map((id) => {
               const item = CANTINHO_BY_ID[id];
@@ -6504,7 +6504,7 @@ function WellnessScreen({
         <button
           onClick={() => setOpenKey(null)}
           aria-label="Voltar às atividades"
-          className="press fixed right-4 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-lg text-slate-600 backdrop-blur-xl"
+          className="press fixed right-4 top-[calc(0.75rem+var(--safe-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-lg text-slate-600 backdrop-blur-xl"
           style={{
             boxShadow:
               "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.5), 0 8px 20px -8px rgba(80,50,40,0.45)",
@@ -6518,7 +6518,7 @@ function WellnessScreen({
           navegação do app fica ATRÁS dela (z-40). A folga de 96px que havia
           aqui era para uma barra que nunca aparece — e era ela que empurrava
           o cartão de recompensa para fora da primeira tela. */}
-      <div className="relative mx-auto max-w-md px-8 pb-8 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+      <div className="relative mx-auto max-w-md px-8 pb-8 pt-[calc(0.75rem+var(--safe-top))]">
         {openKey === "aula" ? (
           <div>
             <p className="mb-3 text-center text-sm font-bold text-foreground/60">

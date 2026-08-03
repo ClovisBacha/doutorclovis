@@ -984,17 +984,59 @@ button:active > .duo3d {
   }
 }
 
-/* ── Safe areas do iPhone (notch/Dynamic Island) ─────────────────────────────
-   Com viewport-fit=cover (PWA standalone), a página desenha SOB a barra de
-   status. Elementos fixos/sticky no topo compensam com --safe-top. */
+/* ── Safe areas do aparelho (notch, Dynamic Island, barra de gestos) ─────────
+   Com viewport-fit=cover (PWA standalone ou casca nativa), a página desenha SOB
+   a barra de status. Elementos fixos/sticky no topo compensam com --safe-top.
+
+   POR QUE SÃO DUAS FONTES, E NÃO SÓ `env()`
+
+   `env(safe-area-inset-*)` é a API da web, e no iPhone ela funciona — tanto no
+   Safari quanto dentro do `WKWebView` do app. **No Android ela vale zero.** O
+   WebView do Android nunca expôs os insets do sistema por `env()`; quem os
+   conhece é a Activity, do lado nativo.
+
+   O Capacitor resolve isso medindo os insets de verdade e escrevendo
+   `--safe-area-inset-top/right/bottom/left` como estilo inline no `<html>`
+   (`SystemBars.insetsHandling: "css"`, ligado por padrão — ver
+   `capacitor.config.ts`). São outros nomes, de propósito: `env()` é reservado à
+   plataforma e não dá para um plugin preenchê-lo.
+
+   Daí o `max()` das duas: no iPhone ganha o `env()`, no Android ganha a
+   variável injetada, e no navegador comum sobra `0px` nos dois lados. Uma conta
+   só, e nenhuma tela precisa saber onde está rodando.
+
+   Sem isto, todo `pt-[calc(… + var(--safe-top))]` do app virava zero no Android:
+   o relógio do sistema deitava em cima do conteúdo em cima, e o botão de baixo
+   subia por dentro da barra de gestos. */
 :root {
-  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
   /* O par de baixo. Existir como VARIÁVEL e não como `env()` solto em cada
-     lugar tem duas razões: a conta do rodapé aparece em quatro pontos e
-     precisa bater entre eles, e um teste automatizado consegue redefinir a
+     lugar tem três razões: a conta do rodapé aparece em quatro pontos e
+     precisa bater entre eles, um teste automatizado consegue redefinir a
      variável para medir o layout com a geometria real de um iPhone — coisa que
-     `env()` não permite, porque no navegador de teste ele vale zero. */
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+     `env()` não permite, porque no navegador de teste ele vale zero —, e é
+     aqui, num lugar só, que as duas fontes de inset se juntam. */
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+  --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+}
+
+/* ── Dentro da casca nativa, o SITE não aparece ──────────────────────────────
+   A classe `.nativo` é posta no `<html>` por `prepararNativo()`, no escopo do
+   módulo do router — antes de o React hidratar, para não haver um quadro com o
+   cabeçalho errado.
+
+   O que ela esconde é o cabeçalho, o rodapé e os botões flutuantes do SITE.
+   Dentro do app eles são estranhos de três jeitos ao mesmo tempo: oferecem um
+   menu para páginas que a casca nem navega (`allowNavigation` só libera o
+   próprio domínio), empilham uma segunda marca sobre a do app, e são o sinal
+   mais óbvio de "site embrulhado" — a diretriz 4.2 da Apple, que é o risco de
+   reprovação que este projeto já assumiu por carregar a URL publicada.
+
+   As telas do app (`/minha-conta`, `/painel`) já escondiam isso por conta
+   própria; o que sobrava era a de LOGIN, que é a primeira que o app abre. */
+.nativo .chrome-publico {
+  display: none;
 }
 
 /* ── Segundo Cérebro: visual tecnológico do card de score ─────────────── */

@@ -46,7 +46,7 @@ function PreviewHome() {
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
       {/* Repete a folga de rodapé que a página real aplica (a barra
           flutuante fica por cima), para a bancada medir o mesmo espaço. */}
-      <div className="mx-auto max-w-md px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-2">
+      <div className="mx-auto max-w-md px-5 pb-[calc(7rem+var(--safe-bottom))] pt-2">
         <AppHomeScreen
           firstName="Clovis"
           babyName="Clovis"

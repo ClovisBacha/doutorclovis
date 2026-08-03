@@ -25,7 +25,7 @@ export function PublicBottomNav() {
   return (
     <div
       className="print:hidden fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pt-2 md:hidden"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
+      style={{ paddingBottom: "calc(var(--safe-bottom) + 0.75rem)" }}
     >
       <Link
         to={to}

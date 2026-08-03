@@ -152,7 +152,7 @@ export function MenuDaConta({
         /* `max-h` + rolagem: com oito linhas o cartão passa da tela num
            iPhone SE, e um menu que vaza pela borda esconde justamente o
            último item — que aqui é "Sair". */
-        className="mt-[calc(3.5rem+env(safe-area-inset-top))] max-h-[calc(100dvh-8rem)] w-[86%] max-w-sm overflow-y-auto rounded-3xl border border-white/70 bg-card/95 p-2 shadow-[var(--shadow-float)] backdrop-blur-xl"
+        className="mt-[calc(3.5rem+var(--safe-top))] max-h-[calc(100dvh-8rem)] w-[86%] max-w-sm overflow-y-auto rounded-3xl border border-white/70 bg-card/95 p-2 shadow-[var(--shadow-float)] backdrop-blur-xl"
       >
         <div className="flex items-center gap-3 px-4 pb-2 pt-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/12 ring-1 ring-primary/20">

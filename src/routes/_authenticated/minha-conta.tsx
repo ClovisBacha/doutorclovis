@@ -1429,7 +1429,7 @@ function MinhaContaPage() {
 
       {/* pb: folga p/ a barra flutuante + área segura do iPhone não cobrirem o fim */}
       <PullToRefresh onRefresh={refreshAll}>
-        <section className="mx-auto max-w-5xl px-5 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))] md:py-12">
+        <section className="mx-auto max-w-5xl px-5 pt-[calc(1.5rem+var(--safe-top))] pb-[calc(7rem+var(--safe-bottom))] md:py-12">
           {/* ── Desktop header ───────────────────────────────────── */}
           <div className="hidden md:flex flex-wrap items-end justify-between gap-3 mb-2">
             <div>

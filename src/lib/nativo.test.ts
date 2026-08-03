@@ -129,30 +129,83 @@ describe("a tela de abertura sempre tem saída", () => {
     expect(() => esconderSplash()).not.toThrow();
   });
 
-  test("o plugin é procurado na hora de esconder, não no carregamento", () => {
-    /* A página remota não empacota `@capacitor/splash-screen`: quem publica o
-       plugin é a ponte injetada, e ela pode chegar depois deste módulo. Guardar
-       a referência agora seria guardar `undefined` para sempre. */
-    expect(fonte).toMatch(/ponte\(\)\s*\?\.Plugins\?\.SplashScreen\?\.hide/);
-    /* E não guardada numa variável antes do agendamento. */
-    expect(fonte).not.toMatch(/const\s+splash\s*=/);
-  });
-
   test("esconder duas vezes não é esconder duas vezes", () => {
     expect(fonte).toContain("if (feito) return;");
   });
 });
 
-describe("a splash sai antes de qualquer componente montar", () => {
+/**
+ * ESTE É O TESTE MAIS IMPORTANTE DO ARQUIVO.
+ *
+ * A primeira versão da ponte falava com `window.Capacitor.Plugins.X`. Parecia
+ * elegante — sem importar nada, sem engordar o bundle da web — e não fazia
+ * absolutamente nada: `Capacitor.Plugins` só é preenchido pelo `registerPlugin`
+ * do `@capacitor/core`, que roda quando a PÁGINA importa o pacote. A ponte
+ * injetada publica `PluginHeaders` e `nativeCallback`, não os plugins. O
+ * próprio `native-bridge.js` avisa `"App plugin not installed"` quando precisa
+ * de um.
+ *
+ * O defeito não deixava rastro: `?.` engolia a chamada, nada dava erro, e a
+ * paciente de iPhone continuava sem sentir a respiração guiada — que era a
+ * única razão de a ponte existir.
+ */
+describe("os plugins vêm de import de verdade, não do global", () => {
+  const fonte = readFileSync("src/lib/nativo.ts", "utf8");
+  /* Sem comentários: o cabeçalho deste arquivo EXPLICA o defeito e cita
+     `Capacitor.Plugins` várias vezes. O que se cobra é o código. */
+  const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+
+  test("nada neste arquivo lê `Capacitor.Plugins`", () => {
+    expect(codigo).not.toContain(".Plugins");
+  });
+
+  test("cada plugin usado é importado do seu pacote", () => {
+    for (const pkg of ["haptics", "splash-screen", "status-bar"]) {
+      expect(fonte).toContain(`import("@capacitor/${pkg}")`);
+    }
+  });
+
+  test("o import é dinâmico — o navegador não baixa código nativo", () => {
+    /* Import estático colocaria os quatro pacotes no bundle de todo visitante
+       do site. Dinâmico, o Vite separa num pedaço que só a casca busca. */
+    expect(fonte).not.toMatch(/^import \{[^}]*\} from "@capacitor\//m);
+  });
+
+  test("uma falha de rede num pacote não derruba os outros", () => {
+    expect(fonte.match(/\.catch\(\(\) => null\)/g)?.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("a barra de status e a inversão que engana quem revisa", () => {
+  test('fundo escuro pede estilo "DARK" — que no Capacitor quer dizer TEXTO CLARO', async () => {
+    /* Se alguém "corrigir" isto para o que parece intuitivo, o relógio do
+       sistema fica preto sobre o céu de madrugada e some. É invisível na
+       revisão de código e só aparece no aparelho, à noite. */
+    const { estiloDaBarra } = await import("./nativo");
+    expect(estiloDaBarra(true)).toBe("DARK");
+    expect(estiloDaBarra(false)).toBe("LIGHT");
+  });
+});
+
+describe("o boot nativo acontece antes de qualquer componente montar", () => {
   const router = readFileSync("src/router.tsx", "utf8");
 
   test("a chamada mora no começo do cliente, não num useEffect", () => {
     /* Num `useEffect` do `__root.tsx`, um erro de hidratação deixaria a marca
-       na tela até o teto nativo estourar. */
-    const chamada = router.indexOf("\nesconderSplash();");
+       na tela até o teto nativo estourar — e o menu do SITE apareceria por um
+       quadro dentro do app. */
+    const chamada = router.indexOf("\nprepararNativo();");
     expect(chamada).toBeGreaterThan(0);
     /* No escopo do módulo — antes da primeira função. Dentro de `getRouter` ela
        só rodaria quando o router fosse montado. */
     expect(chamada).toBeLessThan(router.indexOf("export const getRouter"));
+  });
+
+  test("a classe `.nativo` é posta antes de qualquer await", () => {
+    const fonte = readFileSync("src/lib/nativo.ts", "utf8");
+    const classe = fonte.indexOf('classList.add("nativo")');
+    const carga = fonte.indexOf("void carregar().then");
+    expect(classe).toBeGreaterThan(0);
+    expect(classe).toBeLessThan(carga);
   });
 });

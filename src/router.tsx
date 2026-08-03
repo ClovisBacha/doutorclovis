@@ -1,14 +1,17 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
-import { esconderSplash } from "@/lib/nativo";
+import { prepararNativo } from "@/lib/nativo";
 
-/* A tela de abertura do app nativo sai aqui, e não num `useEffect` do
-   `__root.tsx`, de propósito: este módulo é o começo do lado cliente e roda
-   ANTES de qualquer componente montar. Se a splash dependesse de uma árvore
-   React renderizar, um erro de hidratação a deixaria na tela.
-   No servidor e no navegador é no-op — a função checa se há ponte nativa. */
-esconderSplash();
+/* O boot do lado nativo acontece aqui, e não num `useEffect` do `__root.tsx`,
+   de propósito: este módulo é o começo do lado cliente e roda ANTES de qualquer
+   componente montar. Os plugins vêm por `import()` dinâmico — quanto antes o
+   pedido sair, antes a primeira vibração tem com o que tocar — e a tela de
+   abertura sai assim que eles chegam. Se isso dependesse de uma árvore React
+   renderizar, um erro de hidratação deixaria a marca na tela.
+   No servidor e no navegador é no-op — a função checa se há ponte nativa antes
+   de sequer buscar o pedaço de código nativo. */
+prepararNativo();
 
 export const getRouter = () => {
   const queryClient = new QueryClient();
