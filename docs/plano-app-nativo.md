@@ -246,10 +246,34 @@ para um evento que ela mesma dispara. Há teste cobrando que **não** pedimos.
 Sem isso tudo o app funciona e o envio vira silêncio — de propósito, igual ao
 VAPID.
 
-### Fase 4 — loja
+### Fase 4 — loja (parcial)
 
 Ícones, capturas, textos, política, e a submissão. Conte com **duas ou três
 rodadas** de revisão na primeira vez.
+
+**Feito aqui:**
+
+- ✅ **Ícones e tela de abertura** — eram os de exemplo do Capacitor (um "X"
+  azul). Agora saem da marca, por `scripts/icones-nativos.py`: trocar a arte e
+  rodar de novo. Full-bleed no iOS (a máscara do sistema corta a cor, não o
+  desenho), com folga na área segura no adaptativo do Android.
+- ✅ **Excluir a conta** — não existia, e os Termos prometiam que sim. Reprova
+  sozinho pela 5.1.1(v). Paciente apaga na hora; médico passa por atendimento,
+  porque a conta dele é o vínculo das pacientes e a autoria de prontuário que a
+  lei manda guardar por 20 anos.
+- ✅ **CI que compila os dois apps** — `.github/workflows/app-nativo.yml`, ligado
+  no push. Roda **sem conta de desenvolvedor**: build de simulador não exige
+  assinatura. É a única prova, hoje, de que a casca compila.
+- ✅ **Textos e respostas das lojas** — `docs/loja-textos.md`, pronto para colar.
+
+**Depende de você:**
+
+- Conta Apple Developer e Google Play
+- `google-services.json` do Firebase, chave APNs `.p8`
+- Os SQL pendentes (a exclusão de conta FALHA sem os cascades)
+- Conta de demonstração para o revisor — app atrás de login sem credencial de
+  teste é reprovado sem o revisor abrir a segunda tela
+- Capturas de tela, tiradas de uma conta de demonstração e nunca de dados reais
 
 ---
 
