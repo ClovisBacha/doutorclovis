@@ -219,6 +219,7 @@ import {
   type PreventiveReminder,
 } from "@/lib/saudefeminina.functions";
 import { joinCorporate } from "@/lib/corporativo.functions";
+import { OfertaPremium } from "@/components/oferta-premium";
 import {
   savePpdScreening,
   getMyPpdScreenings,
@@ -15341,6 +15342,8 @@ function CantinhoTab({
   const [equipped, setEquipped] = useState<string | null>(null);
   const [cat, setCat] = useState<CantinhoType | "all">("all");
   const [buying, setBuying] = useState<string | null>(null);
+  /* Nome do item que ela tentou pegar; `null` = folha fechada. */
+  const [oferta, setOferta] = useState<string | null>(null);
   const [collection, setCollection] = useState({ owned: 0, total: 0, complete: false });
   /* Pele equipada das bolinhas do Caminho. Lida no cliente (localStorage
      dentro do blob da jornada), então começa nula e se corrige ao montar. */
@@ -15631,21 +15634,28 @@ function CantinhoTab({
                 ) : trophyLocked ? (
                   <>
                     <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
-                      🔒 {collection.owned}/{collection.total} da coleção
+                      🔒 {collection.owned}/{collection.total} categorias
                     </span>
-                    {/* A conta inclui os itens Premium, então sem assinatura ela
-                        nunca fecha. Dizer isso aqui evita a paciente juntar
-                        Sementinhas por semanas mirando um alvo inalcançável. */}
-                    {!premium && (
-                      <span className="mt-1 text-[9px] font-medium text-amber-700/70">
-                        Inclui os itens Premium 💎
-                      </span>
-                    )}
+                    {/* Antes dizia "inclui os itens Premium", porque a Coroa
+                        exigia o catálogo inteiro e era inalcançável sem
+                        assinatura. Agora ela pede um item pago de 8 categorias
+                        e todas as 8 mais baratas são alcançáveis sem Premium —
+                        então o aviso saiu, e no lugar entrou o que fazer. */}
+                    <span className="mt-1 text-[9px] font-medium text-amber-700/70">
+                      Um enfeite de cada tipo
+                    </span>
                   </>
                 ) : locked ? (
-                  <span className="mt-2 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-600">
-                    🌱 {i.price}
-                  </span>
+                  /* Era um <span> sem onClick: 38 dos 72 itens pagos são
+                     premium, e tocar em qualquer um deles não fazia nada.
+                     Nem erro, nem explicação, nem caminho para assinar —
+                     metade da loja era parede muda. Agora abre a oferta. */
+                  <button
+                    onClick={() => setOferta(i.name)}
+                    className="press mt-2 flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700"
+                  >
+                    💎 Ver o Premium
+                  </button>
                 ) : (
                   <button
                     onClick={() => buy(i.id, i.price)}
@@ -15662,6 +15672,13 @@ function CantinhoTab({
           })}
         </div>
       </div>
+
+      <OfertaPremium
+        aberto={oferta !== null}
+        onFechar={() => setOferta(null)}
+        motivo="item"
+        itemNome={oferta ?? undefined}
+      />
     </div>
   );
 }

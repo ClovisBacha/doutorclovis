@@ -2132,6 +2132,43 @@ button:active > .duo3d {
   }
 }
 
+/* ── Folha que sobe (oferta do Premium, e o que mais vier) ───────────────
+   Sobe a folha INTEIRA a partir de baixo, e não os 20px do `slideUp` já
+   existente: uma folha que aparece a 20px do lugar final lê como um card
+   piscando, não como algo que veio da beira da tela. A curva desacelera no
+   fim (nada de bounce — isto é informação de preço, não brinquedo).
+   No desktop a folha centraliza, e aí a subida vira só um respiro curto. */
+@keyframes dcSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.dc-sheet-up {
+  animation: dcSheetUp 0.28s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+@media (min-width: 640px) {
+  @keyframes dcSheetUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-sheet-up {
+    animation-duration: 0.001ms;
+  }
+}
+
 /* ══════════════ Chat da IA — atmosfera ═══════════════════════════════
    Esta é a aba que mais fala "tecnologia" no app, e o desafio dela é fazer
    isso sem virar ficção científica: a paciente está aqui para perguntar se
