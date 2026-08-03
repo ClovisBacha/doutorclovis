@@ -103,7 +103,8 @@ import {
   CANTINHO_ITEMS,
   CANTINHO_CATEGORIES,
   CANTINHO_COMPLETIONIST_ID,
-  CANTINHO_COMPLETION_REQUIRED,
+  CANTINHO_COMPLETION_MIN,
+  cantinhoCategoriasCompletas,
   isCantinhoCollectionComplete,
   type CantinhoType,
 } from "@/lib/cantinho";
@@ -1709,7 +1710,12 @@ function MinhaContaPage() {
                   />
                 )}
                 {tab === "Registros" && (
-                  <RegistrosHub profile={profile} gest={gest} careMode={careMode} />
+                  <RegistrosHub
+                    profile={profile}
+                    gest={gest}
+                    careMode={careMode}
+                    onNavigate={goToTab}
+                  />
                 )}
                 {tab === "Saúde" && (
                   <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />
@@ -2305,7 +2311,7 @@ function BemEstarHub({
       <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "meditacoes" && <MeditacoesTab gest={gest} />}
-        {sub === "sons" && <SonsBebêTab gest={gest} careMode={careMode} />}
+        {sub === "sons" && <SonsBebêTab gest={gest} careMode={careMode} onNavigate={onNavigate} />}
         {sub === "exercicios" && <ExerciciosTab gest={gest} />}
         {sub === "humor" && <HumorTab />}
         {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
@@ -2357,10 +2363,12 @@ function RegistrosHub({
   profile,
   gest,
   careMode = false,
+  onNavigate,
 }: {
   profile: Profile | null;
   gest: Gest;
   careMode?: boolean;
+  onNavigate?: (t: Tab) => void;
 }) {
   const [sub, setSub] = useState<(typeof REGISTROS_SUBTABS)[number]["key"] | null>(null);
   const atual = REGISTROS_SUBTABS.find((s) => s.key === sub);
@@ -2382,6 +2390,7 @@ function RegistrosHub({
             weeks={gest?.weeks ?? null}
             babyName={profile?.baby_name ?? null}
             careMode={careMode}
+            onNavigate={onNavigate}
           />
         )}
         {sub === "contracoes" && <ContracoesTab weeks={gest?.weeks ?? null} />}
@@ -3285,10 +3294,12 @@ function KicksTab({
   weeks,
   babyName,
   careMode = false,
+  onNavigate,
 }: {
   weeks: number | null;
   babyName: string | null;
   careMode?: boolean;
+  onNavigate?: (t: Tab) => void;
 }) {
   const [active, setActive] = useState<KickSession | null>(null);
   const [count, setCount] = useState(0);
@@ -3390,7 +3401,7 @@ function KicksTab({
     return manterTelaAcesa();
   }, [active]);
 
-  if (careMode) return <SilencioDoCuidado />;
+  if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
   return (
     <div className="space-y-6">
       {/* Context banner */}
@@ -11172,7 +11183,15 @@ const SOUND_INFO: Record<
   },
 };
 
-function SonsBebêTab({ gest, careMode = false }: { gest: Gest; careMode?: boolean }) {
+function SonsBebêTab({
+  gest,
+  careMode = false,
+  onNavigate,
+}: {
+  gest: Gest;
+  careMode?: boolean;
+  onNavigate?: (t: Tab) => void;
+}) {
   const currentWeek = gest?.weeks ?? 0;
   const [playing, setPlaying] = useState<SoundType | null>(null);
   const [volume, setVolume] = useState(0.5);
@@ -11403,7 +11422,7 @@ function SonsBebêTab({ gest, careMode = false }: { gest: Gest; careMode?: boole
     return manterTelaAcesa();
   }, [playing]);
 
-  if (careMode) return <SilencioDoCuidado />;
+  if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
   return (
     <div className="space-y-6">
       {/* Info */}
@@ -15663,9 +15682,15 @@ function CantinhoTab({
           const next = o.includes(itemId) ? o : [...o, itemId];
           // Trofeu da coleção: se esta compra fechou a coleção, desbloqueia na hora.
           const nowComplete = isCantinhoCollectionComplete(next);
+          /* Conta CATEGORIAS, igual ao servidor (`getCantinho`).
+             Contava `CANTINHO_COMPLETION_REQUIRED.filter(...)` — a lista de
+             ids REPRESENTATIVOS, um por categoria — então o selo caía de
+             "5/8 categorias" para "1/8" na hora em que ela comprava algo, a
+             menos que o item comprado fosse exatamente o representante. O
+             servidor já tinha sido corrigido; o cliente, não. */
           setCollection((c) => ({
-            owned: CANTINHO_COMPLETION_REQUIRED.filter((id) => next.includes(id)).length,
-            total: c.total || CANTINHO_COMPLETION_REQUIRED.length,
+            owned: cantinhoCategoriasCompletas(next),
+            total: c.total || CANTINHO_COMPLETION_MIN,
             complete: nowComplete,
           }));
           return nowComplete && !next.includes(CANTINHO_COMPLETIONIST_ID)

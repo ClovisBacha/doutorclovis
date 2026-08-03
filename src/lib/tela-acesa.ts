@@ -43,13 +43,20 @@ export function manterTelaAcesa(): () => void {
   let solto = false;
 
   const pedir = async () => {
-    if (solto || sentinela) return;
+    /* `!sentinela.released` é a metade que faltava, e sem ela este arquivo
+       inteiro não fazia nada além do primeiro pedido.
+
+       Quando o sistema solta o bloqueio sozinho — aba para segundo plano, a
+       paciente atende uma mensagem — a sentinela CONTINUA preenchida, só com
+       `released: true`. A guarda original (`if (solto || sentinela) return`)
+       via um objeto ali e saía na primeira linha, então o `visibilitychange`
+       chamava `pedir()` e não pedia nada. Quatro telas achavam que tinham a
+       tela acesa e tinham só o primeiro pedido; a respiração escapava por
+       acidente, porque o efeito dela depende de `phase` e refaz o pedido a
+       cada fase. */
+    if (solto || (sentinela && !sentinela.released)) return;
     try {
       sentinela = await wl.request("screen");
-      /* `released` fica true quando o SISTEMA solta (tela bloqueada pelo
-         usuário, aba escondida). Limpar a referência aqui é o que permite ao
-         `visibilitychange` pedir de novo. */
-      sentinela.release = sentinela.release.bind(sentinela);
     } catch {
       /* Negado (aba em segundo plano, bateria fraca): segue sem. */
     }

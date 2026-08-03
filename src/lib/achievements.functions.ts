@@ -125,7 +125,6 @@ export const ACHIEVEMENT_DEFS: AchievementDef[] = [
     description: "Checklist completo — parabéns!",
     emoji: "🥇",
     category: "bebe",
-    posParto: true,
   },
   // ── Pós-parto ──────────────────────────────────────────────
   {

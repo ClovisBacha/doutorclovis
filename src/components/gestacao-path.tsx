@@ -1680,7 +1680,7 @@ export function GestacaoPath({
     lsSet(LS.lessons, next);
     setRevealing(true);
     setTimeout(() => setRevealing(false), 1800);
-    toast.success(`📚 Lição da semana ${week} completa!`);
+    if (!careMode) toast.success(`📚 Lição da semana ${week} completa!`);
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
@@ -2565,7 +2565,21 @@ export function GestacaoPath({
                 aria-disabled={isFuture}
                 className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none ${isFuture ? "cursor-not-allowed" : ""}`}
                 style={{ left: `${node.x}%`, top: `${node.y}px` }}
-                aria-label={`Dia ${dayOfWeek} da semana ${week}`}
+                /* O rótulo diz o ESTADO, não só a data. Eram ~300 botões com
+                   "Dia 3 da semana 12" e nada mais: um leitor de tela lia
+                   trezentos rótulos quase idênticos, sem nenhuma âncora para
+                   achar onde a paciente está nem o que já fez. */
+                aria-label={
+                  `Dia ${dayOfWeek} da semana ${week}` +
+                  (isToday
+                    ? `, hoje — ${halvesToday} de 6 atividades`
+                    : done
+                      ? ", concluído"
+                      : isFuture
+                        ? `, abre em ${D - todayD} ${D - todayD === 1 ? "dia" : "dias"}`
+                        : ", não concluído")
+                }
+                aria-current={isToday ? "date" : undefined}
               >
                 {isToday && (
                   <div className="duo-bubble absolute -top-11 z-20 whitespace-nowrap">
@@ -3293,11 +3307,12 @@ function QuizPaywall({
                     dia corrente — no servidor, não só na tela — então a aula de
                     ontem é releitura, e prometer que ela "faz" é prometer um
                     ganho que não vem. Entrou no lugar o benefício maior e que o
-                    texto escondia: 20 dos 34 enfeites do Cantinho e a Coroa da
+                    texto escondia: 38 dos 74 enfeites do Cantinho e a Coroa da
                     Coleção são exclusivos do premium, e nada disso era dito. */}
                 No plano grátis você faz <strong>só a aula de hoje</strong>. Com o{" "}
                 <strong>Obstétrica Premium</strong> você <strong>revê todas as aulas</strong> que já
-                passaram e libera <strong>20 enfeites exclusivos</strong> do seu Cantinho. 💛
+                passaram e libera <strong>dezenas de enfeites exclusivos</strong> do seu Cantinho.
+                💛
               </p>
             </>
           ) : (
@@ -3307,7 +3322,7 @@ function QuizPaywall({
                 Essa aula é de um dia que já passou. No plano grátis você faz{" "}
                 <strong>a aula de cada dia</strong> no próprio dia. Com o premium, você{" "}
                 <strong>revê todas as aulas já liberadas</strong> quando quiser — e libera{" "}
-                <strong>20 enfeites exclusivos</strong> do seu Cantinho.
+                <strong>dezenas de enfeites exclusivos</strong> do seu Cantinho.
               </p>
             </>
           )}
@@ -7369,9 +7384,13 @@ function PosPartoJourney({
         const ns = [...posStickers, week];
         setPosStickers(ns);
         lsSet(LS.posStickers, ns);
-        toast.success(`${POS_EMOJI[week] ?? "🍼"} Figurinha da semana ${week} de vida coletada!`);
+        /* Modo Cuidado também no PÓS-PARTO. Eu tinha protegido as duas
+           equivalentes da gestação e deixado estas duas de fora — e aqui é
+           pior: a perda perinatal acontece justamente nesta fase. */
+        if (!careMode)
+          toast.success(`${POS_EMOJI[week] ?? "🍼"} Figurinha da semana ${week} de vida coletada!`);
       }
-      toast.success(`🎉 Dia ${babyAgeDays + 1} com ${babyLabel} completo!`);
+      if (!careMode) toast.success(`🎉 Dia ${babyAgeDays + 1} com ${babyLabel} completo!`);
     }
   }
 
@@ -7588,7 +7607,11 @@ function PosPartoJourney({
                 aria-disabled={isFuture}
                 className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none ${isFuture ? "cursor-not-allowed" : ""}`}
                 style={{ left: `${node.x}%`, top: `${node.y}px` }}
-                aria-label={`Dia ${(D % 7) + 1} da semana ${week} de vida`}
+                aria-label={
+                  `Dia ${(D % 7) + 1} da semana ${week} de vida` +
+                  (D === todayD ? ", hoje" : done ? ", concluído" : "")
+                }
+                aria-current={D === todayD ? "date" : undefined}
               >
                 {isToday && (
                   <div className="duo-bubble absolute -top-10 z-20 whitespace-nowrap">
