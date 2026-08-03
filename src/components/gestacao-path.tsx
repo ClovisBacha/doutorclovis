@@ -5762,10 +5762,16 @@ function GratitudeBlock({
         return;
       }
 
-      // Recompensa (uma por dia, como as outras atividades de bem-estar).
-      // A meia-estrela vem primeiro: ela escreveu, e isso já aconteceu.
+      /* Recompensa (uma por dia, como as outras atividades de bem-estar).
+         A meia-estrela vem antes do servidor — ela escreveu, e isso já
+         aconteceu, então rede caída não pode apagar o progresso dela.
+         Mas NÃO vem antes do Modo Cuidado: as outras quatro atividades saem
+         no começo do `finish()` quando ele está ligado, e só esta acendia a
+         estrela no luto. Em Modo Cuidado não há jornada, não há estrela e não
+         há placar — o diário continua funcionando, que é o que importa. */
+      if (careMode) return;
       onEarn();
-      if (canEarn && !careMode) {
+      if (canEarn) {
         const { data: s } = await supabase.auth.getSession();
         const token = s.session?.access_token;
         if (token) {
@@ -6004,12 +6010,16 @@ function ChallengeBlock({
   alreadyDone,
   canEarn,
   onEarn,
+  /* Faltava. Este bloco é o plano B da aula do dia, e era o único da tela que
+     não sabia do Modo Cuidado — comemorava "+½ ⭐" no luto. */
+  careMode = false,
 }: {
   label: string;
   emoji: string;
   alreadyDone: boolean;
   canEarn: boolean;
   onEarn: () => void;
+  careMode?: boolean;
 }) {
   const [doneNow, setDoneNow] = useState(false);
   const isDone = alreadyDone || doneNow;
@@ -6027,7 +6037,7 @@ function ChallengeBlock({
           if (isDone || !canEarn) return;
           setDoneNow(true);
           onEarn();
-          toast.success("📚 Desafio do dia completo! +½ ⭐");
+          if (!careMode) toast.success("📚 Desafio do dia completo! +½ ⭐");
         }}
         disabled={isDone || !canEarn}
         className="press mt-3 w-full rounded-full bg-indigo-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-50"
@@ -6466,6 +6476,7 @@ function WellnessScreen({
                 alreadyDone={lesson.alreadyDone}
                 canEarn={canEarn}
                 onEarn={onEarnLesson}
+                careMode={careMode}
               />
             )}
           </div>
