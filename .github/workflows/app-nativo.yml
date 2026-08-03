@@ -1,113 +1,37 @@
 name: App nativo
 
 # Existe porque NÃO HÁ como compilar para iOS sem macOS — é regra da Apple, não
-# escolha nossa. Quem escreve o código aqui (inclusive eu, o Claude) roda em
-# Linux e não consegue gerar o app. Este runner é a única prova de que a casca
-# compila.
+# escolha nossa. Quem escreve o código aqui roda em Linux e não consegue gerar o
+# app. Este runner é a única prova de que a casca compila.
 #
 # E ele roda SEM conta de desenvolvedor: build para SIMULADOR não exige
 # assinatura. Isso separa duas perguntas que costumam vir emboladas —
 # "o projeto compila?" (respondida aqui, de graça, a cada push) e
 # "o app pode ir para a loja?" (que aí sim precisa dos US$ 99).
 #
-# Enquanto a conta não existe, este workflow já pega o que mais quebra: um
-# `cap sync` mal configurado, um plugin sem a permissão declarada, um Info.plist
-# faltando chave.
+# O que este workflow pega, e nenhum teste em Linux pega: um plugin declarado no
+# package.json e ausente do projeto nativo, uma permissão faltando no manifesto,
+# uma chave faltando no Info.plist, um erro de Swift no AppDelegate.
 
 on:
-  # ATENÇÃO — o gatilho por `push` está DESLIGADO de propósito.
-  #
-  # Este workflow depende de `@capacitor/cli` no package.json, e a instalação
-  # não passou: a rede do contêiner derrubou tarballs em duas tentativas
-  # (`ConnectionClosed downloading tarball`). Sem as dependências, `cap sync`
-  # falha e o CI ficaria vermelho por um motivo que não é do código.
-  #
-  # Assim que `bun add -d @capacitor/cli @capacitor/core` e os plugins entrarem
-  # no package.json, DEVOLVER o bloco abaixo:
-  #
-  #   push:
-  #     paths:
-  #       - "capacitor.config.ts"
-  #       - "native/**"
-  #       - "ios/**"
-  #       - "android/**"
-  #       - "package.json"
-  #       - ".github/workflows/app-nativo.yml"
-  #
-  # Até lá, roda só na mão — o que já serve para a primeira prova de que
-  # compila.
+  push:
+    paths:
+      - "capacitor.config.ts"
+      - "native/**"
+      - "ios/**"
+      - "android/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/app-nativo.yml"
   workflow_dispatch:
 
 jobs:
-  ios:
-    name: iOS — compila no simulador
-    # `macos-latest` é o único runner com Xcode. É mais caro em minutos que o
-    # Linux, e por isso o `paths:` acima existe: sem ele, todo commit de CSS
-    # gastaria cota de macOS à toa.
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      # As dependencias do Capacitor NAO estao no package.json.
-      #
-      # Eu as declarei uma vez, com versoes resolvidas do registro, e isso
-      # QUEBROU o CI principal: `ci.yml` usa `bun install --frozen-lockfile` nos
-      # tres jobs, e `--frozen-lockfile` falha em qualquer divergencia entre
-      # package.json e lockfile. Declarar sem instalar deixou os dois fora de
-      # sincronia e derrubou Lint, TypeScript e Testes de uma vez.
-      #
-      # A instalacao tem que acontecer com rede que funcione, gerando o lock
-      # junto. Versoes verificadas no registro em 2 de agosto de 2026:
-      #
-      #   bun add @capacitor/core@8.5.0 @capacitor/ios@8.5.0 \
-      #           @capacitor/android@8.5.0 @capacitor/status-bar@8.0.3 \
-      #           @capacitor/haptics@8.0.2 @capacitor/app@8.1.1 \
-      #           @capacitor/keyboard@8.0.5 @capacitor/splash-screen@8.0.2
-      #   bun add -d @capacitor/cli@8.5.0
-      #
-      # Feito isso, commitar package.json E bun.lock juntos, e trocar a linha
-      # abaixo por `bun install --frozen-lockfile`.
-      - run: bun install
-
-      # `cap sync` copia a `webDir` e reinstala os pods dos plugins. É aqui que
-      # aparece plugin declarado no package.json e ausente do projeto nativo.
-      # `cap add` cria o projeto Xcode. Ele nao existe no repositorio porque
-      # gerar exige o CLI instalado, e a instalacao nao passou no conteiner onde
-      # esta casca foi escrita.
-      #
-      # Rodar `add` no CI e temporario e tem um custo: qualquer coisa que se
-      # personalize no projeto nativo (Info.plist, icones, permissoes) se perde
-      # a cada execucao. Assim que o primeiro build passar, o `ios/` deve ser
-      # gerado UMA vez, personalizado e COMMITADO — e este passo vira so `sync`.
-      - name: Preparar projeto iOS
-        run: |
-          [ -d ios ] || bunx cap add ios
-          bunx cap sync ios
-
-      - name: Compilar para o simulador
-        # `CODE_SIGNING_ALLOWED=NO` é o que dispensa a conta: sem assinatura o
-        # binário não roda em aparelho de verdade, mas compila — e compilar é o
-        # que este job responde.
-        run: |
-          xcodebuild \
-            -workspace ios/App/App.xcworkspace \
-            -scheme App \
-            -sdk iphonesimulator \
-            -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            build | xcpretty && exit ${PIPESTATUS[0]}
-
   android:
     name: Android — gera o APK de debug
-    # Android compila em Linux, então este job é barato e pode rodar sempre.
-    # Ele também é a rede de segurança do outro: quando os dois quebram junto, o
-    # problema é da configuração compartilhada; quando só o iOS quebra, é do
-    # Xcode.
+    # Primeiro na lista de propósito: Android compila em Linux, é barato, e
+    # quando os dois quebram junto o problema é da configuração compartilhada —
+    # quando só o iOS quebra, é do Xcode. Ter o barato respondendo primeiro
+    # encurta o diagnóstico.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,33 +45,23 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # As dependencias do Capacitor NAO estao no package.json.
-      #
-      # Eu as declarei uma vez, com versoes resolvidas do registro, e isso
-      # QUEBROU o CI principal: `ci.yml` usa `bun install --frozen-lockfile` nos
-      # tres jobs, e `--frozen-lockfile` falha em qualquer divergencia entre
-      # package.json e lockfile. Declarar sem instalar deixou os dois fora de
-      # sincronia e derrubou Lint, TypeScript e Testes de uma vez.
-      #
-      # A instalacao tem que acontecer com rede que funcione, gerando o lock
-      # junto. Versoes verificadas no registro em 2 de agosto de 2026:
-      #
-      #   bun add @capacitor/core@8.5.0 @capacitor/ios@8.5.0 \
-      #           @capacitor/android@8.5.0 @capacitor/status-bar@8.0.3 \
-      #           @capacitor/haptics@8.0.2 @capacitor/app@8.1.1 \
-      #           @capacitor/keyboard@8.0.5 @capacitor/splash-screen@8.0.2
-      #   bun add -d @capacitor/cli@8.5.0
-      #
-      # Feito isso, commitar package.json E bun.lock juntos, e trocar a linha
-      # abaixo por `bun install --frozen-lockfile`.
-      - run: bun install
+      # `--frozen-lockfile`, igual ao `ci.yml`. Ele falha em QUALQUER divergência
+      # entre package.json e lockfile — e foi exatamente assim que a primeira
+      # tentativa de instalar o Capacitor derrubou os três jobs do CI principal.
+      # Aqui a rigidez é o que queremos: se o lockfile não bate, o app que este
+      # job constrói não é o app que o site publica.
+      - run: bun install --frozen-lockfile
 
-      # Mesma nota do iOS: `add` aqui e temporario, ate o `android/` ser
-      # gerado, personalizado e commitado.
-      - name: Preparar projeto Android
-        run: |
-          [ -d android ] || bunx cap add android
-          bunx cap sync android
+      # Só `sync`, NUNCA `cap add`.
+      #
+      # `cap add` regenera o projeto nativo do zero, e o projeto no repositório
+      # tem coisas que só existem porque foram escritas à mão: as permissões de
+      # localização, a POST_NOTIFICATIONS, o texto do Info.plist e o repasse do
+      # token de push no AppDelegate. Regenerar apagaria tudo isso em silêncio, e
+      # o build passaria — com um app que não pede localização nem recebe push.
+      # Se a pasta sumir, é melhor este passo falhar barulhento.
+      - name: Sincronizar a casca
+        run: bunx cap sync android
 
       - name: Compilar o APK de debug
         run: cd android && ./gradlew assembleDebug --no-daemon
@@ -159,3 +73,45 @@ jobs:
           name: obstetrica-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 14
+
+  ios:
+    name: iOS — compila no simulador
+    # `macos-latest` é o único runner com Xcode, e custa 10x os minutos do Linux.
+    # É por isso que o `paths:` lá em cima existe: sem ele, todo commit de CSS
+    # gastaria cota de macOS à toa.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Sincronizar a casca
+        run: bunx cap sync ios
+
+      - name: Compilar para o simulador
+        # `-project`, e não `-workspace`.
+        #
+        # Capacitor 8 usa **Swift Package Manager** (`ios/App/CapApp-SPM`), não
+        # CocoaPods — e é o CocoaPods que cria o `.xcworkspace`. Apontar para um
+        # workspace aqui falha na primeira linha dizendo só que o arquivo não
+        # existe. Vale saber, porque quase todo tutorial de Capacitor na internet
+        # ainda mostra `-workspace`, e era o que estava escrito aqui.
+        #
+        # `CODE_SIGNING_ALLOWED=NO` é o que dispensa a conta de desenvolvedor:
+        # sem assinatura o binário não roda em aparelho de verdade, mas compila —
+        # e compilar é a pergunta que este job responde.
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build

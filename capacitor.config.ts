@@ -78,6 +78,12 @@ const config: CapacitorConfig = {
     allowNavigation: ["www.obstetrica.com.br", "obstetrica.com.br"],
   },
 
+  /* A cor de espera é o ROSA DA MARCA, e não um azul escuro como estava.
+     Ela aparece em dois momentos: atrás da tela de abertura e em volta da
+     página antes do primeiro pixel útil. Com um escuro ali, a abertura era
+     marca clara → moldura escura → tela de login clara, três cores em menos de
+     um segundo. É o mesmo `#FEE2EA` que `scripts/icones-nativos.py` extrai da
+     própria arte — mudar a marca e rodar o script mantém os dois iguais. */
   ios: {
     /* O app desenha SOB a barra de status. É o que resolve a faixa branca do
        print — no PWA isso dependia de o iOS obedecer a uma meta tag; aqui é
@@ -86,11 +92,11 @@ const config: CapacitorConfig = {
     /* Rolagem elástica desligada na raiz: com ela, puxar a página revela o fundo
        do WebView acima do conteúdo — exatamente a faixa clara que aparecia. */
     scrollEnabled: true,
-    backgroundColor: "#0b0b17",
+    backgroundColor: "#FEE2EA",
   },
 
   android: {
-    backgroundColor: "#0b0b17",
+    backgroundColor: "#FEE2EA",
     /* `https` em vez de `http`: o Android trata a origem como segura, e as APIs
        que exigem contexto seguro (geolocalização, notificação, câmera) passam a
        funcionar igual ao iOS. */
@@ -110,7 +116,7 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchAutoHide: true,
       launchShowDuration: 6000,
-      backgroundColor: "#0b0b17",
+      backgroundColor: "#FEE2EA",
       showSpinner: false,
     },
   },
