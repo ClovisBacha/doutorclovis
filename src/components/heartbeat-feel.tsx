@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Heart, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { pararVibracao, tocarPadrao } from "@/lib/nativo";
 
 /**
  * "Sentir o coração" — vibração háptica no ritmo do batimento fetal (lub-dub),
@@ -9,9 +10,12 @@ import { Heart, Pause, Play, Volume2, VolumeX } from "lucide-react";
  * háptico do coração do bebê). Aqui a fonte do ritmo é o BPM da última
  * consulta/ultrassom, digitado pela família.
  *
- * Suporte à vibração: Android (Chrome/Edge/Firefox). O iOS não expõe
- * navigator.vibrate para sites — lá a experiência é som + pulsação visual,
- * com aviso transparente.
+ * Suporte à vibração: Android e, agora, iPhone — mas só no APP NATIVO. O
+ * Safari nunca expôs `navigator.vibrate`, então no site o iOS segue com som +
+ * pulsação visual e o aviso transparente. Dentro do app, `tocarPadrao` cai nos
+ * impactos do Haptics e o batimento finalmente se sente. Quem editar isto:
+ * não volte a chamar `navigator.vibrate` direto — é o que deixava metade das
+ * pacientes sem a única coisa que esta tela promete.
  */
 export function HeartbeatFeel({
   defaultBpm = 140,
@@ -61,11 +65,7 @@ export function HeartbeatFeel({
     timerRef.current = null;
     ctxRef.current?.close().catch(() => {});
     ctxRef.current = null;
-    try {
-      navigator.vibrate?.(0);
-    } catch {
-      /* sem suporte */
-    }
+    pararVibracao();
     setPlaying(false);
   }
 
@@ -81,12 +81,10 @@ export function HeartbeatFeel({
     ctxRef.current = ctx;
     setPlaying(true);
     const tick = () => {
-      // lub-dub: pulso forte + pulso curto ~140ms depois, como no Doppler
-      try {
-        navigator.vibrate?.([70, 80, 45]);
-      } catch {
-        /* sem suporte */
-      }
+      /* lub-dub: pulso forte + pulso curto ~140ms depois, como no Doppler.
+         Pela ponte — no iPhone o `navigator.vibrate` não existe, e o batimento
+         que não se SENTE é justamente o que esta tela promete. */
+      tocarPadrao([70, 80, 45]);
       if (soundRef.current) {
         const t = ctx.currentTime;
         beat(ctx, t, 70, 0.6); // lub

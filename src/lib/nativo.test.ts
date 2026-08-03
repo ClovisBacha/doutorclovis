@@ -81,6 +81,22 @@ describe("a agenda preserva a forma do padrão", () => {
     expect(agendaDeImpactos([])).toEqual([]);
     expect(agendaDeImpactos(padraoDaFase("in", 0))).toEqual([]);
   });
+
+  /* O padrão do contador de chutes começa com um pulso de duração ZERO, que
+     no `navigator.vibrate` serve só para ATRASAR o primeiro toque (índice par
+     = vibra, ímpar = pausa). Sem esta regra o iPhone sentia um impacto
+     fantasma em 0 ms e o Android sentia um pulso só — mesmo código, sensações
+     diferentes, e ninguém perceberia porque háptico não deixa rastro. */
+  test("pulso de duração zero não vira impacto", () => {
+    const agenda = agendaDeImpactos([0, 25, 40, 55]);
+    expect(agenda).toHaveLength(1);
+    expect(agenda[0].em).toBe(25);
+  });
+
+  test("o relógio do padrão continua correndo mesmo com pulso zero", () => {
+    // [0,10,5,10,7] → pulsos reais em 10ms e 25ms; o zero não desloca nada.
+    expect(agendaDeImpactos([0, 10, 5, 10, 7]).map((a) => a.em)).toEqual([10, 25]);
+  });
 });
 
 describe("sem ponte, o app continua sendo web", () => {

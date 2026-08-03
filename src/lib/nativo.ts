@@ -97,7 +97,13 @@ export function agendaDeImpactos(padrao: number[]): Array<{ em: number; forca: s
   const agenda: Array<{ em: number; forca: string }> = [];
   let t = 0;
   for (let i = 0; i < padrao.length; i++) {
-    if (i % 2 === 0) agenda.push({ em: t, forca: forcaDoPulso(padrao[i]) });
+    /* `> 0`, não só "índice par": um pulso de duração ZERO não é vibração
+       nenhuma, e virava impacto assim mesmo. É um padrão real e comum — o
+       `[0, 25, 40, 55]` do contador de chutes começa com zero justamente para
+       ATRASAR o primeiro toque (par = vibra, ímpar = pausa). O Android tocava
+       um pulso e o iPhone sentia dois: um fantasma em 0 ms e o de verdade em
+       25 ms. Mesmo código, aparelhos com sensações diferentes. */
+    if (i % 2 === 0 && padrao[i] > 0) agenda.push({ em: t, forca: forcaDoPulso(padrao[i]) });
     t += padrao[i];
   }
   return agenda;

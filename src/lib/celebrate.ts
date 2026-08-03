@@ -11,6 +11,7 @@
  *   é dispará-los no clique de um botão (senão a política de autoplay bloqueia,
  *   e degradam em silêncio).
  */
+import { tocarPadrao } from "@/lib/nativo";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -147,20 +148,22 @@ export function celebrateChime(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
   }
 }
 
-/** Vibração curta e festiva (Android; iOS PWA não tem Vibration API). */
+/**
+ * Vibração curta e festiva.
+ *
+ * Vai por `tocarPadrao` (`nativo.ts`). Ia direto no `navigator.vibrate`, que
+ * no iPhone não existe — então a celebração, que é o momento de recompensa do
+ * jogo inteiro, era muda em todo iOS. A ponte traduz o padrão nos impactos do
+ * Haptics; no Android e no navegador ela cai no próprio `navigator.vibrate`.
+ */
 export function celebrateHaptic(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
-  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
-  try {
-    /* Um par de batidas por nível, e a última mais longa. O padrão fica
-       reconhecível pelo COMPRIMENTO — no bolso ela sente que hoje foi maior
-       sem precisar olhar a tela. */
-    const padrao: number[] = [];
-    for (let i = 0; i < 1 + nivel; i++) padrao.push(30, 40);
-    padrao.push(40 + nivel * 30);
-    navigator.vibrate(padrao);
-  } catch {
-    /* sem vibração */
-  }
+  /* Um par de batidas por nível, e a última mais longa. O padrão fica
+     reconhecível pelo COMPRIMENTO — no bolso ela sente que hoje foi maior
+     sem precisar olhar a tela. */
+  const padrao: number[] = [];
+  for (let i = 0; i < 1 + nivel; i++) padrao.push(30, 40);
+  padrao.push(40 + nivel * 30);
+  tocarPadrao(padrao);
 }
 
 /** Dispara os três (ideal dentro de um clique). */

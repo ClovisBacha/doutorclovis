@@ -233,6 +233,7 @@ import { Bolha, humorDaJornada } from "@/components/bolha";
 import jogoBolha from "@/assets/jogo/bolha.webp";
 import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
+import { tocarPadrao } from "@/lib/nativo";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -3485,12 +3486,12 @@ function QuizIntro({
 const BREATH_PATTERN = { in: 4000, hold: 4000, out: 6000 } as const;
 const BREATH_CYCLES = 5;
 
+/* Toque curto das viradas (mudança de movimento, próxima linha da carta).
+   Passa pela ponte: `navigator.vibrate` não existe no iPhone, então isto era
+   mudo em todo iOS — e é justamente o sinal que diz "mudou" a quem está de
+   olhos fechados. */
 function buzz(ms = 28) {
-  try {
-    navigator.vibrate?.(ms);
-  } catch {
-    /* sem haptics */
-  }
+  tocarPadrao([ms]);
 }
 
 function BreathingBlock({
@@ -5363,17 +5364,14 @@ function BondingBlock({
 
   useEffect(() => () => audioRef.current?.stop(), []);
 
-  useEffect(() => {
-    if (phase !== "active") return;
-    const t = setTimeout(() => {
-      if (idx + 1 >= carta.lines.length) {
-        setPhase("done");
-        finish();
-      } else setIdx(idx + 1);
-    }, 10000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, idx]);
+  /* Aqui havia um avanço automático a cada 10 segundos, e ele brigava com o
+     enunciado da própria tela.
+     A atividade pede que ELA leia a carta em voz alta para o bebê — é esse o
+     exercício, é dele que vem o vínculo. Quem lê em voz alta lê devagar, e
+     lendo devagar a linha trocava embaixo dela no meio da frase. Pior: quem
+     parava para chorar, ou para repetir o nome do bebê, perdia o lugar.
+     Não existe relógio certo aqui. Quem decide quando a linha acabou é quem
+     está lendo — por isso só o botão "Próxima linha" avança. */
 
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
@@ -5574,7 +5572,9 @@ function BondingBlock({
                 }}
                 className="press mt-4 rounded-full border border-rose-200 bg-white/70 px-6 py-2 text-xs font-bold text-rose-500 backdrop-blur"
               >
-                Próxima linha →
+                {/* A última linha não é "próxima": é o fim da carta. Dizer
+                    "Próxima linha →" ali prometia uma página que não existe. */}
+                {idx + 1 >= carta.lines.length ? "Terminei de ler 💛" : "Próxima linha →"}
               </button>
             </div>
           )}
