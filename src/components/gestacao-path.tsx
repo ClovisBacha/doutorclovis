@@ -250,6 +250,7 @@ import jogoBolha from "@/assets/jogo/bolha.webp";
 import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { ehNativo, tocarPadrao } from "@/lib/nativo";
+import { manterTelaAcesa } from "@/lib/tela-acesa";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -3632,6 +3633,14 @@ function BreathingBlock({
   // Garante que o áudio pare se o componente sair da tela.
   useEffect(() => () => audioRef.current?.stop(), []);
 
+  /* Tela acesa enquanto respira. São 70 segundos com a tela pedindo que ela
+     feche os olhos — tempo de sobra para o aparelho bloquear e suspender o
+     `setTimeout` que conduz as fases. */
+  useEffect(() => {
+    if (phase !== "in" && phase !== "hold" && phase !== "out") return;
+    return manterTelaAcesa();
+  }, [phase]);
+
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
     grantedRef.current = true;
@@ -4777,6 +4786,15 @@ function MeditationBlock({
    * fazer. Depois dela, são a única coisa que orienta quem está de olhos
    * fechados, que é o estado em que a tela pede que ela fique.
    */
+  /* Tela acesa durante a meditação. É a atividade mais longa do app — até dez
+     minutos — e a própria tela pede "com a voz você pode fechar os olhos".
+     Sem isto, o aparelho bloqueia em uns trinta segundos, o ciclo é suspenso e
+     a sessão morre exatamente por a paciente ter feito o que pedimos. */
+  useEffect(() => {
+    if (etapa !== "sessao") return;
+    return manterTelaAcesa();
+  }, [etapa]);
+
   useEffect(() => {
     if (etapa !== "sessao" || !voz || !guiaTerminou()) return;
     const palavra =

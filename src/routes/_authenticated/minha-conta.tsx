@@ -221,6 +221,7 @@ import {
 import { joinCorporate } from "@/lib/corporativo.functions";
 import { OfertaPremium } from "@/components/oferta-premium";
 import { LojaSementinhas } from "@/components/loja-sementinhas";
+import { manterTelaAcesa } from "@/lib/tela-acesa";
 import {
   savePpdScreening,
   getMyPpdScreenings,
@@ -3381,6 +3382,14 @@ function KicksTab({
   /* Modo Cuidado: a aba inteira se cala. Ela oferecia "conte 10
      movimentos de {nome do bebê}" — o convite mais doloroso possível para
      quem acabou de perder a gestação. */
+  /* Tela acesa durante a contagem. É a atividade mais longa do app — a
+     paciente pode ficar até duas horas esperando o bebê se mexer, sem tocar no
+     aparelho, e é justamente por não tocar que a tela apaga. */
+  useEffect(() => {
+    if (!active) return;
+    return manterTelaAcesa();
+  }, [active]);
+
   if (careMode) return <SilencioDoCuidado />;
   return (
     <div className="space-y-6">
@@ -11383,6 +11392,17 @@ function SonsBebêTab({ gest, careMode = false }: { gest: Gest; careMode?: boole
 
   /* Modo Cuidado: cala. A aba diz "o bebê pode reconhecê-los após o
      nascimento". */
+  /* Tela acesa enquanto um som toca. Esta aba existe para embalar — o ruído
+     rosa e o batimento são feitos em Web Audio, e o `AudioContext` é suspenso
+     quando a tela bloqueia. Um som de ninar que para quando a tela apaga é o
+     oposto do que a aba promete.
+     Isto NÃO resolve áudio em segundo plano (sair do app ainda corta): para
+     isso é preciso plugin nativo, e está anotado no relatório. */
+  useEffect(() => {
+    if (!playing) return;
+    return manterTelaAcesa();
+  }, [playing]);
+
   if (careMode) return <SilencioDoCuidado />;
   return (
     <div className="space-y-6">
