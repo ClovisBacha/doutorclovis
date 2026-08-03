@@ -250,6 +250,8 @@ import jogoBolha from "@/assets/jogo/bolha.webp";
 import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { ehNativo, tocarPadrao } from "@/lib/nativo";
+import { brl as brlPromo, formataRestante } from "@/lib/promo";
+import type { OfertaBoasVindas } from "@/lib/promo.functions";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
@@ -3165,6 +3167,41 @@ function QuizPaywall({
   const [nativo, setNativo] = useState(false);
   useEffect(() => setNativo(ehNativo()), []);
 
+  /* A mesma oferta de boas-vindas da folha do Cantinho.
+     Precisa estar nos DOIS lugares: a paciente que visse 61% num paywall e o
+     preço cheio no outro acharia que um dos dois está mentindo — e o desconto
+     seria aplicado no checkout de qualquer jeito, porque quem decide é o
+     servidor. Melhor ela saber o que está levando. */
+  const [oferta, setOferta] = useState<OfertaBoasVindas | null>(null);
+  const [restante, setRestante] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return;
+        const { getOfertaBoasVindas } = await import("@/lib/promo.functions");
+        const o = await getOfertaBoasVindas({ data: { accessToken: s.session.access_token } });
+        if (!vivo) return;
+        setOferta(o);
+        setRestante(o.restanteMs);
+        if (o.ativa) setPlan("annual");
+      } catch {
+        /* sem oferta: preços normais */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (restante <= 0) return;
+    const t = setInterval(() => setRestante((r) => Math.max(0, r - 1000)), 1000);
+    return () => clearInterval(t);
+  }, [restante]);
+  const promoViva = Boolean(oferta?.ativa) && restante > 0;
+
   // Código do médico Elite: a paciente digita e ganha o premium na hora.
   async function redeem() {
     if (code.trim().length < 4) {
@@ -3355,6 +3392,27 @@ function QuizPaywall({
         </div>
       )}
 
+      {promoViva && oferta && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-2.5 text-white">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/85">
+              Oferta de boas-vindas
+            </p>
+            <p className="font-serif text-xl leading-tight">{oferta.descontoPct}% no 1º ano</p>
+          </div>
+          <div className="shrink-0 rounded-lg bg-black/25 px-2.5 py-1.5 text-center">
+            <p className="text-[8px] font-bold uppercase tracking-wide text-white/80">termina em</p>
+            <p
+              className="font-mono text-[15px] font-bold tabular-nums"
+              role="timer"
+              aria-live="off"
+            >
+              {formataRestante(restante)}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mt-3 grid grid-cols-2 gap-2">
         <PlanCard
           id="monthly"
@@ -3365,9 +3423,17 @@ function QuizPaywall({
         <PlanCard
           id="annual"
           label="Anual"
-          price={`R$ ${QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}`}
-          sub={`por mês · R$ ${QUIZ_PRICE_ANNUAL_TOTAL.toFixed(2).replace(".", ",")} por ano`}
-          badge="ECONOMIZE 50%"
+          price={
+            promoViva && oferta
+              ? brlPromo(oferta.promoCentavos)
+              : `R$ ${QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}`
+          }
+          sub={
+            promoViva && oferta
+              ? `no 1º ano · depois ${brlPromo(oferta.cheioCentavos)}/ano`
+              : `por mês · R$ ${QUIZ_PRICE_ANNUAL_TOTAL.toFixed(2).replace(".", ",")} por ano`
+          }
+          badge={promoViva && oferta ? `−${oferta.descontoPct}%` : "ECONOMIZE 50%"}
         />
       </div>
 
