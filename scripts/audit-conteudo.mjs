@@ -28,6 +28,10 @@ const JANELA_REVISAO = 14;
 
 const probs = [];
 const erro = (m) => probs.push(m);
+/* Aviso ≠ erro: sai no relatório e não reprova o build. É para o problema
+   REAL cuja correção exige escrita clínica, que não é trabalho de script. */
+const avisos = [];
+const aviso = (m) => avisos.push(m);
 
 /* ── Aulas ── */
 for (let D = GEST[0]; D <= GEST[1]; D++) {
@@ -38,6 +42,17 @@ for (const k of Object.keys(aulas)) {
 }
 
 const enunciados = new Map();
+
+/* ── Contadores de "dá pra gabaritar sem ler?" ──────────────────────────
+   Uma paciente que descobre um padrão de FORMA passa a acertar sem estudar,
+   e o quiz deixa de ensinar sem que nada pareça quebrado. Estes três
+   contadores existem para que isso não volte em silêncio.
+   `posicao[n][i]` = quantas escolhas únicas de n alternativas têm a certa em i. */
+const posicao = {};
+let totalMulti = 0;
+let multiQuaseTodas = 0;
+let totalComparaveis = 0;
+let certaMaisLonga = 0;
 const licoes = new Map();
 let totalPerguntas = 0;
 
@@ -74,7 +89,31 @@ for (const [D, aula] of Object.entries(aulas)) {
     const antes = enunciados.get(chave);
     if (antes != null && Math.abs(+D - +antes) < JANELA_REVISAO)
       erro(`${id}: mesmo enunciado de D${antes}, a ${Math.abs(+D - +antes)} dias`);
-    else if (antes == null) enunciados.set(chave, D);
+    /* Guarda SEMPRE a ocorrência mais recente. Guardava só a primeira, e aí o
+       mesmo enunciado em D10, D100 e D105 comparava D105 contra D10 (95 dias,
+       passa) e nunca comparava D100 contra D105 (5 dias, deveria acusar). */
+    enunciados.set(chave, D);
+
+    /* Estatística de posição do gabarito — ver o bloco no fim do arquivo. */
+    if (opts.length > 2) {
+      const cesta = Array.isArray(q.a) ? null : (posicao[opts.length] ??= []);
+      if (cesta) {
+        cesta[q.a] = (cesta[q.a] ?? 0) + 1;
+        cesta.total = (cesta.total ?? 0) + 1;
+      }
+    }
+    if (Array.isArray(q.a)) {
+      totalMulti++;
+      if (gab.length === opts.length - 1) multiQuaseTodas++;
+    }
+    if (!Array.isArray(q.a) && opts.length > 2) {
+      const comp = opts.map((t) => t.length);
+      const max = Math.max(...comp);
+      if (comp.filter((c) => c === max).length === 1) {
+        totalComparaveis++;
+        if (comp[q.a] === max) certaMaisLonga++;
+      }
+    }
   });
 }
 
@@ -107,6 +146,54 @@ console.log(
   `aulas: ${Object.keys(aulas).length} dias · ${totalPerguntas} perguntas\n` +
     `desafios: ${nGest} dias de gestação + ${nPos} de pós-parto`,
 );
+
+/* ── Viés de posição: trava dura ────────────────────────────────────────
+   Antes do embaralhamento, as 294 perguntas "marque todas" tinham a
+   alternativa 0 correta em 294 delas — 100%. Bastava marcar a primeira,
+   todo dia, para gabaritar sem abrir a aula.
+   A trava é por índice: em escolha única de n alternativas cada posição
+   deve receber perto de 1/n. A banda é generosa (±10 pontos) porque isto
+   pega REGRESSÃO estrutural, não flutuação de amostra — com 745 perguntas,
+   um desvio de 10 pontos está a quase 6 desvios-padrão do acaso. */
+for (const [n, cesta] of Object.entries(posicao)) {
+  const alvo = 100 / Number(n);
+  for (let i = 0; i < Number(n); i++) {
+    const pc = ((cesta[i] ?? 0) / cesta.total) * 100;
+    if (Math.abs(pc - alvo) > 10)
+      erro(
+        `viés de posição: em ${n} alternativas, a certa cai no índice ${i} em ` +
+          `${pc.toFixed(1)}% das ${cesta.total} perguntas (o acaso é ${alvo.toFixed(1)}%). ` +
+          `Reembaralhe — dá para acertar sem ler.`,
+      );
+  }
+}
+
+/* ── Os dois vazamentos que NÃO se consertam embaralhando ───────────────
+   Ficam como aviso, não como erro: consertar exige escrever alternativa
+   clínica nova, e isso passa pelo médico — não por script. */
+if (totalMulti) {
+  const pc = (multiQuaseTodas / totalMulti) * 100;
+  if (pc > 60)
+    aviso(
+      `${pc.toFixed(1)}% dos "marque todas" têm exatamente UMA alternativa errada ` +
+        `(${multiQuaseTodas} de ${totalMulti}). Marcar todas menos uma acerta quase sempre. ` +
+        `Some um segundo distrator a parte delas.`,
+    );
+}
+if (totalComparaveis) {
+  const pc = (certaMaisLonga / totalComparaveis) * 100;
+  if (pc > 50)
+    aviso(
+      `a alternativa CERTA é a mais longa em ${pc.toFixed(1)}% das escolhas únicas ` +
+        `(${certaMaisLonga} de ${totalComparaveis}; o acaso seria ~33%). ` +
+        `Distrator curto entrega a resposta — dê corpo aos errados.`,
+    );
+}
+
+if (avisos.length) {
+  console.warn(`\n${avisos.length} aviso(s) — não reprovam, mas custam aprendizado:`);
+  for (const a of avisos) console.warn(` ! ${a}`);
+}
 
 if (probs.length) {
   console.error(`\n${probs.length} problema(s):`);
