@@ -130,9 +130,23 @@ function TermosPage() {
 
         <Block title="10. Encerramento">
           <p>
-            Você pode encerrar sua conta a qualquer momento. Podemos suspender ou encerrar contas
-            que violem estes termos. Após o encerramento, tratamos seus dados conforme a Política de
-            Privacidade.
+            Você pode encerrar sua conta a qualquer momento, sozinha, em{" "}
+            <strong>Perfil → Excluir minha conta</strong>. A exclusão apaga seu perfil, seu diário,
+            seus registros de saúde, suas conversas com a assistente e seu vínculo com o médico, e
+            não tem volta.
+          </p>
+          <p>
+            Permanece o que o seu médico registrou sobre um atendimento — prontuário e receitas
+            emitidas —, porque a legislação obriga o profissional a guardar esses registros por 20
+            anos. Essa obrigação é dele, não sua.
+          </p>
+          <p>
+            Se você tiver uma assinatura ativa, cancele antes nos ajustes do seu aparelho (App Store
+            ou Play Store): excluir a conta aqui não interrompe a cobrança da loja.
+          </p>
+          <p>
+            Podemos suspender ou encerrar contas que violem estes termos. Após o encerramento,
+            tratamos seus dados conforme a Política de Privacidade.
           </p>
         </Block>
 

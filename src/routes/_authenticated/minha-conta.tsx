@@ -53,6 +53,7 @@ import { shareMilestoneCard } from "@/lib/share-card";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
+import { ExcluirConta } from "@/components/excluir-conta";
 import { sendTestPushToMe } from "@/lib/push.functions";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
@@ -1790,6 +1791,7 @@ function MinhaContaPage() {
                     careMode={careMode}
                     onToggleCare={toggleCareMode}
                     onNavigate={goToTab}
+                    ehMedico={isDoctor}
                   />
                 )}
               </TabErrorBoundary>
@@ -3989,12 +3991,15 @@ function ProfileTab({
   careMode,
   onToggleCare,
   onNavigate,
+  ehMedico = false,
 }: {
   profile: Profile | null;
   onSaved: (p: Profile) => void;
   careMode: boolean;
   onToggleCare: (on: boolean) => void;
   onNavigate: (tab: string) => void;
+  /** Muda o que a caixa de excluir conta oferece — ver `ExcluirConta`. */
+  ehMedico?: boolean;
 }) {
   const [form, setForm] = useState({
     display_name: profile?.display_name ?? "",
@@ -4642,6 +4647,11 @@ function ProfileTab({
       </div>
 
       {/* Feature 50: Corporate */}
+      {/* Excluir a conta. Fica no fim do Perfil de propósito: é o último item,
+          depois de tudo que a paciente pode QUERER mexer. Ver
+          `src/components/excluir-conta.tsx`. */}
+      <ExcluirConta ehMedico={ehMedico} />
+
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Benefício Corporativo</p>
         {profile?.corporate_account_id ? (
