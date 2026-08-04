@@ -103,49 +103,71 @@ function tokenApns(): string | null {
   }
 }
 
-/** `true` quando o token morreu e deve sair do banco. */
-function apnsTokenMorto(status: number, corpo: string): boolean {
-  if (status === 410) return true;
+const APNS_PRODUCAO = "https://api.push.apple.com";
+const APNS_SANDBOX = "https://api.sandbox.push.apple.com";
+
+/**
+ * O aparelho sumiu de vez? Só o 410 diz isso.
+ *
+ * `410 Unregistered` é a Apple afirmando que aquele token não existe mais — app
+ * desinstalado. É o único motivo para apagar a linha.
+ */
+function apnsTokenMorto(status: number): boolean {
+  return status === 410;
+}
+
+/**
+ * O token é de OUTRO ambiente?
+ *
+ * `400 BadDeviceToken` quase nunca quer dizer "token inválido": quer dizer
+ * "este token não é deste ambiente". E um app cruza três ambientes na vida:
+ *
+ *   instalado pelo Xcode   → sandbox
+ *   TestFlight             → PRODUÇÃO
+ *   App Store              → produção
+ *
+ * A primeira versão disto tratava `BadDeviceToken` como token morto e APAGAVA a
+ * linha. O resultado seria descoberto no pior dia possível: ao subir para o
+ * TestFlight, todo iPhone cadastrado responderia 400 e o servidor apagaria os
+ * tokens de todas as pacientes de uma vez. O push morreria em silêncio e cada
+ * uma teria que reativar na mão — o que quase ninguém faz, porque ninguém
+ * percebe que parou.
+ *
+ * Então aqui isso vira uma SEGUNDA TENTATIVA no outro ambiente, e o
+ * `APNS_PRODUCTION` deixa de ser uma configuração que, errada, quebra tudo
+ * calado: ele passa a ser só a ordem em que se tenta.
+ */
+function apnsAmbienteErrado(status: number, corpo: string): boolean {
   return status === 400 && /BadDeviceToken|DeviceTokenNotForTopic/.test(corpo);
 }
 
-async function enviarApns(
+type SaidaApns = { sent: number; failed: number; mortos: string[]; outroAmbiente: string[] };
+
+function enviarApnsNoHost(
+  host: string,
   tokens: string[],
-  payload: PushPayload,
-): Promise<{ sent: number; failed: number; mortos: string[] }> {
-  const jwt = tokenApns();
-  if (!jwt || !tokens.length) return { sent: 0, failed: 0, mortos: [] };
-  const http2 = await import("node:http2");
-  const host = env("APNS_PRODUCTION")
-    ? "https://api.push.apple.com"
-    : "https://api.sandbox.push.apple.com";
-
-  const corpo = JSON.stringify({
-    aps: {
-      alert: { title: payload.title, body: payload.body },
-      sound: "default",
-      "mutable-content": 1,
-    },
-    url: payload.url,
-  });
-
-  return await new Promise((resolve) => {
+  corpo: string,
+  jwt: string,
+  http2: typeof import("node:http2"),
+): Promise<SaidaApns> {
+  return new Promise((resolve) => {
     const cliente = http2.connect(host);
     let sent = 0;
     let failed = 0;
     const mortos: string[] = [];
+    const outroAmbiente: string[] = [];
     let restantes = tokens.length;
 
     /* Uma conexão HTTP/2 para todos os aparelhos — é o ponto do protocolo aqui,
        e a Apple penaliza quem abre uma conexão por mensagem. */
     const terminar = () => {
       cliente.close();
-      resolve({ sent, failed, mortos });
+      resolve({ sent, failed, mortos, outroAmbiente });
     };
     cliente.on("error", () => {
       failed += restantes;
       restantes = 0;
-      resolve({ sent, failed, mortos });
+      resolve({ sent, failed, mortos, outroAmbiente });
     });
 
     for (const token of tokens) {
@@ -171,9 +193,10 @@ async function enviarApns(
       });
       const fecha = () => {
         if (status >= 200 && status < 300) sent++;
+        else if (apnsAmbienteErrado(status, resposta)) outroAmbiente.push(token);
         else {
           failed++;
-          if (apnsTokenMorto(status, resposta)) mortos.push(token);
+          if (apnsTokenMorto(status)) mortos.push(token);
         }
         if (--restantes === 0) terminar();
       };
@@ -185,6 +208,44 @@ async function enviarApns(
       req.end(corpo);
     }
   });
+}
+
+async function enviarApns(
+  tokens: string[],
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number; mortos: string[] }> {
+  const jwt = tokenApns();
+  if (!jwt || !tokens.length) return { sent: 0, failed: 0, mortos: [] };
+  const http2 = await import("node:http2");
+
+  /* `APNS_PRODUCTION` diz por onde COMEÇAR, não onde é permitido entregar. */
+  const primeiro = env("APNS_PRODUCTION") ? APNS_PRODUCAO : APNS_SANDBOX;
+  const segundo = primeiro === APNS_PRODUCAO ? APNS_SANDBOX : APNS_PRODUCAO;
+
+  const corpo = JSON.stringify({
+    aps: {
+      alert: { title: payload.title, body: payload.body },
+      sound: "default",
+      "mutable-content": 1,
+    },
+    url: payload.url,
+  });
+
+  const a = await enviarApnsNoHost(primeiro, tokens, corpo, jwt, http2);
+  if (!a.outroAmbiente.length) {
+    return { sent: a.sent, failed: a.failed, mortos: a.mortos };
+  }
+
+  /* Segunda tentativa, só com os que recusaram por ambiente. Quem cair de novo
+     conta como falha — e ainda assim NÃO é apagado: um token que erra os dois
+     ambientes é um mistério, e apagar mistério é perder o aparelho da paciente
+     sem saber por quê. */
+  const b = await enviarApnsNoHost(segundo, a.outroAmbiente, corpo, jwt, http2);
+  return {
+    sent: a.sent + b.sent,
+    failed: a.failed + b.failed + b.outroAmbiente.length,
+    mortos: [...a.mortos, ...b.mortos],
+  };
 }
 
 /* ── FCM ─────────────────────────────────────────────────────────────────── */

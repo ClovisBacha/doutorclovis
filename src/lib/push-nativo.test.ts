@@ -130,11 +130,45 @@ describe("o JWT que o Google aceita", () => {
   });
 });
 
-describe("tokens mortos saem do banco", () => {
-  test("410 da Apple é aparelho que não existe mais", () => {
-    const fonte = readFileSync("src/lib/push-nativo.server.ts", "utf8");
-    expect(fonte).toContain("if (status === 410) return true;");
-    expect(fonte).toMatch(/BadDeviceToken/);
+describe("tokens mortos saem do banco — e só os mortos mesmo", () => {
+  const fonte = readFileSync("src/lib/push-nativo.server.ts", "utf8");
+
+  test("só o 410 da Apple apaga a linha", () => {
+    /* 410 Unregistered é a Apple afirmando que o token nao existe mais (app
+       desinstalado). É o único motivo honesto para apagar. */
+    expect(fonte).toContain("function apnsTokenMorto(status: number): boolean");
+    expect(fonte).toContain("return status === 410;");
+  });
+
+  test("BadDeviceToken NÃO conta como token morto", () => {
+    /* Este é o teste que existe por causa de um defeito real: BadDeviceToken
+       quase nunca quer dizer "token inválido", quer dizer "outro ambiente". A
+       versão anterior apagava a linha — e no dia da subida para o TestFlight
+       isso apagaria o token de TODAS as pacientes de uma vez, em silêncio.
+       A função que decide morte não pode nem mencionar o erro de ambiente. */
+    const corpoMorto = fonte
+      .slice(fonte.indexOf("function apnsTokenMorto"), fonte.indexOf("function apnsAmbienteErrado"))
+      /* Sem comentários: o bloco seguinte EXPLICA o defeito e cita
+         `BadDeviceToken` — citar na explicação não pode reprovar o teste. */
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(corpoMorto).not.toMatch(/BadDeviceToken/);
+    expect(corpoMorto).not.toMatch(/DeviceTokenNotForTopic/);
+  });
+
+  test("ambiente errado vira SEGUNDA TENTATIVA no outro host", () => {
+    expect(fonte).toContain("apnsAmbienteErrado(status, resposta)) outroAmbiente.push(token)");
+    /* E a segunda tentativa acontece de verdade, no host oposto. */
+    expect(fonte).toContain(
+      "const segundo = primeiro === APNS_PRODUCAO ? APNS_SANDBOX : APNS_PRODUCAO",
+    );
+    expect(fonte).toContain("enviarApnsNoHost(segundo, a.outroAmbiente");
+  });
+
+  test("quem falha nos DOIS ambientes conta como falha, mas não é apagado", () => {
+    /* Um token que erra os dois lados é um mistério — e apagar mistério é
+       perder o aparelho da paciente sem saber por quê. */
+    expect(fonte).toContain("failed: a.failed + b.failed + b.outroAmbiente.length");
+    expect(fonte).toContain("mortos: [...a.mortos, ...b.mortos]");
   });
 
   test("404 do Google é app desinstalado", () => {
