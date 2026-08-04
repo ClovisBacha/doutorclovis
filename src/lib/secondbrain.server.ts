@@ -26,6 +26,7 @@ import {
   normalizeGapQuestion,
   rankEntriesByKeywords,
   type BrainBlockLabels,
+  type BrainEntry,
 } from "./doctorthink/core";
 
 // Re-export para compatibilidade: chat.ts importa normalizeGapQuestion daqui.
@@ -286,6 +287,59 @@ type BrainEntryRow = { question: string; answer: string };
 
 const MAX_ENTRIES_LOADED = 200;
 const MAX_ENTRIES_SCORED = 6;
+
+/**
+ * Teto de CARACTERES das entradas que entram no prompt.
+ *
+ * Seis entradas era um limite de contagem, não de tamanho — e o tamanho é do
+ * médico. Um que escreve orientações longas e detalhadas produz um bloco de
+ * ~1.500 tokens; um que escreve em duas linhas, ~300. Cinco vezes de diferença
+ * na maior parcela variável do prompt, e ela se paga em TODA mensagem.
+ *
+ * Isso importa por dois motivos que se somam:
+ *
+ *  · O custo cresce junto com a QUALIDADE do uso — o médico caprichoso, que é o
+ *    melhor cliente, é o mais caro de servir.
+ *  · Se um dia a plataforma cobrar por mensagem, "1 mensagem = 1 unidade" só é
+ *    honesto se a mensagem custar mais ou menos o mesmo. Sem este teto, não
+ *    custa.
+ *
+ * 4.000 caracteres ≈ 1.000 tokens: cabe folgado o caso comum (6 entradas de
+ * ~300 caracteres) e corta só a cauda.
+ */
+const MAX_BLOCK_CHARS = 4000;
+
+/**
+ * Corta as entradas até caber no teto — sempre INTEIRAS, e nunca até zero.
+ *
+ * Duas regras que parecem detalhe e não são:
+ *
+ *  · **Nunca corta uma entrada pela metade.** O texto é orientação clínica
+ *    escrita pelo médico; meia frase pode inverter o sentido ("não use X em
+ *    caso de…" cortado no "não use X"). Entrada que não cabe inteira não entra.
+ *
+ *  · **Nunca devolve lista vazia se havia alguma.** `selected.length > 0` é o
+ *    que define `hadCoverage`, e `hadCoverage` muda o que a IA DIZ: sem
+ *    cobertura ela responde "essa dúvida o seu médico prefere responder
+ *    pessoalmente" e registra uma lacuna. Zerar aqui transformaria uma
+ *    otimização de custo numa mudança de comportamento clínico — e ninguém
+ *    entenderia por quê. Se a primeira entrada sozinha estoura o teto, ela
+ *    passa: pagar caro uma vez é melhor que mentir sobre cobertura.
+ */
+export function limitarPorCaracteres(
+  selected: BrainEntry[],
+  maxChars = MAX_BLOCK_CHARS,
+): BrainEntry[] {
+  const out: BrainEntry[] = [];
+  let usado = 0;
+  for (const e of selected) {
+    const custo = (e.question?.length ?? 0) + (e.answer?.length ?? 0) + 8; /* "P: \nR: \n" */
+    if (out.length > 0 && usado + custo > maxChars) break;
+    out.push(e);
+    usado += custo;
+  }
+  return out;
+}
 /** Corte de similaridade de cosseno da busca semântica (abaixo = irrelevante). */
 const SEMANTIC_MIN_SIMILARITY = 0.55;
 
@@ -395,7 +449,11 @@ export async function getBrainContext(
     // Obstétrica). Retorna "" quando não há persona/regras nem entries.
     const block = assembleBrainBlock(
       { persona, samplePhrases, rules },
-      selected,
+      /* O teto de caracteres entra aqui, e não dentro do `assembleBrainBlock`:
+         a persona e as regras são a VOZ do médico e valem para toda pergunta —
+         cortá-las mudaria como ele soa. O que se corta é a lista de referência,
+         que é longa, variável e específica daquela pergunta. */
+      limitarPorCaracteres(selected),
       OBSTETRICA_LABELS,
     );
     if (!block) {

@@ -1,0 +1,161 @@
+/**
+ * A medição de uso de IA.
+ *
+ * Duas classes de defeito, e as duas são silenciosas:
+ *
+ * · **Medir errado.** Uma linha de zeros derruba o custo médio por resposta —
+ *   e é justamente o número que vai definir quantas mensagens cabem num plano.
+ *   Errar aqui é errar o preço.
+ * · **Atrapalhar a resposta.** Isto roda dentro do caminho da conversa de uma
+ *   gestante. Um `await` esquecido ou um erro que sobe transforma telemetria em
+ *   indisponibilidade.
+ */
+
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { registrarUso } from "./uso-ia.server";
+
+/** A fonte sem comentários — o texto que explica o defeito costuma citá-lo. */
+function codigoDe(caminho: string): string {
+  return readFileSync(caminho, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*/g, "");
+}
+
+const uso = codigoDe("src/lib/uso-ia.server.ts");
+const chat = codigoDe("src/routes/api/chat.ts");
+const memoria = codigoDe("src/lib/chat-memory.server.ts");
+
+describe("medir nunca derruba a resposta", () => {
+  test("sem banco configurado, registrar não lança", () => {
+    expect(() =>
+      registrarUso({ especie: "chat", modelo: "x", inputTokens: 10, outputTokens: 5 }),
+    ).not.toThrow();
+  });
+
+  test("a função devolve void — não dá para esperar por ela sem querer", () => {
+    expect(uso).toContain("export function registrarUso(u: Uso): void");
+  });
+
+  test("a escrita é dispara-e-esquece, com catch", () => {
+    expect(uso).toContain("void (async () => {");
+    expect(uso).toMatch(/catch \{/);
+  });
+});
+
+describe("zero não vira linha", () => {
+  test("uso sem tokens é descartado", () => {
+    /* Quando o provedor não reporta `usage`, gravar zeros faria o custo médio
+       por resposta cair sozinho — e esse é o número que define o plano. */
+    expect(uso).toContain("if (entrada === 0 && saida === 0) return;");
+  });
+
+  test("tokens negativos ou fracionários não passam", () => {
+    expect(uso).toContain("Math.max(0, Math.trunc(u.inputTokens ?? 0))");
+    expect(uso).toContain("Math.max(0, Math.trunc(u.outputTokens ?? 0))");
+  });
+});
+
+describe("as três chamadas que custam são contadas", () => {
+  test("a conversa (chat)", () => {
+    expect(chat).toContain('especie: "chat"');
+    expect(chat).toContain("inputTokens: usage?.inputTokens");
+  });
+
+  test("a memória — a que some numa medição ingênua", () => {
+    /* Ela roda a cada 6 mensagens, manda 40 de histórico e a paciente nunca a
+       vê. Vale ~20% da conta. */
+    expect(memoria).toContain('especie: "memoria"');
+    expect(memoria).toContain("result.usage?.inputTokens");
+  });
+
+  test("a espécie 'embedding' existe no tipo, para quando valer a pena", () => {
+    expect(uso).toContain('"chat" | "memoria" | "embedding"');
+  });
+});
+
+describe("o canal anônimo também conta", () => {
+  test("o onFinish roda mesmo sem paciente", () => {
+    /* Antes ele era `persistFor ? … : undefined` — sem paciente, nada rodava.
+       A conversa do site custa tokens igual, e um medidor que ignora um canal
+       inteiro mede errado. */
+    expect(chat).toContain("onFinish: ({ text, usage }) => {");
+    expect(chat).not.toContain("onFinish: persistFor");
+  });
+
+  test("o canal é distinguido", () => {
+    expect(chat).toContain('canal: patient ? "app" : "site"');
+  });
+});
+
+describe("grava token, não real", () => {
+  test("nenhuma coluna de custo em dinheiro", () => {
+    /* Preço de token, câmbio e modelo mudam. Custo gravado congela a conta de
+       hoje num número que estará errado no mês que vem — e ninguém percebe que
+       envelheceu. Token é fato; real é interpretação, feita na leitura. */
+    const sql = readFileSync("supabase/migrations/20260804120000_ai_usage.sql", "utf8");
+    expect(sql).toContain("input_tokens integer");
+    expect(sql).toContain("output_tokens integer");
+    expect(sql).not.toMatch(/custo_centavos|custo_reais\s+numeric|preco/i);
+  });
+
+  test("nenhum texto de conversa na tabela de telemetria", () => {
+    /* Já existe `chat_messages`, com a RLS dela. Duplicar conversa de gestante
+       numa tabela de custo seria uma segunda cópia do dado mais sensível do
+       produto para responder a uma pergunta de dinheiro. */
+    const sql = readFileSync("supabase/migrations/20260804120000_ai_usage.sql", "utf8");
+    expect(sql).not.toMatch(/\b(content|texto|mensagem|pergunta|resposta)\s+text/i);
+  });
+
+  test("apagar a conta da paciente não apaga o custo já pago", () => {
+    /* `ON DELETE SET NULL`, não CASCADE: exclusão de conta é direito dela, e
+       não pode reescrever o histórico financeiro do mês passado. */
+    const sql = readFileSync("supabase/migrations/20260804120000_ai_usage.sql", "utf8");
+    expect(sql).toContain("patient_id uuid REFERENCES auth.users(id) ON DELETE SET NULL");
+  });
+});
+
+describe("o bloco do cérebro tem teto de caracteres", () => {
+  const brain = readFileSync("src/lib/secondbrain.server.ts", "utf8");
+
+  test("existe um limite em CARACTERES, não só em contagem de entradas", () => {
+    /* Seis entradas de qualquer tamanho fazia o custo variar 5× entre um médico
+       que escreve muito e um que escreve pouco — na maior parcela variável do
+       prompt, paga em toda mensagem. */
+    expect(brain).toContain("const MAX_BLOCK_CHARS = 4000;");
+    expect(brain).toContain("limitarPorCaracteres(selected)");
+  });
+
+  test("nunca corta uma entrada pela metade", async () => {
+    /* Meia orientação clínica pode inverter o sentido: "não use X em caso de…"
+       cortado no "não use X". */
+    const { limitarPorCaracteres } = await import("./secondbrain.server");
+    const entradas = Array.from({ length: 6 }, (_, i) => ({
+      question: `P${i}`.padEnd(100, "."),
+      answer: `R${i}`.padEnd(900, "."),
+    }));
+    const saida = limitarPorCaracteres(entradas, 2000);
+    expect(saida.length).toBeLessThan(6);
+    for (const e of saida) {
+      expect(e.answer.length).toBe(900); // inteira, nunca truncada
+    }
+  });
+
+  test("nunca devolve lista vazia se havia alguma", async () => {
+    /* `selected.length > 0` define `hadCoverage`, e `hadCoverage` muda o que a
+       IA DIZ à paciente. Zerar aqui transformaria uma otimização de custo numa
+       mudança de comportamento clínico. */
+    const { limitarPorCaracteres } = await import("./secondbrain.server");
+    const gigante = [{ question: "P".repeat(500), answer: "R".repeat(9000) }];
+    expect(limitarPorCaracteres(gigante, 100)).toHaveLength(1);
+  });
+
+  test("o caso comum passa inteiro — o teto corta só a cauda", async () => {
+    const { limitarPorCaracteres } = await import("./secondbrain.server");
+    const comuns = Array.from({ length: 6 }, () => ({
+      question: "P".repeat(80),
+      answer: "R".repeat(220),
+    }));
+    expect(limitarPorCaracteres(comuns)).toHaveLength(6);
+  });
+});

@@ -174,6 +174,24 @@ export function maybeUpdateChatMemory(patientId: string, doctorId: string | null
           .join("\n\n"),
         maxOutputTokens: 500,
       });
+      /* A chamada de memória é INVISÍVEL no produto — a paciente nunca a vê —
+         e é justamente por isso que ela sumiria de uma medição ingênua. Ela
+         manda 40 mensagens de histórico ao modelo a cada 6 mensagens novas, e
+         responde por cerca de 20% da conta total de IA. */
+      try {
+        const { registrarUso } = await import("./uso-ia.server");
+        registrarUso({
+          especie: "memoria",
+          modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          inputTokens: result.usage?.inputTokens,
+          outputTokens: result.usage?.outputTokens,
+          doctorId,
+          patientId,
+        });
+      } catch {
+        /* medir é opcional */
+      }
+
       const summary = result.text.trim().slice(0, 2400);
       if (!summary) return;
 

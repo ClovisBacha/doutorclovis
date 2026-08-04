@@ -675,24 +675,41 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const google = createChatProvider(key);
+        /* Lido uma vez: o medidor precisa gravar o MESMO modelo que respondeu,
+           e reler o ambiente no `onFinish` deixaria os dois divergirem se
+           alguém trocasse a variável no meio. */
+        const modeloEmUso = process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL;
+        const usoIa = await import("@/lib/uso-ia.server");
         const result = streamText({
-          model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
+          model: google(modeloEmUso),
           system,
           messages: await convertToModelMessages(paraOModelo),
-          onFinish: persistFor
-            ? ({ text }) => {
-                void (async () => {
-                  try {
-                    const { saveChatMessage, maybeUpdateChatMemory } =
-                      await import("@/lib/chat-memory.server");
-                    saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text);
-                    maybeUpdateChatMemory(persistFor.patientId, persistFor.doctorId);
-                  } catch {
-                    /* best-effort */
-                  }
-                })();
+          /* O `onFinish` roda SEMPRE agora, e não só quando há paciente para
+             persistir: a conversa anônima do site também custa tokens, e um
+             medidor que ignora um canal inteiro mede errado. */
+          onFinish: ({ text, usage }) => {
+            const { registrarUso } = usoIa;
+            registrarUso({
+              especie: "chat",
+              modelo: modeloEmUso,
+              inputTokens: usage?.inputTokens,
+              outputTokens: usage?.outputTokens,
+              doctorId: patient?.doctorId ?? null,
+              patientId: patient?.patientId ?? null,
+              canal: patient ? "app" : "site",
+            });
+            if (!persistFor) return;
+            void (async () => {
+              try {
+                const { saveChatMessage, maybeUpdateChatMemory } =
+                  await import("@/lib/chat-memory.server");
+                saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text);
+                maybeUpdateChatMemory(persistFor.patientId, persistFor.doctorId);
+              } catch {
+                /* best-effort */
               }
-            : undefined,
+            })();
+          },
         });
 
         return result.toUIMessageStreamResponse({
