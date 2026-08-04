@@ -1,0 +1,172 @@
+/**
+ * O plano Essencial, e a escada inteira.
+ *
+ * O que se protege aqui é uma classe de defeito que não dá erro e custa
+ * dinheiro dos dois lados: **conceder o plano errado**.
+ *
+ * Um plano é enumerado em nove lugares (tipo, entitlements, preço, escada,
+ * normalizador, mapa de Price, lista do checkout, webhook, telas). Esquecer um
+ * não quebra o build — só faz o médico pagar um plano e receber outro.
+ */
+
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import {
+  PLAN_ENTITLEMENTS,
+  PLAN_PRICE,
+  PLAN_RANK,
+  normalizePlan,
+  mensalidadeCentavos,
+  type PlanKey,
+} from "./entitlements";
+
+const TODOS = Object.keys(PLAN_ENTITLEMENTS) as PlanKey[];
+
+/**
+ * A fonte sem comentários.
+ *
+ * Testes que cobram "este arquivo NÃO contém X" se enganam sozinhos: o
+ * comentário que EXPLICA o defeito quase sempre cita X. Aconteceu quatro vezes
+ * nesta base — sempre passando por acidente, que é o pior jeito de um teste
+ * falhar. O que se cobra é o código.
+ */
+function codigoDe(caminho: string): string {
+  return readFileSync(caminho, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*/g, "");
+}
+
+describe("nenhum plano fica pela metade", () => {
+  test("todo plano tem entitlements, preço, posição na escada e normaliza para si", () => {
+    for (const p of TODOS) {
+      expect(PLAN_ENTITLEMENTS[p]).not.toBeUndefined();
+      expect(PLAN_PRICE[p]).not.toBeUndefined();
+      expect(PLAN_RANK[p]).not.toBeUndefined();
+      expect(normalizePlan(p)).toBe(p);
+    }
+  });
+
+  test("a escada não tem empate — dois planos no mesmo degrau é ordem indefinida", () => {
+    /* `PLAN_RANK` decide quem aparece antes na busca que a paciente vê. */
+    const postos = TODOS.map((p) => PLAN_RANK[p]);
+    expect(new Set(postos).size).toBe(postos.length);
+  });
+
+  test("quem paga mais nunca fica abaixo de quem paga menos", () => {
+    const pagos = TODOS.filter((p) => PLAN_PRICE[p] > 0).sort(
+      (a, b) => PLAN_PRICE[a] - PLAN_PRICE[b],
+    );
+    for (let i = 1; i < pagos.length; i++) {
+      expect(PLAN_RANK[pagos[i]]).toBeGreaterThan(PLAN_RANK[pagos[i - 1]]);
+    }
+  });
+});
+
+describe("o Essencial é o primeiro degrau pago", () => {
+  const e = PLAN_ENTITLEMENTS.essencial;
+
+  test("custa um terço do Starter — perto demais não abriria segmento", () => {
+    /* A R$102 (31% abaixo do Starter) a conta por paciente favorecia tanto o
+       Starter que ninguém compraria o Essencial. R$102 virou âncora riscada. */
+    expect(PLAN_PRICE.essencial).toBe(49.9);
+    expect(PLAN_PRICE.essencial).toBeLessThan(PLAN_PRICE.starter / 2.5);
+    expect(mensalidadeCentavos("essencial")).toBe(4990);
+  });
+
+  test("INCLUI o Segundo Cérebro — é o motivo de comprar", () => {
+    /* Era o pedido explícito, e é o que separa o Essencial do Free: um plano de
+       entrada sem IA seria o Free com mais pacientes. */
+    expect(e.aiApp).toBe(true);
+    expect(PLAN_ENTITLEMENTS.free.aiApp).toBe(false);
+  });
+
+  test("cabe ENTRE o Free e o Starter em pacientes", () => {
+    expect(e.maxPatients).toBeGreaterThan(PLAN_ENTITLEMENTS.free.maxPatients!);
+    expect(e.maxPatients).toBeLessThan(PLAN_ENTITLEMENTS.starter.maxPatients!);
+  });
+
+  test("o Starter continua tendo duas razões de existir", () => {
+    /* Mais pacientes E as ferramentas clínicas avançadas. Sem a segunda, a
+       única diferença seria o número — e aí o Essencial canibaliza. */
+    expect(e.clinicalToolsAdvanced).toBe(false);
+    expect(PLAN_ENTITLEMENTS.starter.clinicalToolsAdvanced).toBe(true);
+  });
+
+  test("não invade o que é do Pro para cima", () => {
+    expect(e.aiWhatsapp).toBe(false);
+    expect(e.teamSeats).toBe(false);
+    expect(e.premiumInvitesPerMonth).toBe(0);
+    expect(e.dedicatedManager).toBe(false);
+  });
+});
+
+describe("o webhook concede o plano que foi pago", () => {
+  const fonte = codigoDe("src/routes/api/stripe-webhook.ts");
+
+  test("não existe mais a corrente de startsWith com 'starter' como padrão", () => {
+    /* Era o defeito mais caro possível aqui: um plano novo que ninguém
+       acrescentasse à corrente viraria Starter em silêncio — o médico pagaria
+       R$49,90 e receberia o plano de R$149. Nenhum erro, nenhum log. */
+    expect(fonte).not.toContain('p.startsWith("black")');
+    expect(fonte).not.toContain(': "starter";');
+  });
+
+  test("usa a fonte única e tira o sufixo do ciclo", () => {
+    expect(fonte).toContain('normalizePlan((plan ?? "").replace(/_annual$/, ""))');
+  });
+
+  test("o ciclo anual concede o MESMO plano do mensal", () => {
+    for (const p of TODOS) {
+      expect(normalizePlan(`${p}_annual`.replace(/_annual$/, ""))).toBe(p);
+    }
+  });
+
+  test("plano desconhecido concede de MENOS, nunca de mais", () => {
+    /* Bug de cobrança tem que errar para o lado seguro. */
+    expect(normalizePlan("plano_que_nao_existe")).toBe("free");
+    expect(PLAN_RANK[normalizePlan("")]).toBe(0);
+  });
+});
+
+describe("o Essencial existe em todos os lugares que enumeram plano", () => {
+  const arquivos = {
+    "mapa de Price do Stripe": "src/lib/stripe.server.ts",
+    "lista aceita no checkout": "src/lib/billing.functions.ts",
+    "enum do console": "src/lib/platform.functions.ts",
+    "seletor do admin": "src/routes/_authenticated/admin.tsx",
+    "card do painel": "src/routes/_authenticated/painel.tsx",
+    "página de vendas": "src/routes/medicos.tsx",
+    "variáveis de ambiente": ".env.example",
+  };
+
+  for (const [onde, caminho] of Object.entries(arquivos)) {
+    test(`aparece em: ${onde}`, () => {
+      expect(readFileSync(caminho, "utf8").toLowerCase()).toContain("essencial");
+    });
+  }
+
+  test("tem os dois Price — mensal e anual", () => {
+    const fonte = readFileSync("src/lib/stripe.server.ts", "utf8");
+    expect(fonte).toContain("STRIPE_PRICE_DOCTOR_ESSENCIAL_MONTHLY");
+    expect(fonte).toContain("STRIPE_PRICE_DOCTOR_ESSENCIAL_ANNUAL");
+  });
+});
+
+describe("o preço com centavos não vaza para a tela", () => {
+  test("o card formata em pt-BR — `R$ {monthly}` cru imprimiria 'R$ 49.9'", () => {
+    const codigo = codigoDe("src/routes/_authenticated/painel.tsx");
+    expect(codigo).toContain('monthly.toLocaleString("pt-BR"');
+    expect(codigo).not.toMatch(/R\$ \{monthly\}/);
+  });
+
+  test("e os planos inteiros continuam sem centavos", () => {
+    const fmt = (v: number) =>
+      v.toLocaleString("pt-BR", {
+        minimumFractionDigits: v % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2,
+      });
+    expect(fmt(49.9)).toBe("49,90");
+    expect(fmt(149)).toBe("149");
+    expect(fmt(1499)).toBe("1.499");
+  });
+});

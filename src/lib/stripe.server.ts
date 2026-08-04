@@ -70,6 +70,8 @@ export function priceIdFor(product: BillingProduct, plan: string): string | null
   const map: Record<string, string | undefined> = {
     "quiz_premium:monthly": env.STRIPE_PRICE_QUIZ_MONTHLY,
     "quiz_premium:annual": env.STRIPE_PRICE_QUIZ_ANNUAL,
+    "doctor_plan:essencial": env.STRIPE_PRICE_DOCTOR_ESSENCIAL_MONTHLY,
+    "doctor_plan:essencial_annual": env.STRIPE_PRICE_DOCTOR_ESSENCIAL_ANNUAL,
     "doctor_plan:starter": env.STRIPE_PRICE_DOCTOR_STARTER_MONTHLY,
     "doctor_plan:starter_annual": env.STRIPE_PRICE_DOCTOR_STARTER_ANNUAL,
     "doctor_plan:pro": env.STRIPE_PRICE_DOCTOR_PRO_MONTHLY,

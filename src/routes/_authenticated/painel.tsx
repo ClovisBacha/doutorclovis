@@ -7183,7 +7183,8 @@ function DoctorBilling({
   const [busy, setBusy] = useState<string | null>(null);
   // Convite de paciente: +15% em qualquer plano (aplicado no checkout).
   const [inviteDiscount, setInviteDiscount] = useState(false);
-  const isPaid = active && ["starter", "pro", "clinica", "elite", "black"].includes(plan);
+  const isPaid =
+    active && ["essencial", "starter", "pro", "clinica", "elite", "black"].includes(plan);
   const isTeam = plan === "clinica";
 
   useEffect(() => {
@@ -7199,7 +7200,7 @@ function DoctorBilling({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function checkout(planKey: "starter" | "pro" | "elite" | "black") {
+  async function checkout(planKey: "essencial" | "starter" | "pro" | "elite" | "black") {
     /* O médico USA o app, mas não ASSINA nele — plano de médico se contrata
        no site. Duas razões, e as duas contam:
        · a loja da Apple/Google cobra comissão sobre assinatura vendida dentro
@@ -7303,7 +7304,7 @@ function DoctorBilling({
     black,
     perk,
   }: {
-    planKey: "starter" | "pro" | "elite" | "black";
+    planKey: "essencial" | "starter" | "pro" | "elite" | "black";
     name: string;
     monthly: number;
     tagline: string;
@@ -7336,7 +7337,13 @@ function DoctorBilling({
         {tagline}
       </p>
       <p className="mt-2 text-2xl font-extrabold">
-        R$ {monthly}
+        {/* `R$ {monthly}` cru imprimia "R$ 49.9" no Essencial — ponto decimal e
+            um dígito só. Os planos inteiros continuam sem centavos. */}
+        R${" "}
+        {monthly.toLocaleString("pt-BR", {
+          minimumFractionDigits: monthly % 1 === 0 ? 0 : 2,
+          maximumFractionDigits: 2,
+        })}
         <span
           className={`text-sm font-normal ${black ? "text-white/60" : "text-muted-foreground"}`}
         >
@@ -7405,7 +7412,16 @@ function DoctorBilling({
         </p>
       )}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Cinco cards agora: `lg:grid-cols-4` deixaria o Black sozinho na linha
+          de baixo, e o plano mais caro da tabela não pode parecer sobra. */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <PlanBtn
+          planKey="essencial"
+          name="Essencial"
+          monthly={49.9}
+          tagline="Até 15 pacientes · o Segundo Cérebro incluído"
+          perk="de R$ 102 por R$ 49,90"
+        />
         <PlanBtn
           planKey="starter"
           name="Starter"

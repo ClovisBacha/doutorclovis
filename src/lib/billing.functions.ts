@@ -13,10 +13,12 @@ import { z } from "zod";
 import { DOCTOR } from "@/lib/doctor.config";
 
 const PRODUCTS = ["quiz_premium", "doctor_plan"] as const;
-// quiz: monthly|annual · médico: starter|pro (+ _annual)
+// quiz: monthly|annual · médico: essencial|starter|pro|elite|black (+ _annual)
 const PLANS = [
   "monthly",
   "annual",
+  "essencial",
+  "essencial_annual",
   "starter",
   "starter_annual",
   "pro",

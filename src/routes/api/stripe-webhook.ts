@@ -256,14 +256,20 @@ async function applySubscription(subscriptionId: string): Promise<void> {
       .update({ quiz_premium: keep })
       .eq("id", userId);
   } else if (product === "doctor_plan") {
-    const p = plan ?? "";
-    const planKey = p.startsWith("black")
-      ? "black"
-      : p.startsWith("elite")
-        ? "elite"
-        : p.startsWith("pro")
-          ? "pro"
-          : "starter";
+    /* O plano vem da NOSSA metadata, então basta tirar o sufixo do ciclo e
+       normalizar pela fonte única — `normalizePlan` conhece todas as PlanKey.
+
+       Antes isto era uma corrente de `startsWith` com **"starter" como
+       padrão**. Parece inofensivo e não é: qualquer plano novo que alguém
+       esquecesse de acrescentar aqui viraria Starter em silêncio. Com o
+       Essencial (R$49,90) isso significaria o médico pagar 49,90 e receber o
+       plano de R$149 — 50 pacientes e as ferramentas avançadas —, e ninguém
+       descobriria, porque não há erro: há um plano concedido a mais.
+
+       O padrão agora é `free`, o mais restritivo. Um plano desconhecido aqui é
+       bug nosso, e bug de cobrança deve conceder de MENOS, nunca de mais. */
+    const { normalizePlan } = await import("@/lib/entitlements");
+    const planKey = normalizePlan((plan ?? "").replace(/_annual$/, ""));
     if (grants) {
       await (supabaseAdmin as any)
         .from("doctors")

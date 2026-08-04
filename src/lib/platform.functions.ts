@@ -600,7 +600,9 @@ const SetStatusSchema = z.object({
   doctorId: z.string().uuid(),
   active: z.boolean().optional(),
   verified: z.boolean().optional(),
-  plan: z.enum(["trial", "free", "starter", "pro", "clinica", "elite", "black"]).optional(),
+  plan: z
+    .enum(["trial", "free", "essencial", "starter", "pro", "clinica", "elite", "black"])
+    .optional(),
 });
 
 /** Ativa/desativa ou muda o plano de um médico (super-admin). */

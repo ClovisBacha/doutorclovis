@@ -51,6 +51,23 @@ const PLANS = [
     cta: "Criar conta grátis",
   },
   {
+    key: "essencial",
+    name: "Essencial",
+    tagline: "O Segundo Cérebro, sem salto",
+    monthly: 49.9,
+    isFrom: false,
+    perSuffix: "",
+    highlight: false,
+    desc: "O primeiro passo pago: a sua IA atendendo as pacientes no app, por um terço do Starter. Para quem está começando e ainda não tem volume.",
+    features: [
+      "👩‍🍼 Até 15 pacientes · 🧠 1 cérebro (o seu) — sai a R$ 3,33/paciente",
+      "IA com as suas respostas, 24h no app",
+      "Pré-consulta digital + monitoramento (peso, pressão, chutes)",
+      "As ferramentas clínicas avançadas ficam no Starter",
+    ],
+    cta: "Começar por R$ 49,90",
+  },
+  {
     key: "starter",
     name: "Starter",
     tagline: "A sua IA no app",

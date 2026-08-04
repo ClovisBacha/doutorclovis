@@ -142,7 +142,16 @@ function LinkCard({ path, label }: { path: string; label: string }) {
   );
 }
 
-const PLANS = ["trial", "free", "starter", "pro", "clinica", "elite", "black"] as const;
+const PLANS = [
+  "trial",
+  "free",
+  "essencial",
+  "starter",
+  "pro",
+  "clinica",
+  "elite",
+  "black",
+] as const;
 
 type AdminTab =
   | "visao"
