@@ -491,8 +491,34 @@ export function logBrainGap(
 
 /** Quantas lacunas cegas se cura por abertura do painel. */
 const CURA_POR_VEZ = 20;
-/** Teto por embedding da cura. Alguém está olhando a tela — não pode travar. */
-const CURA_TIMEOUT_MS = 2500;
+/**
+ * Teto por embedding da cura, e quantas saem por vez.
+ *
+ * Era 2500ms com TODAS disparadas de uma vez — erro meu, e do tipo que se
+ * esconde: com doze lacunas eram doze chamadas simultâneas ao modelo, e uma
+ * lentidão ou um 429 de limite de taxa derrubava as doze juntas. Cada uma
+ * devolvia null, a cura relatava zero, e a cada abertura do painel a mesma
+ * rajada falhava igual. Os vetores nunca voltavam.
+ *
+ * O aperto existia porque a cura rodava no caminho da tela. Agora ela tem
+ * requisição própria (`curarLacunasDoMedico`), então pode ir devagar: lotes
+ * pequenos e o tempo folgado que uma chamada de embedding realmente precisa.
+ */
+const CURA_TIMEOUT_MS = 6000;
+const CURA_POR_LOTE = 4;
+
+/**
+ * Roda em lotes: paralelo o bastante para ser rápido, gentil o bastante para
+ * não bater no limite de taxa do modelo — que é o que transformava uma falha
+ * de uma chamada em falha de todas.
+ */
+async function emLotes<T, R>(itens: T[], tamanho: number, fn: (item: T) => Promise<R>) {
+  const saida: R[] = [];
+  for (let i = 0; i < itens.length; i += tamanho) {
+    saida.push(...(await Promise.all(itens.slice(i, i + tamanho).map(fn))));
+  }
+  return saida;
+}
 
 /**
  * Dá vetor às lacunas que nasceram sem um.
@@ -552,13 +578,11 @@ export async function curarLacunasSemVetor(doctorId: string): Promise<number> {
 
     const { embedText } = await import("./embeddings.server");
     const linhas = cegas as { id: string; question: string }[];
-    const vetores = await Promise.all(
-      /* Mesma limpeza dos outros dois caminhos. Curar com o texto cru
-         deixaria as lacunas antigas num tratamento e as novas noutro — e duas
-         perguntas iguais não se encontrariam por causa de uma saudação. */
-      linhas.map((g) =>
-        embedText(textoParaVetor(String(g.question ?? "").slice(0, 300)), CURA_TIMEOUT_MS),
-      ),
+    /* Mesma limpeza dos outros dois caminhos. Curar com o texto cru deixaria
+       as lacunas antigas num tratamento e as novas noutro — e duas perguntas
+       iguais não se encontrariam por causa de uma saudação. */
+    const vetores = await emLotes(linhas, CURA_POR_LOTE, (g) =>
+      embedText(textoParaVetor(String(g.question ?? "").slice(0, 300)), CURA_TIMEOUT_MS),
     );
 
     const curadas = linhas

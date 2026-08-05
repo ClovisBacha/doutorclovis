@@ -617,19 +617,38 @@ export const listBrainGaps = createServerFn({ method: "POST" })
     if (error?.code === "42P01")
       return { ok: false as const, gaps: [] as BrainGap[], missingTable: true as const };
     if (error) return { ok: false as const, gaps: [] as BrainGap[] };
-    /* Cura preguiçosa: quem abre o painel faz o sistema andar. Lacuna sem
-       vetor não agrupa nem é agrupada, e todas as anteriores à migration
-       nasceram assim — sem isto, a fila que ele tem hoje nunca passa a agrupar.
-
-       COM `await`, e isso não é descuido. Sem ele a cura não acontecia: em
-       serverless a invocação congela assim que esta função devolve a lista, e
-       o trabalho solto morria antes do primeiro embedding — silenciosamente, e
-       com a tela mostrando exatamente o que mostraria se tivesse funcionado.
-       A espera é curta e some sozinha: os embeddings saem em paralelo com teto
-       de 2,5s, e depois da primeira abertura não sobra lacuna cega. */
-    const { curarLacunasSemVetor } = await import("./secondbrain.server");
-    await curarLacunasSemVetor(doctorId);
     return { ok: true as const, gaps: (rows ?? []) as BrainGap[] };
+  });
+
+/**
+ * Dá vetor às lacunas que nasceram sem um.
+ *
+ * Server function PRÓPRIA, e não um pedaço do `listBrainGaps`, por dois
+ * motivos que se somam:
+ *
+ *   · a lista do médico aparece na hora — a cura pode levar segundos sem que
+ *     ninguém espere por ela;
+ *   · e a cura ganha o tempo de vida de uma requisição só dela. Dentro do
+ *     `listBrainGaps` ela precisava caber no instante em que a tela carrega, e
+ *     foi por isso que eu apertei o teto de cada embedding para 2,5s e disparei
+ *     todos de uma vez — o que derrubava os doze juntos num soluço do modelo.
+ *
+ * Em serverless, disparar-e-esquecer NÃO funciona (a invocação congela com a
+ * resposta), então o navegador chama esta função separadamente e é a
+ * requisição DELA que mantém o trabalho vivo.
+ */
+export const curarLacunasDoMedico = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), asDoctor: z.string().uuid().optional() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, curadas: 0 };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const, curadas: 0 };
+    const { curarLacunasSemVetor } = await import("./secondbrain.server");
+    const curadas = await curarLacunasSemVetor(target.doctorId);
+    return { ok: true as const, curadas };
   });
 
 /**

@@ -112,6 +112,7 @@ import {
   listUnansweredQuestions,
   answerAndTrain,
   testBrain,
+  curarLacunasDoMedico,
   listBrainGaps,
   resolveBrainGap,
   dismissBrainGap,
@@ -5844,6 +5845,15 @@ function BrainGapsCard({
       if (res.ok) {
         setGaps(res.gaps);
         setLoadError(null);
+        /* Lacuna sem vetor não agrupa nem é agrupada, e toda lacuna anterior à
+           migration nasceu assim. A cura vai numa requisição SEPARADA de
+           propósito: a lista já está na tela, e é a requisição dela que mantém
+           o trabalho vivo em serverless — dentro do `listBrainGaps` a cura
+           tinha que caber no instante do carregamento, e era isso que a fazia
+           falhar em bloco. Ninguém espera por ela. */
+        void curarLacunasDoMedico({
+          data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
+        }).catch(() => {});
       } else if ("missingTable" in res && res.missingTable) {
         setLoadError("migracao");
       } else {

@@ -594,77 +594,54 @@ describe("as lacunas antigas ganham vetor sozinhas", () => {
   });
 });
 
-describe("a cura é disparada por quem abre a fila", () => {
-  const fonte = readFileSync("src/lib/secondbrain.functions.ts", "utf8");
-  const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+describe("a cura tem requisição própria", () => {
+  const fn = codigoDe("src/lib/secondbrain.functions.ts");
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
 
-  test("`listBrainGaps` chama a cura", () => {
-    expect(codigo).toContain("curarLacunasSemVetor(doctorId)");
+  test("existe como server function separada", () => {
+    expect(fn).toContain("export const curarLacunasDoMedico = createServerFn(");
   });
 
-  /**
-   * ESTE É O TESTE QUE FALTAVA — e a versão anterior dele cobrava o CONTRÁRIO.
-   *
-   * A cura foi escrita como `void (async () => {…})()`, disparar e esquecer,
-   * para o painel não esperar. Não curou nada: em serverless a invocação
-   * congela assim que a resposta sai, e `listBrainGaps` devolve a lista na
-   * hora — o trabalho solto morria antes do primeiro embedding.
-   *
-   * O defeito não deixou rastro nenhum. A fila aparecia certa, sem erro, e a
-   * consulta no banco seguia mostrando as mesmas lacunas cegas. Só apareceu
-   * porque alguém rodou o `count(*)` duas vezes e viu o mesmo número.
-   */
-  test("com `await` — sem ele o trabalho morre com a resposta", () => {
-    expect(codigo).toMatch(/await\s+curarLacunasSemVetor/);
-  });
-
-  test("a função é async de verdade, não `void` disfarçado", () => {
-    /* `await` sobre uma função que devolve `void` aguarda `undefined` e
-       resolve no microtask seguinte — parece certo e não é. */
-    const fonteServer = readFileSync("src/lib/secondbrain.server.ts", "utf8");
-    expect(fonteServer).toMatch(
-      /export async function curarLacunasSemVetor\([^)]*\): Promise<number>/,
+  test("`listBrainGaps` NÃO cura mais — a lista aparece na hora", () => {
+    /* Dentro dela, a cura tinha que caber no instante do carregamento. Foi
+       isso que me levou a apertar cada embedding em 2,5s e disparar todos de
+       uma vez — e um soluço do modelo derrubava os doze juntos. */
+    const lista = fn.slice(
+      fn.indexOf("export const listBrainGaps"),
+      fn.indexOf("export const curarLacunasDoMedico"),
     );
+    expect(lista).not.toContain("curarLacunasSemVetor");
   });
 
-  test("os embeddings saem juntos, para o `await` ser curto", async () => {
-    /* Sequencial, vinte perguntas seriam vinte idas ao Gemini EM FILA — e o
-       médico esperaria por todas antes de ver a própria fila. Agora que a cura
-       é aguardada, isso deixou de ser detalhe de custo e virou tempo de tela.
+  test("o painel chama a cura depois de mostrar a lista", () => {
+    /* Em serverless, disparar-e-esquecer NÃO sobrevive: a invocação congela
+       com a resposta. É a requisição do NAVEGADOR que mantém o trabalho vivo. */
+    expect(painel).toContain("void curarLacunasDoMedico({");
+  });
 
-       Medido pela simultaneidade real, e não lendo `Promise.all` no fonte:
-       a primeira versão deste teste lia o fonte, casava com o `Promise.all`
-       das GRAVAÇÕES, e continuava passando com os embeddings em fila. */
+  test("a cura aguarda de verdade dentro da requisição dela", () => {
+    expect(fn).toContain("const curadas = await curarLacunasSemVetor(target.doctorId);");
+  });
+
+  test("os embeddings saem em LOTES, não todos de uma vez", async () => {
+    /* Doze chamadas simultâneas ao modelo: uma lentidão ou um 429 derruba as
+       doze juntas, e a cada abertura do painel a mesma rajada falha igual.
+       Medido pela simultaneidade real, não lendo o fonte. */
     const reg = await rodarCura({
-      cegas: [
-        { id: "g1", question: "a" },
-        { id: "g2", question: "b" },
-        { id: "g3", question: "c" },
-      ],
+      cegas: Array.from({ length: 9 }, (_, i) => ({ id: `g${i}`, question: `pergunta ${i}` })),
     });
-    expect(reg.maxSimultaneos).toBe(3);
+    expect(reg.maxSimultaneos).toBeGreaterThan(1);
+    expect(reg.maxSimultaneos).toBeLessThanOrEqual(4);
+    expect(reg.updates).toHaveLength(9);
+  });
+
+  test("o teto por embedding deixou de ser apertado", () => {
+    const server = codigoDe("src/lib/secondbrain.server.ts");
+    const teto = Number(server.match(/CURA_TIMEOUT_MS = (\d+)/)?.[1]);
+    expect(teto).toBeGreaterThanOrEqual(5000);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// A saudação não pode separar duas perguntas iguais
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * CASO REAL, medido na fila de verdade.
- *
- * Estas duas são a MESMA pergunta:
- *
- *   "A doutora já respondeu minha dúvida"
- *   "Olá tudo bem a doutora já chegou a aprovar e responder as dúvidas"
- *
- * A primeira juntou com uma paráfrase curta; a segunda abriu linha nova. A
- * diferença não é o assunto — é que metade da segunda é protocolo social, e
- * saudação entra no vetor com o mesmo peso do conteúdo.
- *
- * O que o médico VÊ continua sendo o texto cru da paciente. Só a comparação
- * usa a versão enxuta.
- */
 describe("o texto que vira vetor é enxuto; o que ele lê, não", () => {
   test("tira a saudação da frente", async () => {
     const { textoParaVetor } = await import("./secondbrain.server");
