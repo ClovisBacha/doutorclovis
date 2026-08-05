@@ -46,7 +46,12 @@ type Registro = {
   fim: Promise<void>;
 };
 
-function supabaseDeMentira(opts: { existente?: any; parecidas?: any[] }): {
+function supabaseDeMentira(opts: {
+  existente?: any;
+  parecidas?: any[];
+  /** Simula o banco SEM a coluna `embedding` (SQL ainda não aplicado). */
+  semColunaEmbedding?: boolean;
+}): {
   sb: any;
   reg: Registro;
 } {
@@ -81,9 +86,17 @@ function supabaseDeMentira(opts: { existente?: any; parecidas?: any[] }): {
         },
         insert(linha: any) {
           reg.inserts.push(linha);
-          terminou();
+          /* Igual ao PostgREST: coluna desconhecida recusa a LINHA INTEIRA e
+             devolve `error` — não estoura. */
+          const recusa = opts.semColunaEmbedding && linha.embedding !== undefined;
+          if (!recusa) terminou();
           return {
-            select: () => ({ maybeSingle: async () => ({ data: { id: "lacuna-nova" } }) }),
+            select: () => ({
+              maybeSingle: async () =>
+                recusa
+                  ? { data: null, error: { code: "PGRST204", message: "column not found" } }
+                  : { data: { id: "lacuna-nova" }, error: null },
+            }),
           };
         },
         upsert: async (linha: any) => {
@@ -109,6 +122,7 @@ async function rodarLacuna(opts: {
   embedding?: number[] | null;
   /** O que o `embedText` de reserva devolve. `null` = sem chave de IA. */
   embedTextDevolve?: number[] | null;
+  semColunaEmbedding?: boolean;
 }) {
   const { sb, reg } = supabaseDeMentira(opts);
   mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sb }));
@@ -196,6 +210,39 @@ describe("a lacuna nova nasce com o vetor", () => {
   test("sem isso, a PRIMEIRA nunca agruparia a segunda", async () => {
     const reg = await rodarLacuna({ embedding: VETOR });
     expect(reg.inserts[0].embedding).toEqual(VETOR);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A janela entre o deploy e o SQL — onde a lacuna sumia calada
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("com o banco ainda sem a coluna, a pergunta não se perde", () => {
+  /* O código sobe pela Vercel a cada push; o SQL é aplicado à mão, depois.
+     Nessa janela o PostgREST recusa a linha inteira por causa de uma coluna
+     que ele não conhece — e recusa devolvendo `error`, sem estourar. Ignorar
+     esse `error` fazia TODA lacuna nova sumir em silêncio, enquanto a IA
+     continuava prometendo à paciente "registrei aqui para ele ver".
+     É o pior tipo de defeito deste projeto: some a pergunta de alguém, não
+     deixa rastro, e só aparece quando o médico estranha a fila vazia. */
+  test("a segunda tentativa vai sem o vetor e a lacuna entra", async () => {
+    const reg = await rodarLacuna({ embedding: VETOR, semColunaEmbedding: true });
+    expect(reg.inserts).toHaveLength(2);
+    expect(reg.inserts[0].embedding).toEqual(VETOR); // tentou agrupar
+    expect(reg.inserts[1].embedding).toBeUndefined(); // desistiu do vetor
+    expect(reg.inserts[1].question).toContain("enjoo"); // a pergunta sobreviveu
+  });
+
+  test("quem perguntou continua sendo registrado como esperando", async () => {
+    /* Sem o id da lacuna, a paciente não recebe o push quando o médico
+       responder — ela some junto com o vetor. */
+    const reg = await rodarLacuna({ embedding: VETOR, semColunaEmbedding: true });
+    expect(reg.askers[0]).toEqual({ gap_id: "lacuna-nova", user_id: "paciente-1" });
+  });
+
+  test("com a coluna existindo, não há segunda tentativa", async () => {
+    const reg = await rodarLacuna({ embedding: VETOR });
+    expect(reg.inserts).toHaveLength(1);
   });
 });
 

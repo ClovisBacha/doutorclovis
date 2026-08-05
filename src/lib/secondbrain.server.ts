@@ -318,19 +318,31 @@ export function logBrainGap(
           .eq("id", existing.id);
         await anotaQuemPerguntou(existing.id);
       } else {
-        const { data: nova } = await sb
-          .from("brain_gaps")
-          .insert({
-            doctor_id: doctorId,
-            question: clean,
-            norm_question: norm,
-            channel,
-            /* Sem vetor a lacuna funciona igual — só não agrupa. Melhor nascer
-               sem que não nascer. */
-            ...(vetor ? { embedding: vetor } : {}),
-          })
-          .select("id")
-          .maybeSingle();
+        const base = {
+          doctor_id: doctorId,
+          question: clean,
+          norm_question: norm,
+          channel,
+        };
+        const gravar = (linha: Record<string, unknown>) =>
+          sb.from("brain_gaps").insert(linha).select("id").maybeSingle();
+
+        /* Sem vetor a lacuna funciona igual — só não agrupa. Melhor nascer sem
+           que não nascer. */
+        const primeira = await gravar(vetor ? { ...base, embedding: vetor } : base);
+        let nova = primeira.data;
+
+        /* O código sobe pela Vercel a cada push; o SQL é aplicado à mão. Nessa
+           janela a coluna `embedding` ainda não existe, e o PostgREST recusa a
+           LINHA INTEIRA por causa dela — o insert não estoura, devolve `error`.
+           Ignorar esse `error` fazia toda lacuna nova sumir calada justamente
+           enquanto ninguém desconfia de nada: a IA segue dizendo à paciente
+           "registrei aqui para ele ver", e não registrou.
+           Então a segunda tentativa vai sem o vetor: perde o agrupamento,
+           mantém a pergunta. */
+        if (primeira.error && vetor) {
+          nova = (await gravar(base)).data;
+        }
         await anotaQuemPerguntou(nova?.id);
         // Fecha o ciclo em horas, não em dias: avisa o médico que a IA tem
         // pergunta sem resposta. No máximo 1 e-mail por dia por médico (o
