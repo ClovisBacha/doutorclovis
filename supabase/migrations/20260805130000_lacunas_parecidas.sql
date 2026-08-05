@@ -94,5 +94,64 @@ GRANT EXECUTE ON FUNCTION public.match_brain_gaps(uuid, vector, int) TO service_
 -- nada, INSERE mais uma. A partir daí aquela pergunta nunca mais junta, nem
 -- quando repetida com o texto idêntico.
 
+-- Antes do índice, limpar o que já duplicou — senão o CREATE UNIQUE INDEX
+-- falha e, no editor do Supabase, DESFAZ O ARQUIVO INTEIRO (é uma transação
+-- só). O arquivo passaria a não conseguir mais consertar nada.
+--
+-- A sobrevivente é a MAIS ANTIGA: é ela que tem o histórico em
+-- `brain_gap_askers`. As repetições somam os `hits` nela — o contador da fila
+-- continua dizendo a verdade sobre quantas pacientes perguntaram.
+WITH ranqueadas AS (
+  SELECT id,
+         doctor_id,
+         norm_question,
+         hits,
+         row_number() OVER (
+           PARTITION BY doctor_id, norm_question ORDER BY created_at
+         ) AS posicao
+  FROM public.brain_gaps
+),
+somas AS (
+  SELECT doctor_id, norm_question, sum(hits) AS total
+  FROM ranqueadas GROUP BY 1, 2 HAVING count(*) > 1
+)
+UPDATE public.brain_gaps g
+   SET hits = s.total
+  FROM ranqueadas r
+  JOIN somas s
+    ON s.doctor_id = r.doctor_id AND s.norm_question = r.norm_question
+ WHERE g.id = r.id AND r.posicao = 1;
+
+-- Quem perguntou não pode se perder junto com a linha duplicada: reaponta os
+-- registros das repetições para a sobrevivente antes de apagá-las.
+WITH ranqueadas AS (
+  SELECT id, doctor_id, norm_question,
+         row_number() OVER (
+           PARTITION BY doctor_id, norm_question ORDER BY created_at
+         ) AS posicao,
+         first_value(id) OVER (
+           PARTITION BY doctor_id, norm_question ORDER BY created_at
+         ) AS sobrevivente
+  FROM public.brain_gaps
+)
+UPDATE public.brain_gap_askers a
+   SET gap_id = r.sobrevivente
+  FROM ranqueadas r
+ WHERE a.gap_id = r.id
+   AND r.posicao > 1
+   AND NOT EXISTS (
+     SELECT 1 FROM public.brain_gap_askers b
+      WHERE b.gap_id = r.sobrevivente AND b.user_id = a.user_id
+   );
+
+DELETE FROM public.brain_gaps g
+ USING (
+   SELECT id, row_number() OVER (
+            PARTITION BY doctor_id, norm_question ORDER BY created_at
+          ) AS posicao
+     FROM public.brain_gaps
+ ) r
+ WHERE g.id = r.id AND r.posicao > 1;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_brain_gaps_doctor_question
   ON public.brain_gaps (doctor_id, norm_question);

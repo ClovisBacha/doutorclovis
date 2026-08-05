@@ -389,9 +389,10 @@ describe("o vetor da pergunta sobrevive ao bloco onde foi calculado", () => {
   });
 
   test("é o vetor que a lacuna recebe", () => {
-    expect(fonte).toContain(
-      "logBrainGap(target, userMessage, channel, patientId, vetorDaPergunta)",
-    );
+    /* Condicionado ao tamanho: acima de 300 caracteres os dois lados tratam o
+       texto de formas diferentes, e reaproveitar gravaria um vetor que a
+       consulta seguinte não procuraria. */
+    expect(fonte).toContain("cabeNoCorteDaLacuna ? vetorDaPergunta : null,");
   });
 
   test("é o MESMO vetor da busca — não um embedding novo", () => {
@@ -825,5 +826,60 @@ describe("e-mail de lacuna só quando a lacuna existe", () => {
        que não estava lá. */
     const fonte = codigoDe("src/lib/secondbrain.server.ts");
     expect(fonte).toContain("if (nova?.id) notifyDoctorOfGap(doctorId, sb);");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dois vetores da mesma pergunta, em espaços diferentes
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("o vetor reaproveitado só vale quando o tratamento é o mesmo", () => {
+  /* A lacuna embeda `question.trim().slice(0, 300)`; a consulta embeda a
+     mensagem INTEIRA. Para mensagem curta as duas strings coincidem e
+     reaproveitar é de graça. Passando de 300 caracteres são strings
+     diferentes — e o vetor GRAVADO na lacuna deixa de ser o que a próxima
+     consulta vai procurar. Dois vetores da mesma pergunta em espaços
+     distintos: exatamente o defeito que este arquivo existe para consertar. */
+  test("mensagem longa não reaproveita o vetor da consulta", () => {
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain("const cabeNoCorteDaLacuna = userMessage.trim().length <= 300;");
+    expect(fonte).toContain("cabeNoCorteDaLacuna ? vetorDaPergunta : null,");
+  });
+
+  test("o limite bate com o corte que a lacuna usa", () => {
+    /* Se um lado mudar sem o outro, a assimetria volta calada. */
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain("question.trim().slice(0, 300)");
+    expect(fonte).toContain("userMessage.trim().length <= 300");
+  });
+});
+
+describe("o reset dos vetores sujos alcança TODAS as lacunas", () => {
+  const sql = readFileSync("supabase/APLICAR_LACUNAS_PARECIDAS.sql", "utf8").replace(
+    /^\s*--.*$/gm,
+    "",
+  );
+
+  test("zera sem filtrar por status", () => {
+    /* Lacuna `respondida` é REABERTA quando o texto exato repete, e voltaria
+       para a busca com o vetor sujo — que a cura nunca mais alcança, porque
+       ela só enxerga vetor nulo. Vetor nulo é inerte; sujo é ativo e errado. */
+    expect(sql).toContain("UPDATE public.brain_gaps SET embedding = NULL;");
+    expect(sql).not.toMatch(/SET embedding = NULL WHERE status/);
+  });
+
+  test("as duplicatas são fundidas ANTES do índice único", () => {
+    /* No editor do Supabase o arquivo roda numa transação só: se o CREATE
+       UNIQUE INDEX estourar por duplicata, ele desfaz TUDO — inclusive o
+       reset acima. O arquivo passaria a não conseguir consertar nada. */
+    const posMerge = sql.indexOf("DELETE FROM public.brain_gaps g");
+    const posIndice = sql.indexOf("CREATE UNIQUE INDEX IF NOT EXISTS uq_brain_gaps");
+    expect(posMerge).toBeGreaterThan(0);
+    expect(posMerge).toBeLessThan(posIndice);
+  });
+
+  test("fundir duplicata não perde quem perguntou nem os hits", () => {
+    expect(sql).toContain("UPDATE public.brain_gap_askers a");
+    expect(sql).toContain("sum(hits)");
   });
 });

@@ -833,9 +833,25 @@ export async function getBrainContext(
     }
 
     if (selected.length === 0 && channel !== "teste") {
-      /* É o MESMO vetor usado para procurar cobertura, calculado logo acima.
-         Passar adiante custa zero e é o que permite agrupar. */
-      logBrainGap(target, userMessage, channel, patientId, vetorDaPergunta);
+      /* Reaproveita o vetor da busca — mas SÓ quando os dois lados tratam o
+         texto igual.
+
+         A lacuna embeda `question.trim().slice(0, 300)`; a consulta embeda a
+         mensagem INTEIRA (até 2000). Para mensagem curta as duas strings são a
+         mesma e reaproveitar é de graça. Passando de 300, são strings
+         diferentes — e o vetor gravado na lacuna não seria o que a próxima
+         consulta procura. Dois vetores da MESMA pergunta em espaços
+         diferentes: exatamente o defeito que se está consertando.
+         Acima do limite, `logBrainGap` calcula o vetor canônico dele. É o
+         caminho raro do caminho raro: mensagem longa E sem cobertura. */
+      const cabeNoCorteDaLacuna = userMessage.trim().length <= 300;
+      logBrainGap(
+        target,
+        userMessage,
+        channel,
+        patientId,
+        cabeNoCorteDaLacuna ? vetorDaPergunta : null,
+      );
     }
 
     // Montagem do bloco pelo núcleo DoctorThink (rótulos de domínio da
