@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   MINIMO_DE_AMOSTRAS,
   MINUTOS_PADRAO,
@@ -16,6 +17,7 @@ import {
   minutosPorResposta,
   palavras,
   tempoPoupado,
+  fechoDoTempo,
 } from "./tempo-poupado";
 
 const frase = (n: number) => Array.from({ length: n }, () => "palavra").join(" ");
@@ -99,15 +101,71 @@ describe("o rótulo fala a língua da agenda", () => {
     expect(tempoPoupado(25, 3)).toBe("1h15");
   });
 
-  test("acima de 8 horas vira DIAS de consultório", () => {
-    /* "50h" o médico lê como número; "6 dias" ele lê como a agenda dele. */
-    /* 1000 × 3 min = 3.000 min = 50h → 6 dias de 8h e sobram 2. */
-    expect(tempoPoupado(1000, 3)).toBe("6d2h");
-    expect(tempoPoupado(160, 3)).toBe("1 dia");
-    expect(tempoPoupado(320, 3)).toBe("2 dias");
+  test("NUNCA fala em dias de consultório — consulta é a renda dele", () => {
+    /* Este é o teste que existe por causa de uma correção de negócio, não de
+       formatação: "você economizou 6 dias de consultório" diz ao médico que ele
+       faturou menos. O tempo que a IA devolve é o NÃO PAGO — mensagem à noite,
+       no domingo, no jantar. Isso não se mede em jornadas de trabalho. */
+    for (const n of [160, 320, 1000, 5000]) {
+      const r = tempoPoupado(n, 3);
+      expect(r).not.toMatch(/dia/i);
+      expect(r).not.toMatch(/consult/i);
+    }
+    /* 1000 × 3 min = 3.000 min = 50h. */
+    expect(tempoPoupado(1000, 3)).toBe("50 horas");
+  });
+
+  test("depois de 10 horas os minutos somem — viram ruído", () => {
+    expect(tempoPoupado(200, 3)).toBe("10 horas");
+    expect(tempoPoupado(199, 3)).toBe("9h57");
   });
 
   test("o total também desce, nunca sobe", () => {
     expect(tempoPoupado(1, 3.9)).toBe("3 min");
+  });
+});
+
+describe("o fecho do card", () => {
+  test("é estável dentro do mesmo mês — sorteio leria como defeito", () => {
+    /* Frase que muda a cada carregamento parece bug. Pelo mês, ela muda quando
+       o número muda. */
+    expect(fechoDoTempo(3)).toBe(fechoDoTempo(3));
+  });
+
+  test("qualquer mês devolve uma frase — inclusive fora da faixa", () => {
+    for (const m of [-13, -1, 0, 5, 11, 99]) {
+      expect(fechoDoTempo(m).length).toBeGreaterThan(10);
+    }
+  });
+
+  test("nenhuma frase fala do consultório ou da agenda de atendimento", () => {
+    /* É a mesma regra do rótulo: o tempo devolvido é o de casa. */
+    for (const m of [0, 1, 2, 3, 4, 5]) {
+      expect(fechoDoTempo(m)).not.toMatch(/consult[óo]rio|agenda|paciente/i);
+    }
+  });
+});
+
+describe("o card nunca fala em tempo de consultório", () => {
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8")
+    /* Sem comentários: eles EXPLICAM a correção e citam "consultório". */
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+  test('a linha do dinheiro não diz mais "em consultas suas"', () => {
+    /* Dizia que a IA poupou CONSULTAS — ou seja, que ele faturou menos.
+       Consulta é a renda dele; o que a IA poupa é o tempo não pago. */
+    expect(painel).not.toContain("em consultas suas");
+  });
+
+  test("a frase direta diz QUAL tempo voltou", () => {
+    const semQuebras = painel.replace(/\s+/g, " ");
+    expect(semQuebras).toContain("Você ganhou");
+    expect(semQuebras).toContain("respondendo mensagem fora do consultório");
+  });
+
+  test("a frase só aparece a partir de uma hora", () => {
+    /* "Você ganhou 12 minutos de volta" não é uma frase, é uma piada. */
+    expect(painel).toContain("assists * minutosPorResposta >= 60");
   });
 });

@@ -85,23 +85,49 @@ export function minutosPorResposta(respostasDele: string[]): number {
 }
 
 /**
- * O rótulo do card: "1h30", "45 min", "2 dias de consultório".
+ * O rótulo do card: "45 min", "1h30", "84 horas".
  *
- * Acima de 8 horas a unidade muda para DIAS de trabalho, porque é aí que a hora
- * para de significar alguma coisa: "50h" o médico lê como número; "6 dias de
- * consultório" ele lê como a agenda dele.
+ * ─── Por que NÃO se converte para "dias" ────────────────────────────────
+ *
+ * A primeira versão virava "6 dias de consultório" acima de 8 horas, e isso
+ * estava errado por um motivo de negócio, não de formatação: **consulta é a
+ * renda do médico.** Dizer que ele "economizou 6 dias de consultório" é dizer
+ * que ele faturou menos — o oposto do que o card quer afirmar.
+ *
+ * O tempo que a IA devolve não é o do consultório: é o NÃO PAGO. A mensagem
+ * respondida às onze da noite, no domingo, no meio do jantar. Esse tempo não se
+ * mede em jornadas de trabalho, então a unidade certa é hora — e "84 horas"
+ * continua sendo um número que impressiona, sem sugerir agenda vazia.
  */
 export function tempoPoupado(respostas: number, minutosCada = MINUTOS_PADRAO): string {
   const total = Math.floor(respostas * minutosCada);
   if (total < 60) return `${total} min`;
   const h = Math.floor(total / 60);
-  if (h < 8) {
-    const m = total % 60;
-    return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
-  }
-  const dias = Math.floor(h / 8);
-  const resto = h % 8;
-  /* "1 dias" é o tipo de erro que faz a tela inteira parecer descuidada. */
-  if (resto === 0) return dias === 1 ? "1 dia" : `${dias} dias`;
-  return `${dias}d${resto}h`;
+  const m = total % 60;
+  /* Depois de 10 horas, os minutos viram ruído: "84h" lê melhor que "84h37". */
+  if (h >= 10) return `${h} horas`;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * A frase que fecha o card. Rotaciona pelo MÊS, não por sorteio.
+ *
+ * Sorteio faria a frase mudar a cada carregamento da página, o que lê como
+ * defeito. Pelo mês, ela muda quando o número muda — e o médico que volta ao
+ * painel três vezes no mesmo dia vê a mesma coisa, como deve ser.
+ *
+ * O que elas nunca dizem: nada sobre a agenda do consultório. Todas apontam
+ * para o tempo que a IA de fato devolveu — o de casa.
+ */
+const FECHOS = [
+  "Aproveite para jantar sem o celular na mesa.",
+  "Aproveite para dormir cedo uma noite.",
+  "Aproveite para ficar com quem estava esperando por você.",
+  "Aproveite para não abrir o WhatsApp no fim de semana.",
+  "Aproveite para sair do plantão e não levar trabalho para casa.",
+  "Aproveite para fazer aquilo que você vive adiando.",
+];
+
+export function fechoDoTempo(mes: number): string {
+  return FECHOS[((mes % FECHOS.length) + FECHOS.length) % FECHOS.length];
 }

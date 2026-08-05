@@ -78,7 +78,7 @@ import {
 } from "@/lib/doctor-addresses.functions";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { gradientFor, periodFor } from "@/components/weather-sky";
-import { tempoPoupado } from "@/lib/tempo-poupado";
+import { fechoDoTempo, tempoPoupado } from "@/lib/tempo-poupado";
 import { ymdLocal } from "@/lib/utils";
 import {
   getTeleconsultasAdmin,
@@ -1434,10 +1434,30 @@ function ValorGeradoBanner({
         <ValueTile big={answered} label="perguntas que você respondeu" />
         <ValueTile
           big={tempoPoupado(assists, minutosPorResposta)}
-          label="que a IA respondeu por você (estimativa)"
+          label="do seu tempo de volta (estimativa)"
         />
         <ValueTile big={activePatients} label="pacientes ativas nos últimos 7 dias" />
       </div>
+
+      {/* A frase direta, e ela é o ponto do card.
+
+          Os quatro azulejos são números; número o médico lê e esquece. O que
+          fica é a frase — e ela precisa dizer QUAL tempo voltou, porque é aí
+          que mora a proposta inteira: não é hora de consultório (essa é a renda
+          dele), é a mensagem respondida às onze da noite, no domingo, no meio
+          do jantar. Tempo que ele dava de graça e não contava.
+
+          Só aparece a partir de uma hora: "você ganhou 12 minutos de volta" não
+          é uma frase, é uma piada. */}
+      {assists * minutosPorResposta >= 60 && (
+        <p className="mt-3.5 text-[13.5px] leading-relaxed text-foreground">
+          Você ganhou{" "}
+          <strong className="text-primary">{tempoPoupado(assists, minutosPorResposta)}</strong> de
+          volta este mês — o tempo que você não passou respondendo mensagem fora do consultório.{" "}
+          {fechoDoTempo(new Date().getMonth())}
+        </p>
+      )}
+
       {/* A conta fechada, em dinheiro.
 
           "A IA respondeu 3 horas por você" é bonito e some da cabeça na hora de
@@ -1460,8 +1480,8 @@ function ValorGeradoBanner({
         const rodape = (
           <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
             Estimativa: cada resposta da IA poupa ~{minutosPorResposta.toString().replace(".", ",")}{" "}
-            min seus — o tempo de escrever uma resposta do tamanho das suas — e uma consulta ocupa
-            ~40 min da sua agenda.
+            min seus — o tempo de escrever uma resposta do tamanho das suas. A sua hora é calculada
+            pela consulta (~40 min), só como régua de valor.
           </p>
         );
 
@@ -1488,7 +1508,14 @@ function ValorGeradoBanner({
                       : "bg-secondary text-foreground"
                   }`}
                 >
-                  A IA trabalhou o equivalente a <strong>{texto}</strong> em consultas suas
+                  {/* NÃO se diz mais "o equivalente a X em consultas suas".
+                      Consulta é a RENDA dele: a frase antiga afirmava que a IA
+                      poupou consultas, ou seja, que ele faturou menos. O que a
+                      IA poupa é o tempo NÃO PAGO — a mensagem das onze da
+                      noite. O dinheiro continua aqui porque hora some da cabeça
+                      na hora de renovar, mas ele agora VALORA o tempo dele, em
+                      vez de sugerir agenda vazia. */}
+                  Esse tempo, valendo o que vale a sua hora, dá <strong>{texto}</strong>
                   {mensalidadeDoPlanoCentavos > 0
                     ? ganha
                       ? " — mais que a mensalidade do seu plano."
