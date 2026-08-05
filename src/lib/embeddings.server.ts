@@ -1,16 +1,56 @@
 /**
- * Embeddings do Segundo Cérebro — Gemini text-embedding-004 (768 dims) via
- * REST (mesmo padrão do transcritor; sem dependência nova).
+ * Embeddings do Segundo Cérebro — Gemini `gemini-embedding-001` em 768 dims,
+ * via REST (mesmo padrão do transcritor; sem dependência nova).
  *
  * Filosofia: embeddings são ENRIQUECIMENTO, nunca dependência. Toda função
  * aqui é best-effort e devolve null/false em falha — o chamador segue com o
  * ranking por palavras. Nada de IA no caminho crítico sem rede de segurança.
+ *
+ * ─── O DEFEITO QUE ISTO CONSERTA ────────────────────────────────────────────
+ *
+ * O padrão era `text-embedding-004`, que o Google APOSENTOU. Toda chamada
+ * voltava erro, o `!res.ok` devolvia null, e a filosofia acima — a mesma que
+ * protege o chat — escondeu a falha por completo: nenhum vetor era gravado,
+ * nenhum erro aparecia, e a busca semântica caía no ranking por palavras
+ * sempre. Do lado de fora, um cérebro que nunca entendeu sinônimos parecia um
+ * cérebro que só não tinha achado nada parecido.
+ *
+ * Foi descoberto porque as lacunas paravam de agrupar: `embedding IS NULL` em
+ * TODAS, inclusive nas recém-criadas.
+ *
+ * A lição não é o nome do modelo — é que "best-effort silencioso" e "modelo
+ * que some" juntos produzem um recurso morto que ninguém vê morrer. Por isso
+ * a falha agora é REGISTRADA (`console.error`) com o status da resposta.
  */
 
-const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "text-embedding-004";
+/**
+ * `gemini-embedding-001`: modelo de TEXTO atual. Existe o
+ * `gemini-embedding-2`, multimodal e mais novo — não é preciso aqui, e os dois
+ * espaços vetoriais são INCOMPATÍVEIS entre si. Trocar de modelo depois exige
+ * regerar tudo (ver a nota de migração no fim do arquivo).
+ */
+const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "gemini-embedding-001";
+/**
+ * 768 é o tamanho das colunas `vector(768)` no banco.
+ *
+ * O padrão deste modelo é 3072. Sem pedir 768 explicitamente, o vetor volta
+ * grande demais, a guarda de tamanho abaixo o rejeita, e voltaríamos a
+ * gravar nada — o mesmo defeito com outra causa.
+ */
 const EMBEDDING_DIMS = 768;
 /** Entrada truncada: perguntas/respostas longas não precisam de mais que isso. */
 const MAX_INPUT_CHARS = 2000;
+
+/** Não repetir o mesmo erro a cada mensagem: um aviso por processo basta. */
+let jaAvisouDaFalha = false;
+function avisarFalha(motivo: string): void {
+  if (jaAvisouDaFalha) return;
+  jaAvisouDaFalha = true;
+  console.error(
+    `[embeddings] busca semântica DESLIGADA (${motivo}). ` +
+      `Modelo: ${EMBEDDING_MODEL}. O cérebro segue funcionando por palavras.`,
+  );
+}
 
 /**
  * Gera o vetor de um texto. null em qualquer falha (sem chave, rede, cota).
@@ -28,18 +68,52 @@ export async function embedText(text: string, timeoutMs = 6000): Promise<number[
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: { parts: [{ text: clean }] } }),
+        body: JSON.stringify({
+          content: { parts: [{ text: clean }] },
+          embedContentConfig: { outputDimensionality: EMBEDDING_DIMS },
+        }),
         signal: AbortSignal.timeout(timeoutMs),
       },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      /* 404 aqui quer dizer "modelo aposentado" — foi assim que o recurso
+         morreu da última vez, e sem esta linha morreria calado de novo. */
+      avisarFalha(`HTTP ${res.status}`);
+      return null;
+    }
     const data = (await res.json()) as { embedding?: { values?: number[] } };
     const values = data.embedding?.values;
-    if (!Array.isArray(values) || values.length !== EMBEDDING_DIMS) return null;
-    return values;
+    if (!Array.isArray(values)) {
+      avisarFalha("resposta sem vetor");
+      return null;
+    }
+    if (values.length !== EMBEDDING_DIMS) {
+      /* Tamanho errado não pode ser gravado: a coluna é `vector(768)`. */
+      avisarFalha(`vetor com ${values.length} dimensões, esperado ${EMBEDDING_DIMS}`);
+      return null;
+    }
+    return normalizar(values);
   } catch {
     return null;
   }
+}
+
+/**
+ * Normaliza para norma 1.
+ *
+ * Pedindo menos que 3072 dimensões o Google devolve o vetor TRUNCADO e não
+ * renormalizado. Para a distância de cosseno (`<=>`, a que o banco usa) isso
+ * não muda o ranking — cosseno ignora magnitude. Normalizamos assim mesmo por
+ * dois motivos: o número de similaridade passa a significar o que aparenta
+ * (e é ele que calibra o corte de agrupamento), e quem um dia usar `<->`
+ * (distância L2) não herda um erro silencioso.
+ */
+function normalizar(v: number[]): number[] {
+  let soma = 0;
+  for (const x of v) soma += x * x;
+  const norma = Math.sqrt(soma);
+  if (!norma || !Number.isFinite(norma)) return v;
+  return v.map((x) => x / norma);
 }
 
 /**
@@ -105,3 +179,20 @@ export function backfillBrainEmbeddings(doctorId: string, limit = 40): void {
     }
   })();
 }
+
+/* ─── NOTA DE MIGRAÇÃO DE MODELO ─────────────────────────────────────────────
+ *
+ * Espaços vetoriais de modelos diferentes NÃO são comparáveis. Um vetor gerado
+ * pelo `text-embedding-004` e outro pelo `gemini-embedding-001` produzem uma
+ * similaridade que parece um número normal e não significa nada.
+ *
+ * Trocar de modelo, portanto, obriga a regerar TUDO. Como os `embedding` estão
+ * todos nulos (o modelo antigo já estava aposentado quando isto foi
+ * descoberto), não há o que migrar hoje. Se um dia houver — ou se este arquivo
+ * mudar de modelo de novo —, limpe antes de deixar o backfill correr:
+ *
+ *   UPDATE public.brain_entries SET embedding = NULL;
+ *   UPDATE public.brain_gaps    SET embedding = NULL;
+ *
+ * O backfill (`backfillBrainEmbeddings`) e a cura (`curarLacunasSemVetor`) só
+ * enxergam linhas com vetor NULO — é assim que elas se reconstroem sozinhas.  */
