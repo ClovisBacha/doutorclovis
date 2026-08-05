@@ -167,3 +167,51 @@ describe("o histórico é contexto, não uma fila de perguntas pendentes", () =>
     expect(chat).toContain("nem faça um resumo do que já foi conversado");
   });
 });
+
+/**
+ * A IA sabia que tinha encaminhado a dúvida e não sabia o que aconteceu depois.
+ *
+ * Quando a paciente voltava e perguntava "a doutora respondeu?", ela fazia a
+ * única coisa que podia: inventava. Confirmava o encaminhamento (verdade) e
+ * emendava um processo que nunca existiu — "geralmente é pela seção de
+ * acompanhamento que a Dra. envia as respostas". Navegação inventada, contada a
+ * uma gestante que está esperando o médico dela.
+ */
+describe("o estado das dúvidas encaminhadas ao médico", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+
+  test("a IA passa a receber o status de cada uma", () => {
+    expect(chat).toContain("async function buildPendenciasBlock(");
+    expect(chat).toContain("JÁ RESPONDIDA pelo médico");
+    expect(chat).toContain("AINDA AGUARDANDO o médico");
+  });
+
+  test("só as dúvidas DESTA paciente", () => {
+    /* A lacuna é deduplicada por (médico, pergunta): cinquenta pacientes com a
+       mesma dúvida viram UM item. Sem o filtro por quem perguntou, a IA
+       contaria a esta paciente a dúvida de outra. */
+    expect(chat).toContain('.from("brain_gap_askers")');
+    expect(chat).toContain('.eq("user_id", patientId)');
+    expect(chat).toContain('.eq("doctor_id", doctorId)');
+  });
+
+  test("'ignorada' não vira 'o médico ignorou você'", () => {
+    expect(chat).toContain('g.status === "aberta" || g.status === "respondida"');
+  });
+
+  test("o bloco entra no prompt clínico", () => {
+    expect(chat).toContain("buildPendenciasBlock(patient.patientId, patient.doctorId)");
+    expect(chat).toMatch(/memoria,\s*\n\s*pendencias,/);
+  });
+
+  test("sem dado, o bloco some — não vira afirmação errada", () => {
+    /* Melhor a IA não saber que afirmar o que não pode verificar. */
+    expect(chat).toContain('if (!ids.length) return "";');
+    expect(chat).toContain('if (!linhas.length) return "";');
+  });
+
+  test("proíbe inventar tela, e isso vale sempre — não só quando há pendência", () => {
+    expect(chat).toContain("NUNCA descreva telas, abas, seções ou fluxos do app");
+    expect(chat).toContain("NÃO invente onde a resposta aparece");
+  });
+});

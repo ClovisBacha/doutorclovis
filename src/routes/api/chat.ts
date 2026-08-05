@@ -48,6 +48,7 @@ Regras de resposta:
 Você TAMBÉM é o suporte do app — e isso não passa pelo médico:
 - Dúvida de COMO USAR o app ou o site (onde fica uma aba, registrar contração ou chute, marcar consulta, enviar exame, convidar acompanhante, teleconsulta, plano/assinatura, login, notificação) você responde direto, na hora.
 - Nunca encaminhe uma dúvida dessas ao médico nem diga que "registrou para ele ver": ele responde conduta clínica, não suporte do aplicativo.
+- NUNCA descreva telas, abas, seções ou fluxos do app que não estejam escritos nestas instruções. Inventar onde algo fica ("vá na seção de acompanhamento", "a Dra. envia a resposta por lá") é pior que admitir que não sabe: manda a paciente procurar o que não existe. Se não souber, diga que não sabe e ofereça ajudar a encontrar.
 - Se a pergunta misturar as duas coisas, resolva a parte do app e trate a parte clínica pela regra acima.`;
 }
 
@@ -195,6 +196,82 @@ function buildClinicalBlock(
  *    médico continua mandando na conduta: saber a pressão não faz a IA
  *    prescrever nada.
  */
+/**
+ * O ESTADO das dúvidas que já foram encaminhadas ao médico.
+ *
+ * ─── O defeito que isto conserta ────────────────────────────────────────
+ *
+ * Quando a IA não tem cobertura para uma pergunta, ela registra uma lacuna e
+ * diz à paciente: "registrei aqui para ele ver". Até agora, essa era a última
+ * vez que ela sabia qualquer coisa sobre o assunto.
+ *
+ * Então, quando a paciente voltava e perguntava "a doutora respondeu?", a IA
+ * fazia a única coisa que podia: **inventava**. Dizia que tinha encaminhado
+ * (verdade), e emendava um processo que nunca existiu — "geralmente é pela
+ * seção de acompanhamento que a Dra. envia as respostas", "ela solicita um
+ * agendamento". Navegação inventada, contada a uma gestante que está esperando
+ * o médico dela.
+ *
+ * O dado existia o tempo todo: `brain_gaps.status` vira `respondida` no
+ * instante em que o médico responde, e `brain_gap_askers` diz quem perguntou.
+ * Faltava a IA enxergar.
+ *
+ * ─── Por que só as DELA ─────────────────────────────────────────────────
+ *
+ * A lacuna é deduplicada por `(médico, pergunta)`: cinquenta pacientes com a
+ * mesma dúvida viram UM item na fila dele. Sem o filtro por `brain_gap_askers`,
+ * a IA contaria a esta paciente a dúvida de outra — e "você perguntou sobre
+ * sangramento" para quem nunca perguntou é um vazamento com cara de bug.
+ */
+async function buildPendenciasBlock(patientId: string, doctorId: string): Promise<string> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: askers } = await sb
+      .from("brain_gap_askers")
+      .select("gap_id")
+      .eq("user_id", patientId)
+      .limit(40);
+    const ids = ((askers ?? []) as { gap_id: string }[]).map((a) => a.gap_id);
+    if (!ids.length) return "";
+
+    const { data: gaps } = await sb
+      .from("brain_gaps")
+      .select("question, status, updated_at")
+      .eq("doctor_id", doctorId)
+      .in("id", ids)
+      .order("updated_at", { ascending: false })
+      .limit(6);
+
+    const linhas = ((gaps ?? []) as { question: string; status: string; updated_at: string }[])
+      /* `ignorada` não entra: o médico decidiu que aquilo não vira orientação, e
+         dizer "ele ignorou a sua pergunta" seria péssimo e nem verdadeiro — o
+         motivo costuma ser que a dúvida não cabia num conselho geral. Para a
+         paciente, continua valendo "está com ele". */
+      .filter((g) => g.status === "aberta" || g.status === "respondida")
+      .map((g) => {
+        const quando = new Date(g.updated_at).toLocaleDateString("pt-BR");
+        return g.status === "respondida"
+          ? `- "${g.question}" — JÁ RESPONDIDA pelo médico (em ${quando}). A orientação dele já faz parte do que você sabe: se ela retomar o assunto, responda com ela.`
+          : `- "${g.question}" — AINDA AGUARDANDO o médico (encaminhada em ${quando}).`;
+      });
+    if (!linhas.length) return "";
+
+    return [
+      "## Dúvidas desta paciente encaminhadas ao médico (fonte: sistema)",
+      ...linhas,
+      /* Sem estas duas frases o bloco resolve um problema e cria outro: a IA
+         passaria a ter o estado certo e continuaria inventando o resto. */
+      "Use isto para responder com HONESTIDADE quando ela perguntar se o médico respondeu. NÃO invente onde a resposta aparece, NÃO prometa prazo e NÃO descreva telas ou seções do app que não estão nas suas instruções. Se estiver aguardando, diga que está aguardando — e que ela será avisada quando ele responder.",
+    ].join("\n");
+  } catch {
+    /* Tabela ausente: o bloco some e a IA volta a não saber. Melhor não saber
+       que afirmar errado. */
+    return "";
+  }
+}
+
 async function buildMedidasBlock(patientId: string): Promise<string> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -584,7 +661,7 @@ export const Route = createFileRoute("/api/chat")({
           // getBrainContext/getChatMemory são safe (falha vira bloco vazio).
           const userText = lastUserText(messages);
           const { getChatMemory, memoryBlock } = await import("@/lib/chat-memory.server");
-          const [brain, memorySummary, cicloBemEstar, medidas] = await Promise.all([
+          const [brain, memorySummary, cicloBemEstar, medidas, pendencias] = await Promise.all([
             // Fonte resolvida: local por padrão; DoctorThink remoto se ligado
             // (env + flag doctorthink_remote). Fallback local em qualquer falha.
             getBrainContextResolved(userText, patient.doctorId, "app", patient.patientId),
@@ -593,6 +670,7 @@ export const Route = createFileRoute("/api/chat")({
             // à fase do ciclo e a como ela vem se sentindo.
             buildCycleMoodBlock(patient.patientId),
             buildMedidasBlock(patient.patientId),
+            buildPendenciasBlock(patient.patientId, patient.doctorId),
           ]);
           const memoria = memoryBlock(memorySummary);
           const base = medicalSystemPrompt(patient.doctorName);
@@ -625,6 +703,7 @@ export const Route = createFileRoute("/api/chat")({
             medidas,
             cicloBemEstar,
             memoria,
+            pendencias,
             brain.enabledApp && brain.block ? brain.block : "",
             confianca,
           ]
