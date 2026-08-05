@@ -168,3 +168,63 @@ describe("as duas pontas continuam concordando", () => {
     }
   });
 });
+
+/**
+ * A REGRA QUE VIROU MORDAÇA.
+ *
+ * Caso real, e a prova veio de uma comparação: a MESMA pergunta ("posso comer
+ * comida japonesa"), o MESMO cérebro vazio, dois canais.
+ *
+ *   Playground do painel → "evitar carnes e peixes crus… pode consumir as
+ *                           opções cozidas ou bem passadas"
+ *   App da paciente      → "como sou uma inteligência artificial e não posso
+ *                           dar orientações médicas, o ideal é que você
+ *                           converse diretamente com a Dra."
+ *
+ * A diferença não era o cérebro — era o prompt. O do app dizia "responda
+ * SOMENTE seguindo as condutas já validadas pelo médico", e com o cérebro
+ * vazio NADA está validado: o modelo concluiu, corretamente, que não podia
+ * dizer nada. A regra escrita para proteger a paciente passou a deixá-la sem
+ * resposta nenhuma — e ela vai procurar num grupo de WhatsApp, que é pior.
+ *
+ * O conserto separa as duas camadas: informação consolidada a IA responde;
+ * conduta do caso dela continua sendo do médico.
+ */
+describe("o prompt do app informa antes de encaminhar", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+
+  test("não existe mais o `SOMENTE` que travava tudo", () => {
+    expect(chat).not.toContain("responda SOMENTE seguindo o estilo e as condutas");
+  });
+
+  test("as duas camadas da dúvida clínica estão escritas", () => {
+    expect(chat).toContain("Informação consolidada");
+    expect(chat).toContain("Conduta para o caso DELA");
+  });
+
+  test('"sou uma IA" deixa de ser desculpa para não responder', () => {
+    /* Foi a frase exata que a paciente recebeu. */
+    expect(chat).toContain('NUNCA use "sou uma IA" como motivo para não responder');
+  });
+
+  test("recusar sem informar está nomeado como resposta RUIM", () => {
+    /* Sem dizer isso com todas as letras, o modelo escolhe o caminho seguro
+       para ele — que é o caminho inútil para ela. */
+    expect(chat).toContain("Informe primeiro, encaminhe depois");
+  });
+
+  test("sem cobertura, a ordem é responder E DEPOIS registrar", () => {
+    /* Antes era "limite-se a informações gerais", que o modelo leu como
+       permissão para não dizer nada. Agora é uma obrigação, e o encaminhamento
+       vem depois. */
+    expect(chat).toContain("RESPONDA mesmo assim, com informação obstétrica consolidada");
+    expect(chat).toContain("SÓ DEPOIS diga");
+  });
+
+  test("a fronteira de segurança continua de pé", () => {
+    /* Informar mais não pode ter afrouxado o que realmente protege. */
+    expect(chat).toContain("NUNCA dê diagnóstico, prescrição, dose de medicamento");
+    expect(chat).toContain("192 (SAMU)");
+    expect(chat).toContain("Não invente dados");
+  });
+});
