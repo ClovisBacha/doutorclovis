@@ -6813,6 +6813,67 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
     .filter(Boolean)
     .join(" ");
 
+  /* Começa VAZIO, não com a saudação.
+
+     Se nascesse com a saudação, ela apareceria e seria trocada pelo histórico
+     meio segundo depois — um salto visível, logo na abertura. Como não dá para
+     saber de antemão se existe conversa anterior, a lista fica vazia até a
+     resposta chegar, e aí é uma coisa ou outra. */
+  const [messages, setMessages] = useState<WAMsg[]>([]);
+
+  /* O HISTÓRICO na tela.
+
+     Tudo o que ela conversou já era guardado, e o servidor reconstruía as
+     últimas 12 a cada mensagem — é por isso que a IA lembra do que foi dito
+     ontem. A TELA não: abria com a saudação e mais nada, toda vez. A paciente
+     perguntava sobre uma dor na terça, voltava na quinta e não achava a
+     resposta que tinha recebido, enquanto a IA continuava lembrando.
+
+     A IA lembrava e ela não. */
+  const [carregandoHistorico, setCarregandoHistorico] = useState(true);
+  useEffect(() => {
+    let vivo = true;
+    /* Toda saída deste efeito passa por aqui: sem sessão, sem histórico, erro
+       de rede. Em todos os casos a paciente precisa ver ALGUMA coisa — um chat
+       em branco para sempre porque o banco não respondeu é pior que um chat sem
+       histórico. */
+    const abrirVazio = () => {
+      if (!vivo) return;
+      setMessages((ms) =>
+        ms.length === 0 ? [{ role: "assistant", content: greeting, ts: new Date() }] : ms,
+      );
+      setCarregandoHistorico(false);
+    };
+    void (async () => {
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        if (!sess.session?.access_token) return abrirVazio();
+        const { historicoDaConversa } = await import("@/lib/historico-chat.functions");
+        const r = await historicoDaConversa({
+          data: { accessToken: sess.session.access_token },
+        });
+        if (!vivo) return;
+        if (!r.ok || r.mensagens.length === 0) return abrirVazio();
+        setMessages((ms) => {
+          /* Se ela já escreveu enquanto o banco respondia, o que acabou de
+             digitar vale mais que o histórico — não se sobrescreve. */
+          if (ms.length > 0) return ms;
+          return r.mensagens.map((m) => ({
+            role: m.role,
+            content: m.content,
+            ts: new Date(m.created_at),
+          }));
+        });
+        setCarregandoHistorico(false);
+      } catch {
+        abrirVazio();
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
   /* Quando o nome do consultório chega, a saudação passa a citá-lo — mas SÓ
      se a conversa ainda não começou. Reescrever uma mensagem que a paciente
      já leu e respondeu seria adulterar o histórico dela. */
@@ -6830,11 +6891,14 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         },
       ];
     });
-  }, [doctorName]);
+    /* `messages.length` nas dependências, e não só `doctorName`.
 
-  const [messages, setMessages] = useState<WAMsg[]>([
-    { role: "assistant", content: greeting, ts: new Date() },
-  ]);
+       A lista agora começa VAZIA e só ganha a saudação quando o histórico
+       responde. Se o nome do consultório chegasse ANTES disso — o caso comum,
+       porque é uma consulta mais rápida —, este efeito rodaria com a lista
+       vazia, não faria nada, e a saudação apareceria depois para sempre com o
+       texto genérico. */
+  }, [doctorName, messages.length]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
@@ -7093,6 +7157,22 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
 
       {/* Área de mensagens */}
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto space-y-0.5 px-3 py-3">
+        {/* Enquanto o histórico não respondeu, a lista está vazia de propósito.
+            Três pontinhos discretos são melhores que uma tela em branco — e
+            muito melhores que uma saudação que aparece e é trocada. */}
+        {carregandoHistorico && messages.length === 0 && (
+          <div className="flex justify-center py-6" aria-label="Carregando a conversa">
+            <span className="flex gap-1">
+              {[0, 1, 2].map((n) => (
+                <span
+                  key={n}
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/25"
+                  style={{ animationDelay: `${n * 160}ms` }}
+                />
+              ))}
+            </span>
+          </div>
+        )}
         {messages.map((m, i) => {
           // Avaliável: resposta da IA com pergunta anterior, fora do streaming.
           const canVote =
