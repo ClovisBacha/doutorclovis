@@ -66,6 +66,12 @@ export type DoctorDashboard = {
     enabledApp: boolean;
     enabledWhatsapp: boolean;
     hitsThisMonth: number;
+    /**
+     * Minutos que UMA resposta dele custaria, estimados pelo tamanho mediano do
+     * que ele já escreveu. É o que transforma "a IA economizou 50h suas" de
+     * chute em conta — ver `src/lib/tempo-poupado.ts`.
+     */
+    minutosPorResposta: number;
   };
   appointments: {
     pending: number;
@@ -336,7 +342,7 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     // ── Segundo Cérebro: entradas, aprovadas, canais ligados, usos no mês ─────
     const brain = await safe(
       async () => {
-        const [entriesRes, approvedRes, settingsRes, hitsRes] = await Promise.all([
+        const [entriesRes, approvedRes, settingsRes, hitsRes, respostasRes] = await Promise.all([
           sb
             .from("brain_entries")
             .select("*", { count: "exact", head: true })
@@ -358,16 +364,36 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
             .eq("doctor_id", doctorId)
             .neq("channel", "teste")
             .gte("created_at", monthStart),
+          /* As respostas que ELE escreveu — daqui sai o tempo por resposta. Sem
+             recorte de período: quanto mais amostra, mais estável a mediana, e
+             o jeito de escrever de um médico não muda de um mês para o outro. */
+          sb
+            .from("doctor_questions")
+            .select("answer")
+            .eq("doctor_id", doctorId)
+            .not("answer", "is", null)
+            .limit(200),
         ]);
+        const { minutosPorResposta } = await import("./tempo-poupado");
         return {
           entries: (entriesRes.count ?? 0) as number,
           approved: (approvedRes.count ?? 0) as number,
           enabledApp: (settingsRes.data?.enabled_app ?? true) as boolean,
           enabledWhatsapp: (settingsRes.data?.enabled_whatsapp ?? true) as boolean,
           hitsThisMonth: (hitsRes.count ?? 0) as number,
+          minutosPorResposta: minutosPorResposta(
+            ((respostasRes.data ?? []) as { answer: string | null }[]).map((r) => r.answer ?? ""),
+          ),
         };
       },
-      { entries: 0, approved: 0, enabledApp: true, enabledWhatsapp: true, hitsThisMonth: 0 },
+      {
+        entries: 0,
+        approved: 0,
+        enabledApp: true,
+        enabledWhatsapp: true,
+        hitsThisMonth: 0,
+        minutosPorResposta: 3,
+      },
     );
 
     // ── Consultas: pendentes, confirmadas futuras, próxima ────────────────────

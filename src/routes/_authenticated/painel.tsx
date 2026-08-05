@@ -78,6 +78,7 @@ import {
 } from "@/lib/doctor-addresses.functions";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { gradientFor, periodFor } from "@/components/weather-sky";
+import { tempoPoupado } from "@/lib/tempo-poupado";
 import { ymdLocal } from "@/lib/utils";
 import {
   getTeleconsultasAdmin,
@@ -1245,13 +1246,6 @@ function timeAgo(iso: string): string {
 }
 
 // Tempo economizado pelo cérebro: cada resposta ≈ 3 min do médico.
-function savedTimeLabel(hits: number): string {
-  const totalMin = hits * 3;
-  if (totalMin < 60) return `${totalMin} min`;
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
-}
 
 const STAGE_META: {
   key: keyof DoctorDashboard["patients"]["stages"];
@@ -1345,6 +1339,7 @@ function DashboardSection({
  */
 function ValorGeradoBanner({
   aiHits,
+  minutosPorResposta,
   answered,
   activePatients,
   onNavigate,
@@ -1355,6 +1350,8 @@ function ValorGeradoBanner({
   rotuloPlano,
 }: {
   aiHits: number;
+  /** Minutos que UMA resposta dele custaria — ver `src/lib/tempo-poupado.ts`. */
+  minutosPorResposta: number;
   answered: number;
   activePatients: number;
   onNavigate: (tab: PanelTab) => void;
@@ -1435,7 +1432,10 @@ function ValorGeradoBanner({
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <ValueTile big={aiHits} label="dúvidas respondidas pela sua IA" />
         <ValueTile big={answered} label="perguntas que você respondeu" />
-        <ValueTile big={savedTimeLabel(assists)} label="que a IA respondeu por você (estimativa)" />
+        <ValueTile
+          big={tempoPoupado(assists, minutosPorResposta)}
+          label="que a IA respondeu por você (estimativa)"
+        />
         <ValueTile big={activePatients} label="pacientes ativas nos últimos 7 dias" />
       </div>
       {/* A conta fechada, em dinheiro.
@@ -1447,7 +1447,7 @@ function ValorGeradoBanner({
           "R$ 2.025" com consulta de R$ 450 faz a conta de cabeça, chega em
           R$ 1.350 e conclui, com razão, que a tela está inflando. */}
       {(() => {
-        const minutos = assists * 3;
+        const minutos = assists * minutosPorResposta;
         /* `(horas * 60) / 40` era ida e volta: a conta real é minutos/40, ou
            seja uma consulta a cada ~13 atendimentos da IA. */
         const equivalente = minutos / 40;
@@ -1459,8 +1459,9 @@ function ValorGeradoBanner({
         const mesmaMoeda = moedaDoMedico === "BRL";
         const rodape = (
           <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-            Estimativa: cada resposta da IA poupa ~3 min seus, e uma consulta ocupa ~40 min da sua
-            agenda.
+            Estimativa: cada resposta da IA poupa ~{minutosPorResposta.toString().replace(".", ",")}{" "}
+            min seus — o tempo de escrever uma resposta do tamanho das suas — e uma consulta ocupa
+            ~40 min da sua agenda.
           </p>
         );
 
@@ -1565,6 +1566,7 @@ export function DashboardView({
       {/* Valor gerado no mês — reenquadra os números como ROI (retenção). */}
       <ValorGeradoBanner
         aiHits={brain.hitsThisMonth}
+        minutosPorResposta={brain.minutosPorResposta}
         answered={questions.answeredThisMonth}
         activePatients={patients.active7d}
         onNavigate={onNavigate}
@@ -1770,9 +1772,10 @@ function BrainValueCard({
                 {brain.hitsThisMonth === 1 ? "vez" : "vezes"} este mês
               </p>
               <p className="mt-3 text-sm opacity-90">
-                Isso são cerca de <strong>{savedTimeLabel(brain.hitsThisMonth)}</strong> que você
-                não precisou gastar digitando respostas — o cérebro atendeu por você, no seu tom, a
-                qualquer hora.
+                Isso são cerca de{" "}
+                <strong>{tempoPoupado(brain.hitsThisMonth, brain.minutosPorResposta)}</strong> que
+                você não precisou gastar digitando respostas — o cérebro atendeu por você, no seu
+                tom, a qualquer hora.
               </p>
             </>
           ) : (
