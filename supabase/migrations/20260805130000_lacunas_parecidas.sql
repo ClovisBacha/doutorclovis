@@ -1,9 +1,12 @@
 -- Agrupar lacunas parecidas: vetor na lacuna + busca por semelhança.
 --
 -- Corrige a primeira versão desta migration, que tinha dois defeitos mudos:
--- índice `ivfflat` criado com a tabela vazia (centroides sem significado,
--- busca voltando vazia) e `SECURITY DEFINER` + `SET search_path = public`,
--- que escondia o operador `<=>` do pgvector dentro da função.
+-- índice `ivfflat` criado com a tabela vazia (centroides sem significado —
+-- medido: 36% das consultas voltando vazias, 14% de recall) e
+-- `SECURITY DEFINER` + `SET search_path = public`, que escondia o operador
+-- `<=>` do pgvector dentro da função.
+
+SET search_path = public, extensions;
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -66,6 +69,11 @@ CREATE OR REPLACE FUNCTION public.match_brain_gaps(
 RETURNS TABLE (id uuid, question text, hits integer, similarity double precision)
 LANGUAGE sql
 STABLE
+-- Determinístico, e não "funciona por sorte": sem esta linha a função herda o
+-- caminho de quem chama. Hoje o PostgREST do Supabase acrescenta `extensions`
+-- (é por isso que `match_brain_entries` funciona sem declarar nada), mas o
+-- padrão do PostgREST é só `public` — e aí o `<=>` sumiria de novo, calado.
+SET search_path = public, extensions
 AS $$
   SELECT
     g.id,
@@ -155,3 +163,21 @@ DELETE FROM public.brain_gaps g
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_brain_gaps_doctor_question
   ON public.brain_gaps (doctor_id, norm_question);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- Regerar os vetores existentes
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- Os vetores gravados até agora vieram do texto CRU, antes de a limpeza de
+-- saudação existir — "Olá, tudo bem? ..." entrava no vetor com o mesmo peso do
+-- conteúdo. Comparar um vetor limpo (o novo) com vetores sujos (os antigos)
+-- não mede o que se quer medir.
+--
+-- Zerar aqui é seguro: a cura (`curarLacunasSemVetor`) só enxerga linha com
+-- vetor nulo, e roda sozinha quando o médico abre a aba do Cérebro.
+
+-- SEM `WHERE status = 'aberta'`, de propósito. Uma lacuna `respondida` é
+-- REABERTA quando o texto exato repete — e voltaria para a busca carregando o
+-- vetor sujo, que a cura nunca mais alcança (ela só enxerga vetor NULO).
+-- Vetor nulo é inerte; vetor sujo é ativo e errado.
+UPDATE public.brain_gaps SET embedding = NULL;

@@ -564,10 +564,22 @@ export async function curarLacunasSemVetor(doctorId: string): Promise<number> {
     const curadas = linhas
       .map((g, i) => ({ id: g.id, vetor: vetores[i] }))
       .filter((c): c is { id: string; vetor: number[] } => !!c.vetor);
-    await Promise.all(
+    /* Conferir o resultado de cada update, e não só disparar.
+       Antes isto devolvia `curadas.length` sem olhar nada: com a coluna
+       ausente ou a RLS no caminho, a função relatava "curei 20" tendo gravado
+       ZERO. Um número que mente sobre o próprio trabalho é pior que nenhum —
+       foi exatamente o tipo de silêncio que fez esta investigação durar. */
+    const gravacoes = await Promise.all(
       curadas.map((c) => sb.from("brain_gaps").update({ embedding: c.vetor }).eq("id", c.id)),
     );
-    return curadas.length;
+    const falhas = gravacoes.filter((r: any) => r?.error);
+    if (falhas.length) {
+      console.error(
+        `[lacuna] cura: ${falhas.length} de ${curadas.length} updates falharam — ` +
+          `${(falhas[0] as any)?.error?.code ?? "?"} ${(falhas[0] as any)?.error?.message ?? ""}`,
+      );
+    }
+    return curadas.length - falhas.length;
   } catch {
     /* best-effort — a fila do médico aparece do mesmo jeito */
     return 0;

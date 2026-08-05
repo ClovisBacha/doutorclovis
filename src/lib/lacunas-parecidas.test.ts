@@ -459,8 +459,14 @@ describe("a busca no banco", () => {
    * A lição não é o detalhe do pgvector. É que havia uma função equivalente,
    * provada em produção, e eu escrevi outra forma.
    */
-  test("NÃO fixa search_path — senão o operador `<=>` some", () => {
-    expect(sql).not.toMatch(/SET search_path/);
+  test("nunca fixa o search_path só em `public`", () => {
+    /* Este era o defeito: `SET search_path = public` sem `extensions`. No
+       Supabase a extensão `vector` vive em `extensions`, então o operador
+       `<=>` fica invisível dentro do corpo da função. Reproduzido com pgvector
+       de verdade: `operator does not exist: extensions.vector <=> extensions.vector`.
+       Fixar o caminho é BOM — desde que `extensions` esteja nele. */
+    expect(sql).not.toMatch(/SET search_path = public\s*[;\n]/);
+    expect(sql).not.toMatch(/SET search_path = public\s+AS/);
   });
 
   test("NÃO usa SECURITY DEFINER — a chave de serviço já passa pela RLS", () => {
@@ -881,5 +887,55 @@ describe("o reset dos vetores sujos alcança TODAS as lacunas", () => {
   test("fundir duplicata não perde quem perguntou nem os hits", () => {
     expect(sql).toContain("UPDATE public.brain_gap_askers a");
     expect(sql).toContain("sum(hits)");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Endurecimentos vindos da auditoria com pgvector real
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("o SQL não depende de como a sessão foi aberta", () => {
+  const sql = readFileSync("supabase/APLICAR_LACUNAS_PARECIDAS.sql", "utf8");
+
+  test("fixa o search_path da SESSÃO antes de tudo", () => {
+    /* `CREATE EXTENSION IF NOT EXISTS vector` é NO-OP quando a extensão já
+       vive em `extensions` — ele não a move para `public`. Sem `extensions` no
+       caminho, o `ADD COLUMN ... vector(768)` falha com "type vector does not
+       exist" e, como o editor roda tudo numa transação, o arquivo INTEIRO
+       reverte. */
+    const posPath = sql.indexOf("SET search_path = public, extensions;");
+    const posColuna = sql.indexOf("ADD COLUMN IF NOT EXISTS embedding");
+    expect(posPath).toBeGreaterThan(0);
+    expect(posPath).toBeLessThan(posColuna);
+  });
+
+  test("a função declara o caminho, em vez de herdar", () => {
+    /* Sem declarar, ela depende do `db-extra-search-path` do PostgREST. O
+       Supabase acrescenta `extensions` — mas o padrão do PostgREST é só
+       `public`, e aí o `<=>` sumiria de novo, calado. */
+    expect(sql).toMatch(/STABLE\n(--[^\n]*\n)*SET search_path = public, extensions\nAS \$\$/);
+  });
+
+  test("a migration carrega o reset dos vetores sujos", () => {
+    /* Um banco reconstruído só das migrations herdaria vetores gerados antes
+       da limpeza de saudação — e a cura nunca os alcança, porque ela só
+       enxerga vetor nulo. */
+    const mig = readFileSync("supabase/migrations/20260805130000_lacunas_parecidas.sql", "utf8");
+    expect(mig).toContain("UPDATE public.brain_gaps SET embedding = NULL;");
+  });
+});
+
+describe("a cura não mente sobre o que gravou", () => {
+  test("confere o erro de cada update", () => {
+    /* Antes devolvia `curadas.length` sem olhar nada: com a coluna ausente ou
+       a RLS no caminho, relatava "curei 20" tendo gravado zero. */
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain("const falhas = gravacoes.filter((r: any) => r?.error);");
+    expect(fonte).toContain("return curadas.length - falhas.length;");
+  });
+
+  test("falha de gravação aparece no log", () => {
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain("updates falharam");
   });
 });

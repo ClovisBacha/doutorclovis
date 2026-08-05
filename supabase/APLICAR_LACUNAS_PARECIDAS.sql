@@ -24,6 +24,17 @@
 -- A LEITURA já entende sinônimos (busca por vetor nas entradas aprovadas). A
 -- ESCRITA da lacuna, não. Esta migration dá à lacuna o mesmo vetor.
 
+-- O `search_path` DA SESSÃO, antes de tudo.
+--
+-- No Supabase a extensão `vector` vive no schema `extensions`, e
+-- `CREATE EXTENSION IF NOT EXISTS vector` é NO-OP quando ela já existe lá — ele
+-- não a move para `public`. Sem `extensions` no caminho, o `ADD COLUMN
+-- embedding vector(768)` abaixo falha com "type vector does not exist" e, como
+-- o editor roda tudo numa transação só, o arquivo INTEIRO reverte.
+--
+-- Uma linha aqui torna o arquivo independente de como a sessão foi aberta.
+SET search_path = public, extensions;
+
 CREATE EXTENSION IF NOT EXISTS vector;
 
 ALTER TABLE public.brain_gaps
@@ -85,6 +96,11 @@ CREATE OR REPLACE FUNCTION public.match_brain_gaps(
 RETURNS TABLE (id uuid, question text, hits integer, similarity double precision)
 LANGUAGE sql
 STABLE
+-- Determinístico, e não "funciona por sorte": sem esta linha a função herda o
+-- caminho de quem chama. Hoje o PostgREST do Supabase acrescenta `extensions`
+-- (é por isso que `match_brain_entries` funciona sem declarar nada), mas o
+-- padrão do PostgREST é só `public` — e aí o `<=>` sumiria de novo, calado.
+SET search_path = public, extensions
 AS $$
   SELECT
     g.id,
