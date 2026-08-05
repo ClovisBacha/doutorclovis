@@ -213,10 +213,54 @@ export function isCortesia(question: string): boolean {
  * que respondeu a outra — e a paciente da segunda recebe uma orientação que não
  * era para ela.
  *
- * 0,86 é "a mesma pergunta com outras palavras". Abaixo disso, duas linhas na
- * fila é o resultado seguro.
+ * ─── POR QUE 0,82, E NÃO O 0,86 QUE EU TINHA CHUTADO ────────────────────────
+ *
+ * 0,86 foi palpite. Dois casos reais, medidos na fila de verdade, o corrigiram:
+ *
+ *   · "a doutora já viu minhas dúvidas?" JUNTOU com "A doutora já respondeu
+ *     minha dúvida" → o corte alcança paráfrase limpa.
+ *   · "Olá tudo bem a doutora já chegou a aprovar e responder as dúvidas" NÃO
+ *     juntou — mesma pergunta, com saudação e enrolo em volta.
+ *
+ * Ou seja: 0,86 pegava a paráfrase curta e perdia a mesma pergunta escrita do
+ * jeito que gente escreve. A margem é estreita — por isso a mudança é pequena,
+ * e vem acompanhada da limpeza do texto abaixo, que ataca a causa em vez de só
+ * afrouxar a régua.
  */
-const GAP_MERGE_MIN_SIMILARITY = 0.86;
+const GAP_MERGE_MIN_SIMILARITY = 0.82;
+
+/**
+ * O texto que vira VETOR — não o que vira lacuna.
+ *
+ * A paciente escreve "Olá, tudo bem? A doutora já chegou a responder?". Metade
+ * disso é protocolo social e entra no vetor com o mesmo peso do resto,
+ * afastando duas perguntas idênticas só porque uma veio com saudação.
+ *
+ * O que o médico VÊ na fila continua sendo o texto cru dela — é o que ele
+ * precisa para entender quem perguntou o quê. Só a comparação usa a versão
+ * enxuta.
+ *
+ * Aplicado nos DOIS lados (ao gravar a lacuna e ao consultar): vetores de
+ * espaços diferentes não se comparam, e limpar só uma ponta seria pior que não
+ * limpar nenhuma.
+ *
+ * Conservador: se sobrar pouca coisa, devolve o texto original. Uma mensagem
+ * que é SÓ saudação não deve virar vetor vazio.
+ */
+const ABERTURAS = new RegExp(
+  "^(\\s*(oi+|ol(á|a)|e a(í|i)|bom dia|boa tarde|boa noite|tudo bem|tudo bom|" +
+    "como vai|doutora?|dra?\\.?|por favor|pfv|desculpa|desculpe|licen(ç|c)a|" +
+    "gostaria de saber|queria saber|uma d(ú|u)vida|tenho uma d(ú|u)vida|" +
+    "me tira uma d(ú|u)vida|s(ó|o) uma d(ú|u)vida)[\\s,.!?;:-]*)+",
+  "i",
+);
+
+export function textoParaVetor(texto: string): string {
+  const enxuto = texto.replace(ABERTURAS, "").trim();
+  /* Piso de 12 caracteres: abaixo disso a limpeza tirou conteúdo, não
+     protocolo — e comparar sobra de frase gera semelhança sem sentido. */
+  return enxuto.length >= 12 ? enxuto : texto;
+}
 
 /**
  * Elogio à IA ou ao app — "bacana dms, gostei muito dessa ia".
@@ -323,7 +367,7 @@ export function logBrainGap(
       if (!existing && !vetor) {
         try {
           const { embedText } = await import("./embeddings.server");
-          vetor = await embedText(clean, 4000);
+          vetor = await embedText(textoParaVetor(clean), 4000);
         } catch {
           vetor = null; // sem chave de IA → segue a deduplicação por texto
         }
@@ -468,7 +512,12 @@ export async function curarLacunasSemVetor(doctorId: string): Promise<number> {
     const { embedText } = await import("./embeddings.server");
     const linhas = cegas as { id: string; question: string }[];
     const vetores = await Promise.all(
-      linhas.map((g) => embedText(String(g.question ?? "").slice(0, 300), CURA_TIMEOUT_MS)),
+      /* Mesma limpeza dos outros dois caminhos. Curar com o texto cru
+         deixaria as lacunas antigas num tratamento e as novas noutro — e duas
+         perguntas iguais não se encontrariam por causa de uma saudação. */
+      linhas.map((g) =>
+        embedText(textoParaVetor(String(g.question ?? "").slice(0, 300)), CURA_TIMEOUT_MS),
+      ),
     );
 
     const curadas = linhas
@@ -709,7 +758,10 @@ export async function getBrainContext(
         const { embedText } = await import("./embeddings.server");
         // Timeout CURTO: estamos no caminho crítico do chat — se o embedding
         // não chegar em 1,8s, o fallback por palavras responde na hora.
-        const qvec = await embedText(userMessage, 1800);
+        /* Mesma limpeza da ESCRITA da lacuna: o vetor da consulta e o
+           vetor gravado precisam vir do mesmo tratamento, senão a saudação
+           volta a afastar duas perguntas idênticas. */
+        const qvec = await embedText(textoParaVetor(userMessage), 1800);
         vetorDaPergunta = qvec ?? null;
         if (qvec) {
           const { data: matches, error } = await (supabaseAdmin as any).rpc("match_brain_entries", {

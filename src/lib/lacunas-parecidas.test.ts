@@ -255,7 +255,7 @@ describe("o corte alto é o que protege a paciente", () => {
      0,55 da leitura — errar para o lado de duas linhas na fila é barato. */
   test("perto, mas não igual, continua sendo lacuna separada", async () => {
     const reg = await rodarLacuna({
-      parecidas: [{ id: "outra-coisa", hits: 2, similarity: 0.85 }],
+      parecidas: [{ id: "outra-coisa", hits: 2, similarity: 0.79 }],
       embedding: VETOR,
     });
     expect(reg.updates).toHaveLength(0);
@@ -395,7 +395,7 @@ describe("o vetor da pergunta sobrevive ao bloco onde foi calculado", () => {
        resposta, mesmo agrupamento. Só a conta no fim do mês — uma chamada a
        mais por pergunta sem cobertura, que é justamente a mais comum enquanto
        o cérebro do médico está pequeno. */
-    expect(fonte.match(/embedText\(userMessage/g) ?? []).toHaveLength(1);
+    expect(fonte.match(/embedText\(textoParaVetor\(userMessage/g) ?? []).toHaveLength(1);
     expect(fonte).toContain("vetorDaPergunta = qvec");
   });
 });
@@ -574,5 +574,97 @@ describe("a cura é disparada por quem abre a fila", () => {
       ],
     });
     expect(reg.maxSimultaneos).toBe(3);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A saudação não pode separar duas perguntas iguais
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * CASO REAL, medido na fila de verdade.
+ *
+ * Estas duas são a MESMA pergunta:
+ *
+ *   "A doutora já respondeu minha dúvida"
+ *   "Olá tudo bem a doutora já chegou a aprovar e responder as dúvidas"
+ *
+ * A primeira juntou com uma paráfrase curta; a segunda abriu linha nova. A
+ * diferença não é o assunto — é que metade da segunda é protocolo social, e
+ * saudação entra no vetor com o mesmo peso do conteúdo.
+ *
+ * O que o médico VÊ continua sendo o texto cru da paciente. Só a comparação
+ * usa a versão enxuta.
+ */
+describe("o texto que vira vetor é enxuto; o que ele lê, não", () => {
+  test("tira a saudação da frente", async () => {
+    const { textoParaVetor } = await import("./secondbrain.server");
+    expect(textoParaVetor("Olá tudo bem a doutora já chegou a responder as dúvidas")).toBe(
+      "a doutora já chegou a responder as dúvidas",
+    );
+    expect(textoParaVetor("Oi, bom dia! posso tomar dipirona na gravidez?")).toBe(
+      "posso tomar dipirona na gravidez?",
+    );
+  });
+
+  test("aproxima as duas formas da mesma pergunta", async () => {
+    /* O teste do vetor em si depende do modelo; o que se pode prender aqui é
+       que, depois da limpeza, as duas frases passam a compartilhar quase todo
+       o vocabulário — que é a causa da distância. */
+    const { textoParaVetor } = await import("./secondbrain.server");
+    const a = textoParaVetor("A doutora já respondeu minha dúvida");
+    const b = textoParaVetor("Olá tudo bem a doutora já chegou a aprovar e responder as dúvidas");
+    expect(b.toLowerCase().startsWith("a doutora")).toBe(true);
+    expect(a.toLowerCase().startsWith("a doutora")).toBe(true);
+  });
+
+  test("não come conteúdo quando a mensagem é curta", async () => {
+    /* "Oi, dor?" limpo vira "dor?" — sobra de frase, e comparar sobra produz
+       semelhança sem sentido. Abaixo do piso, devolve o original. */
+    const { textoParaVetor } = await import("./secondbrain.server");
+    expect(textoParaVetor("oi, e a dor?")).toBe("oi, e a dor?");
+    expect(textoParaVetor("bom dia")).toBe("bom dia");
+  });
+
+  test("mensagem sem saudação passa intacta", async () => {
+    const { textoParaVetor } = await import("./secondbrain.server");
+    const t = "posso tomar dipirona na gravidez?";
+    expect(textoParaVetor(t)).toBe(t);
+  });
+
+  test("a limpeza vale nos TRÊS caminhos que geram vetor", () => {
+    /* Vetores de tratamentos diferentes não se comparam. Limpar só uma ponta
+       seria pior que não limpar nenhuma: a lacuna gravada e a consulta
+       passariam a viver em espaços distintos. */
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain("embedText(textoParaVetor(clean)");
+    expect(fonte).toContain("embedText(textoParaVetor(userMessage)");
+    expect(fonte).toContain("embedText(textoParaVetor(String(g.question");
+  });
+
+  test("o texto GRAVADO na lacuna continua sendo o da paciente", () => {
+    /* O médico precisa ler o que ela escreveu, com saudação e tudo — é o que
+       dá o tom e mostra quem está do outro lado. */
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain("question: clean,");
+    expect(fonte).not.toContain("question: textoParaVetor(");
+  });
+});
+
+describe("o corte de junção foi corrigido por medida, não por palpite", () => {
+  test("desceu de 0,86 para 0,82", async () => {
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    const juncao = Number(fonte.match(/GAP_MERGE_MIN_SIMILARITY = ([\d.]+)/)?.[1]);
+    expect(juncao).toBe(0.82);
+  });
+
+  test("continua MUITO acima do corte de leitura", () => {
+    /* Afrouxar é aceitável; chegar perto do 0,55 da leitura não é. Juntar duas
+       perguntas diferentes faz o médico responder uma achando que respondeu as
+       duas — e a paciente da segunda recebe orientação que não era dela. */
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    const juncao = Number(fonte.match(/GAP_MERGE_MIN_SIMILARITY = ([\d.]+)/)?.[1]);
+    const leitura = Number(fonte.match(/SEMANTIC_MIN_SIMILARITY = ([\d.]+)/)?.[1]);
+    expect(juncao).toBeGreaterThan(leitura + 0.2);
   });
 });
