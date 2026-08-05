@@ -51,6 +51,18 @@ export type Uso = {
  * por ela no meio do streaming da resposta.
  */
 export function registrarUso(u: Uso): void {
+  void registrarUsoAgora(u);
+}
+
+/**
+ * A mesma coisa, aguardável.
+ *
+ * Existe por causa de um defeito de servidor sem servidor: trabalho disparado e
+ * não aguardado DEPOIS que a resposta terminou pode ser morto quando a função é
+ * congelada. Quem chama de dentro do `onFinish` precisa esperar — a SDK aguarda
+ * o `onFinish`, e é isso que mantém a função viva.
+ */
+export async function registrarUsoAgora(u: Uso): Promise<void> {
   /* Sem tokens não há o que medir. Acontece quando o provedor não reporta
      `usage` — e gravar uma linha de zeros faria o custo médio por resposta
      cair sozinho, que é pior que não ter a linha. */
@@ -58,21 +70,19 @@ export function registrarUso(u: Uso): void {
   const saida = Math.max(0, Math.trunc(u.outputTokens ?? 0));
   if (entrada === 0 && saida === 0) return;
 
-  void (async () => {
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await (supabaseAdmin as any).from("ai_usage").insert({
-        doctor_id: u.doctorId ?? null,
-        patient_id: u.patientId ?? null,
-        especie: u.especie,
-        canal: u.canal ?? "app",
-        modelo: u.modelo,
-        input_tokens: entrada,
-        output_tokens: saida,
-      });
-    } catch {
-      /* Tabela ainda não migrada, banco fora do ar: medir é opcional, responder
-         não é. */
-    }
-  })();
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (supabaseAdmin as any).from("ai_usage").insert({
+      doctor_id: u.doctorId ?? null,
+      patient_id: u.patientId ?? null,
+      especie: u.especie,
+      canal: u.canal ?? "app",
+      modelo: u.modelo,
+      input_tokens: entrada,
+      output_tokens: saida,
+    });
+  } catch {
+    /* Tabela ainda não migrada, banco fora do ar: medir é opcional, responder
+       não é. */
+  }
 }

@@ -37,8 +37,12 @@ describe("medir nunca derruba a resposta", () => {
     expect(uso).toContain("export function registrarUso(u: Uso): void");
   });
 
-  test("a escrita é dispara-e-esquece, com catch", () => {
-    expect(uso).toContain("void (async () => {");
+  test("quem chama não é obrigado a esperar — mas pode", () => {
+    /* Duas portas de propósito: `registrarUso` para o caminho comum (não
+       segura ninguém) e `registrarUsoAgora` para dentro do `onFinish`, onde
+       NÃO esperar significa a gravação ser morta com a função. */
+    expect(uso).toContain("void registrarUsoAgora(u);");
+    expect(uso).toContain("export async function registrarUsoAgora(u: Uso): Promise<void>");
     expect(uso).toMatch(/catch \{/);
   });
 });
@@ -79,7 +83,7 @@ describe("o canal anônimo também conta", () => {
     /* Antes ele era `persistFor ? … : undefined` — sem paciente, nada rodava.
        A conversa do site custa tokens igual, e um medidor que ignora um canal
        inteiro mede errado. */
-    expect(chat).toContain("onFinish: ({ text, usage }) => {");
+    expect(chat).toContain("onFinish: async ({ text, usage }) => {");
     expect(chat).not.toContain("onFinish: persistFor");
   });
 

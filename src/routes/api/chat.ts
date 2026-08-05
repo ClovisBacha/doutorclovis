@@ -647,7 +647,7 @@ export const Route = createFileRoute("/api/chat")({
 
         if (persistFor) {
           const { saveChatMessage } = await import("@/lib/chat-memory.server");
-          saveChatMessage(
+          void saveChatMessage(
             persistFor.patientId,
             persistFor.doctorId,
             "user",
@@ -719,9 +719,23 @@ export const Route = createFileRoute("/api/chat")({
           /* O `onFinish` roda SEMPRE agora, e não só quando há paciente para
              persistir: a conversa anônima do site também custa tokens, e um
              medidor que ignora um canal inteiro mede errado. */
-          onFinish: ({ text, usage }) => {
-            const { registrarUso } = usoIa;
-            registrarUso({
+          /* `async`, e o que está aqui dentro é AGUARDADO — a diferença entre
+             gravar e não gravar.
+
+             O `onFinish` dispara quando o fluxo termina, ou seja, depois de a
+             resposta inteira já ter ido para a paciente. Em servidor sem
+             servidor, o que se dispara e não se aguarda nesse instante pode ser
+             morto junto com a função — e era exatamente o que acontecia: a
+             pergunta DELA era gravada (antes do fluxo, com tempo de sobrar) e a
+             resposta da IA se perdia. O chat guardava só metade da conversa, e
+             a memória da paciente era construída sobre as perguntas dela sem
+             nenhuma das respostas.
+
+             A SDK tipa `onFinish` como `PromiseLike<void> | void` e aguarda por
+             ele: devolver uma promessa aqui é o que mantém a função viva até a
+             gravação terminar. */
+          onFinish: async ({ text, usage }) => {
+            const registro = usoIa.registrarUsoAgora({
               especie: "chat",
               modelo: modeloEmUso,
               inputTokens: usage?.inputTokens,
@@ -730,17 +744,29 @@ export const Route = createFileRoute("/api/chat")({
               patientId: patient?.patientId ?? null,
               canal: soSuporte ? "suporte" : patient ? "app" : "site",
             });
-            if (!persistFor) return;
-            void (async () => {
-              try {
-                const { saveChatMessage, maybeUpdateChatMemory } =
-                  await import("@/lib/chat-memory.server");
-                saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text);
-                maybeUpdateChatMemory(persistFor.patientId, persistFor.doctorId);
-              } catch {
-                /* best-effort */
-              }
-            })();
+            if (!persistFor) {
+              await registro;
+              return;
+            }
+            try {
+              const { saveChatMessage, maybeUpdateChatMemory } =
+                await import("@/lib/chat-memory.server");
+              await Promise.all([
+                registro,
+                saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text),
+              ]);
+              /* A memória fica de fora do `await` de propósito: ela é uma
+                 chamada de modelo inteira (~2s) e faria a paciente ver o
+                 "digitando…" persistir depois de a resposta já estar lida.
+                 Perdê-la de vez em quando não custa nada, porque ela se
+                 conserta sozinha: `maybeUpdateChatMemory` conta as mensagens
+                 desde a última atualização, então uma execução morta é
+                 retomada na mensagem seguinte. A gravação da resposta, não —
+                 essa se perde para sempre. */
+              maybeUpdateChatMemory(persistFor.patientId, persistFor.doctorId);
+            } catch {
+              /* best-effort */
+            }
           },
         });
 

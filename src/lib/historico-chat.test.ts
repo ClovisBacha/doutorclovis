@@ -89,3 +89,58 @@ describe("a abertura não pisca", () => {
     expect(tela).toContain("}, [doctorName, messages.length]);");
   });
 });
+
+/**
+ * O defeito de servidor sem servidor, e por que ele so aparece em producao.
+ *
+ * O `onFinish` dispara DEPOIS que a resposta inteira ja foi para a paciente.
+ * Trabalho disparado e nao aguardado nesse instante pode ser morto junto com a
+ * funcao — e era o que acontecia: a pergunta dela ficava gravada (ela acontece
+ * antes do fluxo, com tempo de sobra) e a resposta da IA se perdia.
+ *
+ * Resultado: o chat guardava METADE da conversa, e a memoria da paciente era
+ * construida sobre as perguntas dela sem nenhuma das respostas. Em
+ * desenvolvimento nunca aparece — a funcao local nao e congelada.
+ */
+describe("a resposta da IA precisa sobreviver ao fim do fluxo", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+  const memoria = readFileSync("src/lib/chat-memory.server.ts", "utf8");
+  const uso = readFileSync("src/lib/uso-ia.server.ts", "utf8");
+
+  test("o onFinish é async — a SDK aguarda por ele", () => {
+    /* `PromiseLike<void> | void` no tipo: devolver promessa aqui é o que mantém
+       a função viva até a gravação terminar. */
+    expect(chat).toContain("onFinish: async ({ text, usage }) => {");
+  });
+
+  test("a gravação da resposta é AGUARDADA", () => {
+    expect(chat).toContain(
+      'saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text)',
+    );
+    expect(chat).toContain("await Promise.all([");
+  });
+
+  test("`saveChatMessage` devolve promessa — não dá para esquecer de esperar", () => {
+    /* Antes ela era `void` e disparava por dentro: quem chamasse não tinha como
+       aguardar nem que quisesse. */
+    expect(memoria).toContain("export async function saveChatMessage(");
+    expect(memoria).toContain("): Promise<void> {");
+  });
+
+  test("o registro de custo também é aguardado", () => {
+    expect(uso).toContain("export async function registrarUsoAgora(u: Uso): Promise<void>");
+    expect(chat).toContain("usoIa.registrarUsoAgora({");
+  });
+
+  test("a MEMÓRIA fica de fora do await, e isso é proposital", () => {
+    /* É uma chamada de modelo inteira (~2s) e faria o "digitando…" persistir
+       depois de a resposta já estar lida. Perdê-la não custa: ela conta as
+       mensagens desde a última atualização, então uma execução morta é retomada
+       na mensagem seguinte. A resposta da IA, não — essa se perde para sempre. */
+    const awaitPromise = chat.indexOf("await Promise.all([");
+    const memChamada = chat.indexOf("maybeUpdateChatMemory(persistFor.patientId");
+    expect(awaitPromise).toBeGreaterThan(0);
+    expect(memChamada).toBeGreaterThan(awaitPromise);
+    expect(chat).not.toContain("await maybeUpdateChatMemory(");
+  });
+});

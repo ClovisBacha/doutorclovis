@@ -15,24 +15,22 @@ const SUMMARY_EVERY = 6; // regenera o resumo a cada N mensagens novas
 const SUMMARY_SOURCE_LIMIT = 40; // últimas mensagens usadas no resumo
 
 /** Grava uma mensagem do chat (fire-and-forget). */
-export function saveChatMessage(
+export async function saveChatMessage(
   patientId: string,
   doctorId: string | null,
   role: "user" | "assistant",
   content: string,
-): void {
+): Promise<void> {
   const text = content.trim().slice(0, MAX_SAVED_CHARS);
   if (!text) return;
-  void (async () => {
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await (supabaseAdmin as any)
-        .from("chat_messages")
-        .insert({ patient_id: patientId, doctor_id: doctorId, role, content: text });
-    } catch {
-      /* best-effort */
-    }
-  })();
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (supabaseAdmin as any)
+      .from("chat_messages")
+      .insert({ patient_id: patientId, doctor_id: doctorId, role, content: text });
+  } catch {
+    /* best-effort: a conversa nunca falha por causa da gravacao */
+  }
 }
 
 /**
