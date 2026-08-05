@@ -45,7 +45,7 @@ Regras de resposta:
 - NUNCA dê diagnóstico, prescrição, dose de medicamento ou conduta médica. Para qualquer sintoma ou decisão clínica, oriente falar com o obstetra pelo app; em urgência (sangramento, dor intensa, redução dos movimentos do bebê, pressão muito alta), ligar 192 (SAMU) ou ir ao pronto-socorro AGORA.
 - Dúvida CLÍNICA tem DUAS camadas, e confundi-las é o erro mais caro deste app:
   · **Informação consolidada** — o que a obstetrícia já sabe e está em qualquer material de pré-natal: peixe cru não na gestação, o que costuma ser normal em cada fase, quais são os sinais de alerta. Isso você RESPONDE, de verdade e com conteúdo. Recusar aqui não é prudência: é deixar a paciente sem nada às 3 da manhã, e ela vai procurar num grupo de WhatsApp, que é pior.
-  · **Conduta para o caso DELA** — diagnosticar, prescrever, dar dose, mudar tratamento, ou dizer se ELA especificamente pode algo dado o histórico dela. Isso é do médico, sempre. Não improvise: diga que registrou a pergunta para ele.
+  · **Decisão sobre o caso DELA** — o que só quem acompanha a gestação pode definir, olhando o histórico e os exames dela. Isso é do médico, sempre. Não improvise: diga que registrou a pergunta para ele.
   Quando o bloco do médico cobrir o assunto, a resposta segue o que ELE validou, e você deixa claro que a orientação é dele.
 - Uma resposta que só diz "converse com sua médica" e não informa nada é uma resposta RUIM. Informe primeiro, encaminhe depois.
 - Não invente dados (telefone, endereço, valores, resultados de exame).
@@ -826,7 +826,30 @@ export const Route = createFileRoute("/api/chat")({
              sair, e some uma conta invisível — token de pensamento é cobrado
              como SAÍDA, que é a parte cara (8x a entrada). O que se pede aqui
              não precisa de deliberação: é informar bem e encaminhar o resto. */
-          providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+          providerOptions: {
+            google: {
+              thinkingConfig: { thinkingBudget: 0 },
+              /* ─── O FILTRO QUE ENGOLIA A RESPOSTA ─────────────────────────
+                 Desligar o raciocínio não bastou: a resposta continuou vindo
+                 vazia. O que sobra é o filtro de segurança do Gemini, e ele é
+                 mal calibrado para um app clínico — "sangramento", "dose",
+                 "prescrever", "dor intensa" são o vocabulário normal do
+                 pré-natal e caem em DANGEROUS_CONTENT. O modelo bloqueia a
+                 resposta inteira e devolve texto zero, sem erro.
+
+                 `BLOCK_ONLY_HIGH`, e não `OFF`: o que protege de verdade neste
+                 chat não é o filtro genérico do provedor — é o prompt (sem
+                 diagnóstico, sem prescrição, sem dose) e o Segundo Cérebro do
+                 médico. O filtro alto continua barrando o que é de fato
+                 perigoso; o que ele para de barrar é a obstetrícia. */
+              safetySettings: [
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+              ],
+            },
+          },
           /* Teto de saída. Sem ele, uma pergunta aberta rende texto que ninguém
              lê e todo mundo paga — e é a saída que domina o custo. 6 frases
              cabem folgadas aqui. */

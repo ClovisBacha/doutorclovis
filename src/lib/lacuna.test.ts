@@ -199,7 +199,7 @@ describe("o prompt do app informa antes de encaminhar", () => {
 
   test("as duas camadas da dúvida clínica estão escritas", () => {
     expect(chat).toContain("Informação consolidada");
-    expect(chat).toContain("Conduta para o caso DELA");
+    expect(chat).toContain("Decisão sobre o caso DELA");
   });
 
   test('"sou uma IA" deixa de ser desculpa para não responder', () => {
@@ -280,5 +280,42 @@ describe("a resposta nunca chega vazia", () => {
        guarda, toda resposta piscaria o aviso antes da primeira palavra. */
     expect(app).toContain("terminada={!(loading && i === messages.length - 1)}");
     expect(app).toContain("!isUser && terminada && !msg.content");
+  });
+});
+
+describe("o filtro de segurança do provedor não engole a obstetrícia", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+
+  /* Desligar o raciocínio não bastou — a resposta continuou vindo vazia. O que
+     sobra é o filtro do Gemini, mal calibrado para um app clínico:
+     "sangramento", "dose", "dor intensa" são o vocabulário normal do pré-natal
+     e caem em DANGEROUS_CONTENT. Ele bloqueia a resposta inteira e devolve
+     texto zero, sem erro nenhum. */
+  test("as quatro categorias estão em BLOCK_ONLY_HIGH", () => {
+    for (const cat of [
+      "HARM_CATEGORY_DANGEROUS_CONTENT",
+      "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+      "HARM_CATEGORY_HARASSMENT",
+      "HARM_CATEGORY_HATE_SPEECH",
+    ]) {
+      expect(chat).toMatch(new RegExp(`${cat}", threshold: "BLOCK_ONLY_HIGH`));
+    }
+  });
+
+  test("NÃO é `OFF` nem `BLOCK_NONE`", () => {
+    /* O que protege este chat é o prompt (sem diagnóstico, sem prescrição, sem
+       dose) e o cérebro do médico — mas isso não é motivo para desligar o
+       filtro por completo. Alto continua barrando o que é de fato perigoso. */
+    const bloco = chat.slice(chat.indexOf("safetySettings"), chat.indexOf("safetySettings") + 700);
+    expect(bloco).not.toContain('"OFF"');
+    expect(bloco).not.toContain('"BLOCK_NONE"');
+  });
+
+  test("o prompt não lista atos médicos como se fossem instruções", () => {
+    /* "diagnosticar, prescrever, dar dose, mudar tratamento" numa lista
+       imperativa é exatamente o que o classificador lê como conteúdo perigoso.
+       A regra continua valendo — mudou só a forma de dizê-la. */
+    expect(chat).not.toContain("diagnosticar, prescrever, dar dose, mudar tratamento");
+    expect(chat).toContain("NUNCA dê diagnóstico, prescrição, dose de medicamento");
   });
 });
