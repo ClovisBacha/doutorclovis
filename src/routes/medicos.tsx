@@ -82,7 +82,7 @@ const PLANS = [
       "Pré-consulta digital + monitoramento (peso, pressão, chutes)",
       "Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia)",
     ],
-    cta: "Começar grátis por 14 dias",
+    cta: "Assinar o Starter",
   },
   {
     key: "pro",
@@ -815,9 +815,8 @@ function MedicosPage() {
 
           <Reveal>
             <p className="mt-10 text-center text-xs text-white/50">
-              Todo plano pago começa com 14 dias grátis, sem cartão de crédito. · Valores em BRL. ·
-              O WhatsApp usa a conta Meta Business do próprio médico (grátis até 1.000
-              conversas/mês).
+              Valores em BRL. · O WhatsApp usa a conta Meta Business do próprio médico (grátis até
+              1.000 conversas/mês).
             </p>
           </Reveal>
         </div>

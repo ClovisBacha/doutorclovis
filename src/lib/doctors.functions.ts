@@ -1,8 +1,9 @@
 /**
  * Perfil do médico assinante — server functions.
  *
- * Qualquer usuário autenticado pode se registrar como médico (trial); o gate
- * de cobrança/plano vem na etapa de billing do roadmap (docs/MULTI_TENANT.md).
+ * Qualquer usuário autenticado pode se registrar como médico; ele entra em
+ * `free` (perfil no ar, agenda e pacientes) e as capacidades pagas — a IA em
+ * primeiro lugar — só com assinatura.
  * A equipe da instalação (ADMIN_EMAILS) é o superadmin da plataforma.
  */
 
@@ -328,14 +329,18 @@ export const registerDoctor = createServerFn({ method: "POST" })
       }
     }
 
-    // Médico NOVO começa em trial com prazo de 14 dias (o "grátis por 14
-    // dias" prometido). Médico já existente NÃO tem o prazo redefinido aqui
-    // (pode ser um assinante pago só atualizando o perfil).
-    const trialFields = existing
+    /* Médico NOVO entra em `free`: cria o perfil, aparece na busca, recebe
+       paciente — mas a IA e as ferramentas pagas só com assinatura.
+       O trial de 14 dias saiu. Ele dava as capacidades de Pro (inclusive o
+       Segundo Cérebro) sem cartão nenhum, e cada conversa dessas é chamada de
+       modelo que a gente paga. Quem já está em `trial` continua até vencer —
+       `entitlements.server` derruba no prazo; o que muda é só quem nasce agora.
+       Médico já existente NÃO tem o plano mexido aqui (pode ser assinante pago
+       só atualizando o perfil). */
+    const camposDeEntrada = existing
       ? {}
       : {
-          plan: "trial",
-          plan_expires_at: new Date(Date.now() + 14 * 86400000).toISOString(),
+          plan: "free",
           ...(referredBy ? { referred_by: referredBy } : {}),
           ...(invitedByPatient ? { invited_by_patient: invitedByPatient } : {}),
         };
@@ -356,15 +361,31 @@ export const registerDoctor = createServerFn({ method: "POST" })
       "accepts_insurance",
       "accepts_private",
     ] as const;
+    /* Campos com `.default("")` no schema: quando o formulário não os manda,
+       eles chegam como string VAZIA — não como ausentes — e o `stripUndefined`
+       não tem como distinguir. Num perfil que JÁ EXISTE isso apaga o que
+       estava salvo.
+       Não é hipótese: a validação de obrigatórios só roda no cadastro novo
+       (`if (!existing)` acima, e por bom motivo — barrar ali trancava o médico
+       fora do próprio painel). Então um reenvio com o campo em branco passava
+       direto e zerava CRM, WhatsApp ou chave PIX de quem já estava cadastrado.
+       Apagar exige intenção: continua possível pelo "Meu Perfil", que manda o
+       campo de propósito. O que não pode é acontecer por omissão. */
+    const COM_PADRAO_VAZIO = ["title", "specialty", "crm", "whatsapp", "pix_key"] as const;
     const doUpsert = (s: string | null, richOk: boolean) => {
       const profile = stripUndefined(data.profile) as Record<string, unknown>;
+      if (existing) {
+        for (const k of COM_PADRAO_VAZIO) {
+          if (typeof profile[k] === "string" && !(profile[k] as string).trim()) delete profile[k];
+        }
+      }
       if (!richOk) for (const k of RICH_KEYS) delete profile[k];
       return (supabaseAdmin as any)
         .from("doctors")
         .upsert({
           id: user.id,
           ...profile,
-          ...trialFields,
+          ...camposDeEntrada,
           slug: s,
           updated_at: new Date().toISOString(),
         })
@@ -450,7 +471,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
                <p style="margin:0 0 6px"><strong>CRM:</strong> ${escEmail(data.profile.crm)}</p>
                <p style="margin:0 0 6px"><strong>WhatsApp:</strong> ${escEmail(data.profile.whatsapp ?? "—")}</p>
                <p style="margin:0 0 6px"><strong>E-mail:</strong> ${escEmail(user.email ?? "—")}</p>
-               <p style="margin:14px 0 0">O painel dele já está ativo (trial 14 dias) — vale dar as boas-vindas e ajudar no onboarding.</p>`,
+               <p style="margin:14px 0 0">O perfil dele já está no ar — vale dar as boas-vindas e ajudar no onboarding.</p>`,
             ),
           });
         }

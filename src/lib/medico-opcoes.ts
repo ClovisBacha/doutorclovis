@@ -176,8 +176,22 @@ export function separarFormacoes(texto?: string | null): {
       l.toLowerCase().startsWith(c.prefixo.toLowerCase().slice(0, 8)),
     );
     if (cat && !valores[cat.chave]) {
-      // Tira o prefixo e o travessão para o campo mostrar só o conteúdo.
-      valores[cat.chave] = l.replace(/^[^—-]*[—-]\s*/, "").trim() || l;
+      /* Tira o prefixo e o travessão para o campo mostrar só o conteúdo — mas
+         só quando a linha está no formato canônico que `montarFormacoes`
+         escreve.
+
+         O corte antes era um regex genérico (`^[^—-]*[—-]\s*`), e ele comia o
+         hífen do PRÓPRIO prefixo: "Pós-doutorado — USP" voltava como
+         "doutorado — USP", e o envio seguinte gravava "Pós-doutorado —
+         doutorado — USP". Cada ida e volta somava um pedaço.
+
+         Linha escrita à mão ("Residência em GO no HC") volta INTEIRA: o
+         `jaTemPrefixo` do outro lado reconhece e não duplica nada. Melhor
+         devolver o que ele escreveu do que adivinhar onde termina o rótulo. */
+      const canonico = `${cat.prefixo} — `;
+      valores[cat.chave] = l.toLowerCase().startsWith(canonico.toLowerCase())
+        ? l.slice(canonico.length).trim() || l
+        : l;
     } else {
       sobrou.push(l);
     }

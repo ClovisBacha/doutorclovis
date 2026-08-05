@@ -365,7 +365,7 @@ function AuthPage() {
             Continuar com e-mail e senha →
           </Link>
           <p className="mt-3 text-xs text-muted-foreground">
-            14 dias grátis · sem cartão de crédito
+            Leva 2 minutos · cancele quando quiser
           </p>
         </div>
       )}

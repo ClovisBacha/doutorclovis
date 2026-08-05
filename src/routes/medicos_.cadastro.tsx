@@ -14,7 +14,12 @@ const RASCUNHO_CADASTRO = "obst_rascunho_cadastro_medico";
 import { CampoFormacoes } from "@/components/campo-formacoes";
 import { CampoFocos } from "@/components/campo-focos";
 import { PreviaCardMedico } from "@/components/previa-card-medico";
-import { TITULOS_MEDICO, ESPECIALIDADES_MEDICO, montarFormacoes } from "@/lib/medico-opcoes";
+import {
+  TITULOS_MEDICO,
+  ESPECIALIDADES_MEDICO,
+  montarFormacoes,
+  separarFormacoes,
+} from "@/lib/medico-opcoes";
 import {
   MOEDAS,
   centavosDe,
@@ -33,7 +38,7 @@ export const Route = createFileRoute("/medicos_/cadastro")({
       {
         name: "description",
         content:
-          "Crie sua conta de médico: 14 dias grátis, painel completo, Segundo Cérebro de IA e app para suas pacientes.",
+          "Crie sua conta de médico: painel completo, Segundo Cérebro de IA e app para suas pacientes.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -163,6 +168,66 @@ function CadastroMedicoPage() {
     }
   }, []);
 
+  /**
+   * Traz para a tela o perfil que já está no banco.
+   *
+   * Só preenche o que está VAZIO. O rascunho do aparelho é carregado antes
+   * desta chamada (ele é síncrono, esta é de rede), e o que o médico digitou
+   * agora vale mais que a versão salva — sobrescrever seria trocar o recente
+   * pelo antigo justamente enquanto ele edita.
+   */
+  function preencherDoServidor(d: Record<string, any>) {
+    const texto = (v: unknown) => (typeof v === "string" ? v : "");
+    setProfile((p) => {
+      const n = { ...p };
+      for (const k of [
+        "display_name",
+        "title",
+        "specialty",
+        "whatsapp",
+        "pix_key",
+        "bio",
+        "insurances",
+      ] as const) {
+        if (!texto((n as any)[k]).trim() && texto(d[k]).trim()) (n as any)[k] = d[k];
+      }
+      if (typeof d.accepts_insurance === "boolean") n.accepts_insurance = d.accepts_insurance;
+      if (typeof d.accepts_private === "boolean") n.accepts_private = d.accepts_private;
+      if (!n.focos.length && Array.isArray(d.focos)) n.focos = d.focos.filter(Boolean);
+      return n;
+    });
+    /* CRM vive partido na tela (UF + número) e junto no banco. */
+    if (!crmUf && !crmNumero && texto(d.crm).trim()) {
+      const { uf, numero } = separarCrm(d.crm);
+      if (uf) setCrmUf(uf);
+      if (numero) setCrmNumero(numero);
+    }
+    /* Formação: sem este caminho de volta, reenviar o formulário APAGA o que
+       estava salvo — `education` é SEMPRE remontado a partir das categorias no
+       envio, então categoria vazia na tela vira coluna vazia no banco.
+       `separarFormacoes` já existia no repositório, escrita para exatamente
+       isto e nunca chamada por ninguém. */
+    const { valores, livre } = separarFormacoes(texto(d.education));
+    setFormacoes((f) => (Object.keys(f).some((k) => (f[k] ?? "").trim()) ? f : valores));
+    /* O que não casou com categoria nenhuma (perfil antigo, escrito à mão) vai
+       para o texto corrido, que é onde a tela sabe mostrá-lo. Só se estiver
+       vazio: nunca por cima do que ele escreveu. */
+    if (livre.trim()) {
+      setProfile((p) => (p.bio.trim() ? p : { ...p, bio: livre }));
+    }
+    if (!valorTexto) {
+      const cents =
+        typeof d.consultation_price_cents === "number"
+          ? d.consultation_price_cents
+          : typeof d.consultation_price_brl === "number"
+            ? d.consultation_price_brl * 100
+            : null;
+      if (cents && cents > 0) setValorTexto(formatarDinheiro(cents));
+      const m = texto(d.consultation_currency);
+      if (m && m in MOEDAS) setMoeda(m as MoedaChave);
+    }
+  }
+
   // Já logado? Médico ativo vai direto ao painel (ex.: login com Google);
   // senão mostra o perfil profissional, avisando qual conta está em uso e
   // oferecendo trocar — evita paciente virando "médico" sem perceber.
@@ -175,6 +240,19 @@ function CadastroMedicoPage() {
           navigate({ to: "/painel" });
           return;
         }
+        /* Perfil existe mas não está ativo: o formulário abre PREENCHIDO com o
+           que já está no banco.
+
+           Antes ele só sabia recuperar o rascunho do `localStorage` — que é do
+           aparelho e do navegador. Numa aba anônima, num outro celular ou
+           depois de limpar o histórico, o rascunho não existe, e quem já tinha
+           preenchido quinze campos os digitava de novo. Foi exatamente o que
+           aconteceu: cadastro repetido numa janela privada.
+
+           E não era só o trabalho perdido. Na volta, o `upsert` grava o que veio
+           da tela — então um campo esquecido na segunda passada apagava o valor
+           bom que estava salvo. O prejuízo era maior que o incômodo. */
+        if (me.ok && me.doctor) preencherDoServidor(me.doctor);
       } catch {
         /* sem rede/perfil: segue para a etapa de perfil */
       }
@@ -487,7 +565,7 @@ function CadastroMedicoPage() {
         </h1>
         <p className="mt-2 text-center text-sm text-muted-foreground">
           {step === "auth"
-            ? "14 dias grátis · sem cartão de crédito · cancele quando quiser"
+            ? "Leva 2 minutos · cancele quando quiser"
             : "É com esses dados que suas pacientes vão te encontrar."}
         </p>
 
@@ -542,14 +620,13 @@ function CadastroMedicoPage() {
             <p className="text-4xl">🎉</p>
             <h2 className="mt-3 font-serif text-xl">Seu painel já está ativo!</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Seus <strong>14 dias grátis</strong> começaram agora. Você já pode entrar no painel,
-              treinar a sua IA (Segundo Cérebro), abrir a agenda e convidar suas pacientes — sem
-              esperar por ninguém.
+              Seu perfil já está no ar e as pacientes conseguem te encontrar. Entre no painel para
+              abrir a agenda, convidar suas pacientes e escolher seu plano.
             </p>
             <div className="mt-5 space-y-2 rounded-2xl bg-secondary/50 p-4 text-left text-xs text-muted-foreground">
               <p>✅ Conta e perfil profissional criados</p>
-              <p>✅ Painel liberado — trial de 14 dias ativo</p>
-              <p>👉 Agora: treine sua IA e convide suas pacientes pelo painel</p>
+              <p>✅ Painel liberado — agenda e pacientes</p>
+              <p>👉 Agora: escolha seu plano para ligar o Segundo Cérebro</p>
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <button

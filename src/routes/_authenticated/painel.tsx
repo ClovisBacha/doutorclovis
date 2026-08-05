@@ -783,7 +783,7 @@ function PainelPage() {
           <a href="/medicos/cadastro" className="font-semibold text-primary hover:underline">
             crie sua conta aqui
           </a>{" "}
-          — leva 2 minutos e os primeiros 14 dias são grátis.
+          — leva 2 minutos.
         </p>
       </section>
     );
