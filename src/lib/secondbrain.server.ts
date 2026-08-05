@@ -348,13 +348,25 @@ export function logBrainGap(
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const sb = supabaseAdmin as any;
-      /* Primeiro pelo texto exato (barato e certeiro), depois por semelhança. */
-      let { data: existing } = await sb
+      /* Primeiro pelo texto exato (barato e certeiro), depois por semelhança.
+         `.limit(1)` em vez de `.maybeSingle()`, e isso é conserto de uma bola
+         de neve: `maybeSingle()` devolve ERRO quando acha mais de uma linha, e
+         o erro caía no chão do destructuring. Com `data` nulo, o código
+         concluía "não existe" e inseria MAIS uma duplicata — então bastava uma
+         duplicata nascer (corrida entre duas pacientes, ou índice único ausente
+         no banco) para aquela pergunta nunca mais juntar, nem repetida com o
+         texto idêntico. Pegar a primeira e seguir é sempre correto: se há
+         duplicata, juntar em qualquer uma delas é melhor que criar a terceira. */
+      const achadasPorTexto = await sb
         .from("brain_gaps")
         .select("id,hits,status")
         .eq("doctor_id", doctorId)
         .eq("norm_question", norm)
-        .maybeSingle();
+        .order("created_at", { ascending: true })
+        .limit(1);
+      let existing = (achadasPorTexto.data ?? [])[0] as
+        | { id: string; hits: number; status: string }
+        | undefined;
 
       /* O vetor, quando quem chamou não tinha um.
          Só DEPOIS da busca por texto, de propósito: se o texto exato já bateu,
@@ -465,7 +477,11 @@ export function logBrainGap(
         // Fecha o ciclo em horas, não em dias: avisa o médico que a IA tem
         // pergunta sem resposta. No máximo 1 e-mail por dia por médico (o
         // primeiro gap do dia dispara; os demais só aparecem no painel).
-        notifyDoctorOfGap(doctorId, sb);
+        /* Só quando a linha REALMENTE nasceu. Sem esta guarda, um insert que
+           falhou (corrida com outra paciente na mesma pergunta) ainda mandava
+           o e-mail "sua IA recebeu uma pergunta que não soube responder" — e o
+           médico abria o painel para procurar uma lacuna que não existe. */
+        if (nova?.id) notifyDoctorOfGap(doctorId, sb);
       }
     } catch {
       /* best-effort — nunca afeta a resposta ao paciente */

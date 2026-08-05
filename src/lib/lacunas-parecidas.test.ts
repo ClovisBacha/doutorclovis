@@ -73,6 +73,10 @@ function supabaseDeMentira(opts: {
         gte() {
           return this;
         },
+        order() {
+          return this;
+        },
+        limit: async () => ({ data: opts.existente ? [opts.existente] : [] }),
         maybeSingle: async () => ({ data: opts.existente ?? null }),
         update(patch: any) {
           reg.updates.push(patch);
@@ -432,11 +436,69 @@ describe("a busca no banco", () => {
   });
 
   test("a função é do serviço, não do navegador", () => {
-    /* `security definer` sobre uma tabela com RLS: exposta ao `anon`, ela
-       deixaria qualquer visitante ler a fila de dúvidas de qualquer médico. */
-    expect(sql).toContain("SECURITY DEFINER");
     expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.match_brain_gaps[^;]*anon/);
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.match_brain_gaps[^;]*authenticated/);
     expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION public\.match_brain_gaps[^;]*service_role/);
+  });
+
+  /**
+   * OS DOIS DEFEITOS QUE CUSTARAM QUATRO RODADAS DE TESTE.
+   *
+   * A função existia, era chamada, e devolvia vazio — sem erro visível. As
+   * causas eram duas divergências que EU introduzi em relação à
+   * `match_brain_entries`, que funciona há meses:
+   *
+   *   · `SET search_path = public` — no Supabase a extensão `vector` vive em
+   *     `extensions`. Fixar o caminho em `public` deixa o operador `<=>`
+   *     invisível dentro do corpo da função.
+   *   · índice `ivfflat` criado com a tabela VAZIA — os centroides são
+   *     calculados na criação, e com `probes = 1` a busca passa ao largo das
+   *     linhas que existem.
+   *
+   * A lição não é o detalhe do pgvector. É que havia uma função equivalente,
+   * provada em produção, e eu escrevi outra forma.
+   */
+  test("NÃO fixa search_path — senão o operador `<=>` some", () => {
+    expect(sql).not.toMatch(/SET search_path/);
+  });
+
+  test("NÃO usa SECURITY DEFINER — a chave de serviço já passa pela RLS", () => {
+    expect(sql).not.toContain("SECURITY DEFINER");
+  });
+
+  test("o índice é hnsw, nunca ivfflat", () => {
+    /* `hnsw` se constrói a cada linha inserida; `ivfflat` depende de haver
+       dados no momento da criação, e aqui não havia nenhum. */
+    expect(sql).toContain("USING hnsw (embedding vector_cosine_ops)");
+    expect(sql).not.toMatch(/USING ivfflat/);
+  });
+
+  test("derruba o índice velho antes de criar o novo", () => {
+    /* `CREATE INDEX IF NOT EXISTS` sozinho não troca nada: o ivfflat quebrado
+       continuaria lá, e rodar o arquivo de novo não consertaria nada. */
+    const posDrop = sql.indexOf("DROP INDEX IF EXISTS public.idx_brain_gaps_embedding");
+    const posCreate = sql.indexOf("CREATE INDEX IF NOT EXISTS idx_brain_gaps_embedding");
+    expect(posDrop).toBeGreaterThan(0);
+    expect(posDrop).toBeLessThan(posCreate);
+  });
+
+  test("derruba a função velha antes de recriar", () => {
+    /* `CREATE OR REPLACE` não remove `SECURITY DEFINER` nem `SET search_path`
+       de uma função que já os tem — o defeito sobreviveria a rodar o arquivo
+       outra vez, que é exatamente o que se pede ao usuário. */
+    const posDrop = sql.indexOf("DROP FUNCTION IF EXISTS public.match_brain_gaps");
+    const posCreate = sql.indexOf("CREATE OR REPLACE FUNCTION public.match_brain_gaps");
+    expect(posDrop).toBeGreaterThan(0);
+    expect(posDrop).toBeLessThan(posCreate);
+  });
+
+  test("a chave única que impede a bola de neve", () => {
+    /* Sem ela, uma duplicata faz o código inserir a terceira, a quarta… */
+    expect(sql).toContain("CREATE UNIQUE INDEX IF NOT EXISTS uq_brain_gaps_doctor_question");
+  });
+
+  test("zera os vetores antigos, gerados com texto sujo", () => {
+    expect(sql).toContain("UPDATE public.brain_gaps SET embedding = NULL");
   });
 
   test("a migration e o arquivo de aplicar contam a mesma história", () => {
@@ -713,5 +775,55 @@ describe("o agrupamento diz por que não juntou", () => {
     /* Diagnóstico é observação, nunca decisão: a pergunta da paciente entra na
        fila mesmo com o agrupamento fora do ar. */
     expect(fonte).not.toMatch(/if \(erroRpc\) (return|throw)/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A bola de neve do `maybeSingle()`
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `.maybeSingle()` tolera zero linhas — e devolve ERRO quando acha mais de
+ * uma. O erro caía no chão do destructuring, então `data` vinha nulo e o
+ * código concluía "não existe": inseria MAIS uma duplicata.
+ *
+ * Bastava uma duplicata nascer — corrida entre duas pacientes, ou índice único
+ * ausente no banco — para aquela pergunta nunca mais juntar. Nem repetida com
+ * o texto byte a byte idêntico. Cada repetição empilhava outra linha.
+ *
+ * É um defeito que se ALIMENTA: quanto mais acontece, mais provável fica.
+ */
+describe("duplicata existente não vira duplicata nova", () => {
+  test("a busca por texto pega a primeira, em vez de exigir exatamente uma", () => {
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    const trecho = fonte.slice(fonte.indexOf("export function logBrainGap"));
+    const buscaPorTexto = trecho.slice(0, trecho.indexOf("match_brain_gaps"));
+    expect(buscaPorTexto).toContain('.eq("norm_question", norm)');
+    expect(buscaPorTexto).toContain(".limit(1)");
+    expect(buscaPorTexto).not.toContain(".maybeSingle()");
+  });
+
+  test("pega a MAIS ANTIGA — a que já tem os hits e quem perguntou", () => {
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain('.order("created_at", { ascending: true })');
+  });
+
+  test("achando pelo texto, junta em vez de inserir", async () => {
+    const reg = await rodarLacuna({
+      existente: { id: "ja-existe", hits: 4, status: "aberta" },
+      embedding: VETOR,
+    });
+    expect(reg.inserts).toHaveLength(0);
+    expect(reg.updates[0].hits).toBe(5);
+  });
+});
+
+describe("e-mail de lacuna só quando a lacuna existe", () => {
+  test("insert que falhou não avisa o médico", () => {
+    /* Sem a guarda, uma corrida perdida mandava "sua IA recebeu uma pergunta
+       que não soube responder" — e ele abria o painel para procurar uma lacuna
+       que não estava lá. */
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain("if (nova?.id) notifyDoctorOfGap(doctorId, sb);");
   });
 });
