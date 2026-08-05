@@ -939,3 +939,79 @@ describe("a cura não mente sobre o que gravou", () => {
     expect(fonte).toContain("updates falharam");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O agrupamento que vale mais: na RESPOSTA, não na chegada
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * "Como reduzir o estresse", "Como reduzir o MEU estresse" e "Como consigo
+ * controlar o estresse" são três linhas na fila e UMA pergunta.
+ *
+ * Juntá-las quando NASCEM é adivinhação — ninguém escreveu a resposta ainda, e
+ * errar significa o médico responder uma achando que respondeu as outras.
+ * Juntá-las quando ele RESPONDE não é: a resposta existe, ele acabou de
+ * escrevê-la, e o número volta na tela para ele conferir o que foi fechado.
+ *
+ * E o ganho é maior. Não economiza uma linha na fila — economiza as OUTRAS
+ * respostas que ele escreveria, e cada paciente das parecidas recebe a
+ * orientação dele em vez de continuar esperando.
+ */
+describe("responder uma lacuna fecha as parecidas", () => {
+  const fonte = codigoDe("src/lib/secondbrain.functions.ts");
+
+  test("`resolveBrainGap` fecha as parecidas e devolve quantas", () => {
+    expect(fonte).toContain("const parecidas = await fecharLacunasParecidas(sb, {");
+    expect(fonte).toContain("return { ok: true as const, avisadas, parecidas };");
+  });
+
+  test("compara o vetor da PERGUNTA, não o da entrada", () => {
+    /* As lacunas guardam vetor de pergunta; a entrada do cérebro é indexada
+       por pergunta + resposta. Comparar conteúdos diferentes produz um número
+       que parece similaridade e não é. */
+    expect(fonte).toContain("embedText(textoParaVetor(args.pergunta.slice(0, 300))");
+  });
+
+  test("usa o MESMO corte do agrupamento na chegada", () => {
+    /* Dois cortes para a mesma decisão divergem com o tempo, e ninguém percebe
+       porque os dois "funcionam". */
+    expect(fonte).toContain("c.similarity >= GAP_MERGE_MIN_SIMILARITY");
+  });
+
+  test("nunca fecha a própria lacuna que acabou de ser respondida", () => {
+    expect(fonte).toContain("c.id !== args.gapIdRespondida");
+  });
+
+  test("só fecha o que ainda está ABERTO, e só do próprio médico", () => {
+    /* Entre a busca e a escrita ele pode ter respondido ou ignorado outra numa
+       segunda aba — e escopo por médico nunca é opcional aqui. */
+    expect(fonte).toMatch(
+      /\.eq\("doctor_id", args\.doctorId\)[\s\S]{0,80}\.eq\("status", "aberta"\)/,
+    );
+  });
+
+  test("quem perguntou a parecida também recebe a resposta", () => {
+    /* Sem isto, a paciente da lacuna fechada some: a linha sai da fila e ela
+       continua esperando uma resposta que já existe. */
+    const trecho = fonte.slice(fonte.indexOf("async function fecharLacunasParecidas"));
+    expect(trecho).toContain("await entregarRespostaDaLacuna(sb, {");
+    expect(trecho).toContain("perguntaDela: linha.question as string,");
+  });
+
+  test("falhar aqui não desfaz a resposta principal", () => {
+    /* A lacuna respondida e o conhecimento novo já existem. Uma falha no
+       fechamento das parecidas só significa fila mais cheia — nunca resposta
+       perdida. */
+    const trecho = fonte.slice(fonte.indexOf("async function fecharLacunasParecidas"));
+    expect(trecho).toContain("return 0;");
+    expect(trecho).not.toMatch(/throw /);
+  });
+
+  test("o médico VÊ quantas saíram junto", () => {
+    /* Três linhas sumindo da fila sem explicação é pior que fila cheia: ele
+       fica sem saber se respondeu ou se perdeu alguma. */
+    const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+    expect(painel).toContain("parecida");
+    expect(painel).toMatch(/juntas > 0/);
+  });
+});

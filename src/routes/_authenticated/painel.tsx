@@ -5883,7 +5883,14 @@ function BrainGapsCard({
         );
         return;
       }
-      toast.success("Respondida e aprendida pelo cérebro 🧠");
+      /* Diz quantas parecidas saíram junto. Sem isso, três linhas somem da
+         fila e o médico fica sem saber se respondeu ou se perdeu alguma. */
+      const juntas = "parecidas" in res && typeof res.parecidas === "number" ? res.parecidas : 0;
+      toast.success(
+        juntas > 0
+          ? `Respondida e aprendida 🧠 — ${juntas} pergunta${juntas > 1 ? "s" : ""} parecida${juntas > 1 ? "s" : ""} também ${juntas > 1 ? "foram respondidas" : "foi respondida"}`
+          : "Respondida e aprendida pelo cérebro 🧠",
+      );
       setAnswering(null);
       setDrafted(null);
       setAnswer("");

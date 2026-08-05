@@ -227,7 +227,7 @@ export function isCortesia(question: string): boolean {
  * e vem acompanhada da limpeza do texto abaixo, que ataca a causa em vez de só
  * afrouxar a régua.
  */
-const GAP_MERGE_MIN_SIMILARITY = 0.82;
+export const GAP_MERGE_MIN_SIMILARITY = 0.82;
 
 /**
  * O texto que vira VETOR — não o que vira lacuna.

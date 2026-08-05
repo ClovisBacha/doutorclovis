@@ -719,8 +719,90 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
       perguntaDela: gap.question as string,
       resposta: data.answer,
     });
-    return { ok: true as const, avisadas };
+
+    /* E AS PARECIDAS SAEM JUNTO.
+
+       "Como reduzir o estresse", "Como reduzir o MEU estresse" e "Como consigo
+       controlar o estresse" são três linhas na fila e UMA pergunta. Juntá-las
+       na hora em que nascem é adivinhação; juntá-las AGORA não é — a resposta
+       existe, ele acabou de escrevê-la, e o número volta na tela para ele ver
+       o que foi fechado.
+
+       É aqui que o agrupamento vale mais: não economiza uma linha na fila,
+       economiza as OUTRAS respostas que ele escreveria. E cada paciente das
+       parecidas recebe a orientação dele, em vez de continuar esperando. */
+    const parecidas = await fecharLacunasParecidas(sb, {
+      doctorId,
+      gapIdRespondida: gap.id as string,
+      pergunta: questionText,
+      resposta: data.answer,
+    });
+    return { ok: true as const, avisadas, parecidas };
   });
+
+/**
+ * Fecha as lacunas ABERTAS que a resposta recém-escrita também responde.
+ *
+ * O vetor comparado é o da PERGUNTA, não o da entrada (que é pergunta +
+ * resposta): as lacunas guardam vetor de pergunta, e comparar coisas de
+ * conteúdos diferentes produz um número que parece similaridade e não é.
+ *
+ * Best-effort inteiro: a lacuna principal já está respondida e o conhecimento
+ * já existe. Falhar aqui só significa que a fila continua com as parecidas —
+ * nunca que a resposta se perdeu.
+ */
+async function fecharLacunasParecidas(
+  sb: any,
+  args: { doctorId: string; gapIdRespondida: string; pergunta: string; resposta: string },
+): Promise<number> {
+  try {
+    const { embedText } = await import("./embeddings.server");
+    const { textoParaVetor, GAP_MERGE_MIN_SIMILARITY } = await import("./secondbrain.server");
+    const vetor = await embedText(textoParaVetor(args.pergunta.slice(0, 300)), 4000);
+    if (!vetor) return 0;
+
+    const { data: candidatas, error } = await sb.rpc("match_brain_gaps", {
+      p_doctor_id: args.doctorId,
+      p_embedding: vetor,
+      p_limit: 10,
+    });
+    if (error) {
+      console.error(`[lacuna] fechar parecidas: ${error.code ?? "?"} ${error.message ?? ""}`);
+      return 0;
+    }
+    const alvos = ((candidatas ?? []) as { id: string; similarity: number }[]).filter(
+      (c) => c.id !== args.gapIdRespondida && c.similarity >= GAP_MERGE_MIN_SIMILARITY,
+    );
+    if (!alvos.length) return 0;
+
+    let fechadas = 0;
+    for (const alvo of alvos) {
+      /* Uma por vez, e só a que ainda está aberta: entre a busca e a escrita o
+         médico pode ter respondido ou ignorado outra numa segunda aba. */
+      const { data: linha } = await sb
+        .from("brain_gaps")
+        .update({ status: "respondida", updated_at: new Date().toISOString() })
+        .eq("id", alvo.id)
+        .eq("doctor_id", args.doctorId)
+        .eq("status", "aberta")
+        .select("id,question")
+        .maybeSingle();
+      if (!linha) continue;
+      fechadas++;
+      /* Quem perguntou a parecida recebe a MESMA orientação. A pergunta que vai
+         junto é a dela, crua — ela precisa reconhecer a própria dúvida. */
+      await entregarRespostaDaLacuna(sb, {
+        gapId: linha.id as string,
+        doctorId: args.doctorId,
+        perguntaDela: linha.question as string,
+        resposta: args.resposta,
+      });
+    }
+    return fechadas;
+  } catch {
+    return 0;
+  }
+}
 
 /**
  * Entrega a resposta de uma lacuna a todas as pacientes que perguntaram.
