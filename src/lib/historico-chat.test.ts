@@ -144,3 +144,26 @@ describe("a resposta da IA precisa sobreviver ao fim do fluxo", () => {
     expect(chat).not.toContain("await maybeUpdateChatMemory(");
   });
 });
+
+describe("o histórico é contexto, não uma fila de perguntas pendentes", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+
+  test("os dois prompts mandam responder só a ÚLTIMA mensagem", () => {
+    /* Sem esta regra, uma conversa retomada depois de dias faz o modelo
+       "colocar em dia" tudo o que veio antes. Apareceu de forma extrema por
+       causa do defeito de gravação — o banco tinha cinco perguntas seguidas sem
+       nenhuma resposta, e um simples "Olá" respondia todas elas de uma vez —
+       mas o problema é geral: histórico é contexto, não pauta. */
+    expect(chat.match(/apenas à ÚLTIMA mensagem/g)?.length).toBe(2);
+  });
+
+  test("cumprimento sozinho recebe cumprimento de volta", () => {
+    /* "Olá" não é pedido de resumo do acompanhamento. */
+    expect(chat).toMatch(/Cumprimento sozinho recebe cumprimento curto de volta/);
+    expect(chat).toMatch(/responda com um cumprimento curto/);
+  });
+
+  test("proíbe explicitamente o resumo do que já foi conversado", () => {
+    expect(chat).toContain("nem faça um resumo do que já foi conversado");
+  });
+});
