@@ -622,6 +622,15 @@ export const Route = createFileRoute("/api/chat")({
         // geral da plataforma. Assim cada conta é individual.
         const patient = await resolvePatientDoctor(request);
 
+        /* Guardado fora do `if` para chegar ao medidor no `onFinish`. Fica
+           `undefined` quando a pergunta nem passou pelo cérebro — suporte, site
+           anônimo, paciente sem médico —, e a coluna fica NULA. Nulo e `false`
+           dizem coisas diferentes: `false` é "o cérebro olhou e não achou";
+           nulo é "o cérebro nem foi consultado". Misturar os dois afundaria a
+           taxa de cobertura com perguntas que nunca deveriam entrar na conta. */
+        let cobertura: boolean | undefined;
+        let similaridade: number | null = null;
+
         let system: string;
         /* CAMINHO ENXUTO — pergunta que é da PLATAFORMA, não do médico.
 
@@ -672,6 +681,8 @@ export const Route = createFileRoute("/api/chat")({
             buildMedidasBlock(patient.patientId),
             buildPendenciasBlock(patient.patientId, patient.doctorId),
           ]);
+          cobertura = brain.hadCoverage;
+          similaridade = brain.melhorSimilaridade;
           const memoria = memoryBlock(memorySummary);
           const base = medicalSystemPrompt(patient.doctorName);
           const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
@@ -824,6 +835,8 @@ export const Route = createFileRoute("/api/chat")({
               doctorId: patient?.doctorId ?? null,
               patientId: patient?.patientId ?? null,
               canal: soSuporte ? "suporte" : patient ? "app" : "site",
+              cobertura,
+              similaridade,
             });
             if (!persistFor) {
               await registro;

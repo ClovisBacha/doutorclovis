@@ -222,3 +222,49 @@ describe("pergunta de app é da plataforma, não do médico", () => {
     expect(enxuto).toBeLessThan(clinico);
   });
 });
+
+/**
+ * A eficiencia do Segundo Cerebro era uma pergunta sem resposta.
+ *
+ * O sinal existia (`hadCoverage`) e nao era gravado. E `brain_hits`, que parece
+ * ser isso, nao e: ele registra sempre que um bloco nao-vazio e montado, e a
+ * persona do medico sozinha ja faz o bloco nao ser vazio — um "hit" pode nao ter
+ * tido cobertura nenhuma.
+ */
+describe("a cobertura do cérebro passa a ser medida", () => {
+  const brain = readFileSync("src/lib/secondbrain.server.ts", "utf8");
+
+  test("a similaridade do melhor acerto sobe junto com o contexto", () => {
+    expect(brain).toContain("melhorSimilaridade: number | null;");
+    expect(brain).toContain("melhorSimilaridade = Math.max(...achados.map((m) => m.similarity))");
+  });
+
+  test("a similaridade é capturada ANTES do corte", () => {
+    /* Guardar só o que passou esconderia metade da informação: saber que a
+       melhor entrada deu 0,52 é o que revela um corte apertado demais — e isso
+       some se a gente só olhar o que virou cobertura. */
+    const captura = brain.indexOf("melhorSimilaridade = Math.max");
+    const corte = brain.indexOf("m.similarity >= SEMANTIC_MIN_SIMILARITY");
+    expect(captura).toBeGreaterThan(0);
+    expect(captura).toBeLessThan(corte);
+  });
+
+  test("nulo e `false` dizem coisas diferentes", () => {
+    /* `false` = o cérebro olhou e não achou. Nulo = o cérebro nem foi
+       consultado (suporte, site anônimo, paciente sem médico). Gravar `false`
+       nesses casos afundaria a taxa de cobertura com perguntas que nunca
+       deveriam entrar na conta. */
+    expect(chat).toContain("let cobertura: boolean | undefined;");
+    expect(uso).toContain("cobertura: u.cobertura ?? null,");
+  });
+
+  test("o cérebro remoto declara que não sabe, em vez de chutar", () => {
+    expect(brain).toContain("melhorSimilaridade: null,");
+  });
+
+  test("os dois valores chegam ao medidor", () => {
+    expect(chat).toContain("cobertura = brain.hadCoverage;");
+    expect(chat).toContain("similaridade = brain.melhorSimilaridade;");
+    expect(chat).toMatch(/cobertura,\s*\n\s*similaridade,/);
+  });
+});

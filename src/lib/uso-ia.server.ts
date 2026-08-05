@@ -42,6 +42,17 @@ export type Uso = {
   doctorId?: string | null;
   patientId?: string | null;
   canal?: string;
+  /**
+   * Alguma orientação validada do médico casou com a pergunta?
+   *
+   * `undefined` quando a pergunta nem passou pelo cérebro (suporte, site
+   * anônimo, paciente sem médico) — e aí a coluna fica nula, que é diferente
+   * de `false`. Gravar `false` ali afundaria a taxa de cobertura com perguntas
+   * que nunca deveriam entrar na conta.
+   */
+  cobertura?: boolean;
+  /** Similaridade do melhor acerto (0–1), inclusive abaixo do corte. */
+  similaridade?: number | null;
 };
 
 /**
@@ -78,6 +89,8 @@ export async function registrarUsoAgora(u: Uso): Promise<void> {
       especie: u.especie,
       canal: u.canal ?? "app",
       modelo: u.modelo,
+      cobertura: u.cobertura ?? null,
+      similaridade: u.similaridade ?? null,
       input_tokens: entrada,
       output_tokens: saida,
     });

@@ -59,6 +59,21 @@ export type BrainContext = {
    * improvisar conduta.
    */
   hadCoverage: boolean;
+  /**
+   * Similaridade de cosseno do MELHOR acerto semântico (0 a 1), quando a busca
+   * por vetor foi quem selecionou. `null` quando não houve busca semântica —
+   * sem chave de IA, sem a extensão, ou quando o fallback por palavras assumiu.
+   *
+   * Existe para uma pergunta que hoje não tem resposta: **qual é a eficiência
+   * real do cérebro?** O corte está em 0,55, que para este modelo de embedding
+   * ainda aceita "vagamente relacionado" — e o erro daí é o mais perigoso num
+   * app clínico: a IA acha que tem cobertura e responde "a sua médica orienta
+   * que…" com uma entrada que não responde bem à pergunta.
+   *
+   * Guardando a similaridade de cada acerto, a decisão de mexer no corte passa
+   * a ser tomada com a distribuição na mão em vez de por intuição.
+   */
+  melhorSimilaridade: number | null;
 };
 
 /** Canal em que o cérebro foi usado (telemetria do dashboard do médico). */
@@ -397,7 +412,14 @@ export async function getBrainContext(
     // médico vinculado (doctorId undefined) → chat genérico, sem cérebro.
     // Não existe mais fallback para "o dono da instalação".
     const target = doctorId ?? null;
-    if (!target) return { block: "", enabledApp: true, enabledWhatsapp: true, hadCoverage: false };
+    if (!target)
+      return {
+        block: "",
+        enabledApp: true,
+        enabledWhatsapp: true,
+        hadCoverage: false,
+        melhorSimilaridade: null,
+      };
 
     const { getEntitlementsByDoctorId } = await import("./entitlements.server");
     const [settingsRes, entriesRes, ent] = await Promise.all([
@@ -430,12 +452,30 @@ export async function getBrainContext(
 
     // Canal não coberto pelo plano → bloco vazio (nada do cérebro vaza).
     if (channel === "app" && !enabledApp)
-      return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
+      return {
+        block: "",
+        enabledApp,
+        enabledWhatsapp,
+        hadCoverage: false,
+        melhorSimilaridade: null,
+      };
     if (channel === "whatsapp" && !enabledWhatsapp) {
-      return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
+      return {
+        block: "",
+        enabledApp,
+        enabledWhatsapp,
+        hadCoverage: false,
+        melhorSimilaridade: null,
+      };
     }
     if (channel === "teste" && !ent.aiApp)
-      return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
+      return {
+        block: "",
+        enabledApp,
+        enabledWhatsapp,
+        hadCoverage: false,
+        melhorSimilaridade: null,
+      };
 
     // ── Seleção em 2 camadas ─────────────────────────────────────────────
     // 1ª) SEMÂNTICA (pgvector + embedding da pergunta): entende sinônimos —
@@ -446,6 +486,11 @@ export async function getBrainContext(
     // A mensagem da paciente vira só o VETOR de consulta — segue nunca
     // entrando no texto do bloco (anti prompt-injection preservado).
     let selected: BrainEntryRow[] = [];
+    /* A similaridade do MELHOR acerto, antes do corte — inclusive quando ela
+       fica ABAIXO dele. Guardar só os aprovados esconderia metade da
+       informação: saber que a melhor entrada deu 0,52 é o que revela um corte
+       apertado demais, e isso some se a gente só olhar o que passou. */
+    let melhorSimilaridade: number | null = null;
     if (entries.length > 0) {
       try {
         const { embedText } = await import("./embeddings.server");
@@ -459,7 +504,11 @@ export async function getBrainContext(
             p_limit: MAX_ENTRIES_SCORED,
           });
           if (!error && Array.isArray(matches)) {
-            selected = (matches as { question: string; answer: string; similarity: number }[])
+            const achados = matches as { question: string; answer: string; similarity: number }[];
+            if (achados.length > 0) {
+              melhorSimilaridade = Math.max(...achados.map((m) => m.similarity));
+            }
+            selected = achados
               .filter((m) => m.similarity >= SEMANTIC_MIN_SIMILARITY)
               .map((m) => ({ question: m.question, answer: m.answer }));
           }
@@ -492,7 +541,13 @@ export async function getBrainContext(
       OBSTETRICA_LABELS,
     );
     if (!block) {
-      return { block: "", enabledApp, enabledWhatsapp, hadCoverage: false };
+      return {
+        block: "",
+        enabledApp,
+        enabledWhatsapp,
+        hadCoverage: false,
+        melhorSimilaridade: null,
+      };
     }
 
     // Bloco não-vazio realmente montado → o cérebro vai ser usado: registra o
@@ -504,10 +559,17 @@ export async function getBrainContext(
       enabledApp,
       enabledWhatsapp,
       hadCoverage: selected.length > 0,
+      melhorSimilaridade,
     };
   } catch {
     // Falha de banco não pode derrubar o chat: segue sem o segundo cérebro.
-    return { block: "", enabledApp: true, enabledWhatsapp: true, hadCoverage: false };
+    return {
+      block: "",
+      enabledApp: true,
+      enabledWhatsapp: true,
+      hadCoverage: false,
+      melhorSimilaridade: null,
+    };
   }
 }
 
@@ -546,6 +608,8 @@ export async function getBrainContextResolved(
             enabledApp: remote.enabledChannels.app ?? true,
             enabledWhatsapp: remote.enabledChannels.whatsapp ?? true,
             hadCoverage: remote.hadCoverage,
+            /* O cérebro remoto não devolve similaridade: `null` é honesto. */
+            melhorSimilaridade: null,
           };
         }
       }
