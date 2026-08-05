@@ -6591,12 +6591,15 @@ function WABubble({
   msg,
   feedback,
   onFeedback,
+  terminada = true,
 }: {
   msg: WAMsg;
   /** Voto já dado nesta resposta (persistido no estado do chat). */
   feedback?: "up" | "down";
   /** Presente só em respostas da IA elegíveis a avaliação. */
   onFeedback?: (helpful: boolean) => void;
+  /** `false` só na mensagem que ainda está chegando pelo streaming. */
+  terminada?: boolean;
 }) {
   const isUser = msg.role === "user";
   const timeStr = msg.ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -6718,6 +6721,23 @@ function WABubble({
             style={{ color: ink }}
           >
             {msg.content}
+          </p>
+        )}
+
+        {/* RESPOSTA VAZIA.
+
+            O modelo às vezes termina sem texto nenhum — no Gemini 2.5 isso
+            acontece quando o raciocínio consome todo o orçamento de saída. Sem
+            esta guarda a paciente via uma bolha em branco com dois botões de
+            joinha: nada para ler, nada para entender, e nenhum erro na tela.
+            Uma bolha muda é pior que um erro — erro pelo menos se pode
+            reagir a.
+
+            Só depois que a mensagem terminou de chegar: durante o streaming o
+            texto nasce vazio e isso é normal. */}
+        {!isUser && terminada && !msg.content && !msg.fileName && !msg.audioUrl && (
+          <p className="px-3 pt-2 text-[14px] leading-snug italic" style={{ color: inkSoft }}>
+            Não consegui formular a resposta agora. Pode perguntar de novo?
           </p>
         )}
 
@@ -7186,6 +7206,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
               msg={m}
               feedback={votes[i]}
               onFeedback={canVote ? (helpful) => voteMessage(i, helpful) : undefined}
+              terminada={!(loading && i === messages.length - 1)}
             />
           );
         })}

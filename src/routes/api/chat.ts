@@ -814,6 +814,26 @@ export const Route = createFileRoute("/api/chat")({
           model: google(modeloEmUso),
           system,
           messages: await convertToModelMessages(paraOModelo),
+          /* ─── A BOLHA VAZIA ────────────────────────────────────────────────
+             O Gemini 2.5 Flash "pensa" antes de responder, e os tokens desse
+             raciocínio saem do MESMO orçamento da resposta. Numa pergunta que
+             puxa deliberação — e o prompt clínico daqui puxa: duas camadas,
+             cobertura do médico, o que informar e o que encaminhar — o modelo
+             gasta o orçamento pensando e entrega texto ZERO. A paciente vê uma
+             bolha vazia com dois botões de joinha, sem erro nenhum.
+
+             Desligar o raciocínio resolve os dois lados: a resposta volta a
+             sair, e some uma conta invisível — token de pensamento é cobrado
+             como SAÍDA, que é a parte cara (8x a entrada). O que se pede aqui
+             não precisa de deliberação: é informar bem e encaminhar o resto. */
+          providerOptions: { google: { thinkingConfig: { thinkingBudget: 0 } } },
+          /* Teto de saída. Sem ele, uma pergunta aberta rende texto que ninguém
+             lê e todo mundo paga — e é a saída que domina o custo. 6 frases
+             cabem folgadas aqui. */
+          maxOutputTokens: 900,
+          onError: ({ error }) => {
+            console.error("[chat] stream falhou:", error);
+          },
           /* O `onFinish` roda SEMPRE agora, e não só quando há paciente para
              persistir: a conversa anônima do site também custa tokens, e um
              medidor que ignora um canal inteiro mede errado. */
@@ -832,7 +852,19 @@ export const Route = createFileRoute("/api/chat")({
              A SDK tipa `onFinish` como `PromiseLike<void> | void` e aguarda por
              ele: devolver uma promessa aqui é o que mantém a função viva até a
              gravação terminar. */
-          onFinish: async ({ text, usage }) => {
+          onFinish: async ({ text, usage, finishReason }) => {
+            /* Resposta vazia é o defeito mais cruel deste chat: a paciente vê
+               uma bolha em branco, não há erro em lugar nenhum, e ninguém
+               descobre a causa sem o motivo do término. `MAX_TOKENS` com texto
+               vazio quer dizer que o raciocínio comeu o orçamento; `SAFETY` ou
+               `OTHER` são outra conversa e pedem outro conserto. */
+            if (!text.trim()) {
+              console.error(
+                `[chat] resposta VAZIA — finishReason=${finishReason} ` +
+                  `entrada=${usage?.inputTokens ?? "?"} saida=${usage?.outputTokens ?? "?"} ` +
+                  `modelo=${modeloEmUso}`,
+              );
+            }
             const registro = usoIa.registrarUsoAgora({
               especie: "chat",
               modelo: modeloEmUso,

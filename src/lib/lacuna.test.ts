@@ -228,3 +228,57 @@ describe("o prompt do app informa antes de encaminhar", () => {
     expect(chat).toContain("Não invente dados");
   });
 });
+
+/**
+ * A BOLHA VAZIA.
+ *
+ * A paciente perguntou e recebeu uma bolha em branco: só os dois botões de
+ * joinha e o horário. Nada para ler, nada para entender, e nenhum erro em
+ * lugar nenhum.
+ *
+ * A causa é do Gemini 2.5: ele "pensa" antes de responder, e os tokens desse
+ * raciocínio saem do MESMO orçamento da resposta. Numa pergunta que puxa
+ * deliberação — e o prompt clínico daqui puxa — o modelo gasta o orçamento
+ * pensando e entrega texto ZERO.
+ *
+ * Duas defesas, porque uma só não basta: tirar a causa (não deliberar) e não
+ * deixar o sintoma chegar na tela (bolha muda vira frase honesta).
+ */
+describe("a resposta nunca chega vazia", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+  const app = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+
+  test("o raciocínio do modelo está desligado", () => {
+    /* Ele não é necessário aqui — o trabalho é informar bem e encaminhar o
+       resto — e cada token dele é cobrado como SAÍDA, a parte cara. */
+    expect(chat).toContain("thinkingConfig: { thinkingBudget: 0 }");
+  });
+
+  test("a saída tem teto", () => {
+    /* Sem teto, uma pergunta aberta rende texto que ninguém lê e todo mundo
+       paga. E é a saída que domina o custo. */
+    expect(chat).toMatch(/maxOutputTokens: \d+/);
+  });
+
+  test("resposta vazia deixa rastro com o MOTIVO do término", () => {
+    /* `MAX_TOKENS` com texto vazio diz "o raciocínio comeu o orçamento";
+       `SAFETY` diz outra coisa e pede outro conserto. Sem o motivo, os dois
+       são a mesma bolha em branco. */
+    expect(chat).toContain("resposta VAZIA — finishReason=");
+  });
+
+  test("falha no streaming também é registrada", () => {
+    expect(chat).toContain("[chat] stream falhou:");
+  });
+
+  test("a tela mostra uma frase honesta em vez de bolha muda", () => {
+    expect(app).toContain("Não consegui formular a resposta agora. Pode perguntar de novo?");
+  });
+
+  test("o aviso NÃO aparece durante o streaming", () => {
+    /* Enquanto a resposta chega, o texto nasce vazio — e isso é normal. Sem a
+       guarda, toda resposta piscaria o aviso antes da primeira palavra. */
+    expect(app).toContain("terminada={!(loading && i === messages.length - 1)}");
+    expect(app).toContain("!isUser && terminada && !msg.content");
+  });
+});

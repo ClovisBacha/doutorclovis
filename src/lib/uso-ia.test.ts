@@ -83,7 +83,10 @@ describe("o canal anônimo também conta", () => {
     /* Antes ele era `persistFor ? … : undefined` — sem paciente, nada rodava.
        A conversa do site custa tokens igual, e um medidor que ignora um canal
        inteiro mede errado. */
-    expect(chat).toContain("onFinish: async ({ text, usage }) => {");
+    /* Sem prender a lista de parâmetros: ela cresce quando o handler passa
+       a olhar mais coisa (o `finishReason`, por exemplo). O que importa aqui
+       é o `async` — é ele que a SDK aguarda. */
+    expect(chat).toMatch(/onFinish: async \(\{[^}]*\}\) => \{/);
     expect(chat).not.toContain("onFinish: persistFor");
   });
 

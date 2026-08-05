@@ -110,7 +110,10 @@ describe("a resposta da IA precisa sobreviver ao fim do fluxo", () => {
   test("o onFinish é async — a SDK aguarda por ele", () => {
     /* `PromiseLike<void> | void` no tipo: devolver promessa aqui é o que mantém
        a função viva até a gravação terminar. */
-    expect(chat).toContain("onFinish: async ({ text, usage }) => {");
+    /* Sem prender a lista de parâmetros: ela cresce quando o handler passa
+       a olhar mais coisa (o `finishReason`, por exemplo). O que importa aqui
+       é o `async` — é ele que a SDK aguarda. */
+    expect(chat).toMatch(/onFinish: async \(\{[^}]*\}\) => \{/);
   });
 
   test("a gravação da resposta é AGUARDADA", () => {
