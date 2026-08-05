@@ -119,18 +119,15 @@ const VETOR = Array.from({ length: 768 }, (_, i) => (i % 7) / 7);
  * Um banco de mentira para a CURA — outra forma de uso: aqui o que importa é
  * a varredura das lacunas cegas, não a gravação de uma nova.
  */
-function bancoDeCura(opts: { cegas?: any[]; erro?: any; embedTextDevolve?: (i: number) => any }) {
+function bancoDeCura(opts: { cegas?: any[]; erro?: any }) {
   const reg = {
     filtros: [] as [string, any][],
     limite: null as number | null,
     embeds: [] as string[],
     updates: [] as { id: string; embedding: any }[],
-    passos: 0,
+    curadas: 0,
+    maxSimultaneos: 0,
   };
-  let terminou!: () => void;
-  const fim = new Promise<void>((r) => {
-    terminou = r;
-  });
   const sb: any = {
     from() {
       const q: any = {
@@ -150,7 +147,6 @@ function bancoDeCura(opts: { cegas?: any[]; erro?: any; embedTextDevolve?: (i: n
         update: (patch: any) => ({
           eq: async (_c: string, id: string) => {
             reg.updates.push({ id, embedding: patch.embedding });
-            if (reg.updates.length === (opts.cegas ?? []).length) terminou();
             return {};
           },
         }),
@@ -158,34 +154,40 @@ function bancoDeCura(opts: { cegas?: any[]; erro?: any; embedTextDevolve?: (i: n
       return q;
     },
   };
-  return { sb, reg, fim, terminou };
+  return { sb, reg };
 }
 
 async function rodarCura(opts: {
   cegas?: any[];
   erro?: any;
   embedTextDevolve?: (i: number) => any;
+  semChave?: boolean;
 }) {
-  const { sb, reg, fim, terminou } = bancoDeCura(opts);
+  const { sb, reg } = bancoDeCura(opts);
   mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sb }));
+  let ativos = 0;
   mock.module("./embeddings.server", () => ({
     embedText: async (texto: string) => {
       const i = reg.embeds.length;
       reg.embeds.push(texto);
-      const v = opts.embedTextDevolve ? opts.embedTextDevolve(i) : VETOR;
-      if (!v) terminou(); // desistiu: é aqui que a cura para
-      return v;
+      /* Contar quantos estao no ar AO MESMO TEMPO e a unica forma honesta de
+         provar paralelismo: ler `Promise.all` no fonte passa igual se o
+         `Promise.all` que existe for o das gravacoes. */
+      ativos++;
+      reg.maxSimultaneos = Math.max(reg.maxSimultaneos, ativos);
+      await new Promise((r) => setTimeout(r, 5));
+      ativos--;
+      return opts.embedTextDevolve ? opts.embedTextDevolve(i) : VETOR;
     },
   }));
+  const anterior = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = opts.semChave ? "" : "chave-de-teste";
   const { curarLacunasSemVetor } = await import("./secondbrain.server");
-  curarLacunasSemVetor("doutor-1");
-  /* Sem lacuna cega nenhuma (ou com erro), nada mais acontece — dar uns
-     tiques ao laço de eventos é o bastante para provar isso. */
-  if (!opts.cegas?.length || opts.erro) {
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-  } else {
-    await fim;
-  }
+  /* Aguardar aqui e' o teste: se a funcao voltasse a ser dispare-e-esqueca,
+     nada teria acontecido quando esta linha terminasse. */
+  reg.curadas = await curarLacunasSemVetor("doutor-1");
+  if (anterior === undefined) delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  else process.env.GOOGLE_GENERATIVE_AI_API_KEY = anterior;
   return reg;
 }
 
@@ -488,19 +490,27 @@ describe("as lacunas antigas ganham vetor sozinhas", () => {
     expect(reg.limite).toBeLessThanOrEqual(25);
   });
 
-  test("sem chave de IA, para na primeira e não insiste", async () => {
-    /* Vazio quer dizer sem chave ou sem quota — as outras dezenove vão falhar
-       igual. Insistir seria vinte chamadas perdidas por abertura de painel. */
+  test("uma pergunta que falha não leva as outras junto", async () => {
+    /* Em paralelo, um vetor vazio no meio não pode abortar o lote — o que
+       falhou fica cego e tenta na próxima abertura. */
     const reg = await rodarCura({
       cegas: [
         { id: "g1", question: "a" },
         { id: "g2", question: "b" },
         { id: "g3", question: "c" },
       ],
-      embedTextDevolve: () => null,
+      embedTextDevolve: (i) => (i === 1 ? null : VETOR),
     });
-    expect(reg.embeds).toHaveLength(1);
-    expect(reg.updates).toHaveLength(0);
+    expect(reg.updates.map((u) => u.id)).toEqual(["g1", "g3"]);
+    expect(reg.curadas).toBe(2);
+  });
+
+  test("sem chave de IA, não chega nem a consultar o banco", async () => {
+    /* Nenhuma das vinte teria vetor — a consulta seria uma ida ao banco por
+       abertura de painel, sem nada em troca. */
+    const reg = await rodarCura({ semChave: true, cegas: [{ id: "g1", question: "x" }] });
+    expect(reg.filtros).toHaveLength(0);
+    expect(reg.embeds).toHaveLength(0);
   });
 
   test("com a coluna ainda inexistente, não faz nada", async () => {
@@ -523,9 +533,46 @@ describe("a cura é disparada por quem abre a fila", () => {
     expect(codigo).toContain("curarLacunasSemVetor(doctorId)");
   });
 
-  test("sem `await` — a lista do médico não espera por embedding nenhum", () => {
-    /* Com `await`, abrir o painel passaria a custar até vinte chamadas de
-       modelo ANTES de a fila aparecer na tela. */
-    expect(codigo).not.toMatch(/await\s+curarLacunasSemVetor/);
+  /**
+   * ESTE É O TESTE QUE FALTAVA — e a versão anterior dele cobrava o CONTRÁRIO.
+   *
+   * A cura foi escrita como `void (async () => {…})()`, disparar e esquecer,
+   * para o painel não esperar. Não curou nada: em serverless a invocação
+   * congela assim que a resposta sai, e `listBrainGaps` devolve a lista na
+   * hora — o trabalho solto morria antes do primeiro embedding.
+   *
+   * O defeito não deixou rastro nenhum. A fila aparecia certa, sem erro, e a
+   * consulta no banco seguia mostrando as mesmas lacunas cegas. Só apareceu
+   * porque alguém rodou o `count(*)` duas vezes e viu o mesmo número.
+   */
+  test("com `await` — sem ele o trabalho morre com a resposta", () => {
+    expect(codigo).toMatch(/await\s+curarLacunasSemVetor/);
+  });
+
+  test("a função é async de verdade, não `void` disfarçado", () => {
+    /* `await` sobre uma função que devolve `void` aguarda `undefined` e
+       resolve no microtask seguinte — parece certo e não é. */
+    const fonteServer = readFileSync("src/lib/secondbrain.server.ts", "utf8");
+    expect(fonteServer).toMatch(
+      /export async function curarLacunasSemVetor\([^)]*\): Promise<number>/,
+    );
+  });
+
+  test("os embeddings saem juntos, para o `await` ser curto", async () => {
+    /* Sequencial, vinte perguntas seriam vinte idas ao Gemini EM FILA — e o
+       médico esperaria por todas antes de ver a própria fila. Agora que a cura
+       é aguardada, isso deixou de ser detalhe de custo e virou tempo de tela.
+
+       Medido pela simultaneidade real, e não lendo `Promise.all` no fonte:
+       a primeira versão deste teste lia o fonte, casava com o `Promise.all`
+       das GRAVAÇÕES, e continuava passando com os embeddings em fila. */
+    const reg = await rodarCura({
+      cegas: [
+        { id: "g1", question: "a" },
+        { id: "g2", question: "b" },
+        { id: "g3", question: "c" },
+      ],
+    });
+    expect(reg.maxSimultaneos).toBe(3);
   });
 });

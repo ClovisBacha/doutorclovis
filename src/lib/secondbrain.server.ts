@@ -357,6 +357,8 @@ export function logBrainGap(
 
 /** Quantas lacunas cegas se cura por abertura do painel. */
 const CURA_POR_VEZ = 20;
+/** Teto por embedding da cura. Alguém está olhando a tela — não pode travar. */
+const CURA_TIMEOUT_MS = 2500;
 
 /**
  * Dá vetor às lacunas que nasceram sem um.
@@ -376,40 +378,61 @@ const CURA_POR_VEZ = 20;
  * real vem da PRÓXIMA paciente, que agora encontra a lacuna antiga pela
  * frente.
  *
- * Roda solto na abertura do painel: ninguém espera por ela, e a lista aparece
- * igual se isto falhar inteiro.
+ * É `async` DE PROPÓSITO, e quem chama TEM que aguardar.
+ *
+ * A primeira versão era `void (async () => {…})()`, disparar e esquecer. Não
+ * curou nada: em serverless a invocação congela quando a resposta sai, e
+ * `listBrainGaps` devolve a lista na hora — a cura morria antes do primeiro
+ * embedding. O painel abria, a consulta no banco seguia mostrando as mesmas
+ * lacunas cegas, e não havia erro nenhum para explicar.
+ *
+ * Este arquivo vizinho (`embeddings.server.ts`) já tinha essa cicatriz escrita
+ * em cima do `embedBrainEntry`. Copiei o padrão errado do lado dela.
+ *
+ * Para o `await` não custar caro, os embeddings saem TODOS de uma vez e com
+ * teto curto: o pior caso é ~2,5s na primeira abertura, e zero nas seguintes,
+ * porque depois não sobra lacuna cega.
+ *
+ * Devolve quantas curou — quem chama pode ignorar, mas o número é o que torna
+ * o efeito verificável de fora.
  */
-export function curarLacunasSemVetor(doctorId: string): void {
-  void (async () => {
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const sb = supabaseAdmin as any;
-      const { data: cegas, error } = await sb
-        .from("brain_gaps")
-        .select("id,question")
-        .eq("doctor_id", doctorId)
-        .eq("status", "aberta")
-        .is("embedding", null)
-        /* Teto por vez: um médico com centenas de lacunas antigas dispararia
-           centenas de embeddings de uma vez só por ter aberto o painel. Com o
-           teto, ele cura vinte por abertura e chega no fim do mesmo jeito. */
-        .limit(CURA_POR_VEZ);
-      /* Coluna ainda não existe (SQL não aplicado) → `error`, e nada acontece. */
-      if (error || !cegas?.length) return;
+export async function curarLacunasSemVetor(doctorId: string): Promise<number> {
+  try {
+    /* Sem chave, sai antes até de consultar o banco: nenhuma das vinte teria
+       vetor, e a consulta seria uma ida ao banco por abertura de painel. */
+    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) return 0;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const { data: cegas, error } = await sb
+      .from("brain_gaps")
+      .select("id,question")
+      .eq("doctor_id", doctorId)
+      .eq("status", "aberta")
+      .is("embedding", null)
+      /* Teto por vez: um médico com centenas de lacunas antigas dispararia
+         centenas de embeddings de uma vez só por ter aberto o painel. Com o
+         teto, ele cura vinte por abertura e chega no fim do mesmo jeito. */
+      .limit(CURA_POR_VEZ);
+    /* Coluna ainda não existe (SQL não aplicado) → `error`, e nada acontece. */
+    if (error || !cegas?.length) return 0;
 
-      const { embedText } = await import("./embeddings.server");
-      for (const g of cegas) {
-        const vetor = await embedText(String(g.question ?? "").slice(0, 300), 4000);
-        /* Parar no primeiro vazio, não seguir: vazio quer dizer sem chave ou
-           sem quota, e nesse estado as outras dezenove também vão falhar. Sair
-           agora e tentar na próxima abertura é mais barato que insistir. */
-        if (!vetor) return;
-        await sb.from("brain_gaps").update({ embedding: vetor }).eq("id", g.id);
-      }
-    } catch {
-      /* best-effort — a fila do médico aparece do mesmo jeito */
-    }
-  })();
+    const { embedText } = await import("./embeddings.server");
+    const linhas = cegas as { id: string; question: string }[];
+    const vetores = await Promise.all(
+      linhas.map((g) => embedText(String(g.question ?? "").slice(0, 300), CURA_TIMEOUT_MS)),
+    );
+
+    const curadas = linhas
+      .map((g, i) => ({ id: g.id, vetor: vetores[i] }))
+      .filter((c): c is { id: string; vetor: number[] } => !!c.vetor);
+    await Promise.all(
+      curadas.map((c) => sb.from("brain_gaps").update({ embedding: c.vetor }).eq("id", c.id)),
+    );
+    return curadas.length;
+  } catch {
+    /* best-effort — a fila do médico aparece do mesmo jeito */
+    return 0;
+  }
 }
 
 /**
