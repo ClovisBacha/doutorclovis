@@ -115,6 +115,80 @@ function supabaseDeMentira(opts: {
 
 const VETOR = Array.from({ length: 768 }, (_, i) => (i % 7) / 7);
 
+/**
+ * Um banco de mentira para a CURA — outra forma de uso: aqui o que importa é
+ * a varredura das lacunas cegas, não a gravação de uma nova.
+ */
+function bancoDeCura(opts: { cegas?: any[]; erro?: any; embedTextDevolve?: (i: number) => any }) {
+  const reg = {
+    filtros: [] as [string, any][],
+    limite: null as number | null,
+    embeds: [] as string[],
+    updates: [] as { id: string; embedding: any }[],
+    passos: 0,
+  };
+  let terminou!: () => void;
+  const fim = new Promise<void>((r) => {
+    terminou = r;
+  });
+  const sb: any = {
+    from() {
+      const q: any = {
+        select: () => q,
+        eq: (col: string, v: any) => {
+          reg.filtros.push([col, v]);
+          return q;
+        },
+        is: (col: string, v: any) => {
+          reg.filtros.push([col, v]);
+          return q;
+        },
+        limit: async (n: number) => {
+          reg.limite = n;
+          return { data: opts.cegas ?? [], error: opts.erro ?? null };
+        },
+        update: (patch: any) => ({
+          eq: async (_c: string, id: string) => {
+            reg.updates.push({ id, embedding: patch.embedding });
+            if (reg.updates.length === (opts.cegas ?? []).length) terminou();
+            return {};
+          },
+        }),
+      };
+      return q;
+    },
+  };
+  return { sb, reg, fim, terminou };
+}
+
+async function rodarCura(opts: {
+  cegas?: any[];
+  erro?: any;
+  embedTextDevolve?: (i: number) => any;
+}) {
+  const { sb, reg, fim, terminou } = bancoDeCura(opts);
+  mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sb }));
+  mock.module("./embeddings.server", () => ({
+    embedText: async (texto: string) => {
+      const i = reg.embeds.length;
+      reg.embeds.push(texto);
+      const v = opts.embedTextDevolve ? opts.embedTextDevolve(i) : VETOR;
+      if (!v) terminou(); // desistiu: é aqui que a cura para
+      return v;
+    },
+  }));
+  const { curarLacunasSemVetor } = await import("./secondbrain.server");
+  curarLacunasSemVetor("doutor-1");
+  /* Sem lacuna cega nenhuma (ou com erro), nada mais acontece — dar uns
+     tiques ao laço de eventos é o bastante para provar isso. */
+  if (!opts.cegas?.length || opts.erro) {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  } else {
+    await fim;
+  }
+  return reg;
+}
+
 async function rodarLacuna(opts: {
   existente?: any;
   parecidas?: any[];
@@ -371,5 +445,87 @@ describe("a busca no banco", () => {
     for (const pedaco of ["match_brain_gaps", "vector(768)", "status = 'aberta'"]) {
       expect(mig).toContain(pedaco);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A cura das lacunas que nasceram cegas
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("as lacunas antigas ganham vetor sozinhas", () => {
+  /* Toda lacuna anterior à migration é cega, e cega não agrupa NEM é agrupada.
+     Sem a cura, a fila que o médico tem hoje nunca passa a agrupar: uma
+     paciente nova perguntando a mesma coisa que uma lacuna antiga abre uma
+     linha nova, e o recurso só valeria quando a fila inteira girasse. */
+  test("cada lacuna cega recebe o vetor da própria pergunta", async () => {
+    const reg = await rodarCura({
+      cegas: [
+        { id: "g1", question: "é normal sentir enjoo?" },
+        { id: "g2", question: "posso tomar dipirona?" },
+      ],
+    });
+    expect(reg.embeds).toEqual(["é normal sentir enjoo?", "posso tomar dipirona?"]);
+    expect(reg.updates.map((u) => u.id)).toEqual(["g1", "g2"]);
+    expect(reg.updates[0].embedding).toEqual(VETOR);
+  });
+
+  test("procura só as ABERTAS do médico, e só as sem vetor", async () => {
+    /* Curar as respondidas seria gastar embedding em algo que já virou entrada
+       do cérebro; curar as de outro médico seria gastar o dinheiro dele. */
+    const reg = await rodarCura({ cegas: [{ id: "g1", question: "enjoo?" }] });
+    expect(reg.filtros).toEqual([
+      ["doctor_id", "doutor-1"],
+      ["status", "aberta"],
+      ["embedding", null],
+    ]);
+  });
+
+  test("tem teto por abertura", async () => {
+    /* Sem teto, um médico com trezentas lacunas antigas dispara trezentos
+       embeddings de uma vez só por ter aberto o painel. */
+    const reg = await rodarCura({ cegas: [{ id: "g1", question: "enjoo?" }] });
+    expect(reg.limite).toBeGreaterThan(0);
+    expect(reg.limite).toBeLessThanOrEqual(25);
+  });
+
+  test("sem chave de IA, para na primeira e não insiste", async () => {
+    /* Vazio quer dizer sem chave ou sem quota — as outras dezenove vão falhar
+       igual. Insistir seria vinte chamadas perdidas por abertura de painel. */
+    const reg = await rodarCura({
+      cegas: [
+        { id: "g1", question: "a" },
+        { id: "g2", question: "b" },
+        { id: "g3", question: "c" },
+      ],
+      embedTextDevolve: () => null,
+    });
+    expect(reg.embeds).toHaveLength(1);
+    expect(reg.updates).toHaveLength(0);
+  });
+
+  test("com a coluna ainda inexistente, não faz nada", async () => {
+    const reg = await rodarCura({ erro: { code: "42703" }, cegas: [{ id: "g1", question: "x" }] });
+    expect(reg.embeds).toHaveLength(0);
+    expect(reg.updates).toHaveLength(0);
+  });
+
+  test("nada cego, nada gasto", async () => {
+    const reg = await rodarCura({ cegas: [] });
+    expect(reg.embeds).toHaveLength(0);
+  });
+});
+
+describe("a cura é disparada por quem abre a fila", () => {
+  const fonte = readFileSync("src/lib/secondbrain.functions.ts", "utf8");
+  const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+
+  test("`listBrainGaps` chama a cura", () => {
+    expect(codigo).toContain("curarLacunasSemVetor(doctorId)");
+  });
+
+  test("sem `await` — a lista do médico não espera por embedding nenhum", () => {
+    /* Com `await`, abrir o painel passaria a custar até vinte chamadas de
+       modelo ANTES de a fila aparecer na tela. */
+    expect(codigo).not.toMatch(/await\s+curarLacunasSemVetor/);
   });
 });

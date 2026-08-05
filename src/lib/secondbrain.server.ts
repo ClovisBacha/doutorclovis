@@ -355,6 +355,63 @@ export function logBrainGap(
   })();
 }
 
+/** Quantas lacunas cegas se cura por abertura do painel. */
+const CURA_POR_VEZ = 20;
+
+/**
+ * Dá vetor às lacunas que nasceram sem um.
+ *
+ * Toda lacuna anterior à migration é cega, e lacuna cega não agrupa — nem
+ * agrupa nem É agrupada. Sem esta cura, a fila que o médico tem HOJE nunca se
+ * beneficia: uma paciente nova perguntando a mesma coisa que uma lacuna antiga
+ * abre uma linha nova, e o recurso só passaria a valer quando a fila inteira
+ * girasse.
+ *
+ * Não é só o passado. O vetor também falta quando o `embedText` estoura o
+ * tempo ou a quota — então isto é a rede que conserta sozinha, não um script
+ * de mudança de casa.
+ *
+ * DE PROPÓSITO só preenche o vetor; não junta o que já está na fila. Fundir
+ * retroativamente mexeria em itens que o médico já está olhando — e o ganho
+ * real vem da PRÓXIMA paciente, que agora encontra a lacuna antiga pela
+ * frente.
+ *
+ * Roda solto na abertura do painel: ninguém espera por ela, e a lista aparece
+ * igual se isto falhar inteiro.
+ */
+export function curarLacunasSemVetor(doctorId: string): void {
+  void (async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+      const { data: cegas, error } = await sb
+        .from("brain_gaps")
+        .select("id,question")
+        .eq("doctor_id", doctorId)
+        .eq("status", "aberta")
+        .is("embedding", null)
+        /* Teto por vez: um médico com centenas de lacunas antigas dispararia
+           centenas de embeddings de uma vez só por ter aberto o painel. Com o
+           teto, ele cura vinte por abertura e chega no fim do mesmo jeito. */
+        .limit(CURA_POR_VEZ);
+      /* Coluna ainda não existe (SQL não aplicado) → `error`, e nada acontece. */
+      if (error || !cegas?.length) return;
+
+      const { embedText } = await import("./embeddings.server");
+      for (const g of cegas) {
+        const vetor = await embedText(String(g.question ?? "").slice(0, 300), 4000);
+        /* Parar no primeiro vazio, não seguir: vazio quer dizer sem chave ou
+           sem quota, e nesse estado as outras dezenove também vão falhar. Sair
+           agora e tentar na próxima abertura é mais barato que insistir. */
+        if (!vetor) return;
+        await sb.from("brain_gaps").update({ embedding: vetor }).eq("id", g.id);
+      }
+    } catch {
+      /* best-effort — a fila do médico aparece do mesmo jeito */
+    }
+  })();
+}
+
 /**
  * E-mail "sua IA tem perguntas sem resposta" (fire-and-forget, ≤1/dia).
  * Sem RESEND_API_KEY vira no-op (o painel continua sendo a fonte).

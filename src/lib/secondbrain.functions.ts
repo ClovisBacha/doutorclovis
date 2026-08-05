@@ -617,6 +617,13 @@ export const listBrainGaps = createServerFn({ method: "POST" })
     if (error?.code === "42P01")
       return { ok: false as const, gaps: [] as BrainGap[], missingTable: true as const };
     if (error) return { ok: false as const, gaps: [] as BrainGap[] };
+    /* Cura preguiçosa, igual à cascata da fila de espera: quem abre o painel
+       faz o sistema andar. Lacuna sem vetor não agrupa nem é agrupada, e todas
+       as anteriores à migration nasceram assim — sem isto, a fila que ele tem
+       hoje nunca passa a agrupar. Solto de propósito: a lista abaixo não espera
+       por ela nem muda se falhar. */
+    const { curarLacunasSemVetor } = await import("./secondbrain.server");
+    curarLacunasSemVetor(doctorId);
     return { ok: true as const, gaps: (rows ?? []) as BrainGap[] };
   });
 
