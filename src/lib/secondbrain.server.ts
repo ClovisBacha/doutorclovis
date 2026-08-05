@@ -377,7 +377,7 @@ export function logBrainGap(
          pergunta escrita de outro jeito. É isto que impede o médico de
          responder "é normal sentir enjoo?" três vezes. */
       if (!existing && vetor) {
-        const { data: parecidas } = await sb.rpc("match_brain_gaps", {
+        const { data: parecidas, error: erroRpc } = await sb.rpc("match_brain_gaps", {
           p_doctor_id: doctorId,
           p_embedding: vetor,
           p_limit: 1,
@@ -387,6 +387,31 @@ export function logBrainGap(
           | undefined;
         if (perto && perto.similarity >= GAP_MERGE_MIN_SIMILARITY) {
           existing = { id: perto.id, hits: perto.hits, status: "aberta" };
+        }
+        /* ─── POR QUE ISTO EXISTE ────────────────────────────────────────────
+           O `error` desta RPC era IGNORADO, e os três desfechos abaixo eram
+           indistinguíveis de fora — todos terminavam numa linha nova na fila:
+
+             · a função não existe no banco (SQL não aplicado);
+             · a função existe e não achou nada parecido;
+             · achou, mas abaixo do corte.
+
+           Sem separá-los, ajustar o corte é chute: dois dos três casos não têm
+           nada a ver com o corte. Custou três rodadas de tentativa e erro para
+           perceber. Uma linha por lacuma nova é volume desprezível — lacuna já
+           é o caminho raro. */
+        if (erroRpc) {
+          console.error(
+            `[lacuna] agrupamento INDISPONÍVEL: ${erroRpc.code ?? "?"} ${erroRpc.message ?? ""}` +
+              ` — aplique supabase/APLICAR_LACUNAS_PARECIDAS.sql`,
+          );
+        } else if (!perto) {
+          console.log("[lacuna] nenhuma lacuna aberta com vetor para comparar");
+        } else {
+          console.log(
+            `[lacuna] mais parecida: ${perto.similarity.toFixed(4)} ` +
+              `(corte ${GAP_MERGE_MIN_SIMILARITY}) → ${existing ? "JUNTOU" : "linha nova"}`,
+          );
         }
       }
       /* Registra quem está esperando. Tabela separada de propósito: a lacuna é

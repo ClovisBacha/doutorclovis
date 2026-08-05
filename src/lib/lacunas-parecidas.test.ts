@@ -668,3 +668,50 @@ describe("o corte de junção foi corrigido por medida, não por palpite", () =>
     expect(juncao).toBeGreaterThan(leitura + 0.2);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Três desfechos que pareciam um só
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * O `error` da RPC era ignorado. Isso tornou INDISTINGUÍVEIS três situações
+ * que exigem consertos completamente diferentes:
+ *
+ *   · a função não existe no banco → aplicar o SQL;
+ *   · existe e não achou candidata → problema de vetor, não de corte;
+ *   · achou abaixo do corte        → aí sim, é o corte.
+ *
+ * Todas terminavam igual: uma linha nova na fila. Ajustar o corte sem separar
+ * os três é chute — e foi exatamente o que aconteceu, por três rodadas.
+ */
+describe("o agrupamento diz por que não juntou", () => {
+  const fonte = codigoDe("src/lib/secondbrain.server.ts");
+
+  test("o erro da RPC deixou de ser descartado", () => {
+    expect(fonte).toContain("error: erroRpc } = await sb.rpc(");
+  });
+
+  test("função ausente aponta o arquivo que resolve", () => {
+    /* Quem lê o log tem que saber o que FAZER, não só que algo falhou. */
+    expect(fonte).toContain("APLICAR_LACUNAS_PARECIDAS.sql");
+  });
+
+  test("os três desfechos têm mensagens distintas", () => {
+    expect(fonte).toContain("agrupamento INDISPONÍVEL");
+    expect(fonte).toContain("nenhuma lacuna aberta com vetor para comparar");
+    expect(fonte).toContain("mais parecida:");
+  });
+
+  test("a similaridade sai com o corte ao lado", () => {
+    /* Número sozinho não decide nada: é a distância ATÉ o corte que diz se a
+       régua está errada ou se as perguntas eram mesmo diferentes. */
+    expect(fonte).toContain("perto.similarity.toFixed(4)");
+    expect(fonte).toContain("(corte ${GAP_MERGE_MIN_SIMILARITY})");
+  });
+
+  test("nada disso quebra o registro da lacuna", () => {
+    /* Diagnóstico é observação, nunca decisão: a pergunta da paciente entra na
+       fila mesmo com o agrupamento fora do ar. */
+    expect(fonte).not.toMatch(/if \(erroRpc\) (return|throw)/);
+  });
+});
