@@ -204,6 +204,20 @@ export function isCortesia(question: string): boolean {
   return CORTESIAS.has(normalizeGapQuestion(question));
 }
 
+/**
+ * Corte para JUNTAR duas lacunas.
+ *
+ * Muito mais alto que o 0,55 da leitura, e de propósito: são erros de custo
+ * diferente. Ler uma entrada meio relacionada dá uma resposta mais fraca;
+ * JUNTAR duas perguntas diferentes numa só faz o médico responder uma e achar
+ * que respondeu a outra — e a paciente da segunda recebe uma orientação que não
+ * era para ela.
+ *
+ * 0,86 é "a mesma pergunta com outras palavras". Abaixo disso, duas linhas na
+ * fila é o resultado seguro.
+ */
+const GAP_MERGE_MIN_SIMILARITY = 0.86;
+
 export function logBrainGap(
   doctorId: string,
   question: string,
@@ -217,6 +231,20 @@ export function logBrainGap(
    * ver" — em vez de a resposta morrer no treinamento.
    */
   patientId?: string,
+  /**
+   * O vetor da pergunta, quando já existe.
+   *
+   * Ele acabou de ser calculado — alguns milissegundos antes, para procurar
+   * cobertura nas entradas do médico. Reaproveitá-lo aqui é o que faz o
+   * agrupamento custar ZERO embedding a mais no caminho do chat, que é o
+   * volume.
+   *
+   * Omitir é permitido: quem não tem um à mão (o polegar para baixo no app, a
+   * API do DoctorThink) deixa a função calcular. Sem chave de IA, a lacuna
+   * nasce sem vetor e a deduplicação segue sendo a por texto — o comportamento
+   * de antes, nunca pior.
+   */
+  embedding?: number[] | null,
 ): void {
   const clean = question.trim().slice(0, 300);
   const norm = normalizeGapQuestion(clean);
@@ -227,12 +255,47 @@ export function logBrainGap(
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const sb = supabaseAdmin as any;
-      const { data: existing } = await sb
+      /* Primeiro pelo texto exato (barato e certeiro), depois por semelhança. */
+      let { data: existing } = await sb
         .from("brain_gaps")
         .select("id,hits,status")
         .eq("doctor_id", doctorId)
         .eq("norm_question", norm)
         .maybeSingle();
+
+      /* O vetor, quando quem chamou não tinha um.
+         Só DEPOIS da busca por texto, de propósito: se o texto exato já bateu,
+         não há nada para agrupar e o embedding seria dinheiro no lixo.
+         Quem chega aqui sem vetor são os caminhos raros — o polegar para baixo
+         no app e a API do DoctorThink, que não têm um calculado à mão. O chat,
+         que é o volume, sempre passa o dele. Timeout folgado porque isto roda
+         solto: ninguém está esperando esta resposta. */
+      let vetor = embedding ?? null;
+      if (!existing && !vetor) {
+        try {
+          const { embedText } = await import("./embeddings.server");
+          vetor = await embedText(clean, 4000);
+        } catch {
+          vetor = null; // sem chave de IA → segue a deduplicação por texto
+        }
+      }
+
+      /* Não achou pelo texto: procura uma lacuna ABERTA que seja a mesma
+         pergunta escrita de outro jeito. É isto que impede o médico de
+         responder "é normal sentir enjoo?" três vezes. */
+      if (!existing && vetor) {
+        const { data: parecidas } = await sb.rpc("match_brain_gaps", {
+          p_doctor_id: doctorId,
+          p_embedding: vetor,
+          p_limit: 1,
+        });
+        const perto = (parecidas ?? [])[0] as
+          | { id: string; hits: number; similarity: number }
+          | undefined;
+        if (perto && perto.similarity >= GAP_MERGE_MIN_SIMILARITY) {
+          existing = { id: perto.id, hits: perto.hits, status: "aberta" };
+        }
+      }
       /* Registra quem está esperando. Tabela separada de propósito: a lacuna é
          deduplicada por `(médico, pergunta)` — é isso que faz cinquenta
          pacientes com a mesma dúvida virarem UM item na fila dele. */
@@ -262,6 +325,9 @@ export function logBrainGap(
             question: clean,
             norm_question: norm,
             channel,
+            /* Sem vetor a lacuna funciona igual — só não agrupa. Melhor nascer
+               sem que não nascer. */
+            ...(vetor ? { embedding: vetor } : {}),
           })
           .select("id")
           .maybeSingle();
@@ -491,12 +557,19 @@ export async function getBrainContext(
        informação: saber que a melhor entrada deu 0,52 é o que revela um corte
        apertado demais, e isso some se a gente só olhar o que passou. */
     let melhorSimilaridade: number | null = null;
+    /* Declarado AQUI, fora do `try`, porque quem precisa dele é a lacuna — e a
+       lacuna é registrada lá embaixo, depois que o `try` já fechou. Dentro do
+       bloco, o vetor morreria no escopo alguns milissegundos antes de ser
+       usado, e o agrupamento nunca aconteceria: as lacunas nasceriam todas sem
+       vetor, silenciosamente, exatamente como antes desta mudança. */
+    let vetorDaPergunta: number[] | null = null;
     if (entries.length > 0) {
       try {
         const { embedText } = await import("./embeddings.server");
         // Timeout CURTO: estamos no caminho crítico do chat — se o embedding
         // não chegar em 1,8s, o fallback por palavras responde na hora.
         const qvec = await embedText(userMessage, 1800);
+        vetorDaPergunta = qvec ?? null;
         if (qvec) {
           const { data: matches, error } = await (supabaseAdmin as any).rpc("match_brain_entries", {
             p_doctor_id: target,
@@ -526,7 +599,9 @@ export async function getBrainContext(
     }
 
     if (selected.length === 0 && channel !== "teste") {
-      logBrainGap(target, userMessage, channel, patientId);
+      /* É o MESMO vetor usado para procurar cobertura, calculado logo acima.
+         Passar adiante custa zero e é o que permite agrupar. */
+      logBrainGap(target, userMessage, channel, patientId, vetorDaPergunta);
     }
 
     // Montagem do bloco pelo núcleo DoctorThink (rótulos de domínio da

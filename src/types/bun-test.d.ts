@@ -8,8 +8,11 @@
  *
  * Declarar o pouco que usamos custa vinte linhas, não muda o lockfile e faz o
  * ambiente local e o CI se comportarem igual — que é a propriedade que importa.
- * Se um dia a suíte precisar de mocks, spies ou temporizadores falsos, aí sim
- * vale trocar por `@types/bun` de verdade, com o lockfile atualizado.
+ *
+ * O dia dos mocks chegou (`mock.module`, em `lacunas-parecidas.test.ts`) e a
+ * conta continua a mesma: quatro linhas aqui contra um lockfile mexido e o CI
+ * quebrando no install. Spies e temporizadores falsos ainda não são
+ * necessários — quando forem, aí sim vale `@types/bun` de verdade.
  */
 
 declare module "bun:test" {
@@ -39,4 +42,14 @@ declare module "bun:test" {
   };
 
   export function expect(valor: unknown): Matchers;
+
+  export const mock: {
+    /**
+     * Troca um módulo inteiro por outro, inclusive para `import()` dinâmico —
+     * que é o caso do cliente do Supabase dentro de `logBrainGap`.
+     */
+    module(especificador: string, fabrica: () => unknown): void;
+    /** Desfaz as trocas. Sem isto, um teste contamina o arquivo seguinte. */
+    restore(): void;
+  };
 }
