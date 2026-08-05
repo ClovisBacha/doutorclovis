@@ -116,6 +116,41 @@ export function isSuporteDoApp(question: string): boolean {
 }
 
 /**
+ * Vocabulário CLÍNICO — o sinal que impede o caminho enxuto de roubar contexto.
+ *
+ * `isSuporteDoApp` é heurística de superfície e erra para o lado seguro numa
+ * decisão barata (registrar uma lacuna a mais). Para DESLIGAR o cérebro numa
+ * conversa, o mesmo erro fica caro na direção oposta: "estou com dor de cabeça,
+ * é normal? aliás o app travou" casa com "app" e perderia toda a orientação do
+ * médico — a paciente receberia suporte técnico para uma queixa clínica.
+ *
+ * Por isso o caminho enxuto exige DOIS sinais: fala de app E não fala de corpo.
+ * Na dúvida, é clínica.
+ */
+const TERMOS_CLINICOS = new RegExp(
+  [
+    "dor|sangr|c(ó|o)lica|contra(ç|c)|enjo|n(á|a)usea|v(ô|o)mit|tontur",
+    "press(ã|a)o|glicem|diabet|incha|edema|febre|corrim|secre(ç|c)",
+    "beb(ê|e)|feto|mexer|mexeu|chute|movimento|barriga|(ú|u)tero|placenta|l(í|i)quido",
+    "exame|ultrassom|ultrasso|resultado|hemogram|urina|parto|ces(á|a)re|amamenta",
+    "rem(é|e)dio|medicament|comprimido|dose|tomar|s(í|i)ntoma|sinto|senti|semana",
+  ].join("|"),
+  "i",
+);
+
+/**
+ * É pergunta de suporte PURA — cabe à plataforma, não ao médico.
+ *
+ * Quando é, a conversa não precisa do Segundo Cérebro dele, nem da memória
+ * clínica dela, nem das medidas: "como troco minha senha" não melhora com o
+ * histórico de pressão arterial da paciente. Injetar tudo isso gasta os créditos
+ * do médico e ainda produz a resposta longa que mistura dois assuntos.
+ */
+export function ehSoSuporte(question: string): boolean {
+  return isSuporteDoApp(question) && !TERMOS_CLINICOS.test(question);
+}
+
+/**
  * Cortesia — agradecimento, despedida, confirmação.
  *
  * "obrigada!!" normaliza para "obrigada": oito caracteres, passa o piso de

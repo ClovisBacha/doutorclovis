@@ -83,8 +83,11 @@ describe("o canal anônimo também conta", () => {
     expect(chat).not.toContain("onFinish: persistFor");
   });
 
-  test("o canal é distinguido", () => {
-    expect(chat).toContain('canal: patient ? "app" : "site"');
+  test("o canal é distinguido — e agora são três", () => {
+    /* 'app' consome o plano do médico; 'suporte' é da plataforma; 'site' é
+       visitante anônimo. Sem separar, a pergunta "como funciona o app" entraria
+       na cota dele. */
+    expect(chat).toContain('canal: soSuporte ? "suporte" : patient ? "app" : "site"');
   });
 });
 
@@ -157,5 +160,61 @@ describe("o bloco do cérebro tem teto de caracteres", () => {
       answer: "R".repeat(220),
     }));
     expect(limitarPorCaracteres(comuns)).toHaveLength(6);
+  });
+});
+
+describe("pergunta de app é da plataforma, não do médico", () => {
+  test("suporte puro vai pelo caminho enxuto", async () => {
+    const { ehSoSuporte } = await import("./secondbrain.server");
+    for (const q of [
+      "como funciona o app?",
+      "esqueci minha senha",
+      "onde fica a aba de notificações no aplicativo",
+      "o app travou ao carregar",
+      "como faço para assinar o premium",
+    ]) {
+      expect(ehSoSuporte(q)).toBe(true);
+    }
+  });
+
+  test("na dúvida é CLÍNICA — dois sinais, não um", async () => {
+    /* O detector antigo casava com "app" em qualquer lugar da frase. Usado para
+       DESLIGAR o cérebro, isso daria suporte técnico a uma queixa clínica: a
+       paciente perderia toda a orientação do médico dela. */
+    const { ehSoSuporte, isSuporteDoApp } = await import("./secondbrain.server");
+    for (const q of [
+      "estou com dor de cabeça, é normal? aliás o app travou",
+      "no app não achei onde lançar minha pressão, que está 150/100",
+      "a tela de contrações some quando o bebê mexe",
+    ]) {
+      expect(isSuporteDoApp(q)).toBe(true); // o antigo diria "suporte"
+      expect(ehSoSuporte(q)).toBe(false); // o novo devolve ao caminho clínico
+    }
+  });
+
+  test("pergunta puramente clínica nunca entra no caminho enxuto", async () => {
+    const { ehSoSuporte } = await import("./secondbrain.server");
+    for (const q of [
+      "posso tomar dipirona?",
+      "estou sangrando um pouco",
+      "o bebê não mexeu hoje",
+      "minha pressão deu 150 por 100",
+    ]) {
+      expect(ehSoSuporte(q)).toBe(false);
+    }
+  });
+
+  test("o custo de suporte é separado no medidor", () => {
+    /* Sem canal próprio, a pergunta de app entraria na cota do médico — que é o
+       que esta mudança existe para evitar. */
+    expect(chat).toContain('canal: soSuporte ? "suporte"');
+  });
+
+  test("o caminho enxuto vem ANTES do ramo clínico", () => {
+    /* Se viesse depois, nada mudaria: o prompt clínico já teria sido montado. */
+    const enxuto = chat.indexOf("if (soSuporte) {");
+    const clinico = chat.indexOf("} else if (patient && patient.doctorId) {");
+    expect(enxuto).toBeGreaterThan(0);
+    expect(enxuto).toBeLessThan(clinico);
   });
 });

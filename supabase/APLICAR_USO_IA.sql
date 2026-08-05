@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS public.ai_usage (
   -- 'chat' = a resposta que a paciente leu · 'memoria' = o resumo interno.
   especie text NOT NULL CHECK (especie IN ('chat', 'memoria', 'embedding')),
   -- 'app' | 'site' | 'whatsapp' — de onde veio.
+  -- 'app'     = conversa clínica (consome o plano do médico)
+  -- 'suporte' = pergunta sobre o aplicativo — é da plataforma, não dele
+  -- 'site'    = visitante anônimo
   canal text NOT NULL DEFAULT 'app',
   modelo text NOT NULL,
   input_tokens integer NOT NULL DEFAULT 0,

@@ -5,6 +5,7 @@ import {
   getBrainContextResolved,
   isCortesia,
   isSuporteDoApp,
+  ehSoSuporte,
   normalizeGapQuestion,
 } from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
@@ -543,7 +544,38 @@ export const Route = createFileRoute("/api/chat")({
         const patient = await resolvePatientDoctor(request);
 
         let system: string;
-        if (patient && patient.doctorId) {
+        /* CAMINHO ENXUTO — pergunta que é da PLATAFORMA, não do médico.
+
+           "Como funciona o app?", "esqueci a senha", "onde vejo as
+           notificações": nada disso melhora com o Segundo Cérebro do médico, com
+           a memória clínica dela ou com a última pressão arterial. Injetar tudo
+           isso fazia três estragos de uma vez:
+
+             · gastava os créditos do médico numa pergunta que não é dele;
+             · produzia resposta LONGA, abrindo dois assuntos ao mesmo tempo
+               ("sobre o estresse vou perguntar à sua médica; sobre o app, é
+               isso, isso e isso") — e resposta longa é a parte cara, porque a
+               saída custa 8× a entrada;
+             · e recitava a memória de volta para a paciente, que é exatamente o
+               que o bloco de memória manda NÃO fazer.
+
+           O detector já existia e servia para uma coisa só: decidir se a
+           pergunta virava lacuna para o médico. Agora ele também escolhe o
+           prompt.
+
+           `ehSoSuporte` exige DOIS sinais (fala de app E não fala de corpo). Na
+           dúvida, é clínica: perder contexto clínico é muito pior que gastar
+           tokens à toa. */
+        const soSuporte = !!patient && ehSoSuporte(lastUserText(messages));
+        if (soSuporte) {
+          system =
+            SUPPORT_SYSTEM_PROMPT +
+            "\n\nA paciente está logada no app dela. Responda SÓ o que ela perguntou sobre o " +
+            "aplicativo, em até 4 frases. Não puxe assuntos anteriores da conversa, não comente " +
+            "sintomas e não resuma o que ela já contou — se ela tiver uma dúvida clínica, ela " +
+            "pergunta. Se a pergunta misturar app e saúde, responda a parte do app e convide-a a " +
+            "perguntar a parte clínica em seguida.";
+        } else if (patient && patient.doctorId) {
           // App: injeta o Segundo Cérebro DAQUELE médico (respeitando o plano)
           // + o contexto clínico DELA (semana/histórico, direto do banco)
           // + a MEMÓRIA dela (o que já contou/perguntou em conversas passadas).
@@ -696,7 +728,7 @@ export const Route = createFileRoute("/api/chat")({
               outputTokens: usage?.outputTokens,
               doctorId: patient?.doctorId ?? null,
               patientId: patient?.patientId ?? null,
-              canal: patient ? "app" : "site",
+              canal: soSuporte ? "suporte" : patient ? "app" : "site",
             });
             if (!persistFor) return;
             void (async () => {
