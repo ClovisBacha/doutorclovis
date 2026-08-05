@@ -787,8 +787,11 @@ export const Route = createFileRoute("/api/chat")({
           ) {
             anteriores.pop();
           }
+          /* SEGUNDA TRAVA do mesmo laço: mesmo que uma linha vazia já esteja
+             gravada — e há doze delas hoje —, ela não pode ir para o modelo. */
+          const comConteudo = anteriores.filter((m) => m.content?.trim());
           paraOModelo = [
-            ...anteriores.map(
+            ...comConteudo.map(
               (m, i) =>
                 ({
                   id: `h${i}`,
@@ -803,6 +806,15 @@ export const Route = createFileRoute("/api/chat")({
             } as UIMessage,
           ];
         }
+
+        /* TERCEIRA TRAVA, e a única que cobre TODOS os caminhos: o array que
+           chega do navegador (conversa anônima do site) também pode trazer uma
+           bolha vazia, e a poda acima só limpa o histórico reconstruído do
+           banco. Uma mensagem sem texto nenhum não é uma mensagem — é o que faz
+           o provedor devolver resposta vazia e o defeito se repetir sozinho. */
+        paraOModelo = paraOModelo.filter((m) =>
+          m.parts?.some((p) => p.type === "text" && p.text.trim()),
+        );
 
         const google = createChatProvider(key);
         /* Lido uma vez: o medidor precisa gravar o MESMO modelo que respondeu,
@@ -908,7 +920,14 @@ export const Route = createFileRoute("/api/chat")({
                 await import("@/lib/chat-memory.server");
               await Promise.all([
                 registro,
-                saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text),
+                /* Só com conteúdo. Gravar resposta vazia envenena a conversa
+                   inteira: ela volta no histórico da próxima pergunta, e o
+                   Gemini recusa mensagem de assistente sem texto — o que
+                   produz OUTRA resposta vazia. Uma falha isolada virava
+                   permanente, e foi exatamente o que aconteceu. */
+                text.trim()
+                  ? saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text)
+                  : Promise.resolve(),
               ]);
               /* A memória fica de fora do `await` de propósito: ela é uma
                  chamada de modelo inteira (~2s) e faria a paciente ver o

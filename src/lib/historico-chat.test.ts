@@ -218,3 +218,53 @@ describe("o estado das dúvidas encaminhadas ao médico", () => {
     expect(chat).toContain("NÃO invente onde a resposta aparece");
   });
 });
+
+/**
+ * O LAÇO QUE SE ALIMENTAVA.
+ *
+ * Uma resposta vazia era GRAVADA como mensagem da IA. Na pergunta seguinte ela
+ * voltava no histórico, e o Gemini recusa mensagem de assistente sem texto —
+ * produzindo OUTRA resposta vazia, que era gravada de novo.
+ *
+ * Uma falha isolada virava permanente. É por isso que o chat não saía mais do
+ * "não consegui formular a resposta agora", enquanto o playground do painel —
+ * que manda só a pergunta, sem histórico — respondia bem a mesma coisa com o
+ * mesmo modelo e a mesma chave.
+ *
+ * Três travas, porque o laço tem três entradas.
+ */
+describe("mensagem vazia não entra na conversa", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+
+  test("1) resposta vazia não é GRAVADA", () => {
+    /* Sem isto, a próxima pergunta já nasce com o veneno no histórico. */
+    expect(chat).toContain("text.trim()\n                  ? saveChatMessage(");
+  });
+
+  test("2) o histórico do banco é podado antes de virar mensagem", () => {
+    /* As linhas vazias que JÁ existem não podem ir para o modelo. */
+    expect(chat).toContain("const comConteudo = anteriores.filter((m) => m.content?.trim());");
+    expect(chat).toContain("...comConteudo.map(");
+  });
+
+  test("3) a poda final cobre TODOS os caminhos, inclusive o anônimo", () => {
+    /* O array que chega do navegador (site sem login) não passa pelo banco —
+       e também pode trazer uma bolha vazia. */
+    expect(chat).toMatch(/paraOModelo = paraOModelo\.filter\(\(m\) =>/);
+    expect(chat).toContain('p.type === "text" && p.text.trim()');
+  });
+
+  test("a poda acontece ANTES de montar a chamada ao modelo", () => {
+    const posPoda = chat.indexOf("paraOModelo = paraOModelo.filter(");
+    const posChamada = chat.indexOf("messages: await convertToModelMessages(paraOModelo)");
+    expect(posPoda).toBeGreaterThan(0);
+    expect(posPoda).toBeLessThan(posChamada);
+  });
+
+  test("a tela da paciente também ignora conteúdo vazio", () => {
+    /* Já era assim, e tem que continuar: é o que faz as bolhas mudas já
+       gravadas sumirem sozinhas quando ela recarrega. */
+    const hist = readFileSync("src/lib/historico-chat.functions.ts", "utf8");
+    expect(hist).toContain('(m.role === "user" || m.role === "assistant") && m.content?.trim()');
+  });
+});
