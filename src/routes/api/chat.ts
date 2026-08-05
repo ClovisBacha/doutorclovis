@@ -4,6 +4,7 @@ import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server"
 import {
   getBrainContextResolved,
   isCortesia,
+  isElogio,
   isSuporteDoApp,
   ehSoSuporte,
   normalizeGapQuestion,
@@ -695,7 +696,8 @@ export const Route = createFileRoute("/api/chat")({
           const gapWasLogged =
             normalizeGapQuestion(userText).length >= 8 &&
             !isSuporteDoApp(userText) &&
-            !isCortesia(userText);
+            !isCortesia(userText) &&
+            !isElogio(userText);
           const confianca =
             brain.enabledApp && brain.hadCoverage
               ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`

@@ -14,13 +14,17 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { normalizeGapQuestion } from "./doctorthink/core";
-import { isCortesia, isSuporteDoApp } from "./secondbrain.server";
+import { isCortesia, isElogio, isSuporteDoApp } from "./secondbrain.server";
 
 /** A condição, escrita uma vez. É esta que os dois lados têm que respeitar. */
 function viraLacuna(pergunta: string): boolean {
   return (
-    normalizeGapQuestion(pergunta).length >= 8 && !isSuporteDoApp(pergunta) && !isCortesia(pergunta)
+    normalizeGapQuestion(pergunta).length >= 8 &&
+    !isSuporteDoApp(pergunta) &&
+    !isCortesia(pergunta) &&
+    !isElogio(pergunta)
   );
 }
 
@@ -79,5 +83,88 @@ describe("normalização — a chave de deduplicação", () => {
   test("não estoura com entrada vazia ou só símbolos", () => {
     expect(normalizeGapQuestion("").length).toBe(0);
     expect(normalizeGapQuestion("!!!???").length).toBeLessThan(8);
+  });
+});
+
+/**
+ * ELOGIO NÃO É DÚVIDA.
+ *
+ * Caso real, visto na fila do médico: "Bacana dms , gostei muito dessa ia"
+ * virou um item com botão "Responder". A paciente estava agradando; o produto
+ * transformou isso em trabalho clínico.
+ *
+ * A lista de cortesias não alcançava — ela compara o texto INTEIRO com um
+ * dicionário fechado, e elogio é frase livre. Mas a regra nova precisa ser
+ * conservadora: perder uma dúvida clínica de verdade é muito pior que uma
+ * linha de ruído na fila.
+ */
+describe("elogio à IA não vira fila do médico", () => {
+  test("o caso real que apareceu na fila", () => {
+    expect(viraLacuna("Bacana dms , gostei muito dessa ia")).toBe(false);
+  });
+
+  test("outros elogios comuns", () => {
+    expect(viraLacuna("adorei o aplicativo, muito bom mesmo")).toBe(false);
+    expect(viraLacuna("parabéns pelo trabalho de vocês")).toBe(false);
+    expect(viraLacuna("essa ia me ajudou muito, sensacional")).toBe(false);
+  });
+
+  /* O erro caro é este lado. Um elogio no começo da frase não pode fazer a
+     dúvida da paciente desaparecer sem ninguém ver. */
+  test("elogio SEGUIDO de pergunta continua sendo pergunta", () => {
+    expect(viraLacuna("adorei, mas posso tomar dipirona?")).toBe(true);
+    expect(viraLacuna("gostei muito! quando devo fazer o próximo exame")).toBe(true);
+    expect(viraLacuna("que legal isso, é normal sentir enjoo assim")).toBe(true);
+  });
+
+  /* DEFEITO PRÉ-EXISTENTE, achado ao escrever o teste acima e deixado à
+     mostra de propósito.
+
+     "adorei O APP, mas posso tomar dipirona?" NÃO vira lacuna — e não é culpa
+     do filtro de elogio: `isSuporteDoApp` casa com a palavra "app" em
+     qualquer posição, então basta citar o aplicativo para a dúvida clínica ser
+     descartada. O comentário do filtro promete o contrário ("na dúvida
+     REGISTRA"), e aqui ele faz o oposto: perde a pergunta.
+
+     Este teste documenta o comportamento ATUAL. Quando o filtro for
+     consertado, ele falha — e é isso que se quer. */
+  test("HOJE: citar o app derruba até pergunta clínica (a consertar)", () => {
+    expect(viraLacuna("adorei o app, mas posso tomar dipirona?")).toBe(false);
+    expect(viraLacuna("no app não achei: posso tomar dipirona?")).toBe(false);
+  });
+
+  test("elogio junto de relato clínico continua sendo lacuna", () => {
+    /* "gostei do resultado do exame" tem elogio e nenhum "?" — mas fala de
+       exame, e relato de corpo nunca pode cair no filtro de agrado. */
+    expect(viraLacuna("gostei do resultado do exame de sangue")).toBe(true);
+    expect(viraLacuna("show, a dor nas costas melhorou com o alongamento")).toBe(true);
+  });
+
+  test("dúvida clínica sem elogio nenhum não é afetada", () => {
+    expect(viraLacuna("estou com dor de cabeça forte, é normal?")).toBe(true);
+    expect(viraLacuna("posso tomar dipirona na gravidez?")).toBe(true);
+  });
+});
+
+describe("as duas pontas continuam concordando", () => {
+  /* O `chat.ts` reimplementa a condição para decidir se a IA pode dizer
+     "registrei aqui para ele ver". Um filtro novo só de um lado faz o produto
+     mentir: a IA promete o registro e a lacuna não existe. */
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*/g, "");
+
+  test("o chat também descarta elogio antes de prometer registro", () => {
+    expect(chat).toContain("!isElogio(userText)");
+  });
+
+  test("os três filtros do registro estão nos dois lados", () => {
+    const server = readFileSync("src/lib/secondbrain.server.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*/g, "");
+    for (const f of ["isSuporteDoApp", "isCortesia", "isElogio"]) {
+      expect(server).toContain(`if (${f}(clean)) return;`);
+      expect(chat).toContain(`!${f}(userText)`);
+    }
   });
 });

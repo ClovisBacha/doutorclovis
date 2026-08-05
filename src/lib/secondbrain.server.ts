@@ -218,6 +218,54 @@ export function isCortesia(question: string): boolean {
  */
 const GAP_MERGE_MIN_SIMILARITY = 0.86;
 
+/**
+ * Elogio à IA ou ao app — "bacana dms, gostei muito dessa ia".
+ *
+ * A lista fechada de cortesias não alcança isto: elogio é frase livre, e a
+ * comparação exata só pega o que está no dicionário. Uma paciente satisfeita
+ * escrevendo isso virava um item na fila do médico, com botão "Responder" —
+ * trabalho clínico gerado por um agrado.
+ *
+ * A regra é conservadora de propósito, porque o erro caro é o outro: perder
+ * uma dúvida clínica de verdade é muito pior que uma linha de ruído na fila.
+ * Por isso exige TRÊS coisas ao mesmo tempo:
+ *
+ *   1. palavra de elogio,
+ *   2. nenhum sinal de pergunta ("?" ou palavra interrogativa),
+ *   3. nenhuma palavra do corpo ou da gestação.
+ *
+ * Com as três, "adorei, mas posso tomar dipirona?" continua sendo lacuna (tem
+ * "?" e "posso"), e "gostei do resultado do exame, é normal?" também.
+ */
+const ELOGIOS = new RegExp(
+  "\\b(gostei|gostando|adorei|amei|amando|curti|bacana|legal|(ó|o)tim[oa]|excelente|maravilhos|" +
+    "perfeit[oa]|top|show|incr(í|i)vel|sensacional|parab(é|e)ns|muito bom|muito boa|melhor app|" +
+    "ajudou muito|me ajudou|salvou)\\b",
+  "i",
+);
+/* Sinal de que ainda é pergunta, mesmo com elogio no meio. */
+const SINAL_DE_PERGUNTA = new RegExp(
+  "\\?|\\b(qual|quais|quando|como|onde|quem|quanto|quanta|por que|porque|pq|" +
+    "posso|pode|devo|preciso|tenho que|serve|adianta|vale a pena|é normal|e normal|" +
+    "normal|seguro|perigoso|faz mal|pode ser)\\b",
+  "i",
+);
+/* Vocabulário clínico: se aparece, não é só elogio — é relato. */
+const TEM_ASSUNTO_CLINICO = new RegExp(
+  "\\b(dor|dores|sangr|enjoo|n(á|a)usea|v(ô|o)mit|febre|press(ã|a)o|gl(i|í)cemia|beb(ê|e)|" +
+    "parto|gravid|gesta(ç|c)|exame|ultrass|rem(é|e)dio|medicament|contra(ç|c)|mexer|chute|" +
+    "corrimento|c(ó|o)lica|incha|cabe(ç|c)a|barriga|peso|consulta|cesare|amament|leite)\\b",
+  "i",
+);
+
+export function isElogio(question: string): boolean {
+  return (
+    ELOGIOS.test(question) &&
+    !SINAL_DE_PERGUNTA.test(question) &&
+    !TEM_ASSUNTO_CLINICO.test(question)
+  );
+}
+
 export function logBrainGap(
   doctorId: string,
   question: string,
@@ -251,6 +299,7 @@ export function logBrainGap(
   if (norm.length < 8) return; // "oi", "ok" etc. não são lacunas
   if (isSuporteDoApp(clean)) return; // suporte do app não vira fila do médico
   if (isCortesia(clean)) return; // "obrigada" não é dúvida esperando resposta
+  if (isElogio(clean)) return; // "gostei muito dessa IA" não é dúvida
   void (async () => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
