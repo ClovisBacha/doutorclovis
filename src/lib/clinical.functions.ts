@@ -1043,7 +1043,12 @@ export const examesRecebidos = createServerFn({ method: "POST" })
     /* `incompleto` é o que separa "não há exame" de "não consegui ler". Sem
        ele, uma falha de banco virava a tela dizendo "Nenhuma paciente enviou
        exame" — o médico lendo que não há laudo quando há. */
-    const vazio = { ok: true as const, exames: [] as ExameRecebido[], incompleto: false };
+    const vazio = {
+      ok: true as const,
+      exames: [] as ExameRecebido[],
+      incompleto: false,
+      bytes: null as number | null,
+    };
     const user = await medicoDaSessao(data.accessToken);
     if (!user) return { ...vazio, ok: false as const };
     try {
@@ -1091,9 +1096,36 @@ export const examesRecebidos = createServerFn({ method: "POST" })
         }))
         .filter((e) => !data.apenasNaoVistos || !e.visto_em)
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return { ok: true as const, exames, incompleto: truncou };
+      /* ─── O CUSTO DO ARMAZENAMENTO, MEDIDO ────────────────────────────
+       *
+       * O laudo vive em `image_data`, uma coluna `TEXT` com o arquivo em
+       * base64. Base64 infla 4/3 e JPEG/PDF já vêm comprimidos, então o TOAST
+       * quase não recupera nada: cada PDF no teto ocupa ~4 MB de BANCO.
+       *
+       * Isso é a escolha certa hoje — a RLS, o visualizador e a devolutiva já
+       * existem, e trocar por Storage agora seria refazer um ciclo que
+       * funciona. Mas é custo recorrente que cresce sozinho: disco de banco
+       * custa ~6× o de Storage e entra em todo backup e PITR.
+       *
+       * Então ele fica VISÍVEL. Um número na tela, somado do que já está lá,
+       * é o que transforma "um dia isso vai custar caro" numa decisão com
+       * data — em vez de uma surpresa na fatura. `pg_column_size` mede o
+       * tamanho REAL depois da compressão, não o do base64.
+       *
+       * A conta é uma consulta a mais e só roda para o médico que abre a aba;
+       * falhar aqui não pode custar a lista, então o `catch` devolve nulo. */
+      let bytes: number | null = null;
+      try {
+        const { data: soma } = await (supabaseAdmin as any).rpc("tamanho_dos_exames", {
+          p_user_ids: ids,
+        });
+        if (typeof soma === "number") bytes = soma;
+      } catch {
+        /* sem a função no banco, o número simplesmente não aparece */
+      }
+      return { ok: true as const, exames, incompleto: truncou, bytes };
     } catch {
-      return { ...vazio, incompleto: true };
+      return { ...vazio, incompleto: true, bytes: null };
     }
   });
 

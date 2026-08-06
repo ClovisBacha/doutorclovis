@@ -1288,9 +1288,9 @@ export function limitarPorCaracteres(
  * isso que `melhorSimilaridade` é gravada em `ai_usage` a cada resposta. Com
  * tráfego real, a distribuição manda; até lá, o lado seguro é este.
  */
-const SEMANTIC_MIN_SIMILARITY = 0.62;
+export const SEMANTIC_MIN_SIMILARITY = 0.62;
 /** A partir daqui a IA pode dizer "o(a) Dr(a). X orienta que…". */
-const ATRIBUICAO_MIN_SIMILARITY = 0.74;
+export const ATRIBUICAO_MIN_SIMILARITY = 0.74;
 
 /**
  * Carrega settings + entries DO MÉDICO e monta o bloco para o prompt.

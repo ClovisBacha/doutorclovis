@@ -231,6 +231,32 @@ export const saveBrainSettings = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    /* ─── LIGAR A IA EXIGE UM CAMINHO ATÉ ELE ─────────────────────────────
+     *
+     * Quando a cota do mês acaba, a IA continua atendendo — mas sem as
+     * orientações dele — e precisa dizer à paciente COMO falar com o médico. O
+     * canal é `doctors.whatsapp` (o número das pacientes, o mesmo do SOS). Sem
+     * ele, a gestante recebe "pela aba Consultas do app", que funciona e é a
+     * segunda melhor coisa.
+     *
+     * Um campo vazio no cadastro custa um atrito de dez segundos; a mesma
+     * lacuna, às 3 da manhã, custa uma paciente sem saída. Decisão do Clóvis:
+     * o atrito vale.
+     *
+     * Só barra LIGAR. Desligar, ou salvar persona e regras com a IA já
+     * desligada, continua livre — senão o médico ficaria preso numa
+     * configuração que não consegue mudar. */
+    if (data.settings.enabled_app || data.settings.enabled_whatsapp) {
+      const { data: doc } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("whatsapp")
+        .eq("id", target.doctorId)
+        .maybeSingle();
+      if (!String(doc?.whatsapp ?? "").trim()) {
+        return { ok: false as const, reason: "semWhatsapp" as const };
+      }
+    }
+
     const { error } = await (supabaseAdmin as any).from("brain_settings").upsert({
       doctor_id: target.doctorId,
       ...data.settings,

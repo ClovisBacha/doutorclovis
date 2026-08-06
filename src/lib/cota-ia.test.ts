@@ -676,3 +676,101 @@ describe("o painel do cérebro conta a verdade", () => {
     expect(painel).toContain("Mostrando as {questions.length} mais antigas de {totalQ}");
   });
 });
+
+/**
+ * AS SEIS DECISÕES DO CLÓVIS — travadas para não se desfazerem sozinhas.
+ *
+ * Cada uma foi uma escolha dele, não uma dedução minha. Um teste é o que
+ * impede que a próxima pessoa (ou eu, em três semanas) desfaça sem saber que
+ * havia uma decisão ali.
+ */
+describe("as decisões do dono, escritas em teste", () => {
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+  const store = readFileSync("src/lib/doctorthink/obstetrica-store.server.ts", "utf8");
+  const fns = readFileSync("src/lib/secondbrain.functions.ts", "utf8");
+  const widget = readFileSync("src/components/chatbot-widget.tsx", "utf8");
+
+  test("a API do DoctorThink usa a MESMA régua clínica da Obstétrica", () => {
+    /* Vivia ali um `const SEMANTIC_MIN_SIMILARITY = 0.55` — segunda régua, com
+       o valor que a Obstétrica já tinha abandonado, servida ao vivo por
+       `/api/doctorthink/ask`. O CLAUDE.md proíbe: "nunca duplique um limite
+       clínico fora desse arquivo". Se a API vira produto para outros sites, o
+       mesmo médico responderia diferente conforme o canal. */
+    /* SEM COMENTÁRIOS: a explicação de por que a constante saiu cita a própria
+       constante. É a quinta vez nesta base que uma asserção casa com a prosa
+       que descreve o código em vez do código. */
+    expect(codigoDe("src/lib/doctorthink/obstetrica-store.server.ts")).not.toMatch(
+      /const SEMANTIC_MIN_SIMILARITY *=/,
+    );
+    expect(store).toContain('import { SEMANTIC_MIN_SIMILARITY } from "../secondbrain.server"');
+    /* E a consulta é embedada como CONSULTA, com a limpeza de saudação — sem
+       isso a similaridade sai um número incomparável com o corte. */
+    expect(store).toContain('embedText(textoParaVetor(message), EMBED_TIMEOUT_MS, "consulta")');
+  });
+
+  test("no celular ele entra pelo resumo, e todas as abas continuam a um toque", () => {
+    /* `PainelNoApp` existe porque quinze abas de tela de computador não
+       encolhem para 390px — e o conteúdo da aba renderizava LOGO ABAIXO dele:
+       resumo do dia mais os doze cards do Cérebro, a tela mais pesada do
+       produto. O resumo virou cabeçalho do despejo que ele evita.
+       Aterrissar no Painel (e não no Cérebro) é o que mantém TODAS as abas
+       alcançáveis: se a entrada fosse o Cérebro, tocar em "Cérebro" não
+       mostraria nada — a aba ativa seria a de entrada. */
+    /* Sem espaços: o prettier quebra o ternário em quatro linhas conforme o
+       tamanho dos nomes muda, e uma asserção presa à formatação quebra por
+       motivo errado. */
+    expect(painel.replace(/\s+/g, " ")).toContain(
+      "const abaDeEntrada = noApp ? ABA_DE_ENTRADA_SEM_IA",
+    );
+    expect(painel).toContain("if (nativo) setTab(ABA_DE_ENTRADA_SEM_IA);");
+    expect(painel).toContain('noApp && tab === abaDeEntrada ? "hidden" : "mt-8"');
+  });
+
+  test("ligar a IA exige o WhatsApp do consultório preenchido", () => {
+    /* Quando a cota acaba, a IA precisa dar à paciente um caminho até ele.
+       Campo vazio no cadastro custa dez segundos; a mesma lacuna às 3 da manhã
+       custa uma gestante sem saída.
+       Só barra LIGAR — desligar, ou salvar persona com a IA já desligada,
+       continua livre, senão ele ficaria preso numa configuração. */
+    expect(fns).toContain('return { ok: false as const, reason: "semWhatsapp" as const };');
+    expect(fns).toContain("if (data.settings.enabled_app || data.settings.enabled_whatsapp)");
+    expect(painel).toContain("Preencha o WhatsApp do consultório em Meu Perfil");
+  });
+
+  test('"Empresas" saiu do painel — mora no console do dono', () => {
+    /* ~200 linhas vivas e inalcançáveis: render, loader e estados, com a aba
+       fora do menu. O `/admin` tem a própria implementação. */
+    expect(painel).not.toContain("EmpresasSection");
+    expect(painel).not.toContain("loadCorporate");
+    expect(painel).not.toContain("getCorporateLeadsAdmin");
+    const admin = readFileSync("src/routes/_authenticated/admin.tsx", "utf8");
+    expect(admin).toContain("getCorporateLeadsAdmin");
+  });
+
+  test("o chat do site público tem indicador e botão de parar", () => {
+    /* Era "digitando…" em itálico contra a bolha de varredura do chat da
+       paciente — mesma espera, dois produtos. E é a primeira tela que uma
+       gestante nova vê. */
+    expect(widget).toContain("stop } = useChat");
+    expect(widget).toContain("onClick={() => stop()}");
+    expect(widget).toContain('role="status"');
+  });
+
+  test("o custo dos laudos no banco é medido e mostrado", () => {
+    /* Base64 em coluna TEXT é a escolha certa hoje — a RLS, o visualizador e a
+       devolutiva já existem em cima da tabela. E é custo recorrente que cresce
+       sozinho: disco de banco custa ~6× o de Storage e entra em todo backup.
+       O número na tela é o que transforma "um dia vai custar caro" numa
+       decisão com data. `pg_column_size` mede o tamanho REAL depois do TOAST,
+       não o do base64. */
+    const clinical = readFileSync("src/lib/clinical.functions.ts", "utf8");
+    expect(clinical).toContain('rpc("tamanho_dos_exames"');
+    const visor = readFileSync("src/components/exames-recebidos.tsx", "utf8");
+    expect(visor).toContain("no banco. Acima de ~1 GB");
+    const sql = readFileSync("supabase/APLICAR_TAMANHO_EXAMES.sql", "utf8");
+    expect(sql).toContain("pg_column_size(image_data)");
+    expect(sql).toContain(
+      "GRANT EXECUTE ON FUNCTION public.tamanho_dos_exames(uuid[]) TO service_role",
+    );
+  });
+});

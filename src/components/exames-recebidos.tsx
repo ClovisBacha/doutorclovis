@@ -28,12 +28,15 @@ export function ExamesRecebidos({ tokenFn }: { tokenFn: () => Promise<string> })
   const [carregando, setCarregando] = useState(true);
   const [falhou, setFalhou] = useState(false);
   const [aberto, setAberto] = useState<ExameRecebido | null>(null);
+  /** Quanto os laudos ocupam no banco — custo que cresce sozinho. */
+  const [bytes, setBytes] = useState<number | null>(null);
 
   async function carregar() {
     try {
       const r = await examesRecebidos({ data: { accessToken: await tokenFn(), dias: 120 } });
       if (r.ok) {
         setExames(r.exames);
+        setBytes(r.bytes ?? null);
         /* `incompleto` também acende a faixa: o servidor passou a avisar quando
            o teto de leitura cortou, e descartar esse aviso aqui seria repetir o
            erro que ele existe para corrigir — uma lista curta com cara de
@@ -71,6 +74,23 @@ export function ExamesRecebidos({ tokenFn }: { tokenFn: () => Promise<string> })
           </span>
         )}
       </div>
+
+      {/* ─── O CUSTO, À VISTA ────────────────────────────────────────────
+          Os laudos ficam no banco em base64. É a escolha certa hoje (a RLS, o
+          visualizador e a devolutiva já existem em cima dessa tabela), e é
+          custo recorrente que cresce sozinho — disco de banco custa ~6× o de
+          Storage e entra em todo backup.
+          O número na tela é o que transforma "um dia isso vai custar caro"
+          numa decisão com data, em vez de uma surpresa na fatura. Só aparece
+          quando começa a pesar: abaixo de 200 MB é ruído. */}
+      {bytes != null && bytes > 200 * 1024 * 1024 && (
+        <p className="rounded-2xl border border-border bg-secondary/40 px-4 py-2 text-[11px] leading-snug text-muted-foreground">
+          Os laudos das suas pacientes ocupam{" "}
+          <strong>{(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB</strong> no banco. Acima de ~1 GB
+          vale mover os arquivos para armazenamento de objetos — sai bem mais barato e nada muda
+          para você.
+        </p>
+      )}
 
       {/* Falha de leitura não pode virar "nenhum exame": ela mandou o laudo e
           precisa ser lida, e uma caixa vazia por erro de rede é a pior notícia

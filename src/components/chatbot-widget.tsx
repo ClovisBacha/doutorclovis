@@ -15,7 +15,7 @@ export function ChatbotWidget() {
   /* `error` sai do `useChat` porque falha ANTES do stream abrir (rede, 500)
      nunca vira mensagem — sem isto ela é engolida e a visitante fica olhando
      "digitando…" que some sem nada aparecer. */
-  const { messages, sendMessage, status, error } = useChat({ transport });
+  const { messages, sendMessage, status, error, stop } = useChat({ transport });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // O botão só aparece quando a visitante rola PARA CIMA (sinal de que procura
@@ -95,7 +95,32 @@ export function ChatbotWidget() {
                 </div>
               );
             })}
-            {loading && <p className="text-xs italic text-muted-foreground">digitando…</p>}
+            {/* "digitando…" em itálico era o único feedback, contra a bolha de
+                varredura de luz do chat da paciente. Mesma espera, dois
+                produtos diferentes — e esta é a primeira tela que uma gestante
+                nova vê. `role="status"` porque sem live region o leitor de tela
+                não anuncia que algo está acontecendo. */}
+            {loading && (
+              <div className="flex items-center gap-2" role="status">
+                <span className="flex gap-1" aria-hidden>
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary/60"
+                      style={{ animationDelay: `${i * 160}ms` }}
+                    />
+                  ))}
+                </span>
+                <span className="sr-only">Pensando</span>
+                <button
+                  type="button"
+                  onClick={() => stop()}
+                  className="text-xs text-muted-foreground underline"
+                >
+                  Parar
+                </button>
+              </div>
+            )}
             {/* A BOLHA VAZIA DO SITE PÚBLICO.
                 O `error` do `useChat` era desestruturado fora e nunca lido:
                 qualquer falha — rede, 500, cota do provedor, o 429 do limitador
