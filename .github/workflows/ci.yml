@@ -5,6 +5,12 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["**"]
+  # Gatilho manual. Existe por um episódio concreto: três commits seguidos não
+  # geraram execução nenhuma — nem falha, nem fila, nada — e não havia como
+  # distinguir "o Actions está fora" de "o gatilho de push não disparou". Sem um
+  # botão, o único caminho era empurrar mais um commit para ver o que acontecia,
+  # que é adivinhação com custo.
+  workflow_dispatch:
 
 # ─── POR QUE ESTE BLOCO EXISTE ───────────────────────────────────────────────
 #
