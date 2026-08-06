@@ -126,7 +126,15 @@ export async function cotaDoMedico(
   teto: number | null,
   agora = new Date(),
 ): Promise<SituacaoDaCota> {
-  if (teto === null || teto <= 0) return situacaoDaCota(0, teto);
+  /* TETO ZERO é plano sem IA: não há consumo porque não há recurso. Sai antes
+     de consultar o banco, e isso está certo. */
+  if (teto !== null && teto <= 0) return situacaoDaCota(0, teto);
+  /* TETO NULO é plano ILIMITADO — e ilimitado não quer dizer INVISÍVEL.
+     Este ramo também devolvia `usadas: 0` sem consultar nada, então o card de
+     consumo (que exige `usadas > 0`) nunca aparecia: justamente o cliente que
+     paga contrato aberto era o único que não enxergava o próprio uso. E o
+     teste que deveria pegar isso só procurava a string "plano sem limite" no
+     arquivo — passava por cima de um ramo inalcançável. */
   return situacaoDaCota(await respostasNoCiclo(doctorId, agora), teto);
 }
 

@@ -16,7 +16,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { normalizeGapQuestion } from "./doctorthink/core";
-import { mereceFila } from "./secondbrain.server";
+import { ehSoSuporte, mereceFila } from "./secondbrain.server";
 
 /**
  * A FUNÇÃO DE PRODUÇÃO, importada. Não uma cópia dela.
@@ -413,5 +413,96 @@ describe("o log do erro cabe na primeira linha", () => {
     /* O prettier quebra a chamada em várias linhas, então a asserção olha o
        corte sem depender de onde a quebra caiu. */
     expect(chat.replace(/\s+/g, " ")).toContain(".slice( 0, 300, )");
+  });
+});
+
+/**
+ * A TABELA. Frase → o que tem que acontecer.
+ *
+ * Cada linha aqui saiu de uma medição, não de imaginação: um avaliador rodou
+ * as funções de produção contra 100 frases inventadas e trouxe as que erravam.
+ * Treze classes de erro, e cinco delas eram queixa de corpo classificada como
+ * suporte técnico — o erro caro, porque `ehSoSuporte` não decide só a fila,
+ * decide o PROMPT: vira um bot proibido de comentar sintomas, sem o cérebro do
+ * médico e sem lacuna registrada.
+ *
+ * A seção ACENTUADA é obrigatória e não pode encolher. Duas vezes nesta base
+ * um filtro morreu por ASCII: primeiro o `\b` (que nunca casava "ótimo"),
+ * depois o `\w*` (que parava no "ç" de "contração"). Toda palavra clínica de
+ * verdade tem acento em português.
+ */
+describe("a tabela do portão — medida, não imaginada", () => {
+  /* CLÍNICAS: têm que chegar ao médico. Errar aqui é o erro caro. */
+  const clinicas = [
+    "estou com dor de cabeça",
+    "posso tomar dipirona?",
+    "não sinto meu bebê desde ontem",
+    "não consigo respirar",
+    "não consigo dormir de tanta azia",
+    "quanto de peso é normal ganhar?",
+    // ── ACENTUADAS: o `\w*` ASCII parava antes da cedilha e do til ──────────
+    "o app não abre e estou com contração de 5 em 5 minutos",
+    "não consigo abrir o app e estou tendo contrações fortes",
+    "não consigo entrar, minha secreção mudou de cor",
+    "o aplicativo travou, minha secreção está com sangue",
+    "quanto custa? estou com inchaço no rosto",
+    "minha gestação está de quantas semanas?",
+    "dúvida sobre amamentação",
+    "estou com sangue na urina",
+    "não consigo registrar minha contração",
+    // ── reclamação de atendimento: não é clínica, mas é dele ────────────────
+    "esse app é ótimo mas ninguém responde minhas dúvidas",
+  ];
+
+  /* SUPORTE: a plataforma resolve, o médico não é incomodado. */
+  const suporte = [
+    "como cancelo?",
+    "quanto custa o plano?",
+    "o app travou",
+    "não recebo as notificações",
+    "quando sai a atualização do app?",
+    "posso pagar no pix?",
+    "como eu saio da conta nesse celular?",
+    "quero apagar minhas fotos do álbum",
+    "como faço para trocar de médico por aqui?",
+    "a aba de contrações não abre",
+    "não consigo entrar",
+  ];
+
+  /* CORTESIA e ELOGIO: não viram trabalho para ninguém. */
+  const silenciosas = [
+    "entendi, valeu",
+    "ta bom então",
+    "beleza, tchau",
+    "muito obrigada mesmo",
+    "obrigada doutora",
+    "bom dia",
+    "vocês são ótimos",
+    "vcs sao demais",
+    "perfeitíssimo esse app",
+    "adorei o app!",
+  ];
+
+  for (const frase of clinicas) {
+    test(`CLÍNICA → fila: "${frase}"`, () => {
+      expect(viraLacuna(frase)).toBe(true);
+    });
+  }
+  for (const frase of suporte) {
+    test(`SUPORTE → não vai ao médico: "${frase}"`, () => {
+      expect(viraLacuna(frase)).toBe(false);
+    });
+  }
+  for (const frase of silenciosas) {
+    test(`SILÊNCIO → nada acontece: "${frase}"`, () => {
+      expect(viraLacuna(frase)).toBe(false);
+    });
+  }
+
+  /* O prompt é a outra metade da decisão, e a mais perigosa das duas: só ela
+     pode trocar o assistente clínico por um bot proibido de falar de sintoma. */
+  test("nenhuma frase clínica cai no prompt de suporte", () => {
+    const erradas = clinicas.filter((f) => ehSoSuporte(f));
+    expect(erradas).toEqual([]);
   });
 });

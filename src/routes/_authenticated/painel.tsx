@@ -524,6 +524,31 @@ function PainelPage() {
    * qualquer modal de emergência aberto. No primeiro carregamento o bloqueio é
    * a resposta certa; a cada três minutos, para sempre, é uma armadilha.
    */
+  /**
+   * O QUE O PLANO LIBERA — num lugar só.
+   *
+   * Estava escrito duas vezes, nos dois ramos do `load` (caminho feliz e
+   * fallback), e só a cópia do fallback ganhou o desvio do Free. Como o médico
+   * Free ATIVO entra sempre pelo caminho feliz, o desvio nunca rodava para
+   * ele: abria o painel dentro do paywall do Cérebro — a porta fechada que o
+   * comentário de `ABA_DE_ENTRADA_SEM_IA` existe para impedir — e, de quebra,
+   * ficava sem o interruptor de push do SOS, que só aparece na aba de entrada.
+   *
+   * Duas cópias de uma regra divergem. Foi assim com os dois filtros de
+   * lacuna, e foi assim aqui.
+   */
+  function aplicarPlano(
+    ent: { aiApp?: boolean; teamSeats?: unknown; label?: string } | undefined,
+    ehRefresh: boolean,
+  ) {
+    setPodeIA(ent?.aiApp !== false);
+    setPodeEquipe(!!ent?.teamSeats);
+    setRotuloPlano(ent?.label ?? "");
+    /* Só na entrada: arrancar o médico da aba em que ele está, a cada
+       atualização de três minutos, seria pior que o problema que isto resolve. */
+    if (ent?.aiApp === false && !ehRefresh) setTab(ABA_DE_ENTRADA_SEM_IA);
+  }
+
   async function load(ehRefresh = false) {
     try {
       const tk = await token();
@@ -557,11 +582,7 @@ function PainelPage() {
         try {
           const me = await getMyDoctor({ data: { accessToken: tk } });
           if (me.ok && me.doctor) setEuMedico(me.doctor as DoctorProfile);
-          if (me.ok) {
-            setPodeIA(me.entitlements?.aiApp !== false);
-            setPodeEquipe(!!me.entitlements?.teamSeats);
-            setRotuloPlano(me.entitlements?.label ?? "");
-          }
+          if (me.ok) aplicarPlano(me.entitlements, ehRefresh);
         } catch {
           /* segue com o padrão */
         }
@@ -580,16 +601,7 @@ function PainelPage() {
          abaixo e não tem linha em `doctors`) recebia entitlements de plano Free
          — e era barrado justamente da Clínica e do Cérebro, as duas telas para
          as quais ele foi admitido. */
-      if (me.ok && me.doctor) {
-        setPodeIA(me.entitlements?.aiApp !== false);
-        setPodeEquipe(!!me.entitlements?.teamSeats);
-        setRotuloPlano(me.entitlements?.label ?? "");
-        /* O Cérebro é a aba de entrada, e no Free ele é um paywall. Abrir o
-           painel numa porta fechada é a pior primeira tela possível — o médico
-           do Free tem consultório, agenda e pacientes aqui dentro. Só na
-           entrada, pelo mesmo motivo do desvio de "inativo" logo abaixo. */
-        if (me.entitlements?.aiApp === false && !ehRefresh) setTab(ABA_DE_ENTRADA_SEM_IA);
-      }
+      if (me.ok && me.doctor) aplicarPlano(me.entitlements, ehRefresh);
       /* Perfil de médico INATIVO também entra — só que direto em Meu Perfil.
          
          Antes ele era recusado aqui e caía em "área restrita", vindo de um

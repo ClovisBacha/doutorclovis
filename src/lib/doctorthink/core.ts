@@ -76,6 +76,23 @@ export function rankEntriesByKeywords(
   maxScored: number,
 ): BrainEntry[] {
   const words = significantWords(userMessage);
+  /* ─── PISO: UMA PALAVRA EM COMUM NÃO É COBERTURA ──────────────────────────
+   *
+   * Era `score > 0`. Medido com as entradas reais: *"posso tomar dipirona para
+   * dor de cabeça?"* selecionava *"Posso comer sushi na gravidez?"* — as duas
+   * têm "posso" — e o bloco entrava no prompt sob o rótulo "Respostas reais do
+   * médico (use como referência de conduta e tom)", com `hadCoverage = true` e
+   * NENHUMA lacuna registrada. Sushi respondendo sobre dipirona.
+   *
+   * Isso contornava o corte de similaridade inteiro pela porta dos fundos: o
+   * 0,62 só governa o caminho vetorial, e este aqui é justamente o caminho de
+   * quem ainda não tem vetor — ou seja, todo médico novo.
+   *
+   * Metade das palavras significativas, com piso de 2, é o mínimo que exige
+   * que o ASSUNTO coincida e não só a gramática. Perguntas de uma palavra só
+   * ("enjoo?") continuam valendo com essa palavra, que aí é o assunto inteiro.
+   */
+  const minimo = words.length <= 1 ? 1 : Math.max(2, Math.ceil(words.length / 2));
   return entries
     .map((entry) => {
       const haystack = normalizeText(`${entry.question} ${entry.answer}`);
@@ -83,7 +100,7 @@ export function rankEntriesByKeywords(
       for (const w of words) if (haystack.includes(w)) score += 1;
       return { entry, score };
     })
-    .filter((s) => s.score > 0)
+    .filter((s) => s.score >= minimo)
     .sort((a, b) => b.score - a.score)
     .slice(0, maxScored)
     .map((s) => s.entry);

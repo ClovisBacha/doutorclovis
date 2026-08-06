@@ -167,6 +167,25 @@ function logBrainHit(doctorId: string, channel: BrainChannel): void {
 const PRE = "(?<![0-9a-zà-ÿ])";
 const POS = "(?![a-zà-ÿ])";
 
+/**
+ * "Mais letras", COM ACENTO — porque `\w` do JavaScript também é ASCII.
+ *
+ * É o mesmo defeito do `\b`, no quantificador ao lado dele.
+ * `contra(?:ç|c)\w*` casa "contra" e PARA no "ç": "contração" e "contrações"
+ * eram invisíveis para o vocabulário clínico.
+ *
+ * O preço, medido: *"o app não abre e estou com contração de 5 em 5 minutos"*
+ * era classificado como suporte PURO — e `ehSoSuporte` não decide só a fila,
+ * decide o prompt: a gestante recebia um bot de suporte técnico proibido de
+ * comentar sintomas, sem o cérebro do médico e sem lacuna registrada. Trabalho
+ * de parto prematuro atendido por suporte técnico.
+ *
+ * Cinco frases assim foram medidas, todas com o mesmo desenho: menção ao app +
+ * sintoma acentuado. `secreção`, `inchaço`, `gestação`, `amamentação` — e
+ * `sangue`, que `sangr\w*` nunca alcançou por outro motivo.
+ *
+ * Mesma faixa do `PRE`/`POS` abaixo, que os testes de "ótimos" já provam.
+ */
 /** Envolve cada alternativa numa fronteira que respeita acento. */
 function comFronteira(alternativas: string): string {
   return `${PRE}(?:${alternativas})${POS}`;
@@ -178,7 +197,7 @@ const TERMOS_SUPORTE = new RegExp(
       // superfície do produto (nomeia a coisa na tela)
       "app|aplicativo|site|aba|tela|menu|bot(?:ã|a)o|(?:í|i)cone",
       // conta e cobrança
-      "login|logar|senha|assinatura|assinar|premium|pagamento|cadastr\\w*|notifica(?:ç|c)\\w*",
+      "login|logar|senha|assinatura|assinar|premium|pagamento|cadastr[0-9a-zà-ÿ]*|notifica(?:ç|c)[0-9a-zà-ÿ]*",
       /* DINHEIRO é da plataforma, não do médico.
          "quanto custa o plano?" entrava na fila CLÍNICA dele, com a IA
          prometendo resposta pessoal — para uma pergunta de cobrança que ele
@@ -186,12 +205,24 @@ const TERMOS_SUPORTE = new RegExp(
 
          A lista é de RADICAIS, e sem stemming ela erra por conjugação: tinha
          `cancelar` e não tinha `cancelo`, então "como cancelo?" — literalmente
-         a frase que o pedido citou — vazava para a fila clínica. Os `\\w*`
+         a frase que o pedido citou — vazava para a fila clínica. Os `[0-9a-zà-ÿ]*`
          abaixo cobrem a família inteira de cada verbo. */
-      "cust\\w*|pre(?:ç|c)o\\w*|valor\\w*|mensalidade\\w*|cobran(?:ç|c)\\w*|cobra\\w*|reembols\\w*|estorn\\w*",
-      "cancel\\w*|desativ\\w*|descadastr\\w*|excluir|exclu(?:o|(?:í|i)r)|apagar (?:minha|meus|a) \\w+|deletar",
+      "cust[0-9a-zà-ÿ]*|pre(?:ç|c)o[0-9a-zà-ÿ]*|valor[0-9a-zà-ÿ]*|mensalidade[0-9a-zà-ÿ]*|cobran(?:ç|c)[0-9a-zà-ÿ]*|cobra[0-9a-zà-ÿ]*|reembols[0-9a-zà-ÿ]*|estorn[0-9a-zà-ÿ]*",
+      "cancel[0-9a-zà-ÿ]*|desativ[0-9a-zà-ÿ]*|descadastr[0-9a-zà-ÿ]*|excluir|exclu(?:o|(?:í|i)r)|deletar",
+      /* Apagar COISA DA CONTA. Tinha `(?:minha|meus|a)` e não `minhas`, então
+         "quero apagar minhas fotos do álbum" — a forma mais comum — passava
+         direto para a fila clínica do médico. E o `\\w+` aqui era ASCII pelo
+         mesmo motivo de todo o resto deste arquivo. */
+      "(?:apagar|deletar|remover|excluir) (?:minha|minhas|meu|meus|o|a|os|as|essa|esse) [0-9a-zà-ÿ]+",
+      /* Formas de pagar, e sair. `cartão` sozinho fica FORA de propósito — é o
+         cartão de pré-natal —, mas "cartão de crédito" não é ambíguo. */
+      "pix|boleto|fatura|comprovante|cart(?:ã|a)o de cr(?:é|e)dito|nota fiscal",
+      "sai(?:r|o|u)[0-9a-zà-ÿ]* da conta|desconectar|deslogar|trocar de senha",
+      /* Trocar de médico é da plataforma por definição: é a única pergunta que
+         o médico atual não pode responder sem conflito de interesse. */
+      "trocar de m(?:é|e)dico|mudar de m(?:é|e)dico|trocar de obstetra|desvincular",
       // falha técnica
-      "instalar|atualiza(?:r|ç|c)\\w*|carregar|carrega|travand?o|travou|bug|sair da conta",
+      "instalar|atualiza(?:r|ç|c)[0-9a-zà-ÿ]*|carregar|carrega|travand?o|travou|bug|sair da conta",
       /* ─── "não consigo X" — E O X TEM LISTA FECHADA ───────────────────────
          "não consigo entrar" e "não carrega nada aqui" são as duas frases de
          suporte mais comuns e nenhuma casava: `entrar` está fora da lista de
@@ -223,7 +254,7 @@ const TERMOS_SUPORTE = new RegExp(
         "(?:entrar|logar|acessar|abrir o|abrir a|abrir|instalar|atualizar|carregar|baixar|" +
         "pagar|assinar|cadastrar|me cadastrar|criar conta|recuperar|redefinir|" +
         "encontrar a aba|achar a aba|usar o app|usar o aplicativo|ver no app)",
-      "n(?:ã|a)o (?:carrega|abre|funciona|recebo|recebi|chega\\w*|aparece)",
+      "n(?:ã|a)o (?:carrega|abre|funciona|recebo|recebi|chega[0-9a-zà-ÿ]*|aparece)",
     ].join("|"),
   ),
   "i",
@@ -254,11 +285,11 @@ const TERMOS_CLINICOS = new RegExp(
       /* `dor` SEM fronteira casava dentro de "aDORei" — e "adorei o app!" ia
          para o caminho clínico completo: embedding, busca vetorial e uma
          unidade da cota do médico, por um elogio. */
-      "dor(?:es)?|sangr\\w*|c(?:ó|o)lica\\w*|contra(?:ç|c)\\w*|enjo\\w*|n(?:á|a)usea\\w*|v(?:ô|o)mit\\w*|tontur\\w*",
-      "press(?:ã|a)o|glicem\\w*|diabet\\w*|incha\\w*|edema|febre|corrim\\w*|secre(?:ç|c)\\w*",
-      "beb(?:ê|e)|feto|mexer|mexeu|chute\\w*|movimento\\w*|barriga|(?:ú|u)tero|placenta|l(?:í|i)quido",
-      "exame\\w*|ultrassom|ultrasso\\w*|resultado\\w*|hemogram\\w*|urina|parto|ces(?:á|a)re\\w*|amamenta\\w*",
-      "rem(?:é|e)dio\\w*|medicament\\w*|comprimido\\w*|dose|tomar|s(?:í|i)ntoma\\w*|sinto|senti|semana\\w*",
+      "dor(?:es)?|sang(?:r|u)[0-9a-zà-ÿ]*|c(?:ó|o)lica[0-9a-zà-ÿ]*|contra(?:ç|c)[0-9a-zà-ÿ]*|enjo[0-9a-zà-ÿ]*|n(?:á|a)usea[0-9a-zà-ÿ]*|v(?:ô|o)mit[0-9a-zà-ÿ]*|tontur[0-9a-zà-ÿ]*",
+      "press(?:ã|a)o|glicem[0-9a-zà-ÿ]*|diabet[0-9a-zà-ÿ]*|incha[0-9a-zà-ÿ]*|edema|febre|corrim[0-9a-zà-ÿ]*|secre(?:ç|c)[0-9a-zà-ÿ]*",
+      "beb(?:ê|e)|feto|mex(?:e|i|eu|em|endo)|chute[0-9a-zà-ÿ]*|movimento[0-9a-zà-ÿ]*|barriga|(?:ú|u)tero|placenta|l(?:í|i)quido",
+      "exame[0-9a-zà-ÿ]*|ultrassom|ultrasso[0-9a-zà-ÿ]*|resultado[0-9a-zà-ÿ]*|hemogram[0-9a-zà-ÿ]*|urina|parto|ces(?:á|a)re[0-9a-zà-ÿ]*|amamenta[0-9a-zà-ÿ]*",
+      "rem(?:é|e)dio[0-9a-zà-ÿ]*|medicament[0-9a-zà-ÿ]*|comprimido[0-9a-zà-ÿ]*|dose|tomar|s(?:í|i)ntoma[0-9a-zà-ÿ]*|sinto|senti|semana[0-9a-zà-ÿ]*",
     ].join("|"),
   ),
   "i",
@@ -272,8 +303,47 @@ const TERMOS_CLINICOS = new RegExp(
  * histórico de pressão arterial da paciente. Injetar tudo isso gasta os créditos
  * do médico e ainda produz a resposta longa que mistura dois assuntos.
  */
+/**
+ * "a aba de CONTRAÇÕES não abre" fala de contrações e não é sobre o corpo.
+ *
+ * Depois que o vocabulário clínico passou a enxergar acento, os NOMES DE TELA
+ * viraram sintoma: o app tem aba de contrações, de exames, de pressão. Uma
+ * queixa de interface começou a chegar na fila clínica do médico.
+ *
+ * A regra é de POSIÇÃO, não de palavra: substantivo clínico logo depois de
+ * "aba de / tela de / botão de / seção de" é o NOME de uma parte do app. Some
+ * antes de procurar sintoma; em qualquer outra posição continua valendo — e é
+ * por isso que "não consigo registrar minha contração" segue sendo clínica.
+ */
+const NOME_DE_TELA = new RegExp(
+  `${PRE}(?:aba|tela|se(?:ç|c)(?:ã|a)o|bot(?:ã|a)o|(?:í|i)cone|menu|campo|p(?:á|a)gina)` +
+    ` (?:de|do|da|dos|das) [0-9a-zà-ÿ]+`,
+  "gi",
+);
+
+/**
+ * "ninguém responde minhas dúvidas" — a plataforma não conserta isso.
+ *
+ * Reclamação de ATENDIMENTO menciona o app ("esse app é ótimo mas ninguém
+ * responde") e não menciona o corpo, então caía como suporte puro e era
+ * descartada. A paciente que estava dizendo que ninguém a responde ficava sem
+ * resposta — o produto confirmando a queixa dela.
+ *
+ * É a única coisa deste filtro que o médico PRECISA ler mesmo não sendo
+ * clínica: fala do atendimento dele, não da tela.
+ */
+const QUEIXA_DE_ATENDIMENTO = new RegExp(
+  "(?:ningu(?:é|e)m|n(?:ã|a)o|nunca)\\s+(?:me\\s+|nos\\s+)?(?:respond|atend|retorn)[0-9a-zà-ÿ]*" +
+    `|${comFronteira("sem resposta|sem retorno|nenhuma resposta")}`,
+  "i",
+);
+
 export function ehSoSuporte(question: string): boolean {
-  return isSuporteDoApp(question) && !TERMOS_CLINICOS.test(question);
+  return (
+    isSuporteDoApp(question) &&
+    !QUEIXA_DE_ATENDIMENTO.test(question) &&
+    !TERMOS_CLINICOS.test(question.replace(NOME_DE_TELA, " "))
+  );
 }
 
 /**
@@ -311,8 +381,96 @@ const CORTESIAS = new Set([
   "boa noite",
 ]);
 
+/**
+ * Palavras que não mudam o sentido de uma despedida: vocativo, muleta, ênfase.
+ * "obrigada DOUTORA" e "ta bom ENTÃO" são o mesmo ato de fala que "obrigada".
+ */
+const RECHEIO = new Set([
+  "muito",
+  "mesmo",
+  "entao",
+  "ai",
+  "ja",
+  "so",
+  "agora",
+  "doutora",
+  "doutor",
+  "dra",
+  "dr",
+  "moca",
+  "voce",
+  "vc",
+  "voces",
+  "vcs",
+  "de",
+  "novo",
+  "pela",
+  "pelo",
+  "ajuda",
+  "atencao",
+  "resposta",
+  "e",
+  "eh",
+  "sim",
+  "ok",
+  "okay",
+  "blz",
+  "vlw",
+]);
+
+/** Cada peça de cortesia, isolada — é assim que elas se combinam na vida real. */
+const PECAS_DE_CORTESIA = new Set([
+  "obrigada",
+  "obrigado",
+  "brigada",
+  "brigado",
+  "valeu",
+  "ta",
+  "tah",
+  "bom",
+  "boa",
+  "tudo",
+  "bem",
+  "entendi",
+  "entendido",
+  "certo",
+  "beleza",
+  "perfeito",
+  "otimo",
+  "otima",
+  "ate",
+  "mais",
+  "tchau",
+  "dia",
+  "tarde",
+  "noite",
+  "abraco",
+  "abracos",
+  "bjs",
+  "beijos",
+]);
+
+/**
+ * É cortesia — agradecimento, despedida, confirmação.
+ *
+ * Era `Set.has(textoInteiro)`: igualdade exata contra um dicionário fechado de
+ * vinte frases. Qualquer combinação escapava, e gente não escreve em frases
+ * canônicas. Medido, todas viravam item na fila do médico COM e-mail "sua IA
+ * não soube responder": "entendi, valeu" · "ta bom então" · "beleza, tchau" ·
+ * "muito obrigada mesmo" · "obrigada doutora".
+ *
+ * Agora a decisão é por TOKEN: é cortesia quando toda palavra restante é peça
+ * de cortesia ou recheio. Uma única palavra de conteúdo — "dor", "exame",
+ * "quando" — derruba a classificação e a frase volta a ser pergunta, que é o
+ * lado seguro do erro.
+ */
 export function isCortesia(question: string): boolean {
-  return CORTESIAS.has(normalizeGapQuestion(question));
+  const tokens = normalizeGapQuestion(question).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return false;
+  /* Pelo menos UMA peça de cortesia de verdade: só recheio ("muito mesmo")
+     não é despedida, é frase truncada — e frase truncada é dúvida perdida. */
+  if (!tokens.some((t) => PECAS_DE_CORTESIA.has(t))) return false;
+  return tokens.every((t) => PECAS_DE_CORTESIA.has(t) || RECHEIO.has(t));
 }
 
 /**
@@ -399,17 +557,17 @@ const ELOGIOS = new RegExp(
        ASCII, fazia "ótimo" NUNCA casar. Medido: `ótimo`→0, `ótimos`→0,
        `otimo`→1. Ou seja, o filtro só funcionava para quem escrevia sem
        acento. */
-    "gostei|gostando|adorei|adorando|amei|amando|curti|bacana\\w*|legal|legais|" +
-      "(?:ó|o)tim\\w*|excelente\\w*|maravilhos\\w*|perfeit\\w*|top|show|" +
-      "incr(?:í|i)ve\\w*|sensacional|sensacionais|parab(?:é|e)ns|muito bom|muito boa|" +
+    "gostei|gostando|adorei|adorando|amei|amando|curti|bacana[0-9a-zà-ÿ]*|legal|legais|" +
+      "(?:ó|o)tim[0-9a-zà-ÿ]*|excelente[0-9a-zà-ÿ]*|maravilhos[0-9a-zà-ÿ]*|perfeit[0-9a-zà-ÿ]*|top|show|" +
+      "incr(?:í|i)ve[0-9a-zà-ÿ]*|sensacional|sensacionais|parab(?:é|e)ns|muito bom|muito boa|" +
       /* Gíria e superlativo são metade do elogio real que chega. "vcs sao
          demais", "melhor coisa que já usei" e "vocês arrasam" viravam lacuna
          clínica — e disparavam o e-mail "sua IA não soube responder" para o
          médico, por um agradecimento. */
-      "demais|arras\\w*|fant(?:á|a)stic\\w*|(?:ó|o)tima ideia|nota 10|nota dez|" +
+      "demais|arras[0-9a-zà-ÿ]*|fant(?:á|a)stic[0-9a-zà-ÿ]*|(?:ó|o)tima ideia|nota 10|nota dez|" +
       "melhor (?:app|aplicativo|coisa|programa)|melhor que|" +
       "ajudou muito|me ajudou|ajudando muito|salvou|salvando|" +
-      "recomendo|indiquei|indico|amando (?:o|a)\\w*",
+      "recomendo|indiquei|indico|amando (?:o|a)[0-9a-zà-ÿ]*",
   ),
   "i",
 );
@@ -419,25 +577,42 @@ const SINAL_DE_PERGUNTA = new RegExp(
     comFronteira(
       "qual|quais|quando|como|onde|quem|quanto|quanta|por que|porque|pq|" +
         "posso|pode|devo|preciso|tenho que|serve|adianta|vale a pena|(?:é|e) normal|" +
-        "normal|segur\\w*|perigos\\w*|faz mal|pode ser",
+        "normal|segur[0-9a-zà-ÿ]*|perigos[0-9a-zà-ÿ]*|faz mal|pode ser",
     ),
   "i",
 );
 /* Vocabulário clínico: se aparece, não é só elogio — é relato. */
 const TEM_ASSUNTO_CLINICO = new RegExp(
   comFronteira(
-    "dor(?:es)?|sangr\\w*|enjoo|n(?:á|a)usea\\w*|v(?:ô|o)mit\\w*|febre|press(?:ã|a)o|" +
-      "gl(?:i|í)cemia|beb(?:ê|e)|parto|gravid\\w*|gesta(?:ç|c)\\w*|exame\\w*|ultrass\\w*|" +
-      "rem(?:é|e)dio\\w*|medicament\\w*|contra(?:ç|c)\\w*|mexer|chute\\w*|corrimento|" +
-      "c(?:ó|o)lica\\w*|incha\\w*|cabe(?:ç|c)a|barriga|peso|consulta\\w*|cesare\\w*|" +
-      "amament\\w*|leite",
+    "dor(?:es)?|sang(?:r|u)[0-9a-zà-ÿ]*|enjoo|n(?:á|a)usea[0-9a-zà-ÿ]*|v(?:ô|o)mit[0-9a-zà-ÿ]*|febre|press(?:ã|a)o|" +
+      "gl(?:i|í)cemia|beb(?:ê|e)|parto|gravid[0-9a-zà-ÿ]*|gesta(?:ç|c)[0-9a-zà-ÿ]*|exame[0-9a-zà-ÿ]*|ultrass[0-9a-zà-ÿ]*|" +
+      "rem(?:é|e)dio[0-9a-zà-ÿ]*|medicament[0-9a-zà-ÿ]*|contra(?:ç|c)[0-9a-zà-ÿ]*|mexer|chute[0-9a-zà-ÿ]*|corrimento|" +
+      "c(?:ó|o)lica[0-9a-zà-ÿ]*|incha[0-9a-zà-ÿ]*|cabe(?:ç|c)a|barriga|peso|consulta[0-9a-zà-ÿ]*|cesare[0-9a-zà-ÿ]*|" +
+      "amament[0-9a-zà-ÿ]*|leite",
   ),
+  "i",
+);
+
+/**
+ * "…, MAS …" — o elogio virou embalagem de reclamação.
+ *
+ * "esse app é ótimo mas ninguém responde minhas dúvidas" não tem "?" e não fala
+ * de corpo, então caía inteiro no filtro de agrado: a reclamação SUMIA, e a
+ * paciente que estava dizendo que ninguém a responde ficava sem resposta —
+ * confirmando a própria queixa.
+ *
+ * A conjunção adversativa é o sinal mais barato e mais confiável de que o que
+ * vem depois é o assunto de verdade. Na dúvida, registra.
+ */
+const ADVERSATIVA = new RegExp(
+  comFronteira("mas|por(?:é|e)m|s(?:ó|o) que|entretanto|contudo|todavia|no entanto|embora"),
   "i",
 );
 
 export function isElogio(question: string): boolean {
   return (
     ELOGIOS.test(question) &&
+    !ADVERSATIVA.test(question) &&
     !SINAL_DE_PERGUNTA.test(question) &&
     !TEM_ASSUNTO_CLINICO.test(question)
   );
@@ -1159,6 +1334,18 @@ export async function getBrainContext(
             p_embedding: qvec,
             p_limit: MAX_ENTRIES_SCORED,
           });
+          /* A RPC MAIS IMPORTANTE DAS TRÊS ERA A ÚNICA MUDA.
+             As irmãs (`match_brain_gaps`, `match_brain_entries_id`) logam com
+             o código do PostgREST e o nome do SQL a rodar. Esta descartava o
+             `error` — e sem ela o chat cai calado no ranking por palavras para
+             SEMPRE, que é o defeito que já custou uma noite inteira aqui. */
+          if (error) {
+            console.error(
+              `[cerebro] match_brain_entries falhou (${(error as any)?.code ?? "?"}) — ` +
+                `a busca por significado está DESLIGADA; sobra o ranking por palavras. ` +
+                `Rode supabase/APLICAR_PENDENTES.sql.`,
+            );
+          }
           if (!error && Array.isArray(matches)) {
             const achados = matches as { question: string; answer: string; similarity: number }[];
             if (achados.length > 0) {
@@ -1181,9 +1368,35 @@ export async function getBrainContext(
       selected = rankEntriesByKeywords(userMessage, entries, MAX_ENTRIES_SCORED);
     }
 
+    /* ─── QUEM PODE LEVAR O NOME DELE ─────────────────────────────────────
+     * Calculado AQUI, e não no `return`, porque é o mesmo juízo que decide se
+     * a dúvida entra na fila — e as duas decisões não podem discordar.
+     *
+     * Só com similaridade medida E alta. O fallback por palavras não produz
+     * número nenhum, então ali a resposta usa o material sem assinar o nome. */
+    const podeAtribuir =
+      selected.length > 0 &&
+      melhorSimilaridade !== null &&
+      melhorSimilaridade >= ATRIBUICAO_MIN_SIMILARITY;
+
     /* A promessa em voo: quem chama aguarda no `onFinish`. */
     let gravacaoDaLacuna: Promise<void> | undefined;
-    if (selected.length === 0 && channel !== "teste") {
+    /* ─── A FAIXA DO MEIO TAMBÉM VIRA LACUNA ───────────────────────────────
+     *
+     * Era `selected.length === 0`. Mas entre 0,62 e 0,74 — e em TODO o caminho
+     * por palavras — o bloco é injetado, `hadCoverage` é `true`, e o `chat.ts`
+     * instrui a IA a dizer que *"registrou a dúvida para ${medico}
+     * confirmar"*. Medido: zero lacunas gravadas nessa faixa. A IA prometia à
+     * gestante uma confirmação que o médico jamais veria pedida.
+     *
+     * O critério certo não é "achei alguma coisa", é "posso assinar isto no
+     * nome dele". Se não posso, ele precisa olhar — que é a definição de
+     * lacuna. `logBrainGapAgora` já deduplica por texto e por semelhança, então
+     * a mesma dúvida repetida continua sendo UMA linha com contador.
+     *
+     * O comentário deste bloco já afirmava esse comportamento ("E a dúvida
+     * segue para a fila, para ele confirmar"). Agora o código faz. */
+    if (!podeAtribuir && channel !== "teste") {
       /* O vetor da lacuna é calculado por ela, e NÃO reaproveitado daqui.
 
          O atalho existia e economizava um embedding — mas com o `taskType` ele
@@ -1233,13 +1446,10 @@ export async function getBrainContext(
       hadCoverage: selected.length > 0,
       melhorSimilaridade,
       cotaEsgotada: false,
-      /* Só com similaridade medida E alta. O fallback por palavras não produz
-         número nenhum — e sem número não há como afirmar que a orientação é
-         dele, então ali a resposta usa o material sem assinar o nome. */
-      podeAtribuir:
-        selected.length > 0 &&
-        melhorSimilaridade !== null &&
-        melhorSimilaridade >= ATRIBUICAO_MIN_SIMILARITY,
+      /* A MESMA variável que decidiu a lacuna, acima. Estava recalculada aqui
+         em duplicata — e duas cópias de um juízo é como as duas cópias do
+         filtro de lacuna divergiram nesta base. */
+      podeAtribuir,
       gravacaoDaLacuna,
     };
   } catch {
