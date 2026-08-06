@@ -118,3 +118,70 @@ describe("a decisão continua auditável", () => {
     expect(chat).toContain("similaridade,");
   });
 });
+
+/**
+ * O VETOR TEM QUE CHEGAR NA TABELA — senão o resto deste arquivo não vale nada.
+ *
+ * `match_brain_entries` exige `embedding IS NOT NULL`. Com a coluna nula, a
+ * busca semântica não devolve NADA: os cortes de 0,62 e 0,74 estão certos e
+ * nunca são exercitados, e o chat cai calado no ranking por palavras. "Posso
+ * comer comida japonesa?" volta a não encontrar a orientação sobre sushi.
+ *
+ * E nascem sem vetor: o kit de partida, tudo o que foi salvo antes da
+ * migration, e tudo o que foi salvo com a chave de IA fora do ar.
+ */
+describe("as entradas do cérebro ganham vetor de verdade", () => {
+  /* SEM COMENTÁRIOS: a docstring do `embedBrainEntry` cita o padrão antigo
+     (`void (async () => {`) para explicar por que ele foi removido — e um
+     `not.toContain` cru casaria com a própria explicação. É o terceiro teste
+     desta sessão a cair nessa; medir o texto que descreve o código em vez do
+     código é o erro que mais me custou aqui. */
+  const emb = codigoDe("src/lib/embeddings.server.ts");
+  const fns = readFileSync("src/lib/secondbrain.functions.ts", "utf8");
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+
+  test("o backfill é aguardável, não dispare-e-esqueça", () => {
+    /* Era `void (async () => {…})()` — o mesmo padrão que `curarLacunasSemVetor`
+       diagnosticou, e cujo comentário aponta ESTE arquivo como origem.
+       Consertaram o lado que copiou e deixaram o original. Em serverless a
+       invocação congela com a resposta: o laço morria antes do primeiro
+       embedding, sem erro nenhum. */
+    expect(emb).toContain("export async function backfillBrainEmbeddings(");
+    expect(emb).not.toContain("void (async () => {");
+  });
+
+  test("uma falha não leva as outras entradas junto", () => {
+    /* Era `if (!vec) return` dentro do laço: um estouro de tempo na terceira
+       jogava fora as dezessete seguintes. */
+    expect(emb).toContain("const vetores = await emLotes(linhas, BACKFILL_POR_LOTE");
+    expect(emb).toContain(".filter((e): e is { id: string; vetor: number[] } => !!e.vetor)");
+  });
+
+  test("o backfill confere o que gravou, em vez de só disparar", () => {
+    /* Com a coluna ausente ou a RLS no caminho, "embedei 20" tendo gravado
+       zero — um número que mente sobre o próprio trabalho. */
+    expect(emb).toContain("const falhas = gravacoes.filter((r: any) => r?.error);");
+    expect(emb).toContain("return prontas.length - falhas.length;");
+  });
+
+  test("existe requisição própria para ele", () => {
+    expect(fns).toContain("export const embedarEntradasDoMedico");
+    expect(fns).toContain("await backfillBrainEmbeddings(target.doctorId)");
+  });
+
+  test("E O PAINEL A CHAMA — a ponta que faz tudo isso valer", () => {
+    /* Sem esta linha, o conserto fica pior que o defeito: antes o backfill ao
+       menos TENTAVA e morria; tirar o disparo de dentro do `listBrainEntries`
+       sem ligar a função nova faria ele não rodar nunca mais. */
+    expect(painel).toContain("void embedarEntradasDoMedico({");
+    expect(painel).toContain("embedarEntradasDoMedico,");
+  });
+
+  test("o `listBrainEntries` não dispara mais nada por dentro", () => {
+    const trecho = fns.slice(
+      fns.indexOf("export const listBrainEntries"),
+      fns.indexOf("export const embedarEntradasDoMedico"),
+    );
+    expect(trecho).not.toContain("backfillBrainEmbeddings(doctorId);");
+  });
+});

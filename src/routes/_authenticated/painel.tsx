@@ -116,6 +116,7 @@ import {
   listBrainReviews,
   resolveBrainReview,
   curarLacunasDoMedico,
+  embedarEntradasDoMedico,
   listBrainGaps,
   resolveBrainGap,
   dismissBrainGap,
@@ -6801,6 +6802,26 @@ function BrainKnowledgeCard({
         if (!alive) return;
         if (res.ok) setEntries(res.entries);
         else toast.error("Não foi possível carregar a base de conhecimento.");
+
+        /* DAR VETOR ÀS ENTRADAS QUE NÃO TÊM — em requisição SEPARADA.
+           `match_brain_entries` exige `embedding IS NOT NULL`. Sem vetor, a
+           busca semântica não devolve NADA e o chat cai calado no ranking por
+           palavras: "posso comer comida japonesa?" não encontra a orientação
+           sobre sushi. E nascem sem vetor o kit de partida, tudo o que foi
+           salvo antes da migration e tudo o que foi salvo com a chave de IA
+           fora do ar.
+           Requisição própria pelo mesmo motivo da cura de lacunas: é a
+           requisição dela que mantém o trabalho vivo em serverless. Dentro do
+           `listBrainEntries` isto era disparado e esquecido, e a invocação
+           congelava com a resposta — nenhuma entrada era embedada, nunca, sem
+           um único erro no log.
+           Só na primeira carga (`!search`): trocar o termo de busca não muda
+           quais entradas estão cegas. */
+        if (!search) {
+          void embedarEntradasDoMedico({
+            data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+          }).catch(() => {});
+        }
       },
       search ? 350 : 0,
     );
