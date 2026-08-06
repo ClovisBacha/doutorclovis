@@ -74,6 +74,16 @@ export type BrainContext = {
    * a ser tomada com a distribuição na mão em vez de por intuição.
    */
   melhorSimilaridade: number | null;
+  /**
+   * A cota do ciclo do médico acabou.
+   *
+   * Precisa ser um campo PRÓPRIO, e não "bloco vazio": sem cobertura e cota
+   * esgotada produzem o mesmo bloco vazio e pedem respostas opostas. Sem
+   * cobertura, a IA diz "registrei para ele ver" — uma promessa que se cumpre.
+   * Com a cota estourada, ele NÃO vai responder pelo app, e repetir a mesma
+   * frase seria mentir para a paciente e deixá-la esperando.
+   */
+  cotaEsgotada: boolean;
 };
 
 /** Canal em que o cérebro foi usado (telemetria do dashboard do médico). */
@@ -752,6 +762,7 @@ export async function getBrainContext(
         enabledWhatsapp: true,
         hadCoverage: false,
         melhorSimilaridade: null,
+        cotaEsgotada: false,
       };
 
     const { getEntitlementsByDoctorId } = await import("./entitlements.server");
@@ -791,6 +802,7 @@ export async function getBrainContext(
         enabledWhatsapp,
         hadCoverage: false,
         melhorSimilaridade: null,
+        cotaEsgotada: false,
       };
 
     /* ─── COTA DO CICLO ESTOURADA ────────────────────────────────────────────
@@ -820,6 +832,7 @@ export async function getBrainContext(
           enabledWhatsapp,
           hadCoverage: false,
           melhorSimilaridade: null,
+          cotaEsgotada: true,
         };
       }
     }
@@ -830,6 +843,7 @@ export async function getBrainContext(
         enabledWhatsapp,
         hadCoverage: false,
         melhorSimilaridade: null,
+        cotaEsgotada: false,
       };
     }
     if (channel === "teste" && !ent.aiApp)
@@ -839,6 +853,7 @@ export async function getBrainContext(
         enabledWhatsapp,
         hadCoverage: false,
         melhorSimilaridade: null,
+        cotaEsgotada: false,
       };
 
     // ── Seleção em 2 camadas ─────────────────────────────────────────────
@@ -939,6 +954,7 @@ export async function getBrainContext(
         enabledWhatsapp,
         hadCoverage: false,
         melhorSimilaridade: null,
+        cotaEsgotada: false,
       };
     }
 
@@ -952,6 +968,7 @@ export async function getBrainContext(
       enabledWhatsapp,
       hadCoverage: selected.length > 0,
       melhorSimilaridade,
+      cotaEsgotada: false,
     };
   } catch {
     // Falha de banco não pode derrubar o chat: segue sem o segundo cérebro.
@@ -961,6 +978,7 @@ export async function getBrainContext(
       enabledWhatsapp: true,
       hadCoverage: false,
       melhorSimilaridade: null,
+      cotaEsgotada: false,
     };
   }
 }
@@ -1002,6 +1020,7 @@ export async function getBrainContextResolved(
             hadCoverage: remote.hadCoverage,
             /* O cérebro remoto não devolve similaridade: `null` é honesto. */
             melhorSimilaridade: null,
+            cotaEsgotada: false,
           };
         }
       }

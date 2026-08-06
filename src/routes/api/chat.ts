@@ -66,6 +66,15 @@ async function resolvePatientDoctor(request: Request): Promise<{
   patientId: string;
   doctorId: string | null;
   doctorName: string | null;
+  /**
+   * O WhatsApp que a paciente pode usar — a coluna `whatsapp` é o número DAS
+   * PACIENTES (o mesmo que o SOS disca), nunca o pessoal dele.
+   *
+   * Existe para um momento só: quando a cota do plano acaba, a IA precisa
+   * oferecer um caminho REAL até ele. "Fale com sua médica" sem dizer como é
+   * o mesmo que não dizer nada.
+   */
+  doctorWhatsapp: string | null;
   clinicalBlock: string;
 } | null> {
   const auth = request.headers.get("authorization") || request.headers.get("Authorization");
@@ -102,16 +111,23 @@ async function resolvePatientDoctor(request: Request): Promise<{
     const clinicalBlock = buildClinicalBlock(prof ?? null);
     const doctorId = (prof?.doctor_id ?? null) as string | null;
     if (!doctorId)
-      return { patientId: data.user.id, doctorId: null, doctorName: null, clinicalBlock };
+      return {
+        patientId: data.user.id,
+        doctorId: null,
+        doctorName: null,
+        doctorWhatsapp: null,
+        clinicalBlock,
+      };
     const { data: doc } = await (supabaseAdmin as any)
       .from("doctors")
-      .select("display_name")
+      .select("display_name,whatsapp")
       .eq("id", doctorId)
       .maybeSingle();
     return {
       patientId: data.user.id,
       doctorId,
       doctorName: (doc?.display_name || null) as string | null,
+      doctorWhatsapp: (doc?.whatsapp || null) as string | null,
       clinicalBlock,
     };
   } catch {
@@ -702,8 +718,34 @@ export const Route = createFileRoute("/api/chat")({
             !isSuporteDoApp(userText) &&
             !isCortesia(userText) &&
             !isElogio(userText);
-          const confianca =
-            brain.enabledApp && brain.hadCoverage
+          /* ─── COTA DO MÉDICO ESGOTADA ──────────────────────────────────
+             Este caso tem instrução PRÓPRIA, e não é preciosismo: sem
+             cobertura e cota esgotada produzem o mesmo bloco vazio e pedem
+             respostas opostas.
+
+             Sem cobertura, a IA promete "registrei aqui para ele ver" — e a
+             promessa se cumpre: a lacuna entra na fila dele. Com a cota
+             estourada ele NÃO vai responder pelo app, e repetir a mesma frase
+             seria mentir e deixar a paciente esperando por algo que não vem.
+
+             Então ela é avisada com honestidade, sem jargão de cobrança e sem
+             culpar ninguém, e recebe um caminho REAL até ele. "Fale com sua
+             médica", sem dizer como, é o mesmo que não dizer nada. */
+          const comoFalarComEle = patient.doctorWhatsapp
+            ? `pelo WhatsApp do consultório (${patient.doctorWhatsapp})`
+            : "pelo canal que ela já usa com o consultório";
+          const avisoDeCota = `IMPORTANTE — o plano que ${medico} mantém para responder pelo app atingiu o limite deste mês, então as SUAS orientações pessoais não estão disponíveis nesta conversa agora.
+
+Como agir, nesta ordem:
+1. Responda a pergunta com informação obstétrica consolidada e geral, com cuidado e sem inventar conduta.
+2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico} — sem falar em cota, plano, pagamento ou limite.
+3. Se a pergunta for daquelas que só quem acompanha a gestação pode decidir, oriente falar diretamente com ${medico} ${comoFalarComEle}.
+
+NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai responder por aqui neste momento, e prometer isso deixaria a paciente esperando.`;
+
+          const confianca = brain.cotaEsgotada
+            ? avisoDeCota
+            : brain.enabledApp && brain.hadCoverage
               ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
               : brain.enabledApp
                 ? gapWasLogged

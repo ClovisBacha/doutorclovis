@@ -187,3 +187,74 @@ describe("todo plano tem teto declarado", () => {
     expect(teto("ELITE")).toBeLessThan(teto("BLACK"));
   });
 });
+
+/**
+ * O QUE A PACIENTE OUVE QUANDO A COTA DO MÉDICO ACABA.
+ *
+ * Sem cobertura e cota esgotada produzem o MESMO bloco vazio e pedem respostas
+ * OPOSTAS:
+ *
+ *   sem cobertura → "registrei aqui para ele ver" — e a promessa se cumpre,
+ *                   porque a lacuna entra na fila dele.
+ *   cota esgotada → ele NÃO vai responder pelo app. Repetir a mesma frase
+ *                   seria mentir e deixar a paciente esperando por algo que
+ *                   não vem.
+ *
+ * Por isso `cotaEsgotada` é um campo próprio, e não uma dedução a partir do
+ * bloco vazio.
+ */
+describe("a paciente é avisada com honestidade, não com jargão", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+  const cerebro = readFileSync("src/lib/secondbrain.server.ts", "utf8");
+
+  test("`cotaEsgotada` é um campo do contexto, não uma dedução", () => {
+    expect(cerebro).toContain("cotaEsgotada: boolean;");
+    expect(cerebro).toContain("cotaEsgotada: true,");
+  });
+
+  test("o aviso tem instrução PRÓPRIA, escolhida antes das outras", () => {
+    /* Se ele viesse depois, a regra de "sem cobertura" ganharia e a promessa
+       impossível voltaria. */
+    expect(chat).toContain("const confianca = brain.cotaEsgotada");
+    expect(chat).toContain("? avisoDeCota");
+  });
+
+  test("PROÍBE explicitamente a promessa que não se cumpre", () => {
+    expect(chat).toContain("NÃO diga que registrou a pergunta para ${medico} responder no app");
+  });
+
+  test("não fala de cota, plano nem pagamento com a paciente", () => {
+    /* O problema comercial é entre a plataforma e o médico. Jogar isso na
+       conversa da gestante a constrange e não resolve nada para ela. */
+    expect(chat).toContain("sem falar em cota, plano, pagamento ou limite");
+  });
+
+  test("oferece um caminho REAL até o médico", () => {
+    /* "Fale com sua médica" sem dizer como é o mesmo que não dizer nada. */
+    expect(chat).toContain("patient.doctorWhatsapp");
+    expect(chat).toContain("pelo WhatsApp do consultório");
+  });
+
+  test("sem WhatsApp cadastrado, não inventa um canal", () => {
+    expect(chat).toContain('"pelo canal que ela já usa com o consultório"');
+  });
+
+  test("a pergunta é respondida ANTES de qualquer aviso", () => {
+    /* A ordem importa: primeiro serve, depois explica. Uma resposta que abre
+       com "não posso te ajudar" já perdeu a paciente. */
+    const aviso = chat.slice(
+      chat.indexOf("const avisoDeCota"),
+      chat.indexOf("const confianca = brain.cotaEsgotada"),
+    );
+    const posResponda = aviso.indexOf("1. Responda a pergunta");
+    const posDiga = aviso.indexOf("2. Diga com naturalidade");
+    expect(posResponda).toBeGreaterThan(0);
+    expect(posResponda).toBeLessThan(posDiga);
+  });
+
+  test("o WhatsApp vem da coluna das PACIENTES, não do pessoal", () => {
+    /* `personal_phone` existe justamente para nunca ser exposto. */
+    expect(chat).toContain('.select("display_name,whatsapp")');
+    expect(chat).not.toContain("personal_phone");
+  });
+});
