@@ -991,12 +991,145 @@ export const installStarterPack = createServerFn({ method: "POST" })
  * entra na fila de lacunas do médico (a pergunta original vira item de
  * treino). Nunca lança: telemetria é best-effort.
  */
+export type ItemDeRevisao = {
+  id: string;
+  question: string;
+  /** O que a paciente leu e reprovou. */
+  answer: string | null;
+  entryId: string | null;
+  /** A resposta APROVADA hoje — o que será corrigido. */
+  entryQuestion: string | null;
+  entryAnswer: string | null;
+  quando: string;
+};
+
+/**
+ * A fila de REVISÃO: respostas que a IA soube dar e a paciente reprovou.
+ *
+ * É a irmã da fila de lacunas, e a diferença entre as duas é a diferença entre
+ * ensinar e corrigir. Misturá-las foi o defeito original: todo 👎 virava
+ * "a IA não soube responder", e o médico, ao respondê-lo, criava uma SEGUNDA
+ * entrada sobre o mesmo assunto — deixando a errada aprovada e competindo.
+ */
+export const listBrainReviews = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, itens: [] as ItemDeRevisao[] };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const, itens: [] as ItemDeRevisao[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: linhas, error } = await (supabaseAdmin as any)
+      .from("brain_feedback")
+      .select("id,question,answer,entry_id,created_at,brain_entries(question,answer)")
+      .eq("doctor_id", target.doctorId)
+      .eq("helpful", false)
+      .eq("status", "aberta")
+      .not("entry_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    /* Coluna ausente (SQL não aplicado) → fila vazia, sem quebrar o painel. */
+    if (error)
+      return { ok: false as const, itens: [] as ItemDeRevisao[], semTabela: true as const };
+    const itens: ItemDeRevisao[] = (linhas ?? []).map((l: any) => ({
+      id: l.id,
+      question: l.question ?? "",
+      answer: l.answer ?? null,
+      entryId: l.entry_id ?? null,
+      entryQuestion: l.brain_entries?.question ?? null,
+      entryAnswer: l.brain_entries?.answer ?? null,
+      quando: l.created_at,
+    }));
+    return { ok: true as const, itens };
+  });
+
+/**
+ * O médico resolve a revisão: corrige a entrada, ou confirma que ela está boa.
+ *
+ * CORRIGIR edita a entrada que já existe — não cria outra. Criar uma segunda
+ * deixaria a errada aprovada, competindo na busca com a nova, e o cérebro
+ * passaria a ter duas verdades sobre o mesmo assunto sem forma de escolher.
+ *
+ * CONFIRMAR existe porque nem todo 👎 é erro: às vezes a paciente queria outra
+ * coisa, ou não gostou da notícia. Forçar uma edição nesse caso faria o médico
+ * piorar um texto que estava certo só para tirar o item da tela.
+ */
+export const resolveBrainReview = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        reviewId: z.string().uuid(),
+        /** Texto novo da entrada. Ausente = só confirmar o que já está lá. */
+        answer: z.string().min(5).max(4000).optional(),
+        asDoctor: z.string().uuid().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const doctorId = target.doctorId;
+
+    /* Escopo no WHERE, sempre: só revisão DESTE médico e ainda aberta. */
+    const { data: rev } = await sb
+      .from("brain_feedback")
+      .select("id,entry_id,question")
+      .eq("id", data.reviewId)
+      .eq("doctor_id", doctorId)
+      .eq("status", "aberta")
+      .maybeSingle();
+    if (!rev) return { ok: false as const };
+
+    if (data.answer && rev.entry_id) {
+      /* Edita a entrada existente, e SÓ se ela for deste médico — o id veio de
+         uma linha que já validamos, mas o dono é checado de novo aqui porque
+         escopo herdado é escopo que um refactor quebra em silêncio. */
+      const { data: ent, error: errEnt } = await sb
+        .from("brain_entries")
+        .update({ answer: data.answer })
+        .eq("id", rev.entry_id)
+        .eq("doctor_id", doctorId)
+        .select("id,question")
+        .maybeSingle();
+      if (errEnt || !ent) return { ok: false as const };
+      /* O vetor tem que acompanhar o texto. Sem isto a busca continuaria
+         achando a entrada pela resposta ANTIGA — o médico corrigiria e nada
+         mudaria, que é o pior desfecho possível para quem acabou de trabalhar. */
+      const { embedBrainEntry } = await import("./embeddings.server");
+      await embedBrainEntry(ent.id as string, (ent.question as string) ?? "", data.answer);
+    }
+
+    await sb
+      .from("brain_feedback")
+      .update({ status: "resolvida", resolved_at: new Date().toISOString() })
+      .eq("id", rev.id)
+      .eq("doctor_id", doctorId);
+
+    return { ok: true as const, corrigida: !!data.answer };
+  });
+
 export const submitBrainFeedback = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
       .object({
         accessToken: z.string().min(10),
         question: z.string().min(1).max(500),
+        /**
+         * A RESPOSTA que levou o voto.
+         *
+         * Antes só a pergunta viajava, e a pergunta é justamente a única coisa
+         * que não estava errada. Sem o texto da resposta o médico revisaria no
+         * escuro — veria a dúvida e teria que adivinhar o que a paciente leu.
+         *
+         * Opcional para não quebrar cliente antigo em cache; sem ela, o voto
+         * ainda conta na satisfação, só não abre revisão.
+         */
+        answer: z.string().max(4000).optional(),
         helpful: z.boolean(),
       })
       .parse(i),
@@ -1013,20 +1146,62 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
         .eq("id", u.user.id)
         .maybeSingle();
       const doctorId = (prof?.doctor_id as string | null) ?? null;
+      const pergunta = data.question.slice(0, 500);
 
-      await sb.from("brain_feedback").insert({
-        doctor_id: doctorId,
-        user_id: u.user.id,
-        question: data.question.slice(0, 500),
-        helpful: data.helpful,
-        channel: "app",
-      });
-
+      /* QUAL ENTRADA produziu a resposta reprovada.
+         O chat não carrega esse id até aqui — e plumbá-lo pelo streaming seria
+         muito encanamento para um caminho raro. Refazer a busca com a mesma
+         pergunta acha a mesma entrada, porque é exatamente o que o chat fez
+         segundos antes.
+         Só acima do corte de ATRIBUIÇÃO: abaixo dele a resposta não era "a
+         orientação do médico", então não há entrada dele para corrigir — é
+         lacuna, e mora na outra fila. */
+      let entryId: string | null = null;
       if (!data.helpful && doctorId) {
-        const { logBrainGap } = await import("./secondbrain.server");
-        logBrainGap(doctorId, data.question, "app");
+        try {
+          const { entradaQueRespondeu } = await import("./secondbrain.server");
+          entryId = await entradaQueRespondeu(doctorId, pergunta);
+        } catch {
+          /* sem id, o voto ainda conta — só não abre revisão */
+        }
       }
-      return { ok: true as const };
+
+      /* `upsert` e não `insert`: o voto vivia só no estado da tela, então
+         recarregar a conversa permitia votar de novo na MESMA resposta, e cada
+         repetição inflava a fila. Uma pessoa reclamando de uma pergunta é UM
+         voto, por mais vezes que ela toque no botão. */
+      await sb.from("brain_feedback").upsert(
+        {
+          doctor_id: doctorId,
+          user_id: u.user.id,
+          question: pergunta,
+          answer: data.answer?.slice(0, 4000) ?? null,
+          entry_id: entryId,
+          helpful: data.helpful,
+          channel: "app",
+          ...(entryId ? { status: "aberta" } : {}),
+        },
+        { onConflict: "user_id,question,helpful" },
+      );
+
+      /* AS DUAS FILAS.
+
+         Achou a entrada → a IA SABIA e errou: isso é REVISÃO, e o registro
+         acima já é o item da fila. Mandar para lacuna seria dizer ao médico
+         que "a IA não soube responder" sobre algo que ela soube — e ao
+         respondê-la ele criaria uma SEGUNDA entrada com a mesma pergunta,
+         deixando a errada aprovada e competindo com a nova.
+
+         Não achou → a IA não sabia mesmo: é lacuna, como sempre foi.
+
+         E o `patientId` vai junto agora. Sem ele, `brain_gap_askers` ficava
+         vazia e a paciente que leu "seu médico vai ver 💛" nunca recebia a
+         resposta. */
+      if (!data.helpful && doctorId && !entryId) {
+        const { logBrainGap } = await import("./secondbrain.server");
+        logBrainGap(doctorId, pergunta, "app", u.user.id);
+      }
+      return { ok: true as const, emRevisao: !!entryId };
     } catch {
       return { ok: false as const };
     }

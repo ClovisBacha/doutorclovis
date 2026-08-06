@@ -6974,10 +6974,20 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           .reverse()
           .find((x) => x.role === "user")?.content;
         if (!q) return;
+        /* A RESPOSTA vai junto agora.
+           Antes só a pergunta viajava — e a pergunta é justamente a única coisa
+           que não estava errada. Sem o texto que ela leu, o médico revisaria no
+           escuro: veria a dúvida e teria que adivinhar o que a IA respondeu. */
+        const resposta = messages[i]?.content ?? "";
         const { data: s } = await supabase.auth.getSession();
         if (!s.session?.access_token) return;
         await submitBrainFeedback({
-          data: { accessToken: s.session.access_token, question: q, helpful },
+          data: {
+            accessToken: s.session.access_token,
+            question: q,
+            ...(resposta ? { answer: resposta } : {}),
+            helpful,
+          },
         });
       } catch {
         /* telemetria é best-effort */
@@ -7290,6 +7300,12 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           const canVote =
             m.role === "assistant" &&
             !m.error &&
+            /* Bolha VAZIA não é votável. Quando o provedor falha, a resposta
+               chega em branco e a paciente vê o aviso de "não consegui
+               formular" — um 👎 ali viraria lacuna (ou revisão) sobre uma falha
+               de infraestrutura, e o médico receberia trabalho criado por um
+               erro 429 do Gemini. */
+            !!m.content?.trim() &&
             messages.slice(0, i).some((x) => x.role === "user") &&
             !(loading && i === messages.length - 1);
           return (

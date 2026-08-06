@@ -633,6 +633,47 @@ export async function curarLacunasSemVetor(doctorId: string): Promise<number> {
 }
 
 /**
+ * Qual entrada do cérebro respondeu esta pergunta.
+ *
+ * Existe para o 👎: sem saber QUAL entrada produziu a resposta ruim, não há o
+ * que revisar — sobra a pergunta, que é justamente a única coisa que não
+ * estava errada.
+ *
+ * O chat não carrega esse id até o voto, e plumbá-lo pelo streaming seria
+ * muito encanamento para um caminho raro. Refazer a busca com a mesma pergunta
+ * acha a mesma entrada, porque é exatamente o que o chat fez segundos antes.
+ *
+ * Usa o corte de ATRIBUIÇÃO, não o de cobertura: abaixo dele a resposta não
+ * era "a orientação do médico" — era material próximo do assunto. Corrigir uma
+ * entrada por causa de uma resposta que não foi atribuída a ela seria punir o
+ * texto errado, e o médico veria uma correção que não faz sentido.
+ *
+ * `null` em qualquer falha: sem chave de IA, sem vetores, sem match. Nunca
+ * lança — o voto da paciente não pode depender disto.
+ */
+export async function entradaQueRespondeu(
+  doctorId: string,
+  pergunta: string,
+): Promise<string | null> {
+  try {
+    const { embedText } = await import("./embeddings.server");
+    const qvec = await embedText(textoParaVetor(pergunta), 4000, "consulta");
+    if (!qvec) return null;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any).rpc("match_brain_entries_id", {
+      p_doctor_id: doctorId,
+      p_embedding: qvec,
+      p_limit: 1,
+    });
+    if (error || !Array.isArray(data) || !data.length) return null;
+    const melhor = data[0] as { id: string; similarity: number };
+    return melhor.similarity >= ATRIBUICAO_MIN_SIMILARITY ? melhor.id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * E-mail "sua IA tem perguntas sem resposta" (fire-and-forget, ≤1/dia).
  * Sem RESEND_API_KEY vira no-op (o painel continua sendo a fonte).
  */

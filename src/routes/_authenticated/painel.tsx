@@ -113,6 +113,8 @@ import {
   answerAndTrain,
   testBrain,
   cotaDeRespostas,
+  listBrainReviews,
+  resolveBrainReview,
   curarLacunasDoMedico,
   listBrainGaps,
   resolveBrainGap,
@@ -5065,6 +5067,7 @@ function CerebroSection({
       </div>
       <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainReviewCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainConversationsCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainConsultaCard tokenFn={tokenFn} asDoctor={asId} />
@@ -5819,6 +5822,186 @@ function BrainScoreCard({
           permanente.
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * A FILA DE REVISÃO — respostas que a IA SOUBE dar e a paciente reprovou.
+ *
+ * É a irmã da fila de lacunas, e a diferença entre as duas é a diferença entre
+ * ENSINAR e CORRIGIR. Antes elas eram a mesma: todo 👎 virava "a IA não soube
+ * responder", inclusive quando ela sabia — e o médico, ao respondê-lo, criava
+ * uma SEGUNDA entrada sobre o mesmo assunto, deixando a errada aprovada e
+ * competindo com a nova na busca.
+ *
+ * Por isso o card mostra as TRÊS coisas: o que ela perguntou, o que ela LEU, e
+ * o que está aprovado hoje. Sem a resposta que ela leu, o médico revisaria no
+ * escuro.
+ */
+function BrainReviewCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  asDoctor?: string;
+}) {
+  const [itens, setItens] = useState<
+    {
+      id: string;
+      question: string;
+      answer: string | null;
+      entryQuestion: string | null;
+      entryAnswer: string | null;
+    }[]
+  >([]);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [texto, setTexto] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  async function carregar() {
+    try {
+      const tk = await tokenFn();
+      const res = await listBrainReviews({
+        data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
+      });
+      if (res.ok) setItens(res.itens);
+    } catch {
+      /* a fila de revisão é enriquecimento — sem ela o painel segue inteiro */
+    }
+  }
+  useEffect(() => {
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function resolver(id: string, novaResposta?: string) {
+    if (ocupado) return;
+    setOcupado(true);
+    try {
+      const tk = await tokenFn();
+      const res = await resolveBrainReview({
+        data: {
+          accessToken: tk,
+          reviewId: id,
+          ...(novaResposta ? { answer: novaResposta } : {}),
+          ...(asDoctor ? { asDoctor } : {}),
+        },
+      });
+      if (!res.ok) {
+        toast.error("Não consegui salvar. Tente de novo.");
+        return;
+      }
+      toast.success(
+        "corrigida" in res && res.corrigida
+          ? "Corrigido — a IA já responde com o texto novo 🧠"
+          : "Confirmado. A resposta continua como está.",
+      );
+      setEditando(null);
+      setTexto("");
+      setItens((v) => v.filter((x) => x.id !== id));
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  /* Fila vazia não vira card: um painel que mostra caixas vazias ensina o
+     médico a ignorar caixas. */
+  if (!itens.length) return null;
+
+  return (
+    <div className="rounded-3xl border border-amber-400/50 bg-amber-50/60 p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-xl">
+        ✋ Respostas que uma paciente não achou úteis{" "}
+        <span className="ml-1 rounded-full bg-amber-500 px-2 py-0.5 align-middle text-xs font-semibold text-white">
+          {itens.length}
+        </span>
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Aqui a IA <strong>sabia</strong> responder e usou o seu conhecimento — mas a paciente marcou
+        👎. Corrija o texto e a IA passa a responder do jeito novo na hora; ou confirme, se a
+        resposta estava certa.
+      </p>
+
+      <div className="mt-4 space-y-3">
+        {itens.map((it) => (
+          <div key={it.id} className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold">&ldquo;{it.question}&rdquo;</p>
+
+            {it.answer && (
+              <div className="mt-2 rounded-xl bg-secondary/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  O que ela leu
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+                  {it.answer}
+                </p>
+              </div>
+            )}
+
+            {editando === it.id ? (
+              <div className="mt-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  A sua resposta, corrigida
+                </p>
+                <textarea
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  rows={5}
+                  className="mt-1 w-full rounded-xl border border-border bg-background p-3 text-sm"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={ocupado || texto.trim().length < 5}
+                    onClick={() => resolver(it.id, texto.trim())}
+                    className="press rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                  >
+                    Salvar correção
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditando(null);
+                      setTexto("");
+                    }}
+                    className="rounded-full border border-border px-5 py-2 text-sm"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditando(it.id);
+                    /* Abre com o texto APROVADO, não com o que ela leu: é a
+                       entrada que vai ser gravada, e partir dela evita que uma
+                       edição rápida sobrescreva o conhecimento com a versão
+                       que a própria paciente reprovou. */
+                    setTexto(it.entryAnswer ?? it.answer ?? "");
+                  }}
+                  className="press rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+                >
+                  Corrigir resposta
+                </button>
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => resolver(it.id)}
+                  className="rounded-full border border-border px-5 py-2 text-sm disabled:opacity-50"
+                >
+                  Está certa, manter
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
