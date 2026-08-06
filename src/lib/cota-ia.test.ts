@@ -403,10 +403,60 @@ describe("quem mais conversou", () => {
 
 /** Só o corpo de `DOCTOR_TABS` — a lista termina em `];`, não em `as const`,
     e recortar até o marcador errado varre metade do arquivo junto. */
+/**
+ * A lista de abas SEM COMENTÁRIOS.
+ *
+ * O bloco de `DOCTOR_TABS` é quase todo prosa: cada aba ligada carrega o
+ * parágrafo que explica por que ela estava faltando. Uma dessas explicações
+ * cita `setTab("Calendário")` — com aspas — e um `toContain('"Calendário"')`
+ * cru casava com a EXPLICAÇÃO em vez da entrada da lista. Removi o Calendário
+ * de propósito para conferir, e os 50 testes continuaram verdes.
+ *
+ * É a quarta vez nesta base que um teste mede o texto que descreve o código em
+ * vez do código. Por isso a limpeza mora no helper, e não em cada chamada.
+ */
 function listaDeAbas(painel: string): string {
   const ini = painel.indexOf("const DOCTOR_TABS");
-  return painel.slice(ini, painel.indexOf("\n];", ini));
+  return painel
+    .slice(ini, painel.indexOf("\n];", ini))
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*/g, "");
 }
+
+/**
+ * TODA ABA IMPLEMENTADA TEM QUE SER ALCANÇÁVEL.
+ *
+ * `DOCTOR_TABS` é a ÚNICA fonte dos botões da fita. Uma aba com bloco de
+ * renderização e ausente dessa lista não tem caminho nenhum até ela — e é pior
+ * que uma tela que não existe, porque ninguém a procura. Já aconteceu quatro
+ * vezes neste arquivo: Ferramentas (a única tela de receituário do produto),
+ * Exames, e o Calendário, que ficou órfão até agosto/2026.
+ *
+ * "Empresas" é a única exceção legítima: mora no console do dono (`/admin`),
+ * por decisão registrada no comentário de `DOCTOR_TABS`.
+ */
+describe("nenhuma aba fica órfã", () => {
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+
+  test("toda aba com render está no menu do médico", () => {
+    const lista = listaDeAbas(painel);
+    /* As abas que o corpo do componente sabe desenhar — no código, não nos
+       comentários, pelo mesmo motivo explicado em `listaDeAbas`. */
+    const codigo = painel.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    const comRender = [...codigo.matchAll(/\{tab === "([^"]+)"/g)].map((m) => m[1]);
+    const orfas = [...new Set(comRender)].filter(
+      (aba) => aba !== "Empresas" && !lista.includes(`"${aba}"`),
+    );
+    expect(orfas).toEqual([]);
+  });
+
+  test("o Calendário está ligado — decisão do Clóvis", () => {
+    /* Implementado (`CalendárioSection`, grade do mês) e fora da lista: não
+       havia UM `setTab("Calendário")` em lugar nenhum do arquivo. */
+    expect(listaDeAbas(painel)).toContain('"Calendário"');
+    expect(painel).toContain('{tab === "Calendário" && (');
+  });
+});
 
 describe("o Cérebro é a primeira coisa que ele vê", () => {
   const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");

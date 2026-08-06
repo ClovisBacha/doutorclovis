@@ -234,6 +234,17 @@ const DOCTOR_TABS: readonly PanelTab[] = [
   "Cérebro 🧠",
   "Painel 📊",
   "Agendamentos",
+  /* CALENDÁRIO ligado — decisão do Clóvis, out/ago 2026.
+     Ele estava implementado (`CalendárioSection`, com a grade do mês e o
+     salto para o dia) e fora desta lista, que é a ÚNICA fonte dos botões de
+     aba. Nenhum `setTab("Calendário")` existia em lugar nenhum: a tela era
+     inalcançável por qualquer caminho, e `if (tab === "Empresas")` mais abaixo
+     era código morto pelo mesmo motivo.
+     Vem logo depois de Agendamentos de propósito: são a mesma pergunta em duas
+     formas — a lista responde "o que pediram", o calendário responde "como
+     está a minha semana". Separá-las na fita obrigaria a rolar entre uma e
+     outra justamente quando ele está comparando as duas. */
+  "Calendário",
   "Perguntas",
   /* FERRAMENTAS ligada. Ela já existia — receituário e painéis de exame, ~1.150
      linhas escritas — e nunca foi listada aqui, então nenhum botão a montava.
