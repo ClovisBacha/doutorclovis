@@ -745,13 +745,20 @@ NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai
 
           const confianca = brain.cotaEsgotada
             ? avisoDeCota
-            : brain.enabledApp && brain.hadCoverage
+            : brain.enabledApp && brain.hadCoverage && brain.podeAtribuir
               ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
-              : brain.enabledApp
-                ? gapWasLogged
-                  ? `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. RESPONDA mesmo assim, com informação obstétrica consolidada e os sinais de alerta que valem para o caso — uma resposta útil de verdade, nunca uma recusa. SÓ DEPOIS diga, com acolhimento, que registrou a pergunta para ele responder pessoalmente (ex.: "registrei aqui para ${medico} ver"). O que você não faz é decidir a conduta do caso dela.`
-                  : `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. Responda com informação obstétrica consolidada e peça, com gentileza, o detalhe que falta para você poder encaminhar ao médico. Informe primeiro; não devolva a pergunta em branco.`
-                : "";
+              : brain.enabledApp && brain.hadCoverage
+                ? /* Casou, mas não o bastante para assinar o nome dele.
+                     O material do médico ENTRA na resposta — é conhecimento bom
+                     e é dele — mas sem a frase "ele orienta que", que
+                     transformaria semelhança de assunto em conduta atribuída.
+                     E a dúvida segue para a fila, para ele confirmar. */
+                  `Use o bloco do médico como referência de conduta e de tom, mas NÃO diga que a orientação é dele nem cite o nome dele como fonte: o material é próximo do assunto, e não necessariamente a resposta que ${medico} daria a ESTA pergunta. Responda com naturalidade e, ao final, diga com acolhimento que registrou a dúvida para ${medico} confirmar.`
+                : brain.enabledApp
+                  ? gapWasLogged
+                    ? `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. RESPONDA mesmo assim, com informação obstétrica consolidada e os sinais de alerta que valem para o caso — uma resposta útil de verdade, nunca uma recusa. SÓ DEPOIS diga, com acolhimento, que registrou a pergunta para ele responder pessoalmente (ex.: "registrei aqui para ${medico} ver"). O que você não faz é decidir a conduta do caso dela.`
+                    : `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. Responda com informação obstétrica consolidada e peça, com gentileza, o detalhe que falta para você poder encaminhar ao médico. Informe primeiro; não devolva a pergunta em branco.`
+                  : "";
           system = [
             base,
             patient.clinicalBlock,

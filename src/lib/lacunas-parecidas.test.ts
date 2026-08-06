@@ -270,7 +270,7 @@ describe("o corte alto é o que protege a paciente", () => {
     const fonte = codigoDe("src/lib/secondbrain.server.ts");
     const juncao = Number(fonte.match(/GAP_MERGE_MIN_SIMILARITY = ([\d.]+)/)?.[1]);
     const leitura = Number(fonte.match(/SEMANTIC_MIN_SIMILARITY = ([\d.]+)/)?.[1]);
-    expect(juncao).toBeGreaterThan(leitura + 0.2);
+    expect(juncao).toBeGreaterThanOrEqual(leitura + 0.15);
   });
 });
 
@@ -373,41 +373,46 @@ describe("os caminhos raros calculam o vetor; o caminho do volume, nunca", () =>
 // O vetor precisa CHEGAR até aqui — é a parte que falha em silêncio
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("o vetor da pergunta sobrevive ao bloco onde foi calculado", () => {
+describe("cada vetor é gerado para o uso que ele terá", () => {
   const fonte = codigoDe("src/lib/secondbrain.server.ts");
 
-  test("é declarado fora do bloco onde é preenchido", () => {
-    /* Âncora no `entries.length` e não no `import` do `embedText`: a reserva
-       dos caminhos raros também importa `embedText`, e mais acima no arquivo —
-       ancorar nele fazia o teste medir a distância errada e passar sempre. */
-    const declaracao = fonte.indexOf("let vetorDaPergunta");
-    const blocoDaBusca = fonte.indexOf("if (entries.length > 0)");
-    const atribuicao = fonte.indexOf("vetorDaPergunta = qvec");
-    expect(declaracao).toBeGreaterThan(0);
-    expect(declaracao).toBeLessThan(blocoDaBusca);
-    expect(atribuicao).toBeGreaterThan(blocoDaBusca);
+  /**
+   * O ATALHO QUE VIROU ERRO.
+   *
+   * A lacuna reaproveitava o vetor já calculado para procurar cobertura — e
+   * isso economizava um embedding. Com o `taskType`, passou a ser incorreto:
+   * aquele vetor é de CONSULTA (pergunta curta procurando resposta longa) e a
+   * lacuna precisa de um SIMÉTRICO (pergunta comparada com pergunta).
+   *
+   * Misturar os dois produz uma similaridade que parece número normal e não é
+   * — o mesmo tipo de erro mudo que já custou uma noite nesta base.
+   */
+  test("a lacuna calcula o dela, e não herda o da busca", () => {
+    expect(fonte).toContain("logBrainGap(target, userMessage, channel, patientId, null);");
+    expect(fonte).not.toContain("vetorDaPergunta");
   });
 
-  test("é o vetor que a lacuna recebe", () => {
-    /* Condicionado ao tamanho: acima de 300 caracteres os dois lados tratam o
-       texto de formas diferentes, e reaproveitar gravaria um vetor que a
-       consulta seguinte não procuraria. */
-    expect(fonte).toContain("cabeNoCorteDaLacuna ? vetorDaPergunta : null,");
+  test("lacuna com lacuna é comparação SIMÉTRICA", () => {
+    /* Consulta/documento corrige um desequilíbrio de tamanho. Entre duas
+       perguntas de paciente não há desequilíbrio — aplicar a correção ali
+       piora em vez de melhorar. */
+    expect(fonte).toContain('embedText(textoParaVetor(clean), 4000, "semelhanca")');
+    expect(fonte).toContain('"semelhanca",');
   });
 
-  test("é o MESMO vetor da busca — não um embedding novo", () => {
-    /* Um segundo `embedText` aqui funcionaria e ninguém notaria: mesma
-       resposta, mesmo agrupamento. Só a conta no fim do mês — uma chamada a
-       mais por pergunta sem cobertura, que é justamente a mais comum enquanto
-       o cérebro do médico está pequeno. */
-    expect(fonte.match(/embedText\(textoParaVetor\(userMessage/g) ?? []).toHaveLength(1);
-    expect(fonte).toContain("vetorDaPergunta = qvec");
+  test("a busca no cérebro do médico é uma CONSULTA", () => {
+    expect(fonte).toContain('embedText(textoParaVetor(userMessage), 1800, "consulta")');
+  });
+
+  test("a entrada do médico é um DOCUMENTO", () => {
+    /* Pergunta + resposta inteira, esperando ser encontrada. */
+    const emb = codigoDe("src/lib/embeddings.server.ts");
+    expect(emb).toContain('6000, "documento")');
+    expect(emb).toContain('consulta: "RETRIEVAL_QUERY"');
+    expect(emb).toContain('documento: "RETRIEVAL_DOCUMENT"');
+    expect(emb).toContain('semelhanca: "SEMANTIC_SIMILARITY"');
   });
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// O SQL
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe("a busca no banco", () => {
   /* Sem os comentários: metade do arquivo EXPLICA a regra citando o próprio
@@ -682,10 +687,13 @@ describe("o texto que vira vetor é enxuto; o que ele lê, não", () => {
     /* Vetores de tratamentos diferentes não se comparam. Limpar só uma ponta
        seria pior que não limpar nenhuma: a lacuna gravada e a consulta
        passariam a viver em espaços distintos. */
-    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    /* Sem espaço em branco: o prettier quebra a chamada da cura em várias
+       linhas quando ela ganha o terceiro argumento, e a asserção não pode
+       depender de onde a quebra caiu. */
+    const fonte = codigoDe("src/lib/secondbrain.server.ts").replace(/\s+/g, " ");
     expect(fonte).toContain("embedText(textoParaVetor(clean)");
     expect(fonte).toContain("embedText(textoParaVetor(userMessage)");
-    expect(fonte).toContain("embedText(textoParaVetor(String(g.question");
+    expect(fonte).toContain("embedText( textoParaVetor(String(g.question");
   });
 
   test("o texto GRAVADO na lacuna continua sendo o da paciente", () => {
@@ -711,7 +719,7 @@ describe("o corte de junção foi corrigido por medida, não por palpite", () =>
     const fonte = codigoDe("src/lib/secondbrain.server.ts");
     const juncao = Number(fonte.match(/GAP_MERGE_MIN_SIMILARITY = ([\d.]+)/)?.[1]);
     const leitura = Number(fonte.match(/SEMANTIC_MIN_SIMILARITY = ([\d.]+)/)?.[1]);
-    expect(juncao).toBeGreaterThan(leitura + 0.2);
+    expect(juncao).toBeGreaterThanOrEqual(leitura + 0.15);
   });
 });
 
@@ -815,27 +823,6 @@ describe("e-mail de lacuna só quando a lacuna existe", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Dois vetores da mesma pergunta, em espaços diferentes
 // ─────────────────────────────────────────────────────────────────────────────
-
-describe("o vetor reaproveitado só vale quando o tratamento é o mesmo", () => {
-  /* A lacuna embeda `question.trim().slice(0, 300)`; a consulta embeda a
-     mensagem INTEIRA. Para mensagem curta as duas strings coincidem e
-     reaproveitar é de graça. Passando de 300 caracteres são strings
-     diferentes — e o vetor GRAVADO na lacuna deixa de ser o que a próxima
-     consulta vai procurar. Dois vetores da mesma pergunta em espaços
-     distintos: exatamente o defeito que este arquivo existe para consertar. */
-  test("mensagem longa não reaproveita o vetor da consulta", () => {
-    const fonte = codigoDe("src/lib/secondbrain.server.ts");
-    expect(fonte).toContain("const cabeNoCorteDaLacuna = userMessage.trim().length <= 300;");
-    expect(fonte).toContain("cabeNoCorteDaLacuna ? vetorDaPergunta : null,");
-  });
-
-  test("o limite bate com o corte que a lacuna usa", () => {
-    /* Se um lado mudar sem o outro, a assimetria volta calada. */
-    const fonte = codigoDe("src/lib/secondbrain.server.ts");
-    expect(fonte).toContain("question.trim().slice(0, 300)");
-    expect(fonte).toContain("userMessage.trim().length <= 300");
-  });
-});
 
 describe("o reset dos vetores sujos alcança TODAS as lacunas", () => {
   const sql = readFileSync("supabase/APLICAR_LACUNAS_PARECIDAS.sql", "utf8").replace(

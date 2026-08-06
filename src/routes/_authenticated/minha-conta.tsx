@@ -6930,6 +6930,41 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
   // Feedback 👍👎 por índice de mensagem — o 👎 vira lacuna na fila do médico.
   const [votes, setVotes] = useState<Record<number, "up" | "down">>({});
 
+  /* ─── A RESPOSTA APARECE SENDO ESCRITA ─────────────────────────────────────
+     O streaming já entregava a resposta em pedaços, mas cada pedaço virava um
+     `setState` imediato — e o modelo manda blocos grandes, então o texto
+     surgia aos trancos: nada, nada, parágrafo inteiro.
+
+     Aqui a CHEGADA é separada da EXIBIÇÃO. O que chega vai para `alvoRef`; o
+     que aparece avança sozinho, quadro a quadro, até alcançar. A paciente vê a
+     resposta sendo escrita, que é o que uma conversa parece.
+
+     O passo é adaptativo de propósito: quanto mais texto acumulado, mais
+     rápido ele anda. Um ritmo fixo faria a paciente esperar depois de a
+     resposta inteira já ter chegado — trocaria um defeito por outro, e o
+     segundo é pior, porque é tempo que ela perde sem ganhar nada. */
+  const alvoRef = useRef("");
+  const mostradoRef = useRef(0);
+  const quadroRef = useRef<number | null>(null);
+  const streamAbertoRef = useRef(false);
+
+  /* Quem pede menos movimento recebe o texto inteiro de uma vez. A animação
+     aqui é conforto, nunca informação — nada se perde ao desligá-la. */
+  const semAnimacao =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  useEffect(() => {
+    /* Sair da tela no meio da digitação não pode deixar um laço de quadros
+       vivo chamando `setState` num componente que não existe mais. */
+    return () => {
+      if (quadroRef.current !== null) cancelAnimationFrame(quadroRef.current);
+      quadroRef.current = null;
+      streamAbertoRef.current = false;
+    };
+  }, []);
+
   function voteMessage(i: number, helpful: boolean) {
     setVotes((v) => ({ ...v, [i]: helpful ? "up" : "down" }));
     void (async () => {
@@ -7015,6 +7050,37 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
       let buffer = "";
       const asstMsg: WAMsg = { role: "assistant", content: "", ts: new Date() };
       setMessages([...displayNext, asstMsg]);
+
+      alvoRef.current = "";
+      mostradoRef.current = 0;
+      streamAbertoRef.current = true;
+
+      /* O laço de exibição. Ele anda por conta própria, quadro a quadro, e não
+         depende do ritmo em que os pedaços chegam — é essa separação que
+         transforma "bloco de texto surgindo" em "resposta sendo escrita". */
+      const digitar = () => {
+        const alvo = alvoRef.current;
+        const atraso = alvo.length - mostradoRef.current;
+        if (atraso > 0) {
+          /* Passo adaptativo: 2 caracteres por quadro num ritmo de leitura
+             confortável, até 12 quando há muito texto represado. Um passo fixo
+             faria a paciente esperar DEPOIS de a resposta inteira já ter
+             chegado — tempo perdido sem nada em troca. */
+          const passo = Math.min(12, Math.max(2, Math.ceil(atraso / 45)));
+          mostradoRef.current = Math.min(alvo.length, mostradoRef.current + passo);
+          setMessages([
+            ...displayNext,
+            { ...asstMsg, content: alvo.slice(0, mostradoRef.current) },
+          ]);
+        }
+        if (streamAbertoRef.current || mostradoRef.current < alvoRef.current.length) {
+          quadroRef.current = requestAnimationFrame(digitar);
+        } else {
+          quadroRef.current = null;
+        }
+      };
+      if (!semAnimacao) quadroRef.current = requestAnimationFrame(digitar);
+
       const processLine = (line: string) => {
         if (!line.startsWith("data: ")) return;
         try {
@@ -7029,10 +7095,30 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
         lines.forEach(processLine);
-        setMessages([...displayNext, { ...asstMsg, content: acc }]);
+        alvoRef.current = acc;
+        /* Sem animação, a chegada É a exibição — igual ao comportamento
+           anterior, que é exatamente o que quem pediu menos movimento quer. */
+        if (semAnimacao) setMessages([...displayNext, { ...asstMsg, content: acc }]);
       }
       (buffer + decoder.decode()).split("\n").forEach(processLine);
-      setMessages([...displayNext, { ...asstMsg, content: acc }]);
+      alvoRef.current = acc;
+      streamAbertoRef.current = false;
+
+      if (semAnimacao) {
+        setMessages([...displayNext, { ...asstMsg, content: acc }]);
+      } else {
+        /* Espera o texto terminar de aparecer antes de liberar o "digitando".
+           Sem isto, o indicador sumiria com a bolha ainda pela metade — e a
+           paciente veria uma resposta truncada parecendo pronta. */
+        await new Promise<void>((resolve) => {
+          const conferir = () => {
+            if (mostradoRef.current >= alvoRef.current.length) resolve();
+            else setTimeout(conferir, 60);
+          };
+          conferir();
+        });
+        setMessages([...displayNext, { ...asstMsg, content: acc }]);
+      }
     } catch {
       setMessages([
         ...displayNext,
@@ -7044,6 +7130,12 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         },
       ]);
     } finally {
+      /* O laço de digitação morre AQUI, sempre. Deixá-lo vivo depois de um erro
+         faria ele reescrever por cima da mensagem de falha — a paciente veria a
+         resposta antiga voltando por cima do aviso. */
+      streamAbertoRef.current = false;
+      if (quadroRef.current !== null) cancelAnimationFrame(quadroRef.current);
+      quadroRef.current = null;
       setLoading(false);
     }
   }

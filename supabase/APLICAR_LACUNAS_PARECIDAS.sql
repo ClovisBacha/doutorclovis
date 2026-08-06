@@ -209,6 +209,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_brain_gaps_doctor_question
 -- Vetor nulo é inerte; vetor sujo é ativo e errado.
 UPDATE public.brain_gaps SET embedding = NULL;
 
+-- E as ENTRADAS do cérebro pelo mesmo motivo, agora somado a um segundo: os
+-- vetores passaram a declarar o PAPEL de cada texto ao modelo (`taskType`).
+-- Consulta, documento e semelhança são orientações diferentes, e um vetor
+-- gerado sem essa declaração não é comparável com um gerado com ela — a
+-- similaridade sai um número plausível e sem significado.
+--
+-- Zerar aqui é seguro: `backfillBrainEmbeddings` só enxerga linha com vetor
+-- nulo, e roda sozinho quando o médico abre a base de conhecimento.
+UPDATE public.brain_entries SET embedding = NULL;
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- CONFERIR — rode isto depois, é o que prova que os dois defeitos morreram
 -- ════════════════════════════════════════════════════════════════════════════

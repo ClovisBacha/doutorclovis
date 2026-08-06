@@ -84,6 +84,14 @@ export type BrainContext = {
    * frase seria mentir para a paciente e deixá-la esperando.
    */
   cotaEsgotada: boolean;
+  /**
+   * A resposta pode ser ATRIBUÍDA ao médico ("a sua médica orienta que…").
+   *
+   * Separado de `hadCoverage` porque são decisões de custo diferente: usar o
+   * conhecimento dele numa resposta parecida é barato; pôr o nome dele em algo
+   * que ele não disse para AQUELA pergunta é caro. Ver os dois cortes acima.
+   */
+  podeAtribuir: boolean;
 };
 
 /** Canal em que o cérebro foi usado (telemetria do dashboard do médico). */
@@ -389,7 +397,7 @@ export function logBrainGap(
       if (!existing && !vetor) {
         try {
           const { embedText } = await import("./embeddings.server");
-          vetor = await embedText(textoParaVetor(clean), 4000);
+          vetor = await embedText(textoParaVetor(clean), 4000, "semelhanca");
         } catch {
           vetor = null; // sem chave de IA → segue a deduplicação por texto
         }
@@ -592,7 +600,11 @@ export async function curarLacunasSemVetor(doctorId: string): Promise<number> {
        as lacunas antigas num tratamento e as novas noutro — e duas perguntas
        iguais não se encontrariam por causa de uma saudação. */
     const vetores = await emLotes(linhas, CURA_POR_LOTE, (g) =>
-      embedText(textoParaVetor(String(g.question ?? "").slice(0, 300)), CURA_TIMEOUT_MS),
+      embedText(
+        textoParaVetor(String(g.question ?? "").slice(0, 300)),
+        CURA_TIMEOUT_MS,
+        "semelhanca",
+      ),
     );
 
     const curadas = linhas
@@ -733,8 +745,48 @@ export function limitarPorCaracteres(
   }
   return out;
 }
-/** Corte de similaridade de cosseno da busca semântica (abaixo = irrelevante). */
-const SEMANTIC_MIN_SIMILARITY = 0.55;
+/**
+ * DOIS cortes, porque são duas decisões com custos diferentes.
+ *
+ * ─── Por que 0,55 era perigoso ─────────────────────────────────────────────
+ *
+ * A escala real deste espaço foi medida na própria fila: "a mesma pergunta com
+ * outras palavras" vive entre 0,82 e 0,86 (ver GAP_MERGE_MIN_SIMILARITY). Com
+ * o topo em ~0,85, um corte em 0,55 não quer dizer "relacionado" — quer dizer
+ * "é português, é clínico, e tem formato de pergunta".
+ *
+ * "posso comer sushi?" e "posso tomar café na gravidez?" têm o mesmo verbo
+ * modal, o mesmo domínio e a mesma sintaxe: passam de 0,55 com folga e têm
+ * condutas completamente diferentes. O resultado era o erro mais caro de um
+ * app clínico — a IA dizendo "a sua médica orienta que…" sobre uma entrada que
+ * não responde à pergunta.
+ *
+ * Truncar de 3072 para 768 agrava: as dimensões descartadas são justamente as
+ * que fazem a discriminação FINA, então as similaridades ficam mais altas e
+ * mais amontoadas do que seriam.
+ *
+ * ─── Por que dois, e não um mais alto ──────────────────────────────────────
+ *
+ * Subir o corte único resolveria a atribuição errada e criaria outro problema:
+ * a paciente deixaria de receber a orientação do médico em casos que são, sim,
+ * dela. As duas coisas não têm o mesmo custo:
+ *
+ *   USAR o conhecimento dele numa resposta parecida → no pior caso, contexto
+ *   a mais. Barato.
+ *   ATRIBUIR a ele ("a sua médica orienta que…") algo que ele não disse para
+ *   aquela pergunta → quebra a confiança e pode virar conduta errada. Caro.
+ *
+ * Então o conhecimento entra a partir de 0,62, e o nome dele só é usado a
+ * partir de 0,74. Entre os dois, a resposta usa o material dele sem dizer que
+ * é a orientação dele — e a pergunta VAI para a fila, para ele confirmar.
+ *
+ * Os dois números continuam sendo estimativa informada, não medição — e é por
+ * isso que `melhorSimilaridade` é gravada em `ai_usage` a cada resposta. Com
+ * tráfego real, a distribuição manda; até lá, o lado seguro é este.
+ */
+const SEMANTIC_MIN_SIMILARITY = 0.62;
+/** A partir daqui a IA pode dizer "o(a) Dr(a). X orienta que…". */
+const ATRIBUICAO_MIN_SIMILARITY = 0.74;
 
 /**
  * Carrega settings + entries DO MÉDICO e monta o bloco para o prompt.
@@ -763,6 +815,7 @@ export async function getBrainContext(
         hadCoverage: false,
         melhorSimilaridade: null,
         cotaEsgotada: false,
+        podeAtribuir: false,
       };
 
     const { getEntitlementsByDoctorId } = await import("./entitlements.server");
@@ -803,6 +856,7 @@ export async function getBrainContext(
         hadCoverage: false,
         melhorSimilaridade: null,
         cotaEsgotada: false,
+        podeAtribuir: false,
       };
 
     /* ─── COTA DO CICLO ESTOURADA ────────────────────────────────────────────
@@ -833,6 +887,7 @@ export async function getBrainContext(
           hadCoverage: false,
           melhorSimilaridade: null,
           cotaEsgotada: true,
+          podeAtribuir: false,
         };
       }
     }
@@ -844,6 +899,7 @@ export async function getBrainContext(
         hadCoverage: false,
         melhorSimilaridade: null,
         cotaEsgotada: false,
+        podeAtribuir: false,
       };
     }
     if (channel === "teste" && !ent.aiApp)
@@ -854,6 +910,7 @@ export async function getBrainContext(
         hadCoverage: false,
         melhorSimilaridade: null,
         cotaEsgotada: false,
+        podeAtribuir: false,
       };
 
     // ── Seleção em 2 camadas ─────────────────────────────────────────────
@@ -870,22 +927,15 @@ export async function getBrainContext(
        informação: saber que a melhor entrada deu 0,52 é o que revela um corte
        apertado demais, e isso some se a gente só olhar o que passou. */
     let melhorSimilaridade: number | null = null;
-    /* Declarado AQUI, fora do `try`, porque quem precisa dele é a lacuna — e a
-       lacuna é registrada lá embaixo, depois que o `try` já fechou. Dentro do
-       bloco, o vetor morreria no escopo alguns milissegundos antes de ser
-       usado, e o agrupamento nunca aconteceria: as lacunas nasceriam todas sem
-       vetor, silenciosamente, exatamente como antes desta mudança. */
-    let vetorDaPergunta: number[] | null = null;
     if (entries.length > 0) {
       try {
         const { embedText } = await import("./embeddings.server");
         // Timeout CURTO: estamos no caminho crítico do chat — se o embedding
         // não chegar em 1,8s, o fallback por palavras responde na hora.
-        /* Mesma limpeza da ESCRITA da lacuna: o vetor da consulta e o
-           vetor gravado precisam vir do mesmo tratamento, senão a saudação
-           volta a afastar duas perguntas idênticas. */
-        const qvec = await embedText(textoParaVetor(userMessage), 1800);
-        vetorDaPergunta = qvec ?? null;
+        /* A limpeza de saudação vale aqui também: "Oi, tudo bem? posso
+           comer sushi?" e "posso comer sushi?" têm que encontrar a mesma
+           entrada do médico. */
+        const qvec = await embedText(textoParaVetor(userMessage), 1800, "consulta");
         if (qvec) {
           const { data: matches, error } = await (supabaseAdmin as any).rpc("match_brain_entries", {
             p_doctor_id: target,
@@ -915,25 +965,18 @@ export async function getBrainContext(
     }
 
     if (selected.length === 0 && channel !== "teste") {
-      /* Reaproveita o vetor da busca — mas SÓ quando os dois lados tratam o
-         texto igual.
+      /* O vetor da lacuna é calculado por ela, e NÃO reaproveitado daqui.
 
-         A lacuna embeda `question.trim().slice(0, 300)`; a consulta embeda a
-         mensagem INTEIRA (até 2000). Para mensagem curta as duas strings são a
-         mesma e reaproveitar é de graça. Passando de 300, são strings
-         diferentes — e o vetor gravado na lacuna não seria o que a próxima
-         consulta procura. Dois vetores da MESMA pergunta em espaços
-         diferentes: exatamente o defeito que se está consertando.
-         Acima do limite, `logBrainGap` calcula o vetor canônico dele. É o
-         caminho raro do caminho raro: mensagem longa E sem cobertura. */
-      const cabeNoCorteDaLacuna = userMessage.trim().length <= 300;
-      logBrainGap(
-        target,
-        userMessage,
-        channel,
-        patientId,
-        cabeNoCorteDaLacuna ? vetorDaPergunta : null,
-      );
+         O atalho existia e economizava um embedding — mas com o `taskType` ele
+         virou erro: o vetor acima é de CONSULTA (pergunta procurando resposta
+         longa), e a lacuna precisa de um SIMÉTRICO (pergunta comparada com
+         pergunta). Misturar os dois produz uma similaridade que parece número
+         normal e não é.
+
+         O que se paga é uma chamada de embedding a mais, só quando não houve
+         cobertura. É a chamada mais barata do sistema — só entrada, texto
+         curto — e correção vale mais que a economia. */
+      logBrainGap(target, userMessage, channel, patientId, null);
     }
 
     // Montagem do bloco pelo núcleo DoctorThink (rótulos de domínio da
@@ -955,6 +998,7 @@ export async function getBrainContext(
         hadCoverage: false,
         melhorSimilaridade: null,
         cotaEsgotada: false,
+        podeAtribuir: false,
       };
     }
 
@@ -969,6 +1013,13 @@ export async function getBrainContext(
       hadCoverage: selected.length > 0,
       melhorSimilaridade,
       cotaEsgotada: false,
+      /* Só com similaridade medida E alta. O fallback por palavras não produz
+         número nenhum — e sem número não há como afirmar que a orientação é
+         dele, então ali a resposta usa o material sem assinar o nome. */
+      podeAtribuir:
+        selected.length > 0 &&
+        melhorSimilaridade !== null &&
+        melhorSimilaridade >= ATRIBUICAO_MIN_SIMILARITY,
     };
   } catch {
     // Falha de banco não pode derrubar o chat: segue sem o segundo cérebro.
@@ -979,6 +1030,7 @@ export async function getBrainContext(
       hadCoverage: false,
       melhorSimilaridade: null,
       cotaEsgotada: false,
+      podeAtribuir: false,
     };
   }
 }
@@ -1021,6 +1073,7 @@ export async function getBrainContextResolved(
             /* O cérebro remoto não devolve similaridade: `null` é honesto. */
             melhorSimilaridade: null,
             cotaEsgotada: false,
+            podeAtribuir: false,
           };
         }
       }

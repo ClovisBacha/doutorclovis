@@ -805,7 +805,7 @@ async function fecharLacunasParecidas(
   try {
     const { embedText } = await import("./embeddings.server");
     const { textoParaVetor, GAP_MERGE_MIN_SIMILARITY } = await import("./secondbrain.server");
-    const vetor = await embedText(textoParaVetor(args.pergunta.slice(0, 300)), 4000);
+    const vetor = await embedText(textoParaVetor(args.pergunta.slice(0, 300)), 4000, "semelhanca");
     if (!vetor) return 0;
 
     const { data: candidatas, error } = await sb.rpc("match_brain_gaps", {

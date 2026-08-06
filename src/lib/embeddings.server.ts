@@ -58,7 +58,42 @@ function avisarFalha(motivo: string): void {
  * de LEITURA do chat use um valor curto — a paciente está esperando a
  * resposta, e um Gemini lento não pode congelar o chat até o fallback.
  */
-export async function embedText(text: string, timeoutMs = 6000): Promise<number[] | null> {
+/**
+ * Para que serve o vetor: procurar (`consulta`) ou ser encontrado (`documento`).
+ *
+ * O Gemini tem `RETRIEVAL_QUERY` e `RETRIEVAL_DOCUMENT` para exatamente o
+ * desequilíbrio que existe aqui: a consulta é uma pergunta de trinta
+ * caracteres, e o documento é pergunta + resposta inteira do médico, com até
+ * dois mil. Sem dizer qual é qual, o modelo trata os dois como o mesmo tipo de
+ * texto e a comparação fica pior do que precisa — a resposta longa domina o
+ * vetor e a pergunta curta some dentro dela.
+ *
+ * Era ganho de graça sendo jogado fora: o parâmetro existe, não custa nada, e
+ * é a diferença entre "posso comer sushi?" encontrar ou não a orientação que o
+ * médico já escreveu sobre peixe cru.
+ */
+export type UsoDoVetor = "consulta" | "documento" | "semelhanca";
+
+const TASK_TYPE: Record<UsoDoVetor, string> = {
+  /** A pergunta da paciente procurando no conhecimento do médico. */
+  consulta: "RETRIEVAL_QUERY",
+  /** A entrada do médico (pergunta + resposta) esperando ser encontrada. */
+  documento: "RETRIEVAL_DOCUMENT",
+  /**
+   * Duas coisas do MESMO tipo se comparando — lacuna com lacuna.
+   *
+   * Aqui não há lado curto e lado longo: são duas perguntas de paciente. Usar
+   * consulta/documento numa comparação simétrica é aplicar uma correção de
+   * desequilíbrio onde não há desequilíbrio, e piora em vez de melhorar.
+   */
+  semelhanca: "SEMANTIC_SIMILARITY",
+};
+
+export async function embedText(
+  text: string,
+  timeoutMs = 6000,
+  uso: UsoDoVetor = "documento",
+): Promise<number[] | null> {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   const clean = text.trim().slice(0, MAX_INPUT_CHARS);
   if (!apiKey || clean.length < 2) return null;
@@ -77,6 +112,10 @@ export async function embedText(text: string, timeoutMs = 6000): Promise<number[
              assim que nenhum vetor chegou a ser gravado: a guarda de tamanho
              recusava todos, silenciosamente, porque a coluna é `vector(768)`. */
           outputDimensionality: EMBEDDING_DIMS,
+          /* Consulta e documento vivem no MESMO espaço — o `taskType` não os
+             separa, ele orienta o modelo sobre o papel de cada texto. Trocar
+             este valor depois exige regerar tudo, como trocar de modelo. */
+          taskType: TASK_TYPE[uso],
         }),
         signal: AbortSignal.timeout(timeoutMs),
       },
@@ -153,7 +192,7 @@ export async function embedBrainEntry(
   answer: string,
 ): Promise<void> {
   try {
-    const vec = await embedText(`${question}\n${answer}`);
+    const vec = await embedText(`${question}\n${answer}`, 6000, "documento");
     if (!vec) return;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Coluna embedding ausente (migração pendente): o supabase-js devolve
@@ -185,7 +224,7 @@ export function backfillBrainEmbeddings(doctorId: string, limit = 40): void {
       if (error || !rows?.length) return; // 42703/42P01: migração pendente → nada a fazer
       // Sequencial de propósito: evita estourar rate limit da API de embeddings.
       for (const row of rows as { id: string; question: string; answer: string }[]) {
-        const vec = await embedText(`${row.question}\n${row.answer}`);
+        const vec = await embedText(`${row.question}\n${row.answer}`, 6000, "documento");
         if (!vec) return; // falhou uma → para o lote (cota/chave); tenta na próxima visita
         await sb.from("brain_entries").update({ embedding: vec }).eq("id", row.id);
       }
