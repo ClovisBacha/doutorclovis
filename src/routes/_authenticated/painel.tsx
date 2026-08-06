@@ -6984,6 +6984,8 @@ function BrainKnowledgeCard({
   const [editQ, setEditQ] = useState("");
   const [editA, setEditA] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  /** Entradas sem vetor: invisíveis para a busca por significado. */
+  const [cegas, setCegas] = useState(0);
 
   // Busca com debounce; a primeira carga (search vazio) é imediata.
   useEffect(() => {
@@ -7019,7 +7021,15 @@ function BrainKnowledgeCard({
         if (!search) {
           void embedarEntradasDoMedico({
             data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
-          }).catch(() => {});
+          })
+            .then((r) => {
+              /* O número volta para a TELA. O teto é 20 por visita, então uma
+                 base de 100 entradas precisa de cinco aberturas — e sem isto o
+                 médico não tinha como saber que parte do conhecimento dele não
+                 era encontrável por significado. */
+              if (alive && r?.ok && "cegas" in r) setCegas(r.cegas);
+            })
+            .catch(() => {});
         }
       },
       search ? 350 : 0,
@@ -7133,7 +7143,24 @@ function BrainKnowledgeCard({
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <p className="font-medium">Base de conhecimento</p>
+      <p className="font-medium">📚 Base de conhecimento</p>
+      {/* A DÍVIDA DE VETORES, à vista.
+          Entrada sem vetor é INVISÍVEL para a busca por significado — e o
+          backfill embeda 20 por visita, então uma base grande precisa de várias
+          aberturas desta aba. Sem este aviso, o médico não tinha como saber que
+          parte do conhecimento dele não estava sendo encontrada. */}
+      {cegas > 0 && (
+        <p className="mt-1 rounded-xl border border-amber-300 bg-amber-50/70 px-3 py-2 text-xs leading-snug text-amber-900">
+          <strong>
+            {cegas}{" "}
+            {cegas === 1
+              ? "entrada ainda não é encontrável"
+              : "entradas ainda não são encontráveis"}
+          </strong>{" "}
+          por significado — a IA só as acha por palavra exata. Estou preparando aos poucos; mantenha
+          esta aba aberta ou volte aqui mais tarde.
+        </p>
+      )}
       <p className="mt-0.5 text-sm text-muted-foreground">
         Tudo o que o cérebro já sabe. Desative uma entrada para tirá-la das respostas sem excluir.
       </p>

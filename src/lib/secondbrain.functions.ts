@@ -302,7 +302,19 @@ export const embedarEntradasDoMedico = createServerFn({ method: "POST" })
     if (!target) return { ok: false as const, embedadas: 0 };
     const { backfillBrainEmbeddings } = await import("./embeddings.server");
     const embedadas = await backfillBrainEmbeddings(target.doctorId);
-    return { ok: true as const, embedadas };
+    /* QUANTAS AINDA ESTÃO CEGAS.
+       `match_brain_entries` exige `embedding IS NOT NULL`: entrada sem vetor é
+       INVISÍVEL para a busca por significado. O teto é 20 por visita, então um
+       médico com 100 entradas precisa voltar cinco vezes — e não havia nada na
+       tela dizendo isso. Ele não tinha como saber que metade da base dele não
+       era encontrável. */
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await (supabaseAdmin as any)
+      .from("brain_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("doctor_id", target.doctorId)
+      .is("embedding", null);
+    return { ok: true as const, embedadas, cegas: typeof count === "number" ? count : 0 };
   });
 
 const AddSchema = z.object({
