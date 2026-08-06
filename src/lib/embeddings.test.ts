@@ -59,16 +59,23 @@ describe("o tamanho pedido bate com a coluna do banco", () => {
     expect(codigo).toMatch(/EMBEDDING_DIMS\s*=\s*768/);
   });
 
-  test("o pedido vai dentro de `embedContentConfig`", () => {
-    /* Solto na raiz do corpo, o campo é IGNORADO: a API devolve 3072, a guarda
-       rejeita, e nada é gravado. É um erro que não dá erro. */
-    expect(codigo).toContain("embedContentConfig: { outputDimensionality");
+  test("o pedido vai na RAIZ do corpo, não aninhado", () => {
+    /* MEDIDO em produção: com `embedContentConfig: { outputDimensionality }` a
+       API respondeu com 3072 dimensões — o campo aninhado é a forma dos SDKs
+       oficiais, aceito pelo parser da REST e IGNORADO na geração. Nenhum vetor
+       chegava a ser gravado. */
+    expect(codigo).toContain("outputDimensionality: EMBEDDING_DIMS,");
+    expect(codigo).not.toContain("embedContentConfig:");
   });
 
-  test("vetor de tamanho errado é recusado, não gravado", () => {
-    /* A coluna é `vector(768)`. Gravar 3072 falha no banco — e falharia dentro
-       de um `catch` best-effort, invisível de novo. */
-    expect(codigo).toContain("values.length !== EMBEDDING_DIMS");
+  test("vetor GRANDE demais é cortado, não recusado", () => {
+    /* `gemini-embedding-001` é Matryoshka: as primeiras dimensões carregam a
+       maior parte do significado, e pedir menos que 3072 devolve justamente o
+       vetor truncado. Cortar aqui dá o MESMO vetor que o parâmetro daria.
+       Recusar era o comportamento antigo — e transformava um campo ignorado em
+       recurso morto, sem ninguém conseguir adivinhar por quê. */
+    expect(codigo).toContain("normalizar(values.slice(0, EMBEDDING_DIMS))");
+    expect(codigo).toContain("values.length < EMBEDDING_DIMS");
   });
 });
 
@@ -109,7 +116,7 @@ describe("o vetor sai normalizado", () => {
        renormalizar. Cosseno ignora magnitude, então o ranking não muda — mas o
        NÚMERO de similaridade muda, e é ele que calibra o corte de agrupamento
        das lacunas. Um corte calibrado em cima de número torto erra duas vezes. */
-    expect(codigo).toContain("return normalizar(values);");
+    expect(codigo).toContain("return normalizar(values.slice(0, EMBEDDING_DIMS));");
   });
 
   test("norma zero não vira divisão por zero", () => {

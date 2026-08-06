@@ -70,7 +70,13 @@ export async function embedText(text: string, timeoutMs = 6000): Promise<number[
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: { parts: [{ text: clean }] },
-          embedContentConfig: { outputDimensionality: EMBEDDING_DIMS },
+          /* NA RAIZ, e não dentro de `embedContentConfig`.
+             O aninhado é a forma dos SDKs oficiais; aqui a chamada é REST
+             crua, e nela o campo aninhado é ACEITO pelo parser e IGNORADO na
+             hora de gerar — a resposta volta com as 3072 dimensões padrão. Foi
+             assim que nenhum vetor chegou a ser gravado: a guarda de tamanho
+             recusava todos, silenciosamente, porque a coluna é `vector(768)`. */
+          outputDimensionality: EMBEDDING_DIMS,
         }),
         signal: AbortSignal.timeout(timeoutMs),
       },
@@ -87,12 +93,21 @@ export async function embedText(text: string, timeoutMs = 6000): Promise<number[
       avisarFalha("resposta sem vetor");
       return null;
     }
-    if (values.length !== EMBEDDING_DIMS) {
-      /* Tamanho errado não pode ser gravado: a coluna é `vector(768)`. */
-      avisarFalha(`vetor com ${values.length} dimensões, esperado ${EMBEDDING_DIMS}`);
+    /* CORTAR, em vez de recusar — e isso é mais que tolerância a defeito.
+       `gemini-embedding-001` é treinado com Matryoshka: as primeiras
+       dimensões carregam a maior parte do significado, e a própria
+       documentação diz que pedir menos que 3072 devolve o vetor TRUNCADO. Ou
+       seja, cortar aqui produz exatamente o mesmo vetor que o parâmetro
+       produziria.
+       Recusar era o comportamento anterior, e ele transformava um campo
+       ignorado em recurso morto: todos os vetores viravam null e ninguém
+       conseguia adivinhar por quê. Agora o parâmetro é uma otimização (menos
+       bytes na rede), não uma dependência. */
+    if (values.length < EMBEDDING_DIMS) {
+      avisarFalha(`vetor com ${values.length} dimensões, menor que ${EMBEDDING_DIMS}`);
       return null;
     }
-    return normalizar(values);
+    return normalizar(values.slice(0, EMBEDDING_DIMS));
   } catch {
     return null;
   }
