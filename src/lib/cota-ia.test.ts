@@ -390,10 +390,36 @@ describe("o consumo aparece antes de virar problema", () => {
     expect(painel).toContain('setTab("Pacientes 👩‍🍼");');
   });
 
-  test("a cor da barra significa alguma coisa", () => {
-    /* O pedido dizia "barra colorida" e todas eram `bg-primary/70`. */
+  test("a cor da barra significa alguma coisa — e NÃO a mesma coisa que a de cima", () => {
+    /* O pedido dizia "barra colorida" e todas eram `bg-primary/70`. Mas a
+       primeira tentativa usou vermelho/âmbar, que a 40px dali significam "cota
+       estourada" e "cota em aviso": "Maria em vermelho" leria como "Maria tem
+       algo errado" quando é o contrário — ela conversa muito, o que é
+       engajamento. Escala sequencial própria, que ordena sem alarmar. */
     expect(painel).toContain("p.fatia >= 0.4");
     expect(painel).toContain("p.fatia >= 0.25");
+    expect(painel).toContain("bg-violet-600");
+    /* Só a linha da régua de cor — logo abaixo vem o aviso de cota, que USA
+       `bg-destructive` legitimamente, e uma fatia larga demais o alcançaria. */
+    const regua = painel.slice(painel.indexOf("const cor ="), painel.indexOf("const cor =") + 220);
+    expect(regua).not.toContain("bg-destructive");
+    expect(regua).not.toContain("bg-amber");
+  });
+
+  test("a cota estourada tem uma PORTA para os planos", () => {
+    /* O texto dizia "ou se você subir de plano" sem link, botão ou aba — a
+       única ação que resolve o problema não tinha caminho. O `TrancadoCard`
+       vizinho já tinha essa ponte. */
+    expect(painel).toContain("Ver planos →");
+    expect(painel).toContain('onIrParaPlanos={() => setTab("Meu Perfil")}');
+  });
+
+  test("a fita de abas é uma tablist de verdade", () => {
+    /* Quinze botões numa fita rolável sem semântica: o leitor de tela os lê
+       como quinze botões soltos e não anuncia qual está ativo. */
+    expect(painel).toContain('role="tablist"');
+    expect(painel).toContain('role="tab"');
+    expect(painel).toContain("aria-selected={tab === t}");
   });
 
   test("a barra muda de cor conforme a régua", () => {

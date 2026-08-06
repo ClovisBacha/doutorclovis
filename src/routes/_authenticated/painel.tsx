@@ -1081,11 +1081,18 @@ function PainelPage() {
            e comia 1px da `border-b-2` da aba ativa. Tirar a margem negativa
            basta — o `pb-px` que eu tinha posto junto só abria uma folga de 1px
            entre o sublinhado e a linha cinza, sem cobrir nada. */
+        /* `role="tablist"`: são quinze botões numa fita rolável, e sem
+           semântica de aba o leitor de tela os lê como quinze botões soltos,
+           sem anunciar qual está ativo — a informação mais importante da fita. */
+        role="tablist"
+        aria-label="Seções do painel"
         className="mt-8 flex snap-x gap-2 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {DOCTOR_TABS.map((t) => (
           <button
             key={t}
+            role="tab"
+            aria-selected={tab === t}
             ref={(el) => {
               refsAbas.current[t] = el;
             }}
@@ -1223,6 +1230,7 @@ function PainelPage() {
                aba Pacientes carrega as MINHAS — o clique nunca acharia
                nenhuma, e falharia calado. Sem callback, a linha não finge ser
                clicável. */
+            onIrParaPlanos={() => setTab("Meu Perfil")}
             onAbrirPaciente={
               brainAsDoctor
                 ? undefined
@@ -5113,6 +5121,7 @@ function CerebroSection({
   asDoctor,
   onExitAsDoctor,
   onAbrirPaciente,
+  onIrParaPlanos,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
@@ -5121,6 +5130,8 @@ function CerebroSection({
   onExitAsDoctor?: () => void;
   /** Da lista "quem mais conversou" direto para o prontuário dela. */
   onAbrirPaciente?: (patientId: string) => void;
+  /** Do aviso de cota direto para os planos — a ação que resolve o problema. */
+  onIrParaPlanos?: () => void;
 }) {
   const asId = asDoctor?.id;
   return (
@@ -5184,7 +5195,12 @@ function CerebroSection({
       </h3>
       <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
-      <ConsumoDaIACard tokenFn={tokenFn} asDoctor={asId} onAbrirPaciente={onAbrirPaciente} />
+      <ConsumoDaIACard
+        tokenFn={tokenFn}
+        asDoctor={asId}
+        onAbrirPaciente={onAbrirPaciente}
+        onIrParaPlanos={onIrParaPlanos}
+      />
 
       {/* ─── ③ FERRAMENTAS ───────────────────────────────────────────────── */}
       <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
@@ -5981,11 +5997,16 @@ function ConsumoDaIACard({
   tokenFn,
   asDoctor,
   onAbrirPaciente,
+  onIrParaPlanos,
 }: {
   tokenFn: () => Promise<string>;
   asDoctor?: string;
   /** Abre o prontuário daquela paciente — sem isto a lista é só um relatório. */
   onAbrirPaciente?: (patientId: string) => void;
+  /** A ÚNICA ação que resolve a cota estourada não tinha porta: o texto dizia
+      "ou se você subir de plano" sem link, botão ou aba. O `TrancadoCard`
+      vizinho já tem essa ponte; este não tinha. */
+  onIrParaPlanos?: () => void;
 }) {
   const [cota, setCota] = useState<{
     usadas: number;
@@ -6153,15 +6174,18 @@ function ConsumoDaIACard({
             {onAbrirPaciente ? " Toque para abrir o prontuário." : ""}
           </p>
           {cota.pacientes.map((p) => {
-            /* A COR DIZ ALGUMA COISA. O pedido falava em "barra colorida" e
-               todas eram `bg-primary/70` — monocromático. Quem sozinha
-               responde por um quarto do mês merece um olhar; por 40%, dois. */
+            /* A COR DIZ ALGUMA COISA — mas NÃO a mesma coisa que a barra de
+               cima. Vermelho e âmbar significam "cota estourada" e "cota em
+               aviso" a 40px daqui; reusá-los aqui faria "Maria em vermelho"
+               ler como "Maria tem algo errado", quando é o contrário: ela
+               conversa muito, o que é engajamento.
+               Escala sequencial própria (índigo → violeta): ordena sem alarmar. */
             const cor =
               p.fatia >= 0.4
-                ? "bg-destructive"
+                ? "bg-violet-600"
                 : p.fatia >= 0.25
-                  ? "bg-amber-500"
-                  : "bg-primary/70";
+                  ? "bg-indigo-500"
+                  : "bg-primary/60";
             return (
               /* CLICÁVEL. `patientId` é o `auth.users.id` — exatamente o que
                  `setAbrirPaciente` espera. A ponte não estava ligada: o card
@@ -6222,6 +6246,18 @@ function ConsumoDaIACard({
               <strong>Cota do mês esgotada</strong> ({cota.usadas} de {cota.teto} respostas). Suas
               pacientes continuam sendo atendidas, mas <strong>sem as suas orientações</strong> —
               elas voltam na virada do mês ou se você subir de plano.
+              {onIrParaPlanos && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={onIrParaPlanos}
+                    className="font-semibold underline"
+                  >
+                    Ver planos →
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <>
@@ -6418,9 +6454,17 @@ function BrainReviewCard({
         toast.error("Não consegui salvar. Tente de novo.");
         return;
       }
+      /* O `avisada` do servidor era JOGADO FORA. O toast dizia "corrigido"
+         mesmo quando a paciente NÃO foi avisada — ela trocou de médico, ou o
+         push falhou —, e o médico ficava achando que tinha fechado o ciclo com
+         quem reclamou. Dizer a verdade custa uma frase. */
+      const corrigiu = "corrigida" in res && res.corrigida;
+      const avisou = "avisada" in res && res.avisada;
       toast.success(
-        "corrigida" in res && res.corrigida
-          ? "Corrigido — a IA já responde com o texto novo 🧠"
+        corrigiu
+          ? avisou
+            ? "Corrigido — a IA já responde com o texto novo, e a paciente foi avisada 🧠"
+            : "Corrigido — a IA já responde com o texto novo. Não consegui avisar a paciente desta vez."
           : "Confirmado. A resposta continua como está.",
       );
       setEditando(null);
