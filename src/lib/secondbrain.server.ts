@@ -129,15 +129,49 @@ function logBrainHit(doctorId: string, channel: BrainChannel): void {
  * pedem a palavra dele. Heurística de superfície de propósito: na dúvida
  * REGISTRA (perder uma lacuna clínica é pior que uma de suporte a mais).
  */
+/**
+ * FRONTEIRA DE PALAVRA QUE ENTENDE PORTUGUÊS.
+ *
+ * O `\b` do JavaScript é ASCII: para ele, `ó` não é letra. Duas consequências
+ * medidas, e as duas silenciosas:
+ *
+ *   · `\b(ótimo)\b` NUNCA casa. Depois de um espaço, antes de `ó`, não existe
+ *     fronteira — então "vocês são ótimos" passava direto pelo filtro de
+ *     elogio, virava lacuna na fila do médico e disparava o e-mail "sua IA
+ *     recebeu uma pergunta que não soube responder". Por um elogio.
+ *   · o `\b` final mata todo plural: "ótimos" nunca casaria nem sem acento.
+ *
+ * E a falta de fronteira é igualmente cara: `dor` sem delimitador casa dentro
+ * de "aDORei", então "adorei o app!" era tratado como queixa clínica — com
+ * embedding, busca vetorial e uma unidade da cota do médico.
+ *
+ * `PRE`/`POS` usam lookaround sobre a faixa acentuada, e valem para as duas
+ * pontas: não casar no meio da palavra, e casar até o fim dela.
+ */
+const PRE = "(?<![0-9a-zà-ÿ])";
+const POS = "(?![a-zà-ÿ])";
+
+/** Envolve cada alternativa numa fronteira que respeita acento. */
+function comFronteira(alternativas: string): string {
+  return `${PRE}(?:${alternativas})${POS}`;
+}
+
 const TERMOS_SUPORTE = new RegExp(
-  [
-    // superfície do produto (nomeia a coisa na tela)
-    "app|aplicativo|site|aba|tela|menu|bot(ã|a)o|(í|i)cone",
-    // conta e cobrança
-    "login|logar|senha|assinatura|assinar|premium|pagamento|cadastr|notifica(ç|c)",
-    // falha técnica
-    "instalar|atualiza(r|ç|c)|carregar|travand?o|travou|bug|sair da conta",
-  ].join("|"),
+  comFronteira(
+    [
+      // superfície do produto (nomeia a coisa na tela)
+      "app|aplicativo|site|aba|tela|menu|bot(?:ã|a)o|(?:í|i)cone",
+      // conta e cobrança
+      "login|logar|senha|assinatura|assinar|premium|pagamento|cadastr\\w*|notifica(?:ç|c)\\w*",
+      /* DINHEIRO é da plataforma, não do médico.
+         "quanto custa o plano?" entrava na fila CLÍNICA dele, com a IA
+         prometendo resposta pessoal — para uma pergunta de cobrança que ele
+         não tem como responder e que a plataforma responde na hora. */
+      "custa|custo|pre(?:ç|c)o|valor|mensalidade|cobran(?:ç|c)a|reembolso|cancelar|estorno",
+      // falha técnica
+      "instalar|atualiza(?:r|ç|c)\\w*|carregar|travand?o|travou|bug|sair da conta",
+    ].join("|"),
+  ),
   "i",
 );
 /* Fora de propósito: "plano" (plano de parto), "cartão" (cartão de pré-natal),
@@ -161,13 +195,18 @@ export function isSuporteDoApp(question: string): boolean {
  * Na dúvida, é clínica.
  */
 const TERMOS_CLINICOS = new RegExp(
-  [
-    "dor|sangr|c(ó|o)lica|contra(ç|c)|enjo|n(á|a)usea|v(ô|o)mit|tontur",
-    "press(ã|a)o|glicem|diabet|incha|edema|febre|corrim|secre(ç|c)",
-    "beb(ê|e)|feto|mexer|mexeu|chute|movimento|barriga|(ú|u)tero|placenta|l(í|i)quido",
-    "exame|ultrassom|ultrasso|resultado|hemogram|urina|parto|ces(á|a)re|amamenta",
-    "rem(é|e)dio|medicament|comprimido|dose|tomar|s(í|i)ntoma|sinto|senti|semana",
-  ].join("|"),
+  comFronteira(
+    [
+      /* `dor` SEM fronteira casava dentro de "aDORei" — e "adorei o app!" ia
+         para o caminho clínico completo: embedding, busca vetorial e uma
+         unidade da cota do médico, por um elogio. */
+      "dor(?:es)?|sangr\\w*|c(?:ó|o)lica\\w*|contra(?:ç|c)\\w*|enjo\\w*|n(?:á|a)usea\\w*|v(?:ô|o)mit\\w*|tontur\\w*",
+      "press(?:ã|a)o|glicem\\w*|diabet\\w*|incha\\w*|edema|febre|corrim\\w*|secre(?:ç|c)\\w*",
+      "beb(?:ê|e)|feto|mexer|mexeu|chute\\w*|movimento\\w*|barriga|(?:ú|u)tero|placenta|l(?:í|i)quido",
+      "exame\\w*|ultrassom|ultrasso\\w*|resultado\\w*|hemogram\\w*|urina|parto|ces(?:á|a)re\\w*|amamenta\\w*",
+      "rem(?:é|e)dio\\w*|medicament\\w*|comprimido\\w*|dose|tomar|s(?:í|i)ntoma\\w*|sinto|senti|semana\\w*",
+    ].join("|"),
+  ),
   "i",
 );
 
@@ -300,23 +339,38 @@ export function textoParaVetor(texto: string): string {
  * "?" e "posso"), e "gostei do resultado do exame, é normal?" também.
  */
 const ELOGIOS = new RegExp(
-  "\\b(gostei|gostando|adorei|amei|amando|curti|bacana|legal|(ó|o)tim[oa]|excelente|maravilhos|" +
-    "perfeit[oa]|top|show|incr(í|i)vel|sensacional|parab(é|e)ns|muito bom|muito boa|melhor app|" +
-    "ajudou muito|me ajudou|salvou)\\b",
+  comFronteira(
+    /* Cada palavra aceita plural e flexão. O `\b` final da versão anterior
+       matava "ótimos", "excelentes", "maravilhosas" — e o `\b` inicial, sendo
+       ASCII, fazia "ótimo" NUNCA casar. Medido: `ótimo`→0, `ótimos`→0,
+       `otimo`→1. Ou seja, o filtro só funcionava para quem escrevia sem
+       acento. */
+    "gostei|gostando|adorei|adorando|amei|amando|curti|bacana\\w*|legal|legais|" +
+      "(?:ó|o)tim\\w*|excelente\\w*|maravilhos\\w*|perfeit\\w*|top|show|" +
+      "incr(?:í|i)ve\\w*|sensacional|sensacionais|parab(?:é|e)ns|muito bom|muito boa|" +
+      "melhor app|ajudou muito|me ajudou|salvou",
+  ),
   "i",
 );
 /* Sinal de que ainda é pergunta, mesmo com elogio no meio. */
 const SINAL_DE_PERGUNTA = new RegExp(
-  "\\?|\\b(qual|quais|quando|como|onde|quem|quanto|quanta|por que|porque|pq|" +
-    "posso|pode|devo|preciso|tenho que|serve|adianta|vale a pena|é normal|e normal|" +
-    "normal|seguro|perigoso|faz mal|pode ser)\\b",
+  "\\?|" +
+    comFronteira(
+      "qual|quais|quando|como|onde|quem|quanto|quanta|por que|porque|pq|" +
+        "posso|pode|devo|preciso|tenho que|serve|adianta|vale a pena|(?:é|e) normal|" +
+        "normal|segur\\w*|perigos\\w*|faz mal|pode ser",
+    ),
   "i",
 );
 /* Vocabulário clínico: se aparece, não é só elogio — é relato. */
 const TEM_ASSUNTO_CLINICO = new RegExp(
-  "\\b(dor|dores|sangr|enjoo|n(á|a)usea|v(ô|o)mit|febre|press(ã|a)o|gl(i|í)cemia|beb(ê|e)|" +
-    "parto|gravid|gesta(ç|c)|exame|ultrass|rem(é|e)dio|medicament|contra(ç|c)|mexer|chute|" +
-    "corrimento|c(ó|o)lica|incha|cabe(ç|c)a|barriga|peso|consulta|cesare|amament|leite)\\b",
+  comFronteira(
+    "dor(?:es)?|sangr\\w*|enjoo|n(?:á|a)usea\\w*|v(?:ô|o)mit\\w*|febre|press(?:ã|a)o|" +
+      "gl(?:i|í)cemia|beb(?:ê|e)|parto|gravid\\w*|gesta(?:ç|c)\\w*|exame\\w*|ultrass\\w*|" +
+      "rem(?:é|e)dio\\w*|medicament\\w*|contra(?:ç|c)\\w*|mexer|chute\\w*|corrimento|" +
+      "c(?:ó|o)lica\\w*|incha\\w*|cabe(?:ç|c)a|barriga|peso|consulta\\w*|cesare\\w*|" +
+      "amament\\w*|leite",
+  ),
   "i",
 );
 
@@ -325,6 +379,32 @@ export function isElogio(question: string): boolean {
     ELOGIOS.test(question) &&
     !SINAL_DE_PERGUNTA.test(question) &&
     !TEM_ASSUNTO_CLINICO.test(question)
+  );
+}
+
+/**
+ * A pergunta merece entrar na fila do médico?
+ *
+ * Existe como função ÚNICA porque a condição vive em dois lugares: aqui, que
+ * decide se a lacuna é gravada, e no `chat.ts`, que decide se a IA pode dizer
+ * "registrei aqui para ele ver". Duas cópias divergem — e divergiam: uma
+ * filtrava o texto cortado em 300 caracteres e a outra o texto inteiro, então
+ * uma mensagem longa com a palavra de suporte depois do caractere 300 era
+ * registrada por um lado e negada pelo outro. A IA dizia que não registrou, e
+ * tinha registrado.
+ *
+ * Usa `ehSoSuporte` (dois sinais), e não `isSuporteDoApp` (um): "o app travou
+ * e estou com dor de cabeça" mencionava o app, então a queixa clínica era
+ * DESCARTADA da fila. Uma dor de cabeça sumindo porque a frase citava o
+ * aplicativo é o erro mais caro que este filtro pode cometer.
+ */
+export function mereceFila(pergunta: string): boolean {
+  const clean = pergunta.trim().slice(0, 300);
+  return (
+    normalizeGapQuestion(clean).length >= 8 &&
+    !ehSoSuporte(clean) &&
+    !isCortesia(clean) &&
+    !isElogio(clean)
   );
 }
 
@@ -358,10 +438,7 @@ export function logBrainGap(
 ): void {
   const clean = question.trim().slice(0, 300);
   const norm = normalizeGapQuestion(clean);
-  if (norm.length < 8) return; // "oi", "ok" etc. não são lacunas
-  if (isSuporteDoApp(clean)) return; // suporte do app não vira fila do médico
-  if (isCortesia(clean)) return; // "obrigada" não é dúvida esperando resposta
-  if (isElogio(clean)) return; // "gostei muito dessa IA" não é dúvida
+  if (!mereceFila(question)) return;
   void (async () => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

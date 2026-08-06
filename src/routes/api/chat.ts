@@ -3,10 +3,8 @@ import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
 import {
   getBrainContextResolved,
-  isCortesia,
-  isElogio,
-  isSuporteDoApp,
   ehSoSuporte,
+  mereceFila,
   normalizeGapQuestion,
 } from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
@@ -741,11 +739,14 @@ export const Route = createFileRoute("/api/chat")({
           // chars) — a IA nunca afirma um registro que não aconteceu.
           // Espelha logBrainGap EXATAMENTE (tamanho + filtro de suporte): se a
           // pergunta não entrou na fila, a IA não pode dizer que entrou.
-          const gapWasLogged =
-            normalizeGapQuestion(userText).length >= 8 &&
-            !isSuporteDoApp(userText) &&
-            !isCortesia(userText) &&
-            !isElogio(userText);
+          /* A MESMA função que decide a gravação, e não uma cópia.
+             As duas condições eram idênticas em forma e diferentes em
+             argumento: `logBrainGap` filtrava o texto cortado em 300
+             caracteres e isto aqui filtrava o texto inteiro. Numa mensagem
+             longa com a palavra de suporte depois do caractere 300, uma
+             registrava e a outra negava — a IA dizia "não registrei" sobre
+             algo que estava na fila dele. */
+          const gapWasLogged = mereceFila(userText);
           /* ─── COTA DO MÉDICO ESGOTADA ──────────────────────────────────
              Este caso tem instrução PRÓPRIA, e não é preciosismo: sem
              cobertura e cota esgotada produzem o mesmo bloco vazio e pedem

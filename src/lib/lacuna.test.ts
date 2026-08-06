@@ -146,50 +146,51 @@ describe("elogio à IA não vira fila do médico", () => {
   });
 });
 
-describe("as duas pontas continuam concordando", () => {
-  /* O `chat.ts` reimplementa a condição para decidir se a IA pode dizer
-     "registrei aqui para ele ver". Um filtro novo só de um lado faz o produto
-     mentir: a IA promete o registro e a lacuna não existe. */
+describe("as duas pontas não podem divergir", () => {
+  /**
+   * A condição vive em dois lugares: a que grava a lacuna e a que autoriza a
+   * IA a dizer "registrei aqui para ele ver". Elas eram duas CÓPIAS — idênticas
+   * em forma e diferentes em argumento: uma filtrava o texto cortado em 300
+   * caracteres, a outra o texto inteiro.
+   *
+   * Numa mensagem longa com a palavra de suporte depois do caractere 300, uma
+   * registrava e a outra negava. A IA dizia "não registrei" sobre algo que
+   * estava na fila dele — ou o contrário, que é pior.
+   *
+   * Agora é uma função só. Não é que elas concordem: é que não há duas.
+   */
   const chat = readFileSync("src/routes/api/chat.ts", "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/.*/g, "");
+  const server = readFileSync("src/lib/secondbrain.server.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*/g, "");
 
-  test("o chat também descarta elogio antes de prometer registro", () => {
-    expect(chat).toContain("!isElogio(userText)");
+  test("o chat usa a MESMA função, não uma cópia da regra", () => {
+    expect(chat).toContain("const gapWasLogged = mereceFila(userText);");
+    expect(chat).not.toContain("normalizeGapQuestion(userText).length >= 8");
   });
 
-  test("os três filtros do registro estão nos dois lados", () => {
-    const server = readFileSync("src/lib/secondbrain.server.ts", "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*/g, "");
-    for (const f of ["isSuporteDoApp", "isCortesia", "isElogio"]) {
-      expect(server).toContain(`if (${f}(clean)) return;`);
-      expect(chat).toContain(`!${f}(userText)`);
-    }
+  test("a gravação usa a mesma função", () => {
+    expect(server).toContain("if (!mereceFila(question)) return;");
+  });
+
+  test("a função corta o texto uma vez só, dentro dela", () => {
+    /* Era o ponto exato da divergência: cada lado cortava por conta própria. */
+    expect(server).toContain("export function mereceFila(pergunta: string): boolean {");
+    expect(server).toContain("const clean = pergunta.trim().slice(0, 300);");
+  });
+
+  test("usa DOIS sinais para suporte, não um", () => {
+    /* Com `isSuporteDoApp` sozinho, "o app travou e estou com dor de cabeça"
+       tinha a queixa clínica DESCARTADA da fila. Uma dor de cabeça sumindo
+       porque a frase citava o aplicativo é o erro mais caro deste filtro. */
+    const corpo = server.slice(server.indexOf("export function mereceFila"));
+    expect(corpo.slice(0, 400)).toContain("!ehSoSuporte(clean)");
+    expect(corpo.slice(0, 400)).not.toContain("!isSuporteDoApp(clean)");
   });
 });
 
-/**
- * A REGRA QUE VIROU MORDAÇA.
- *
- * Caso real, e a prova veio de uma comparação: a MESMA pergunta ("posso comer
- * comida japonesa"), o MESMO cérebro vazio, dois canais.
- *
- *   Playground do painel → "evitar carnes e peixes crus… pode consumir as
- *                           opções cozidas ou bem passadas"
- *   App da paciente      → "como sou uma inteligência artificial e não posso
- *                           dar orientações médicas, o ideal é que você
- *                           converse diretamente com a Dra."
- *
- * A diferença não era o cérebro — era o prompt. O do app dizia "responda
- * SOMENTE seguindo as condutas já validadas pelo médico", e com o cérebro
- * vazio NADA está validado: o modelo concluiu, corretamente, que não podia
- * dizer nada. A regra escrita para proteger a paciente passou a deixá-la sem
- * resposta nenhuma — e ela vai procurar num grupo de WhatsApp, que é pior.
- *
- * O conserto separa as duas camadas: informação consolidada a IA responde;
- * conduta do caso dela continua sendo do médico.
- */
 describe("o prompt do app informa antes de encaminhar", () => {
   const chat = readFileSync("src/routes/api/chat.ts", "utf8");
 
