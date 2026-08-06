@@ -92,8 +92,15 @@ export function inicioDoCiclo(agora = new Date()): Date {
  * ─── A COTA CONTA UM CANAL SÓ ───────────────────────────────────────────────
  *
  * O portão que interrompe as respostas do cérebro vive em `getBrainContext`, e
- * ele protege UM caminho: o chat da paciente no app (`canal: "app"`). A cota
- * tem que contar exatamente o que esse portão consegue parar — nada mais.
+ * ele protege os chats CLÍNICOS da paciente dentro do app: o chat principal
+ * (`app`) e o de nutrição (`nutricao`). A cota conta exatamente o que esse
+ * portão consegue parar — nada mais.
+ *
+ * A nutrição entrou nesta lista quando entrou no ciclo do cérebro. Ela é a
+ * mesma coisa que o chat principal do ponto de vista do que importa aqui: IA
+ * respondendo à paciente DELE, com as orientações DELE, sobre um assunto
+ * clínico. Deixá-la de fora seria uma segunda porta de entrada que não custa
+ * franquia nenhuma — e ninguém teria escolhido isso de propósito.
  *
  * ─── POR QUE ERA UMA LISTA DE EXCLUSÕES, E POR QUE ISSO ERRAVA ──────────────
  *
@@ -114,11 +121,11 @@ export function inicioDoCiclo(agora = new Date()): Date {
  * O consumo — o que custa dinheiro — continua medindo TODOS os canais. São
  * perguntas diferentes: "quanto isto gasta" e "quanto do plano dele já foi".
  */
-export const CANAL_DA_COTA = "app";
+export const CANAIS_DA_COTA = ["app", "nutricao"] as const;
 
 export function aplicarRecorteDaCota<T>(q: T): T {
-  const query = q as unknown as { eq: (c: string, v: string) => unknown };
-  return query.eq("canal", CANAL_DA_COTA) as T;
+  const query = q as unknown as { in: (c: string, v: readonly string[]) => unknown };
+  return query.in("canal", CANAIS_DA_COTA) as T;
 }
 
 export async function respostasNoCiclo(doctorId: string, agora = new Date()): Promise<number> {

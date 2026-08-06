@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { voltouDepoisDoResgate } from "@/lib/cupons";
 import {
   getPlatformOverview,
+  custoDaPlataforma,
+  type CustoSemDono,
   getPlatformInsights,
   getRetentionMetrics,
   setDoctorStatus,
@@ -439,7 +441,82 @@ function OverviewTab({ data }: { data: PlatformOverview }) {
         referência por plano (ajustáveis em <code>platform.functions.ts</code>).
       </p>
 
+      <CustoSemDonoCard />
       <RetentionCard />
+    </div>
+  );
+}
+
+/**
+ * O QUE A PLATAFORMA PAGA SOZINHA.
+ *
+ * `ai_usage` grava `doctor_id = null` para tudo que não pertence a consultório
+ * nenhum — paciente sem médico vinculado, widget do site, suporte. Toda leitura
+ * de consumo que existia era POR MÉDICO, então essas linhas eram escritas e
+ * nunca lidas: não havia tela nenhuma dizendo quanto gastamos com quem ainda
+ * não é paciente de ninguém.
+ *
+ * Por canal, e não só o total: "gastamos X" não permite decidir nada; "o widget
+ * do site gastou X e o suporte gastou Y" permite desligar um dos dois.
+ */
+function CustoSemDonoCard() {
+  const [canais, setCanais] = useState<CustoSemDono[] | null>(null);
+  const [falhou, setFalhou] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await custoDaPlataforma({ data: { accessToken: await token() } });
+        if (res.ok) setCanais(res.canais);
+        else setFalhou(true);
+      } catch {
+        setFalhou(true);
+      }
+    })();
+  }, []);
+
+  if (falhou) return null;
+  if (!canais) return null;
+
+  const total = canais.reduce((s, c) => s + c.entrada + c.saida, 0);
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <p className="font-medium">🧾 IA sem dono — o que a plataforma paga</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Ciclo atual. Linhas de <code>ai_usage</code> sem médico: paciente ainda sem vínculo, widget
+        do site e suporte. Nenhum consultório é cobrado por isto.
+      </p>
+      {canais.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">Nada neste ciclo.</p>
+      ) : (
+        <>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="pb-1 font-medium">Canal</th>
+                  <th className="pb-1 text-right font-medium">Respostas</th>
+                  <th className="pb-1 text-right font-medium">Tokens</th>
+                </tr>
+              </thead>
+              <tbody>
+                {canais.map((c) => (
+                  <tr key={c.canal} className="border-t border-border/60">
+                    <td className="py-1.5">{c.canal}</td>
+                    <td className="py-1.5 text-right tabular-nums">{c.respostas}</td>
+                    <td className="py-1.5 text-right tabular-nums">
+                      {(c.entrada + c.saida).toLocaleString("pt-BR")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Total: {total.toLocaleString("pt-BR")} tokens no ciclo.
+          </p>
+        </>
+      )}
     </div>
   );
 }

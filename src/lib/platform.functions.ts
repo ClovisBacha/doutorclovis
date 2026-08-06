@@ -51,6 +51,80 @@ export type PlatformOverview = {
   generatedAt: string;
 };
 
+/**
+ * O QUE A PLATAFORMA PAGA SOZINHA.
+ *
+ * ─── A COLUNA ESCRITA E NUNCA LIDA, DE NOVO ─────────────────────────────────
+ *
+ * `ai_usage` grava `doctor_id = null` para tudo que não pertence a consultório
+ * nenhum: paciente sem médico vinculado, widget do site público e suporte da
+ * plataforma. Toda leitura de consumo que existe é POR MÉDICO — o card do
+ * painel, "quem consome mais", a projeção do mês.
+ *
+ * Ninguém lia as linhas sem dono. É o mesmo padrão da `similaridade` que este
+ * projeto acabou de consertar (coluna gravada e nunca lida), só que desta vez
+ * é a nossa conta: não havia nenhuma tela que dissesse quanto a plataforma
+ * gasta com quem ainda não é paciente de ninguém — que é exatamente o número
+ * que decide se o widget público se paga.
+ *
+ * Por canal, e não só o total: "gastamos X" não permite decidir nada. "O
+ * widget do site gastou X e o suporte gastou Y" permite desligar um dos dois.
+ */
+export type CustoSemDono = {
+  canal: string;
+  respostas: number;
+  entrada: number;
+  saida: number;
+};
+
+export const custoDaPlataforma = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const, canais: [] as CustoSemDono[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { inicioDoCiclo } = await import("./cota-ia.server");
+    const { data: rows, error } = await (supabaseAdmin as any)
+      .from("ai_usage")
+      .select("canal,input_tokens,output_tokens")
+      /* `is null`, não `eq(null)`: em SQL nada é igual a nulo, e `eq` devolveria
+         zero linhas em silêncio — o mesmo "tudo certo" de não ter gasto. */
+      .is("doctor_id", null)
+      .gte("created_at", inicioDoCiclo().toISOString())
+      .limit(5000);
+    if (error) return { ok: false as const, canais: [] as CustoSemDono[] };
+    return { ok: true as const, canais: agruparPorCanal((rows ?? []) as LinhaDeUso[]) };
+  });
+
+export type LinhaDeUso = {
+  canal: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+};
+
+/**
+ * Soma por canal, do mais caro para o mais barato.
+ *
+ * Puro para poder ser exercitado: o `null` do canal é o detalhe que decide se a
+ * tela mostra uma linha honesta ou some com o gasto. Agregar aqui e não no
+ * banco porque o PostgREST não faz GROUP BY.
+ */
+export function agruparPorCanal(linhas: LinhaDeUso[]): CustoSemDono[] {
+  const por = new Map<string, CustoSemDono>();
+  for (const l of linhas) {
+    /* Canal nulo vira "(sem canal)" e NÃO é descartado: linha sem rótulo é
+       gasto real, e sumir com ela produziria um total que não fecha com a
+       fatura — que é o defeito que este card existe para acabar. */
+    const canal = (l.canal ?? "").trim() || "(sem canal)";
+    const atual = por.get(canal) ?? { canal, respostas: 0, entrada: 0, saida: 0 };
+    atual.respostas++;
+    atual.entrada += l.input_tokens ?? 0;
+    atual.saida += l.output_tokens ?? 0;
+    por.set(canal, atual);
+  }
+  return [...por.values()].sort((a, b) => b.saida + b.entrada - (a.saida + a.entrada));
+}
+
 /** Visão geral da plataforma (super-admin). */
 export const getPlatformOverview = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))

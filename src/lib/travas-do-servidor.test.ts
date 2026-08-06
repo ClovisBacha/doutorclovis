@@ -14,6 +14,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import divida from "./divida-tecnica.json";
+import { CANAIS_DA_COTA } from "./cota-ia.server";
 
 /** Todo `.ts`/`.tsx` de `src/`, exceto os próprios testes. */
 function arquivosDoProjeto(dir = "src", saida: string[] = []): string[] {
@@ -87,6 +88,23 @@ describe("dispare-e-esqueça não volta ao servidor", () => {
   });
 });
 
+/**
+ * Este código grava no canal `nome`?
+ *
+ * Uma JANELA depois de `canal:`, e não o literal grudado: o chat escreve
+ * `canal: soSuporte ? "suporte" : patient ? "app" : "site"`, e a regex exigindo
+ * `canal: "app"` respondia "ninguém grava em app" — verde por não enxergar, que
+ * é o pior tipo de teste verde.
+ */
+function gravaNoCanal(codigo: string, nome: string): boolean {
+  const re = /canal:/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(codigo))) {
+    if (codigo.slice(m.index, m.index + 140).includes(`"${nome}"`)) return true;
+  }
+  return false;
+}
+
 describe("chamada paga de modelo tem que ser medida", () => {
   /**
    * ─── O DEFEITO QUE ISTO IMPEDE DE VOLTAR ─────────────────────────────────
@@ -124,19 +142,28 @@ describe("chamada paga de modelo tem que ser medida", () => {
     expect(semMedicao).toEqual([]);
   });
 
-  test("só o chat da paciente grava no canal que a cota conta", () => {
+  test("só os chats clínicos da paciente gravam num canal que a cota conta", () => {
     /* ─── O OUTRO LADO DA MOEDA ────────────────────────────────────────────
-       A cota virou lista de PERMISSÃO: conta `canal: "app"` e nada mais. Isso
-       impede um canal novo de entrar na franquia por omissão — mas não impede
-       alguém de rotular o canal novo COMO "app", que produz o mesmo estrago
-       com uma linha de aparência inocente.
+       A cota virou lista de PERMISSÃO. Isso impede um canal novo de entrar na
+       franquia por omissão — mas não impede alguém de ROTULAR o canal novo com
+       um dos nomes que contam, que produz o mesmo estrago numa linha de
+       aparência inocente.
        Uma busca de médico ou uma carta do bebê marcadas como "app" comeriam a
        franquia de dúvidas clínicas da gestante, e ela ficaria sem resposta
-       clínica por causa disso. O chat dela é o único que pode cobrar. */
-    const gravamNoCanalDaCota = DO_SERVIDOR.filter(
-      (f) => /canal:\s*"app"/.test(codigoDe(f)) && !f.endsWith("api/chat.ts"),
+       clínica por causa disso. Só os dois chats clínicos podem cobrar. */
+    const PODEM_COBRAR = ["src/routes/api/chat.ts", "src/routes/api/nutrition.ts"];
+    const infratores = DO_SERVIDOR.filter(
+      (f) => !PODEM_COBRAR.includes(f) && CANAIS_DA_COTA.some((c) => gravaNoCanal(codigoDe(f), c)),
     );
-    expect(gravamNoCanalDaCota).toEqual([]);
+    expect(infratores).toEqual([]);
+  });
+
+  test("cada canal da cota é gravado por alguém (a lista não é decoração)", () => {
+    /* Um canal na lista que ninguém grava seria uma franquia contando algo que
+       não existe — e o médico veria "0 de 500" para sempre, achando que não
+       usou. Foi o que a lista de exclusões produzia ao contrário. */
+    const todoCodigo = DO_SERVIDOR.map(codigoDe).join("\n");
+    for (const c of CANAIS_DA_COTA) expect(gravaNoCanal(todoCodigo, c)).toBe(true);
   });
 
   test("a varredura acha chamadas de modelo de verdade (o teste testa algo)", () => {

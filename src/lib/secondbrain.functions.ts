@@ -10,6 +10,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { colunaAusente } from "./postgrest";
+import { MAX_CAMPO_DO_MEDICO } from "./doctorthink/core";
 
 // Quem é "o médico": e-mails autorizados, separados por vírgula em ADMIN_EMAILS.
 function adminEmails() {
@@ -158,7 +159,41 @@ export type BrainEntry = {
   source: string;
   approved: boolean;
   created_at: string;
+  /** Última revisão do médico. Ausente enquanto a migration não roda. */
+  updated_at?: string | null;
 };
+
+/**
+ * A partir de quantos dias uma orientação merece um olhar.
+ *
+ * 365. Não é validade — conhecimento obstétrico não estraga numa data. É o
+ * intervalo em que vale a pena PERGUNTAR: as coisas que mudam de verdade
+ * (profilaxia com AAS, rastreio de EGB, alvo pressórico, critérios de indução)
+ * mudam em ciclos de diretriz, que são anuais.
+ *
+ * Curto demais e o médico vê metade da base marcada, aprende que a marca não
+ * quer dizer nada e para de olhar — o mesmo destino de todo alerta barato.
+ */
+export const DIAS_PARA_REVISAR = 365;
+
+/** Há quantos dias esta orientação não é olhada. `null` = não dá para saber. */
+export function diasSemRevisao(entry: BrainEntry, agora = Date.now()): number | null {
+  /* `created_at` NÃO serve de substituto. Uma entrada criada há dois anos e
+     revisada ontem apareceria como velha, e o médico perderia a confiança na
+     marca por vê-la errada — que é como um aviso morre. Sem a coluna, a
+     resposta honesta é "não sei". */
+  const quando = entry.updated_at;
+  if (!quando) return null;
+  const dias = Math.floor((agora - new Date(quando).getTime()) / 86_400_000);
+  return Number.isFinite(dias) && dias >= 0 ? dias : null;
+}
+
+/** Merece um olhar? Só o que está aprovado — rascunho ainda nem entrou em uso. */
+export function precisaDeRevisao(entry: BrainEntry, agora = Date.now()): boolean {
+  if (!entry.approved) return false;
+  const dias = diasSemRevisao(entry, agora);
+  return dias !== null && dias >= DIAS_PARA_REVISAR;
+}
 
 export type BrainSettings = {
   persona: string;
@@ -210,9 +245,17 @@ const SettingsSchema = z.object({
   accessToken: z.string().min(10),
   asDoctor: z.string().uuid().optional(),
   settings: z.object({
-    persona: z.string(),
-    sample_phrases: z.string(),
-    rules: z.string(),
+    /* TETO POR CAMPO. Eram `z.string()` sem limite nenhum, e o teto de
+       caracteres do bloco corta só as entradas de referência — o comentário
+       dele diz com todas as letras que persona e regras nunca são cortadas.
+       Resultado: o campo mais caro do prompt era o único sem limite, e ele se
+       paga em TODA mensagem.
+       `MAX_CAMPO_DO_MEDICO` corta na montagem (protege o que já está no banco);
+       este `.max()` protege o que for salvo daqui em diante, e é o que permite
+       à tela mostrar um contador em vez de cortar escondido. */
+    persona: z.string().max(MAX_CAMPO_DO_MEDICO),
+    sample_phrases: z.string().max(MAX_CAMPO_DO_MEDICO),
+    rules: z.string().max(MAX_CAMPO_DO_MEDICO),
     enabled_app: z.boolean(),
     enabled_whatsapp: z.boolean(),
   }),
@@ -441,19 +484,35 @@ export const updateBrainEntry = createServerFn({ method: "POST" })
     if (!(await brainPlanAllows(user, target))) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: mexeu, error } = await (supabaseAdmin as any)
+    /* `updated_at` é a idade da CONDUTA, não da linha: é quando o médico
+       olhou para aquilo pela última vez. Sem isso, uma orientação de dois anos
+       atrás entrava na resposta com a mesma confiança da de ontem, e ninguém
+       tinha como saber qual era qual — em obstetrícia, onde a conduta muda. */
+    const campos = {
+      question: data.question,
+      answer: data.answer,
+      category: data.category ?? null,
+      approved: data.approved,
+    };
+    let { data: mexeu, error } = await (supabaseAdmin as any)
       .from("brain_entries")
-      .update({
-        question: data.question,
-        answer: data.answer,
-        category: data.category ?? null,
-        approved: data.approved,
-      })
+      .update({ ...campos, updated_at: new Date().toISOString() })
       .eq("id", data.id)
       .eq("doctor_id", target.doctorId)
       // Sem `select`, um id de outro consultório (ou inexistente) devolvia
       // sucesso e a tela dizia "salvo".
       .select("id");
+    /* Coluna ainda não migrada: salvar continua funcionando como sempre. O que
+       se perde é a data — e o painel simplesmente não mostra idade nenhuma, em
+       vez de mostrar uma data inventada. */
+    if (colunaAusente(error)) {
+      ({ data: mexeu, error } = await (supabaseAdmin as any)
+        .from("brain_entries")
+        .update(campos)
+        .eq("id", data.id)
+        .eq("doctor_id", target.doctorId)
+        .select("id"));
+    }
     if (error || !mexeu?.length) return { ok: false as const };
     /* Recalcula o vetor — AGUARDADO. Em serverless nada garante execução depois
        da resposta, então o fire-and-forget deixava o texto novo com o vetor

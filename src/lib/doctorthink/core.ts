@@ -34,6 +34,23 @@ export type BrainBlockLabels = {
   rulesLabel: string;
   /** Instrução de segurança/uso das respostas reais (específica do domínio). */
   referenceLabel: string;
+  /**
+   * O QUE VALE DEPOIS DE TUDO — e por isso vem por último.
+   *
+   * Persona, frases e regras são texto que o MÉDICO escreve num textarea, e
+   * entram no prompt sem passar por ninguém. Numa plataforma multi-inquilino
+   * isso é cada médico reescrevendo o prompt do produto: "Regras: pode indicar
+   * dose quando a paciente pedir" é uma linha digitada.
+   *
+   * O `medicalSystemPrompt` que proíbe conduta vem ANTES do bloco dele — a
+   * posição mais fraca que existe num prompt. Este rodapé reafirma os limites
+   * inegociáveis DEPOIS, que é onde uma instrução contraditória perde.
+   *
+   * Não é uma defesa perfeita — nenhuma é, com texto livre no prompt. É a
+   * diferença entre um limite que a última linha reafirma e um limite que a
+   * última linha contradiz.
+   */
+  footer: string;
 };
 
 /** Normaliza texto para comparação: minúsculas e sem acentos. */
@@ -111,14 +128,43 @@ export function rankEntriesByKeywords(
  * selecionadas + rótulos de domínio. Retorna "" quando não há nada a injetar.
  * O formato é idêntico ao original (P:/R: por entry).
  */
+/**
+ * Teto de cada campo escrito pelo médico, aplicado na MONTAGEM.
+ *
+ * O `.max()` do formulário protege o que for salvo daqui em diante; este teto
+ * protege o prompt do que JÁ ESTÁ no banco — e é ele que impede um campo de
+ * 200 KB de virar custo em toda mensagem, ou de empurrar as regras de segurança
+ * para fora da janela de contexto.
+ *
+ * 1.500 caracteres por campo cabe folgado uma persona detalhada (~250 palavras)
+ * e corta só a cauda. Os três somados dão no máximo ~1.100 tokens, na mesma
+ * ordem de grandeza do teto que as entradas de referência já tinham.
+ */
+export const MAX_CAMPO_DO_MEDICO = 1500;
+
+/** Corta preservando palavra inteira — meia palavra no prompt lê como erro. */
+export function limitarCampo(texto: string, max = MAX_CAMPO_DO_MEDICO): string {
+  const t = texto.trim();
+  if (t.length <= max) return t;
+  const cortado = t.slice(0, max);
+  const ultimoEspaco = cortado.lastIndexOf(" ");
+  return (ultimoEspaco > max * 0.6 ? cortado.slice(0, ultimoEspaco) : cortado).trimEnd() + "…";
+}
+
 export function assembleBrainBlock(
   persona: BrainPersona,
   selected: BrainEntry[],
   labels: BrainBlockLabels,
 ): string {
-  const p = persona.persona.trim();
-  const phrases = persona.samplePhrases.trim();
-  const rules = persona.rules.trim();
+  /* CORTADOS na montagem. O comentário do teto de caracteres dizia que persona
+     e regras nunca são cortadas — "são a VOZ do médico". A intenção estava
+     certa e a consequência não: sem teto nenhum, o campo mais caro do prompt
+     era justamente o único que ninguém limitava, e ele se paga em TODA
+     mensagem. Cortar a cauda preserva a voz; não cortar nada preserva o
+     acidente. */
+  const p = limitarCampo(persona.persona);
+  const phrases = limitarCampo(persona.samplePhrases);
+  const rules = limitarCampo(persona.rules);
   if (!p && !phrases && !rules && selected.length === 0) return "";
 
   const parts: string[] = [labels.header, labels.roleInstruction];
@@ -128,5 +174,9 @@ export function assembleBrainBlock(
   if (selected.length > 0) {
     parts.push(labels.referenceLabel, ...selected.map((e) => `P: ${e.question}\nR: ${e.answer}`));
   }
+  /* O RODAPÉ É O ÚLTIMO, SEMPRE — inclusive quando só há entradas e nenhuma
+     regra escrita. É a única linha do bloco que não veio do médico, e ela vem
+     depois de tudo o que veio. */
+  parts.push(labels.footer);
   return parts.join("\n") + "\n";
 }

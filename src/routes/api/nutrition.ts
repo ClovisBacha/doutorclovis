@@ -19,6 +19,47 @@ Regras absolutas:
 - Mencione alimentos que devem ser EVITADOS quando relevante (peixes com mercúrio, queijos não pasteurizados, carnes cruas, álcool, embutidos em excesso).
 - Valorize uma alimentação variada, colorida e baseada em alimentos in natura.`;
 
+/**
+ * O consultório desta paciente. Sem médico vinculado → sem cérebro, e a
+ * nutrição responde com informação consolidada, como sempre respondeu.
+ */
+async function consultorioDaPaciente(
+  userId: string,
+): Promise<{ doctorId: string | null; patientId: string }> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", userId)
+      .maybeSingle();
+    return { doctorId: (data?.doctor_id as string | null) ?? null, patientId: userId };
+  } catch {
+    /* Falha de banco não pode derrubar o chat dela: segue sem o cérebro. */
+    return { doctorId: null, patientId: userId };
+  }
+}
+
+/**
+ * A última coisa que a paciente escreveu — é ela que procura no cérebro.
+ *
+ * O histórico inteiro não serve: a busca é por significado de UMA pergunta, e
+ * misturar seis mensagens produz um vetor que não é de nada.
+ */
+function ultimaPergunta(mensagens: UIMessage[]): string {
+  for (let i = mensagens.length - 1; i >= 0; i--) {
+    const m = mensagens[i];
+    if (m?.role !== "user") continue;
+    const texto = (m.parts ?? [])
+      .filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join(" ")
+      .trim();
+    if (texto) return texto;
+  }
+  return "";
+}
+
 export const Route = createFileRoute("/api/nutrition")({
   server: {
     handlers: {
@@ -60,10 +101,34 @@ export const Route = createFileRoute("/api/nutrition")({
               : ({ ...m, parts: m.parts.filter((p) => p.type === "text") } as UIMessage),
           );
 
+        /* ─── A NUTRIÇÃO ENTRA NO CICLO DO CÉREBRO ─────────────────────────
+           Este era um chat clínico ÓRFÃO: streaming completo, vocabulário de
+           vômito, perda de peso e queijo não pasteurizado — e nenhuma das três
+           peças que fazem o produto funcionar. Sem cérebro (não usava as
+           orientações do médico), sem 👍👎 (nada que saísse errado voltava para
+           ele) e sem lacuna (a dúvida que ele não cobria morria ali).
+           Ou seja: um segundo canal onde a IA falava com a paciente DELE sobre
+           alimentação na gestação, completamente fora do controle dele.
+
+           `channel: "app"` de propósito — é o mesmo interruptor que ele já
+           ligou ("usar no chat do app"), e a nutrição é o app. Inventar um
+           canal novo faria o cérebro nascer DESLIGADO aqui por default-deny,
+           e ninguém entenderia por quê. */
+        const { doctorId, patientId } = await consultorioDaPaciente(usuario.id);
+        const ultima = ultimaPergunta(paraOModelo);
+        const { getBrainContextResolved } = await import("@/lib/secondbrain.server");
+        const brain =
+          doctorId && ultima ? await getBrainContextResolved(ultima, doctorId, "app") : null;
+
+        const blocoDoMedico =
+          brain?.enabledApp && brain.block
+            ? `\n\n${brain.block}\nO bloco acima é do médico que acompanha esta gestante. Use como referência de conduta e tom. Quando a dúvida dela não estiver coberta por ele, responda com informação nutricional consolidada e diga, com acolhimento, que registrou a pergunta para ele.`
+            : "";
+
         const google = createChatProvider(key);
         const result = streamText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
-          system: NUTRITION_SYSTEM,
+          system: NUTRITION_SYSTEM + blocoDoMedico,
           messages: await convertToModelMessages(paraOModelo),
           providerOptions: {
             google: {
@@ -93,8 +158,17 @@ export const Route = createFileRoute("/api/nutrition")({
               modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
               inputTokens: usage?.inputTokens,
               outputTokens: usage?.outputTokens,
+              doctorId,
+              patientId,
               canal: "nutricao",
+              cobertura: brain ? brain.hadCoverage : undefined,
+              similaridade: brain?.melhorSimilaridade ?? null,
             });
+            /* A LACUNA É AGUARDADA AQUI, e não disparada.
+               `getBrainContext` devolve a gravação em voo; em serverless, o que
+               não for esperado dentro do `onFinish` morre com o congelamento da
+               invocação. Foi assim que três recursos desta base morreram. */
+            if (brain?.gravacaoDaLacuna) await brain.gravacaoDaLacuna;
           },
         });
 

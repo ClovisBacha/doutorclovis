@@ -118,6 +118,8 @@ import {
   installStarterPack,
   getBrainQualityStats,
   diagnosticoDaBusca,
+  diasSemRevisao,
+  precisaDeRevisao,
   extractKnowledgeFromTranscript,
   evalBrainQuestion,
   listBrainConversations,
@@ -125,6 +127,9 @@ import {
   getBrainScore,
   type BrainGap,
   type LacunaQueVoltou,
+} from "@/lib/secondbrain.functions";
+import { MAX_CAMPO_DO_MEDICO } from "@/lib/doctorthink/core";
+import {
   type BrainEntry,
   type BrainSettings,
   type BrainConversation,
@@ -6935,6 +6940,31 @@ function BrainGapsCard({
   );
 }
 
+/**
+ * Quanto do campo já foi usado — e o aviso quando o corte está perto.
+ *
+ * O teto existe por dois motivos que se somam: estes três campos entram no
+ * prompt em TODA mensagem (então o custo deles se paga toda vez), e são texto
+ * livre do médico dentro das instruções do modelo. Sem teto, o campo mais caro
+ * do prompt era justamente o único que ninguém limitava.
+ *
+ * O contador aparece só a partir de 70%: um número embaixo de todo campo, o
+ * tempo inteiro, ensina a não olhar para ele.
+ */
+function ContadorDoCampo({ valor }: { valor: string }) {
+  const usado = valor.length;
+  if (usado < MAX_CAMPO_DO_MEDICO * 0.7) return null;
+  const cheio = usado >= MAX_CAMPO_DO_MEDICO;
+  return (
+    <p
+      className={`mt-1 text-[11px] tabular-nums ${cheio ? "text-amber-600" : "text-muted-foreground"}`}
+    >
+      {usado}/{MAX_CAMPO_DO_MEDICO}
+      {cheio ? " — limite atingido" : ""}
+    </p>
+  );
+}
+
 /** Card "Estilo do médico": persona, frases típicas, regras e onde usar o cérebro. */
 function BrainSettingsCard({
   tokenFn,
@@ -7008,10 +7038,12 @@ function BrainSettingsCard({
             <textarea
               value={settings.persona}
               onChange={(e) => patch({ persona: e.target.value })}
+              maxLength={MAX_CAMPO_DO_MEDICO}
               rows={3}
               placeholder="Ex: Sou acolhedor e direto, explico com linguagem simples e sempre tranquilizo a paciente antes de orientar."
               className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
             />
+            <ContadorDoCampo valor={settings.persona} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -7020,12 +7052,14 @@ function BrainSettingsCard({
             <textarea
               value={settings.sample_phrases}
               onChange={(e) => patch({ sample_phrases: e.target.value })}
+              maxLength={MAX_CAMPO_DO_MEDICO}
               rows={3}
               placeholder={
                 "Ex:\nFica tranquila, isso é comum na gestação.\nQualquer dúvida, estou por aqui."
               }
               className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
             />
+            <ContadorDoCampo valor={settings.sample_phrases} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -7034,10 +7068,12 @@ function BrainSettingsCard({
             <textarea
               value={settings.rules}
               onChange={(e) => patch({ rules: e.target.value })}
+              maxLength={MAX_CAMPO_DO_MEDICO}
               rows={3}
               placeholder="Ex: Nunca indicar medicação. Em sangramento ou dor forte, orientar procurar o pronto-socorro imediatamente."
               className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
             />
+            <ContadorDoCampo valor={settings.rules} />
           </div>
           <div className="flex flex-wrap items-center gap-6">
             <BrainToggle
@@ -7576,6 +7612,19 @@ function BrainKnowledgeCard({
                     {entry.category && (
                       <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                         {entry.category}
+                      </span>
+                    )}
+                    {/* A IDADE DA CONDUTA.
+                        Uma orientação escrita há dois anos entrava na resposta
+                        com a mesma confiança da de ontem, e nem ele nem a tela
+                        conseguiam dizer qual era qual — em obstetrícia, onde a
+                        conduta muda por ciclo de diretriz.
+                        Só aparece quando passa de um ano: marcar tudo o tempo
+                        todo ensina a não olhar. */}
+                    {precisaDeRevisao(entry) && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                        revisar · {Math.floor((diasSemRevisao(entry) ?? 0) / 365)} ano
+                        {Math.floor((diasSemRevisao(entry) ?? 0) / 365) > 1 ? "s" : ""} sem olhar
                       </span>
                     )}
                   </div>

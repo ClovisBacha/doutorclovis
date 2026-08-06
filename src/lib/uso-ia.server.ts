@@ -104,7 +104,15 @@ export async function registrarUsoAgora(u: Uso): Promise<void> {
       doctor_id: u.doctorId ?? null,
       patient_id: u.patientId ?? null,
       especie: u.especie,
-      canal: u.canal ?? "app",
+      /* ─── O PADRÃO NÃO PODE SER UM CANAL QUE COBRA ─────────────────────
+         Era `?? "app"`. Ou seja: quem chamasse `registrarUso` sem informar o
+         canal cobrava da franquia clínica da gestante — a mesma "cobrança por
+         omissão" que a lista de exclusões produzia, agora no lugar exato que
+         decide. Uma trava mecânica encontrou esta linha.
+         `desconhecido` fica fora da cota e aparece no card de custo da
+         plataforma, que é onde um canal não rotulado deve doer: em quem pode
+         consertá-lo. */
+      canal: u.canal ?? "desconhecido",
       modelo: u.modelo,
       input_tokens: entrada,
       output_tokens: saida,

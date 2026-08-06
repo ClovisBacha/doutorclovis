@@ -9261,6 +9261,36 @@ function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest })
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  /* ─── O 👎 QUE NÃO EXISTIA AQUI ────────────────────────────────────────────
+     Este chat clínico não tinha nenhum caminho de correção: o que saísse errado
+     ficava entre a IA e a paciente, para sempre. O chat principal tem
+     `submitBrainFeedback` em três lugares; este tinha zero.
+     Mesma função, mesma fila de revisão do médico — o 👎 daqui chega no mesmo
+     lugar que o de lá, e é isso que fecha o ciclo. */
+  const [votos, setVotos] = useState<Record<number, boolean>>({});
+
+  async function votar(indice: number, gostou: boolean) {
+    if (votos[indice] !== undefined) return;
+    setVotos((v) => ({ ...v, [indice]: gostou }));
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess.session) return;
+      await submitBrainFeedback({
+        data: {
+          accessToken: sess.session.access_token,
+          /* A PERGUNTA DELA, não a resposta: é ela que o médico precisa ler
+             para entender o que foi perguntado e onde o cérebro falhou. */
+          question: messages[indice - 1]?.content ?? "",
+          answer: messages[indice]?.content ?? "",
+          helpful: gostou,
+        },
+      });
+      if (!gostou) toast("Anotado — seu médico vai ver 💛");
+    } catch {
+      /* O voto já está na tela; insistir com um erro sobre um 👍 seria pior
+         que perder o 👍. */
+    }
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -9418,6 +9448,33 @@ function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest })
                 }`}
               >
                 {m.content || "..."}
+                {/* Só nas respostas da IA, e não na saudação (i > 0). */}
+                {m.role === "assistant" && i > 0 && m.content && (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    {votos[i] !== undefined ? (
+                      <span className="text-[10px] text-muted-foreground">
+                        {votos[i] ? "Obrigada 💛" : "Anotado — seu médico vai ver"}
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => votar(i, true)}
+                          aria-label="Esta resposta ajudou"
+                          className="text-xs opacity-50 hover:opacity-100"
+                        >
+                          👍
+                        </button>
+                        <button
+                          onClick={() => votar(i, false)}
+                          aria-label="Esta resposta não ajudou"
+                          className="text-xs opacity-50 hover:opacity-100"
+                        >
+                          👎
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

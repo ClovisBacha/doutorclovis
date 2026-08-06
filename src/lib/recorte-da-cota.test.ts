@@ -22,7 +22,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { CANAL_DA_COTA, aplicarRecorteDaCota } from "./cota-ia.server";
+import { CANAIS_DA_COTA, aplicarRecorteDaCota } from "./cota-ia.server";
 
 type Filtro = { op: string; coluna: string; valor: string };
 
@@ -32,6 +32,10 @@ function consultaFalsa() {
   const q: any = {
     eq: (coluna: string, valor: string) => {
       filtros.push({ op: "eq", coluna, valor });
+      return q;
+    },
+    in: (coluna: string, valores: readonly string[]) => {
+      filtros.push({ op: "in", coluna, valor: [...valores].join(",") });
       return q;
     },
     neq: (coluna: string, valor: string) => {
@@ -52,11 +56,11 @@ describe("o recorte da cota", () => {
   const { q, filtros } = consultaFalsa();
   aplicarRecorteDaCota(q);
 
-  test("conta o chat do app — o canal que o portão consegue parar", () => {
-    /* O portão vive em `getBrainContext` e protege um caminho só. Contar o que
-       ele não consegue interromper faria a cota estourar por um trabalho que
-       ninguém tem como frear. */
-    expect(filtros).toEqual([{ op: "eq", coluna: "canal", valor: "app" }]);
+  test("conta os chats clínicos do app — o que o portão consegue parar", () => {
+    /* O portão vive em `getBrainContext`. Contar o que ele não consegue
+       interromper faria a cota estourar por um trabalho que ninguém tem como
+       frear — e a gestante ficaria sem resposta clínica por causa disso. */
+    expect(filtros).toEqual([{ op: "in", coluna: "canal", valor: "app,nutricao" }]);
   });
 
   test("é uma lista de PERMISSÃO, não de exclusão", () => {
@@ -72,11 +76,13 @@ describe("o recorte da cota", () => {
     expect(filtros).toHaveLength(1);
   });
 
-  test("o canal é literalmente 'app'", () => {
-    /* Literal, e não derivado da constante: um teste que só reafirma a
-       constante passa verde quando alguém a troca por 'whatsapp'. Foi medido
-       nesta base — mutar um limiar deixava a suíte inteira verde. */
-    expect(CANAL_DA_COTA).toBe("app");
+  test("os canais são literalmente 'app' e 'nutricao'", () => {
+    /* Literais, e não derivados da constante: um teste que só a reafirma passa
+       verde quando alguém troca 'app' por 'whatsapp'. Foi medido nesta base —
+       mutar um limiar deixava a suíte inteira verde.
+       Os dois são chat CLÍNICO da paciente com o cérebro do médico. Um terceiro
+       aqui precisa ser essa mesma coisa, e não "mais um lugar que usa IA". */
+    expect([...CANAIS_DA_COTA].sort()).toEqual(["app", "nutricao"]);
   });
 });
 
@@ -94,7 +100,6 @@ describe("os canais que NÃO podem consumir a franquia clínica", () => {
     "busca-medicos", // interpretar o texto de quem procura obstetra
     "teleconsulta", // resumo da consulta
     "conselheiro", // diagnóstico do consultório, para o médico
-    "nutricao", // o chat de nutrição
     "rascunho-lacuna", // o rascunho que o médico revisa antes de publicar
   ];
 
@@ -102,8 +107,8 @@ describe("os canais que NÃO podem consumir a franquia clínica", () => {
     test(`"${canal}" não conta na cota`, () => {
       const { q, filtros } = consultaFalsa();
       aplicarRecorteDaCota(q);
-      const permitido = filtros.find((f) => f.op === "eq" && f.coluna === "canal")?.valor;
-      expect(permitido).not.toBe(canal);
+      const permitidos = (filtros.find((f) => f.op === "in")?.valor ?? "").split(",");
+      expect(permitidos).not.toContain(canal);
     });
   }
 });

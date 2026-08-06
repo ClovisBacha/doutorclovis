@@ -276,6 +276,24 @@ const BACKFILL_TIMEOUT_MS = 6000;
  * Devolve quantas embedou — é o número que torna o efeito verificável de fora.
  * Nunca lança: enriquecimento perdido não pode virar painel quebrado.
  */
+/**
+ * A ordem em que as entradas ganham vetor. Separada para poder ser exercitada:
+ * é uma decisão de PRODUTO — quem fica visível primeiro — escondida dentro de
+ * duas chamadas de construtor de consulta.
+ *
+ * `approved` DESCENDENTE porque em Postgres `false < true`, então descendente
+ * põe as aprovadas na frente. Desempate pela mais antiga: a que está esperando
+ * há mais tempo é a que está invisível há mais tempo.
+ */
+export function priorizarAprovadas<T>(q: T): T {
+  const query = q as unknown as {
+    order: (c: string, o: { ascending: boolean }) => unknown;
+  };
+  return (query.order("approved", { ascending: false }) as any).order("created_at", {
+    ascending: true,
+  }) as T;
+}
+
 export async function backfillBrainEmbeddings(
   doctorId: string,
   limit = BACKFILL_POR_VEZ,
@@ -284,10 +302,25 @@ export async function backfillBrainEmbeddings(
     if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) return 0;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
-    const { data: rows, error } = await sb
-      .from("brain_entries")
-      .select("id,question,answer")
-      .eq("doctor_id", doctorId)
+    /* ─── APROVADA PRIMEIRO ───────────────────────────────────────────────
+     *
+     * `match_brain_entries` filtra `AND e.approved = true`: rascunho não é
+     * encontrável, por vetor nem por palavra. Mas o backfill pegava qualquer
+     * `embedding IS NULL`, sem ordem, 20 por visita.
+     *
+     * O kit de partida instala ~30 entradas como RASCUNHO. Então duas visitas
+     * inteiras à Base de conhecimento podiam ser gastas vetorizando exatamente
+     * o que a busca nunca vai devolver — enquanto a orientação aprovada do
+     * médico seguia invisível e a paciente ouvia "registrei para ele ver"
+     * sobre um assunto que ele já tinha escrito.
+     *
+     * O rascunho continua sendo embedado (ele vira aprovado um dia, e o vetor
+     * já estar pronto é bom), só que DEPOIS. `approved` descendente porque em
+     * Postgres `false < true`.
+     */
+    const { data: rows, error } = await priorizarAprovadas(
+      sb.from("brain_entries").select("id,question,answer").eq("doctor_id", doctorId),
+    )
       .is("embedding", null)
       .limit(Math.min(limit, BACKFILL_POR_VEZ));
     if (error || !rows?.length) return 0; // 42703/42P01: migração pendente → nada a fazer
