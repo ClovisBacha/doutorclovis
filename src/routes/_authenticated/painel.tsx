@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -5164,6 +5164,8 @@ function CerebroSection({
           que já existe.
         </p>
       </div>
+      <ComecePorAqui tokenFn={tokenFn} asDoctor={asId} />
+
       {/* ─── ① O QUE ESTÁ ESPERANDO ELE ──────────────────────────────────
           O argumento para pôr o Cérebro na PRIMEIRA aba foi "a fila de lacunas
           e a de revisão são trabalho que rende". Dentro da aba, as filas eram o
@@ -5833,6 +5835,132 @@ function BrainLevelCard({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * COMECE POR AQUI — a tela do médico que abriu o Cérebro pela primeira vez.
+ *
+ * A ordem dos cards está certa para o cérebro MADURO: trabalho, depois estado,
+ * depois ferramentas. Para o primeiro acesso ela era o pior arranjo possível —
+ * e o primeiro acesso virou a primeira tela do produto quando o Cérebro passou
+ * a ser a aba de entrada.
+ *
+ * O que ele lia, na ordem: "nenhuma lacuna aberta — o cérebro cobriu tudo que
+ * perguntaram ✅", "nenhuma resposta reprovada", "tudo respondido por aqui 🎉",
+ * um anel zerado e "nenhuma resposta ainda neste ciclo". **Três caixas verdes
+ * de "nada a fazer" e um zero**, num cérebro que nunca foi treinado. Lê-se
+ * "está pronto", e as três ações que de fato começam o produto estavam abaixo
+ * da dobra ou escondidas num botão de 12px.
+ *
+ * Some sozinho assim que existe qualquer conhecimento aprovado — não é
+ * onboarding com "pular", é a ausência de conteúdo falando por si.
+ */
+function ComecePorAqui({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  asDoctor?: string;
+}) {
+  const [novo, setNovo] = useState<boolean | null>(null);
+  const [instalando, setInstalando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    try {
+      const res = await listBrainEntries({
+        data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+      });
+      /* APROVADAS, não "existe alguma linha": o kit de partida entra como
+         rascunho, e um cérebro com 33 rascunhos e nada aprovado é exatamente
+         um cérebro que ainda não começou. */
+      setNovo(res.ok ? !res.entries.some((e) => e.approved) : false);
+    } catch {
+      /* Na dúvida, não aparece: um bloco de boas-vindas para quem já trabalhou
+         é pior que nenhum. */
+      setNovo(false);
+    }
+  }, [tokenFn, asDoctor]);
+
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
+
+  if (novo !== true) return null;
+
+  const passo = "flex items-start gap-3 rounded-2xl border border-border bg-card p-4";
+  const numero =
+    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground";
+
+  return (
+    <div className="rounded-3xl border border-primary/30 bg-primary/5 p-5">
+      <p className="font-serif text-xl">👋 Comece por aqui</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Seu cérebro ainda não tem nenhuma resposta aprovada — então as caixas verdes abaixo dizem
+        &ldquo;nada pendente&rdquo; porque ninguém perguntou nada ainda, não porque está pronto.
+        Três passos e a IA passa a falar como {asDoctor ? "ele" : "você"}.
+      </p>
+
+      <div className="mt-4 space-y-2">
+        <div className={passo}>
+          <span className={numero}>1</span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Diga como você fala</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              É o que muda o tom de toda resposta. Fica no card <strong>Estilo do médico</strong>,
+              no fim desta aba.
+            </p>
+          </div>
+        </div>
+
+        <div className={passo}>
+          <span className={numero}>2</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Instale 30 dúvidas clássicas</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Entram como rascunho: você edita no seu estilo e aprova o que quiser. Nada vai para as
+              pacientes sem o seu aval.
+            </p>
+            <button
+              type="button"
+              disabled={instalando}
+              onClick={async () => {
+                setInstalando(true);
+                try {
+                  const res = await installStarterPack({
+                    data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+                  });
+                  if (res.ok) {
+                    toast.success(
+                      `${res.installed} dúvidas instaladas como rascunho — revise e aprove na Base de conhecimento 👇`,
+                    );
+                    carregar();
+                  } else toast.error("Não consegui instalar agora. Tente de novo.");
+                } catch {
+                  toast.error("Não consegui instalar agora. Tente de novo.");
+                } finally {
+                  setInstalando(false);
+                }
+              }}
+              className="press mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {instalando ? "Instalando…" : "Instalar agora"}
+            </button>
+          </div>
+        </div>
+
+        <div className={passo}>
+          <span className={numero}>3</span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Grave uma consulta</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              A IA extrai as suas orientações do áudio e escreve os rascunhos na sua voz. Fica em{" "}
+              <strong>Consulta vira conhecimento</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

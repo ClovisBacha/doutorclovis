@@ -97,11 +97,16 @@ async function rodar(opts: {
       aiRepliesPerCycle: 500,
     }),
   }));
-  mock.module("./cota-ia.server", () => ({
-    cotaDoMedico: async () => ({ usadas: 1, teto: 500, estado: "ok" }),
-    avisarMedicoDaCota: async () => {},
-    inicioDoCiclo: () => new Date(0),
-  }));
+  /* `./cota-ia.server` NÃO é mockado — e isto é conserto de um defeito que só
+     aparecia no CI.
+     `mock.module` substitui o módulo no registro COMPARTILHADO entre arquivos
+     de teste. Quando este rodava antes de `cota-ia.test.ts`, aquele importava o
+     dublê: `situacaoDaCota` chegava `undefined`, o arquivo estourava no escopo
+     de módulo e os **57 testes dele desapareciam** — não falhavam, sumiam da
+     contagem. Localmente a ordem dos arquivos era outra e nunca acontecia.
+     Não precisa de dublê: com o banco falso devolvendo `count` indefinido,
+     `respostasNoCiclo` dá 0, a cota fica `ok`, e `avisarMedicoDaCota` retorna
+     na primeira linha sem tocar em nada. O caminho real é inofensivo aqui. */
 
   const anterior = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = "chave-de-teste";
