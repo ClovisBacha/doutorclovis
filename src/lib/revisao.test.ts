@@ -52,8 +52,21 @@ describe("o voto carrega o que foi reprovado", () => {
   test("votar duas vezes é um voto só", () => {
     /* O voto vivia no estado da tela: recarregar permitia votar de novo e
        inflar a fila, fazendo uma reclamação parecer dez. */
-    expect(fn).toContain('{ onConflict: "user_id,question,helpful" }');
+    expect(fn).toContain("onConflict:");
     expect(sql).toContain("CREATE UNIQUE INDEX IF NOT EXISTS uq_brain_feedback_voto");
+  });
+
+  test("MUDAR DE IDEIA substitui — o `helpful` não pode estar na chave", () => {
+    /* Com `helpful` DENTRO da chave, 👍 e 👎 da mesma paciente sobre a mesma
+       pergunta conviviam como duas linhas. Uma paciente que tocou no 👎 sem
+       querer e corrigiu entrava como um voto positivo E um negativo — 50% de
+       satisfação sozinha, no número que o produto usa como prova de valor. E o
+       👎 ficava `aberta` na fila dele para sempre, sobre uma resposta que ela
+       já tinha dito que ajudou.
+       Este teste afirma a AUSÊNCIA porque é ela que conserta: a chave certa é
+       (paciente, pergunta), e o último voto vale. */
+    expect(fn).not.toContain('onConflict: "user_id,question,helpful"');
+    expect(fn).toContain('onConflict: "user_id,question"');
   });
 });
 

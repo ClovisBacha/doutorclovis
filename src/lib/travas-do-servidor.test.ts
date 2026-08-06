@@ -175,6 +175,36 @@ describe("chamada paga de modelo tem que ser medida", () => {
   });
 });
 
+describe("o modo cuidado não pode sumir num caminho de degradação", () => {
+  /**
+   * `api/chat.ts` lê o perfil da paciente em DOIS lugares: a consulta rica e o
+   * fallback que existe para o chat não cair quando uma coluna não foi migrada.
+   *
+   * O fallback é o caminho da falha — e é justamente ali que esquecer
+   * `care_mode` teria o efeito de RELIGAR as semanas gestacionais para a
+   * paciente em luto. O pior desfecho do produto acontecendo dentro do
+   * mecanismo que existe para proteger.
+   *
+   * Medido: remover `care_mode` só do fallback não quebrava teste nenhum.
+   */
+  test("toda leitura de patient_profiles no chat traz care_mode", () => {
+    const codigo = codigoDe("src/routes/api/chat.ts");
+    const re = /\.from\("patient_profiles"\)/g;
+    let m: RegExpExecArray | null;
+    let leituras = 0;
+    while ((m = re.exec(codigo))) {
+      const janela = codigo.slice(m.index, m.index + 500);
+      /* Só as que montam o CONTEXTO da resposta. Uma leitura de outra coisa
+         (contagem, vínculo) não precisa do campo. */
+      if (!janela.includes("lmp_date")) continue;
+      leituras++;
+      expect(janela).toContain("care_mode");
+    }
+    // Se a regex parar de casar, o teste passa com zero e vira decoração.
+    expect(leituras).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe("o Segundo Cérebro vive só no chat do app", () => {
   /**
    * Decisão de produto do Clóvis (ago/2026), e ela precisa de trava porque o

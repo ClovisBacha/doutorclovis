@@ -116,7 +116,7 @@ async function resolvePatientDoctor(request: Request): Promise<{
     const first = await (supabaseAdmin as any)
       .from("patient_profiles")
       .select(
-        "doctor_id,lmp_date,reference_date,reference_weeks,reference_days,pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm,prior_cesarean",
+        "doctor_id,care_mode,lmp_date,reference_date,reference_weeks,reference_days,pregnancy_number,prior_bp_elevated,prior_bp_week,prior_gestational_diabetes,prior_preterm,prior_cesarean",
       )
       .eq("id", data.user.id)
       .maybeSingle();
@@ -128,7 +128,12 @@ async function resolvePatientDoctor(request: Request): Promise<{
       console.error("[chat] clinical select failed, fallback to essentials", first.error);
       const fb = await (supabaseAdmin as any)
         .from("patient_profiles")
-        .select("doctor_id,lmp_date,reference_date,reference_weeks,reference_days")
+        /* `care_mode` VEM AQUI TAMBÉM. Este é o caminho de degradação (uma
+           coluna do perfil rico não migrada), e ele existe para o chat não
+           cair. Sem `care_mode` na lista, a degradação teria o efeito de
+           RELIGAR as semanas para a paciente em luto — o pior desfecho do
+           produto acontecendo justamente no caminho que existe para proteger. */
+        .select("doctor_id,care_mode,lmp_date,reference_date,reference_weeks,reference_days")
         .eq("id", data.user.id)
         .maybeSingle();
       prof = fb.data;
@@ -161,11 +166,39 @@ async function resolvePatientDoctor(request: Request): Promise<{
 }
 
 /**
+ * O histórico obstétrico, separado do resto.
+ *
+ * Existe como função porque ele vale nos DOIS estados: na gestação em curso
+ * (calibra a conduta) e no Modo Cuidado (importa para a recuperação e para uma
+ * gestação futura). Só a semana some no segundo.
+ */
+function historicoObstetrico(prof: {
+  pregnancy_number?: number | null;
+  prior_bp_elevated?: boolean | null;
+  prior_bp_week?: number | null;
+  prior_gestational_diabetes?: boolean | null;
+  prior_preterm?: boolean | null;
+  prior_cesarean?: boolean | null;
+}): string {
+  if ((prof.pregnancy_number ?? 1) < 2) return "";
+  const prior: string[] = [];
+  if (prof.prior_bp_elevated)
+    prior.push(
+      `pressão elevada na gestação anterior${prof.prior_bp_week ? ` (a partir da semana ${prof.prior_bp_week})` : ""}`,
+    );
+  if (prof.prior_gestational_diabetes) prior.push("diabetes gestacional anterior");
+  if (prof.prior_preterm) prior.push("parto prematuro anterior");
+  if (prof.prior_cesarean) prior.push("cesariana anterior");
+  return `- ${prof.pregnancy_number}ª gestação${prior.length ? `; histórico: ${prior.join(", ")}` : ""}`;
+}
+
+/**
  * Monta o bloco de contexto clínico para o system prompt. Só entra o que
  * existe no perfil; sem nome (privacidade no prompt) e com instrução de uso.
  */
-function buildClinicalBlock(
+export function buildClinicalBlock(
   prof: {
+    care_mode?: boolean | null;
     lmp_date?: string | null;
     reference_date?: string | null;
     reference_weeks?: number | null;
@@ -179,6 +212,47 @@ function buildClinicalBlock(
   } | null,
 ): string {
   if (!prof) return "";
+
+  /* ─── MODO CUIDADO ────────────────────────────────────────────────────────
+   *
+   * Ela ativa o Modo Cuidado quando a gestação termina em perda. O app inteiro
+   * responde: some a comemoração, some o ganho de sementinhas, some a conquista,
+   * some o push semanal, muda até o céu da tela.
+   *
+   * O chat não sabia. `care_mode` aparecia em doze arquivos e em NENHUM dos
+   * dois que decidem o que a IA diz — e este bloco seguia injetando "Semana
+   * gestacional: 24 (2º trimestre)".
+   *
+   * O resultado é o pior que este produto consegue produzir: a mulher que
+   * acabou de perder o bebê abre o chat e a IA fala com ela sobre as semanas
+   * dela, sobre o que esperar do trimestre, sobre o bebê. Vinte e quatro horas
+   * por dia, porque a IA não dorme.
+   *
+   * Aqui a semana NÃO entra, e no lugar dela entra a única instrução que
+   * importa. O histórico obstétrico continua — ele é o que protege a próxima
+   * gestação e a recuperação desta.
+   */
+  if (prof.care_mode) {
+    const cuidado: string[] = [
+      "- Esta paciente está em MODO CUIDADO: a gestação terminou em perda.",
+      "- NUNCA fale em semanas, trimestre, evolução do bebê, enxoval, parto ou expectativa de nascimento. Nada disso existe para ela agora.",
+      "- Não pergunte como está a gestação nem parabenize.",
+      "- Acolha primeiro, com frases curtas. Ela pode querer falar de luto, do corpo depois da perda, de sangramento, de leite que desceu, de quando tentar de novo — tudo isso é assunto legítimo e clínico.",
+      "- Sinal de alarme continua valendo: sangramento intenso, febre, dor forte → orientar atendimento agora.",
+    ];
+    if ((prof.pregnancy_number ?? 1) >= 2 || prof.prior_bp_elevated || prof.prior_preterm) {
+      cuidado.push(
+        "- O histórico obstétrico abaixo continua valendo: ele importa para a recuperação dela e para uma gestação futura.",
+      );
+    }
+    const hist = historicoObstetrico(prof);
+    return [
+      "## Contexto clínico da paciente (fonte: sistema — confiável)",
+      ...cuidado,
+      ...(hist ? [hist] : []),
+    ].join("\n");
+  }
+
   const lines: string[] = [];
   try {
     // Semana calculada NO SERVIDOR a partir do perfil (não confia no cliente).
@@ -196,19 +270,8 @@ function buildClinicalBlock(
   } catch {
     /* sem semana calculável */
   }
-  if ((prof.pregnancy_number ?? 1) >= 2) {
-    const prior: string[] = [];
-    if (prof.prior_bp_elevated)
-      prior.push(
-        `pressão elevada na gestação anterior${prof.prior_bp_week ? ` (a partir da semana ${prof.prior_bp_week})` : ""}`,
-      );
-    if (prof.prior_gestational_diabetes) prior.push("diabetes gestacional anterior");
-    if (prof.prior_preterm) prior.push("parto prematuro anterior");
-    if (prof.prior_cesarean) prior.push("cesariana anterior");
-    lines.push(
-      `- ${prof.pregnancy_number}ª gestação${prior.length ? `; histórico: ${prior.join(", ")}` : ""}`,
-    );
-  }
+  const hist = historicoObstetrico(prof);
+  if (hist) lines.push(hist);
   if (lines.length === 0) return "";
   return [
     "## Contexto clínico da paciente (fonte: sistema — confiável)",

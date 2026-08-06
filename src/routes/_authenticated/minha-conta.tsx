@@ -7611,6 +7611,23 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
             >
               DoctorThink
             </span>
+            {/* ─── ELA PRECISA SABER QUEM LÊ ISTO ────────────────────────────
+                O painel do médico tem a aba Conversas, e ele lê a transcrição
+                inteira. O comentário de `listBrainConversations` é honesto
+                sobre o que isso significa: "é o dado mais íntimo do produto: é
+                para a IA que ela conta o que não conta a ninguém."
+                E não havia UMA palavra na tela dela dizendo isso. Consentimento
+                que ninguém informou não é consentimento — e aqui o efeito
+                prático é pior que o jurídico: ela escreve coisas que talvez não
+                escrevesse, e descobre depois.
+                Fica na linha de assinatura, no cabeçalho, presente em toda
+                conversa — não num termo que ela aceitou uma vez e nunca leu. */}
+            {doctorName ? (
+              <>
+                {" · "}
+                <span>{doctorName} pode ler esta conversa</span>
+              </>
+            ) : null}
           </p>
         </div>
       </div>

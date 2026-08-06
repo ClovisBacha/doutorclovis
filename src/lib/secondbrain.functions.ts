@@ -1761,9 +1761,24 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
              `status` no default `'aberta'`. `listBrainReviews` filtra
              `.not("entry_id","is",null)`, então a linha some da fila do médico
              e NUNCA MAIS fecha: fica aberta para sempre, invisível. */
-          status: entryId ? "aberta" : "resolvida",
+          /* MUDAR DE IDEIA FECHA O QUE ESTAVA ABERTO.
+             Com `helpful` fora da chave, o 👍 depois de um 👎 SUBSTITUI a
+             linha — e esta expressão é o que impede a linha substituída de
+             continuar na fila dele. Sem isso, ela diria "não, isso me ajudou"
+             e ele ainda veria a correção pendente. */
+          status: data.helpful ? "resolvida" : entryId ? "aberta" : "resolvida",
         },
-        { onConflict: "user_id,question,helpful" },
+        /* SEM `helpful` NA CHAVE.
+           Era `(user_id, question, helpful)`: 👍 e 👎 da mesma paciente sobre a
+           mesma pergunta conviviam como DUAS linhas, e mudar de ideia somava em
+           vez de substituir. Uma paciente que tocou no 👎 sem querer e corrigiu
+           entrava como um voto positivo E um negativo — 50% de satisfação
+           sozinha, no número que o produto usa como prova de valor. E o 👎
+           ficava aberto na fila dele para sempre.
+           Precisa do `supabase/APLICAR_VOTO_UNICO.sql`; sem ele o PostgREST
+           devolve 42P10 e a rede logo abaixo preserva o voto pelo caminho
+           antigo. */
+        { onConflict: "user_id,question" },
       );
 
       /* SE A MIGRATION NÃO FOI APLICADA, O VOTO NÃO PODE SUMIR.
@@ -2241,6 +2256,45 @@ export const listBrainConversations = createServerFn({ method: "POST" })
       return { ok: true as const, conversations: [] as BrainConversation[] };
 
     const ids = [...byPatient.keys()];
+
+    /* ─── O NÚMERO DE MENSAGENS ERA CALCULADO DENTRO DA AMOSTRA ────────────
+     *
+     * A consulta acima traz as 600 mensagens mais recentes do CONSULTÓRIO
+     * inteiro, e o `count` saía de contar quantas dessas 600 eram de cada
+     * paciente. Ou seja: uma paciente com 300 mensagens aparecia com "12" se
+     * as outras 288 estivessem fora da janela — e, num consultório movimentado,
+     * quem escreveu muito EMPURRA as outras para fora e some junto.
+     *
+     * Um número que parece total e é amostra é pior que nenhum: o médico usa
+     * "quem mais conversou" para decidir onde olhar, e estava olhando para uma
+     * fatia arbitrária. É o mesmo defeito que "quem consome mais" já corrigiu
+     * com um `order` explícito — aqui a ordem estava certa e o TOTAL não.
+     *
+     * Uma contagem exata por paciente, em paralelo. `head: true` traz só o
+     * número; são poucas consultas (uma por paciente com conversa no recorte)
+     * e nenhuma linha viaja.
+     */
+    const totais = await Promise.all(
+      ids.map(async (id) => {
+        const { count, error } = await sb
+          .from("chat_messages")
+          .select("patient_id", { count: "exact", head: true })
+          .eq("doctor_id", target.doctorId)
+          .eq("patient_id", id);
+        /* Falhou a contagem? Fica o número da amostra, que é um PISO — nunca
+           maior que o real. Inventar zero apagaria a paciente da lista. */
+        if (error) {
+          console.error("[conversas] total exato não veio", id, error);
+          return null;
+        }
+        return count ?? null;
+      }),
+    );
+    ids.forEach((id, i) => {
+      const exato = totais[i];
+      if (exato !== null) byPatient.get(id)!.count = exato;
+    });
+
     const { data: profs } = await sb
       .from("patient_profiles")
       .select("id,display_name")
