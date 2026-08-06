@@ -258,3 +258,116 @@ describe("a paciente é avisada com honestidade, não com jargão", () => {
     expect(chat).not.toContain("personal_phone");
   });
 });
+
+/**
+ * O CONSUMO PRECISA SER VISTO, NÃO LIDO.
+ *
+ * "340 respostas" não diz se é muito. A barra diz na largura, antes de
+ * qualquer leitura — é a diferença entre informar e fazer entender.
+ *
+ * E o total responde "quanto". A pergunta seguinte, que é a que o médico de
+ * fato faz, é "quem": numa fila de cinquenta gestantes, três costumam
+ * responder por metade das conversas.
+ */
+describe("o consumo aparece antes de virar problema", () => {
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+
+  test("a barra aparece com qualquer uso, não só no aviso", () => {
+    /* Descobrir o limite só quando ele está perto é descobrir tarde. */
+    expect(painel).toContain("cota.teto > 0 && cota.usadas > 0 &&");
+  });
+
+  test("a barra muda de cor conforme a régua", () => {
+    expect(painel).toContain('cota.estado === "estourada"');
+    expect(painel).toContain("bg-destructive");
+    expect(painel).toContain("bg-amber-500");
+  });
+
+  test("passar do limite não faz a barra vazar do card", () => {
+    expect(painel).toContain("Math.min(100, Math.round((cota.usadas / cota.teto) * 100))");
+  });
+
+  test("mostra o número absoluto junto da barra", () => {
+    /* A barra dá a proporção; o número dá o que decidir. */
+    expect(painel).toContain("de {cota.teto}");
+  });
+});
+
+describe("quem mais conversou", () => {
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+  const cota = codigoDe("src/lib/cota-ia.server.ts");
+
+  test("a lista existe e é proporcional ao total", () => {
+    expect(painel).toContain("Quem mais conversou");
+    expect(cota).toContain("fatia: total > 0 ? respostas / total : 0");
+  });
+
+  test("uma paciente com pouquíssimo uso ainda aparece", () => {
+    /* 1 de 300 desenharia uma barra invisível — e barra invisível diz "zero"
+       quando o número diz "um". */
+    expect(painel).toContain("Math.max(4, Math.round(p.fatia * 100))");
+  });
+
+  test("o médico vê QUANTO, nunca O QUÊ", () => {
+    /* Consumo é dado de plano; conteúdo de conversa é da paciente. A lista
+       carrega nome e contagem — nunca texto. */
+    const trecho = cota.slice(cota.indexOf("export async function consumoPorPaciente"));
+    expect(trecho).toContain('.select("patient_id")');
+    expect(trecho).not.toContain("question");
+    expect(trecho).not.toContain("content");
+  });
+
+  test("conta só as respostas, igual à cota", () => {
+    /* Se a lista contasse memória e embedding, as fatias não fechariam com o
+       total que aparece na barra logo acima — dois números discordando na
+       mesma tela. */
+    const trecho = cota.slice(cota.indexOf("export async function consumoPorPaciente"));
+    expect(trecho).toContain('.eq("especie", "chat")');
+  });
+
+  test("falha na lista não derruba a cota", () => {
+    const trecho = cota.slice(cota.indexOf("export async function consumoPorPaciente"));
+    expect(trecho).toContain("return { total: 0, pacientes: [] };");
+  });
+
+  test("usa a coluna de nome que a tabela realmente tem", () => {
+    /* `patient_profiles` tem `display_name`. Pedir `name` devolveria erro e a
+       lista apareceria com todos chamados "Paciente" — um defeito que parece
+       decisão de design. */
+    expect(cota).toContain('.select("id,display_name")');
+  });
+});
+
+/** Só o corpo de `DOCTOR_TABS` — a lista termina em `];`, não em `as const`,
+    e recortar até o marcador errado varre metade do arquivo junto. */
+function listaDeAbas(painel: string): string {
+  const ini = painel.indexOf("const DOCTOR_TABS");
+  return painel.slice(ini, painel.indexOf("\n];", ini));
+}
+
+describe("o Cérebro é a primeira coisa que ele vê", () => {
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+
+  test("é a primeira aba da fita", () => {
+    /* Era a 11ª de 14 numa fita rolável de uma linha — uns oitocentos pixels à
+       direita num celular. O médico precisava ROLAR para chegar na única parte
+       do painel que fica melhor quanto mais ele a usa. */
+    const lista = listaDeAbas(painel);
+    const posCerebro = lista.indexOf('"Cérebro 🧠"');
+    const posPainel = lista.indexOf('"Painel 📊"');
+    expect(posCerebro).toBeGreaterThan(0);
+    expect(posCerebro).toBeLessThan(posPainel);
+  });
+
+  test("e é a aba que abre", () => {
+    /* O painel de números diz o que ACONTECEU; o cérebro é onde ele MUDA o que
+       vai acontecer. */
+    expect(painel).toContain('useState<PanelTab>("Cérebro 🧠")');
+  });
+
+  test("aparece uma vez só na lista", () => {
+    /* Duplicar renderizaria dois botões da mesma aba. */
+    const lista = listaDeAbas(painel);
+    expect((lista.match(/"Cérebro 🧠"/g) ?? []).length).toBe(1);
+  });
+});

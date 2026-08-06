@@ -644,8 +644,12 @@ export const cotaDeRespostas = createServerFn({ method: "POST" })
       import("./cota-ia.server"),
     ]);
     const ent = await getEntitlementsByDoctorId(target.doctorId);
-    const cota = await cotaDoMedico(target.doctorId, ent.aiRepliesPerCycle);
-    return { ok: true as const, ...cota };
+    const { consumoPorPaciente } = await import("./cota-ia.server");
+    const [cota, consumo] = await Promise.all([
+      cotaDoMedico(target.doctorId, ent.aiRepliesPerCycle),
+      consumoPorPaciente(target.doctorId),
+    ]);
+    return { ok: true as const, ...cota, ...consumo };
   });
 
 /**

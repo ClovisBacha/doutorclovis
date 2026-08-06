@@ -223,6 +223,14 @@ type PanelTab = (typeof PANEL_TABS)[number];
 // perfil, todas recortadas ao PRÓPRIO médico. O financeiro da plataforma
 // inteira e as Empresas ficam no console do dono (/admin), não aqui.
 const DOCTOR_TABS: readonly PanelTab[] = [
+  /* CÉREBRO PRIMEIRO, e isso é uma decisão de produto, não de layout.
+     Ele era a 11ª de 14 numa fita rolável de uma linha só — ou seja, uns
+     oitocentos pixels à direita num celular. O médico precisava ROLAR para
+     chegar na única parte do painel que fica melhor quanto mais ele a usa.
+     A fila de lacunas e a de revisão são trabalho que rende: cada resposta
+     dele economiza as próximas. Escondê-las atrás de uma rolagem horizontal é
+     o mesmo que pedir que ele lembre de procurar. */
+  "Cérebro 🧠",
   "Painel 📊",
   "Agendamentos",
   "Perguntas",
@@ -241,7 +249,6 @@ const DOCTOR_TABS: readonly PanelTab[] = [
   "Consultas Pagas",
   "Lives",
   "Engajamento",
-  "Cérebro 🧠",
   "Pacientes 👩‍🍼",
   "Clínica 🏥",
   "Meu Perfil",
@@ -281,7 +288,10 @@ function PainelPage() {
   const [podeEquipe, setPodeEquipe] = useState(true);
   const [rotuloPlano, setRotuloPlano] = useState("");
 
-  const [tab, setTab] = useState<PanelTab>("Painel 📊");
+  /* A aba que abre é a do Cérebro. O painel de números diz o que ACONTECEU; o
+     cérebro é onde ele MUDA o que vai acontecer. Abrir no primeiro faz o
+     produto parecer um relatório; abrir no segundo faz dele uma ferramenta. */
+  const [tab, setTab] = useState<PanelTab>("Cérebro 🧠");
   /* A fita de abas rola, então a aba ativa pode estar fora da tela.
   
      Isso importa porque várias trocas de aba são PROGRAMÁTICAS, não um toque do
@@ -5724,6 +5734,7 @@ function BrainScoreCard({
     usadas: number;
     teto: number | null;
     estado: "ok" | "aviso" | "estourada";
+    pacientes?: { patientId: string; nome: string; respostas: number; fatia: number }[];
   } | null>(null);
 
   useEffect(() => {
@@ -5790,6 +5801,76 @@ function BrainScoreCard({
           conversa e ela não sabe que algo mudou. O número absoluto ("400 de
           500") vem de propósito: é ele que permite decidir se sobe de plano;
           "80%" sozinho não diz nada acionável. */}
+      {/* ─── O CONSUMO, EM BARRA ────────────────────────────────────────────
+          Um número solto ("340 respostas") não diz se é muito. A barra diz na
+          largura, antes de qualquer leitura: é a diferença entre informar e
+          fazer entender.
+
+          Aparece SEMPRE que há teto e algum uso — não só no aviso. Descobrir o
+          limite só quando ele está perto é descobrir tarde; o médico precisa
+          ver o consumo subir para poder decidir com antecedência. */}
+      {cota && cota.teto != null && cota.teto > 0 && cota.usadas > 0 && (
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Respostas da IA neste mês
+            </p>
+            <p className="text-sm tabular-nums">
+              <strong>{cota.usadas}</strong>
+              <span className="text-muted-foreground"> de {cota.teto}</span>
+            </p>
+          </div>
+          <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+            <div
+              className={`h-full rounded-full transition-[width] duration-500 ${
+                cota.estado === "estourada"
+                  ? "bg-destructive"
+                  : cota.estado === "aviso"
+                    ? "bg-amber-500"
+                    : "bg-primary"
+              }`}
+              /* Teto de 100% na largura: passar do limite não pode fazer a
+                 barra vazar do card. O número ao lado continua contando a
+                 verdade. */
+              style={{ width: `${Math.min(100, Math.round((cota.usadas / cota.teto) * 100))}%` }}
+            />
+          </div>
+
+          {/* QUEM está consumindo. O total responde "quanto"; esta lista
+              responde a pergunta seguinte, que é a que ele de fato faz.
+              Numa fila de cinquenta gestantes, três costumam responder por
+              metade das conversas — e saber quais são muda o que ele faz:
+              pode ser ansiedade que pede consulta, ou uma dúvida recorrente
+              que vale virar entrada do cérebro. */}
+          {!!cota.pacientes?.length && (
+            <div className="mt-4 space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Quem mais conversou
+              </p>
+              {cota.pacientes.map((p) => (
+                <div key={p.patientId} className="flex items-center gap-3">
+                  <p className="w-28 shrink-0 truncate text-xs" title={p.nome}>
+                    {p.nome}
+                  </p>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className="h-full rounded-full bg-primary/70"
+                      /* Piso de 4%: uma paciente com 1 de 300 respostas
+                         desenharia uma barra invisível, e uma barra invisível
+                         diz "zero" quando o número diz "um". */
+                      style={{ width: `${Math.max(4, Math.round(p.fatia * 100))}%` }}
+                    />
+                  </div>
+                  <p className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                    {p.respostas} · {Math.round(p.fatia * 100)}%
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {cota && cota.teto != null && cota.teto > 0 && cota.estado !== "ok" && (
         <div
           className={`mt-3 rounded-xl border px-3 py-2 text-xs ${

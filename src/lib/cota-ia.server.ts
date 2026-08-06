@@ -104,3 +104,82 @@ export async function cotaDoMedico(
   if (teto === null || teto <= 0) return situacaoDaCota(0, teto);
   return situacaoDaCota(await respostasNoCiclo(doctorId, agora), teto);
 }
+
+/** Uma paciente na lista de quem mais consome. */
+export type ConsumoDaPaciente = {
+  patientId: string;
+  nome: string;
+  respostas: number;
+  /** Fatia do consumo TOTAL do médico no ciclo, de 0 a 1. */
+  fatia: number;
+};
+
+/**
+ * Quem está consumindo o plano do médico.
+ *
+ * O total já aparece no painel; isto responde a pergunta seguinte, que é a que
+ * ele realmente faz: *quem*. Numa fila de cinquenta gestantes, três costumam
+ * responder por metade das conversas — e saber quais são muda o que ele faz.
+ * Pode ser uma paciente ansiosa que precisa de uma consulta, ou uma dúvida
+ * recorrente que vale virar entrada do cérebro.
+ *
+ * Nome vem de `patient_profiles`; sem nome, um rótulo neutro. O que NÃO se faz
+ * aqui é mostrar o conteúdo das conversas: o médico vê quanto, não o quê.
+ */
+export async function consumoPorPaciente(
+  doctorId: string,
+  agora = new Date(),
+  limite = 6,
+): Promise<{ total: number; pacientes: ConsumoDaPaciente[] }> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const { data, error } = await sb
+      .from("ai_usage")
+      .select("patient_id")
+      .eq("doctor_id", doctorId)
+      .eq("especie", "chat")
+      .gte("created_at", inicioDoCiclo(agora).toISOString())
+      /* Teto de leitura: a agregação acontece aqui, não no banco, porque o
+         PostgREST não faz GROUP BY. Com milhares de linhas isto viraria uma
+         view materializada — mas otimizar antes de existir o problema é
+         inventar complexidade. */
+      .limit(5000);
+    if (error || !Array.isArray(data)) return { total: 0, pacientes: [] };
+
+    const porPaciente = new Map<string, number>();
+    for (const linha of data as { patient_id: string | null }[]) {
+      if (!linha.patient_id) continue;
+      porPaciente.set(linha.patient_id, (porPaciente.get(linha.patient_id) ?? 0) + 1);
+    }
+    const total = data.length;
+    if (!porPaciente.size) return { total, pacientes: [] };
+
+    const topo = [...porPaciente.entries()].sort((a, b) => b[1] - a[1]).slice(0, limite);
+    const { data: perfis } = await sb
+      .from("patient_profiles")
+      .select("id,display_name")
+      .in(
+        "id",
+        topo.map(([id]) => id),
+      );
+    const nomes = new Map<string, string>(
+      ((perfis ?? []) as { id: string; display_name: string | null }[]).map((p) => [
+        p.id,
+        p.display_name ?? "",
+      ]),
+    );
+
+    return {
+      total,
+      pacientes: topo.map(([id, respostas]) => ({
+        patientId: id,
+        nome: nomes.get(id)?.trim() || "Paciente",
+        respostas,
+        fatia: total > 0 ? respostas / total : 0,
+      })),
+    };
+  } catch {
+    return { total: 0, pacientes: [] };
+  }
+}
