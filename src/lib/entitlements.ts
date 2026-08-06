@@ -55,6 +55,22 @@ export type Entitlements = {
   badge: "" | "Starter" | "Pro" | "Elite" | "Black";
   /** Gerente de conta dedicado. */
   dedicatedManager: boolean;
+  /**
+   * Respostas da IA que o médico tem por ciclo (`null` = ilimitado).
+   *
+   * ─── Por que MENSAGEM e não token ────────────────────────────────────────
+   * Token é o que a plataforma paga; mensagem é o que o médico entende. Vender
+   * em token seria vender numa unidade que ninguém sabe estimar — e um plano
+   * que o comprador não consegue dimensionar não é um plano, é uma aposta.
+   * A conversão vive na leitura de `ai_usage`, que grava as duas coisas: quem
+   * consumiu e quantos tokens custou. É de lá que sai a margem real.
+   *
+   * ─── Por que o teto existe ───────────────────────────────────────────────
+   * Sem ele, "pacientes ilimitadas" é uma promessa cujo custo é ilimitado
+   * também. O teto não serve para limitar o médico — serve para o preço ser
+   * verdadeiro.
+   */
+  aiRepliesPerCycle: number | null;
 };
 
 const FREE: Entitlements = {
@@ -70,6 +86,8 @@ const FREE: Entitlements = {
   premiumInvitesPerMonth: 0,
   badge: "",
   dedicatedManager: false,
+  /* Sem IA no plano: o teto é zero, não `null` — `null` quer dizer ilimitado. */
+  aiRepliesPerCycle: 0,
 };
 
 /**
@@ -117,6 +135,8 @@ const ESSENCIAL: Entitlements = {
   premiumInvitesPerMonth: 0,
   badge: "",
   dedicatedManager: false,
+  /* 500 respostas ≈ R$ 0,10 por resposta no preço de R$ 49,90. */
+  aiRepliesPerCycle: 500,
 };
 
 const STARTER: Entitlements = {
@@ -132,6 +152,7 @@ const STARTER: Entitlements = {
   premiumInvitesPerMonth: 0,
   badge: "Starter",
   dedicatedManager: false,
+  aiRepliesPerCycle: 1_500,
 };
 
 const PRO: Entitlements = {
@@ -147,6 +168,7 @@ const PRO: Entitlements = {
   premiumInvitesPerMonth: 0,
   badge: "Pro",
   dedicatedManager: false,
+  aiRepliesPerCycle: 4_000,
 };
 
 // Clínica = plano personalizado (orçamento por contrato). Sem tetos rígidos:
@@ -160,6 +182,8 @@ const CLINICA: Entitlements = {
   teamSeats: true,
   prioritySupport: true,
   dedicatedManager: true,
+  /* Contrato sob medida: o teto é combinado, não tabelado. */
+  aiRepliesPerCycle: null,
 };
 
 // Elite = Pro + equipe + 25 convites premium/mês + selo "Elite".
@@ -171,6 +195,7 @@ const ELITE: Entitlements = {
   teamSeats: true,
   premiumInvitesPerMonth: 25,
   badge: "Elite",
+  aiRepliesPerCycle: 10_000,
 };
 
 // Black = o plano mais alto: tudo do Elite + 250 convites premium/mês, gerente
@@ -183,11 +208,16 @@ const BLACK: Entitlements = {
   premiumInvitesPerMonth: 250,
   badge: "Black",
   dedicatedManager: true,
+  aiRepliesPerCycle: 30_000,
 };
 
 // Trial = experimenta o Pro por 14 dias (mesmas capacidades do Pro), mas SEM
 // selo — quem está só testando não exibe "Pro verificado" às pacientes.
-const TRIAL: Entitlements = { ...PRO, label: "Trial", badge: "" };
+/* O trial herda as CAPACIDADES do Pro, mas não o teto dele: são coisas
+   diferentes. Capacidade é o que ele pode experimentar; teto é quanto a
+   plataforma paga para que ele experimente. Médico novo não entra mais em
+   trial — isto vale só para quem já estava dentro quando a porta fechou. */
+const TRIAL: Entitlements = { ...PRO, label: "Trial", badge: "", aiRepliesPerCycle: 500 };
 
 export const PLAN_ENTITLEMENTS: Record<PlanKey, Entitlements> = {
   trial: TRIAL,

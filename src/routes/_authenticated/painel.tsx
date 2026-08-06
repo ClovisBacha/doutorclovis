@@ -112,6 +112,7 @@ import {
   listUnansweredQuestions,
   answerAndTrain,
   testBrain,
+  cotaDeRespostas,
   curarLacunasDoMedico,
   listBrainGaps,
   resolveBrainGap,
@@ -5716,15 +5717,25 @@ function BrainScoreCard({
     satisfactionPct: number | null;
     feedbackCount: number;
   } | null>(null);
+  const [cota, setCota] = useState<{
+    usadas: number;
+    teto: number | null;
+    estado: "ok" | "aviso" | "estourada";
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
         const tk = await tokenFn();
-        const res = await getBrainQualityStats({
-          data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
-        });
+        const dados = { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) };
+        /* As duas juntas: uma falha na cota não pode levar o placar embora, e
+           vice-versa — são dois enriquecimentos independentes do mesmo card. */
+        const [res, cotaRes] = await Promise.all([
+          getBrainQualityStats({ data: dados }),
+          cotaDeRespostas({ data: dados }).catch(() => ({ ok: false as const })),
+        ]);
         if (res.ok) setStats(res);
+        if (cotaRes.ok && "estado" in cotaRes) setCota(cotaRes);
       } catch {
         /* placar é enhancement — sem dados, sem card */
       }
@@ -5770,6 +5781,38 @@ function BrainScoreCard({
           </p>
         </div>
       </div>
+      {/* A COTA DO CICLO.
+          Ele não pode descobrir o limite pelo efeito — a paciente recebendo
+          resposta sem a voz dele é a pior forma de saber, porque ele não vê a
+          conversa e ela não sabe que algo mudou. O número absoluto ("400 de
+          500") vem de propósito: é ele que permite decidir se sobe de plano;
+          "80%" sozinho não diz nada acionável. */}
+      {cota && cota.teto != null && cota.teto > 0 && cota.estado !== "ok" && (
+        <div
+          className={`mt-3 rounded-xl border px-3 py-2 text-xs ${
+            cota.estado === "estourada"
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : "border-amber-400/40 bg-amber-50 text-amber-900"
+          }`}
+        >
+          {cota.estado === "estourada" ? (
+            <>
+              <strong>Cota do mês esgotada</strong> ({cota.usadas} de {cota.teto} respostas). Suas
+              pacientes continuam sendo atendidas, mas <strong>sem as suas orientações</strong> —
+              elas voltam na virada do mês ou se você subir de plano.
+            </>
+          ) : (
+            <>
+              Você usou{" "}
+              <strong>
+                {cota.usadas} das {cota.teto}
+              </strong>{" "}
+              respostas deste mês. Ao esgotar, suas pacientes continuam atendidas, porém sem as suas
+              orientações.
+            </>
+          )}
+        </div>
+      )}
       {stats.coveragePct != null && stats.coveragePct < 70 && (
         <p className="mt-3 text-xs text-muted-foreground">
           💡 Responda as lacunas abaixo para subir a cobertura — cada resposta vira conhecimento

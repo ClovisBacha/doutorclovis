@@ -621,6 +621,34 @@ export const listBrainGaps = createServerFn({ method: "POST" })
   });
 
 /**
+ * Quanto da cota do ciclo o médico já usou.
+ *
+ * Existe para que ele NUNCA descubra o limite pelo efeito: a paciente
+ * recebendo resposta sem a voz dele é a pior forma possível de saber que a
+ * cota acabou — ele não vê a conversa, e ela não sabe que algo mudou.
+ *
+ * Devolve também o teto, para a tela dizer "400 de 500" em vez de "80%": o
+ * número absoluto é o que permite ao médico decidir se sobe de plano.
+ */
+export const cotaDeRespostas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), asDoctor: z.string().uuid().optional() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    const [{ getEntitlementsByDoctorId }, { cotaDoMedico }] = await Promise.all([
+      import("./entitlements.server"),
+      import("./cota-ia.server"),
+    ]);
+    const ent = await getEntitlementsByDoctorId(target.doctorId);
+    const cota = await cotaDoMedico(target.doctorId, ent.aiRepliesPerCycle);
+    return { ok: true as const, ...cota };
+  });
+
+/**
  * Dá vetor às lacunas que nasceram sem um.
  *
  * Server function PRÓPRIA, e não um pedaço do `listBrainGaps`, por dois

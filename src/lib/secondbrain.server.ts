@@ -792,6 +792,37 @@ export async function getBrainContext(
         hadCoverage: false,
         melhorSimilaridade: null,
       };
+
+    /* ─── COTA DO CICLO ESTOURADA ────────────────────────────────────────────
+       O que sai da resposta é o Segundo Cérebro do médico — só ele. A paciente
+       continua conversando, continua recebendo informação obstétrica
+       consolidada, e a dúvida dela continua entrando na fila dele: por isso a
+       lacuna é registrada AQUI, antes de sair.
+
+       Bloquear a resposta seria transferir para a gestante a consequência de
+       um limite que não é dela e que ela não pode resolver.
+
+       A checagem vem ANTES da busca de propósito. Depois dela custaria uma
+       consulta ao banco, um embedding e uma varredura vetorial para descobrir
+       algo que já se sabia — e economizar importa mais justamente no médico
+       que estourou a conta.
+
+       'teste' fica de fora: o painel dele não pode parar de funcionar
+       enquanto ele decide se sobe de plano. */
+    if (channel !== "teste") {
+      const { cotaDoMedico } = await import("./cota-ia.server");
+      const cota = await cotaDoMedico(target, ent.aiRepliesPerCycle);
+      if (cota.estado === "estourada") {
+        logBrainGap(target, userMessage, channel, patientId, null);
+        return {
+          block: "",
+          enabledApp,
+          enabledWhatsapp,
+          hadCoverage: false,
+          melhorSimilaridade: null,
+        };
+      }
+    }
     if (channel === "whatsapp" && !enabledWhatsapp) {
       return {
         block: "",
