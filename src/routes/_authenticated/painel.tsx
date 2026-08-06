@@ -5798,7 +5798,11 @@ function ConsumoDaIACard({
         /* sem cota, sem card — mas sem derrubar o resto da aba */
       }
     })();
-  }, [tokenFn]);
+    /* `asDoctor` NAS DEPENDÊNCIAS. O efeito lê essa prop, e o componente é
+       montado sem `key`: no plano Clínica, trocar de médico ("ver como") não
+       remontava nada e o card seguia mostrando o consumo do médico ANTERIOR —
+       número de plano atribuído à pessoa errada. */
+  }, [tokenFn, asDoctor]);
 
   /* Nada consumido ainda: não há o que mostrar, e um card zerado no topo do
      Cérebro só ocuparia a tela do médico que ainda nem começou. */

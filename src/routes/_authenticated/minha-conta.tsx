@@ -7050,6 +7050,11 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     setLoading(true);
 
+    /* A bolha da IA é criada ANTES do `try` porque o `catch` precisa achá-la:
+       é o `ts` dela que identifica onde escrever, e reconstruir a lista a
+       partir do retrato antigo apagaria o que a paciente anexou no meio. */
+    const asstMsg: WAMsg = { role: "assistant", content: "", ts: new Date() };
+
     try {
       /* SÓ TEXTO VAI PARA A IA — e isso resolve dois problemas de uma vez.
 
@@ -7104,7 +7109,6 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
          médico. */
       let houveErro = false;
       avisoDoServidorRef.current = null;
-      const asstMsg: WAMsg = { role: "assistant", content: "", ts: new Date() };
       setMessages([...displayNext, asstMsg]);
 
       alvoRef.current = "";
@@ -7114,6 +7118,21 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
       /* O laço de exibição. Ele anda por conta própria, quadro a quadro, e não
          depende do ritmo em que os pedaços chegam — é essa separação que
          transforma "bloco de texto surgindo" em "resposta sendo escrita". */
+      /* A ESCRITA DA BOLHA DA IA, num lugar só.
+         O laço por quadro foi consertado para atualização funcional, mas as
+         QUATRO escritas de fim de stream continuaram usando `displayNext` — o
+         retrato capturado quando o envio começou. O anexo enviado durante a
+         resposta sobrevivia ao laço e era apagado quando o stream fechava: o
+         mesmo defeito, ~1s depois. Uma função só, e as cinco usam ela. */
+      const escreverNaBolha = (texto: string, extra?: Partial<WAMsg>) =>
+        setMessages((atuais) => {
+          const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
+          if (i < 0) return [...atuais, { ...asstMsg, content: texto, ...extra }];
+          const copia = [...atuais];
+          copia[i] = { ...copia[i], content: texto, ...extra };
+          return copia;
+        });
+
       const digitar = () => {
         const alvo = alvoRef.current;
         const atraso = alvo.length - mostradoRef.current;
@@ -7150,18 +7169,10 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
              a resposta digitava fazia sumir da tela a bolha do arquivo e a
              confirmação "já encaminhei para a sua médica". O arquivo estava
              salvo no servidor, e a paciente via o contrário disso. */
-          setMessages((atuais) => {
-            /* Pelo `ts`, e não pela última posição: se a paciente anexar um
-               exame durante o streaming, a bolha do arquivo entra DEPOIS da
-               resposta, e escrever "na última" passaria a sobrescrever a bolha
-               errada. O `ts` é criado uma vez para esta resposta e sobrevive
-               aos spreads. */
-            const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
-            if (i < 0) return atuais;
-            const copia = [...atuais];
-            copia[i] = { ...copia[i], content: alvo.slice(0, mostradoRef.current) };
-            return copia;
-          });
+          /* Pelo `ts`, e não pela última posição: se a paciente anexar um
+             exame durante o streaming, a bolha do arquivo entra DEPOIS da
+             resposta, e escrever "na última" sobrescreveria a bolha errada. */
+          escreverNaBolha(alvo.slice(0, mostradoRef.current));
         }
         if (streamAbertoRef.current || mostradoRef.current < alvoRef.current.length) {
           quadroRef.current = requestAnimationFrame(digitar);
@@ -7217,7 +7228,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
              genérico. O conserto do texto parcial existia e não valia para a
              trilha de acessibilidade. */
           mostradoRef.current = acc.length;
-          setMessages([...displayNext, { ...asstMsg, content: acc }]);
+          escreverNaBolha(acc);
         }
       }
       (buffer + decoder.decode()).split("\n").forEach(processLine);
@@ -7226,10 +7237,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
 
       if (semAnimacao) {
         mostradoRef.current = acc.length;
-        setMessages([
-          ...displayNext,
-          { ...asstMsg, content: acc, ...(houveErro ? { error: true } : {}) },
-        ]);
+        escreverNaBolha(acc, houveErro ? { error: true } : undefined);
       } else {
         /* Espera o texto terminar de aparecer antes de liberar o "digitando".
            Sem isto, o indicador sumiria com a bolha ainda pela metade — e a
@@ -7241,10 +7249,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           };
           conferir();
         });
-        setMessages([
-          ...displayNext,
-          { ...asstMsg, content: acc, ...(houveErro ? { error: true } : {}) },
-        ]);
+        escreverNaBolha(acc, houveErro ? { error: true } : undefined);
       }
     } catch {
       /* O QUE ELA JÁ ESTAVA LENDO NÃO SE PERDE.
@@ -7260,22 +7265,34 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
          mandado e o laço ainda não tinha desenhado — e o comentário acima diz
          "o que chegou fica". Agora diz a verdade. */
       const parcial = alvoRef.current.trim();
-      setMessages([
-        ...displayNext,
-        ...(parcial ? [{ role: "assistant" as const, content: parcial, ts: new Date() }] : []),
-        {
-          role: "assistant",
-          content:
-            /* O aviso do servidor manda, quando existe: ele sabe o que houve
-               (limite de mensagens, manutenção) e a tela não. */
-            avisoDoServidorRef.current ??
-            (parcial
-              ? "A conexão caiu no meio da resposta. Pode perguntar de novo?"
-              : "Desculpe, ocorreu um erro. Tente novamente."),
-          ts: new Date(),
-          error: true, // falha transitória não é votável (senão 👎 vira lacuna falsa)
-        },
-      ]);
+      const aviso: WAMsg = {
+        role: "assistant",
+        content:
+          /* O aviso do servidor manda, quando existe: ele sabe o que houve
+             (limite de mensagens, manutenção) e a tela não. */
+          avisoDoServidorRef.current ??
+          (parcial
+            ? "A conexão caiu no meio da resposta. Pode perguntar de novo?"
+            : "Desculpe, ocorreu um erro. Tente novamente."),
+        ts: new Date(),
+        error: true, // falha transitória não é votável (senão 👎 vira lacuna falsa)
+      };
+      /* FUNCIONAL aqui também, e pelo mesmo motivo dos outros quatro: o
+         `displayNext` é o retrato de antes do envio, então reconstruir a lista
+         a partir dele apagaria o exame que ela anexou enquanto a resposta
+         chegava — justamente no caminho de erro, onde ela mais precisa ver que
+         o arquivo foi salvo. A bolha parcial substitui a da IA no lugar dela,
+         e o aviso entra no fim. */
+      setMessages((atuais) => {
+        const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
+        const semVazia = i < 0 ? atuais : atuais.filter((_, k) => k !== i);
+        return [
+          ...semVazia.slice(0, i < 0 ? semVazia.length : i),
+          ...(parcial ? [{ ...asstMsg, content: parcial }] : []),
+          ...semVazia.slice(i < 0 ? semVazia.length : i),
+          aviso,
+        ];
+      });
     } finally {
       /* O laço de digitação morre AQUI, sempre. Deixá-lo vivo depois de um erro
          faria ele reescrever por cima da mensagem de falha — a paciente veria a

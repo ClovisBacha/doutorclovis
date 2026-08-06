@@ -19,7 +19,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
 import { handleWhatsAppMessage } from "@/lib/whatsapp-agent.server";
-import { waMarkRead, extractMessageText } from "@/lib/whatsapp.server";
+import { waMarkRead, waSendText, extractMessageText } from "@/lib/whatsapp.server";
 
 /** Valida o HMAC-SHA256 que a Meta envia em X-Hub-Signature-256 ("sha256=<hex>"). */
 function verifyMetaSignature(raw: string, header: string | null, secret: string): boolean {
@@ -141,8 +141,33 @@ async function processWebhook(body: unknown): Promise<void> {
         // Extrai texto da mensagem
         const text = extractMessageText(m);
         if (!text) {
-          // Mensagem sem texto suportado (imagem, sticker, etc.)
-          // Poderíamos responder pedindo texto, mas por ora ignoramos
+          /* ─── SILÊNCIO ABSOLUTO ERA A RESPOSTA ANTIGA ────────────────────
+             O comentário aqui dizia "por ora ignoramos". Na prática: a
+             paciente fotografa o laudo, manda pelo WhatsApp do consultório, e
+             não acontece NADA — nem resposta, nem registro, nem sequer o
+             duplo-check azul, porque o `continue` acontecia antes do
+             `waMarkRead`. Ela vê a mensagem entregue e não lida, e fica
+             esperando.
+             É o mesmo defeito que o chat do app acabou de fechar ("a tela
+             confirma e a confirmação é falsa"), sobrevivendo no canal em que
+             exame mais chega. E agora contradiz o produto duas vezes, porque o
+             painel já aprendeu a mostrar PDF de laudo.
+
+             Baixar a mídia do Meta e gravar em `exam_files` exige o token de
+             mídia e uma etapa de download que este webhook ainda não tem —
+             fica para o passo seguinte. O que NÃO pode continuar é o silêncio:
+             marcar como lida e dizer o que fazer custa duas linhas e devolve à
+             paciente a informação de que ela precisa agora. */
+          waMarkRead(messageId);
+          const tipo = String((m as Record<string, unknown>).type ?? "");
+          if (tipo === "image" || tipo === "document") {
+            await waSendText(
+              fromPhone,
+              "Recebi seu arquivo aqui, mas por este canal eu ainda não consigo abri-lo. " +
+                "Para o exame chegar direto ao consultório, envie pelo app em Exames — " +
+                "assim ele fica no seu prontuário e sua médica é avisada na hora. 💛",
+            ).catch(() => {});
+          }
           continue;
         }
 

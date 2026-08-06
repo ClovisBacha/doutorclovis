@@ -1178,7 +1178,17 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
          * Opcional para não quebrar cliente antigo em cache; sem ela, o voto
          * ainda conta na satisfação, só não abre revisão.
          */
-        answer: z.string().max(4000).optional(),
+        /* CORTA, não rejeita — igual à `question` logo acima, e pelo mesmo
+           motivo. O cliente manda a resposta COMPLETA da IA, e o próprio
+           efeito de digitação deste app é calibrado para respostas de 4.000 a
+           8.000 caracteres: com `.max(4000)` o zod estourava e o 👎 INTEIRO se
+           perdia. Ou seja, justamente as respostas mais longas — as mais
+           prováveis de estarem erradas — eram as que não conseguiam ser
+           reclamadas. */
+        answer: z
+          .string()
+          .transform((a) => a.slice(0, 4000))
+          .optional(),
         helpful: z.boolean(),
       })
       .parse(i),

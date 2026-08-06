@@ -164,8 +164,18 @@ describe("o que a paciente vê não pode ser apagado pelo próprio laço", () =>
        estava salvo no servidor e a paciente via o contrário disso.
        Pelo `ts` e não pela última posição, porque a bolha do anexo entra
        DEPOIS da resposta. */
-    expect(codigo).toContain("setMessages((atuais) => {");
+    expect(codigo).toContain("const escreverNaBolha = (texto: string, extra?: Partial<WAMsg>) =>");
     expect(codigo).toContain("atuais.findIndex((m) => m.ts === asstMsg.ts)");
+    /* TODAS as escritas passam por ela. O laço por quadro foi consertado
+       primeiro e as QUATRO escritas de fim de stream continuaram usando
+       `displayNext` — o retrato de antes do envio. O anexo sobrevivia ao laço
+       e era apagado quando o stream fechava: o mesmo defeito, ~1s depois. */
+    const corpo = codigo.slice(
+      codigo.indexOf("const escreverNaBolha"),
+      codigo.indexOf("async function enviarParaOMedico"),
+    );
+    expect(corpo).not.toContain("setMessages([...displayNext, { ...asstMsg");
+    expect(corpo).not.toContain("...displayNext,\n        ...(parcial");
   });
 });
 
@@ -176,7 +186,7 @@ describe("bolha de erro não vira trabalho para o médico", () => {
        polegares apareciam. Um 👎 num 429 do Gemini virava lacuna na fila do
        médico. */
     expect(codigo).toContain("houveErro = true;");
-    expect(codigo).toContain("...(houveErro ? { error: true } : {})");
+    expect(codigo).toContain("escreverNaBolha(acc, houveErro ? { error: true } : undefined)");
   });
 });
 

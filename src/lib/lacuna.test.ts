@@ -150,8 +150,41 @@ describe("elogio à IA não vira fila do médico", () => {
 
   test("falha técnica descrita na negativa é suporte", () => {
     expect(viraLacuna("não estou conseguindo entrar")).toBe(false);
+    expect(viraLacuna("não consigo logar")).toBe(false);
+    expect(viraLacuna("não consigo pagar a assinatura")).toBe(false);
     expect(viraLacuna("não carrega nada aqui")).toBe(false);
     expect(viraLacuna("não recebo as notificações")).toBe(false);
+  });
+
+  /* ─── O CASO DO MEIO, QUE NÃO TINHA TESTE ─────────────────────────────────
+     "não consigo X" com X = VERBO DO CORPO, sem nenhum substantivo clínico.
+
+     Escrevi o padrão como `não consigo \w+` — qualquer verbo — e validei
+     contra os dois casos que ele acertava: "não consigo entrar" (suporte) e
+     "não estou conseguindo sentir o bebê mexer" (clínica, que sobrevive só por
+     ter "bebê" e "mexer"). O caso do meio ficou sem cobertura, e é justamente
+     onde estava o defeito.
+
+     Um verificador mediu contra o commit anterior e provou a regressão: seis
+     frases que devolviam `true` passaram a devolver `false`. E `ehSoSuporte`
+     não decide só a fila — decide o PROMPT: "não consigo respirar" (dispneia,
+     bandeira vermelha de TEP e pré-eclâmpsia) recebia um bot de suporte
+     técnico instruído a NÃO COMENTAR SINTOMAS, sem o cérebro do médico e sem
+     lacuna registrada. Ele nunca ficaria sabendo.
+
+     A lista de objetos de suporte é FECHADA agora. Estes testes são o que
+     impede alguém de reabri-la com um `\w+` por conveniência. */
+  test("verbo do corpo depois de 'não consigo' NUNCA é suporte", () => {
+    expect(viraLacuna("não consigo respirar")).toBe(true);
+    expect(viraLacuna("nao consigo respirar bem")).toBe(true);
+    expect(viraLacuna("não estou conseguindo respirar direito")).toBe(true);
+    expect(viraLacuna("não dá para respirar")).toBe(true);
+    expect(viraLacuna("não consigo dormir de tanta azia")).toBe(true);
+    expect(viraLacuna("não consigo urinar")).toBe(true);
+    expect(viraLacuna("não consigo fazer xixi")).toBe(true);
+    expect(viraLacuna("não estou conseguindo comer nada")).toBe(true);
+    expect(viraLacuna("não consigo me alimentar direito")).toBe(true);
+    expect(viraLacuna("não consigo abaixar")).toBe(true);
   });
 
   test("gíria de elogio também não vira trabalho clínico", () => {

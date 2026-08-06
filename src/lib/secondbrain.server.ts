@@ -192,13 +192,37 @@ const TERMOS_SUPORTE = new RegExp(
       "cancel\\w*|desativ\\w*|descadastr\\w*|excluir|exclu(?:o|(?:í|i)r)|apagar (?:minha|meus|a) \\w+|deletar",
       // falha técnica
       "instalar|atualiza(?:r|ç|c)\\w*|carregar|carrega|travand?o|travou|bug|sair da conta",
-      /* "não consigo entrar" / "não carrega nada aqui" são as duas frases de
+      /* ─── "não consigo X" — E O X TEM LISTA FECHADA ───────────────────────
+         "não consigo entrar" e "não carrega nada aqui" são as duas frases de
          suporte mais comuns e nenhuma casava: `entrar` está fora da lista de
-         propósito (entrar na piscina) e `carrega` só existia no infinitivo. A
-         forma NEGADA desfaz a ambiguidade — "não consigo entrar" não é sobre
-         piscina, e ninguém escreve "não consigo entrar" sobre o próprio corpo
-         sem citar uma parte dele (aí `TERMOS_CLINICOS` desempata). */
-      "n(?:ã|a)o (?:consigo|estou conseguindo|to conseguindo|d(?:á|a) para) \\w+",
+         propósito (entrar na piscina) e `carrega` só existia no infinitivo.
+
+         A primeira versão disto foi `não consigo \w+` — qualquer verbo. Custou
+         o defeito mais perigoso que escrevi nesta base, e um verificador o
+         mediu contra o commit anterior para provar que era regressão minha:
+
+             "não consigo respirar"            → virava SUPORTE
+             "não estou conseguindo respirar direito"  → SUPORTE
+             "não consigo dormir de tanta azia"        → SUPORTE
+             "não consigo urinar" / "fazer xixi"       → SUPORTE
+             "não estou conseguindo comer nada"        → SUPORTE
+
+         E `ehSoSuporte` não decide só a fila: decide o PROMPT. Uma gestante
+         escrevendo "não consigo respirar" — dispneia, que é bandeira vermelha
+         de TEP, pré-eclâmpsia e cardiopatia — recebia um bot de suporte
+         técnico instruído a NÃO COMENTAR SINTOMAS, sem o cérebro do médico,
+         sem a memória clínica, sem as medidas, e sem lacuna registrada. O
+         médico nunca ficaria sabendo.
+
+         Ampliar `TERMOS_CLINICOS` remendaria os casos que alguém lembrasse.
+         Fechar a lista de objetos mata a classe: só é suporte quando o que ela
+         não consegue fazer é uma coisa do APLICATIVO. Qualquer outro verbo —
+         inclusive um que ninguém previu — continua sendo clínica, que é o que
+         o comentário deste bloco sempre prometeu ("na dúvida, é clínica"). */
+      "n(?:ã|a)o (?:consigo|estou conseguindo|to conseguindo|d(?:á|a) para) " +
+        "(?:entrar|logar|acessar|abrir o|abrir a|abrir|instalar|atualizar|carregar|baixar|" +
+        "pagar|assinar|cadastrar|me cadastrar|criar conta|recuperar|redefinir|" +
+        "encontrar a aba|achar a aba|usar o app|usar o aplicativo|ver no app)",
       "n(?:ã|a)o (?:carrega|abre|funciona|recebo|recebi|chega\\w*|aparece)",
     ].join("|"),
   ),
