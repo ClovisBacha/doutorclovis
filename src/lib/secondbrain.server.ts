@@ -1682,10 +1682,14 @@ export async function computeBrainQualityStats(doctorId: string): Promise<{
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-    const since = monthStart.toISOString();
+    /* A MESMA JANELA DA COTA. `setHours(0,0,0,0)` usa o fuso do PROCESSO, que
+       na Vercel é UTC — então o "este mês" deste placar começava 3 horas antes
+       do "este mês" do card de consumo, que fica logo abaixo dele na mesma
+       tela. Dois números com o mesmo rótulo e janelas diferentes.
+       É exatamente o defeito que `inicioDoCiclo` foi escrito para matar, vivo
+       no arquivo vizinho. */
+    const { inicioDoCiclo } = await import("./cota-ia.server");
+    const since = inicioDoCiclo().toISOString();
 
     const [hitsRes, gapsOpenRes, gapRowsRes, fbRes] = await Promise.all([
       sb

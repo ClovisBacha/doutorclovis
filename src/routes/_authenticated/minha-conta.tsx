@@ -7422,7 +7422,15 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           ...(nota ? { nota } : {}),
         },
       });
-      if (!res.ok) throw new Error("falhou");
+      if (!res.ok) {
+        /* "Muitos" é diferente de "falhou": ela precisa saber que o arquivo
+           não foi recusado por ser inválido, e sim porque já mandou vários. */
+        throw new Error(
+          "motivo" in res && res.motivo === "muitos"
+            ? "Você enviou muitos arquivos seguidos. Tente de novo daqui a pouco 💛"
+            : "",
+        );
+      }
       /* A confirmação diz o DESTINO, não só "enviado". A paciente precisa
          saber que quem vai olhar é uma pessoa, e não a assistente — senão ela
          fica esperando uma leitura que não vem. */
@@ -7437,14 +7445,16 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           ts: new Date(),
         },
       ]);
-    } catch {
+    } catch (e) {
       /* Falha aqui a paciente PRECISA ver: se o exame não foi guardado, ela
          tem que saber para mandar de novo. */
       setMessages((m) => [
         ...m,
         {
           role: "assistant",
-          content: "Não consegui enviar o arquivo agora. Pode tentar de novo?",
+          content:
+            (e as Error)?.message?.trim() ||
+            "Não consegui enviar o arquivo agora. Pode tentar de novo?",
           ts: new Date(),
           error: true,
         },

@@ -1218,10 +1218,19 @@ function PainelPage() {
             tokenFn={token}
             asDoctor={brainAsDoctor}
             onExitAsDoctor={() => setBrainAsDoctor(null)}
-            onAbrirPaciente={(id) => {
-              setTab("Pacientes 👩‍🍼");
-              setAbrirPaciente(id);
-            }}
+            /* SÓ NO PRÓPRIO CONSULTÓRIO. Operando o cérebro de um médico da
+               clínica (`brainAsDoctor`), a lista mostra as pacientes DELE e a
+               aba Pacientes carrega as MINHAS — o clique nunca acharia
+               nenhuma, e falharia calado. Sem callback, a linha não finge ser
+               clicável. */
+            onAbrirPaciente={
+              brainAsDoctor
+                ? undefined
+                : (id) => {
+                    setTab("Pacientes 👩‍🍼");
+                    setAbrirPaciente(id);
+                  }
+            }
             onTrained={(id) =>
               setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered: true } : x)))
             }
@@ -5757,9 +5766,12 @@ function BrainLevelCard({
           <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300/90">
             Nível do Segundo Cérebro
           </p>
+          {/* O rótulo também não pode mentir enquanto carrega. A FRASE abaixo
+              foi consertada e este `{level}` ficou: com `pct = score ?? 0`, um
+              médico com score 95 lia "Iniciante" em corpo 2xl por um beat. */}
           <p className="mt-1 font-serif text-2xl">
-            {level}
-            {pct >= 90 && " 🏆"}
+            {score == null ? "—" : level}
+            {score != null && pct >= 90 && " 🏆"}
           </p>
           {/* A FRASE MAIS ERRADA POSSÍVEL NO PRIMEIRO CARD DA TELA.
               `items` começa `[]`, então `pending.length === 0` é verdadeiro
@@ -6009,8 +6021,8 @@ function ConsumoDaIACard({
               a barra compara com quem mais conversou, o número é a fatia do
               mês. Uma legenda custa uma linha. */}
           <p className="text-[10px] leading-snug text-muted-foreground">
-            A barra compara com quem mais conversou; a porcentagem é a fatia do seu mês. Toque para
-            abrir o prontuário.
+            A barra compara com quem mais conversou; a porcentagem é a fatia do mês.
+            {onAbrirPaciente ? " Toque para abrir o prontuário." : ""}
           </p>
           {cota.pacientes.map((p) => {
             /* A COR DIZ ALGUMA COISA. O pedido falava em "barra colorida" e
@@ -6031,8 +6043,11 @@ function ConsumoDaIACard({
               <button
                 type="button"
                 key={p.patientId}
+                disabled={!onAbrirPaciente}
                 onClick={() => onAbrirPaciente?.(p.patientId)}
-                className="flex w-full items-center gap-3 rounded-lg py-0.5 text-left transition-colors hover:bg-secondary/60"
+                className={`flex w-full items-center gap-3 rounded-lg py-0.5 text-left transition-colors ${
+                  onAbrirPaciente ? "hover:bg-secondary/60" : "cursor-default"
+                }`}
               >
                 <span className="w-28 shrink-0 truncate text-xs" title={p.nome}>
                   {p.nome}
@@ -6220,6 +6235,10 @@ function BrainReviewCard({
   const [editando, setEditando] = useState<string | null>(null);
   /* Distingue "não deu para olhar" de "não há nada" — ver `carregar`. */
   const [falhou, setFalhou] = useState<"rede" | "migracao" | null>(null);
+  /* `itens` nasce `[]`, então o primeiro paint dizia "nenhuma resposta
+     reprovada" ANTES de saber — a mesma classe de defeito que o card de nível
+     acabou de consertar, no card vizinho. */
+  const [carregando, setCarregando] = useState(true);
   const [texto, setTexto] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -6232,6 +6251,7 @@ function BrainReviewCard({
       if (res.ok) {
         setItens(res.itens);
         setFalhou(null);
+        setCarregando(false);
       } else {
         /* ERRO NÃO PODE SE DISFARÇAR DE FILA VAZIA.
            `res.ok === false` era descartado e o card caía no estado "nenhuma
@@ -6244,6 +6264,8 @@ function BrainReviewCard({
       }
     } catch {
       setFalhou("rede");
+    } finally {
+      setCarregando(false);
     }
   }
   useEffect(() => {
@@ -6291,6 +6313,8 @@ function BrainReviewCard({
      descobrir que ela existe — enquanto a de lacunas aparece sempre, com
      estado vazio explicativo. Assimetria pura.
      Uma linha discreta não é "caixa vazia": é o nome da coisa. */
+  if (carregando) return <div className="skeleton h-16 rounded-2xl" />;
+
   if (falhou) {
     return (
       <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-xs leading-snug text-amber-900">

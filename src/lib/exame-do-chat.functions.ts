@@ -40,6 +40,17 @@ import { ymdBrasilia } from "./utils";
    uma reimplementação sem as aspas: funciona (o nome entra em nó de texto, não
    em atributo) e é uma segunda verdade sobre escape esperando divergir. */
 import { escEmail as escapar } from "./email.server";
+import { makeRateLimiter } from "./rate-limit.server";
+
+/**
+ * Seis exames por hora, por sessão.
+ *
+ * A escrita é pela chave de serviço, então a RLS não protege este caminho: uma
+ * conta logada podia empilhar linhas de 4 MB à vontade, cada uma disparando
+ * e-mail e push para o médico. Seis cobre qualquer envio real — um laudo tem 1
+ * a 3 páginas — e fecha a torneira de spam e de inchaço do banco.
+ */
+const exameLimitado = makeRateLimiter(6, 3_600_000);
 
 export const enviarExameDoChat = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -59,7 +70,13 @@ export const enviarExameDoChat = createServerFn({ method: "POST" })
         imagem: z
           .string()
           .min(32)
-          .max(8_000_000)
+          /* ALINHADO COM O CLIENTE, e com o limite da Vercel.
+             8 MB era quase o dobro do que a plataforma deixa passar: um
+             arquivo entre 4,2 e 8 MB nunca chegava aqui — morria como 413
+             genérico, que na tela vira "não consegui enviar" e um retry
+             infinito com o MESMO arquivo. O teto do cliente é 3,0 MiB de PDF,
+             que em base64 dá ~4,19 MB; a folga cobre o cabeçalho e o JSON. */
+          .max(4_300_000)
           .refine((v) => v.startsWith("data:image/") || v.startsWith("data:application/pdf"), {
             message: "arquivo precisa ser imagem ou PDF em data URL",
           }),
@@ -71,6 +88,13 @@ export const enviarExameDoChat = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      /* LIMITE DE TAXA. A escrita é pela chave de serviço, então a RLS não
+         protege: uma conta logada podia empilhar linhas de 4 MB à vontade —
+         cada uma disparando e-mail e push para o médico. Seis por hora cobre
+         qualquer envio real (um laudo tem 1 a 3 páginas) e fecha a torneira. */
+      if (exameLimitado(data.accessToken.slice(-32))) {
+        return { ok: false as const, motivo: "muitos" as const };
+      }
       const sb = supabaseAdmin as any;
       const { data: u, error: uerr } = await supabaseAdmin.auth.getUser(data.accessToken);
       if (uerr || !u?.user) return { ok: false as const };
