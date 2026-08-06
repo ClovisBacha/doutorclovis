@@ -150,23 +150,44 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
             }
           }
         }
-        await sb.from("patient_profiles").update({ quiz_premium: true }).eq("id", u.user.id);
+        /* O RESGATE JÁ FOI GRAVADO acima. Se a concessão do premium falhar em
+           silêncio, o cupom foi QUEIMADO e ela não recebeu nada — e, sendo
+           uso único, tentar de novo devolve "codigo_usado". Ou o premium
+           entra, ou o resgate volta atrás. */
+        const { error: premErr } = await sb
+          .from("patient_profiles")
+          .update({ quiz_premium: true })
+          .eq("id", u.user.id);
+        if (premErr) {
+          await sb
+            .from("platform_coupon_redemptions")
+            .delete()
+            .eq("coupon_id", pc.id)
+            .eq("user_id", u.user.id);
+          console.error("[cupom] falha ao liberar premium; resgate desfeito", premErr);
+          return { ok: false as const, error: "falha_ao_liberar" };
+        }
         // Origem 'cupom' → o premium sobrevive ao toggle manual (mesma
         // proteção de stripe/doctor_invite/convite).
-        try {
-          await sb.from("subscriptions").upsert(
-            {
-              user_id: u.user.id,
-              product: "quiz_premium",
-              plan: "cupom",
-              source: "cupom",
-              status: "active",
-              stripe_subscription_id: `cupom_${pc.id}_${u.user.id}`,
-            },
-            { onConflict: "stripe_subscription_id" },
-          );
-        } catch {
-          /* opcional */
+        /* O `try/catch` que estava aqui dizia "opcional" e não protegia nada:
+           o supabase-js não LANÇA quando o Postgres recusa, ele devolve
+           `{ error }`. O catch nunca disparou uma vez sequer.
+           E o efeito de perder esta linha não é nenhum: o premium concedido
+           acima passa a ser revogável por um toggle manual, silenciosamente.
+           Não derruba o resgate — ela ficou premium —, mas precisa aparecer. */
+        const { error: subErr } = await sb.from("subscriptions").upsert(
+          {
+            user_id: u.user.id,
+            product: "quiz_premium",
+            plan: "cupom",
+            source: "cupom",
+            status: "active",
+            stripe_subscription_id: `cupom_${pc.id}_${u.user.id}`,
+          },
+          { onConflict: "stripe_subscription_id" },
+        );
+        if (subErr) {
+          console.error("[cupom] premium concedido sem marca de origem", u.user.id, subErr);
         }
         return { ok: true as const };
       }
@@ -202,11 +223,20 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       }
     }
 
-    // Libera o premium.
-    await (supabaseAdmin as any)
+    /* Libera o premium — e o código JÁ está marcado como resgatado por ela.
+       Falhar em silêncio aqui é o pior desfecho possível: o convite foi
+       consumido e ela não ganhou nada.
+       Não desfaço o resgate (limpar `redeemed_by` reabre a corrida de uso
+       único). Devolvo erro, e tentar de novo é seguro: com `redeemed_by`
+       apontando para ela, o bloco acima é pulado e o fluxo cai direto aqui. */
+    const { error: premErr } = await (supabaseAdmin as any)
       .from("patient_profiles")
       .update({ quiz_premium: true })
       .eq("id", u.user.id);
+    if (premErr) {
+      console.error("[convite] código resgatado sem liberar premium", row.id, premErr);
+      return { ok: false as const, error: "falha_ao_liberar" };
+    }
 
     let semVaga = false;
     // Vincula ao médico só se a paciente ainda não tem um (não "rouba").
@@ -245,10 +275,19 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
         podeVincular = false;
       }
       if (podeVincular) {
-        await (supabaseAdmin as any)
+        /* O vínculo é o que o médico comprou ao distribuir o código. Se ele
+           não gravar, ela sai "premium sem médico" e ninguém fica sabendo —
+           nem ela, que viu "código aplicado", nem ele, que contou com a
+           paciente. `semVaga` já existe para dizer "premium sim, vínculo não";
+           é exatamente esse estado, e a tela dela já sabe explicá-lo. */
+        const { error: vincErr } = await (supabaseAdmin as any)
           .from("patient_profiles")
           .update({ doctor_id: row.doctor_id })
           .eq("id", u.user.id);
+        if (vincErr) {
+          console.error("[convite] premium liberado, vínculo não gravou", row.id, vincErr);
+          semVaga = true;
+        }
       } else {
         /* Não vinculou porque o plano dele está no teto. Ela precisa saber:
            antes a tela dizia "código aplicado" e ela ficava sem médico sem
@@ -258,21 +297,24 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       }
     }
 
-    // Registro em subscriptions (origem convite) — não trava se faltar a tabela.
-    try {
-      await (supabaseAdmin as any).from("subscriptions").upsert(
-        {
-          user_id: u.user.id,
-          product: "quiz_premium",
-          plan: "invite",
-          source: "doctor_invite",
-          status: "active",
-          stripe_subscription_id: `invite_${row.id}`,
-        },
-        { onConflict: "stripe_subscription_id" },
-      );
-    } catch {
-      /* opcional */
+    /* Registro em subscriptions (origem convite): é o que faz o premium dela
+       sobreviver a um toggle manual. Não trava o resgate — ela já é premium —,
+       mas perder isto em silêncio significa que um dia o premium some sem
+       explicação, e o `catch` que estava aqui nunca disparou: o supabase-js
+       devolve `{ error }`, não lança. */
+    const { error: subErr } = await (supabaseAdmin as any).from("subscriptions").upsert(
+      {
+        user_id: u.user.id,
+        product: "quiz_premium",
+        plan: "invite",
+        source: "doctor_invite",
+        status: "active",
+        stripe_subscription_id: `invite_${row.id}`,
+      },
+      { onConflict: "stripe_subscription_id" },
+    );
+    if (subErr) {
+      console.error("[convite] premium concedido sem marca de origem", u.user.id, subErr);
     }
 
     return { ok: true as const, semVaga };

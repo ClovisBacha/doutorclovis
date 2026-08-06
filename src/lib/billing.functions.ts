@@ -93,12 +93,17 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
           .maybeSingle();
         if (aff?.active) {
           refCode = aff.code as string;
-          // Atribuição persistida na paciente (relatório por influenciador).
-          await (supabaseAdmin as any)
+          /* Atribuição persistida na paciente (relatório por influenciador).
+             Não derruba a compra — o `refCode` segue para a metadata da
+             Stripe e é dela que o webhook credita a comissão. Mas o relatório
+             por influenciador sai errado, e sem log ninguém descobre: é uma
+             divergência entre duas fontes que ninguém compara. */
+          const { error: refErr } = await (supabaseAdmin as any)
             .from("patient_profiles")
             .update({ ref_code: refCode })
             .eq("id", u.user.id)
             .is("ref_code", null); // 1º afiliado vence; não sobrescreve
+          if (refErr) console.error("[afiliado] atribuição não gravou", code, refErr);
         }
       } catch {
         /* tabela ausente → segue sem afiliado */

@@ -1541,7 +1541,7 @@ export const responderPergunta = createServerFn({ method: "POST" })
     const perguntaParaOCerebro = (data.perguntaGeneralizada ?? "").trim();
     if (data.treinar && perguntaParaOCerebro.length >= 8) {
       try {
-        const { data: entry } = await sb
+        const { data: entry, error } = await sb
           .from("brain_entries")
           .insert({
             doctor_id: user.id,
@@ -1552,6 +1552,11 @@ export const responderPergunta = createServerFn({ method: "POST" })
           })
           .select("id")
           .single();
+        /* `treinou: false` já é honesto com a tela — ela não promete o que não
+           aconteceu. O que falta é a razão: ele marcou "ensinar isto ao meu
+           cérebro", viu que não ensinou, e não há um único lugar onde o porquê
+           exista. */
+        if (error) console.error("[cérebro] treino a partir da resposta falhou", user.id, error);
         if (entry) {
           const { embedBrainEntry } = await import("./embeddings.server");
           await embedBrainEntry(entry.id, perguntaParaOCerebro, data.resposta);

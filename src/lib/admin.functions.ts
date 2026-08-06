@@ -914,10 +914,14 @@ export const markPreConsultaSeen = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (!(await assertOwnsRow(supabaseAdmin as any, "preconsulta_forms", data.id, scope)))
       return { ok: false as const };
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("preconsulta_forms")
       .update({ seen_by_doctor: true })
       .eq("id", data.id);
+    if (error) {
+      console.error("[pré-consulta] marca de lido não gravou", data.id, error);
+      return { ok: false as const };
+    }
     return { ok: true as const };
   });
 

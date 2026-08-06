@@ -162,11 +162,18 @@ export const dismissAnnouncement = createServerFn({ method: "POST" })
     const user = await getUser(data.accessToken);
     if (!user) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await (supabaseAdmin as any)
+    const { error } = await (supabaseAdmin as any)
       .from("announcement_dismissals")
       .upsert(
         { announcement_id: data.id, user_id: user.id },
         { onConflict: "announcement_id,user_id" },
       );
+    /* "Dispensar" que não grava é o comunicado voltando toda vez que ela abre
+       o app, sem nenhuma forma de calar — e com `ok: true` a tela some na
+       hora, o que faz parecer que funcionou até o próximo carregamento. */
+    if (error) {
+      console.error("[comunicado] dispensa não gravou", data.id, error);
+      return { ok: false as const };
+    }
     return { ok: true as const };
   });

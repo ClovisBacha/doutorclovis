@@ -219,12 +219,17 @@ export function maybeUpdateChatMemory(patientId: string, doctorId: string | null
       const summary = result.text.trim().slice(0, 2400);
       if (!summary) return;
 
-      await sb.from("chat_memory").upsert({
+      /* Best-effort de verdade — perder um resumo não quebra a conversa. Mas
+         se a tabela não existir, TODA memória se perde e o sintoma que chega é
+         "a IA não lembra de nada", que ninguém liga a uma migration faltando.
+         O log é a única ponte entre os dois. */
+      const { error } = await sb.from("chat_memory").upsert({
         patient_id: patientId,
         doctor_id: doctorId,
         summary,
         updated_at: new Date().toISOString(),
       });
+      if (error) console.error("[memória] resumo da conversa não gravou", patientId, error);
     } catch {
       /* best-effort */
     }

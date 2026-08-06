@@ -297,10 +297,15 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     const newlyAwarded = toAward.filter((key) => !existing.has(key));
 
     if (toAward.length > 0) {
-      await db.from("patient_achievements").upsert(
+      const { error } = await db.from("patient_achievements").upsert(
         toAward.map((key) => ({ user_id: uid, achievement_key: key })),
         { onConflict: "user_id,achievement_key", ignoreDuplicates: true },
       );
+      /* `newlyAwarded` é o que dispara a celebração na tela — e ele é
+         calculado ANTES desta escrita. Se ela falhar, a conquista é celebrada
+         e não fica: na próxima checagem ela é "nova" de novo, e a mesma
+         medalha aparece toda vez, como se o app não guardasse nada. */
+      if (error) console.error("[conquistas] concessão não gravou", uid, error);
     }
 
     // 🌱 Sementinhas: recompensa por conquistas + marcos de semana/trimestre.

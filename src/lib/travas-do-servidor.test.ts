@@ -120,8 +120,13 @@ describe("escrita no banco não pode falhar em silêncio", () => {
       if (/\berror\b/.test(janela) || /\bgravar\(/.test(janela)) return;
       /* `createHmac().update()`, `cipher.update()` e `Map.delete()` casam com a
          regex e não são banco — 9 dos 55 contados eram falso positivo, o que
-         inflava o teto e escondia a dívida real. */
-      if (/createHmac|createHash|cipher|decipher|hits\.delete/.test(linha)) return;
+         inflava o teto e escondia a dívida real.
+         E o encadeamento quebrado em duas linhas escapava dessa checagem:
+         `createHmac(...)` numa linha, `.update(raw, "utf8")` na seguinte. A
+         janela para trás resolve — um `.update` que não é banco é sempre
+         encadeado logo depois de quem o produziu. */
+      const antes = linhas.slice(Math.max(0, i - 2), i + 1).join("\n");
+      if (/createHmac|createHash|cipher|decipher|hits\.delete/.test(antes)) return;
       n++;
     });
     return n;

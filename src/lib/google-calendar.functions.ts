@@ -216,7 +216,18 @@ export const disconnectGoogleCalendar = createServerFn({ method: "POST" })
     const userId = await requireDoctorUser(data.accessToken);
     if (!userId) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await (supabaseAdmin as any).from("doctor_google_tokens").delete().eq("user_id", userId);
+    /* Desconectar é uma retirada de CONSENTIMENTO: ele está mandando apagar o
+       token que nos deixa entrar na agenda dele. `ok: true` incondicional
+       dizia "pronto, desconectado" enquanto o refresh token continuava
+       guardado e utilizável pelo servidor. */
+    const { error } = await (supabaseAdmin as any)
+      .from("doctor_google_tokens")
+      .delete()
+      .eq("user_id", userId);
+    if (error) {
+      console.error("[agenda] token do Google NÃO foi apagado", userId, error);
+      return { ok: false as const };
+    }
     return { ok: true as const };
   });
 

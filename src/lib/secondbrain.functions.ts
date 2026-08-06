@@ -595,8 +595,17 @@ export const answerAndTrain = createServerFn({ method: "POST" })
         .eq("id", data.questionId));
     }
     if (updateError) {
-      // Compensação: desfaz a entry recém-criada para o retry não duplicar.
-      await (supabaseAdmin as any).from("brain_entries").delete().eq("id", entry.id);
+      /* Compensação: desfaz a entry recém-criada para o retry não duplicar.
+         Se a própria compensação falhar em silêncio, ela produz exatamente o
+         defeito que existe para impedir — e o médico, que só vê "não deu
+         certo", responde de novo e passa a ter duas entradas dizendo a mesma
+         coisa para a IA. */
+      const { error: delErr } = await (supabaseAdmin as any)
+        .from("brain_entries")
+        .delete()
+        .eq("id", entry.id);
+      if (delErr)
+        console.error("[cérebro] compensação falhou; entrada duplicável", entry.id, delErr);
       return { ok: false as const };
     }
     return { ok: true as const };
@@ -843,7 +852,9 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
       .eq("id", gap.id);
     if (updErr) {
       // Compensação: não deixa conhecimento duplicar num retry.
-      await sb.from("brain_entries").delete().eq("id", entry.id);
+      const { error: delErr } = await sb.from("brain_entries").delete().eq("id", entry.id);
+      if (delErr)
+        console.error("[cérebro] compensação falhou; entrada duplicável", entry.id, delErr);
       return { ok: false as const };
     }
 
@@ -926,7 +937,7 @@ async function fecharLacunasParecidas(
     for (const alvo of alvos) {
       /* Uma por vez, e só a que ainda está aberta: entre a busca e a escrita o
          médico pode ter respondido ou ignorado outra numa segunda aba. */
-      const { data: linha } = await sb
+      const { data: linha, error: fechaErr } = await sb
         .from("brain_gaps")
         .update({ status: "respondida", updated_at: new Date().toISOString() })
         .eq("id", alvo.id)
@@ -934,6 +945,10 @@ async function fecharLacunasParecidas(
         .eq("status", "aberta")
         .select("id,question")
         .maybeSingle();
+      /* Pular é o certo quando a linha já mudou de estado. Quando é o banco
+         recusando, o efeito é outro: a lacuna parecida fica aberta e a
+         paciente que a fez não recebe a resposta que já existe. */
+      if (fechaErr) console.error("[lacuna] parecida não fechou", alvo.id, fechaErr);
       if (!linha) continue;
       fechadas++;
       /* Quem perguntou a parecida recebe a MESMA orientação. A pergunta que vai
@@ -984,7 +999,13 @@ async function entregarRespostaDaLacuna(
     if (destino.length === 0) return 0;
 
     const agora = new Date().toISOString();
-    await sb.from("doctor_questions").insert(
+    /* A ENTREGA VEM PRIMEIRO, E `avisada_em` SÓ DEPOIS DE DAR CERTO.
+       As duas escritas eram cegas e em sequência: se a primeira falhasse, a
+       segunda carimbava "avisada" mesmo assim. A paciente nunca recebia a
+       resposta e o sistema passava a acreditar que tinha entregado — o
+       `.is("avisada_em", null)` lá em cima nunca mais a selecionaria. Um
+       silêncio que se torna permanente é pior que um erro. */
+    const { error: insErr } = await sb.from("doctor_questions").insert(
       destino.map((uid) => ({
         user_id: uid,
         doctor_id: args.doctorId,
@@ -994,11 +1015,19 @@ async function entregarRespostaDaLacuna(
         answered_at: agora,
       })),
     );
-    await sb
+    if (insErr) {
+      console.error("[lacuna] resposta não chegou às pacientes", args.gapId, insErr);
+      return 0;
+    }
+    const { error: marcaErr } = await sb
       .from("brain_gap_askers")
       .update({ avisada_em: agora })
       .eq("gap_id", args.gapId)
       .in("user_id", destino);
+    /* Aqui o lado seguro é o oposto: ela JÁ recebeu. Não marcar faz a próxima
+       execução entregar de novo — chato, não perigoso. */
+    if (marcaErr)
+      console.error("[lacuna] entregue, marca de aviso não gravou", args.gapId, marcaErr);
 
     try {
       const { sendPushToUser } = await import("./push.server");
@@ -1207,11 +1236,15 @@ export const resolveBrainReview = createServerFn({ method: "POST" })
       await embedBrainEntry(ent.id as string, (ent.question as string) ?? "", data.answer);
     }
 
-    await sb
+    /* Tirar da fila é o único passo reversível daqui: se não gravar, o item
+       reaparece e ele resolve de novo. O que não pode é ele ver "resolvida" na
+       tela e o item voltar amanhã sem explicação. */
+    const { error: resErr } = await sb
       .from("brain_feedback")
       .update({ status: "resolvida", resolved_at: new Date().toISOString() })
       .eq("id", rev.id)
       .eq("doctor_id", doctorId);
+    if (resErr) console.error("[revisão] item corrigido continua na fila", rev.id, resErr);
 
     const avisada = await entregarCorrecao(sb, {
       doctorId,
@@ -1260,7 +1293,11 @@ export async function entregarCorrecao(
       .maybeSingle();
     if (!aindaDele?.id) return false;
 
-    await sb.from("doctor_questions").insert({
+    /* `true` é a promessa "ela foi avisada", e a tela do médico mostra isso.
+       Sem checar o erro, a promessa saía do mesmo jeito quando a correção não
+       tinha chegado a lugar nenhum — e o 👎 dela voltaria a ser respondido
+       para sempre com a resposta antiga. */
+    const { error: insErr } = await sb.from("doctor_questions").insert({
       user_id: args.userId,
       doctor_id: args.doctorId,
       question: args.pergunta,
@@ -1268,6 +1305,10 @@ export async function entregarCorrecao(
       answered: true,
       answered_at: new Date().toISOString(),
     });
+    if (insErr) {
+      console.error("[revisão] correção não chegou à paciente", args.userId, insErr);
+      return false;
+    }
     const { sendPushToUser } = await import("./push.server");
     await sendPushToUser(args.userId, {
       /* Sem gênero: o irmão em `entregarRespostaDaLacuna` diz "Seu médico

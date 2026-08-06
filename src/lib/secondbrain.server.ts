@@ -127,7 +127,13 @@ function logBrainHit(doctorId: string, channel: BrainChannel): void {
   void (async () => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await (supabaseAdmin as any).from("brain_hits").insert({ doctor_id: doctorId, channel });
+      const { error } = await (supabaseAdmin as any)
+        .from("brain_hits")
+        .insert({ doctor_id: doctorId, channel });
+      /* Best-effort de verdade — nenhuma paciente perde nada. Mas é este
+         contador que enche o placar de uso do médico, e uma tabela ausente
+         faria o Cérebro parecer nunca ter respondido nada. */
+      if (error) console.error("[cérebro] hit não registrado", doctorId, channel, error);
     } catch {
       /* telemetria é best-effort — nunca afeta a resposta ao paciente */
     }
@@ -883,14 +889,19 @@ export async function logBrainGapAgora(
          pacientes com a mesma dúvida virarem UM item na fila dele. */
       const anotaQuemPerguntou = async (gapId: string) => {
         if (!patientId || !gapId) return;
-        await sb
+        const { error } = await sb
           .from("brain_gap_askers")
           .upsert({ gap_id: gapId, user_id: patientId }, { onConflict: "gap_id,user_id" });
+        /* Esta linha é a única ligação entre a dúvida dela e a resposta que
+           ele vai escrever. Sem ela a lacuna continua na fila do médico, ele
+           responde, e a resposta não chega a ninguém — a IA disse "registrei
+           aqui para ele ver" e a promessa morre sem deixar rastro. */
+        if (error) console.error("[lacuna] quem perguntou não foi registrado", gapId, error);
       };
 
       if (existing) {
         // Reaparecer conta como novo hit; lacuna ignorada não reabre sozinha.
-        await sb
+        const { error } = await sb
           .from("brain_gaps")
           .update({
             hits: (existing.hits ?? 1) + 1,
@@ -898,6 +909,10 @@ export async function logBrainGapAgora(
             ...(existing.status === "respondida" ? { status: "aberta" } : {}),
           })
           .eq("id", existing.id);
+        /* `hits` é o que ordena a fila dele por "quantas pacientes
+           perguntaram". Parado em 1, a dúvida mais comum do consultório fica
+           no fim da lista parecendo caso isolado. */
+        if (error) console.error("[lacuna] contador de repetições não subiu", existing.id, error);
         await anotaQuemPerguntou(existing.id);
       } else {
         const base = {

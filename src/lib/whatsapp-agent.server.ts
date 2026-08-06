@@ -270,11 +270,15 @@ async function getOrCreateConversation(
       .eq("phone", phone)
       .maybeSingle();
     if (legacy) return legacy as WaConversation;
-    const { data: legacyCreated } = await sb
+    const { data: legacyCreated, error: legacyErr } = await sb
       .from("whatsapp_conversations")
       .insert({ phone, state: "start", context: {} })
       .select()
       .single();
+    /* Último recurso do último recurso. Falhando aqui, o `as WaConversation`
+       devolve `null` disfarçado de objeto e quem chama estoura no primeiro
+       campo — longe daqui, com uma mensagem que não diz nada sobre o banco. */
+    if (legacyErr) console.error("[whatsapp] conversa não pôde ser criada", phone, legacyErr);
     return legacyCreated as WaConversation;
   }
   return created as WaConversation;
@@ -288,7 +292,7 @@ async function saveConversation(
 ): Promise<void> {
   const sb = supabaseAdmin;
   // Por id: nunca atualiza a conversa do mesmo telefone com OUTRO médico.
-  await (sb as any)
+  const { error } = await (sb as any)
     .from("whatsapp_conversations")
     .update({
       state,
@@ -297,6 +301,11 @@ async function saveConversation(
       last_message_at: new Date().toISOString(),
     })
     .eq("id", conv.id);
+  /* O estado é a memória inteira desta conversa. Se ele não gravar, o próximo
+     "oi" dela reencontra a conversa no passo anterior: o bot pergunta de novo
+     o que ela acabou de responder, e ela fica presa num loop que, do lado
+     dela, é o consultório não estar ouvindo. */
+  if (error) console.error("[whatsapp] estado da conversa não gravou", conv.id, error);
 }
 
 async function createAppointmentRequest(

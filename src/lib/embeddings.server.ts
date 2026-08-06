@@ -195,9 +195,19 @@ export async function embedBrainEntry(
     const vec = await embedText(`${question}\n${answer}`, 6000, "documento");
     if (!vec) return;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Coluna embedding ausente (migração pendente): o supabase-js devolve
-    // {error} sem lançar — o update vira no-op silencioso, que é o desejado.
-    await (supabaseAdmin as any).from("brain_entries").update({ embedding: vec }).eq("id", entryId);
+    /* Coluna `embedding` ausente (migração pendente): o supabase-js devolve
+       `{error}` sem lançar, e o update vira no-op — o que é desejado, porque
+       o banco sem a coluna não tem busca semântica de qualquer forma.
+       O que NÃO é desejado é o mesmo silêncio para qualquer outro erro: sem
+       vetor, a entrada existe e é inencontrável por significado, e o sintoma
+       ("respondi isso e a IA não usa") não aponta para lugar nenhum. */
+    const { error } = await (supabaseAdmin as any)
+      .from("brain_entries")
+      .update({ embedding: vec })
+      .eq("id", entryId);
+    if (error && (error as { code?: string }).code !== "42703") {
+      console.error("[cérebro] vetor não gravou; entrada fica inencontrável", entryId, error);
+    }
   } catch {
     /* enriquecimento é best-effort — o backfill cobre depois */
   }

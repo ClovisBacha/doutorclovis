@@ -385,20 +385,30 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
        médico aceitar" para sempre, enquanto ele já a via na lista de pacientes.
        Reclamar primeiro, com `.eq("status","pending")`, também fecha a corrida
        de dois cliques: o segundo encontra 0 linhas e desiste. */
-    const { data: claimed } = await (supabaseAdmin as any)
+    const { data: claimed, error: claimErr } = await (supabaseAdmin as any)
       .from("patient_link_requests")
       .update({ status: data.accept ? "accepted" : "declined", decided_at: now })
       .eq("id", req.id)
       .eq("status", "pending")
       .select("id");
+    /* Duas causas com o MESMO silêncio: "o outro clique chegou antes" (normal,
+       e a tela recarregada mostra a decisão) e "o banco recusou a escrita"
+       (defeito). Sem separar, o médico clica em Aceitar, nada acontece, e não
+       há nenhum lugar onde isso apareça. */
+    if (claimErr) console.error("[vínculo] decisão recusada pelo banco", req.id, claimErr);
     if (!claimed?.length) return { ok: false as const };
 
     /** Devolve a solicitação para pendente quando o passo seguinte falha. */
-    const desfazer = async () =>
-      await (supabaseAdmin as any)
+    const desfazer = async () => {
+      const { error } = await (supabaseAdmin as any)
         .from("patient_link_requests")
         .update({ status: "pending", decided_at: null })
         .eq("id", req.id);
+      /* Se o desfazer falha, a solicitação fica "accepted" sem vínculo — o
+         estado inconsistente que a ordem acima existe para impedir, e o único
+         que ninguém consegue enxergar da tela. */
+      if (error) console.error("[vínculo] rollback da decisão falhou", req.id, error);
+    };
 
     if (data.accept) {
       // Escada de planos: cada plano tem um teto de pacientes ativas por
@@ -515,15 +525,22 @@ export const encerrarAcompanhamento = createServerFn({ method: "POST" })
     /* A solicitação antiga volta a "declined" e não some: sem isso, o par
        ficaria com um pedido "accepted" de um vínculo que não existe mais, e ela
        não conseguiria pedir de novo. */
-    try {
-      await (supabaseAdmin as any)
-        .from("patient_link_requests")
-        .update({ status: "declined", decided_at: new Date().toISOString() })
-        .eq("patient_id", data.pacienteId)
-        .eq("doctor_id", user.id)
-        .eq("status", "accepted");
-    } catch {
-      /* o vínculo já caiu, que é o que importa */
+    /* O `try/catch` daqui dizia "o vínculo já caiu, que é o que importa" — e
+       contradizia o parágrafo acima, que explica que sem esta linha ela NÃO
+       CONSEGUE PEDIR DE NOVO. Além disso nunca capturou nada: o supabase-js
+       devolve `{ error }`, não lança. */
+    const { error: reqErr } = await (supabaseAdmin as any)
+      .from("patient_link_requests")
+      .update({ status: "declined", decided_at: new Date().toISOString() })
+      .eq("patient_id", data.pacienteId)
+      .eq("doctor_id", user.id)
+      .eq("status", "accepted");
+    if (reqErr) {
+      console.error(
+        "[vínculo] encerrado, solicitação antiga travada em accepted",
+        data.pacienteId,
+        reqErr,
+      );
     }
 
     /* AVISA ELA. Descobrir sozinha que o médico sumiu do app é a pior forma de

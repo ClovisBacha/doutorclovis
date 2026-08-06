@@ -149,7 +149,7 @@ async function offerNextForWeek(
   if (!entry) return false;
 
   const deadline = new Date(Date.now() + WAITLIST_RESPONSE_HOURS * 3600_000).toISOString();
-  const { data: claimed } = await (admin as any)
+  const { data: claimed, error: claimErr } = await (admin as any)
     .from("appointment_waitlist")
     .update({
       status: "offered",
@@ -161,6 +161,11 @@ async function offerNextForWeek(
     .eq("id", entry.id)
     .eq("status", "waiting") // trava contra corrida
     .select("id");
+  /* `false` aqui significa "não ofertei", e quem chama desiste da vaga. Duas
+     causas davam o mesmo `false`: a corrida (outra chamada ofertou primeiro —
+     correto) e a escrita recusada, que faz uma vaga real morrer sem chegar a
+     ninguém da fila. */
+  if (claimErr) console.error("[fila] oferta não gravou", entry.id, claimErr);
   if (!claimed?.length) return false;
   await notifyOffer({
     patient_name: entry.patient_name,
@@ -206,12 +211,17 @@ export async function sweepWaitlist(admin: Db): Promise<number> {
   let n = 0;
   for (const o of overdue as any[]) {
     // Marca expirada SÓ se ainda estiver 'offered' (evita corrida com aceite).
-    const { data: exp } = await (admin as any)
+    const { data: exp, error: expErr } = await (admin as any)
       .from("appointment_waitlist")
       .update({ status: "expired" })
       .eq("id", o.id)
       .eq("status", "offered")
       .select("id");
+    /* Falha aqui é recuperável — a próxima varredura tenta de novo. Mas se a
+       escrita estiver recusando SEMPRE, a fila para de cascatear e ninguém
+       recebe vaga nenhuma, com a varredura devolvendo 0 como se estivesse tudo
+       em dia. Sem log, isso é indistinguível de uma fila vazia. */
+    if (expErr) console.error("[fila] expiração não gravou", o.id, expErr);
     if (!exp?.length) continue;
     n++;
     if (o.offer_date && o.offer_time) {
@@ -298,12 +308,19 @@ export const leaveWaitlist = createServerFn({ method: "POST" })
     const email = await authEmail(data.accessToken);
     if (!email) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await (supabaseAdmin as any)
+    /* `ok: true` incondicional dizia a ela "você saiu da fila" mesmo quando o
+       banco recusou. Ela fecha a tela achando que resolveu e, semanas depois,
+       recebe uma oferta de vaga para uma consulta que não quer mais. */
+    const { error } = await (supabaseAdmin as any)
       .from("appointment_waitlist")
       .update({ status: "cancelled" })
       .eq("id", data.id)
       .eq("patient_email", email)
       .in("status", ["waiting", "offered"]);
+    if (error) {
+      console.error("[fila] saída não gravou", data.id, error);
+      return { ok: false as const };
+    }
     return { ok: true as const };
   });
 
@@ -395,19 +412,30 @@ export const respondWaitlistOffer = createServerFn({ method: "POST" })
     if (insErr) {
       // Slot tomado: expira esta oferta e tenta a próxima.
       if ((insErr as { code?: string }).code === "23505") {
-        await (supabaseAdmin as any)
+        const { error: expErr } = await (supabaseAdmin as any)
           .from("appointment_waitlist")
           .update({ status: "expired" })
           .eq("id", entry.id)
           .eq("status", "offered");
+        /* Não muda o que ela vê (o horário foi tomado de qualquer jeito), mas
+           deixa a entrada presa em "offered": a varredura vai reoferecer um
+           slot que já tem dono, e a próxima da fila recebe uma vaga que morre
+           na hora do aceite. */
+        if (expErr) console.error("[fila] oferta perdida ficou presa", entry.id, expErr);
         return { ok: false as const, error: "Esse horário acabou de ser preenchido." };
       }
       return { ok: false as const, error: "Não foi possível confirmar" };
     }
-    await (supabaseAdmin as any)
+    /* A CONSULTA JÁ EXISTE — por isso o retorno continua sendo sucesso. Mas se
+       a fila não registrar "booked", a entrada fica em "offered" com prazo
+       vencendo, e a varredura oferta o MESMO horário para a próxima da fila.
+       Ela aceita, o índice único recusa, e ela recebe "esse horário acabou de
+       ser preenchido" sem nunca ter havido concorrente de verdade. */
+    const { error: bookErr } = await (supabaseAdmin as any)
       .from("appointment_waitlist")
       .update({ status: "booked" })
       .eq("id", entry.id);
+    if (bookErr) console.error("[fila] consulta criada, fila não marcou booked", entry.id, bookErr);
 
     // Avisa o consultório (best-effort).
     try {

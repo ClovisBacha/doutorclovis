@@ -54,9 +54,14 @@ export async function grantSementinhas(db: Db, userId: string, grants: Grant[]):
       dedupe_key: g.dedupeKey,
     }));
   if (rows.length === 0) return;
-  await db
+  const { error } = await db
     .from("sementinhas_ledger")
     .upsert(rows, { onConflict: "user_id,dedupe_key", ignoreDuplicates: true });
+  /* `dedupe_key` torna a concessão idempotente, então repetir é seguro — o que
+     não existe é alguém para repetir. Falhando aqui, ela cumpre o desafio, vê
+     a animação e o saldo não muda; e como todo chamador ignora o retorno, o
+     único lugar onde isso pode aparecer é o log. */
+  if (error) console.error("[sementinhas] concessão não gravou", userId, error);
 }
 
 /** Saldo atual = SUM(amount). Server-only. */

@@ -47,8 +47,29 @@ export const Route = createFileRoute("/api/mp-webhook")({
           return new Response("ok", { status: 200 });
         }
 
+        /* ─── 200 SIGNIFICA "PODE ESQUECER ESTE PAGAMENTO" ──────────────────
+           Este arquivo inteiro respondia 200 para tudo, e cada 200 aqui é uma
+           promessa ao Mercado Pago: recebi, tratei, não precisa reenviar.
+
+           É o MESMO defeito que o webhook do Stripe acabou de fechar — a
+           paciente paga, a consulta continua "pendente_pagamento" para sempre,
+           e não há retry porque nós dissemos que estava tudo bem. Sobreviveu
+           aqui porque o conserto foi feito no arquivo do outro meio de
+           pagamento, não na CLASSE do erro.
+
+           A régua agora: 200 só quando o evento foi resolvido ou quando
+           reenviar não mudaria nada. Falha nossa (config ausente, MP fora do
+           ar, escrita recusada) → 500, e o MP tenta de novo. */
         const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
-        if (!mpToken) return new Response("ok", { status: 200 });
+        if (!mpToken) {
+          /* Sem o token não dá para confirmar o pagamento — e responder 200
+             faria o MP desistir de um evento que só falhou por configuração
+             nossa. 500 mantém o evento vivo até alguém preencher a variável. */
+          console.error(
+            "[mp-webhook] MERCADO_PAGO_ACCESS_TOKEN ausente — pagamento não confirmado",
+          );
+          return new Response("configuração ausente", { status: 500 });
+        }
 
         // Verify payment status directly with MP (never trust webhook body alone)
         const paymentId = String(body.data.id);
@@ -56,17 +77,37 @@ export const Route = createFileRoute("/api/mp-webhook")({
           headers: { Authorization: `Bearer ${mpToken}` },
         }).catch(() => null);
 
-        if (!res?.ok) return new Response("ok", { status: 200 });
+        if (!res) {
+          // Rede caiu no meio: reenviar resolve.
+          console.error("[mp-webhook] falha de rede ao consultar o pagamento", paymentId);
+          return new Response("indisponível", { status: 500 });
+        }
+        if (!res.ok) {
+          /* 4xx é resposta definitiva do MP (pagamento inexistente, token
+             inválido): reenviar dá o mesmo erro para sempre. 5xx é o MP fora
+             do ar — aí vale insistir. */
+          const definitivo = res.status >= 400 && res.status < 500;
+          console.error("[mp-webhook] MP respondeu", res.status, "para", paymentId);
+          return new Response("ok", { status: definitivo ? 200 : 500 });
+        }
 
-        const payment = (await res.json()) as { status?: string };
+        const payment = (await res.json().catch(() => null)) as { status?: string } | null;
+        if (!payment) return new Response("resposta ilegível", { status: 500 });
 
         if (payment.status === "approved") {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          await supabaseAdmin
+          const { error } = await supabaseAdmin
             .from("private_consultations")
             .update({ status: "confirmado" })
             .eq("mp_payment_id", paymentId)
             .in("status", ["pendente_pagamento", "pagamento_enviado"]);
+          if (error) {
+            /* A paciente PAGOU. Se a confirmação não gravou, o único caminho
+               de volta é o MP reenviar — o `.in(...)` torna a operação
+               idempotente, então repetir é seguro. */
+            console.error("[mp-webhook] falha ao confirmar consulta paga", paymentId, error);
+            return new Response("falha ao gravar", { status: 500 });
+          }
         }
 
         return new Response("ok", { status: 200 });

@@ -133,13 +133,22 @@ export const attributeReferral = createServerFn({ method: "POST" })
     const referrerId: string | undefined = ref?.id;
     if (!referrerId || referrerId === uid) return { ok: true as const, attributed: false };
 
-    // Fixa a indicação SÓ se ainda está nula (evita corrida / troca posterior).
-    const { data: claimed } = await sb
+    /* Fixa a indicação SÓ se ainda está nula (evita corrida / troca posterior).
+       Já falhava seguro — sem linha de volta, ninguém é recompensado. O que
+       faltava era distinguir "outra pessoa chegou antes" (normal) de "a
+       escrita foi recusada" (defeito), porque os dois davam exatamente o mesmo
+       silêncio e o segundo custa a recompensa de uma indicação real.
+       O `retry: true` faz a tela tentar de novo mais tarde. */
+    const { data: claimed, error: claimErr } = await sb
       .from("patient_profiles")
       .update({ referred_by: referrerId })
       .eq("id", uid)
       .is("referred_by", null)
       .select("id");
+    if (claimErr) {
+      console.error("[indicação] atribuição recusada pelo banco", uid, claimErr);
+      return { ok: true as const, attributed: false, retry: true };
+    }
     if (!claimed || claimed.length === 0) return { ok: true as const, attributed: false };
 
     // Credita a indicadora: 100 🌱 por amiga (dedupe pelo id da amiga), fora do

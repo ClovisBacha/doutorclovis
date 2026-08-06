@@ -375,7 +375,12 @@ export async function enviarPushNativo(
 
     const mortos = [...a.mortos, ...f.mortos];
     if (mortos.length) {
-      await (supabaseAdmin as any).from("native_push_tokens").delete().in("token", mortos);
+      const { error } = await (supabaseAdmin as any)
+        .from("native_push_tokens")
+        .delete()
+        .in("token", mortos);
+      // Mesma faxina do push web: token que a Apple/o Google já recusaram.
+      if (error) console.error("[push nativo] tokens mortos não foram apagados", error);
     }
     return { sent: a.sent + f.sent, failed: a.failed + f.failed };
   } catch {

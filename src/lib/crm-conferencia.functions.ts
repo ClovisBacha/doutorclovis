@@ -123,18 +123,19 @@ export const conferirMeuCrm = createServerFn({ method: "POST" })
     /* Só grava quando houve resposta REAL do conselho. Um "indisponível" não
        pode apagar uma conferência boa de ontem — nem virar carimbo de hoje. */
     if (r.status === "confirmado" || r.status === "nao_encontrado") {
-      try {
-        await (supabaseAdmin as any)
-          .from("doctors")
-          .update({
-            crm_conferido_em: new Date().toISOString(),
-            crm_conferido_nome: r.status === "confirmado" ? r.nome : null,
-            crm_conferido_situacao: r.status === "confirmado" ? r.situacao : "não encontrado",
-          })
-          .eq("id", u.user.id);
-      } catch {
-        /* coluna ainda não migrada: a resposta abaixo ainda serve na tela */
-      }
+      /* O `try/catch` nunca disparou (o supabase-js devolve `{ error }`), e o
+         que ele descrevia importa: sem gravar, a conferência do CRM vale só
+         para esta tela e some no refresh. O médico acha que ficou conferido; a
+         plataforma continua sem prova de que ele é médico. */
+      const { error } = await (supabaseAdmin as any)
+        .from("doctors")
+        .update({
+          crm_conferido_em: new Date().toISOString(),
+          crm_conferido_nome: r.status === "confirmado" ? r.nome : null,
+          crm_conferido_situacao: r.status === "confirmado" ? r.situacao : "não encontrado",
+        })
+        .eq("id", u.user.id);
+      if (error) console.error("[CRM] conferência não gravou", u.user.id, error);
     }
 
     return {

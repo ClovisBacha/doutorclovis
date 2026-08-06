@@ -441,7 +441,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
             .limit(1);
           if ((kitRows ?? []).length > 0) return;
           const { BRAIN_STARTER_PACK } = await import("./brain-starter-pack");
-          await (supabaseAdmin as any).from("brain_entries").insert(
+          const { error } = await (supabaseAdmin as any).from("brain_entries").insert(
             BRAIN_STARTER_PACK.map((e) => ({
               doctor_id: user.id,
               question: e.question,
@@ -450,6 +450,10 @@ export const registerDoctor = createServerFn({ method: "POST" })
               approved: false,
             })),
           );
+          /* O `catch` abaixo já logava — e nunca capturou nada, porque o
+             supabase-js devolve `{ error }`. O médico novo abria o Cérebro
+             vazio achando que era assim mesmo. */
+          if (error) console.error("[registerDoctor] starter pack seed failed", error);
         } catch (e) {
           console.error("[registerDoctor] starter pack seed failed", e);
         }

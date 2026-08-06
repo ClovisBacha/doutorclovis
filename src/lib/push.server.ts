@@ -217,11 +217,15 @@ export async function sendPushToUser(
   );
 
   if (dead.length) {
-    await (supabaseAdmin as any)
+    const { error } = await (supabaseAdmin as any)
       .from("push_subscriptions")
       .delete()
       .eq("user_id", userId)
       .in("endpoint", dead);
+    /* Faxina: inscrição que o navegador já descartou. Não apagar não perde
+       nenhuma notificação — só faz `failed` subir para sempre, e é justamente
+       esse número que diria se o push está saudável. */
+    if (error) console.error("[push] inscrições mortas não foram apagadas", userId, error);
   }
 
   return { sent: sent + nativo.sent, failed: failed + nativo.failed };

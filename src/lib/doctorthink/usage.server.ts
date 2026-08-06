@@ -13,14 +13,19 @@ export function logDoctorThinkUsage(
   void (async () => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await (supabaseAdmin as any).from("doctorthink_usage").insert({
+      const { error } = await (supabaseAdmin as any).from("doctorthink_usage").insert({
         tenant_id: tenantId,
         doctor_id: doctorId,
         endpoint,
         had_coverage: hadCoverage ?? null,
       });
-    } catch {
-      /* metering best-effort — nunca quebra a API */
+      /* "Telemetria pura" é o que o comentário acima diz, mas o cabeçalho
+         deste arquivo diz outra coisa: é a BASE PARA FATURAR POR USO. Linha
+         perdida em silêncio é chamada consumida e não cobrada, e a conta só
+         fecha errado no fim do mês, sem nada a que voltar. */
+      if (error) console.error("[doctorthink] uso não registrado", tenantId, endpoint, error);
+    } catch (e) {
+      console.error("[doctorthink] uso não registrado", tenantId, endpoint, e);
     }
   })();
 }

@@ -120,7 +120,13 @@ export function createObstetricaBrainStore(): BrainStore {
       void (async () => {
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          await (supabaseAdmin as any).from("brain_hits").insert({ doctor_id: doctorId, channel });
+          const { error } = await (supabaseAdmin as any)
+            .from("brain_hits")
+            .insert({ doctor_id: doctorId, channel });
+          /* Best-effort de verdade — nenhuma paciente perde nada. Mas é este
+             contador que enche o placar de uso do médico, e uma tabela ausente
+             faria o Cérebro parecer nunca ter respondido nada. */
+          if (error) console.error("[cérebro] hit não registrado", doctorId, channel, error);
         } catch {
           /* telemetria best-effort */
         }

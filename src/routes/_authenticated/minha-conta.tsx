@@ -9632,7 +9632,11 @@ function WaitlistCard() {
     setBusy(true);
     const { data: s } = await supabase.auth.getSession();
     if (s.session) {
-      await leaveWaitlist({ data: { accessToken: s.session.access_token, id } });
+      const res = await leaveWaitlist({ data: { accessToken: s.session.access_token, id } });
+      /* Recarregar a lista já mostraria a verdade — mas só para quem repara
+         que o item continuou lá. Um aviso é o que separa "não funcionou" de
+         "achei que tinha saído". */
+      if (!res?.ok) toast("Não foi possível sair da fila. Tente de novo.");
       await load();
     }
     setBusy(false);

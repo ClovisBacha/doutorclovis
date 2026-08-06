@@ -218,6 +218,8 @@ export function OfertaPremium({
         cota_esgotada: "O seu médico já usou todos os convites deste mês.",
         nao_autenticado: "Entre na sua conta para usar o código.",
         falha_resgate: "Não foi possível resgatar. Tente novamente.",
+        falha_ao_liberar:
+          "O código foi aceito, mas o Premium não entrou. Tente de novo — o código continua seu.",
       };
       toast.error(msg[res.error ?? ""] ?? "Não foi possível resgatar o código.");
     } catch {
