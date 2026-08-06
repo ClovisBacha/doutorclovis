@@ -171,39 +171,70 @@ describe("o médico vê antes de estourar", () => {
     expect(card.slice(0, 1200)).toContain("cotaDeRespostas({");
   });
 
+  /**
+   * A fatia do card do consumo, delimitada de verdade.
+   *
+   * Estes três testes usavam `function BrainScoreCard(` como fronteira — e o
+   * placar foi FUNDIDO no card do anel. `indexOf` passou a devolver `-1`, o
+   * `slice` virou outra coisa, e os três continuaram verdes por acidente.
+   * Fronteira que some sem quebrar o teste é fronteira que não protege nada.
+   */
+  function fatiaDoConsumo(fonte: string): string {
+    const ini = fonte.indexOf("function ConsumoDaIACard(");
+    const fim = fonte.indexOf("\nfunction ", ini + 10);
+    expect(ini).toBeGreaterThan(0);
+    expect(fim).toBeGreaterThan(ini);
+    return fonte.slice(ini, fim);
+  }
+
   test("o card do consumo não some junto com o placar", () => {
     /* A única condição de sumiço dele é sobre a PRÓPRIA cota.
-       SEM COMENTÁRIOS: a docstring do card vizinho fala de `stats` para
-       explicar por que a separação existe, e um `not.toContain` cru casaria
-       com a própria explicação. Foi o erro que já custou quatro rodadas hoje —
-       medir o texto que descreve o código em vez do código. */
-    const limpo = codigoDe("src/routes/_authenticated/painel.tsx");
-    const card = limpo.slice(
-      limpo.indexOf("function ConsumoDaIACard("),
-      limpo.indexOf("function BrainScoreCard("),
-    );
-    /* Nenhuma condição de sumiço vinda do PLACAR. As dele são sobre a própria
-       cota — e são três estados distintos, não um `return null` para tudo. */
+       SEM COMENTÁRIOS: a docstring vizinha fala de `stats` para explicar por
+       que a separação existe, e um `not.toContain` cru casaria com a própria
+       explicação — o erro que já custou quatro rodadas nesta base. */
+    const card = fatiaDoConsumo(codigoDe("src/routes/_authenticated/painel.tsx"));
     expect(card).toContain("if (cota === null)");
     expect(card).not.toContain("stats");
   });
 
-  test("o placar já não lê cota nenhuma", () => {
-    const placar = painel.slice(
-      painel.indexOf("function BrainScoreCard("),
-      painel.indexOf("function BrainReviewCard("),
+  test("o placar foi FUNDIDO no card do anel — não há dois", () => {
+    /* Dois cards na mesma faixa respondiam "como está o meu cérebro" com
+       números diferentes, e o médico tinha que decidir qual era o verdadeiro.
+       O anel é a nota; os três tiles são de onde ela vem. */
+    expect(painel).not.toContain("function BrainScoreCard(");
+    const anel = painel.slice(
+      painel.indexOf("function BrainLevelCard("),
+      painel.indexOf("function ConsumoDaIACard("),
     );
-    expect(placar).not.toContain("cotaDeRespostas");
+    expect(anel).toContain("getBrainQualityStats");
+    expect(anel).toContain("Dúvidas que o cérebro cobriu");
+    expect(anel).not.toContain("cotaDeRespostas");
+  });
+
+  test("o consumo aparece nos DOIS lugares — decisão do Clóvis", () => {
+    /* Na aba Cérebro ele lê "quanto do meu trabalho rendeu"; em Meu Perfil,
+       junto do teto de pacientes e da cobrança, lê "quanto do meu plano estou
+       usando". Mesma medida, duas perguntas — e o card já sabe carregar
+       sozinho, então não custa estado nem prop nova. */
+    const usos = (painel.match(/<ConsumoDaIACard\b/g) ?? []).length;
+    expect(usos).toBe(2);
+    const perfil = painel.slice(painel.indexOf("function MeuPerfilSection("));
+    expect(perfil).toContain("<ConsumoDaIACard");
+  });
+
+  test("a contagem das três filas aparece na faixa", () => {
+    /* Sem o número, o médico rolava as três filas para descobrir se havia
+       trabalho — e as três, vazias, são ~400px de "nada". */
+    expect(painel).toContain("const esperando = fila.lacunas + fila.revisao + fila.perguntas;");
+    expect(painel).toContain("onContar={(n) => setFila((f) => ({ ...f, lacunas: n }))}");
+    expect(painel).toContain("onContar={(n) => setFila((f) => ({ ...f, revisao: n }))}");
+    expect(painel).toContain("onContar={(n) => setFila((f) => ({ ...f, perguntas: n }))}");
   });
 
   test("plano ilimitado também vê o próprio consumo", () => {
     /* Antes a barra exigia `teto > 0`, então justamente quem paga mais não
        enxergava nada. */
-    const card = painel.slice(
-      painel.indexOf("function ConsumoDaIACard("),
-      painel.indexOf("function BrainScoreCard("),
-    );
-    expect(card).toContain("plano sem limite");
+    expect(fatiaDoConsumo(painel)).toContain("plano sem limite");
   });
 });
 

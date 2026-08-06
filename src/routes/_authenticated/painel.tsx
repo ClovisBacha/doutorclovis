@@ -5140,6 +5140,11 @@ function CerebroSection({
   onIrParaPlanos?: () => void;
 }) {
   const asId = asDoctor?.id;
+  /* Cada fila reporta o seu número; a faixa soma. Contar aqui em cima exigiria
+     levantar as três buscas para este componente — muito mais código para o
+     mesmo resultado, e cada card deixaria de saber carregar sozinho. */
+  const [fila, setFila] = useState({ lacunas: 0, revisao: 0, perguntas: 0 });
+  const esperando = fila.lacunas + fila.revisao + fila.perguntas;
   return (
     // key: trocar de médico REMONTA todos os cards — cada cérebro carrega do
     // zero, sem estado (lacunas, base, placar) vazando de um médico p/ outro.
@@ -5189,19 +5194,39 @@ function CerebroSection({
           e a de revisão são trabalho que rende". Dentro da aba, as filas eram o
           4º e o 5º card: ~1.200px de placar e fatura antes do que ele tem para
           fazer. A tese e o layout diziam coisas opostas. */}
-      <h3 className="pt-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+      <h3 className="flex items-center gap-2 pt-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
         O que está esperando você
+        {/* O NÚMERO NA FAIXA. Sem ele, o médico rolava as três filas para
+            descobrir se havia trabalho — e as três, vazias, são ~400px de
+            "nada". Com a soma no cabeçalho, ele decide sem rolar. */}
+        {esperando > 0 && (
+          <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+            {esperando}
+          </span>
+        )}
       </h3>
-      <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainReviewCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} asDoctor={asId} />
+      <BrainGapsCard
+        tokenFn={tokenFn}
+        asDoctor={asId}
+        onContar={(n) => setFila((f) => ({ ...f, lacunas: n }))}
+      />
+      <BrainReviewCard
+        tokenFn={tokenFn}
+        asDoctor={asId}
+        onContar={(n) => setFila((f) => ({ ...f, revisao: n }))}
+      />
+      <BrainTrainCard
+        tokenFn={tokenFn}
+        onTrained={onTrained}
+        asDoctor={asId}
+        onContar={(n) => setFila((f) => ({ ...f, perguntas: n }))}
+      />
 
       {/* ─── ② COMO ESTÁ O CÉREBRO ───────────────────────────────────────── */}
       <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
         Como está o seu cérebro
       </h3>
       <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
       <ConsumoDaIACard
         tokenFn={tokenFn}
         asDoctor={asId}
@@ -5714,6 +5739,29 @@ function BrainLevelCard({
   const [items, setItems] = useState<BrainScoreItem[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [failed, setFailed] = useState(false);
+  /* OS TILES VIERAM PARA CÁ. Eram um card separado logo abaixo — dois placares
+     na mesma faixa respondendo "como está o meu cérebro" com números
+     diferentes, e o médico tendo que decidir qual era o verdadeiro. */
+  const [stats, setStats] = useState<{
+    hitsMonth: number;
+    gapsOpen: number;
+    coveragePct: number | null;
+    satisfactionPct: number | null;
+    feedbackCount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getBrainQualityStats({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+        });
+        if (res.ok) setStats(res);
+      } catch {
+        /* os números são enriquecimento — sem eles, o anel continua de pé */
+      }
+    })();
+  }, [tokenFn]);
 
   useEffect(() => {
     (async () => {
@@ -5821,6 +5869,39 @@ function BrainLevelCard({
           </button>
         </div>
       </div>
+
+      {/* ─── OS NÚMEROS DO MÊS, no mesmo card do anel ─────────────────────
+          Eram um placar SEPARADO logo abaixo: dois cards na mesma faixa
+          respondendo "como está o meu cérebro" com números diferentes, e o
+          médico tendo que decidir qual era o verdadeiro. O anel é a nota; estes
+          três são de onde ela vem.
+          Só aparecem quando há sinal — num cérebro novo eles seriam três zeros
+          repetindo o que o anel já disse. */}
+      {stats && (stats.hitsMonth > 0 || stats.feedbackCount > 0) && (
+        <div className="relative mt-5 grid grid-cols-3 gap-3">
+          {[
+            {
+              v: stats.coveragePct != null ? `${stats.coveragePct}%` : "—",
+              r: "Dúvidas que o cérebro cobriu",
+            },
+            {
+              v: stats.satisfactionPct != null ? `${stats.satisfactionPct}%` : "—",
+              r: "Satisfação (👍)",
+            },
+            { v: String(stats.hitsMonth), r: "Respostas com o seu conhecimento" },
+          ].map((t) => (
+            <div
+              key={t.r}
+              className="rounded-2xl border border-white/15 bg-white/[0.07] p-3 text-center"
+            >
+              <p className="font-serif text-2xl leading-none">{t.v}</p>
+              <p className="mt-1.5 text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/60">
+                {t.r}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Checklist do que preencher para subir o score */}
       {expanded && (
@@ -6283,98 +6364,6 @@ function ConsumoDaIACard({
 }
 
 /**
- * Placar de qualidade do cérebro — a prova numérica: cobertura das dúvidas,
- * satisfação das pacientes e usos no mês. Some silenciosamente enquanto as
- * tabelas de telemetria não existirem (migração pendente) ou sem dados.
- *
- * O CONSUMO NÃO MORA MAIS AQUI. Ele morava, e o preço disso era invisível:
- * este card devolve `null` quando `stats` é nulo, e `stats` é nulo quando
- * QUALQUER uma de `brain_hits` / `brain_gaps` / `brain_feedback` falha — três
- * tabelas de telemetria que, segundo o próprio CLAUDE.md, estão entre as que
- * faltam em produção. Ou seja: a cota carregava certinho e a barra não
- * aparecia, por causa de tabelas que não têm nada a ver com cota.
- *
- * Duas leituras independentes não podem compartilhar uma condição de sumiço.
- */
-function BrainScoreCard({
-  tokenFn,
-  asDoctor,
-}: {
-  tokenFn: () => Promise<string>;
-  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
-  asDoctor?: string;
-}) {
-  const [stats, setStats] = useState<{
-    hitsMonth: number;
-    gapsOpen: number;
-    coveragePct: number | null;
-    satisfactionPct: number | null;
-    feedbackCount: number;
-  } | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await getBrainQualityStats({
-          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
-        });
-        if (res.ok) setStats(res);
-      } catch {
-        /* placar é enhancement — sem dados, sem card */
-      }
-    })();
-  }, [tokenFn]);
-
-  // Sem nenhum sinal ainda (mês zerado e nada aberto) → não polui o painel.
-  if (!stats || (stats.hitsMonth === 0 && stats.gapsOpen === 0 && stats.feedbackCount === 0)) {
-    return null;
-  }
-
-  const tile = "rounded-2xl border border-border bg-card p-4 text-center";
-  return (
-    <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-      <p className="font-serif text-xl">📊 Qualidade da sua IA — este mês</p>
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className={tile}>
-          <p className="font-serif text-3xl leading-none text-primary">
-            {stats.coveragePct != null ? `${stats.coveragePct}%` : "—"}
-          </p>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Cobertura das dúvidas
-          </p>
-        </div>
-        <div className={tile}>
-          <p className="font-serif text-3xl leading-none text-primary">
-            {stats.satisfactionPct != null ? `${stats.satisfactionPct}%` : "—"}
-          </p>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Satisfação (👍)
-          </p>
-        </div>
-        <div className={tile}>
-          <p className="font-serif text-3xl leading-none">{stats.hitsMonth}</p>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Respostas com seu cérebro
-          </p>
-        </div>
-        {/* O TILE "Lacunas abertas" SAIU.
-            O mesmo número aparecia em três lugares da mesma tela: aqui, no
-            badge do card de lacunas 200px abaixo, e implicitamente nos "itens
-            pendentes" do anel logo acima. Três lugares, um número — e o médico
-            tinha que decidir qual era o verdadeiro. A fila fica onde o trabalho
-            está, que é no card dela. */}
-      </div>
-      {stats.coveragePct != null && stats.coveragePct < 70 && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          💡 Responda as lacunas abaixo para subir a cobertura — cada resposta vira conhecimento
-          permanente.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
  * A FILA DE REVISÃO — respostas que a IA SOUBE dar e a paciente reprovou.
  *
  * É a irmã da fila de lacunas, e a diferença entre as duas é a diferença entre
@@ -6390,9 +6379,12 @@ function BrainScoreCard({
 function BrainReviewCard({
   tokenFn,
   asDoctor,
+  onContar,
 }: {
   tokenFn: () => Promise<string>;
   asDoctor?: string;
+  /** Reporta quantos itens esta fila tem — a faixa soma os três. */
+  onContar?: (n: number) => void;
 }) {
   const [itens, setItens] = useState<
     {
@@ -6421,6 +6413,7 @@ function BrainReviewCard({
       });
       if (res.ok) {
         setItens(res.itens);
+        onContar?.(res.itens.length);
         setFalhou(null);
         setCarregando(false);
       } else {
@@ -6639,10 +6632,13 @@ function BrainReviewCard({
 function BrainGapsCard({
   tokenFn,
   asDoctor,
+  onContar,
 }: {
   tokenFn: () => Promise<string>;
   // Plano Clínica: operar o cérebro de um médico da clínica (admin).
   asDoctor?: string;
+  /** Reporta quantos itens esta fila tem — a faixa soma os três. */
+  onContar?: (n: number) => void;
 }) {
   const [gaps, setGaps] = useState<BrainGap[]>([]);
   const [loading, setLoading] = useState(true);
@@ -6694,6 +6690,7 @@ function BrainGapsCard({
       });
       if (res.ok) {
         setGaps(res.gaps);
+        onContar?.(res.gaps.length);
         setLoadError(null);
         /* Lacuna sem vetor não agrupa nem é agrupada, e toda lacuna anterior à
            migration nasceu assim. A cura vai numa requisição SEPARADA de
@@ -7073,11 +7070,14 @@ function BrainTrainCard({
   tokenFn,
   onTrained,
   asDoctor,
+  onContar,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
   // Plano Clínica: operar o cérebro de um médico da clínica (admin).
   asDoctor?: string;
+  /** Reporta quantos itens esta fila tem — a faixa soma os três. */
+  onContar?: (n: number) => void;
 }) {
   const [questions, setQuestions] = useState<
     { id: string; question: string; created_at: string }[] | null
@@ -7102,6 +7102,7 @@ function BrainTrainCard({
       if (res.ok) {
         setQuestions(res.questions);
         setTotalQ(res.total);
+        onContar?.(res.total);
         setFalhouQ(false);
       } else {
         /* ESQUELETO ETERNO era o que acontecia: `questions` ficava `null` para
@@ -9547,6 +9548,20 @@ function MeuPerfilSection({
           </ul>
         </div>
       )}
+      {/* AS RESPOSTAS DA IA, AO LADO DAS PACIENTES.
+          O mesmo card que fica na aba Cérebro. Decisão do Clóvis: os dois
+          lugares. Faz sentido — na aba Cérebro ele lê "quanto do meu trabalho
+          rendeu"; aqui, junto do teto de pacientes e da cobrança, ele lê
+          "quanto do meu plano estou usando". É a mesma medida respondendo a
+          duas perguntas diferentes, e o card já sabe carregar sozinho. */}
+      <ConsumoDaIACard
+        tokenFn={tokenFn}
+        onIrParaPlanos={() => {
+          document
+            .getElementById("cobranca")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+      />
       {uso && (
         <ConsumoCard
           uso={uso}
