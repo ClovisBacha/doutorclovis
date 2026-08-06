@@ -7292,12 +7292,22 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
     e.target.value = "";
     setShowAttach(false);
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Envie um arquivo de imagem válido.");
+    /* PDF TAMBÉM. O botão chama-se "Exame", e laudo em PDF é o formato que
+       todo laboratório entrega por e-mail — recusá-lo deixava sem caminho
+       justamente o arquivo mais comum. Foto continua valendo: é assim que
+       exame de papel chega. */
+    const ehPdf = file.type === "application/pdf";
+    if (!file.type.startsWith("image/") && !ehPdf) {
+      toast.error("Envie uma foto ou um PDF do exame.");
       return;
     }
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error("Imagem muito grande — o limite é 4 MB.");
+    /* 3,5 MB, e não 4: o data URL em base64 cresce ~33% sobre o arquivo, e o
+       limite de corpo de requisição da Vercel é 4,5 MB. Com o teto em 4 MB, um
+       arquivo de 3,8 MB virava ~5,1 MB e a requisição era recusada — a
+       paciente via "não consegui enviar" para o exame que mais importa, o
+       fotografado em alta resolução. */
+    if (file.size > 3.3 * 1024 * 1024) {
+      toast.error("Arquivo muito grande — o limite é 3,3 MB. Tente uma foto com menos resolução.");
       return;
     }
     const reader = new FileReader();
@@ -7597,22 +7607,22 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           }}
         >
           {[
-            {
-              Icon: ImageIcon,
-              label: "Galeria",
-              grad: "#8b5cf6, #6366f1",
-              on: () => fileImageRef.current?.click(),
-            },
-            /* Era um botão FALSO: mostrava "em breve" e não fazia nada. Agora abre a
-             mesma seleção de imagem, porque é assim que exame chega de verdade —
-             fotografado. Um botão que não faz nada é pior que um botão a menos:
-             ela tenta, acredita que enviou, e espera. */
+            /* UM BOTÃO SÓ PARA ARQUIVO, e isso é honestidade de destino.
+               Eram dois — "Galeria" e "Exame" — abrindo o MESMO seletor e
+               gravando o MESMO registro em `exam_files`, com e-mail e push
+               para o médico. Uma foto da barriga mandada pela "Galeria"
+               disparava "📄 Uma paciente enviou um exame". Aviso que chega
+               errado ensina o médico a ignorar aviso.
+               Desde que a IA deixou de analisar imagem, todo arquivo tem um
+               destino só: a aba de Exames dele. Então é um botão, e ele diz
+               para onde vai. */
             {
               Icon: FileText,
-              label: "Exame",
+              label: "Enviar ao médico",
               grad: "#ec4899, #f97316",
               on: () => fileImageRef.current?.click(),
             },
+
             {
               Icon: X,
               label: "Fechar",
@@ -7764,7 +7774,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
       <input
         ref={fileImageRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         onChange={handleImage}
         className="hidden"
       />

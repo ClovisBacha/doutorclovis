@@ -232,11 +232,35 @@ function VisorDoExame({
           {carregando ? (
             <div className="skeleton h-64 rounded-2xl" />
           ) : imagem ? (
-            <img
-              src={imagem}
-              alt={`Exame: ${exame.nome}`}
-              className="w-full rounded-2xl border border-border"
-            />
+            /* PDF NÃO É IMAGEM, e um `<img src="data:application/pdf…">`
+               desenha o ícone de arquivo quebrado. Laudo em PDF é o formato
+               que todo laboratório entrega por e-mail — se o chat aceita
+               enviar, o painel tem que saber mostrar. */
+            imagem.startsWith("data:application/pdf") ? (
+              <object
+                data={imagem}
+                type="application/pdf"
+                className="h-[70vh] w-full rounded-2xl border border-border"
+                aria-label={`Exame: ${exame.nome}`}
+              >
+                {/* Alguns navegadores de celular não embutem PDF. Abrir em aba
+                    nova é o caminho que funciona em todos. */}
+                <a
+                  href={imagem}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-2xl border border-border bg-background p-4 text-center text-sm text-primary underline"
+                >
+                  Abrir o PDF do laudo
+                </a>
+              </object>
+            ) : (
+              <img
+                src={imagem}
+                alt={`Exame: ${exame.nome}`}
+                className="w-full rounded-2xl border border-border"
+              />
+            )
           ) : motivo === "sem_imagem" ? (
             <p className="rounded-2xl border border-border bg-background p-4 text-center text-sm text-muted-foreground">
               Este registro não tem imagem anexada — só a anotação dela.

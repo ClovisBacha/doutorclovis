@@ -35,8 +35,23 @@ export const enviarExameDoChat = createServerFn({ method: "POST" })
     z
       .object({
         accessToken: z.string().min(10),
-        /** JPEG em data URL, já redimensionado pelo cliente. */
-        imagem: z.string().min(32).max(8_000_000),
+        /**
+         * O arquivo, em data URL: foto do laudo (JPEG/PNG/HEIC) ou o PDF que o
+         * laboratório mandou por e-mail.
+         *
+         * O `startsWith` não é decoração. Sem ele, qualquer string de 32
+         * caracteres entrava na coluna e o painel do médico desenhava um ícone
+         * de arquivo quebrado — sem nada dizendo por quê. E a docstring
+         * anterior afirmava "já redimensionado pelo cliente", o que nunca foi
+         * verdade: o cliente lia o arquivo direto, sem canvas.
+         */
+        imagem: z
+          .string()
+          .min(32)
+          .max(8_000_000)
+          .refine((v) => v.startsWith("data:image/") || v.startsWith("data:application/pdf"), {
+            message: "arquivo precisa ser imagem ou PDF em data URL",
+          }),
         /** O que ela escreveu junto, se escreveu. Vira a observação do exame. */
         nota: z.string().max(500).optional(),
       })

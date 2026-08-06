@@ -45,12 +45,44 @@ describe("o anexo vai para o médico", () => {
     expect(app).not.toContain("void sendText(input, reader.result as string)");
   });
 
-  test("o botão falso virou botão de verdade", () => {
+  test("o botão falso virou botão de verdade — e é UM só", () => {
     /* Um botão que não faz nada é pior que um botão a menos: ela tenta,
-       acredita que enviou, e espera. */
+       acredita que enviou, e espera.
+       E dois botões que fazem a MESMA coisa sugerindo destinos diferentes é o
+       defeito seguinte: "Galeria" e "Exame" abriam o mesmo seletor e gravavam
+       o mesmo registro em `exam_files`, com e-mail e push. Uma foto da barriga
+       disparava "📄 Uma paciente enviou um exame" — e aviso que chega errado
+       ensina o médico a ignorar aviso. Desde que a IA parou de analisar
+       imagem, todo arquivo tem um destino só, então o botão diz qual é. */
     expect(app).not.toContain("handleDocSoon");
     expect(app).not.toContain("Envio de documentos em breve");
-    expect(app).toContain('label: "Exame"');
+    expect(appBruto).toContain('label: "Enviar ao médico"');
+    expect(appBruto).not.toContain('label: "Galeria"');
+  });
+
+  test("laudo em PDF tem caminho — nas duas pontas", () => {
+    /* O botão chama-se "Exame" e recusava `application/pdf`, que é o formato
+       que todo laboratório entrega por e-mail. Aceitar no envio sem tratar na
+       exibição só moveria o defeito: `<img src="data:application/pdf…">`
+       desenha ícone de arquivo quebrado no painel do médico. */
+    /* No texto BRUTO: o `codigoDe` remove blocos `/* … *\/`, e `image/*` abre
+       um desses por acidente — a partir dali ele engole o arquivo até achar um
+       fechamento qualquer. Medir a versão limpa aqui seria medir um texto que
+       não existe. */
+    expect(appBruto).toContain('accept="image/*,application/pdf"');
+    expect(appBruto).toContain('const ehPdf = file.type === "application/pdf"');
+    expect(fn).toContain('v.startsWith("data:application/pdf")');
+    const visor = readFileSync("src/components/exames-recebidos.tsx", "utf8");
+    expect(visor).toContain('imagem.startsWith("data:application/pdf")');
+    expect(visor).toContain('type="application/pdf"');
+  });
+
+  test("o teto do cliente cabe no limite de corpo da Vercel", () => {
+    /* base64 cresce ~33%: com teto de 4 MB, um arquivo de 3,8 MB virava ~5,1
+       MB de data URL e a requisição era recusada pelo limite de 4,5 MB. A
+       paciente via "não consegui enviar" justamente para a foto de laudo em
+       alta resolução, que é a que mais importa. */
+    expect(appBruto).toContain("file.size > 3.3 * 1024 * 1024");
   });
 });
 
