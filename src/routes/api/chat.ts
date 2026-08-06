@@ -83,7 +83,19 @@ async function resolvePatientDoctor(request: Request): Promise<{
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data.user) return null;
+    if (error || !data.user) {
+      /* A QUEDA SILENCIOSA.
+         Token expirado ou soluço no Auth rebaixa a paciente ao assistente
+         PÚBLICO: ela recebe resposta, mas de um bot sem o cérebro do médico,
+         sem o histórico clínico dela, que não registra lacuna e que é
+         instruído a orientá-la a "se vincular ao seu obstetra" — para alguém
+         que já está vinculada. E nada dessa conversa é gravado.
+         A tela continua mostrando o nome do consultório no cabeçalho, então
+         ela não tem como perceber. Isto não conserta a queda, mas tira o
+         silêncio: sem rastro, ninguém descobre que aconteceu. */
+      console.error(`[chat] token nao resolvido — a paciente cai no assistente publico`, error);
+      return null;
+    }
     // Prontuário resumido DIRETO do banco (fonte confiável — nunca do texto
     // que o cliente envia): é o que permite personalizar a resposta ("dor de
     // cabeça" numa paciente com histórico de pressão alta NÃO é a mesma
@@ -622,8 +634,24 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const ip = clientIp(request);
-        if (rateLimited(ip)) {
+        /* ─── O BALDE COMPARTILHADO ──────────────────────────────────────
+           O limite era por IP, e `clientIp` devolve a string literal
+           "unknown" quando não há cabeçalho de proxy. Nesse caso TODAS as
+           pacientes dividiam um balde só: vinte mensagens no total, e a
+           vigésima primeira gestante do minuto levava 429 por causa das
+           outras. O mesmo valia para CGNAT de operadora e wifi de clínica —
+           justamente onde várias pacientes do mesmo médico se encontram.
+
+           Paciente logada tem identidade própria: o balde passa a ser dela.
+           O token não é verificado aqui (isso acontece depois, em
+           `resolvePatientDoctor`) porque não precisa: trocar de token não
+           burla nada além do próprio limite, e para isso seria preciso ter
+           outra conta de verdade. Visitante anônimo continua por IP. */
+        const auth = request.headers.get("authorization") || "";
+        const chaveDoLimite = auth.toLowerCase().startsWith("bearer ")
+          ? `u:${auth.slice(-32)}`
+          : `ip:${clientIp(request)}`;
+        if (rateLimited(chaveDoLimite)) {
           return new Response("Muitas mensagens em pouco tempo. Aguarde um instante.", {
             status: 429,
           });
@@ -1009,6 +1037,34 @@ NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai
 
         return result.toUIMessageStreamResponse({
           originalMessages: messages,
+          /* ─── O ERRO QUE VIRAVA BOLHA VAZIA ─────────────────────────────
+             Quando o provedor falha DEPOIS de a resposta já ter começado a
+             ser enviada (HTTP 200 já foi), o SDK não pode mais devolver um
+             código de erro: ele emite uma parte `{type:"error"}` dentro do
+             fluxo. O padrão do SDK é a string genérica "An error occurred."
+
+             O cliente só sabe ler `text-delta` e descarta o resto em silêncio.
+             Resultado: cota estourada, 5xx, `RetryError` e bloqueio de
+             conteúdo terminavam todos iguais — bolha em branco. A paciente lia
+             aquilo como "a IA não soube responder", que é a leitura errada, e
+             o único registro do que houve ficava no console da Vercel.
+
+             Aqui o erro ganha um texto ÚTIL — e o cliente aprendeu a ler a
+             parte `error` (ver `processLine` em minha-conta.tsx). As duas
+             pontas: sem a mensagem não há o que mostrar, e sem o leitor a
+             mensagem não chega. */
+          onError: (erro) => {
+            const e = erro as any;
+            const causa = e?.lastError ?? e?.cause ?? e;
+            const status = Number(causa?.statusCode ?? causa?.status ?? 0);
+            /* 429 é o único que a paciente pode resolver — esperando. Dizer
+               "tente de novo em instantes" é acionável; "ocorreu um erro" não
+               é, e ainda sugere que ela fez algo errado. */
+            if (status === 429) {
+              return "Estou recebendo muitas perguntas neste momento. Tente de novo em alguns instantes — sua dúvida não se perdeu.";
+            }
+            return "Não consegui responder agora — foi uma falha minha, não sua. Pode tentar de novo em instantes?";
+          },
         });
       },
     },

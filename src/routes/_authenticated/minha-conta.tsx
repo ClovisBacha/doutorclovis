@@ -7096,6 +7096,18 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         try {
           const json = JSON.parse(line.slice(6));
           if (json.type === "text-delta" && json.delta) acc += json.delta;
+          /* A PARTE QUE FALTAVA LER.
+             Quando o provedor falha depois de o fluxo começar, o HTTP já é 200
+             e o servidor não pode mais mudar o código: ele manda uma parte
+             `error` com o texto. Este `if` não existia — a parte era descartada
+             em silêncio, `acc` ficava vazio, e a paciente via uma bolha em
+             branco. Ela lia aquilo como "a IA não soube responder", que é a
+             leitura errada, e o único registro ficava no console da Vercel. */ else if (
+            json.type === "error" &&
+            (json.errorText || json.error)
+          ) {
+            acc = String(json.errorText ?? json.error);
+          }
         } catch {}
       };
       while (true) {
@@ -7130,11 +7142,23 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         setMessages([...displayNext, { ...asstMsg, content: acc }]);
       }
     } catch {
+      /* O QUE ELA JÁ ESTAVA LENDO NÃO SE PERDE.
+         Antes a lista era reconstruída a partir de `displayNext` — o retrato
+         anterior à resposta. Se a rede caísse no meio, o texto que ela estava
+         lendo sumia da tela e virava um erro genérico. Pior: o servidor
+         terminava e GRAVAVA a resposta inteira, então ela reaparecia "do nada"
+         na próxima abertura do chat.
+         Agora o que chegou fica, e o aviso vem depois — que é o que qualquer
+         conversa interrompida deveria fazer. */
+      const parcial = alvoRef.current.slice(0, Math.max(mostradoRef.current, 0)).trim();
       setMessages([
         ...displayNext,
+        ...(parcial ? [{ role: "assistant" as const, content: parcial, ts: new Date() }] : []),
         {
           role: "assistant",
-          content: "Desculpe, ocorreu um erro. Tente novamente.",
+          content: parcial
+            ? "A conexão caiu no meio da resposta. Pode perguntar de novo?"
+            : "Desculpe, ocorreu um erro. Tente novamente.",
           ts: new Date(),
           error: true, // falha transitória não é votável (senão 👎 vira lacuna falsa)
         },

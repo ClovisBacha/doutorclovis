@@ -76,9 +76,15 @@ describe("o laço nunca sobrevive ao que o criou", () => {
        a paciente veria a resposta antiga voltando por cima do aviso. */
     /* Ancorado na mensagem de erro do chat: o arquivo tem vários `finally`, e
        o primeiro deles é de outra tela. */
-    const posErro = codigo.indexOf('content: "Desculpe, ocorreu um erro. Tente novamente."');
+    /* Âncora ÚNICA deste chat. `content: "Desculpe, ocorreu um erro"` existe em
+       DOIS componentes do arquivo, e a versão anterior deste teste lia o
+       outro — passando e falhando pelos motivos errados. */
+    const posErro = codigo.indexOf('"A conexão caiu no meio da resposta. Pode perguntar de novo?"');
     expect(posErro).toBeGreaterThan(0);
-    const bloco = codigo.slice(posErro, posErro + 600);
+    /* Até o fim da função, e não uma janela de tamanho fixo: o `catch` cresceu
+       quando passou a preservar o texto parcial, e uma janela curta faria o
+       teste falhar por motivo errado — dizendo "não cancela" quando cancela. */
+    const bloco = codigo.slice(posErro, codigo.indexOf("setLoading(false);", posErro) + 40);
     expect(bloco).toContain("} finally {");
     expect(bloco).toContain("streamAbertoRef.current = false;");
     expect(bloco).toContain("cancelAnimationFrame(quadroRef.current)");
