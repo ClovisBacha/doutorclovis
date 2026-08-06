@@ -13,6 +13,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import divida from "./divida-tecnica.json";
 
 /** Todo `.ts`/`.tsx` de `src/`, exceto os próprios testes. */
 function arquivosDoProjeto(dir = "src", saida: string[] = []): string[] {
@@ -100,7 +101,13 @@ describe("escrita no banco não pode falhar em silêncio", () => {
    * há escritas de enriquecimento onde silêncio é a decisão certa (telemetria,
    * `logBrainHit`). O que não pode é o número subir sem ninguém olhar.
    */
-  const TETO = 66;
+  /* O TETO MORA EM ARQUIVO VERSIONADO, não numa constante aqui dentro.
+     Um avaliador mutou `TETO = 66` para `500` e nenhum teste quebrou — a
+     catraca podia ser afrouxada sem resistência nenhuma, e o diff de uma
+     constante num arquivo de teste passa despercebido em revisão.
+     Em `divida-tecnica.json`, subir o número é uma mudança deliberada, com
+     data, que aparece no code review ao lado do código que a causou. */
+  const TETO = (divida as { escritasSemChecagemDeError: number }).escritasSemChecagemDeError;
 
   function escritasSemChecagem(fonte: string): number {
     const linhas = fonte.split("\n");
@@ -111,6 +118,10 @@ describe("escrita no banco não pode falhar em silêncio", () => {
          logo abaixo (`if (error)`); oito linhas de janela cobrem as duas. */
       const janela = linhas.slice(Math.max(0, i - 6), i + 8).join("\n");
       if (/\berror\b/.test(janela) || /\bgravar\(/.test(janela)) return;
+      /* `createHmac().update()`, `cipher.update()` e `Map.delete()` casam com a
+         regex e não são banco — 9 dos 55 contados eram falso positivo, o que
+         inflava o teto e escondia a dívida real. */
+      if (/createHmac|createHash|cipher|decipher|hits\.delete/.test(linha)) return;
       n++;
     });
     return n;
@@ -120,7 +131,11 @@ describe("escrita no banco não pode falhar em silêncio", () => {
     const total = DO_SERVIDOR.reduce((soma, f) => soma + escritasSemChecagem(codigoDe(f)), 0);
     /* Se este teste falhar porque você BAIXOU o número: abaixe o teto junto.
        É a única forma de a dívida não voltar a crescer em silêncio. */
-    expect(total).toBeLessThanOrEqual(TETO);
+    /* IGUALDADE, não `<=`: folga é dívida pré-aprovada, e uma catraca com
+       vagas livres deixa o número subir sem ninguém olhar. Baixou? Baixe o
+       `divida-tecnica.json` junto — é uma linha, e é o registro de que a
+       dívida diminuiu. */
+    expect(total).toBe(TETO);
   });
 
   test("no webhook de cobrança, toda CONCESSÃO é conferida", () => {

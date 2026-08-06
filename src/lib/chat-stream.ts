@@ -99,3 +99,32 @@ export function avisoQuePodeAparecer(corpo: string): string | null {
   if (t.includes("_") || !/^[^_]{8,}$/.test(t) || !/\s/.test(t)) return null;
   return t;
 }
+
+/**
+ * SÓ TEXTO CHEGA AO MODELO — a trava que impede a IA de receber laudo.
+ *
+ * Ler exame é ato médico: o anexo vai para a aba do médico, e mandá-lo junto
+ * convidaria a IA a opinar sobre ele. Duas coisas acontecem aqui:
+ *
+ * 1. mensagem sem NENHUM texto é descartada inteira — assistente vazio no
+ *    histórico faz o Gemini recusar a chamada seguinte, e a falha vira
+ *    permanente;
+ * 2. partes não-texto são removidas das mensagens que ficam — descartar a
+ *    parte é melhor que rejeitar a mensagem, porque a pergunta que veio junto
+ *    do anexo é legítima e continua sendo respondida.
+ *
+ * Vive aqui, e não inline no endpoint, porque um avaliador removeu a trava
+ * inteira num teste de mutação e **nenhum teste quebrou**: era a defesa mais
+ * importante do produto e a única sem cobertura.
+ */
+export function soTexto<T extends { parts?: { type: string; text?: string }[] }>(
+  mensagens: T[],
+): T[] {
+  return mensagens
+    .filter((m) => m.parts?.some((p) => p.type === "text" && p.text?.trim()))
+    .map((m) =>
+      m.parts?.every((p) => p.type === "text")
+        ? m
+        : { ...m, parts: m.parts?.filter((p) => p.type === "text") },
+    );
+}

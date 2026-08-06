@@ -249,13 +249,17 @@ describe("mensagem vazia não entra na conversa", () => {
 
   test("3) a poda final cobre TODOS os caminhos, inclusive o anônimo", () => {
     /* O array que chega do navegador (site sem login) não passa pelo banco —
-       e também pode trazer uma bolha vazia. */
-    expect(chat).toMatch(/paraOModelo = paraOModelo\.filter\(\(m\) =>/);
-    expect(chat).toContain('p.type === "text" && p.text.trim()');
+       e também pode trazer uma bolha vazia.
+       A poda saiu para `chat-stream.ts` (`soTexto`) porque aqui, inline, ela
+       não tinha teste NENHUM: um avaliador removeu as duas condições e a suíte
+       inteira continuou verde. Era a defesa que impede a IA de receber laudo.
+       O comportamento agora é exercitado em `chat-stream.test.ts`; este teste
+       confere que a tela usa aquela função em vez de reimplementar. */
+    expect(chat).toContain("paraOModelo = soTexto(paraOModelo)");
   });
 
   test("a poda acontece ANTES de montar a chamada ao modelo", () => {
-    const posPoda = chat.indexOf("paraOModelo = paraOModelo.filter(");
+    const posPoda = chat.indexOf("paraOModelo = soTexto(paraOModelo)");
     const posChamada = chat.indexOf("messages: await convertToModelMessages(paraOModelo)");
     expect(posPoda).toBeGreaterThan(0);
     expect(posPoda).toBeLessThan(posChamada);

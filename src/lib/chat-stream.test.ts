@@ -14,7 +14,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "./chat-stream";
+import { readFileSync } from "node:fs";
+import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao, soTexto } from "./chat-stream";
 
 describe("ler a linha do fluxo", () => {
   test("pedaço de texto vira texto", () => {
@@ -139,5 +140,64 @@ describe("o que o servidor diz pode chegar à paciente?", () => {
 
   test("uma palavra só não é frase — é identificador", () => {
     expect(avisoQuePodeAparecer("unauthorized")).toBeNull();
+  });
+});
+
+/**
+ * A TRAVA MAIS IMPORTANTE DO PRODUTO — e a única que estava sem teste.
+ *
+ * Um avaliador removeu as duas condições dela num teste de mutação e a suíte
+ * inteira (811 testes) continuou verde. É a defesa que impede a IA de receber a
+ * foto de um laudo — ler exame é ato médico — e ela vivia inline no meio do
+ * endpoint, onde nada a alcançava.
+ */
+describe("só texto chega ao modelo", () => {
+  const texto = (t: string) => ({ type: "text", text: t });
+  const arquivo = { type: "file", mediaType: "image/jpeg", url: "data:image/jpeg;base64,AAA" };
+
+  test("a parte do LAUDO some, e a pergunta ao lado sobrevive", () => {
+    const saida = soTexto([{ parts: [arquivo, texto("o que acha desse exame?")] }]);
+    expect(saida).toHaveLength(1);
+    expect(saida[0].parts).toEqual([texto("o que acha desse exame?")]);
+  });
+
+  test("mensagem SÓ com anexo é descartada inteira", () => {
+    /* Sem texto ela não é pergunta — e mandá-la ao modelo seria pedir leitura
+       de exame sem nem uma dúvida junto. */
+    expect(soTexto([{ parts: [arquivo] }])).toEqual([]);
+  });
+
+  test("mensagem vazia não passa — ela envenena a conversa inteira", () => {
+    /* Assistente sem texto no histórico faz o Gemini recusar a chamada
+       seguinte: uma falha isolada vira permanente. */
+    expect(soTexto([{ parts: [texto("   ")] }])).toEqual([]);
+    expect(soTexto([{ parts: [] }])).toEqual([]);
+  });
+
+  test("conversa normal passa intacta", () => {
+    const conversa = [{ parts: [texto("oi")] }, { parts: [texto("olá, tudo bem?")] }];
+    expect(soTexto(conversa)).toEqual(conversa);
+  });
+
+  test("uma mensagem com anexo não derruba as outras", () => {
+    const saida = soTexto([
+      { parts: [texto("posso comer sushi?")] },
+      { parts: [arquivo] },
+      { parts: [texto("e queijo?")] },
+    ]);
+    expect(saida).toHaveLength(2);
+    expect(saida.every((m) => m.parts?.every((p) => p.type === "text"))).toBe(true);
+  });
+});
+
+describe("o limite de mensagens por minuto", () => {
+  test("é um número que protege de verdade", () => {
+    /* Mutação medida: trocar 20 por 20.000 não quebrava nada. Não é um teste
+       de igualdade — é uma faixa: alto demais deixa de ser limite, baixo
+       demais corta uma gestante ansiosa no meio de uma dúvida real. */
+    const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+    const n = Number(chat.match(/makeRateLimiter\((\d+), 60_000\)/)?.[1] ?? 0);
+    expect(n).toBeGreaterThanOrEqual(10);
+    expect(n).toBeLessThanOrEqual(60);
   });
 });

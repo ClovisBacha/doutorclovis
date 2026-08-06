@@ -123,3 +123,78 @@ describe("a queda para o assistente público deixa rastro", () => {
     expect(chatBruto).toContain("a paciente cai no assistente publico");
   });
 });
+
+/**
+ * OS TRÊS CHATS DO PRODUTO — e o que cada um tem que saber fazer.
+ *
+ * O app tem três superfícies de conversa com IA: o chat principal da paciente,
+ * a aba de Nutrição (mesmo arquivo, ~2.000 linhas abaixo) e o widget do site
+ * público. Um avaliador rodou mutação e mediu: **desligar a leitura de erro do
+ * widget, o `res.ok` da Nutrição e a leitura da parte de erro dela não
+ * quebravam NADA** — três superfícies onde a bolha vazia podia voltar sem
+ * ninguém saber.
+ *
+ * Estes testes são estruturais de propósito: renderizar os três componentes
+ * exigiria um DOM inteiro, e o que importa aqui é que a peça esteja LIGADA —
+ * o comportamento dela já é testado em `chat-stream.test.ts`, que roda as
+ * funções de verdade.
+ */
+describe("os três chats leem erro do mesmo jeito", () => {
+  const widget = readFileSync("src/components/chatbot-widget.tsx", "utf8");
+  /* SÓ o corpo da NutricaoTab. Fatiar "daqui até o fim do arquivo" pegava
+     ocorrências de outros componentes que vêm depois dela — e foi assim que
+     desligar o `res.ok` DELA passou por um `toContain` que casava com o de
+     outro lugar. Teste que encontra a string no vizinho é teste que não
+     protege ninguém. */
+  const nutricao = (() => {
+    const ini = appBruto.indexOf("function NutricaoTab");
+    const fim = appBruto.indexOf("\nfunction ", ini + 10);
+    return appBruto.slice(ini, fim > 0 ? fim : undefined);
+  })();
+  const endpointNutricao = readFileSync("src/routes/api/nutrition.ts", "utf8");
+
+  test("o widget do site LÊ o erro — e filtra o que é interno", () => {
+    /* `DefaultChatTransport` lança `new Error(await response.text())`, então um
+       500 mandava "Missing GOOGLE_GENERATIVE_AI_API_KEY" para a visitante. */
+    expect(widget).toContain("error");
+    expect(widget).toContain('avisoQuePodeAparecer(error.message ?? "")');
+  });
+
+  test("a Nutrição confere `res.ok` ANTES do corpo", () => {
+    /* 429, 401 e o 500 de chave ausente TÊM corpo: o laço lia texto sem
+       prefixo `data: `, `acc` ficava vazio, e a bolha renderizava "..." para
+       sempre — sem erro, sem retry, sem nada dizendo o que houve. */
+    expect(nutricao).toContain("if (!res.ok)");
+    expect(nutricao).toContain("avisoQuePodeAparecer(corpo)");
+  });
+
+  test("a Nutrição usa o MESMO leitor de linha, não uma cópia", () => {
+    /* Duas cópias de um parser divergem — foi assim que a parte `error` ficou
+       sem ser lida aqui depois de consertada no chat principal. */
+    expect(nutricao).toContain("lerLinhaDoStream(line)");
+    expect(nutricao).toContain('parte.tipo === "erro"');
+  });
+
+  test("o endpoint da Nutrição tem as MESMAS quatro proteções", () => {
+    /* Mesmo modelo, respondendo sobre "vômitos intensos" e "carnes cruas" — e
+       era o único dos dois endpoints sem nenhuma delas. A causa-raiz da bolha
+       vazia ficou intacta aqui enquanto o chat principal a consertava. */
+    expect(endpointNutricao).toContain("thinkingConfig: { thinkingBudget: 0 }");
+    expect(endpointNutricao).toContain("BLOCK_ONLY_HIGH");
+    expect(endpointNutricao).toContain("maxOutputTokens");
+    expect(endpointNutricao).toContain("onError:");
+  });
+});
+
+describe("a busca por significado não morre calada", () => {
+  test("a RPC do cérebro registra a própria falha", () => {
+    /* Sem este log, `match_brain_entries` ausente derruba a busca semântica
+       INTEIRA e o chat cai no ranking por palavras para sempre — com o painel
+       verde e nenhum sinal. As duas RPCs irmãs já logavam; a mais importante
+       das três era a única muda. */
+    const cerebro = readFileSync("src/lib/secondbrain.server.ts", "utf8");
+    const trecho = cerebro.slice(cerebro.indexOf('rpc("match_brain_entries"'));
+    expect(trecho.slice(0, 1200)).toContain("[cerebro] match_brain_entries falhou");
+    expect(trecho.slice(0, 1200)).toContain("APLICAR_PENDENTES.sql");
+  });
+});

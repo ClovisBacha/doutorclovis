@@ -11,6 +11,7 @@ import {
 } from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
+import { soTexto } from "@/lib/chat-stream";
 /* Preço e contato de suporte vêm daqui, não de literal solto: "quanto custa o
    plano?" era classificado como suporte (correto — o médico não é incomodado)
    e a plataforma NÃO respondia, porque o prompt proibia inventar valores e
@@ -935,26 +936,12 @@ A dúvida FICA REGISTRADA para ${medico} — isso acontece de verdade, e você p
            bolha vazia, e a poda acima só limpa o histórico reconstruído do
            banco. Uma mensagem sem texto nenhum não é uma mensagem — é o que faz
            o provedor devolver resposta vazia e o defeito se repetir sozinho. */
-        paraOModelo = paraOModelo.filter((m) =>
-          m.parts?.some((p) => p.type === "text" && p.text.trim()),
-        );
-
-        /* QUARTA TRAVA: só TEXTO chega ao modelo.
-           A IA não analisa exame — é ato médico, e o anexo vai para a aba do
-           médico por outro caminho. O filtro acima exige que exista UMA parte
-           de texto, e deixava as outras passarem junto: uma parte `file` com a
-           foto do laudo seguia para o Gemini pendurada numa mensagem que tinha
-           texto. Para a paciente logada a reconstrução do histórico já salvava
-           (ela descarta o array do cliente), mas o chat ANÔNIMO do site não
-           reconstrói nada — ali o caminho de visão continuava aberto, e bastava
-           um POST à mão para usá-lo.
-           Descartar a parte é melhor que rejeitar a mensagem: a pergunta que
-           veio junto do anexo é legítima e continua sendo respondida. */
-        paraOModelo = paraOModelo.map((m) =>
-          m.parts?.every((p) => p.type === "text")
-            ? m
-            : ({ ...m, parts: m.parts.filter((p) => p.type === "text") } as UIMessage),
-        );
+        /* A trava mora em `src/lib/chat-stream.ts` (`soTexto`) porque aqui,
+           inline, ela não tinha teste: um avaliador removeu as duas condições
+           num teste de mutação e a suíte inteira continuou verde. Era a defesa
+           mais importante do produto — a que impede a IA de receber laudo — e a
+           única sem cobertura. */
+        paraOModelo = soTexto(paraOModelo);
 
         const google = createChatProvider(key);
         /* Lido uma vez: o medidor precisa gravar o MESMO modelo que respondeu,
