@@ -1281,8 +1281,11 @@ export async function getBrainContext(
        'teste' fica de fora: o painel dele não pode parar de funcionar
        enquanto ele decide se sobe de plano. */
     if (channel !== "teste") {
-      const { cotaDoMedico } = await import("./cota-ia.server");
+      const { cotaDoMedico, avisarMedicoDaCota } = await import("./cota-ia.server");
       const cota = await cotaDoMedico(target, ent.aiRepliesPerCycle);
+      /* Ele descobria pela paciente, ou abrindo o painel por conta própria.
+         Uma vez por marco, por ciclo — a guarda mora dentro da função. */
+      void avisarMedicoDaCota(target, cota);
       if (cota.estado === "estourada") {
         return {
           block: "",

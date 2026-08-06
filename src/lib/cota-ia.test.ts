@@ -282,8 +282,32 @@ describe("a paciente é avisada com honestidade, não com jargão", () => {
     expect(chat).toContain("pelo WhatsApp do consultório");
   });
 
-  test("sem WhatsApp cadastrado, não inventa um canal", () => {
-    expect(chat).toContain('"pelo canal que ela já usa com o consultório"');
+  test("sem WhatsApp cadastrado, o caminho continua CONCRETO", () => {
+    /* "pelo canal que ela já usa com o consultório" é exatamente o não-resposta
+       que o próprio `medicalSystemPrompt` condena ("uma resposta que só diz
+       'converse com sua médica' e não informa nada é uma resposta RUIM"). A aba
+       Consultas existe, chega ao consultório, e é acionável às 3 da manhã. */
+    expect(chat).toContain('"pela aba Consultas do app, que chega direto ao consultório"');
+  });
+
+  test("o caminho até ela é INCONDICIONAL", () => {
+    /* Era "SE a pergunta for daquelas que só quem acompanha pode decidir" —
+       opcional a critério do modelo. Numa dúvida geral às 3 da manhã, ela lia
+       "isto não é a orientação da sua médica" e não recebia saída nenhuma. */
+    const aviso = chat.slice(chat.indexOf("const avisoDeCota"));
+    expect(aviso.slice(0, 1400)).toContain("SEMPRE ofereça o caminho até ela");
+    expect(aviso.slice(0, 1400)).toContain("Isto não é opcional");
+  });
+
+  test("o aviso tem PRAZO — senão a paciente conclui o pior", () => {
+    /* Proibir "cota, plano, pagamento, limite" tinha virado "sem explicação".
+       Uma gestante ansiosa lendo "esta resposta não é a orientação da sua
+       médica", sem causa e sem prazo, conclui a coisa mais assustadora
+       disponível: que a médica parou de acompanhá-la. "Até a virada do mês" é
+       a verdade, dá prazo, e não diz uma palavra sobre dinheiro. */
+    const aviso = chat.slice(chat.indexOf("const avisoDeCota"));
+    expect(aviso.slice(0, 1400)).toContain("até a virada do mês");
+    expect(aviso.slice(0, 1400)).toContain("continua acompanhando a gestação normalmente");
   });
 
   test("a pergunta é respondida ANTES de qualquer aviso", () => {

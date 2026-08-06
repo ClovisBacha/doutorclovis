@@ -9,6 +9,11 @@ import {
 } from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
+/* Preço e contato de suporte vêm daqui, não de literal solto: "quanto custa o
+   plano?" era classificado como suporte (correto — o médico não é incomodado)
+   e a plataforma NÃO respondia, porque o prompt proibia inventar valores e
+   nenhum valor era injetado. Beco sem saída duplo. */
+import { DOCTOR } from "@/lib/doctor.config";
 
 // Rate limit simples por IP (janela fixa, em memória). Em ambiente serverless
 // a memória não é compartilhada entre instâncias nem persiste entre cold starts,
@@ -28,7 +33,13 @@ Regras de resposta:
 - Responda **apenas à ÚLTIMA mensagem**. As anteriores são contexto, não perguntas pendentes. Cumprimento sozinho recebe cumprimento curto de volta.
 - Responda em português brasileiro, com tom acolhedor, claro e conciso (3 a 6 frases).
 - NÃO dê diagnóstico, prescrição ou conduta médica. Para dúvidas clínicas, oriente falar com o obstetra pelo app; em urgência, ligar 192 (SAMU) ou ir ao pronto-socorro.
-- Não invente dados (telefone, endereço, valores). Se não souber, encaminhe para o suporte.`;
+- Não invente dados (telefone, endereço, valores) além dos listados acima. Se não souber, encaminhe para o suporte pelo e-mail ${DOCTOR.supportEmail}.
+
+Preços do Premium da paciente (pode informar quando perguntarem; nunca invente outros):
+- Mensal: R$ 19,90/mês.
+- Primeiro ano com desconto: R$ 89,90 (equivale a R$ 7,49/mês), contra R$ 238,80 pagando mês a mês.
+- O acompanhamento básico da gestação é gratuito; o Premium libera a jornada completa.
+- Cancelamento a qualquer momento, pelo próprio app.`;
 
 /** Assistente médico do consultório de UM médico (usado no app da paciente). */
 function medicalSystemPrompt(doctorName?: string | null): string {
@@ -765,15 +776,25 @@ export const Route = createFileRoute("/api/chat")({
              Então ela é avisada com honestidade, sem jargão de cobrança e sem
              culpar ninguém, e recebe um caminho REAL até ele. "Fale com sua
              médica", sem dizer como, é o mesmo que não dizer nada. */
+          /* O CAMINHO É INCONDICIONAL, E TEM PRAZO.
+             O passo 3 era "SE a pergunta for daquelas que só quem acompanha
+             pode decidir" — ou seja, opcional a critério do modelo. Numa dúvida
+             geral às 3 da manhã, ela lia "isto não é a orientação da sua
+             médica" e não recebia caminho nenhum.
+             E "sem falar em cota, plano, pagamento ou limite" tinha virado
+             "sem explicação": uma gestante ansiosa que lê aquilo sem causa e
+             sem prazo conclui a coisa mais assustadora disponível — que a
+             médica parou de acompanhá-la. Dizer "até a virada do mês" é a
+             verdade, dá prazo, e não diz uma palavra sobre dinheiro. */
           const comoFalarComEle = patient.doctorWhatsapp
             ? `pelo WhatsApp do consultório (${patient.doctorWhatsapp})`
-            : "pelo canal que ela já usa com o consultório";
-          const avisoDeCota = `IMPORTANTE — o plano que ${medico} mantém para responder pelo app atingiu o limite deste mês, então as SUAS orientações pessoais não estão disponíveis nesta conversa agora.
+            : "pela aba Consultas do app, que chega direto ao consultório";
+          const avisoDeCota = `IMPORTANTE — as respostas pessoais de ${medico} pelo app estão pausadas até a virada do mês. Ela continua acompanhando a gestação normalmente; o que muda é só este canal.
 
 Como agir, nesta ordem:
 1. Responda a pergunta com informação obstétrica consolidada e geral, com cuidado e sem inventar conduta.
-2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico} — sem falar em cota, plano, pagamento ou limite.
-3. Se a pergunta for daquelas que só quem acompanha a gestação pode decidir, oriente falar diretamente com ${medico} ${comoFalarComEle}.
+2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico}, e que as respostas dela voltam na virada do mês — sem falar em cota, plano, pagamento ou limite.
+3. SEMPRE ofereça o caminho até ela: para qualquer coisa do caso dela, falar com ${medico} ${comoFalarComEle}. Isto não é opcional nem depende do tipo de pergunta — é o que impede a paciente de ficar sem saída.
 
 NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai responder por aqui neste momento, e prometer isso deixaria a paciente esperando.`;
 

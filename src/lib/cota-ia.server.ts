@@ -234,3 +234,97 @@ export async function consumoPorPaciente(
     return { total: 0, pacientes: [] };
   }
 }
+
+/**
+ * AVISAR O MÉDICO — porque hoje ele descobre pela paciente.
+ *
+ * `cotaDoMedico` era lida em três lugares e nenhum deles falava com ele: o
+ * portão do chat, o 👎 e o card do painel. Ou seja, o único jeito de saber que
+ * a cota estourou era abrir o painel por conta própria — ou receber a mensagem
+ * de uma gestante dizendo que "a IA está estranha".
+ *
+ * Dois momentos, e só uma vez cada um por ciclo:
+ *
+ *   80%  → dá para agir com antecedência (subir de plano, ou só saber).
+ *   100% → as pacientes já estão recebendo resposta sem a voz dele.
+ *
+ * A marca de "já avisei" mora em `ai_usage`, na tabela que já existe, como uma
+ * linha de espécie própria: criar uma coluna nova em `doctors` exigiria mais
+ * uma migration pendente, e este arquivo inteiro já degrada com elegância
+ * quando o banco está atrás.
+ *
+ * Nunca lança e nunca bloqueia: é chamado de dentro do caminho da resposta da
+ * paciente, e um e-mail não pode atrasar uma conversa.
+ */
+export async function avisarMedicoDaCota(
+  doctorId: string,
+  situacao: SituacaoDaCota,
+  agora = new Date(),
+): Promise<void> {
+  if (situacao.teto === null || situacao.teto <= 0) return;
+  const marco =
+    situacao.estado === "estourada" ? "cota-100" : situacao.estado === "aviso" ? "cota-80" : null;
+  if (!marco) return;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    /* Uma vez por ciclo, por marco. Sem esta guarda, cada mensagem de cada
+       paciente dispararia um e-mail a partir dos 80% — e o médico aprenderia a
+       ignorar o aviso justamente antes de ele importar. */
+    const { count } = await sb
+      .from("ai_usage")
+      .select("id", { count: "exact", head: true })
+      .eq("doctor_id", doctorId)
+      .eq("especie", "aviso")
+      .eq("canal", marco)
+      .gte("created_at", inicioDoCiclo(agora).toISOString());
+    if (typeof count === "number" && count > 0) return;
+
+    const { error } = await sb.from("ai_usage").insert({
+      doctor_id: doctorId,
+      especie: "aviso",
+      canal: marco,
+      modelo: "-",
+      input_tokens: 0,
+      output_tokens: 0,
+    });
+    /* Se a marca não gravou, NÃO manda: melhor um aviso perdido que um e-mail
+       por mensagem de paciente. */
+    if (error) return;
+
+    const [{ avisarMedico }, { sendEmail, emailLayout }] = await Promise.all([
+      import("./doctor-mail.server"),
+      import("./email.server"),
+    ]);
+    const destino = await avisarMedico(doctorId);
+    if (!destino.para.length) return;
+
+    const estourou = situacao.estado === "estourada";
+    const corpo = estourou
+      ? `<p>Suas pacientes continuam sendo atendidas pelo app, mas <strong>sem as suas orientações</strong> — a IA passou a responder com informação geral da plataforma.</p>
+         <p>Você usou <strong>${situacao.usadas} de ${situacao.teto}</strong> respostas deste ciclo. Elas voltam na virada do mês, ou assim que você subir de plano.</p>`
+      : `<p>Você já usou <strong>${situacao.usadas} das ${situacao.teto}</strong> respostas da IA deste mês.</p>
+         <p>Quando acabar, suas pacientes continuam atendidas — porém com informação geral da plataforma, sem as suas orientações.</p>`;
+    await sendEmail({
+      to: destino.para.join(","),
+      subject: estourou ? "Sua cota de respostas da IA acabou" : "Você já usou 80% da cota da IA",
+      html: emailLayout(
+        estourou ? "Cota da IA esgotada" : "80% da cota da IA",
+        corpo,
+        destino.marca,
+      ),
+    });
+    try {
+      const { sendPushToEmail } = await import("./push.server");
+      await sendPushToEmail(destino.para[0], {
+        title: estourou ? "Cota da IA esgotada" : "80% da cota da IA usada",
+        body: `${situacao.usadas} de ${situacao.teto} respostas neste ciclo.`,
+        url: "/painel",
+      });
+    } catch {
+      /* sem push configurado: o e-mail já saiu */
+    }
+  } catch {
+    /* medir e avisar são opcionais; responder à paciente não é */
+  }
+}

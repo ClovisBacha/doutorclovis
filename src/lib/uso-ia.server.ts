@@ -31,7 +31,16 @@
  */
 
 /** Quantos tokens, de qual chamada. */
-export type EspecieDeUso = "chat" | "memoria" | "embedding";
+/**
+ * `aviso` não mede consumo: é a MARCA de que o médico já foi avisado de um
+ * marco da cota (80% ou 100%) neste ciclo. Mora aqui, e não numa coluna nova
+ * em `doctors`, porque `ai_usage` já existe e este arquivo inteiro degrada com
+ * elegância quando o banco está atrás das migrations — uma coluna nova seria
+ * mais uma pendência para o mesmo problema.
+ * É excluída da contagem de cota por `respostasNoCiclo`, que filtra
+ * `especie = 'chat'`.
+ */
+export type EspecieDeUso = "chat" | "memoria" | "embedding" | "aviso";
 
 export type Uso = {
   especie: EspecieDeUso;
