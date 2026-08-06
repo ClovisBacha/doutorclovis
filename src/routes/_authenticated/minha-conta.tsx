@@ -7164,13 +7164,72 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => void sendText(input, reader.result as string);
+    reader.onload = () => void enviarParaOMedico(reader.result as string);
     reader.readAsDataURL(file);
   }
 
-  function handleDocSoon() {
-    setShowAttach(false);
-    toast("Envio de documentos em breve — por enquanto, envie fotos ou texto.");
+  /**
+   * O anexo vai para o MÉDICO — não para a IA.
+   *
+   * Antes ele ia para `sendText`, que mandava a imagem junto da mensagem. E a
+   * imagem não chegava a lugar nenhum: era descartada no servidor (o histórico
+   * é reconstruído só com texto) e sumia no primeiro recarregamento. A tela
+   * confirmava o envio com o duplo-check, e a confirmação era falsa.
+   *
+   * Ler exame é ato médico. Uma IA dizendo "seu hemograma está bom" é conduta
+   * sem CRM, e se errar o erro chega vestido de confiança. Então o arquivo vai
+   * para a aba Exames do painel — o ciclo que já existe, com visualizador e
+   * devolutiva — e ele é avisado.
+   */
+  async function enviarParaOMedico(dataUrl: string) {
+    const nota = input.trim();
+    setInput("");
+    const enviada: WAMsg = {
+      role: "user",
+      content: nota,
+      image: dataUrl,
+      ts: new Date(),
+    };
+    setMessages((m) => [...m, enviada]);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) throw new Error("sem sessão");
+      const { enviarExameDoChat } = await import("@/lib/exame-do-chat.functions");
+      const res = await enviarExameDoChat({
+        data: {
+          accessToken: s.session.access_token,
+          imagem: dataUrl,
+          ...(nota ? { nota } : {}),
+        },
+      });
+      if (!res.ok) throw new Error("falhou");
+      /* A confirmação diz o DESTINO, não só "enviado". A paciente precisa
+         saber que quem vai olhar é uma pessoa, e não a assistente — senão ela
+         fica esperando uma leitura que não vem. */
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content:
+            "semMedico" in res && res.semMedico
+              ? "Recebi o seu arquivo e guardei na sua aba de Exames. Assim que você se vincular a um obstetra, ele poderá ver."
+              : `Recebi o seu exame e já encaminhei para ${doctorName || "a sua médica"} — ele aparece na aba de Exames dele, e a resposta chega aqui. Eu não analiso exames: quem olha é quem pode assinar.`,
+          ts: new Date(),
+        },
+      ]);
+    } catch {
+      /* Falha aqui a paciente PRECISA ver: se o exame não foi guardado, ela
+         tem que saber para mandar de novo. */
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: "Não consegui enviar o arquivo agora. Pode tentar de novo?",
+          ts: new Date(),
+          error: true,
+        },
+      ]);
+    }
   }
 
   function handleAudioSoon() {
@@ -7407,7 +7466,16 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
               grad: "#8b5cf6, #6366f1",
               on: () => fileImageRef.current?.click(),
             },
-            { Icon: FileText, label: "Documento", grad: "#ec4899, #f97316", on: handleDocSoon },
+            /* Era um botão FALSO: mostrava "em breve" e não fazia nada. Agora abre a
+             mesma seleção de imagem, porque é assim que exame chega de verdade —
+             fotografado. Um botão que não faz nada é pior que um botão a menos:
+             ela tenta, acredita que enviou, e espera. */
+            {
+              Icon: FileText,
+              label: "Exame",
+              grad: "#ec4899, #f97316",
+              on: () => fileImageRef.current?.click(),
+            },
             {
               Icon: X,
               label: "Fechar",
