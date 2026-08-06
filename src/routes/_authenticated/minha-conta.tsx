@@ -7566,16 +7566,15 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         </div>
       </div>
 
-      {/* Área de mensagens */}
-      {/* `role="log"` + `aria-live="polite"`: sem isto, para quem usa leitor de
-          tela a resposta aparecia em SILÊNCIO, caractere a caractere, sem
-          começo nem fim declarados. `polite` e não `assertive` de propósito —
-          a resposta não deve interromper o que ela está lendo. */}
+      {/* A RESPOSTA É ANUNCIADA UMA VEZ, NO FIM — não 60 vezes por segundo.
+          `aria-live` num container cujo texto muda a cada quadro é
+          anti-padrão: o leitor de tela enfileira ou repete a cada mutação, e
+          quem usa VoiceOver sem `prefers-reduced-motion` pega o pior caso.
+          A bolha visual fica `aria-hidden` durante o streaming, e o texto
+          completo vai para a região abaixo quando termina de chegar. */}
       <div
         ref={scrollRef}
-        role="log"
-        aria-live="polite"
-        aria-relevant="additions text"
+        aria-hidden={loading}
         className="relative flex-1 overflow-y-auto space-y-0.5 px-3 py-3"
       >
         {/* Enquanto o histórico não respondeu, a lista está vazia de propósito.
@@ -7617,6 +7616,16 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
             />
           );
         })}
+
+        {/* O que o leitor de tela lê: a resposta inteira, uma vez só, quando
+            ela termina de chegar. Enquanto `loading`, fica vazio. */}
+        <div role="status" aria-live="polite" className="sr-only">
+          {loading
+            ? ""
+            : messages[messages.length - 1]?.role === "assistant"
+              ? messages[messages.length - 1]?.content
+              : ""}
+        </div>
 
         {/* ── Primeiras perguntas ───────────────────────────────────────
             Uma tela de chat vazia é uma folha em branco, e folha em branco
@@ -9178,6 +9187,13 @@ const NUTRITION_CHIPS: Record<1 | 2 | 3, string[]> = {
   ],
 };
 
+/** Mesma preferência que o chat principal respeita. */
+function semAnimacaoNutricao(): boolean {
+  return (
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
 function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
   const trimester = gest ? trimesterForWeek(gest.weeks) : 2;
   const tips = NUTRIENT_TIPS[trimester as 1 | 2 | 3];
@@ -9240,22 +9256,66 @@ function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest })
       const decoder = new TextDecoder();
       let acc = "";
       let erroNoFluxo = "";
+      let buffer = "";
       setMessages([...next, { role: "assistant", content: "" }]);
+
+      /* A MESMA CADÊNCIA DO CHAT PRINCIPAL.
+         A paciente usa Chat IA e Nutrição na MESMA tela, trocando de aba —
+         dois ritmos diferentes leem como dois produtos. E aqui o texto vinha
+         em bloco por pedaço, que é exatamente o "nada, nada, parágrafo
+         inteiro" que a régua existe para consertar. */
+      let mostrado = 0;
+      let aberto = true;
+      let quadro: number | null = null;
+      const desenhar = () => {
+        const passo = passoDaDigitacao(acc.length - mostrado, aberto);
+        if (passo > 0) {
+          mostrado = Math.min(acc.length, mostrado + passo);
+          setMessages([...next, { role: "assistant", content: acc.slice(0, mostrado) }]);
+        }
+        quadro = aberto || mostrado < acc.length ? requestAnimationFrame(desenhar) : null;
+      };
+      if (!semAnimacaoNutricao()) quadro = requestAnimationFrame(desenhar);
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value);
+        /* BUFFER de linha, como no chat principal. Sem `{stream: true}` e sem
+           carry-over, um `data:` partido entre dois `read()` some do meio da
+           resposta — e acento partido vira "�". */
+        buffer += decoder.decode(value, { stream: true });
+        const linhas = buffer.split("\n");
+        buffer = linhas.pop() ?? "";
         /* O MESMO leitor do chat principal. Duas cópias de um parser divergem,
            e foi assim que a parte `error` ficou sem ser lida aqui: falha do
            provedor depois do HTTP 200 continuava virando bolha vazia. */
-        chunk.split("\n").forEach((line) => {
+        linhas.forEach((line) => {
           const parte = lerLinhaDoStream(line);
           if (parte.tipo === "texto") acc += parte.texto;
           else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
         });
-        setMessages([...next, { role: "assistant", content: acc }]);
+        if (semAnimacaoNutricao()) {
+          mostrado = acc.length;
+          setMessages([...next, { role: "assistant", content: acc }]);
+        }
       }
-      if (erroNoFluxo && !acc.trim()) throw new Error(erroNoFluxo);
+      (buffer + decoder.decode()).split("\n").forEach((line) => {
+        const parte = lerLinhaDoStream(line);
+        if (parte.tipo === "texto") acc += parte.texto;
+        else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
+      });
+      aberto = false;
+      if (erroNoFluxo && !acc.trim()) {
+        if (quadro !== null) cancelAnimationFrame(quadro);
+        throw new Error(erroNoFluxo);
+      }
+      /* Espera o texto terminar de aparecer antes de liberar o "digitando" —
+         senão o indicador some com a bolha pela metade. */
+      await new Promise<void>((r) => {
+        const conferir = () => (mostrado >= acc.length ? r() : setTimeout(conferir, 60));
+        conferir();
+      });
+      setMessages([...next, { role: "assistant", content: acc }]);
     } catch (e) {
       setMessages([
         ...next,

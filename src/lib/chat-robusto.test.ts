@@ -168,6 +168,22 @@ describe("os três chats leem erro do mesmo jeito", () => {
     expect(nutricao).toContain("avisoQuePodeAparecer(corpo)");
   });
 
+  test("a Nutrição tem a MESMA cadência — a paciente troca de aba na mesma tela", () => {
+    /* Dois ritmos diferentes leem como dois produtos. E aqui o texto vinha em
+       bloco por pedaço, que é exatamente o "nada, nada, parágrafo inteiro" que
+       a régua existe para consertar. */
+    expect(nutricao).toContain("passoDaDigitacao(acc.length - mostrado, aberto)");
+    expect(nutricao).toContain("semAnimacaoNutricao()");
+  });
+
+  test("a Nutrição junta linha partida entre dois `read()`", () => {
+    /* Sem `{stream: true}` e sem carry-over, um `data:` cortado ao meio some da
+       resposta — e acento partido vira "�". O chat principal tinha buffer;
+       este não. */
+    expect(nutricao).toContain("decoder.decode(value, { stream: true })");
+    expect(nutricao).toContain("buffer = linhas.pop()");
+  });
+
   test("a Nutrição usa o MESMO leitor de linha, não uma cópia", () => {
     /* Duas cópias de um parser divergem — foi assim que a parte `error` ficou
        sem ser lida aqui depois de consertada no chat principal. */

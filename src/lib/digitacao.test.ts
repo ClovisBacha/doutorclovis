@@ -210,14 +210,17 @@ describe("o texto final é o texto completo", () => {
  * longa e errada obrigava a paciente a esperar ~19 segundos sem saída.
  */
 describe("a resposta é anunciada, e pode ser interrompida", () => {
-  test("a lista de mensagens é uma live region", () => {
-    /* Sem `role="log"` + `aria-live`, o texto chegando caractere a caractere
-       não é anunciado nem no começo nem no fim: a paciente cega manda a
-       pergunta e não sabe se algo aconteceu.
-       `polite`, não `assertive` — a resposta não deve interromper o que ela
-       está lendo. */
-    expect(codigo).toContain('role="log"');
-    expect(codigo).toContain('aria-live="polite"');
+  test("a resposta é anunciada UMA VEZ, no fim — não 60 vezes por segundo", () => {
+    /* Primeiro não havia live region nenhuma: a paciente cega mandava a
+       pergunta e a resposta aparecia em silêncio absoluto.
+       Depois eu pus `aria-live` no container que o laço de digitação reescreve
+       a cada quadro — o que é anti-padrão pelo motivo oposto: o leitor de tela
+       enfileira ou repete a cada mutação, 60 vezes por segundo. Quem usa
+       VoiceOver sem `prefers-reduced-motion` pegava o pior caso.
+       Agora a bolha visual fica `aria-hidden` durante o streaming e o texto
+       completo vai para uma região `sr-only` quando termina. */
+    expect(codigo).toContain("aria-hidden={loading}");
+    expect(codigo).toContain('<div role="status" aria-live="polite" className="sr-only">');
   });
 
   test('o "Pensando" está numa região que o leitor anuncia', () => {
