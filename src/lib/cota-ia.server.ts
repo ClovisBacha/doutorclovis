@@ -93,6 +93,11 @@ export async function respostasNoCiclo(doctorId: string, agora = new Date()): Pr
          porque a linha é gravada com o `doctor_id` da paciente. O caminho
          enxuto economizava tokens e não economizava cota. */
       .neq("canal", "suporte")
+      /* E o canal "teste" TAMBÉM não é dela: é o médico exercitando o próprio
+         cérebro no playground e no rascunho de lacuna. Cobrar dele por treinar
+         a IA é cobrar pelo trabalho que melhora o produto — e `getBrainContext`
+         já isenta o canal "teste" do portão de cota pelo mesmo motivo. */
+      .neq("canal", "teste")
       .gte("created_at", inicioDoCiclo(agora).toISOString());
     /* Tabela ausente ou falha de rede → 0, ou seja, NÃO estoura.
        Na dúvida o médico é atendido: uma cota que se fecha sozinha por um
@@ -175,6 +180,11 @@ export async function consumoPorPaciente(
       /* Mesmo recorte de `respostasNoCiclo` — se as duas leituras divergirem,
          a soma das fatias não fecha com o número grande logo acima delas. */
       .neq("canal", "suporte")
+      /* E o canal "teste" TAMBÉM não é dela: é o médico exercitando o próprio
+         cérebro no playground e no rascunho de lacuna. Cobrar dele por treinar
+         a IA é cobrar pelo trabalho que melhora o produto — e `getBrainContext`
+         já isenta o canal "teste" do portão de cota pelo mesmo motivo. */
+      .neq("canal", "teste")
       .gte("created_at", inicioDoCiclo(agora).toISOString())
       /* Teto de leitura: a agregação acontece aqui, não no banco, porque o
          PostgREST não faz GROUP BY. Com milhares de linhas isto viraria uma

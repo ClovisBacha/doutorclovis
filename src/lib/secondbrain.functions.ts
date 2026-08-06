@@ -1119,7 +1119,10 @@ export const resolveBrainReview = createServerFn({ method: "POST" })
     /* Escopo no WHERE, sempre: só revisão DESTE médico e ainda aberta. */
     const { data: rev } = await sb
       .from("brain_feedback")
-      .select("id,entry_id,question")
+      /* `user_id` entra aqui porque é ele que leva a correção de volta a quem
+         reclamou — sem isso a fila de revisão termina no médico e a paciente
+         nunca sabe que foi atendida. */
+      .select("id,entry_id,question,user_id")
       .eq("id", data.reviewId)
       .eq("doctor_id", doctorId)
       .eq("status", "aberta")
@@ -1151,8 +1154,75 @@ export const resolveBrainReview = createServerFn({ method: "POST" })
       .eq("id", rev.id)
       .eq("doctor_id", doctorId);
 
-    return { ok: true as const, corrigida: !!data.answer };
+    const avisada = await entregarCorrecao(sb, {
+      doctorId,
+      userId: (rev.user_id as string | null) ?? null,
+      pergunta: String(rev.question ?? ""),
+      resposta: data.answer ?? null,
+    });
+
+    return { ok: true as const, corrigida: !!data.answer, avisada };
   });
+
+/**
+ * A CORREÇÃO VOLTA PARA QUEM RECLAMOU.
+ *
+ * Este era o buraco de produto do 👎. A fila de lacunas entrega
+ * (`entregarRespostaDaLacuna` → `doctor_questions` + push); a de revisão
+ * gravava `resolvida` e parava. A paciente marcava 👎, lia "Anotado — seu
+ * médico vai ver 💛", o médico corrigia — e ela continuava com a resposta
+ * errada na conversa dela, para sempre, sem nunca saber que foi atendida.
+ *
+ * O próprio SQL declara a intenção: `APLICAR_REVISAO.sql` descreve `user_id`
+ * como "quem reclamou, para receber a correção quando ela sair". A coluna
+ * existia e ninguém a lia.
+ *
+ * Função separada de propósito: assim o caminho pode ser testado com um banco
+ * de mentira, sem a cadeia de autenticação inteira no meio. Os testes desta
+ * fila eram 100% `toContain` de string até aqui.
+ *
+ * Devolve `true` só quando a paciente foi de fato avisada.
+ */
+export async function entregarCorrecao(
+  sb: any,
+  args: { doctorId: string; userId: string | null; pergunta: string; resposta: string | null },
+): Promise<boolean> {
+  /* Só quando ele de fato EDITOU. "Está certa, manter" não gera aviso: seria
+     dizer à paciente que algo mudou quando nada mudou. */
+  if (!args.resposta || !args.userId) return false;
+  try {
+    /* Vínculo ATUAL: quem trocou de médico no meio não recebe correção do
+       consultório anterior. Mesma regra de `entregarRespostaDaLacuna`. */
+    const { data: aindaDele } = await sb
+      .from("patient_profiles")
+      .select("id")
+      .eq("doctor_id", args.doctorId)
+      .eq("id", args.userId)
+      .maybeSingle();
+    if (!aindaDele?.id) return false;
+
+    await sb.from("doctor_questions").insert({
+      user_id: args.userId,
+      doctor_id: args.doctorId,
+      question: args.pergunta,
+      answer: args.resposta,
+      answered: true,
+      answered_at: new Date().toISOString(),
+    });
+    const { sendPushToUser } = await import("./push.server");
+    await sendPushToUser(args.userId, {
+      title: "Sua médica revisou a resposta",
+      body: args.pergunta.slice(0, 90),
+      url: "/minha-conta?tab=Consultas&sub=perguntas",
+    }).catch(() => {});
+    return true;
+  } catch {
+    /* Best-effort: a correção já está no cérebro e vale para todas as próximas.
+       Falhar aqui significa que ESTA paciente não foi avisada, nunca que o
+       trabalho dele se perdeu. */
+    return false;
+  }
+}
 
 export const submitBrainFeedback = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -1232,11 +1302,24 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
           ]);
           const ent = await getEntitlementsByDoctorId(doctorId);
           const cota = await cotaDoMedico(doctorId, ent.aiRepliesPerCycle);
-          /* As MESMAS duas portas que `getBrainContext` usa para decidir se
-             injeta o cérebro. Se qualquer uma estava fechada, o texto que a
-             paciente leu não saiu do cérebro dele — e não há entrada dele para
-             corrigir. */
-          if (ent.aiApp && cota.estado !== "estourada") {
+          /* O toggle do médico conta tanto quanto o plano: `getBrainContext`
+             usa `enabledApp = (settings?.enabled_app ?? true) && ent.aiApp`.
+             Com o cérebro desligado no painel, ele recebia revisões de
+             respostas que não saíram dele. */
+          const { data: cfg } = await sb
+            .from("brain_settings")
+            .select("enabled_app")
+            .eq("doctor_id", doctorId)
+            .maybeSingle();
+          const ligado = (cfg?.enabled_app ?? true) && ent.aiApp;
+          /* E a TERCEIRA porta, a montante de todas: quando a pergunta é
+             suporte puro, o `chat.ts` troca o system prompt e NEM CHAMA o
+             cérebro. Medido: `ehSoSuporte("o app não salva minhas contrações")`
+             era verdadeiro — a resposta veio do bot de suporte, e a re-busca
+             cega achava uma entrada sobre contrações e abria revisão sobre um
+             texto que ela nunca gerou. O médico corrigiria uma entrada certa. */
+          const { ehSoSuporte } = await import("./secondbrain.server");
+          if (ligado && cota.estado !== "estourada" && !ehSoSuporte(pergunta)) {
             const { entradaQueRespondeu } = await import("./secondbrain.server");
             entryId = await entradaQueRespondeu(doctorId, pergunta);
           }

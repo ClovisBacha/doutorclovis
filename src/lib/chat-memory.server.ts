@@ -14,6 +14,23 @@ const MAX_SAVED_CHARS = 4000; // mensagens gigantes não explodem a tabela
 const SUMMARY_EVERY = 6; // regenera o resumo a cada N mensagens novas
 const SUMMARY_SOURCE_LIMIT = 40; // últimas mensagens usadas no resumo
 
+/**
+ * Um aviso por processo, por operação — o mesmo padrão de `embeddings.server`.
+ *
+ * Sem dedup isto sairia a cada mensagem de cada paciente e afogaria o log da
+ * Vercel; sem aviso nenhum, a memória do chat pode estar morta há semanas e
+ * ninguém tem como saber.
+ */
+const jaAvisou = new Set<string>();
+function avisarUmaVez(operacao: string, error: { code?: string; message?: string } | null): void {
+  if (!error || jaAvisou.has(operacao)) return;
+  jaAvisou.add(operacao);
+  console.error(
+    `[chat-memory] ${operacao} falhou (${error.code ?? "?"}): ${error.message ?? "sem detalhe"} — ` +
+      `a memória da conversa está DESLIGADA. Rode a migration 20260806050000_chat_messages.sql.`,
+  );
+}
+
 /** Grava uma mensagem do chat (fire-and-forget). */
 export async function saveChatMessage(
   patientId: string,
@@ -25,9 +42,16 @@ export async function saveChatMessage(
   if (!text) return;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await (supabaseAdmin as any)
+    const { error } = await (supabaseAdmin as any)
       .from("chat_messages")
       .insert({ patient_id: patientId, doctor_id: doctorId, role, content: text });
+    /* NÃO derruba a conversa — mas também não some.
+       `chat_messages` só ganhou migration numerada em 20260806050000, e o
+       CLAUDE.md avisa que produção fica atrás. Sem esta linha, a memória da
+       paciente simplesmente não existe em produção e NADA diz isso: a IA a
+       trata como se fosse sempre a primeira vez, e o defeito é indistinguível
+       de "a IA é meio esquecida". */
+    if (error) avisarUmaVez("gravar mensagem", error);
   } catch {
     /* best-effort: a conversa nunca falha por causa da gravacao */
   }
@@ -241,7 +265,13 @@ export async function historicoConfiavel(
       .limit(limite);
     if (doctorId) q = q.eq("doctor_id", doctorId);
     const { data, error } = await q;
-    if (error) return [];
+    if (error) {
+      /* Devolver `[]` está certo — o chat não pode cair por causa do
+         histórico. Devolvê-lo CALADO é que não: é a diferença entre "a memória
+         não funciona em produção" e "ninguém sabe que a memória não funciona". */
+      avisarUmaVez("ler histórico", error);
+      return [];
+    }
     return ((data ?? []) as { role: string; content: string }[])
       .reverse()
       .filter((m) => m.role === "user" || m.role === "assistant")

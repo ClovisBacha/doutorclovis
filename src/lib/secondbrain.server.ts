@@ -834,7 +834,7 @@ export async function logBrainGapAgora(
            falhou (corrida com outra paciente na mesma pergunta) ainda mandava
            o e-mail "sua IA recebeu uma pergunta que não soube responder" — e o
            médico abria o painel para procurar uma lacuna que não existe. */
-        if (nova?.id) notifyDoctorOfGap(doctorId, sb);
+        if (nova?.id) await notifyDoctorOfGap(doctorId, sb);
       }
     } catch {
       /* best-effort — nunca afeta a resposta ao paciente */
@@ -1028,8 +1028,21 @@ export async function entradaQueRespondeu(
  * E-mail "sua IA tem perguntas sem resposta" (fire-and-forget, ≤1/dia).
  * Sem RESEND_API_KEY vira no-op (o painel continua sendo a fonte).
  */
-function notifyDoctorOfGap(doctorId: string, sb: any): void {
-  void (async () => {
+/**
+ * É `async` DE PROPÓSITO, e o `logBrainGapAgora` aguarda.
+ *
+ * Era `void (async () => {…})()` — a MESMA cicatriz que este arquivo já
+ * diagnosticou duas vezes (na cura de lacunas e no backfill de vetores), viva
+ * na terceira. E aqui ela é pior que nas outras: o disparo acontece no FIM de
+ * uma cadeia que é aguardada, ou seja, no instante em que a função serverless
+ * está mais perto de ser congelada. São uma contagem, um `getUserById` e um
+ * POST ao Resend — centenas de milissegundos depois de a resposta já ter saído.
+ *
+ * Aguardar custa zero à paciente: `logBrainGapAgora` roda dentro do `onFinish`,
+ * que a SDK já mantém vivo, e ela terminou de ler antes disso.
+ */
+async function notifyDoctorOfGap(doctorId: string, sb: any): Promise<void> {
+  {
     try {
       if (!process.env.RESEND_API_KEY) return;
       const dayStart = new Date();
@@ -1063,7 +1076,7 @@ function notifyDoctorOfGap(doctorId: string, sb: any): void {
     } catch {
       /* best-effort */
     }
-  })();
+  }
 }
 
 /* ── Multi-inquilino: cada médico tem o SEU cérebro ──────────────────────────

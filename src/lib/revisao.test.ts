@@ -15,7 +15,7 @@
  *   a IA SABIA e errou → revisão. Ele corrige o que já existe.
  */
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 function codigoDe(caminho: string): string {
@@ -160,5 +160,84 @@ describe("a tela mostra as três coisas", () => {
     expect(painel).toContain("{it.question}");
     expect(painel).toContain("{it.answer}");
     expect(painel).toContain("{it.entryQuestion}");
+  });
+});
+
+/**
+ * ─── COMPORTAMENTO, NÃO TEXTO ────────────────────────────────────────────────
+ *
+ * Os testes acima leem o arquivo e procuram string. Eles provam que alguém
+ * escreveu a linha; não provam que o caminho funciona. Um avaliador rodou
+ * mutação nesta base e mediu: 4 de 12 constantes podiam virar valores absurdos
+ * — inclusive a trava que impede a IA de receber imagem de laudo — sem uma
+ * única falha na suíte.
+ *
+ * Estes rodam a decisão de verdade, com um Supabase de mentira. Sem tocar no
+ * Gemini, que é o que o dono pediu.
+ */
+describe("a correção volta para quem reclamou", () => {
+  /** Banco falso: registra o que foi escrito. */
+  function bancoFalso(opts: { vinculoAtual: boolean }) {
+    const reg = { inserts: [] as { tabela: string; linha: any }[] };
+    const sb: any = {
+      from(tabela: string) {
+        const q: any = {
+          select: () => q,
+          eq: () => q,
+          maybeSingle: async () => ({ data: opts.vinculoAtual ? { id: "pac-1" } : null }),
+          insert: async (linha: any) => {
+            reg.inserts.push({ tabela, linha });
+            return { error: null };
+          },
+        };
+        return q;
+      },
+    };
+    return { sb, reg };
+  }
+
+  const args = { doctorId: "doc-1", userId: "pac-1", pergunta: "posso tomar X?" };
+
+  test("editar a resposta entrega em doctor_questions e dispara push", async () => {
+    const { sb, reg } = bancoFalso({ vinculoAtual: true });
+    const empurrados: string[] = [];
+    mock.module("./push.server", () => ({
+      sendPushToUser: async (uid: string) => {
+        empurrados.push(uid);
+      },
+    }));
+    const { entregarCorrecao } = await import("./secondbrain.functions");
+
+    const avisada = await entregarCorrecao(sb, { ...args, resposta: "A resposta corrigida." });
+
+    expect(avisada).toBe(true);
+    const entregue = reg.inserts.find((i) => i.tabela === "doctor_questions");
+    expect(entregue?.linha?.user_id).toBe("pac-1");
+    expect(entregue?.linha?.answer).toBe("A resposta corrigida.");
+    expect(entregue?.linha?.answered).toBe(true);
+    expect(empurrados).toEqual(["pac-1"]);
+  });
+
+  test("quem trocou de médico NÃO recebe correção do consultório anterior", async () => {
+    const { sb, reg } = bancoFalso({ vinculoAtual: false });
+    mock.module("./push.server", () => ({ sendPushToUser: async () => {} }));
+    const { entregarCorrecao } = await import("./secondbrain.functions");
+
+    const avisada = await entregarCorrecao(sb, { ...args, resposta: "corrigida" });
+
+    expect(avisada).toBe(false);
+    expect(reg.inserts.find((i) => i.tabela === "doctor_questions")).toBeUndefined();
+  });
+
+  test('"está certa, manter" não avisa ninguém', async () => {
+    /* Nada mudou para ela — dizer que mudou seria ruído com cara de novidade. */
+    const { sb, reg } = bancoFalso({ vinculoAtual: true });
+    mock.module("./push.server", () => ({ sendPushToUser: async () => {} }));
+    const { entregarCorrecao } = await import("./secondbrain.functions");
+
+    const avisada = await entregarCorrecao(sb, { ...args, resposta: null });
+
+    expect(avisada).toBe(false);
+    expect(reg.inserts.find((i) => i.tabela === "doctor_questions")).toBeUndefined();
   });
 });

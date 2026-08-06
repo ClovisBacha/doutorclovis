@@ -103,6 +103,34 @@ export const Route = createFileRoute("/api/stripe-webhook")({
 });
 
 /** Registra um reembolso/disputa em payment_incidents (idempotente por charge). */
+/**
+ * ESCRITA QUE FALHA ALTO — e por que o webhook precisava disto.
+ *
+ * O `supabase-js` NÃO lança quando o Postgres recusa: devolve `{ error }`. As
+ * escritas deste arquivo ignoravam esse campo, então uma coluna ausente, uma
+ * violação de constraint ou a RLS no caminho passavam despercebidas — o
+ * `try/catch` do handler nunca disparava, o webhook respondia **200**, e a
+ * Stripe considerava entregue e NUNCA reenviava.
+ *
+ * O desfecho: a médica pagou, o plano não foi concedido, ninguém foi avisado,
+ * e não há retry. É o único defeito desta base que custa dinheiro do cliente e
+ * é permanente por construção.
+ *
+ * Lançar aqui faz o handler devolver 500, e a Stripe reenvia com backoff — que
+ * é exatamente o comportamento que um webhook de cobrança deve ter.
+ */
+async function gravar<T extends { error: unknown | null }>(
+  o: string,
+  p: PromiseLike<T>,
+): Promise<T> {
+  const r = await p;
+  if (r?.error) {
+    const e = r.error as { code?: string; message?: string };
+    throw new Error(`[webhook] ${o} falhou (${e?.code ?? "?"}): ${e?.message ?? "sem detalhe"}`);
+  }
+  return r;
+}
+
 async function recordPaymentIncident(
   kind: "refund" | "dispute",
   data: {
@@ -221,18 +249,21 @@ async function applySubscription(subscriptionId: string): Promise<void> {
     : null;
 
   // 1) system of record (upsert por stripe_subscription_id)
-  await (supabaseAdmin as any).from("subscriptions").upsert(
-    {
-      user_id: userId,
-      product,
-      plan,
-      source: "stripe",
-      status: sub.status,
-      stripe_customer_id: sub.customer,
-      stripe_subscription_id: sub.id,
-      current_period_end: periodEnd,
-    },
-    { onConflict: "stripe_subscription_id" },
+  await gravar(
+    "subscriptions.upsert",
+    (supabaseAdmin as any).from("subscriptions").upsert(
+      {
+        user_id: userId,
+        product,
+        plan,
+        source: "stripe",
+        status: sub.status,
+        stripe_customer_id: sub.customer,
+        stripe_subscription_id: sub.id,
+        current_period_end: periodEnd,
+      },
+      { onConflict: "stripe_subscription_id" },
+    ),
   );
 
   // 2) flag derivado que o resto do app já lê
@@ -251,10 +282,13 @@ async function applySubscription(subscriptionId: string): Promise<void> {
         .limit(1);
       if (other && other.length > 0) keep = true;
     }
-    await (supabaseAdmin as any)
-      .from("patient_profiles")
-      .update({ quiz_premium: keep })
-      .eq("id", userId);
+    await gravar(
+      "patient_profiles.quiz_premium",
+      (supabaseAdmin as any)
+        .from("patient_profiles")
+        .update({ quiz_premium: keep })
+        .eq("id", userId),
+    );
   } else if (product === "doctor_plan") {
     /* O plano vem da NOSSA metadata, então basta tirar o sufixo do ciclo e
        normalizar pela fonte única — `normalizePlan` conhece todas as PlanKey.
@@ -271,10 +305,13 @@ async function applySubscription(subscriptionId: string): Promise<void> {
     const { normalizePlan } = await import("@/lib/entitlements");
     const planKey = normalizePlan((plan ?? "").replace(/_annual$/, ""));
     if (grants) {
-      await (supabaseAdmin as any)
-        .from("doctors")
-        .update({ plan: planKey, active: true, plan_expires_at: periodEnd })
-        .eq("id", userId);
+      await gravar(
+        "doctors.plan(conceder)",
+        (supabaseAdmin as any)
+          .from("doctors")
+          .update({ plan: planKey, active: true, plan_expires_at: periodEnd })
+          .eq("id", userId),
+      );
       // Indicação: se este médico foi indicado e ainda não gerou recompensa,
       // dá +30 dias ao indicador. Idempotente (referral_rewarded). Nunca
       // derruba o fluxo principal se falhar (colunas podem não existir ainda).
@@ -294,10 +331,13 @@ async function applySubscription(subscriptionId: string): Promise<void> {
       // cancelou / não pagou → rebaixa para free MANTENDO active=true: o médico
       // continua com o painel no plano grátis e pode reassinar quando quiser
       // (entitlements caem para free por causa do plano, não por desativação).
-      await (supabaseAdmin as any)
-        .from("doctors")
-        .update({ plan: "free", plan_expires_at: null })
-        .eq("id", userId);
+      await gravar(
+        "doctors.plan(rebaixar)",
+        (supabaseAdmin as any)
+          .from("doctors")
+          .update({ plan: "free", plan_expires_at: null })
+          .eq("id", userId),
+      );
     }
   }
 }
@@ -426,11 +466,14 @@ async function creditAffiliate(invoice: {
   const pct = Math.min(100, Math.max(0, Number(aff.commission_pct ?? 50)));
   const commission = Math.round((amountPaid * pct) / 100);
   // UNIQUE(affiliate_code, stripe_invoice_id) → retry não duplica crédito.
-  await sb.from("affiliate_earnings").insert({
-    affiliate_code: refCode,
-    user_id: sub.metadata?.user_id ?? null,
-    stripe_invoice_id: invoiceId,
-    amount_paid_cents: amountPaid,
-    commission_cents: commission,
-  });
+  await gravar(
+    "affiliate_earnings.insert",
+    sb.from("affiliate_earnings").insert({
+      affiliate_code: refCode,
+      user_id: sub.metadata?.user_id ?? null,
+      stripe_invoice_id: invoiceId,
+      amount_paid_cents: amountPaid,
+      commission_cents: commission,
+    }),
+  );
 }

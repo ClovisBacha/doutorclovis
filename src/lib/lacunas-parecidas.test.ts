@@ -833,7 +833,21 @@ describe("e-mail de lacuna só quando a lacuna existe", () => {
        que não soube responder" — e ele abria o painel para procurar uma lacuna
        que não estava lá. */
     const fonte = codigoDe("src/lib/secondbrain.server.ts");
-    expect(fonte).toContain("if (nova?.id) notifyDoctorOfGap(doctorId, sb);");
+    expect(fonte).toContain("if (nova?.id) await notifyDoctorOfGap(doctorId, sb);");
+  });
+
+  test("o e-mail é AGUARDADO, não disparado e esquecido", () => {
+    /* Era `void (async () => {…})()` — a mesma cicatriz que este arquivo já
+       diagnosticou na cura de lacunas e no backfill de vetores, viva na
+       terceira. E aqui é pior: dispara no FIM de uma cadeia aguardada, ou
+       seja, no instante em que a função serverless está mais perto de ser
+       congelada — contagem + getUserById + POST ao Resend, tudo depois de a
+       resposta já ter saído.
+       Custa zero à paciente: `logBrainGapAgora` roda dentro do `onFinish`. */
+    const fonte = codigoDe("src/lib/secondbrain.server.ts");
+    expect(fonte).toContain("async function notifyDoctorOfGap(doctorId: string, sb: any)");
+    const corpo = fonte.slice(fonte.indexOf("async function notifyDoctorOfGap"));
+    expect(corpo.slice(0, 400)).not.toContain("void (async () =>");
   });
 });
 
