@@ -1255,6 +1255,31 @@ export async function getBrainContextResolved(
       // só setar as envs.
       const { isFlagExplicitlyEnabled } = await import("./platform-flags.server");
       if (await isFlagExplicitlyEnabled("doctorthink_remote", doctorId)) {
+        /* A COTA VALE AQUI TAMBÉM.
+           Este caminho devolvia `cotaEsgotada: false` fixo e retornava antes do
+           `getBrainContext`, onde moram TANTO o portão de cota QUANTO o
+           registro da lacuna. Com a flag ligada: a paciente nunca era avisada
+           de que a cota acabou, o médico respondia sem teto nenhum, e nenhuma
+           dúvida entrava na fila dele. Está atrás de duplo opt-in e desligado
+           por padrão — o que faz dele uma bomba armada, não um problema
+           inexistente. */
+        const { getEntitlementsByDoctorId } = await import("./entitlements.server");
+        const { cotaDoMedico } = await import("./cota-ia.server");
+        const ent = await getEntitlementsByDoctorId(doctorId);
+        const cota =
+          channel === "teste" ? null : await cotaDoMedico(doctorId, ent.aiRepliesPerCycle);
+        if (cota?.estado === "estourada") {
+          return {
+            block: "",
+            enabledApp: true,
+            enabledWhatsapp: true,
+            hadCoverage: false,
+            melhorSimilaridade: null,
+            cotaEsgotada: true,
+            podeAtribuir: false,
+            gravacaoDaLacuna: logBrainGapAgora(doctorId, userMessage, channel, patientId, null),
+          };
+        }
         const { askBrainRemote } = await import("./doctorthink/client");
         const remote = await askBrainRemote(url, apiKey, {
           doctorId,
@@ -1271,6 +1296,12 @@ export async function getBrainContextResolved(
             melhorSimilaridade: null,
             cotaEsgotada: false,
             podeAtribuir: false,
+            /* Sem cobertura, a dúvida entra na fila dele — igual ao local.
+               Sem isto, ligar a flag apagava silenciosamente todas as lacunas
+               daquele médico. */
+            gravacaoDaLacuna: remote.hadCoverage
+              ? undefined
+              : logBrainGapAgora(doctorId, userMessage, channel, patientId, null),
           };
         }
       }

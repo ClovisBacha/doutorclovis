@@ -6595,7 +6595,10 @@ function WABubble({
 }: {
   msg: WAMsg;
   /** Voto já dado nesta resposta (persistido no estado do chat). */
-  feedback?: "up" | "down";
+  /* `down-fila` distingue "chegou ao médico" de "só registrado" — a frase de
+     confirmação muda, porque prometer o que não aconteceu deixa a paciente
+     esperando resposta que ninguém vai dar. */
+  feedback?: "up" | "down" | "down-fila";
   /** Presente só em respostas da IA elegíveis a avaliação. */
   onFeedback?: (helpful: boolean) => void;
   /** `false` só na mensagem que ainda está chegando pelo streaming. */
@@ -6747,7 +6750,18 @@ function WABubble({
             <span className="mr-auto flex items-center gap-1.5 pl-0.5">
               {feedback ? (
                 <span className="text-[10px]" style={{ color: inkSoft }}>
-                  {feedback === "up" ? "Obrigado! 💛" : "Anotado — seu médico vai ver 💛"}
+                  {/* A FRASE SEGUE O QUE O SERVIDOR REALMENTE FEZ.
+                      "Anotado — seu médico vai ver" era dito para todo 👎, e o
+                      retorno de `submitBrainFeedback` era ignorado. Um 👎 numa
+                      pergunta de plataforma ("quanto custa?") não entra em fila
+                      nenhuma: a paciente lia que o médico veria, e ele nunca
+                      veria. É o mesmo portão que o `chat.ts` já usa para a IA
+                      não prometer registro que não houve — faltava no botão. */}
+                  {feedback === "up"
+                    ? "Obrigado! 💛"
+                    : feedback === "down-fila"
+                      ? "Anotado — seu médico vai ver 💛"
+                      : "Obrigada pelo aviso 💛"}
                 </span>
               ) : (
                 <>
@@ -6928,7 +6942,10 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
   const [focado, setFocado] = useState(false);
   const typed = useTypedPlaceholder(CHAT_SUGESTOES, !input && !focado);
   // Feedback 👍👎 por índice de mensagem — o 👎 vira lacuna na fila do médico.
-  const [votes, setVotes] = useState<Record<number, "up" | "down">>({});
+  /* `down-fila` = o 👎 chegou de fato ao médico (virou lacuna ou revisão);
+     `down` = registrado, mas não gerou trabalho para ele. A tela precisa saber
+     a diferença para não prometer o que não aconteceu. */
+  const [votes, setVotes] = useState<Record<number, "up" | "down" | "down-fila">>({});
 
   /* ─── A RESPOSTA APARECE SENDO ESCRITA ─────────────────────────────────────
      O streaming já entregava a resposta em pedaços, mas cada pedaço virava um
@@ -6947,6 +6964,11 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
   const mostradoRef = useRef(0);
   const quadroRef = useRef<number | null>(null);
   const streamAbertoRef = useRef(false);
+  /* O texto que o SERVIDOR mandou quando recusou a requisição (429 do
+     limitador, manutenção). O `catch` monta a bolha de erro e não tem acesso à
+     resposta HTTP — sem este ref, a mensagem acionável era descartada e a
+     paciente recebia o genérico. */
+  const avisoDoServidorRef = useRef<string | null>(null);
 
   /* Quem pede menos movimento recebe o texto inteiro de uma vez. A animação
      aqui é conforto, nunca informação — nada se perde ao desligá-la. */
@@ -6981,7 +7003,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         const resposta = messages[i]?.content ?? "";
         const { data: s } = await supabase.auth.getSession();
         if (!s.session?.access_token) return;
-        await submitBrainFeedback({
+        const r = await submitBrainFeedback({
           data: {
             accessToken: s.session.access_token,
             question: q,
@@ -6989,6 +7011,10 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
             helpful,
           },
         });
+        /* Só promete quando o servidor confirma que enfileirou. */
+        if (!helpful && r?.ok && "chegouAoMedico" in r && r.chegouAoMedico) {
+          setVotes((v) => ({ ...v, [i]: "down-fila" }));
+        }
       } catch {
         /* telemetria é best-effort */
       }
@@ -7056,12 +7082,28 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         },
         body: JSON.stringify({ messages: uiMessages }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        /* O TEXTO DO SERVIDOR CHEGA À TELA.
+           Era `throw new Error(await res.text())`, e o `catch` lá embaixo
+           descartava o erro e mostrava "Desculpe, ocorreu um erro. Tente
+           novamente." O 429 do limitador local devolve algo ACIONÁVEL —
+           "Muitas mensagens em pouco tempo. Aguarde um instante." — e ela
+           recebia o genérico, que ainda sugere que ela fez algo errado.
+           Guardado num ref porque o `catch` monta a bolha e não enxerga isto. */
+        const corpo = (await res.text().catch(() => "")).trim();
+        avisoDoServidorRef.current = corpo.length > 0 && corpo.length < 300 ? corpo : null;
+        throw new Error(corpo || "http");
+      }
       if (!res.body) throw new Error("no stream");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let acc = "";
       let buffer = "";
+      /* O provedor falhou DEPOIS de o fluxo abrir? Então o texto que a paciente
+         lê é um aviso, não uma resposta — e aviso não vai para a fila do
+         médico. */
+      let houveErro = false;
+      avisoDoServidorRef.current = null;
       const asstMsg: WAMsg = { role: "assistant", content: "", ts: new Date() };
       setMessages([...displayNext, asstMsg]);
 
@@ -7077,15 +7119,49 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         const atraso = alvo.length - mostradoRef.current;
         if (atraso > 0) {
           /* Passo adaptativo: 2 caracteres por quadro num ritmo de leitura
-             confortável, até 12 quando há muito texto represado. Um passo fixo
-             faria a paciente esperar DEPOIS de a resposta inteira já ter
-             chegado — tempo perdido sem nada em troca. */
-          const passo = Math.min(12, Math.max(2, Math.ceil(atraso / 45)));
+             confortável quando o texto está chegando, e MUITO mais rápido
+             quando já chegou tudo.
+
+             O teto era 12 caracteres por quadro — 720/s a 60fps. Medido: uma
+             resposta de 4.000 caracteres deixava 6,7s de cauda DEPOIS de o
+             texto inteiro já estar no navegador, e uma de 8.000 deixava 12,3s.
+             Resposta obstétrica longa passa de 2.000 com frequência, e o teste
+             só cobria até lá — passando por 0,03s de folga.
+
+             O piso de 2/quadro é o que faz parecer escrita; o teto solto é o
+             que impede que "parecer escrita" vire "fazer esperar". Quando o
+             stream fechou, a cauda inteira sai em no máximo ~1s. */
+          const passo = streamAbertoRef.current
+            ? /* CHEGANDO: ritmo de leitura. 2 por quadro no mínimo, até 12
+                 quando há texto represado — é isto que parece escrita. */
+              Math.min(12, Math.max(2, Math.ceil(atraso / 45)))
+            : /* JÁ CHEGOU TUDO: acabar. Aqui não há mais nada a "revelar" —
+                 só a paciente esperando por texto que o navegador já tem.
+                 Piso de 40 por quadro para a cauda não se arrastar quando
+                 sobra pouco; a régua inteira fecha 8.000 caracteres em ~40
+                 quadros (~0,7s). Antes eram 12,3s, com o teto de 12 valendo
+                 nos dois regimes. */
+              Math.max(40, Math.ceil(atraso / 10));
           mostradoRef.current = Math.min(alvo.length, mostradoRef.current + passo);
-          setMessages([
-            ...displayNext,
-            { ...asstMsg, content: alvo.slice(0, mostradoRef.current) },
-          ]);
+          /* Atualização FUNCIONAL, e isto é conserto de um apagão real.
+             Era `setMessages([...displayNext, …])` — um retrato capturado
+             quando o envio começou. Qualquer mensagem acrescentada durante o
+             streaming era APAGADA no quadro seguinte: anexar um exame enquanto
+             a resposta digitava fazia sumir da tela a bolha do arquivo e a
+             confirmação "já encaminhei para a sua médica". O arquivo estava
+             salvo no servidor, e a paciente via o contrário disso. */
+          setMessages((atuais) => {
+            /* Pelo `ts`, e não pela última posição: se a paciente anexar um
+               exame durante o streaming, a bolha do arquivo entra DEPOIS da
+               resposta, e escrever "na última" passaria a sobrescrever a bolha
+               errada. O `ts` é criado uma vez para esta resposta e sobrevive
+               aos spreads. */
+            const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
+            if (i < 0) return atuais;
+            const copia = [...atuais];
+            copia[i] = { ...copia[i], content: alvo.slice(0, mostradoRef.current) };
+            return copia;
+          });
         }
         if (streamAbertoRef.current || mostradoRef.current < alvoRef.current.length) {
           quadroRef.current = requestAnimationFrame(digitar);
@@ -7111,6 +7187,15 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
             (json.errorText || json.error)
           ) {
             acc = String(json.errorText ?? json.error);
+            /* A BOLHA DE ERRO NÃO PODE SER VOTÁVEL.
+               Ler a parte `error` consertou a bolha vazia — e abriu um buraco
+               por baixo: a mensagem final passou a TER conteúdo (o texto do
+               erro) e continuava sem a marca `error`, então os polegares
+               apareciam. Um 👎 num 429 do Gemini virava lacuna ou revisão na
+               fila do médico, com "o que ela leu" = "Estou recebendo muitas
+               perguntas neste momento". É o cenário que o `canVote` foi escrito
+               para impedir, reaberto pelo caminho novo. */
+            houveErro = true;
           }
         } catch {}
       };
@@ -7124,14 +7209,27 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         alvoRef.current = acc;
         /* Sem animação, a chegada É a exibição — igual ao comportamento
            anterior, que é exatamente o que quem pediu menos movimento quer. */
-        if (semAnimacao) setMessages([...displayNext, { ...asstMsg, content: acc }]);
+        if (semAnimacao) {
+          /* `mostradoRef` TAMBÉM anda aqui. Sem isto, quem pediu menos
+             movimento ficava com ele em zero para sempre — e o `catch` abaixo,
+             que corta o texto parcial em `mostradoRef`, devolvia string vazia:
+             o texto que ela estava lendo sumia da tela e virava o erro
+             genérico. O conserto do texto parcial existia e não valia para a
+             trilha de acessibilidade. */
+          mostradoRef.current = acc.length;
+          setMessages([...displayNext, { ...asstMsg, content: acc }]);
+        }
       }
       (buffer + decoder.decode()).split("\n").forEach(processLine);
       alvoRef.current = acc;
       streamAbertoRef.current = false;
 
       if (semAnimacao) {
-        setMessages([...displayNext, { ...asstMsg, content: acc }]);
+        mostradoRef.current = acc.length;
+        setMessages([
+          ...displayNext,
+          { ...asstMsg, content: acc, ...(houveErro ? { error: true } : {}) },
+        ]);
       } else {
         /* Espera o texto terminar de aparecer antes de liberar o "digitando".
            Sem isto, o indicador sumiria com a bolha ainda pela metade — e a
@@ -7143,7 +7241,10 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           };
           conferir();
         });
-        setMessages([...displayNext, { ...asstMsg, content: acc }]);
+        setMessages([
+          ...displayNext,
+          { ...asstMsg, content: acc, ...(houveErro ? { error: true } : {}) },
+        ]);
       }
     } catch {
       /* O QUE ELA JÁ ESTAVA LENDO NÃO SE PERDE.
@@ -7154,15 +7255,23 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
          na próxima abertura do chat.
          Agora o que chegou fica, e o aviso vem depois — que é o que qualquer
          conversa interrompida deveria fazer. */
-      const parcial = alvoRef.current.slice(0, Math.max(mostradoRef.current, 0)).trim();
+      /* O que CHEGOU, não só o que já apareceu.
+         Cortar em `mostradoRef` jogava fora o texto que o servidor já tinha
+         mandado e o laço ainda não tinha desenhado — e o comentário acima diz
+         "o que chegou fica". Agora diz a verdade. */
+      const parcial = alvoRef.current.trim();
       setMessages([
         ...displayNext,
         ...(parcial ? [{ role: "assistant" as const, content: parcial, ts: new Date() }] : []),
         {
           role: "assistant",
-          content: parcial
-            ? "A conexão caiu no meio da resposta. Pode perguntar de novo?"
-            : "Desculpe, ocorreu um erro. Tente novamente.",
+          content:
+            /* O aviso do servidor manda, quando existe: ele sabe o que houve
+               (limite de mensagens, manutenção) e a tela não. */
+            avisoDoServidorRef.current ??
+            (parcial
+              ? "A conexão caiu no meio da resposta. Pode perguntar de novo?"
+              : "Desculpe, ocorreu um erro. Tente novamente."),
           ts: new Date(),
           error: true, // falha transitória não é votável (senão 👎 vira lacuna falsa)
         },

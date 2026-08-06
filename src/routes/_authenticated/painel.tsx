@@ -6080,9 +6080,23 @@ function BrainReviewCard({
     }
   }
 
-  /* Fila vazia não vira card: um painel que mostra caixas vazias ensina o
-     médico a ignorar caixas. */
-  if (!itens.length) return null;
+  /* FILA VAZIA VIRA UMA LINHA, NÃO O NADA.
+     Era `return null`, e o custo disso era o item que o médico pediu: ele
+     achava a aba confusa, e a distinção entre ENSINAR (lacuna) e CORRIGIR
+     (revisão) só era ensinada a quem já tivesse item na fila. Como a fila de
+     revisão é a rara das duas, dava para usar o Cérebro por meses sem
+     descobrir que ela existe — enquanto a de lacunas aparece sempre, com
+     estado vazio explicativo. Assimetria pura.
+     Uma linha discreta não é "caixa vazia": é o nome da coisa. */
+  if (!itens.length) {
+    return (
+      <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">
+        ✋ <strong>Revisão</strong> — nenhuma resposta reprovada. Quando uma paciente marcar 👎 numa
+        resposta que saiu do <em>seu</em> conhecimento, ela aparece aqui para você corrigir o texto
+        (é diferente da fila de lacunas, que é o que a IA não soube responder).
+      </p>
+    );
+  }
 
   return (
     <div className="rounded-3xl border border-amber-400/50 bg-amber-50/60 p-6 shadow-[var(--shadow-card)]">
@@ -6112,6 +6126,17 @@ function BrainReviewCard({
                   {it.answer}
                 </p>
               </div>
+            )}
+
+            {/* A TERCEIRA COISA. O comentário deste card diz que ele mostra as
+                três — pergunta, o que ela leu, e o que está aprovado hoje — e
+                mostrava duas: a entrada de origem era buscada, tipada e nunca
+                renderizada. Sem ela o médico não sabe QUAL texto do cérebro
+                dele produziu aquilo, que é justamente o que ele vai corrigir. */}
+            {it.entryQuestion && editando !== it.id && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Veio da sua entrada: <em>&ldquo;{it.entryQuestion}&rdquo;</em>
+              </p>
             )}
 
             {editando === it.id ? (

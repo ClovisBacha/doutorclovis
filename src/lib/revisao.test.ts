@@ -141,8 +141,24 @@ describe("a tela mostra as três coisas", () => {
     expect(painel).toContain('setTexto(it.entryAnswer ?? it.answer ?? "")');
   });
 
-  test("fila vazia não vira card vazio", () => {
-    /* Um painel que mostra caixas vazias ensina o médico a ignorar caixas. */
-    expect(painel).toContain("if (!itens.length) return null;");
+  test("fila vazia vira uma LINHA que ensina, não o nada", () => {
+    /* Era `return null`, e o custo era o item que o médico pediu: ele achava a
+       aba confusa, e a distinção entre ENSINAR (lacuna) e CORRIGIR (revisão)
+       só era ensinada a quem já tivesse item na fila. Como a revisão é a rara
+       das duas, dava para usar o Cérebro por meses sem descobrir que ela
+       existe — enquanto a de lacunas sempre aparece, com estado vazio
+       explicativo. Uma linha discreta não é "caixa vazia": é o nome da coisa. */
+    expect(painel).not.toContain("if (!itens.length) return null;");
+    expect(painel).toContain("nenhuma resposta reprovada");
+  });
+
+  test("o card mostra as TRÊS coisas que promete", () => {
+    /* A docstring dele diz "pergunta, o que ela leu, e o que está aprovado
+       hoje". Mostrava duas: `entryQuestion` era buscado, tipado e nunca
+       renderizado — e sem ele o médico não sabe QUAL entrada do cérebro dele
+       produziu aquilo, que é justamente o que ele vai corrigir. */
+    expect(painel).toContain("{it.question}");
+    expect(painel).toContain("{it.answer}");
+    expect(painel).toContain("{it.entryQuestion}");
   });
 });

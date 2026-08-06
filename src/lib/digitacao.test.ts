@@ -106,10 +106,77 @@ describe("quem pede menos movimento recebe o texto inteiro", () => {
   });
 
   test("sem animação, a chegada é a exibição — como era antes", () => {
-    expect(codigo).toContain("if (semAnimacao) setMessages(");
+    expect(codigo).toContain("if (semAnimacao) {");
     expect(codigo).toContain(
       "if (!semAnimacao) quadroRef.current = requestAnimationFrame(digitar)",
     );
+  });
+
+  test("o contador de exibição anda TAMBÉM sem animação", () => {
+    /* `mostradoRef` só era escrito dentro do laço de digitação, que não roda
+       para quem pediu menos movimento. Ficava em zero para sempre — e o
+       `catch` cortava o texto parcial em `mostradoRef`, devolvendo string
+       vazia: o texto que ela estava lendo sumia e virava o erro genérico. O
+       conserto do texto parcial existia e não valia para a trilha de
+       acessibilidade. */
+    const semAnim = codigo.split("if (semAnimacao)").slice(1);
+    expect(semAnim.length).toBeGreaterThanOrEqual(2);
+    expect(semAnim.some((t) => t.slice(0, 200).includes("mostradoRef.current = acc.length"))).toBe(
+      true,
+    );
+  });
+});
+
+describe("a cauda não pode fazer a paciente esperar", () => {
+  test("com o stream fechado, o passo deixa de ter teto fixo", () => {
+    /* Medido com a régua antiga (teto de 12 caracteres por quadro, 720/s a
+       60fps): 4.000 caracteres deixavam 6,7s de cauda DEPOIS de o texto
+       inteiro já estar no navegador; 8.000 deixavam 12,3s. O teste antigo só
+       cobria até 2.000 e passava por 0,03s de folga. */
+    expect(codigo).toContain("const passo = streamAbertoRef.current");
+    expect(codigo).toContain("Math.max(40, Math.ceil(atraso / 10))");
+  });
+
+  test("uma resposta longa termina de aparecer em ~1s depois de chegar", () => {
+    /* A régua, rodada de verdade: quantos quadros para desenhar N caracteres
+       que já chegaram todos. A 60fps, 60 quadros = 1s. */
+    const quadros = (n: number) => {
+      let mostrado = 0;
+      let q = 0;
+      while (mostrado < n && q < 100_000) {
+        const atraso = n - mostrado;
+        mostrado += Math.max(40, Math.ceil(atraso / 10));
+        q++;
+      }
+      return q;
+    };
+    expect(quadros(2_000)).toBeLessThan(60);
+    expect(quadros(4_000)).toBeLessThan(60);
+    expect(quadros(8_000)).toBeLessThan(60);
+  });
+});
+
+describe("o que a paciente vê não pode ser apagado pelo próprio laço", () => {
+  test("a escrita é funcional e acha a bolha pelo `ts`", () => {
+    /* Era `setMessages([...displayNext, …])` — um retrato de quando o envio
+       começou. Anexar um exame durante o streaming fazia o quadro seguinte
+       APAGAR da tela a bolha do arquivo e a confirmação de envio: o arquivo
+       estava salvo no servidor e a paciente via o contrário disso.
+       Pelo `ts` e não pela última posição, porque a bolha do anexo entra
+       DEPOIS da resposta. */
+    expect(codigo).toContain("setMessages((atuais) => {");
+    expect(codigo).toContain("atuais.findIndex((m) => m.ts === asstMsg.ts)");
+  });
+});
+
+describe("bolha de erro não vira trabalho para o médico", () => {
+  test("a parte `error` marca a mensagem", () => {
+    /* Ler a parte `error` consertou a bolha vazia e abriu um buraco: a
+       mensagem passou a TER conteúdo e continuava sem a marca, então os
+       polegares apareciam. Um 👎 num 429 do Gemini virava lacuna na fila do
+       médico. */
+    expect(codigo).toContain("houveErro = true;");
+    expect(codigo).toContain("...(houveErro ? { error: true } : {})");
   });
 });
 

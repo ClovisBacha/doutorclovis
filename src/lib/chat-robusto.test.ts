@@ -86,9 +86,13 @@ describe("o que ela já estava lendo não se perde", () => {
    * gravava a resposta inteira. Ela reaparecia "do nada" na abertura seguinte.
    */
   test("o texto parcial é preservado no erro", () => {
-    expect(app).toContain(
-      "const parcial = alvoRef.current.slice(0, Math.max(mostradoRef.current, 0)).trim()",
-    );
+    /* O que CHEGOU, não o que já tinha sido desenhado.
+       Cortar em `mostradoRef` jogava fora o texto que o servidor já mandara e
+       o laço ainda não pintara — e, para quem pediu menos movimento,
+       `mostradoRef` ficava em ZERO para sempre, então o corte devolvia string
+       vazia e o texto sumia inteiro. O comentário ao lado dizia "o que chegou
+       fica"; agora o código diz a mesma coisa. */
+    expect(app).toContain("const parcial = alvoRef.current.trim()");
   });
 
   test("e o aviso reconhece que a conversa foi interrompida", () => {
