@@ -24,6 +24,7 @@ import { TabSkeleton } from "@/components/tab-skeleton";
 import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
 import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
+import { abrirPdfDeDataUrl } from "@/lib/abrir-pdf";
 import { formatarDinheiro } from "@/lib/dinheiro";
 import { DOCTOR } from "@/lib/doctor.config";
 import drPortrait from "@/assets/dr-clovis-portrait.jpg";
@@ -18779,14 +18780,13 @@ function ExamesTab({ gest }: { gest: Gest }) {
               >
                 {/* Celular nem sempre embute PDF — abrir em aba nova funciona
                     em todos. */}
-                <a
-                  href={preview.image_data!}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => abrirPdfDeDataUrl(preview.image_data!)}
                   className="block p-6 text-center text-sm text-primary underline"
                 >
                   Abrir o PDF
-                </a>
+                </button>
               </object>
             ) : (
               <img src={preview.image_data!} alt={preview.name} className="max-w-full rounded-xl" />

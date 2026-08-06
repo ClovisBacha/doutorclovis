@@ -340,13 +340,103 @@ const QUEIXA_DE_ATENDIMENTO = new RegExp(
   "i",
 );
 
+/**
+ * BANDEIRAS VERMELHAS — vencem qualquer outra regra, sempre.
+ *
+ * `TERMOS_CLINICOS` é uma allowlist, e allowlist de vocabulário clínico é uma
+ * lista que nunca fica pronta. Medido: 61 de 85 termos comuns eram invisíveis
+ * — inclusive `aborto`, `pré-eclâmpsia`, `convulsão`, `desmaio`, `visão
+ * embaçada`, `trombose`, `bolsa rota` e `depressão`.
+ *
+ * O custo disso não é ruído na fila: `ehSoSuporte` troca o system prompt por um
+ * bot instruído a NÃO COMENTAR SINTOMAS. "o aplicativo não funciona e eu quero
+ * morrer" era classificado como suporte técnico.
+ *
+ * Esta lista existe para que a palavra que ninguém lembrou não vire incidente.
+ * Ela é curta de propósito — só o que, aparecendo, torna a conversa clínica
+ * independentemente de tudo mais que esteja escrito junto.
+ */
+const BANDEIRA_VERMELHA = new RegExp(
+  comFronteira(
+    [
+      "sangra\\w*|sangrando|hemorragi\\w*|aborto|abortei|natimort\\w*",
+      "perdi (?:o|a|meu|minha) (?:beb(?:ê|e)|gesta(?:ç|c)(?:ã|a)o|gravidez|filh\\w*)|perda gestacional",
+      "convuls(?:ã|a)\\w*|desmai\\w*|desmaiei|apagu(?:ei|ou)|conv(?:ú|u)ls\\w*",
+      "pr(?:é|e)[- ]?ecl(?:â|a)mps\\w*|ecl(?:â|a)mps\\w*|press(?:ã|a)o (?:alta|nas alturas)",
+      "vis(?:ã|a)o (?:embaçada|emba(?:ç|c)ada|turva|escura)|vendo (?:pontos|estrelas)",
+      "falta de ar|n(?:ã|a)o (?:consigo|estou conseguindo) respirar|sufoca\\w*|dispnei\\w*",
+      "trombos\\w*|emboli\\w*|infart\\w*|avc|derrame",
+      "bolsa (?:rompeu|estourou|rota)|perdendo l(?:í|i)quido|contra(?:ç|c)(?:õ|o)es fortes",
+      "beb(?:ê|e) n(?:ã|a)o (?:mexe|est(?:á|a) mexendo)|parou de mexer|n(?:ã|a)o sinto o beb",
+      "quero morrer|me matar|me machucar|tirar minha vida|acabar com tudo|suic(?:í|i)d\\w*",
+      "febre alta|39 graus|40 graus|convulsion\\w*|n(?:ã|a)o para de vomitar",
+    ].join("|"),
+  ),
+  "i",
+);
+
+/** Onde uma frase se divide em ideias: conjunção, vírgula, ponto. */
+const SEPARADOR =
+  /\s*(?:,|;|\.|\be\b|\bmas\b|\bpor(?:é|e)m\b|\bs(?:ó|o) que\b|\btamb(?:é|e)m\b|\bporque\b|\bpois\b|\bj(?:á|a) que\b|\benquanto\b)\s*/i;
+
+/**
+ * É pergunta de suporte PURA — cabe à plataforma, não ao médico.
+ *
+ * ─── "PURA" PASSOU A SIGNIFICAR PURA ────────────────────────────────────────
+ *
+ * A regra era "fala de app E não fala de corpo", com o vocabulário de corpo
+ * vindo de uma allowlist. Bastava a palavra clínica não estar na lista para a
+ * frase inteira virar suporte — e 25 de 30 frases mistas medidas viraram.
+ *
+ * Agora são três portões, e o mais importante é o terceiro:
+ *
+ * 1. bandeira vermelha em qualquer lugar → clínica, sempre;
+ * 2. queixa de atendimento → do médico, a plataforma não conserta;
+ * 3. **toda oração precisa ser de suporte.** "não consigo respirar E o app não
+ *    abre" tem duas ideias; uma delas não tem sinal nenhum de app. Uma oração
+ *    com conteúdo próprio e sem sinal de suporte devolve a frase ao caminho
+ *    clínico — que é o "na dúvida, é clínica" que o comentário sempre prometeu
+ *    e a implementação não cumpria.
+ *
+ * O portão 3 é genérico: ele não depende de a palavra estar em lista nenhuma.
+ */
 export function ehSoSuporte(question: string): boolean {
-  return (
-    isSuporteDoApp(question) &&
-    !QUEIXA_DE_ATENDIMENTO.test(question) &&
-    !TERMOS_CLINICOS.test(question.replace(NOME_DE_TELA, " "))
-  );
+  if (BANDEIRA_VERMELHA.test(question)) return false;
+  if (QUEIXA_DE_ATENDIMENTO.test(question)) return false;
+  const limpo = question.replace(NOME_DE_TELA, " ");
+  if (!isSuporteDoApp(limpo) || TERMOS_CLINICOS.test(limpo)) return false;
+
+  /* Orações com conteúdo real (≥2 palavras significativas). Fragmentos como
+     "por favor" ou "obrigada" não contam — não mudam o assunto. */
+  const oracoes = limpo
+    .split(SEPARADOR)
+    .map((o) => o.trim())
+    .filter(
+      (o) =>
+        normalizeGapQuestion(o)
+          .split(/\s+/)
+          .filter((w) => w.length > 2).length >= 2,
+    );
+  if (oracoes.length <= 1) return true;
+  return oracoes.every((o) => isSuporteDoApp(o) || RECHEIO_DE_SUPORTE.test(o));
 }
+
+/**
+ * Oração que acompanha a queixa de suporte sem mudar o assunto.
+ *
+ * "não consigo entrar no app, já tentei de tudo" tem duas orações e continua
+ * sendo suporte puro — a segunda é sobre a MESMA coisa. Sem esta válvula, o
+ * portão 3 devolveria ao médico metade das queixas técnicas bem escritas.
+ */
+const RECHEIO_DE_SUPORTE = new RegExp(
+  comFronteira(
+    "j(?:á|a) tentei|de tudo|de novo|v(?:á|a)rias vezes|desde ontem|desde hoje|" +
+      "n(?:ã|a)o sei o que fazer|me ajud\\w*|por favor|urgente|obrigad\\w*|" +
+      "pode(?:m)? (?:ver|verificar|olhar)|o que fa(?:ç|c)o|como fa(?:ç|c)o|" +
+      "no meu celular|no celular|no computador|pelo navegador|no aplicativo|no app",
+  ),
+  "i",
+);
 
 /**
  * Cortesia — agradecimento, despedida, confirmação.

@@ -506,3 +506,67 @@ describe("a tabela do portão — medida, não imaginada", () => {
     expect(erradas).toEqual([]);
   });
 });
+
+/**
+ * A FRASE MISTA — o defeito mais perigoso deste filtro, e o mais teimoso.
+ *
+ * `ehSoSuporte` não decide só a fila: decide o PROMPT. Quando dá `true`, o
+ * chat troca o assistente clínico por um bot de suporte instruído a NÃO
+ * COMENTAR SINTOMAS — sem o cérebro do médico, sem as medidas, sem lacuna.
+ *
+ * A regra era "fala de app E não fala de corpo", com o corpo vindo de uma
+ * ALLOWLIST de vocabulário. Allowlist clínica é lista que nunca fica pronta:
+ * um avaliador mediu 61 de 85 termos comuns invisíveis — `aborto`,
+ * `pré-eclâmpsia`, `convulsão`, `desmaio`, `visão embaçada`, `trombose`,
+ * `bolsa rota`, `depressão`. Resultado: 25 de 30 frases mistas viravam suporte,
+ * incluindo *"o aplicativo não funciona e eu quero morrer"*.
+ *
+ * O conserto não foi engordar a lista — foi mudar a pergunta: TODA oração
+ * precisa ser de suporte. Uma oração com conteúdo próprio e sem sinal de app
+ * devolve a frase ao caminho clínico. Mais as bandeiras vermelhas, que vencem
+ * tudo e existem justamente para a palavra que ninguém lembrou.
+ */
+describe("frase mista: app + corpo nunca é suporte puro", () => {
+  const perigosas = [
+    "não consigo respirar e o app não abre",
+    "o app não abre e minha visão está embaçada",
+    "socorro, desmaiei agora, e o app travou",
+    "o aplicativo não funciona e eu quero morrer",
+    "não consigo entrar e estou com muita tristeza, penso em me machucar",
+    "quero cancelar minha assinatura porque perdi a gestação",
+    "quero excluir minha conta, tive um aborto",
+    "não consigo pagar a assinatura, estou no hospital com pré-eclâmpsia",
+    "o app não abre e tive uma convulsão ontem",
+    "não consigo entrar no app, minha bolsa rompeu",
+    "o site caiu e eu caí da escada agora",
+    "quero cancelar, estou com trombose na perna",
+    "o aplicativo bugou e meu coração está disparado",
+    "não consigo entrar e meu mamilo está rachado e sangrando",
+    "o app trava e tenho depressão pós-parto",
+    "o app não abre, é normal ter falta de ar?",
+  ];
+  for (const frase of perigosas) {
+    test(`NÃO vira bot de suporte: "${frase}"`, () => {
+      expect(ehSoSuporte(frase)).toBe(false);
+    });
+  }
+
+  /* O contrapeso. Endurecer o portão não pode passar a mandar queixa técnica
+     bem escrita para a fila clínica do médico — ela tem mais de uma oração e
+     continua sendo sobre a MESMA coisa. */
+  const tecnicas = [
+    "não consigo entrar no app, já tentei de tudo",
+    "não consigo entrar, já tentei várias vezes no meu celular",
+    "o app travou",
+    "como cancelo?",
+    "quanto custa o plano?",
+    "posso pagar no pix?",
+    "não recebo as notificações",
+    "quero apagar minhas fotos do álbum",
+  ];
+  for (const frase of tecnicas) {
+    test(`continua sendo suporte: "${frase}"`, () => {
+      expect(ehSoSuporte(frase)).toBe(true);
+    });
+  }
+});

@@ -32,15 +32,16 @@
 
 /** Quantos tokens, de qual chamada. */
 /**
- * `aviso` não mede consumo: é a MARCA de que o médico já foi avisado de um
- * marco da cota (80% ou 100%) neste ciclo. Mora aqui, e não numa coluna nova
- * em `doctors`, porque `ai_usage` já existe e este arquivo inteiro degrada com
- * elegância quando o banco está atrás das migrations — uma coluna nova seria
- * mais uma pendência para o mesmo problema.
- * É excluída da contagem de cota por `respostasNoCiclo`, que filtra
- * `especie = 'chat'`.
+ * As três espécies do CHECK da tabela: `ai_usage` tem
+ * `CHECK (especie IN ('chat','memoria','embedding'))`.
+ *
+ * Não invente uma quarta aqui. Eu inventei `"aviso"` para marcar que o médico
+ * já tinha sido notificado da cota, e o insert passou a falhar com 23514 —
+ * silenciosamente, porque quem grava engole `{error}`. A marca de aviso mora
+ * no `canal` ("cota-80"/"cota-100"), que não tem CHECK, e é excluída da
+ * contagem em `respostasNoCiclo`.
  */
-export type EspecieDeUso = "chat" | "memoria" | "embedding" | "aviso";
+export type EspecieDeUso = "chat" | "memoria" | "embedding";
 
 export type Uso = {
   especie: EspecieDeUso;

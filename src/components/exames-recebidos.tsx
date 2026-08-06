@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { quando } from "@/lib/quando";
+import { abrirPdfDeDataUrl } from "@/lib/abrir-pdf";
 import {
   devolutivaDoExame,
   examesRecebidos,
@@ -245,14 +246,13 @@ function VisorDoExame({
               >
                 {/* Alguns navegadores de celular não embutem PDF. Abrir em aba
                     nova é o caminho que funciona em todos. */}
-                <a
-                  href={imagem}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => abrirPdfDeDataUrl(imagem)}
                   className="block rounded-2xl border border-border bg-background p-4 text-center text-sm text-primary underline"
                 >
                   Abrir o PDF do laudo
-                </a>
+                </button>
               </object>
             ) : (
               <img

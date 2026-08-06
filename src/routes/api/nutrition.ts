@@ -42,15 +42,62 @@ export const Route = createFileRoute("/api/nutrition")({
         const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         if (!key) return new Response("Missing GOOGLE_GENERATIVE_AI_API_KEY", { status: 500 });
 
+        /* ─── AS MESMAS QUATRO PROTEÇÕES DO `/api/chat` ────────────────────
+           Este endpoint tinha ZERO delas, e é o mesmo modelo respondendo sobre
+           "vômitos intensos", "carnes cruas" e "queijos não pasteurizados" —
+           ou seja, a causa-raiz da bolha vazia estava intacta aqui enquanto o
+           chat principal a consertava.
+
+           Só TEXTO chega ao modelo, e mensagem vazia não passa: uma parte
+           `file` abriria o caminho de visão que o produto fechou de propósito,
+           e assistente sem texto no histórico faz o Gemini recusar a chamada
+           seguinte — a falha vira permanente. */
+        const paraOModelo = (body.messages as UIMessage[])
+          .filter((m) => m.parts?.some((p) => p.type === "text" && p.text.trim()))
+          .map((m) =>
+            m.parts?.every((p) => p.type === "text")
+              ? m
+              : ({ ...m, parts: m.parts.filter((p) => p.type === "text") } as UIMessage),
+          );
+
         const google = createChatProvider(key);
         const result = streamText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           system: NUTRITION_SYSTEM,
-          messages: await convertToModelMessages(body.messages as UIMessage[]),
+          messages: await convertToModelMessages(paraOModelo),
+          providerOptions: {
+            google: {
+              /* O raciocínio sai do MESMO orçamento da resposta: sem isto, ele
+                 consome tudo e a bolha chega vazia. */
+              thinkingConfig: { thinkingBudget: 0 },
+              /* O filtro padrão do Gemini é mal calibrado para conversa de
+                 pré-natal — e aqui o vocabulário é justamente alimento cru,
+                 vômito e perda de peso. */
+              safetySettings: [
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+              ],
+            },
+          },
+          maxOutputTokens: 900,
         });
 
         return result.toUIMessageStreamResponse({
           originalMessages: body.messages as UIMessage[],
+          /* Falha DEPOIS de o stream abrir não pode mais virar código HTTP: o
+             200 já saiu. Sem este texto, a SDK manda "An error occurred." e a
+             paciente vê uma bolha praticamente vazia. */
+          onError: (erro) => {
+            const e = erro as any;
+            const causa = e?.lastError ?? e?.cause ?? e;
+            const status = Number(causa?.statusCode ?? causa?.status ?? 0);
+            console.error(`[nutrition] stream falhou — HTTP ${status || "?"}`);
+            return status === 429
+              ? "Estou recebendo muitas perguntas neste momento. Tente de novo em instantes 💛"
+              : "Não consegui responder agora. Pode tentar de novo?";
+          },
         });
       },
     },

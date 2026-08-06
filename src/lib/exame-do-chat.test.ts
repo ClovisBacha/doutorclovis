@@ -75,6 +75,16 @@ describe("o anexo vai para o médico", () => {
     const visor = readFileSync("src/components/exames-recebidos.tsx", "utf8");
     expect(visor).toContain('imagem.startsWith("data:application/pdf")');
     expect(visor).toContain('type="application/pdf"');
+    /* E o CAMINHO DE RESERVA tem que funcionar de verdade.
+       `<a href="data:application/pdf…" target="_blank">` é BLOQUEADO por
+       Chrome e Firefox (navegação de nível superior para `data:`), e esse link
+       era exatamente a saída para quem não renderiza `<object>` embutido — que
+       é o Chrome no Android. Somando: o médico no celular não abria laudo
+       nenhum, e o botão era decoração. */
+    expect(visor).toContain("abrirPdfDeDataUrl(imagem)");
+    expect(visor).not.toMatch(/href=\{imagem\}/);
+    const app = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+    expect(app).toContain("abrirPdfDeDataUrl(preview.image_data!)");
   });
 
   test("a foto do exame é redimensionada, como todas as outras do app", () => {

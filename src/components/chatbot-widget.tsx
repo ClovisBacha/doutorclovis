@@ -4,6 +4,7 @@ import { DefaultChatTransport } from "ai";
 import { MessageCircle, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { avisoQuePodeAparecer } from "@/lib/chat-stream";
 
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
@@ -107,7 +108,11 @@ export function ChatbotWidget() {
                 que aparece; senão, uma frase honesta e um caminho. */}
             {!loading && error && (
               <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {error.message?.trim() ||
+                {/* FILTRADO. `DefaultChatTransport` lança
+                    `new Error(await response.text())`, então um 500 mandava
+                    "Missing GOOGLE_GENERATIVE_AI_API_KEY" — o nome de uma
+                    variável de ambiente — para a visitante do site público. */}
+                {avisoQuePodeAparecer(error.message ?? "") ??
                   "Não consegui responder agora. Tente de novo em instantes — se persistir, fale com o consultório."}
               </p>
             )}

@@ -98,6 +98,9 @@ export async function respostasNoCiclo(doctorId: string, agora = new Date()): Pr
          a IA é cobrar pelo trabalho que melhora o produto — e `getBrainContext`
          já isenta o canal "teste" do portão de cota pelo mesmo motivo. */
       .neq("canal", "teste")
+      /* E as MARCAS de aviso ("cota-80"/"cota-100"), que moram nesta tabela
+         por não haver coluna melhor. Não são resposta a paciente nenhuma. */
+      .not("canal", "like", "cota-%")
       .gte("created_at", inicioDoCiclo(agora).toISOString());
     /* Tabela ausente ou falha de rede → 0, ou seja, NÃO estoura.
        Na dúvida o médico é atendido: uma cota que se fecha sozinha por um
@@ -185,6 +188,9 @@ export async function consumoPorPaciente(
          a IA é cobrar pelo trabalho que melhora o produto — e `getBrainContext`
          já isenta o canal "teste" do portão de cota pelo mesmo motivo. */
       .neq("canal", "teste")
+      /* E as MARCAS de aviso ("cota-80"/"cota-100"), que moram nesta tabela
+         por não haver coluna melhor. Não são resposta a paciente nenhuma. */
+      .not("canal", "like", "cota-%")
       .gte("created_at", inicioDoCiclo(agora).toISOString())
       /* Teto de leitura: a agregação acontece aqui, não no banco, porque o
          PostgREST não faz GROUP BY. Com milhares de linhas isto viraria uma
@@ -275,14 +281,22 @@ export async function avisarMedicoDaCota(
       .from("ai_usage")
       .select("id", { count: "exact", head: true })
       .eq("doctor_id", doctorId)
-      .eq("especie", "aviso")
+      /* `especie` fica em "chat" e o marco vai no CANAL.
+         Eu tinha inventado `especie: "aviso"` — e `ai_usage` tem
+         `CHECK (especie IN ('chat','memoria','embedding'))`. O insert falhava
+         com 23514, o `if (error) return` engolia, e o aviso ao médico NUNCA
+         saía: uma função inteira escrita para o defeito que o docstring dela
+         descreve ("hoje ele descobre pela paciente"), morta na primeira linha.
+         `canal` não tem CHECK, e `respostasNoCiclo` já exclui os canais que
+         não são conversa — então a marca não contamina a contagem. */
+      .eq("especie", "chat")
       .eq("canal", marco)
       .gte("created_at", inicioDoCiclo(agora).toISOString());
     if (typeof count === "number" && count > 0) return;
 
     const { error } = await sb.from("ai_usage").insert({
       doctor_id: doctorId,
-      especie: "aviso",
+      especie: "chat",
       canal: marco,
       modelo: "-",
       input_tokens: 0,
