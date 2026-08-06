@@ -297,9 +297,46 @@ describe("a paciente é avisada com honestidade, não com jargão", () => {
 
   test("o aviso tem instrução PRÓPRIA, escolhida antes das outras", () => {
     /* Se ele viesse depois, a regra de "sem cobertura" ganharia e a promessa
-       impossível voltaria. */
-    expect(chat).toContain("const confianca = brain.cotaEsgotada");
-    expect(chat).toContain("? avisoDeCota");
+       impossível voltaria.
+       A asserção é sobre a POSIÇÃO na cadeia, e não sobre qual condição vem
+       primeiro: um terceiro estado entrou no meio (plano sem IA) e o teste
+       reprovou sem que nada tivesse regredido. Prender ao texto exato do
+       primeiro ramo era prender à ordem entre os avisos, que não importa —
+       importa que TODOS venham antes da cobertura. */
+    const posCota = chat.indexOf("? avisoDeCota");
+    const posCobertura = chat.indexOf("brain.enabledApp && brain.hadCoverage");
+    expect(posCota).toBeGreaterThan(0);
+    expect(posCobertura).toBeGreaterThan(posCota);
+  });
+
+  test("plano sem IA também tem instrução própria, e antes da cobertura", () => {
+    /* O caso vizinho da cota, e PIOR que ela: a cota volta na virada do mês, o
+       plano vencido não volta sozinho. Antes disto o ramo nem existia — a
+       paciente perdia a voz do médico em silêncio absoluto, e a dúvida dela
+       nem entrava na fila dele. */
+    const posSemPlano = chat.indexOf("? avisoSemPlano");
+    const posCobertura = chat.indexOf("brain.enabledApp && brain.hadCoverage");
+    expect(posSemPlano).toBeGreaterThan(0);
+    expect(posCobertura).toBeGreaterThan(posSemPlano);
+    /* E a CONDIÇÃO tem que ser `brain.semPlano`. Só a posição não bastava:
+       uma mutação trocou a condição por `false` — o ramo virou código morto e
+       o texto continuava lá, com o teste verde. O aviso existia e nunca saía. */
+    expect(chat).toContain("const confianca = brain.semPlano");
+  });
+
+  test("o aviso de plano PROÍBE falar de dinheiro", () => {
+    /* A relação comercial é entre o médico e a plataforma. Explicá-la à
+       paciente seria constrangê-lo na frente de quem ele atende — e ela não
+       tem o que fazer com essa informação.
+       A asserção é sobre a PROIBIÇÃO existir, e não sobre a ausência das
+       palavras: elas aparecem de propósito na linha que manda o modelo não
+       usá-las, e um `not.toContain("pagamento")` reprovaria justamente a
+       proteção. É a terceira vez que caio nisso nesta base — a lição é que
+       texto de prompt fala SOBRE as palavras que proíbe. */
+    const aviso = chat.slice(chat.indexOf("const avisoSemPlano"), chat.indexOf("const confianca"));
+    expect(aviso).toContain("sem falar em plano, assinatura, pagamento ou limite");
+    // E oferece o caminho até ele, que é o que impede o beco sem saída.
+    expect(aviso).toContain("SEMPRE ofereça o caminho até ele");
   });
 
   test("diz a VERDADE sobre o registro — que é o que acontece", () => {
@@ -362,7 +399,7 @@ describe("a paciente é avisada com honestidade, não com jargão", () => {
        com "não posso te ajudar" já perdeu a paciente. */
     const aviso = chat.slice(
       chat.indexOf("const avisoDeCota"),
-      chat.indexOf("const confianca = brain.cotaEsgotada"),
+      chat.indexOf("const avisoSemPlano"),
     );
     const posResponda = aviso.indexOf("1. Responda a pergunta");
     const posDiga = aviso.indexOf("2. Diga com naturalidade");

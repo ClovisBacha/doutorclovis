@@ -23,6 +23,45 @@ import { DOCTOR } from "@/lib/doctor.config";
 // então é uma proteção básica contra abuso/varredura — não uma garantia rígida.
 const rateLimited = makeRateLimiter(20, 60_000); // 20 mensagens/min
 
+/* ─── O SITE PÚBLICO É UMA SUPERFÍCIE DE CUSTO ABERTA ────────────────────────
+ *
+ * O widget do site responde a QUALQUER pessoa, sem conta. O limitador acima é
+ * por IP — 20/min — e isso protege contra um visitante insistente, não contra o
+ * problema: IPs são infinitos e baratos. Um raspador com mil endereços gera
+ * vinte mil respostas por minuto na nossa chave, e a conta é da plataforma
+ * (`doctor_id` nulo, cota de ninguém).
+ *
+ * Um teto GLOBAL por janela é a única coisa que limita o pior caso. Ele degrada
+ * o widget público num pico de abuso — e essa é a troca certa: o widget é
+ * vitrine, o chat da paciente é cuidado. Quem tem conta passa por outro balde e
+ * não é afetado.
+ *
+ * Memória por instância, como o limitador por IP: em serverless isso não é
+ * garantia rígida, é um teto por instância. Reduz o pior caso em uma ordem de
+ * grandeza, que é o que dá para fazer sem um contador compartilhado.
+ */
+export const TETO_ANONIMO_POR_MINUTO = 60;
+
+/**
+ * Contador de janela fixa por minuto. Exportado para ser exercitado — o relógio
+ * entra por parâmetro justamente para o teste não depender do relógio de
+ * verdade, que é o que faz um teste de tempo ficar instável.
+ */
+export function criarTetoAnonimo(teto = TETO_ANONIMO_POR_MINUTO) {
+  const estado = { minuto: -1, contagem: 0 };
+  return function estourado(agora = Date.now()): boolean {
+    const minutoAtual = Math.floor(agora / 60_000);
+    if (minutoAtual !== estado.minuto) {
+      estado.minuto = minutoAtual;
+      estado.contagem = 0;
+    }
+    estado.contagem += 1;
+    return estado.contagem > teto;
+  };
+}
+
+const tetoGlobalAnonimoEstourado = criarTetoAnonimo();
+
 // Chat do SITE PÚBLICO: assistente geral da plataforma (dúvidas do app e do
 // site, suporte). NÃO fala como um médico específico e NÃO dá conduta clínica.
 const SUPPORT_SYSTEM_PROMPT = `Você é o assistente da plataforma Obstétrica — um app de acompanhamento de gestação para pacientes e um painel para obstetras.
@@ -732,6 +771,16 @@ export const Route = createFileRoute("/api/chat")({
             status: 429,
           });
         }
+        /* O teto global vale SÓ para quem não tem conta. Uma gestante logada
+           nunca pode ser barrada porque o site está sob abuso — o chat dela é
+           cuidado, o widget é vitrine. */
+        if (!chaveDoLimite.startsWith("u:") && tetoGlobalAnonimoEstourado()) {
+          console.error("[chat] teto global do site anônimo atingido");
+          return new Response(
+            "Estou com muitas conversas ao mesmo tempo agora. Tente de novo em um minuto 💛",
+            { status: 429 },
+          );
+        }
 
         const body = (await request.json()) as { messages?: unknown };
         if (!Array.isArray(body.messages)) {
@@ -875,22 +924,46 @@ Como agir, nesta ordem:
 
 A dúvida FICA REGISTRADA para ${medico} — isso acontece de verdade, e você pode dizer. O que você NÃO promete é resposta pelo app agora: diga que ele vê quando puder, e que para hoje o caminho é o contato direto acima. Prometer resposta por aqui deixaria a paciente esperando por algo que não vem neste ciclo.`;
 
-          const confianca = brain.cotaEsgotada
-            ? avisoDeCota
-            : brain.enabledApp && brain.hadCoverage && brain.podeAtribuir
-              ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
-              : brain.enabledApp && brain.hadCoverage
-                ? /* Casou, mas não o bastante para assinar o nome dele.
+          /* ─── O PLANO DELE NÃO COBRE MAIS A IA ────────────────────────
+             A cota estourada tem prazo e volta na virada do mês. Isto não
+             volta sozinho — e antes produzia silêncio absoluto: a paciente
+             perdia a voz do médico sem uma palavra, e a dúvida dela nem entrava
+             na fila.
+
+             O texto NÃO fala de plano, pagamento nem assinatura: a relação
+             comercial é entre ele e a plataforma, e explicá-la a ela seria
+             constrangê-lo na frente da própria paciente. O que ela precisa é
+             saber que ELE continua sendo o médico dela, e como falar com ele.
+
+             A dúvida FICA registrada — isso passou a acontecer de verdade — e
+             é por isso que a IA pode dizer. */
+          const avisoSemPlano = `IMPORTANTE — as respostas pessoais de ${medico} pelo app não estão disponíveis neste momento. O acompanhamento da gestação segue normalmente com ele; o que muda é só este canal.
+
+Como agir, nesta ordem:
+1. Responda a pergunta com informação obstétrica consolidada e geral, com cuidado e sem inventar conduta.
+2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico} — sem falar em plano, assinatura, pagamento ou limite.
+3. SEMPRE ofereça o caminho até ele: para qualquer coisa do caso dela, falar com ${medico} ${comoFalarComEle}. Isto não é opcional — é o que impede a paciente de ficar sem saída.
+
+A dúvida FICA REGISTRADA para ${medico}, e você pode dizer isso. O que você NÃO promete é resposta pelo app: diga que ele vê quando puder e que, para hoje, o caminho é o contato direto acima.`;
+
+          const confianca = brain.semPlano
+            ? avisoSemPlano
+            : brain.cotaEsgotada
+              ? avisoDeCota
+              : brain.enabledApp && brain.hadCoverage && brain.podeAtribuir
+                ? `Ao usar as orientações do bloco do médico, deixe claro de forma natural que a orientação é do próprio médico (ex.: "${medico} orienta que...").`
+                : brain.enabledApp && brain.hadCoverage
+                  ? /* Casou, mas não o bastante para assinar o nome dele.
                      O material do médico ENTRA na resposta — é conhecimento bom
                      e é dele — mas sem a frase "ele orienta que", que
                      transformaria semelhança de assunto em conduta atribuída.
                      E a dúvida segue para a fila, para ele confirmar. */
-                  `Use o bloco do médico como referência de conduta e de tom, mas NÃO diga que a orientação é dele nem cite o nome dele como fonte: o material é próximo do assunto, e não necessariamente a resposta que ${medico} daria a ESTA pergunta. Responda com naturalidade e, ao final, diga com acolhimento que registrou a dúvida para ${medico} confirmar.`
-                : brain.enabledApp
-                  ? gapWasLogged
-                    ? `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. RESPONDA mesmo assim, com informação obstétrica consolidada e os sinais de alerta que valem para o caso — uma resposta útil de verdade, nunca uma recusa. SÓ DEPOIS diga, com acolhimento, que registrou a pergunta para ele responder pessoalmente (ex.: "registrei aqui para ${medico} ver"). O que você não faz é decidir a conduta do caso dela.`
-                    : `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. Responda com informação obstétrica consolidada e peça, com gentileza, o detalhe que falta para você poder encaminhar ao médico. Informe primeiro; não devolva a pergunta em branco.`
-                  : "";
+                    `Use o bloco do médico como referência de conduta e de tom, mas NÃO diga que a orientação é dele nem cite o nome dele como fonte: o material é próximo do assunto, e não necessariamente a resposta que ${medico} daria a ESTA pergunta. Responda com naturalidade e, ao final, diga com acolhimento que registrou a dúvida para ${medico} confirmar.`
+                  : brain.enabledApp
+                    ? gapWasLogged
+                      ? `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. RESPONDA mesmo assim, com informação obstétrica consolidada e os sinais de alerta que valem para o caso — uma resposta útil de verdade, nunca uma recusa. SÓ DEPOIS diga, com acolhimento, que registrou a pergunta para ele responder pessoalmente (ex.: "registrei aqui para ${medico} ver"). O que você não faz é decidir a conduta do caso dela.`
+                      : `A dúvida atual NÃO está coberta pelas orientações que ${medico} validou. Responda com informação obstétrica consolidada e peça, com gentileza, o detalhe que falta para você poder encaminhar ao médico. Informe primeiro; não devolva a pergunta em branco.`
+                    : "";
           system = [
             base,
             patient.clinicalBlock,

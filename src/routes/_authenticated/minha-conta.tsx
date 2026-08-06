@@ -56,6 +56,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
 import { ExcluirConta } from "@/components/excluir-conta";
+import { apagarMinhasConversas } from "@/lib/conta.functions";
 import { sendTestPushToMe } from "@/lib/push.functions";
 import {
   minhasDuvidasRegistradas,
@@ -4656,6 +4657,14 @@ function ProfileTab({
       {/* Excluir a conta. Fica no fim do Perfil de propósito: é o último item,
           depois de tudo que a paciente pode QUERER mexer. Ver
           `src/components/excluir-conta.tsx`. */}
+      {/* ─── APAGAR SÓ AS CONVERSAS ────────────────────────────────────────
+          Vem ANTES de excluir a conta, e é isso que faz sentido: apagar o que
+          ela escreveu para a IA não pode custar a gestação inteira.
+          Passamos a avisá-la de que o médico lê essas conversas. Um aviso sem
+          um botão é uma armadilha educada — informa a pessoa de algo que ela
+          não pode mudar. */}
+      <ApagarConversas />
+
       <ExcluirConta ehMedico={ehMedico} />
 
       <div className="rounded-3xl border border-border bg-card p-6">
@@ -6502,6 +6511,59 @@ function Info({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl bg-card/60 p-3 backdrop-blur">
       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-medium">{value}</p>
+    </div>
+  );
+}
+
+function ApagarConversas() {
+  const [apagando, setApagando] = useState(false);
+  const [pronto, setPronto] = useState(false);
+
+  async function apagar() {
+    if (apagando) return;
+    if (
+      !window.confirm(
+        "Apagar todas as suas conversas com a IA? Isto não apaga sua conta, seu diário, seus exames nem as respostas do seu médico.",
+      )
+    )
+      return;
+    setApagando(true);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session) return;
+      const res = await apagarMinhasConversas({
+        data: { accessToken: s.session.access_token },
+      });
+      if (res.ok) {
+        setPronto(true);
+        toast.success("Conversas apagadas.");
+      } else {
+        /* "Apagamos" sem ter apagado é a mentira que a exclusão de conta
+           contava. Aqui ela sabe que não foi, e pode tentar de novo. */
+        toast.error("Não foi possível apagar agora. Tente de novo.");
+      }
+    } catch {
+      toast.error("Não foi possível apagar agora. Tente de novo.");
+    } finally {
+      setApagando(false);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <p className="font-serif text-lg">Suas conversas com a IA</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Elas ficam guardadas para a IA dar continuidade — e o seu médico pode lê-las no painel dele.
+        Você pode apagar tudo quando quiser, sem perder nada do resto: a gestação, o diário, os
+        exames e as respostas dele continuam.
+      </p>
+      <button
+        onClick={apagar}
+        disabled={apagando || pronto}
+        className="mt-4 rounded-full border border-border px-5 py-2 text-sm font-medium disabled:opacity-50"
+      >
+        {pronto ? "Apagadas ✓" : apagando ? "Apagando…" : "Apagar minhas conversas"}
+      </button>
     </div>
   );
 }

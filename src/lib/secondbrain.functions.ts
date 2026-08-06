@@ -1100,7 +1100,11 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
     const avisadas = await entregarRespostaDaLacuna(sb, {
       gapId: gap.id as string,
       doctorId,
-      perguntaDela: gap.question as string,
+      /* A versão GENERALIZADA que ele acabou de escrever (`questionText`), e
+         não `gap.question`. Cada paciente recebe o próprio texto guardado; esta
+         é a rede para quem não tem — e a rede não pode ser o texto cru da
+         primeira paciente, que é o que era antes. */
+      perguntaGeneralizada: questionText,
       resposta: data.answer,
     });
 
@@ -1177,12 +1181,15 @@ async function fecharLacunasParecidas(
       if (fechaErr) console.error("[lacuna] parecida não fechou", alvo.id, fechaErr);
       if (!linha) continue;
       fechadas++;
-      /* Quem perguntou a parecida recebe a MESMA orientação. A pergunta que vai
-         junto é a dela, crua — ela precisa reconhecer a própria dúvida. */
+      /* Quem perguntou a parecida recebe a MESMA orientação, com o PRÓPRIO
+         texto. A rede, para quem não tem texto guardado, é a pergunta desta
+         lacuna parecida — que é a mais próxima do que ela perguntou e continua
+         não sendo a de outra pessoa identificável, porque é o enunciado que
+         agrupou o conjunto. */
       await entregarRespostaDaLacuna(sb, {
         gapId: linha.id as string,
         doctorId: args.doctorId,
-        perguntaDela: linha.question as string,
+        perguntaGeneralizada: linha.question as string,
         resposta: args.resposta,
       });
     }
@@ -1207,17 +1214,30 @@ async function fecharLacunasParecidas(
  */
 export async function entregarRespostaDaLacuna(
   sb: any,
-  args: { gapId: string; doctorId: string; perguntaDela: string; resposta: string },
+  args: {
+    gapId: string;
+    doctorId: string;
+    /** Versão do MÉDICO — usada só para quem não tem o próprio texto guardado. */
+    perguntaGeneralizada: string;
+    resposta: string;
+  },
 ): Promise<number> {
   try {
     const { data: esperando } = await sb
       .from("brain_gap_askers")
-      .select("user_id")
+      /* `pergunta` é o texto que CADA UMA escreveu. A lacuna é compartilhada
+         (deduplicada por texto e por vetor); a pergunta não é. */
+      .select("user_id,pergunta")
       .eq("gap_id", args.gapId)
       .is("avisada_em", null)
       .limit(200);
-    const ids = ((esperando ?? []) as { user_id: string }[]).map((a) => a.user_id);
+    /* Coluna ainda não migrada: sem o texto de cada uma, TODAS recebem a versão
+       generalizada do médico. Nunca o texto cru de outra. */
+    const comTexto = (esperando ?? []) as { user_id: string; pergunta?: string | null }[] | null;
+    const linhas = comTexto ?? [];
+    const ids = linhas.map((a) => a.user_id);
     if (ids.length === 0) return 0;
+    const textoDe = new Map(linhas.map((l) => [l.user_id, (l.pergunta ?? "").trim()]));
 
     /* Só quem AINDA é paciente dele. Alguém que trocou de médico no meio não
        deve receber resposta do consultório anterior. */
@@ -1236,11 +1256,25 @@ export async function entregarRespostaDaLacuna(
        resposta e o sistema passava a acreditar que tinha entregado — o
        `.is("avisada_em", null)` lá em cima nunca mais a selecionaria. Um
        silêncio que se torna permanente é pior que um erro. */
+    /* ─── CADA UMA RECEBE A PRÓPRIA PERGUNTA ──────────────────────────────
+       Era `args.perguntaDela` para todas — e `perguntaDela` é `gap.question`,
+       o texto CRU da PRIMEIRA paciente que fez aquela dúvida. Com a lacuna
+       deduplicada por vetor, as outras escreveram coisas diferentes e recebiam
+       o texto dela: na aba Perguntas e no corpo do push, na tela de bloqueio.
+
+       O comentário que justificava isso estava certo para UMA paciente ("ela
+       precisa reconhecer a própria dúvida") e não notou que a lacuna é
+       COMPARTILHADA — "a crua dela" tinha virado "a crua da primeira".
+
+       Sem o texto guardado, vai a versão do MÉDICO (generalizada, sem dado
+       pessoal de ninguém). Ela reconhece menos, e não recebe a intimidade de
+       outra pessoa — a troca é essa, e não tem meio-termo. */
+    const perguntaPara = (uid: string) => textoDe.get(uid) || args.perguntaGeneralizada;
     const { error: insErr } = await sb.from("doctor_questions").insert(
       destino.map((uid) => ({
         user_id: uid,
         doctor_id: args.doctorId,
-        question: args.perguntaDela,
+        question: perguntaPara(uid),
         answer: args.resposta,
         answered: true,
         answered_at: agora,
@@ -1266,7 +1300,9 @@ export async function entregarRespostaDaLacuna(
         destino.map((uid) =>
           sendPushToUser(uid, {
             title: "Seu médico respondeu",
-            body: args.perguntaDela.slice(0, 90),
+            /* O push é o pior lugar para o texto de outra pessoa: aparece na
+               tela de bloqueio, sem a paciente pedir. */
+            body: perguntaPara(uid).slice(0, 90),
             url: "/minha-conta?tab=Consultas&sub=perguntas",
           }),
         ),

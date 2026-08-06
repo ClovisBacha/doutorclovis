@@ -42,6 +42,55 @@ export type ResultadoExclusao =
   | { ok: true }
   | { ok: false; motivo: "confirmacao" | "sessao" | "medico" | "falhou" };
 
+/**
+ * APAGAR AS CONVERSAS COM A IA, SEM APAGAR A CONTA.
+ *
+ * ─── POR QUE ISTO PRECISA EXISTIR ───────────────────────────────────────────
+ *
+ * `chat_messages` guarda a transcrição inteira, para sempre, e o médico dela
+ * lê no painel. O comentário de `listBrainConversations` é honesto sobre o que
+ * isso é: "o dado mais íntimo do produto: é para a IA que ela conta o que não
+ * conta a ninguém."
+ *
+ * E o único jeito de apagar aquilo era apagar a CONTA — ou seja, perder a
+ * gestação inteira, o diário, os exames, o vínculo com o médico. Ninguém faz
+ * essa troca. Na prática, o que ela escreveu ficava, e ela sabia disso desde
+ * que passamos a avisá-la de que ele lê.
+ *
+ * Um aviso sem um botão é uma armadilha educada: a pessoa é informada de algo
+ * que não pode mudar.
+ *
+ * A memória (`chat_memory`) vai junto de propósito — ela é um RESUMO das mesmas
+ * mensagens, escrito por um modelo. Apagar a transcrição e deixar o resumo
+ * seria apagar a fonte e guardar a interpretação.
+ *
+ * O que NÃO é apagado: as respostas que o médico escreveu para ela na aba
+ * Perguntas (`doctor_questions`). Aquilo é orientação clínica que ela pediu e
+ * recebeu, e faz parte do cuidado dela — some se ela apagar, uma a uma, onde já
+ * dá.
+ */
+export const apagarMinhasConversas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (!u.user) return { ok: false as const, motivo: "sessao" as const };
+    const sb = supabaseAdmin as any;
+    const uid = u.user.id;
+
+    for (const tabela of ["chat_messages", "chat_memory"]) {
+      const { error } = await sb.from(tabela).delete().eq("patient_id", uid);
+      /* Tabela ausente é normal num banco atrás das migrations — não há o que
+         apagar. Qualquer outro erro é conversa que FICOU, e dizer "apagamos"
+         seria a mesma mentira que a exclusão de conta contava. */
+      if (error && (error as { code?: string }).code !== "42P01") {
+        console.error("[conversas] não foi possível apagar", tabela, error);
+        return { ok: false as const, motivo: "falhou" as const };
+      }
+    }
+    return { ok: true as const };
+  });
+
 export const excluirMinhaConta = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z

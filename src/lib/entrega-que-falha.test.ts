@@ -36,7 +36,7 @@ type Escrita = { tabela: string; op: "insert" | "update" | "upsert"; payload: un
  */
 function bancoFalso(opts: {
   falham?: string[];
-  esperando?: { user_id: string }[];
+  esperando?: { user_id: string; pergunta?: string | null }[];
   atuais?: { id: string }[];
 }) {
   const falham = new Set(opts.falham ?? []);
@@ -94,7 +94,7 @@ describe("a resposta da lacuna só é dada por entregue se foi entregue", () => 
     const n = await entregarRespostaDaLacuna(sb, {
       gapId: "g1",
       doctorId: "d1",
-      perguntaDela: "Posso comer sushi?",
+      perguntaGeneralizada: "Posso comer sushi?",
       resposta: "Peixe cru não.",
     });
     expect(n).toBe(1);
@@ -112,7 +112,7 @@ describe("a resposta da lacuna só é dada por entregue se foi entregue", () => 
     const n = await entregarRespostaDaLacuna(sb, {
       gapId: "g1",
       doctorId: "d1",
-      perguntaDela: "Posso comer sushi?",
+      perguntaGeneralizada: "Posso comer sushi?",
       resposta: "Peixe cru não.",
     });
     expect(n).toBe(0);
@@ -127,7 +127,7 @@ describe("a resposta da lacuna só é dada por entregue se foi entregue", () => 
     const n = await entregarRespostaDaLacuna(sb, {
       gapId: "g1",
       doctorId: "d1",
-      perguntaDela: "Posso comer sushi?",
+      perguntaGeneralizada: "Posso comer sushi?",
       resposta: "Peixe cru não.",
     });
     expect(n).toBe(1);
@@ -138,11 +138,118 @@ describe("a resposta da lacuna só é dada por entregue se foi entregue", () => 
     const n = await entregarRespostaDaLacuna(sb, {
       gapId: "g1",
       doctorId: "d1",
-      perguntaDela: "Posso comer sushi?",
+      perguntaGeneralizada: "Posso comer sushi?",
       resposta: "Peixe cru não.",
     });
     expect(n).toBe(0);
     expect(escritas).toEqual([]);
+  });
+});
+
+describe("cada paciente recebe a PRÓPRIA pergunta", () => {
+  /* ─── O DEFEITO MAIS SÉRIO DESTA BASE ──────────────────────────────────────
+   *
+   * `brain_gaps` é deduplicada por texto normalizado E por semelhança de vetor
+   * (≥0,82). Isso é de propósito e é bom: impede o médico de responder "é
+   * normal sentir enjoo?" três vezes. O efeito colateral é que perguntas
+   * ESCRITAS DE FORMAS DIFERENTES viram uma linha só — cujo texto é o da
+   * PRIMEIRA paciente.
+   *
+   * A entrega mandava esse texto para TODAS: como `doctor_questions.question`,
+   * na aba Perguntas de cada uma, e como CORPO DO PUSH, na tela de bloqueio do
+   * celular delas.
+   *
+   * Paciente A escreve "estou com corrimento com cheiro depois da relação".
+   * Paciente B pergunta algo parecido com outras palavras. B recebe no celular
+   * "Seu médico respondeu — estou com corrimento com cheiro depois da relação".
+   */
+  const RESPOSTA = "Vamos avaliar na consulta.";
+
+  test("quem tem texto guardado recebe o texto DELA", async () => {
+    const { sb, escritas } = bancoFalso({
+      esperando: [
+        { user_id: "p1", pergunta: "minha pergunta" },
+        { user_id: "p2", pergunta: "a pergunta MUITO pessoal da p2" },
+      ],
+      atuais: [{ id: "p1" }, { id: "p2" }],
+    });
+    await entregarRespostaDaLacuna(sb, {
+      gapId: "g1",
+      doctorId: "d1",
+      perguntaGeneralizada: "versão do médico",
+      resposta: RESPOSTA,
+    });
+    const linhas = escritas.find((e) => e.tabela === "doctor_questions")!.payload as {
+      user_id: string;
+      question: string;
+    }[];
+    expect(linhas.find((l) => l.user_id === "p1")?.question).toBe("minha pergunta");
+    expect(linhas.find((l) => l.user_id === "p2")?.question).toBe("a pergunta MUITO pessoal da p2");
+  });
+
+  test("o texto de uma NUNCA aparece na linha da outra", async () => {
+    /* A asserção que descreve o vazamento, e não só o conserto. */
+    const { sb, escritas } = bancoFalso({
+      esperando: [
+        { user_id: "p1", pergunta: "segredo da p1" },
+        { user_id: "p2", pergunta: "segredo da p2" },
+      ],
+      atuais: [{ id: "p1" }, { id: "p2" }],
+    });
+    await entregarRespostaDaLacuna(sb, {
+      gapId: "g1",
+      doctorId: "d1",
+      perguntaGeneralizada: "versão do médico",
+      resposta: RESPOSTA,
+    });
+    const linhas = escritas.find((e) => e.tabela === "doctor_questions")!.payload as {
+      user_id: string;
+      question: string;
+    }[];
+    expect(linhas.find((l) => l.user_id === "p1")?.question).not.toContain("p2");
+    expect(linhas.find((l) => l.user_id === "p2")?.question).not.toContain("p1");
+  });
+
+  test("sem texto guardado, vai a versão do MÉDICO — nunca a de outra", async () => {
+    /* O banco antes da migration. A troca é deliberada: ela reconhece menos a
+       própria dúvida, e não recebe a intimidade de outra pessoa. Não há
+       meio-termo — o meio-termo era o defeito. */
+    const { sb, escritas } = bancoFalso({
+      esperando: [
+        { user_id: "p1", pergunta: null },
+        { user_id: "p2", pergunta: null },
+      ],
+      atuais: [{ id: "p1" }, { id: "p2" }],
+    });
+    await entregarRespostaDaLacuna(sb, {
+      gapId: "g1",
+      doctorId: "d1",
+      perguntaGeneralizada: "É normal sentir enjoo?",
+      resposta: RESPOSTA,
+    });
+    const linhas = escritas.find((e) => e.tabela === "doctor_questions")!.payload as {
+      question: string;
+    }[];
+    expect(linhas.every((l) => l.question === "É normal sentir enjoo?")).toBe(true);
+  });
+
+  test("uma com texto e outra sem — cada uma no seu caso", async () => {
+    const { sb, escritas } = bancoFalso({
+      esperando: [{ user_id: "p1", pergunta: "o que eu escrevi" }, { user_id: "p2" }],
+      atuais: [{ id: "p1" }, { id: "p2" }],
+    });
+    await entregarRespostaDaLacuna(sb, {
+      gapId: "g1",
+      doctorId: "d1",
+      perguntaGeneralizada: "versão do médico",
+      resposta: RESPOSTA,
+    });
+    const linhas = escritas.find((e) => e.tabela === "doctor_questions")!.payload as {
+      user_id: string;
+      question: string;
+    }[];
+    expect(linhas.find((l) => l.user_id === "p1")?.question).toBe("o que eu escrevi");
+    expect(linhas.find((l) => l.user_id === "p2")?.question).toBe("versão do médico");
   });
 });
 

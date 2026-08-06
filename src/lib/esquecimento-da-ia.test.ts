@@ -70,11 +70,14 @@ describe("o SQL cria os quatro cascatas", () => {
 });
 
 describe("o código apaga sozinho, sem depender da migration", () => {
+  /* Ancorado na LISTA `daIa`, e não na primeira ocorrência do nome da tabela:
+     `apagarMinhasConversas` (o botão da paciente) também cita `chat_messages`,
+     e passou a aparecer antes no arquivo. O teste reprovou sem nada ter
+     regredido — de novo, por olhar posição em vez de estrutura. */
+  const lista = fonte.slice(fonte.indexOf("const daIa"), fonte.indexOf("for (const [tabela"));
   for (const [tabela, coluna] of DA_IA) {
     test(`${tabela} é apagada por (${coluna})`, () => {
-      const i = fonte.indexOf(`"${tabela}"`);
-      expect(i).toBeGreaterThan(-1);
-      expect(fonte.slice(i, i + 60)).toContain(`"${coluna}"`);
+      expect(lista).toContain(`["${tabela}", "${coluna}"]`);
     });
   }
 

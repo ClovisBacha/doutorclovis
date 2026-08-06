@@ -137,6 +137,31 @@ export function maybeUpdateChatMemory(patientId: string, doctorId: string | null
     try {
       const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
       if (!key) return;
+
+      /* ─── A MEMÓRIA NÃO TINHA PORTÃO ──────────────────────────────────────
+       *
+       * Ela é uma chamada de modelo inteira — 40 mensagens de histórico a cada
+       * 6 novas — e responde por cerca de 20% da conta de IA, como o comentário
+       * lá embaixo já dizia. E rodava sempre: com o plano do médico vencido,
+       * com a cota do ciclo estourada, com o interruptor desligado.
+       *
+       * O gasto era duplamente inútil nesses casos: o resumo existe para
+       * alimentar o bloco do cérebro, e nos três estados o bloco não é
+       * injetado. Pagávamos para produzir um texto que ninguém ia ler.
+       *
+       * Sem `doctorId` (paciente sem vínculo) o resumo continua — é a memória
+       * da conversa dela com a plataforma, e não há plano de ninguém para
+       * consultar.
+       */
+      if (doctorId) {
+        const { getEntitlementsByDoctorId } = await import("./entitlements.server");
+        const ent = await getEntitlementsByDoctorId(doctorId);
+        if (!ent.aiApp) return;
+        const { cotaDoMedico } = await import("./cota-ia.server");
+        const cota = await cotaDoMedico(doctorId, ent.aiRepliesPerCycle);
+        if (cota.estado === "estourada") return;
+      }
+
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const sb = supabaseAdmin as any;
 

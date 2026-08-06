@@ -28,6 +28,7 @@ import {
   type BrainBlockLabels,
   type BrainEntry,
 } from "./doctorthink/core";
+import { colunaAusente } from "./postgrest";
 
 // Re-export para compatibilidade: chat.ts importa normalizeGapQuestion daqui.
 export { normalizeGapQuestion };
@@ -97,6 +98,15 @@ export type BrainContext = {
    * frase seria mentir para a paciente e deixá-la esperando.
    */
   cotaEsgotada: boolean;
+  /**
+   * O plano do médico não cobre a IA (venceu, ou nunca cobriu).
+   *
+   * Diferente de `cotaEsgotada`: a cota volta na virada do mês, isto não volta
+   * sozinho. E diferente do interruptor desligado, onde ele ESCOLHEU e não há
+   * nada a explicar. Aqui o acesso caiu, e o silêncio faz a paciente concluir a
+   * coisa mais assustadora disponível — que o médico parou de acompanhá-la.
+   */
+  semPlano?: boolean;
   /**
    * A resposta pode ser ATRIBUÍDA ao médico ("a sua médica orienta que…").
    *
@@ -902,9 +912,25 @@ export async function logBrainGapAgora(
          pacientes com a mesma dúvida virarem UM item na fila dele. */
       const anotaQuemPerguntou = async (gapId: string) => {
         if (!patientId || !gapId) return;
-        const { error } = await sb
+        /* ─── O TEXTO DE CADA UMA, E NÃO O DA PRIMEIRA ────────────────────
+           A lacuna é COMPARTILHADA — deduplicada por texto e por vetor (≥0,82),
+           de propósito, para o médico não responder a mesma dúvida três vezes.
+           A pergunta não é compartilhada.
+           Sem esta coluna, a entrega mandava `gap.question` (o texto cru da
+           PRIMEIRA paciente) para todas as outras: na aba Perguntas delas e no
+           corpo do push, na tela de bloqueio. Texto clínico íntimo de uma
+           paciente entregue a outra. */
+        let { error } = await sb
           .from("brain_gap_askers")
-          .upsert({ gap_id: gapId, user_id: patientId }, { onConflict: "gap_id,user_id" });
+          .upsert(
+            { gap_id: gapId, user_id: patientId, pergunta: clean },
+            { onConflict: "gap_id,user_id" },
+          );
+        if (colunaAusente(error)) {
+          ({ error } = await sb
+            .from("brain_gap_askers")
+            .upsert({ gap_id: gapId, user_id: patientId }, { onConflict: "gap_id,user_id" }));
+        }
         /* Esta linha é a única ligação entre a dúvida dela e a resposta que
            ele vai escrever. Sem ela a lacuna continua na fila do médico, ele
            responde, e a resposta não chega a ninguém — a IA disse "registrei
@@ -1446,8 +1472,31 @@ export async function getBrainContext(
     const enabledApp = (settings?.enabled_app ?? true) && ent.aiApp;
     const enabledWhatsapp = (settings?.enabled_whatsapp ?? true) && ent.aiWhatsapp;
 
-    // Canal não coberto pelo plano → bloco vazio (nada do cérebro vaza).
-    if (channel === "app" && !enabledApp)
+    /* ─── CANAL NÃO COBERTO → BLOCO VAZIO, MAS A DÚVIDA NÃO SE PERDE ──────
+     *
+     * Nada do cérebro vaza — isso estava certo. O que faltava era o resto.
+     *
+     * Este caminho cobre DOIS estados que a paciente vive igual: o médico
+     * desligou o interruptor, e o plano dele venceu (o `entitlement` derruba
+     * para `free`, que não tem IA). Nos dois, ela simplesmente para de receber
+     * a voz dele — sem uma palavra, sem prazo, sem caminho até ele.
+     *
+     * E era pior que silêncio: a função voltava AQUI, antes do registro da
+     * lacuna. Então a pergunta dela não entrava na fila. Quando ele renovasse,
+     * não teria a menor ideia do que tinha sido perguntado no intervalo.
+     *
+     * Compare com a cota estourada, logo abaixo, que ganhou tratamento
+     * cuidadoso: aviso honesto, prazo ("até a virada do mês") e um caminho real
+     * até ele. É o mesmo defeito, vivo no caso vizinho — e o vizinho é PIOR,
+     * porque a cota volta sozinha na virada do mês e o plano vencido não volta.
+     *
+     * Agora a lacuna é registrada, e `semPlano` deixa o chat dizer a verdade.
+     */
+    if (channel === "app" && !enabledApp) {
+      const gravacaoDaLacuna =
+        channel === "app" && !ent.aiApp
+          ? logBrainGapAgora(target, userMessage, channel, patientId, null)
+          : undefined;
       return {
         block: "",
         enabledApp,
@@ -1455,8 +1504,15 @@ export async function getBrainContext(
         hadCoverage: false,
         melhorSimilaridade: null,
         cotaEsgotada: false,
+        /* DESLIGADO NO INTERRUPTOR ≠ SEM PLANO. No primeiro ele escolheu, e a
+           paciente não precisa saber de nada — a IA é da plataforma e responde
+           como plataforma. No segundo o acesso caiu, e é isso que ela precisa
+           poder entender em vez de achar que o médico parou de acompanhá-la. */
+        semPlano: !ent.aiApp,
         podeAtribuir: false,
+        gravacaoDaLacuna,
       };
+    }
 
     /* ─── COTA DO CICLO ESTOURADA ────────────────────────────────────────────
        O que sai da resposta é o Segundo Cérebro do médico — só ele. A paciente

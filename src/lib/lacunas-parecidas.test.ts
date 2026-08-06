@@ -259,7 +259,26 @@ describe("a mesma pergunta com outras palavras vira UMA linha na fila", () => {
       embedding: VETOR,
     });
     expect(reg.askers).toHaveLength(1);
-    expect(reg.askers[0]).toEqual({ gap_id: "lacuna-do-enjoo", user_id: "paciente-1" });
+    /* `toMatchObject` não é tipado no bun; comparar campo a campo é
+       equivalente e não prende o teste ao formato inteiro do payload. */
+    expect(reg.askers[0]?.gap_id).toBe("lacuna-do-enjoo");
+    expect(reg.askers[0]?.user_id).toBe("paciente-1");
+  });
+
+  test("e o TEXTO DELA vai junto — a lacuna é compartilhada, a pergunta não", async () => {
+    /* O defeito mais sério desta base. `brain_gaps` é deduplicada por vetor
+       (≥0,82) de propósito, então perguntas escritas de formas DIFERENTES viram
+       uma linha só — cujo texto é o da PRIMEIRA paciente.
+       Na entrega, esse texto ia para TODAS: na aba Perguntas de cada uma e no
+       CORPO DO PUSH, na tela de bloqueio. Texto clínico íntimo de uma paciente
+       entregue a outra.
+       Guardar o texto de cada uma AQUI é o que permite entregar o certo depois.
+       Sem isto, não há de onde tirar a pergunta dela. */
+    const reg = await rodarLacuna({
+      parecidas: [{ id: "lacuna-do-enjoo", hits: 1, similarity: 0.93 }],
+      embedding: VETOR,
+    });
+    expect(reg.askers[0]?.pergunta).toBe("é normal sentir enjoo na gravidez?");
   });
 });
 
@@ -328,7 +347,8 @@ describe("com o banco ainda sem a coluna, a pergunta não se perde", () => {
     /* Sem o id da lacuna, a paciente não recebe o push quando o médico
        responder — ela some junto com o vetor. */
     const reg = await rodarLacuna({ embedding: VETOR, semColunaEmbedding: true });
-    expect(reg.askers[0]).toEqual({ gap_id: "lacuna-nova", user_id: "paciente-1" });
+    expect(reg.askers[0]?.gap_id).toBe("lacuna-nova");
+    expect(reg.askers[0]?.user_id).toBe("paciente-1");
   });
 
   test("com a coluna existindo, não há segunda tentativa", async () => {
@@ -990,7 +1010,12 @@ describe("responder uma lacuna fecha as parecidas", () => {
        continua esperando uma resposta que já existe. */
     const trecho = fonte.slice(fonte.indexOf("async function fecharLacunasParecidas"));
     expect(trecho).toContain("await entregarRespostaDaLacuna(sb, {");
-    expect(trecho).toContain("perguntaDela: linha.question as string,");
+    /* `perguntaGeneralizada`, e não `perguntaDela`. A lacuna é COMPARTILHADA:
+       mandar `linha.question` como "a pergunta dela" entregava, a cada
+       paciente, o texto cru da PRIMEIRA que perguntou — na aba Perguntas e no
+       corpo do push. Agora cada uma recebe o próprio texto guardado, e este
+       campo é só a rede para quem não tem. */
+    expect(trecho).toContain("perguntaGeneralizada: linha.question as string,");
   });
 
   test("falhar aqui não desfaz a resposta principal", () => {

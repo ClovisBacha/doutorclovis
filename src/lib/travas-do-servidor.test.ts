@@ -205,6 +205,65 @@ describe("o modo cuidado não pode sumir num caminho de degradação", () => {
   });
 });
 
+describe("o que não dá para exercitar, mas não pode regredir", () => {
+  /**
+   * Cada um destes é uma linha que uma bateria de mutação conseguiu apagar sem
+   * quebrar teste nenhum — e cujo caminho não é alcançável por execução (push
+   * com import dinâmico, IIFE de dispara-e-esquece, `createServerFn`).
+   *
+   * Trava de forma é a ferramenta certa aqui, e o que a torna honesta é o
+   * motivo escrito ao lado: quem apagar a linha lê o que acontece com quem usa.
+   */
+
+  test("o push da lacuna leva a pergunta DELA, não a compartilhada", () => {
+    /* O push aparece na tela de bloqueio, sem a paciente pedir. Era o pior
+       lugar possível para o texto de outra pessoa — e era exatamente o que
+       acontecia: `args.perguntaGeneralizada` é o enunciado da lacuna, e a
+       lacuna é compartilhada entre todas que perguntaram parecido. */
+    const codigo = codigoDe("src/lib/secondbrain.functions.ts");
+    const i = codigo.indexOf('title: "Seu médico respondeu"');
+    expect(i).toBeGreaterThan(-1);
+    expect(codigo.slice(i, i + 200)).toContain("body: perguntaPara(uid)");
+  });
+
+  test("plano sem IA registra a lacuna antes de devolver o bloco vazio", () => {
+    /* Sem isto, a pergunta feita durante o período sem plano não entra na fila:
+       quando ele renovar, não terá a menor ideia do que foi perguntado. E a
+       cota — o caso vizinho — sempre registrou. */
+    const codigo = codigoDe("src/lib/secondbrain.server.ts");
+    const i = codigo.indexOf('if (channel === "app" && !enabledApp)');
+    expect(i).toBeGreaterThan(-1);
+    const janela = codigo.slice(i, i + 900);
+    expect(janela).toContain("logBrainGapAgora(");
+    expect(janela).toContain("semPlano: !ent.aiApp");
+  });
+
+  test("a memória tem portão de plano E de cota", () => {
+    /* É uma chamada de modelo inteira, ~20% da conta de IA pelo comentário do
+       próprio arquivo. Rodava com o plano vencido e com a cota estourada — e
+       nos dois casos o resumo alimenta um bloco que não é injetado. Pagar para
+       produzir texto que ninguém lê. */
+    const codigo = codigoDe("src/lib/chat-memory.server.ts");
+    const i = codigo.indexOf("export function maybeUpdateChatMemory");
+    const janela = codigo.slice(i, i + 1400);
+    expect(janela).toContain("if (!ent.aiApp) return;");
+    expect(janela).toContain('cota.estado === "estourada"');
+  });
+
+  test("apagar conversas apaga a transcrição E o resumo", () => {
+    /* O resumo é uma leitura das mesmas mensagens, escrita por um modelo.
+       Apagar a fonte e guardar a interpretação seria pior que não apagar. */
+    const codigo = codigoDe("src/lib/conta.functions.ts");
+    const i = codigo.indexOf("export const apagarMinhasConversas");
+    expect(i).toBeGreaterThan(-1);
+    const janela = codigo.slice(i, i + 900);
+    expect(janela).toContain('["chat_messages", "chat_memory"]');
+    // E não pode dizer "apagamos" sem ter apagado — a mentira que a exclusão
+    // de conta contava por meses.
+    expect(janela).toContain('motivo: "falhou"');
+  });
+});
+
 describe("o Segundo Cérebro vive só no chat do app", () => {
   /**
    * Decisão de produto do Clóvis (ago/2026), e ela precisa de trava porque o
