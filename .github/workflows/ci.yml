@@ -6,6 +6,27 @@ on:
   pull_request:
     branches: ["**"]
 
+# ─── POR QUE ESTE BLOCO EXISTE ───────────────────────────────────────────────
+#
+# Sem ele, cada push abre uma execução nova E o push do mesmo branch dispara uma
+# segunda por `pull_request`. Com os runners demorando, os jobs ficavam quinze
+# minutos na fila (`runner_id: 0`, nenhum runner atribuído) e eram cancelados
+# quando o commit seguinte chegava.
+#
+# O estrago não é gastar minuto: é o SINAL. O GitHub reporta `conclusion:
+# failure` para um job cancelado, então uma sequência de commits saudáveis
+# aparecia como uma sequência de reprovações — e eu passei a diagnosticar
+# "instabilidade do GitHub" em cima de execuções que simplesmente nunca
+# rodaram. Um vermelho que não quer dizer nada ensina a ignorar o vermelho, que
+# é o pior desfecho possível para um portão de CI.
+#
+# `github.ref` como grupo: um branch por vez. `cancel-in-progress` torna o
+# cancelamento DELIBERADO — o commit velho é superado de propósito, e o único
+# resultado que importa é o do commit mais novo, que é o que vai para produção.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   typecheck:
     name: TypeScript
