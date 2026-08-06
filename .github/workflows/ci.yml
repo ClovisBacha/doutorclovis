@@ -31,6 +31,11 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun test src/
+      # A auditoria de conteúdo existia, era boa (cobertura de dias, gabarito
+      # fora de faixa, "marque todos" degenerado, enunciado repetido em 14
+      # dias) — e não estava em portão nenhum. Um verificador só a encontrou
+      # lendo o package.json. Script que ninguém roda é documentação.
+      - run: bun run audit:conteudo
 
   lint:
     name: Lint

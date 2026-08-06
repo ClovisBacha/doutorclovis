@@ -420,7 +420,15 @@ export const registerDoctor = createServerFn({ method: "POST" })
     // Mata o cold start: no dia 1 ele já tem ~30 dúvidas clássicas para editar
     // no próprio estilo em vez de uma tela vazia. Fire-and-forget.
     if (!existing) {
-      void (async () => {
+      /* AGUARDADO, e não disparado.
+         Era `void (async () => {…})()`, dentro de uma server function que
+         retorna logo em seguida. Em servidor sem servidor a invocação congela
+         com a resposta — o médico recém-cadastrado podia terminar SEM kit
+         nenhum, e o `console.error` do `catch` não pega congelamento: não há
+         exceção, o processo simplesmente para.
+         O custo é um insert de ~30 linhas no cadastro, que acontece uma vez na
+         vida da conta. O benefício é a tela dele não nascer vazia. */
+      await (async () => {
         try {
           // Idempotência sob duplo-submit/retry do cadastro: dois
           // registerDoctor concorrentes leem `existing=null` ao mesmo tempo —

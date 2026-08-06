@@ -8,6 +8,8 @@ export function logDoctorThinkUsage(
   endpoint: "ask" | "train",
   hadCoverage?: boolean,
 ): void {
+  /* DISPARA-E-ESQUECE AUTORIZADO: telemetria pura. Perder uma linha não muda
+     nada para ninguém, e aguardar poria uma escrita no caminho da resposta. */
   void (async () => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

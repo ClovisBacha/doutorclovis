@@ -131,6 +131,8 @@ export function memoryBlock(summary: string | null): string {
  * (fire-and-forget). Usa o mesmo modelo do chat; sem chave de IA vira no-op.
  */
 export function maybeUpdateChatMemory(patientId: string, doctorId: string | null): void {
+  /* DISPARA-E-ESQUECE AUTORIZADO: telemetria pura. Perder uma linha não muda
+     nada para ninguém, e aguardar poria uma escrita no caminho da resposta. */
   void (async () => {
     try {
       const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;

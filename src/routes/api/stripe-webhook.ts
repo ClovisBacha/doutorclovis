@@ -386,7 +386,10 @@ async function rewardReferrer(referredDoctorId: string): Promise<void> {
   const base = Number.isNaN(currentMs) ? now : Math.max(now, currentMs);
   const newExpiry = new Date(base + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  await sb.from("doctors").update({ plan_expires_at: newExpiry }).eq("id", referrerId);
+  await gravar(
+    "doctors.plan_expires_at(indicacao)",
+    sb.from("doctors").update({ plan_expires_at: newExpiry }).eq("id", referrerId),
+  );
 }
 
 /**
@@ -418,19 +421,25 @@ async function rewardInvitingPatient(doctorId: string): Promise<void> {
   if (!claimed || claimed.length === 0) return;
 
   const oneYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-  await sb.from("subscriptions").upsert(
-    {
-      user_id: patientId,
-      product: "quiz_premium",
-      plan: "convite_medico_1ano",
-      source: "convite",
-      status: "active",
-      stripe_subscription_id: `convite_${doctorId}`,
-      current_period_end: oneYear,
-    },
-    { onConflict: "stripe_subscription_id" },
+  await gravar(
+    "subscriptions.upsert(sementinhas)",
+    sb.from("subscriptions").upsert(
+      {
+        user_id: patientId,
+        product: "quiz_premium",
+        plan: "convite_medico_1ano",
+        source: "convite",
+        status: "active",
+        stripe_subscription_id: `convite_${doctorId}`,
+        current_period_end: oneYear,
+      },
+      { onConflict: "stripe_subscription_id" },
+    ),
   );
-  await sb.from("patient_profiles").update({ quiz_premium: true }).eq("id", patientId);
+  await gravar(
+    "patient_profiles.quiz_premium(sementinhas)",
+    sb.from("patient_profiles").update({ quiz_premium: true }).eq("id", patientId),
+  );
 }
 
 /**

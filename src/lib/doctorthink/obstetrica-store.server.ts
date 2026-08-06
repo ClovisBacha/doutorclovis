@@ -84,6 +84,8 @@ export function createObstetricaBrainStore(): BrainStore {
 
     logHit(doctorId: string, channel: BrainChannel): void {
       if (channel === "teste") return;
+      /* DISPARA-E-ESQUECE AUTORIZADO: telemetria pura. Perder uma linha não muda
+     nada para ninguém, e aguardar poria uma escrita no caminho da resposta. */
       void (async () => {
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

@@ -34,6 +34,8 @@ export async function authApiKey(
       .maybeSingle();
     if (!data || data.active === false) return null;
     // Marca uso (best-effort, sem propagar erro).
+    /* DISPARA-E-ESQUECE AUTORIZADO: telemetria pura. Perder uma linha não muda
+     nada para ninguém, e aguardar poria uma escrita no caminho da resposta. */
     void (async () => {
       try {
         await (supabaseAdmin as any)
