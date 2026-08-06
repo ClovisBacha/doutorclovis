@@ -254,6 +254,29 @@ const DOCTOR_TABS: readonly PanelTab[] = [
   "Meu Perfil",
 ];
 
+/**
+ * A aba em que o médico ATERRISSA — declarada, não deduzida.
+ *
+ * Duas coisas do painel se penduram na "tela de entrada": o interruptor de
+ * push do SOS e, no app nativo, o resumo do dia. As duas estavam escritas como
+ * `tab === "Painel 📊"`, o que era verdade só porque o Painel era a primeira
+ * aba. Ao pôr o Cérebro na frente, as duas saíram silenciosamente da tela de
+ * entrada — inclusive o interruptor de SOS, que o comentário ao lado dele
+ * declara textualmente que não pode depender de o médico passear pelas abas.
+ *
+ * Amarrar as duas a ESTA constante faz a próxima reordenação de abas levá-las
+ * junto, em vez de deixá-las para trás sem ninguém perceber.
+ */
+const ABA_DE_ENTRADA: PanelTab = "Cérebro 🧠";
+/**
+ * E onde ele aterrissa quando o Cérebro está trancado pelo plano.
+ *
+ * Sem isto, o médico do Free abria o painel direto num paywall — a primeira
+ * coisa que ele via ao entrar no produto que já paga (ou que ainda está
+ * decidindo pagar) era uma porta fechada, e não o próprio consultório.
+ */
+const ABA_DE_ENTRADA_SEM_IA: PanelTab = "Painel 📊";
+
 async function token() {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? "";
@@ -291,7 +314,11 @@ function PainelPage() {
   /* A aba que abre é a do Cérebro. O painel de números diz o que ACONTECEU; o
      cérebro é onde ele MUDA o que vai acontecer. Abrir no primeiro faz o
      produto parecer um relatório; abrir no segundo faz dele uma ferramenta. */
-  const [tab, setTab] = useState<PanelTab>("Cérebro 🧠");
+  const [tab, setTab] = useState<PanelTab>(ABA_DE_ENTRADA);
+  /* Onde ele aterrissou de fato — é o que decide onde o interruptor de SOS e o
+     resumo do app aparecem. No Free o Cérebro é paywall, então a entrada é
+     outra, e as duas peças têm que ir junto. */
+  const abaDeEntrada = podeIA ? ABA_DE_ENTRADA : ABA_DE_ENTRADA_SEM_IA;
   /* A fita de abas rola, então a aba ativa pode estar fora da tela.
   
      Isso importa porque várias trocas de aba são PROGRAMÁTICAS, não um toque do
@@ -545,6 +572,11 @@ function PainelPage() {
         setPodeIA(me.entitlements?.aiApp !== false);
         setPodeEquipe(!!me.entitlements?.teamSeats);
         setRotuloPlano(me.entitlements?.label ?? "");
+        /* O Cérebro é a aba de entrada, e no Free ele é um paywall. Abrir o
+           painel numa porta fechada é a pior primeira tela possível — o médico
+           do Free tem consultório, agenda e pacientes aqui dentro. Só na
+           entrada, pelo mesmo motivo do desvio de "inativo" logo abaixo. */
+        if (me.entitlements?.aiApp === false && !ehRefresh) setTab(ABA_DE_ENTRADA_SEM_IA);
       }
       /* Perfil de médico INATIVO também entra — só que direto em Meu Perfil.
          
@@ -1086,7 +1118,7 @@ function PainelPage() {
           abas desenhadas para tela de computador não encolhem para 390px, e
           receituário digitado no celular entre duas consultas é receita
           errada. Nada some — as abas continuam logo abaixo. */}
-      {noApp && tab === "Painel 📊" && (
+      {noApp && tab === abaDeEntrada && (
         <div className="mt-6">
           <PainelNoApp
             nomeDoMedico={euMedico?.display_name ?? null}
@@ -1103,12 +1135,16 @@ function PainelPage() {
         </div>
       )}
 
-      {/* Os avisos ficam na primeira aba, no APP E NO COMPUTADOR — cada
+      {/* Os avisos ficam na ABA DE ENTRADA, no APP E NO COMPUTADOR — cada
           aparelho se inscreve separado, e pôr o interruptor só no celular
           apenas mudaria o defeito de lugar: ele continuaria sem receber SOS
           na máquina onde passa o dia. Não vai para "Meu Perfil" porque o SOS
-          não pode depender de ele ter passeado pelas abas até achar. */}
-      {tab === "Painel 📊" && (
+          não pode depender de ele ter passeado pelas abas até achar.
+
+          Estava escrito `tab === "Painel 📊"`, que era a aba de entrada até o
+          Cérebro passar para a frente. A regra é "onde ele aterrissa", não
+          "aquela aba ali" — agora está amarrada à constante que decide isso. */}
+      {tab === abaDeEntrada && (
         <div className="mt-6">
           <NotificacoesDoMedico />
         </div>
@@ -5074,9 +5110,23 @@ function CerebroSection({
           estilo, responda perguntas reais das pacientes e alimente a base de conhecimento. O
           cérebro é usado pelo chat do app e pelo atendimento no WhatsApp.
         </p>
+        {/* AS DUAS FILAS, ditas antes de aparecerem.
+            A distinção entre ensinar e corrigir era ensinada só a quem já
+            tinha item na fila — e a fila de revisão some quando está vazia,
+            então o médico podia usar o Cérebro por meses sem descobrir que ela
+            existe. Uma linha aqui custa nada e é o que dá nome às duas coisas
+            que ele vai encontrar rolando a página. */}
+        <p className="mt-2 rounded-xl border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+          Abaixo há <strong>duas filas</strong>, e elas pedem coisas diferentes:{" "}
+          <strong>🕳️ Lacunas</strong> é o que a IA <em>não soube</em> responder —{" "}
+          {asDoctor ? "ele ensina" : "você ensina"} algo novo. <strong>✋ Revisão</strong> é o que
+          ela <em>soube</em> e a paciente reprovou — {asDoctor ? "ele corrige" : "você corrige"} o
+          que já existe.
+        </p>
       </div>
       <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
+      <ConsumoDaIACard tokenFn={tokenFn} asDoctor={asId} />
       <BrainReviewCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainConversationsCard tokenFn={tokenFn} asDoctor={asId} />
@@ -5711,9 +5761,165 @@ function BrainLevelCard({
 }
 
 /**
+ * O CONSUMO DE IA DO MÉDICO — quanto do ciclo já foi usado, e por quem.
+ *
+ * Card PRÓPRIO, e essa é a correção mais importante dele: viveu dentro do
+ * `BrainScoreCard`, que devolve `null` quando as tabelas de telemetria não
+ * respondem. Em produção, com migrations pendentes, o médico simplesmente não
+ * via consumo nenhum — e não havia erro para explicar por quê.
+ *
+ * Ele não pode descobrir o limite pelo EFEITO: a paciente recebendo resposta
+ * sem a voz dele é a pior forma de saber, porque ele não vê a conversa e ela
+ * não sabe que algo mudou.
+ */
+function ConsumoDaIACard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  asDoctor?: string;
+}) {
+  const [cota, setCota] = useState<{
+    usadas: number;
+    teto: number | null;
+    estado: "ok" | "aviso" | "estourada";
+    pacientes?: { patientId: string; nome: string; respostas: number; fatia: number }[];
+  } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await cotaDeRespostas({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+        });
+        if (res.ok && "estado" in res) setCota(res);
+      } catch {
+        /* sem cota, sem card — mas sem derrubar o resto da aba */
+      }
+    })();
+  }, [tokenFn]);
+
+  /* Nada consumido ainda: não há o que mostrar, e um card zerado no topo do
+     Cérebro só ocuparia a tela do médico que ainda nem começou. */
+  if (!cota || cota.usadas <= 0) return null;
+
+  const temTeto = cota.teto != null && cota.teto > 0;
+  const pct = temTeto ? Math.min(100, Math.round((cota.usadas / (cota.teto as number)) * 100)) : 0;
+  /* A barra de cada paciente é proporcional à MAIOR, não ao total.
+     Proporcional ao total, numa fila de cinquenta gestantes, a maior fatia dá
+     ~12% da largura e todas as outras colapsam no piso — seis barrinhas do
+     mesmo tamanho, que é precisamente a comparação que o card existe para
+     fazer. A porcentagem do total continua escrita ao lado, em número. */
+  const maior = Math.max(1, ...(cota.pacientes ?? []).map((p) => p.respostas));
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Respostas da IA neste mês
+        </p>
+        <p className="text-sm tabular-nums">
+          <strong>{cota.usadas}</strong>
+          {/* Plano ilimitado também vê o próprio consumo. Antes o card exigia
+              teto, então justamente quem paga mais não enxergava nada. */}
+          <span className="text-muted-foreground">
+            {temTeto ? ` de ${cota.teto}` : " · plano sem limite"}
+          </span>
+        </p>
+      </div>
+
+      {temTeto && (
+        <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+          <div
+            className={`h-full rounded-full transition-[width] duration-500 ${
+              cota.estado === "estourada"
+                ? "bg-destructive"
+                : cota.estado === "aviso"
+                  ? "bg-amber-500"
+                  : "bg-primary"
+            }`}
+            /* Teto de 100% na largura: passar do limite não pode fazer a barra
+               vazar do card. O número ao lado continua contando a verdade. */
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+
+      {/* QUEM está consumindo. O total responde "quanto"; esta lista responde a
+          pergunta seguinte, que é a que ele de fato faz. Numa fila de cinquenta
+          gestantes, três costumam responder por metade das conversas — e saber
+          quais são muda o que ele faz: pode ser ansiedade que pede consulta, ou
+          uma dúvida recorrente que vale virar entrada do cérebro. */}
+      {!!cota.pacientes?.length && (
+        <div className="mt-4 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Quem mais conversou
+          </p>
+          {cota.pacientes.map((p) => (
+            <div key={p.patientId} className="flex items-center gap-3">
+              <p className="w-28 shrink-0 truncate text-xs" title={p.nome}>
+                {p.nome}
+              </p>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-primary/70"
+                  /* Piso de 4%: uma paciente com 1 de 300 respostas desenharia
+                     uma barra invisível, e uma barra invisível diz "zero"
+                     quando o número diz "um". */
+                  style={{ width: `${Math.max(4, Math.round((p.respostas / maior) * 100))}%` }}
+                />
+              </div>
+              <p className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                {p.respostas} · {Math.round(p.fatia * 100)}%
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {temTeto && cota.estado !== "ok" && (
+        <div
+          className={`mt-3 rounded-xl border px-3 py-2 text-xs ${
+            cota.estado === "estourada"
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : "border-amber-400/40 bg-amber-50 text-amber-900"
+          }`}
+        >
+          {cota.estado === "estourada" ? (
+            <>
+              <strong>Cota do mês esgotada</strong> ({cota.usadas} de {cota.teto} respostas). Suas
+              pacientes continuam sendo atendidas, mas <strong>sem as suas orientações</strong> —
+              elas voltam na virada do mês ou se você subir de plano.
+            </>
+          ) : (
+            <>
+              Você usou{" "}
+              <strong>
+                {cota.usadas} das {cota.teto}
+              </strong>{" "}
+              respostas deste mês. Ao esgotar, suas pacientes continuam atendidas, porém sem as suas
+              orientações.
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Placar de qualidade do cérebro — a prova numérica: cobertura das dúvidas,
  * satisfação das pacientes e usos no mês. Some silenciosamente enquanto as
  * tabelas de telemetria não existirem (migração pendente) ou sem dados.
+ *
+ * O CONSUMO NÃO MORA MAIS AQUI. Ele morava, e o preço disso era invisível:
+ * este card devolve `null` quando `stats` é nulo, e `stats` é nulo quando
+ * QUALQUER uma de `brain_hits` / `brain_gaps` / `brain_feedback` falha — três
+ * tabelas de telemetria que, segundo o próprio CLAUDE.md, estão entre as que
+ * faltam em produção. Ou seja: a cota carregava certinho e a barra não
+ * aparecia, por causa de tabelas que não têm nada a ver com cota.
+ *
+ * Duas leituras independentes não podem compartilhar uma condição de sumiço.
  */
 function BrainScoreCard({
   tokenFn,
@@ -5730,26 +5936,14 @@ function BrainScoreCard({
     satisfactionPct: number | null;
     feedbackCount: number;
   } | null>(null);
-  const [cota, setCota] = useState<{
-    usadas: number;
-    teto: number | null;
-    estado: "ok" | "aviso" | "estourada";
-    pacientes?: { patientId: string; nome: string; respostas: number; fatia: number }[];
-  } | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const tk = await tokenFn();
-        const dados = { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) };
-        /* As duas juntas: uma falha na cota não pode levar o placar embora, e
-           vice-versa — são dois enriquecimentos independentes do mesmo card. */
-        const [res, cotaRes] = await Promise.all([
-          getBrainQualityStats({ data: dados }),
-          cotaDeRespostas({ data: dados }).catch(() => ({ ok: false as const })),
-        ]);
+        const res = await getBrainQualityStats({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+        });
         if (res.ok) setStats(res);
-        if (cotaRes.ok && "estado" in cotaRes) setCota(cotaRes);
       } catch {
         /* placar é enhancement — sem dados, sem card */
       }
@@ -5795,108 +5989,6 @@ function BrainScoreCard({
           </p>
         </div>
       </div>
-      {/* A COTA DO CICLO.
-          Ele não pode descobrir o limite pelo efeito — a paciente recebendo
-          resposta sem a voz dele é a pior forma de saber, porque ele não vê a
-          conversa e ela não sabe que algo mudou. O número absoluto ("400 de
-          500") vem de propósito: é ele que permite decidir se sobe de plano;
-          "80%" sozinho não diz nada acionável. */}
-      {/* ─── O CONSUMO, EM BARRA ────────────────────────────────────────────
-          Um número solto ("340 respostas") não diz se é muito. A barra diz na
-          largura, antes de qualquer leitura: é a diferença entre informar e
-          fazer entender.
-
-          Aparece SEMPRE que há teto e algum uso — não só no aviso. Descobrir o
-          limite só quando ele está perto é descobrir tarde; o médico precisa
-          ver o consumo subir para poder decidir com antecedência. */}
-      {cota && cota.teto != null && cota.teto > 0 && cota.usadas > 0 && (
-        <div className="mt-4">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Respostas da IA neste mês
-            </p>
-            <p className="text-sm tabular-nums">
-              <strong>{cota.usadas}</strong>
-              <span className="text-muted-foreground"> de {cota.teto}</span>
-            </p>
-          </div>
-          <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-secondary">
-            <div
-              className={`h-full rounded-full transition-[width] duration-500 ${
-                cota.estado === "estourada"
-                  ? "bg-destructive"
-                  : cota.estado === "aviso"
-                    ? "bg-amber-500"
-                    : "bg-primary"
-              }`}
-              /* Teto de 100% na largura: passar do limite não pode fazer a
-                 barra vazar do card. O número ao lado continua contando a
-                 verdade. */
-              style={{ width: `${Math.min(100, Math.round((cota.usadas / cota.teto) * 100))}%` }}
-            />
-          </div>
-
-          {/* QUEM está consumindo. O total responde "quanto"; esta lista
-              responde a pergunta seguinte, que é a que ele de fato faz.
-              Numa fila de cinquenta gestantes, três costumam responder por
-              metade das conversas — e saber quais são muda o que ele faz:
-              pode ser ansiedade que pede consulta, ou uma dúvida recorrente
-              que vale virar entrada do cérebro. */}
-          {!!cota.pacientes?.length && (
-            <div className="mt-4 space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Quem mais conversou
-              </p>
-              {cota.pacientes.map((p) => (
-                <div key={p.patientId} className="flex items-center gap-3">
-                  <p className="w-28 shrink-0 truncate text-xs" title={p.nome}>
-                    {p.nome}
-                  </p>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-                    <div
-                      className="h-full rounded-full bg-primary/70"
-                      /* Piso de 4%: uma paciente com 1 de 300 respostas
-                         desenharia uma barra invisível, e uma barra invisível
-                         diz "zero" quando o número diz "um". */
-                      style={{ width: `${Math.max(4, Math.round(p.fatia * 100))}%` }}
-                    />
-                  </div>
-                  <p className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                    {p.respostas} · {Math.round(p.fatia * 100)}%
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {cota && cota.teto != null && cota.teto > 0 && cota.estado !== "ok" && (
-        <div
-          className={`mt-3 rounded-xl border px-3 py-2 text-xs ${
-            cota.estado === "estourada"
-              ? "border-destructive/40 bg-destructive/10 text-destructive"
-              : "border-amber-400/40 bg-amber-50 text-amber-900"
-          }`}
-        >
-          {cota.estado === "estourada" ? (
-            <>
-              <strong>Cota do mês esgotada</strong> ({cota.usadas} de {cota.teto} respostas). Suas
-              pacientes continuam sendo atendidas, mas <strong>sem as suas orientações</strong> —
-              elas voltam na virada do mês ou se você subir de plano.
-            </>
-          ) : (
-            <>
-              Você usou{" "}
-              <strong>
-                {cota.usadas} das {cota.teto}
-              </strong>{" "}
-              respostas deste mês. Ao esgotar, suas pacientes continuam atendidas, porém sem as suas
-              orientações.
-            </>
-          )}
-        </div>
-      )}
       {stats.coveragePct != null && stats.coveragePct < 70 && (
         <p className="mt-3 text-xs text-muted-foreground">
           💡 Responda as lacunas abaixo para subir a cobertura — cada resposta vira conhecimento

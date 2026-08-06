@@ -271,14 +271,38 @@ export const listBrainEntries = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await query;
     if (error) return { ok: false as const };
-    // Backfill oportunista (fire-and-forget): abrir a base de conhecimento
-    // embeda as entradas sem vetor (kit de partida, entradas antigas, salvas
-    // sem chave de IA) — o cérebro "se cura" a cada visita ao painel.
-    {
-      const { backfillBrainEmbeddings } = await import("./embeddings.server");
-      backfillBrainEmbeddings(doctorId);
-    }
+    /* O backfill dos vetores NÃO mora mais aqui. Era disparado e esquecido no
+       meio desta função, e em servidor sem servidor a invocação congela quando
+       esta resposta sai — nenhuma entrada era embedada, nunca, e a busca
+       semântica inteira ficava parada sem um único erro no log. Agora tem
+       requisição própria (`embedarEntradasDoMedico`), igual à cura de lacunas:
+       é a requisição dela que mantém o trabalho vivo. */
     return { ok: true as const, entries: (rows ?? []) as BrainEntry[] };
+  });
+
+/**
+ * Dá vetor às entradas do cérebro que não têm — kit de partida, entradas
+ * antigas, e tudo o que foi salvo com a chave de IA fora do ar.
+ *
+ * Requisição SEPARADA de propósito, pelo mesmo motivo de `curarLacunasDoMedico`:
+ * a lista já está na tela, e é a requisição desta chamada que mantém o trabalho
+ * vivo. Ninguém espera pelo resultado; o painel dispara e segue.
+ *
+ * Sem isto, `match_brain_entries` não enxerga nada (ela exige `embedding IS NOT
+ * NULL`) e o chat cai calado no ranking por palavras.
+ */
+export const embedarEntradasDoMedico = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), asDoctor: z.string().uuid().optional() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const, embedadas: 0 };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const, embedadas: 0 };
+    const { backfillBrainEmbeddings } = await import("./embeddings.server");
+    const embedadas = await backfillBrainEmbeddings(target.doctorId);
+    return { ok: true as const, embedadas };
   });
 
 const AddSchema = z.object({
@@ -649,7 +673,20 @@ export const cotaDeRespostas = createServerFn({ method: "POST" })
       cotaDoMedico(target.doctorId, ent.aiRepliesPerCycle),
       consumoPorPaciente(target.doctorId),
     ]);
-    return { ok: true as const, ...cota, ...consumo };
+    /* `consumo.total` é o tamanho da AMOSTRA lida (teto de 5000 linhas);
+       `cota.usadas` é a contagem exata. Espalhar os dois soltos deixava a
+       porcentagem de cada paciente medida contra um denominador diferente do
+       número grande logo acima dela — dois números discordando na mesma tela.
+       A contagem exata manda; `total` fica de fora do retorno. */
+    const denominador = cota.usadas > 0 ? cota.usadas : consumo.total;
+    return {
+      ok: true as const,
+      ...cota,
+      pacientes: consumo.pacientes.map((p) => ({
+        ...p,
+        fatia: denominador > 0 ? p.respostas / denominador : 0,
+      })),
+    };
   });
 
 /**
@@ -1122,7 +1159,15 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
     z
       .object({
         accessToken: z.string().min(10),
-        question: z.string().min(1).max(500),
+        /* CORTA, não rejeita. Era `.max(500)`, e o textarea do chat não tem
+           limite nenhum: uma paciente que escreve um parágrafo — que é como
+           relato clínico chega de verdade — fazia o zod estourar, o `catch` do
+           cliente engolir, e a tela ainda assim dizer "seu médico vai ver 💛".
+           O caminho da lacuna já corta em 300; este rejeitava em 500. */
+        question: z
+          .string()
+          .min(1)
+          .transform((q) => q.slice(0, 500)),
         /**
          * A RESPOSTA que levou o voto.
          *
@@ -1163,8 +1208,28 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
       let entryId: string | null = null;
       if (!data.helpful && doctorId) {
         try {
-          const { entradaQueRespondeu } = await import("./secondbrain.server");
-          entryId = await entradaQueRespondeu(doctorId, pergunta);
+          /* SÓ SE O CÉREBRO DELE FOI MESMO USADO.
+             A busca é refeita às cegas: ela acha a entrada mais parecida
+             existir ou não relação com a resposta que a paciente leu. Com a
+             cota do médico estourada, a resposta veio da PLATAFORMA (genérica,
+             sem o cérebro) — e mesmo assim a re-busca achava uma entrada dele a
+             0,9 e abria revisão sobre um texto que aquela entrada nunca gerou.
+             O médico corrigiria — e regravaria o vetor de — uma entrada que
+             estava certa, por causa de uma resposta que não era dela. */
+          const [{ cotaDoMedico }, { getEntitlementsByDoctorId }] = await Promise.all([
+            import("./cota-ia.server"),
+            import("./entitlements.server"),
+          ]);
+          const ent = await getEntitlementsByDoctorId(doctorId);
+          const cota = await cotaDoMedico(doctorId, ent.aiRepliesPerCycle);
+          /* As MESMAS duas portas que `getBrainContext` usa para decidir se
+             injeta o cérebro. Se qualquer uma estava fechada, o texto que a
+             paciente leu não saiu do cérebro dele — e não há entrada dele para
+             corrigir. */
+          if (ent.aiApp && cota.estado !== "estourada") {
+            const { entradaQueRespondeu } = await import("./secondbrain.server");
+            entryId = await entradaQueRespondeu(doctorId, pergunta);
+          }
         } catch {
           /* sem id, o voto ainda conta — só não abre revisão */
         }
@@ -1174,19 +1239,48 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
          recarregar a conversa permitia votar de novo na MESMA resposta, e cada
          repetição inflava a fila. Uma pessoa reclamando de uma pergunta é UM
          voto, por mais vezes que ela toque no botão. */
-      await sb.from("brain_feedback").upsert(
+      const base = {
+        doctor_id: doctorId,
+        user_id: u.user.id,
+        question: pergunta,
+        helpful: data.helpful,
+        channel: "app",
+      };
+      const gravou = await sb.from("brain_feedback").upsert(
         {
-          doctor_id: doctorId,
-          user_id: u.user.id,
-          question: pergunta,
+          ...base,
           answer: data.answer?.slice(0, 4000) ?? null,
           entry_id: entryId,
-          helpful: data.helpful,
-          channel: "app",
           ...(entryId ? { status: "aberta" } : {}),
         },
         { onConflict: "user_id,question,helpful" },
       );
+
+      /* SE A MIGRATION NÃO FOI APLICADA, O VOTO NÃO PODE SUMIR.
+         Antes disto o resultado do `upsert` não era conferido. Num banco sem
+         `APLICAR_REVISAO.sql` — e o CLAUDE.md avisa que produção fica atrás —
+         o PostgREST devolve 42703 (coluna `answer`/`entry_id` inexistente) ou
+         42P10 (sem a constraint única para o ON CONFLICT), o supabase-js NÃO
+         lança, e o 👎 inteiro virava no-op silencioso. A satisfação no placar
+         zerava sem um único sinal de que algo tinha quebrado.
+         O caminho antigo (só as colunas que sempre existiram) continua
+         disponível como rede — perde a revisão, preserva o voto. */
+      let entryIdEfetivo = entryId;
+      if (gravou?.error) {
+        console.error(
+          `[cerebro] 👎 não gravou na forma nova (${gravou.error.code ?? "?"}: ${
+            gravou.error.message ?? "sem detalhe"
+          }) — rode supabase/APLICAR_REVISAO.sql. Tentando a forma antiga.`,
+        );
+        const antigo = await sb.from("brain_feedback").insert(base);
+        if (antigo?.error) {
+          console.error(`[cerebro] 👎 perdido: ${antigo.error.message ?? "sem detalhe"}`);
+          return { ok: false as const };
+        }
+        /* Sem as colunas novas não existe fila de revisão: o item tem que
+           seguir para a de lacunas, senão o 👎 não chega a lugar nenhum. */
+        entryIdEfetivo = null;
+      }
 
       /* AS DUAS FILAS.
 
@@ -1201,11 +1295,24 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
          E o `patientId` vai junto agora. Sem ele, `brain_gap_askers` ficava
          vazia e a paciente que leu "seu médico vai ver 💛" nunca recebia a
          resposta. */
-      if (!data.helpful && doctorId && !entryId) {
-        const { logBrainGap } = await import("./secondbrain.server");
-        logBrainGap(doctorId, pergunta, "app", u.user.id);
+      let virouLacuna = false;
+      if (!data.helpful && doctorId && !entryIdEfetivo) {
+        const { logBrainGap, mereceFila } = await import("./secondbrain.server");
+        /* O MESMO portão do chat, e pelo mesmo motivo. `logBrainGap` já filtra
+           por dentro, então sem perguntar antes não havia como saber se algo
+           tinha sido enfileirado — e a tela dizia "seu médico vai ver 💛" para
+           um 👎 em "quanto custa?", que é descartado. A paciente ficava
+           esperando resposta que ninguém ia dar. */
+        virouLacuna = mereceFila(pergunta);
+        if (virouLacuna) logBrainGap(doctorId, pergunta, "app", u.user.id);
       }
-      return { ok: true as const, emRevisao: !!entryId };
+      /* `chegouAoMedico` é o que a TELA deve dizer. `emRevisao` sozinho não
+         serve: um 👎 pode virar lacuna, virar revisão, ou não virar nada. */
+      return {
+        ok: true as const,
+        emRevisao: !!entryIdEfetivo,
+        chegouAoMedico: !!entryIdEfetivo || virouLacuna,
+      };
     } catch {
       return { ok: false as const };
     }

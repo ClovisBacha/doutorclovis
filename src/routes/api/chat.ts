@@ -677,6 +677,10 @@ export const Route = createFileRoute("/api/chat")({
            taxa de cobertura com perguntas que nunca deveriam entrar na conta. */
         let cobertura: boolean | undefined;
         let similaridade: number | null = null;
+        /* A gravação da lacuna, em voo. Içada até aqui pelo mesmo motivo de
+           `cobertura`: ela nasce dentro do ramo da paciente e é aguardada no
+           `onFinish`, que está fora daquele escopo. */
+        let gravacaoDaLacuna: Promise<void> | undefined;
 
         let system: string;
         /* CAMINHO ENXUTO — pergunta que é da PLATAFORMA, não do médico.
@@ -730,6 +734,7 @@ export const Route = createFileRoute("/api/chat")({
           ]);
           cobertura = brain.hadCoverage;
           similaridade = brain.melhorSimilaridade;
+          gravacaoDaLacuna = brain.gravacaoDaLacuna;
           const memoria = memoryBlock(memorySummary);
           const base = medicalSystemPrompt(patient.doctorName);
           const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
@@ -894,6 +899,23 @@ NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai
           m.parts?.some((p) => p.type === "text" && p.text.trim()),
         );
 
+        /* QUARTA TRAVA: só TEXTO chega ao modelo.
+           A IA não analisa exame — é ato médico, e o anexo vai para a aba do
+           médico por outro caminho. O filtro acima exige que exista UMA parte
+           de texto, e deixava as outras passarem junto: uma parte `file` com a
+           foto do laudo seguia para o Gemini pendurada numa mensagem que tinha
+           texto. Para a paciente logada a reconstrução do histórico já salvava
+           (ela descarta o array do cliente), mas o chat ANÔNIMO do site não
+           reconstrói nada — ali o caminho de visão continuava aberto, e bastava
+           um POST à mão para usá-lo.
+           Descartar a parte é melhor que rejeitar a mensagem: a pergunta que
+           veio junto do anexo é legítima e continua sendo respondida. */
+        paraOModelo = paraOModelo.map((m) =>
+          m.parts?.every((p) => p.type === "text")
+            ? m
+            : ({ ...m, parts: m.parts.filter((p) => p.type === "text") } as UIMessage),
+        );
+
         const google = createChatProvider(key);
         /* Lido uma vez: o medidor precisa gravar o MESMO modelo que respondeu,
            e reler o ambiente no `onFinish` deixaria os dois divergirem se
@@ -1003,8 +1025,17 @@ NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai
               cobertura,
               similaridade,
             });
+            /* A PROMESSA FEITA À PACIENTE, AGUARDADA AQUI.
+               Quando não houve cobertura, a IA diz "registrei aqui para ela
+               ver". A gravação da lacuna começa lá atrás, no `getBrainContext`,
+               e era disparada e esquecida: em servidor sem servidor a invocação
+               congela junto com a resposta, então a promessa dependia de a
+               escrita ganhar a corrida. O `onFinish` é aguardado pela SDK — é a
+               mesma trava que mantém `registrarUsoAgora` vivo — e aqui não
+               custa nada à paciente, porque ela já terminou de ler. */
+            const lacuna = gravacaoDaLacuna ?? Promise.resolve();
             if (!persistFor) {
-              await registro;
+              await Promise.all([registro, lacuna]);
               return;
             }
             try {
@@ -1012,6 +1043,7 @@ NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai
                 await import("@/lib/chat-memory.server");
               await Promise.all([
                 registro,
+                lacuna,
                 /* Só com conteúdo. Gravar resposta vazia envenena a conversa
                    inteira: ela volta no histórico da próxima pergunta, e o
                    Gemini recusa mensagem de assistente sem texto — o que

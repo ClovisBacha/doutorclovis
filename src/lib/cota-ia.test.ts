@@ -110,7 +110,12 @@ describe("o que a paciente perde quando a cota acaba", () => {
     /* Sem isto, a cota estourada apagaria a pergunta: ele nunca saberia o que
        ela quis saber, e ela esperaria por uma resposta que ninguém registrou. */
     const trecho = cerebro.slice(cerebro.indexOf('cota.estado === "estourada"'));
-    expect(trecho.slice(0, 300)).toContain("logBrainGap(target, userMessage, channel, patientId");
+    /* `logBrainGapAgora`, e a promessa sai no `gravacaoDaLacuna`: a versão
+       disparada-e-esquecida podia ser morta pelo congelamento da função
+       serverless, e aí a promessa "registrei para ela ver" virava mentira. */
+    expect(trecho.slice(0, 400)).toContain(
+      "gravacaoDaLacuna: logBrainGapAgora(target, userMessage, channel, patientId",
+    );
   });
 
   test("a checagem vem ANTES da busca semântica", () => {
@@ -148,10 +153,50 @@ describe("o médico vê antes de estourar", () => {
     expect(painel).toContain('cota.estado !== "ok"');
   });
 
-  test("uma falha na cota não derruba o placar", () => {
-    expect(painel).toContain(
-      "cotaDeRespostas({ data: dados }).catch(() => ({ ok: false as const }))",
+  /* ─── O CONSUMO NÃO PODE DEPENDER DO PLACAR ──────────────────────────────
+     Os dois viviam no MESMO card, e o card devolve `null` quando `stats` é
+     nulo — o que acontece se qualquer uma de `brain_hits`/`brain_gaps`/
+     `brain_feedback` falhar. Em produção, com migrations pendentes, a cota
+     carregava certinho e a barra simplesmente não aparecia, por causa de três
+     tabelas de telemetria que não têm nada a ver com cota.
+     Separá-los foi o conserto; estes testes são o que impede a religação. */
+  test("o consumo tem card próprio, com a própria leitura", () => {
+    expect(painel).toContain("function ConsumoDaIACard(");
+    const card = painel.slice(painel.indexOf("function ConsumoDaIACard("));
+    expect(card.slice(0, 1200)).toContain("cotaDeRespostas({");
+  });
+
+  test("o card do consumo não some junto com o placar", () => {
+    /* A única condição de sumiço dele é sobre a PRÓPRIA cota.
+       SEM COMENTÁRIOS: a docstring do card vizinho fala de `stats` para
+       explicar por que a separação existe, e um `not.toContain` cru casaria
+       com a própria explicação. Foi o erro que já custou quatro rodadas hoje —
+       medir o texto que descreve o código em vez do código. */
+    const limpo = codigoDe("src/routes/_authenticated/painel.tsx");
+    const card = limpo.slice(
+      limpo.indexOf("function ConsumoDaIACard("),
+      limpo.indexOf("function BrainScoreCard("),
     );
+    expect(card).toContain("if (!cota || cota.usadas <= 0) return null;");
+    expect(card).not.toContain("stats");
+  });
+
+  test("o placar já não lê cota nenhuma", () => {
+    const placar = painel.slice(
+      painel.indexOf("function BrainScoreCard("),
+      painel.indexOf("function BrainReviewCard("),
+    );
+    expect(placar).not.toContain("cotaDeRespostas");
+  });
+
+  test("plano ilimitado também vê o próprio consumo", () => {
+    /* Antes a barra exigia `teto > 0`, então justamente quem paga mais não
+       enxergava nada. */
+    const card = painel.slice(
+      painel.indexOf("function ConsumoDaIACard("),
+      painel.indexOf("function BrainScoreCard("),
+    );
+    expect(card).toContain("plano sem limite");
   });
 });
 
@@ -274,7 +319,8 @@ describe("o consumo aparece antes de virar problema", () => {
 
   test("a barra aparece com qualquer uso, não só no aviso", () => {
     /* Descobrir o limite só quando ele está perto é descobrir tarde. */
-    expect(painel).toContain("cota.teto > 0 && cota.usadas > 0 &&");
+    expect(painel).toContain("if (!cota || cota.usadas <= 0) return null;");
+    expect(painel).toContain("const temTeto = cota.teto != null && cota.teto > 0;");
   });
 
   test("a barra muda de cor conforme a régua", () => {
@@ -284,7 +330,9 @@ describe("o consumo aparece antes de virar problema", () => {
   });
 
   test("passar do limite não faz a barra vazar do card", () => {
-    expect(painel).toContain("Math.min(100, Math.round((cota.usadas / cota.teto) * 100))");
+    expect(painel).toContain(
+      "Math.min(100, Math.round((cota.usadas / (cota.teto as number)) * 100))",
+    );
   });
 
   test("mostra o número absoluto junto da barra", () => {
@@ -297,15 +345,30 @@ describe("quem mais conversou", () => {
   const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
   const cota = codigoDe("src/lib/cota-ia.server.ts");
 
-  test("a lista existe e é proporcional ao total", () => {
+  test("a barra compara com a MAIOR, não com o total", () => {
     expect(painel).toContain("Quem mais conversou");
-    expect(cota).toContain("fatia: total > 0 ? respostas / total : 0");
+    /* Proporcional ao TOTAL, numa fila de cinquenta gestantes a maior fatia dá
+       ~12% da largura e todas as outras colapsam no piso: seis barrinhas do
+       mesmo tamanho, que é exatamente a comparação que o card existe para
+       fazer. A porcentagem do total continua escrita ao lado, em número. */
+    expect(painel).toContain(
+      "const maior = Math.max(1, ...(cota.pacientes ?? []).map((p) => p.respostas));",
+    );
+    expect(painel).toContain("Math.round((p.respostas / maior) * 100)");
   });
 
   test("uma paciente com pouquíssimo uso ainda aparece", () => {
     /* 1 de 300 desenharia uma barra invisível — e barra invisível diz "zero"
        quando o número diz "um". */
-    expect(painel).toContain("Math.max(4, Math.round(p.fatia * 100))");
+    expect(painel).toContain("Math.max(4, Math.round((p.respostas / maior) * 100))");
+  });
+
+  test("a amostra é ordenada — senão o topo é um recorte aleatório", () => {
+    /* `.limit(5000)` sem `order by` não garante ordem nenhuma no PostgREST:
+       acima de 5000 respostas no mês, "quem mais conversou" era calculado
+       sobre linhas arbitrárias, e o médico não tinha como saber. */
+    const trecho = cota.slice(cota.indexOf("export async function consumoPorPaciente"));
+    expect(trecho.indexOf('.order("created_at"')).toBeLessThan(trecho.indexOf(".limit(5000)"));
   });
 
   test("o médico vê QUANTO, nunca O QUÊ", () => {
@@ -362,7 +425,12 @@ describe("o Cérebro é a primeira coisa que ele vê", () => {
   test("e é a aba que abre", () => {
     /* O painel de números diz o que ACONTECEU; o cérebro é onde ele MUDA o que
        vai acontecer. */
-    expect(painel).toContain('useState<PanelTab>("Cérebro 🧠")');
+    /* Pela CONSTANTE, não pelo literal: o interruptor de push do SOS e o
+       resumo do app se penduram na "aba de entrada", e escritos como
+       `tab === "Painel 📊"` eles saíram silenciosamente da tela quando o
+       Cérebro passou para a frente. */
+    expect(painel).toContain('const ABA_DE_ENTRADA: PanelTab = "Cérebro 🧠";');
+    expect(painel).toContain("useState<PanelTab>(ABA_DE_ENTRADA)");
   });
 
   test("aparece uma vez só na lista", () => {

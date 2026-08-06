@@ -204,34 +204,108 @@ export async function embedBrainEntry(
 }
 
 /**
- * Backfill oportunista: embeda até `limit` entradas sem vetor do médico.
- * Disparado (fire-and-forget) quando o médico abre a base de conhecimento —
- * visitar o painel "cura" o cérebro dele, incluindo o kit de partida e
- * entradas criadas quando a chave de IA estava indisponível.
+ * Roda em lotes: paralelo o bastante para ser rápido, gentil o bastante para
+ * não bater no limite de taxa do modelo — que é o que transforma a falha de
+ * UMA chamada em falha de todas.
+ *
+ * Mora aqui, e não no lado de quem usa, porque a razão de existir é do
+ * embedding: é a API de vetores que tem o limite de taxa. Havia uma cópia em
+ * `secondbrain.server.ts`; duas cópias de uma regra é como as duas cópias do
+ * filtro de lacuna divergiram.
  */
-export function backfillBrainEmbeddings(doctorId: string, limit = 40): void {
-  void (async () => {
-    try {
-      if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) return;
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const sb = supabaseAdmin as any;
-      const { data: rows, error } = await sb
-        .from("brain_entries")
-        .select("id,question,answer")
-        .eq("doctor_id", doctorId)
-        .is("embedding", null)
-        .limit(Math.min(limit, 60));
-      if (error || !rows?.length) return; // 42703/42P01: migração pendente → nada a fazer
-      // Sequencial de propósito: evita estourar rate limit da API de embeddings.
-      for (const row of rows as { id: string; question: string; answer: string }[]) {
-        const vec = await embedText(`${row.question}\n${row.answer}`, 6000, "documento");
-        if (!vec) return; // falhou uma → para o lote (cota/chave); tenta na próxima visita
-        await sb.from("brain_entries").update({ embedding: vec }).eq("id", row.id);
-      }
-    } catch {
-      /* best-effort */
+export async function emLotes<T, R>(
+  itens: T[],
+  tamanho: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const saida: R[] = [];
+  for (let i = 0; i < itens.length; i += tamanho) {
+    saida.push(...(await Promise.all(itens.slice(i, i + tamanho).map(fn))));
+  }
+  return saida;
+}
+
+/** Teto por visita ao painel, e tamanho do lote. Iguais aos da cura de lacunas. */
+const BACKFILL_POR_VEZ = 20;
+const BACKFILL_POR_LOTE = 4;
+const BACKFILL_TIMEOUT_MS = 6000;
+
+/**
+ * Dá vetor às ENTRADAS do cérebro que nasceram sem um.
+ *
+ * ─── Por que isto vale a busca semântica inteira ────────────────────────────
+ *
+ * `match_brain_entries` só enxerga linha com `embedding` preenchido. Entrada
+ * sem vetor é invisível para a busca por sentido — e o kit de partida, tudo o
+ * que foi salvo antes da migration e tudo o que foi salvo com a chave de IA
+ * fora do ar nasce assim. Com a tabela inteira cega, a busca semântica não
+ * devolve nada, o chat cai calado no ranking por palavras, e "posso comer
+ * comida japonesa?" não encontra a orientação sobre sushi. O corte de 0,62
+ * está certo e simplesmente nunca é exercitado.
+ *
+ * ─── É `async` DE PROPÓSITO, e quem chama TEM que aguardar ──────────────────
+ *
+ * A primeira versão era `void (async () => {…})()`. Não embedava nada: em
+ * servidor sem servidor a invocação congela quando a resposta sai, e
+ * `listBrainEntries` devolve a lista na hora — o laço morria antes do primeiro
+ * embedding. Nenhum erro, nenhum log, e a busca semântica inteira parada.
+ *
+ * A cicatriz gêmea foi diagnosticada e consertada em `curarLacunasSemVetor`,
+ * que inclusive aponta ESTE arquivo como origem do padrão errado. Consertaram
+ * o lado que copiou e deixaram o original. Agora os dois têm a mesma forma:
+ * requisição própria, lotes pequenos, e conferência do que foi gravado.
+ *
+ * Duas diferenças em relação ao laço antigo, além do `await`:
+ *
+ * - **Uma falha não aborta o resto.** Era `if (!vec) return`: um estouro de
+ *   tempo na terceira entrada jogava fora as dezessete seguintes. Agora as que
+ *   deram certo são gravadas e as que falharam ficam para a próxima visita.
+ * - **Confere o `update`.** Antes disparava e contava como feito; com a coluna
+ *   ausente ou a RLS no caminho, "embedei 20" tendo gravado zero.
+ *
+ * Devolve quantas embedou — é o número que torna o efeito verificável de fora.
+ * Nunca lança: enriquecimento perdido não pode virar painel quebrado.
+ */
+export async function backfillBrainEmbeddings(
+  doctorId: string,
+  limit = BACKFILL_POR_VEZ,
+): Promise<number> {
+  try {
+    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) return 0;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const { data: rows, error } = await sb
+      .from("brain_entries")
+      .select("id,question,answer")
+      .eq("doctor_id", doctorId)
+      .is("embedding", null)
+      .limit(Math.min(limit, BACKFILL_POR_VEZ));
+    if (error || !rows?.length) return 0; // 42703/42P01: migração pendente → nada a fazer
+
+    const linhas = rows as { id: string; question: string; answer: string }[];
+    const vetores = await emLotes(linhas, BACKFILL_POR_LOTE, (r) =>
+      embedText(`${r.question}\n${r.answer}`, BACKFILL_TIMEOUT_MS, "documento"),
+    );
+
+    const prontas = linhas
+      .map((r, i) => ({ id: r.id, vetor: vetores[i] }))
+      .filter((e): e is { id: string; vetor: number[] } => !!e.vetor);
+
+    const gravacoes = await Promise.all(
+      prontas.map((e) => sb.from("brain_entries").update({ embedding: e.vetor }).eq("id", e.id)),
+    );
+    const falhas = gravacoes.filter((r: any) => r?.error);
+    if (falhas.length) {
+      console.error(
+        `[embeddings] backfill: ${falhas.length}/${prontas.length} updates falharam — ` +
+          `${(falhas[0] as any)?.error?.message ?? "sem detalhe"}`,
+      );
     }
-  })();
+    return prontas.length - falhas.length;
+  } catch {
+    /* best-effort: o médico volta ao painel e a próxima visita continua */
+    return 0;
+  }
 }
 
 /* ─── NOTA DE MIGRAÇÃO DE MODELO ─────────────────────────────────────────────

@@ -47,7 +47,26 @@ export type SituacaoDaCota = {
  * inventar complexidade antes do problema.
  */
 export function inicioDoCiclo(agora = new Date()): Date {
-  return new Date(agora.getFullYear(), agora.getMonth(), 1);
+  /* NO FUSO DE BRASÍLIA, não no do processo.
+     `new Date(ano, mês, 1)` monta a data no fuso de quem roda — e a Vercel roda
+     em UTC. O ciclo virava às 21h do último dia do mês: três horas de respostas
+     caíam no mês errado, e o médico via a cota zerar antes da meia-noite dele.
+     O resto do repo já usa `America/Sao_Paulo` explícito; este arquivo tinha
+     ficado de fora, e `src/test-setup.ts` força TZ=America/Sao_Paulo — ou seja,
+     os testes passavam sempre e jamais pegariam isto. */
+  const emSP = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(agora);
+  const parte = (t: string) => Number(emSP.find((p) => p.type === t)?.value ?? 0);
+  /* Meia-noite de Brasília do dia 1 é 03:00 UTC (UTC−3). O Brasil não tem
+     horário de verão desde 2019; se voltar, esta conta precisa do offset real
+     do dia, não de uma constante. */
+  return new Date(Date.UTC(parte("year"), parte("month") - 1, 1, 3, 0, 0));
 }
 
 /**
@@ -68,6 +87,12 @@ export async function respostasNoCiclo(doctorId: string, agora = new Date()): Pr
       .select("id", { count: "exact", head: true })
       .eq("doctor_id", doctorId)
       .eq("especie", "chat")
+      /* SUPORTE NÃO É DELE. "Onde vejo minhas notificações?" é pergunta da
+         plataforma, respondida pela plataforma, sem o cérebro do médico e sem
+         a memória clínica — e mesmo assim queimava uma unidade do plano dele,
+         porque a linha é gravada com o `doctor_id` da paciente. O caminho
+         enxuto economizava tokens e não economizava cota. */
+      .neq("canal", "suporte")
       .gte("created_at", inicioDoCiclo(agora).toISOString());
     /* Tabela ausente ou falha de rede → 0, ou seja, NÃO estoura.
        Na dúvida o médico é atendido: uma cota que se fecha sozinha por um
@@ -139,11 +164,19 @@ export async function consumoPorPaciente(
       .select("patient_id")
       .eq("doctor_id", doctorId)
       .eq("especie", "chat")
+      /* Mesmo recorte de `respostasNoCiclo` — se as duas leituras divergirem,
+         a soma das fatias não fecha com o número grande logo acima delas. */
+      .neq("canal", "suporte")
       .gte("created_at", inicioDoCiclo(agora).toISOString())
       /* Teto de leitura: a agregação acontece aqui, não no banco, porque o
          PostgREST não faz GROUP BY. Com milhares de linhas isto viraria uma
          view materializada — mas otimizar antes de existir o problema é
-         inventar complexidade. */
+         inventar complexidade.
+         O `order` NÃO é enfeite: sem ele o PostgREST não garante ordem nenhuma,
+         então acima de 5000 respostas no mês o "quem mais conversou" era
+         calculado sobre uma amostra ARBITRÁRIA — e o médico não tinha como
+         saber que estava lendo um recorte aleatório do próprio mês. */
+      .order("created_at", { ascending: false })
       .limit(5000);
     if (error || !Array.isArray(data)) return { total: 0, pacientes: [] };
 

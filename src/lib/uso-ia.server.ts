@@ -74,26 +74,52 @@ export function registrarUso(u: Uso): void {
  * o `onFinish`, e é isso que mantém a função viva.
  */
 export async function registrarUsoAgora(u: Uso): Promise<void> {
-  /* Sem tokens não há o que medir. Acontece quando o provedor não reporta
-     `usage` — e gravar uma linha de zeros faria o custo médio por resposta
-     cair sozinho, que é pior que não ter a linha. */
   const entrada = Math.max(0, Math.trunc(u.inputTokens ?? 0));
   const saida = Math.max(0, Math.trunc(u.outputTokens ?? 0));
-  if (entrada === 0 && saida === 0) return;
+  /* Sem tokens não há CUSTO para medir — mas pode haver RESPOSTA para contar.
+     A linha é a unidade da cota do médico (`respostasNoCiclo` conta linhas,
+     não tokens), então descartá-la porque o provedor não reportou `usage`
+     fazia a cota sub-contar em silêncio: respostas reais que nunca apareciam
+     no medidor nem consumiam o plano. Zero token com a linha presente é
+     honesto — a média de custo é calculada na leitura e sabe pular zeros.
+     Só o que não é resposta (embedding, memória) continua sendo descartado. */
+  if (entrada === 0 && saida === 0 && u.especie !== "chat") return;
 
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await (supabaseAdmin as any).from("ai_usage").insert({
+    const linha = {
       doctor_id: u.doctorId ?? null,
       patient_id: u.patientId ?? null,
       especie: u.especie,
       canal: u.canal ?? "app",
       modelo: u.modelo,
-      cobertura: u.cobertura ?? null,
-      similaridade: u.similaridade ?? null,
       input_tokens: entrada,
       output_tokens: saida,
-    });
+    };
+    const res = await (supabaseAdmin as any)
+      .from("ai_usage")
+      .insert({ ...linha, cobertura: u.cobertura ?? null, similaridade: u.similaridade ?? null });
+
+    /* AS DUAS COLUNAS NOVAS NÃO PODEM LEVAR A LINHA INTEIRA JUNTO.
+       `cobertura` e `similaridade` vieram numa migration recente, e o CLAUDE.md
+       avisa que produção fica atrás. O PostgREST rejeita a linha TODA quando
+       uma coluna não existe (42703) — e o supabase-js devolve `{error}` sem
+       lançar, então o `catch` abaixo nunca via nada. Resultado: `ai_usage`
+       vazia, `respostasNoCiclo` sempre 0, cota que nunca estoura, medidor
+       sempre zerado, "quem mais conversou" sempre vazio. Quatro telas mortas
+       por duas colunas opcionais, sem uma única linha de log.
+       Mesmo padrão de rede que `chat.ts` já usa nas colunas clínicas. */
+    if (res?.error) {
+      const semExtras = await (supabaseAdmin as any).from("ai_usage").insert(linha);
+      if (semExtras?.error) {
+        console.error(`[uso-ia] não gravou: ${semExtras.error.message ?? "sem detalhe"}`);
+      } else {
+        console.error(
+          `[uso-ia] cobertura/similaridade não existem no banco (${res.error.code ?? "?"}) — ` +
+            `rode supabase/APLICAR_COBERTURA.sql. O consumo está sendo contado sem elas.`,
+        );
+      }
+    }
   } catch {
     /* Tabela ainda não migrada, banco fora do ar: medir é opcional, responder
        não é. */

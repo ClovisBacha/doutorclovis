@@ -92,6 +92,22 @@ export type BrainContext = {
    * que ele não disse para AQUELA pergunta é caro. Ver os dois cortes acima.
    */
   podeAtribuir: boolean;
+  /**
+   * A gravação da lacuna, ainda em voo.
+   *
+   * A IA diz à paciente, com todas as letras, *"registrei aqui para ela ver"*.
+   * A escrita que torna isso verdade era disparada e esquecida — e em servidor
+   * sem servidor a invocação congela quando a resposta termina, então a
+   * promessa dependia de a escrita ganhar uma corrida contra o fim do
+   * streaming.
+   *
+   * Devolver a promessa em vez de aguardá-la aqui é de propósito: aguardar
+   * dentro do `getBrainContext` poria ~300ms de banco ANTES da primeira
+   * palavra, e justamente no caminho em que a paciente já não tem cobertura.
+   * Quem recebe isto aguarda no `onFinish`, que a SDK mantém vivo — nenhum
+   * atraso para ela, e a promessa cumprida.
+   */
+  gravacaoDaLacuna?: Promise<void>;
 };
 
 /** Canal em que o cérebro foi usado (telemetria do dashboard do médico). */
@@ -166,10 +182,24 @@ const TERMOS_SUPORTE = new RegExp(
       /* DINHEIRO é da plataforma, não do médico.
          "quanto custa o plano?" entrava na fila CLÍNICA dele, com a IA
          prometendo resposta pessoal — para uma pergunta de cobrança que ele
-         não tem como responder e que a plataforma responde na hora. */
-      "custa|custo|pre(?:ç|c)o|valor|mensalidade|cobran(?:ç|c)a|reembolso|cancelar|estorno",
+         não tem como responder e que a plataforma responde na hora.
+
+         A lista é de RADICAIS, e sem stemming ela erra por conjugação: tinha
+         `cancelar` e não tinha `cancelo`, então "como cancelo?" — literalmente
+         a frase que o pedido citou — vazava para a fila clínica. Os `\\w*`
+         abaixo cobrem a família inteira de cada verbo. */
+      "cust\\w*|pre(?:ç|c)o\\w*|valor\\w*|mensalidade\\w*|cobran(?:ç|c)\\w*|cobra\\w*|reembols\\w*|estorn\\w*",
+      "cancel\\w*|desativ\\w*|descadastr\\w*|excluir|exclu(?:o|(?:í|i)r)|apagar (?:minha|meus|a) \\w+|deletar",
       // falha técnica
-      "instalar|atualiza(?:r|ç|c)\\w*|carregar|travand?o|travou|bug|sair da conta",
+      "instalar|atualiza(?:r|ç|c)\\w*|carregar|carrega|travand?o|travou|bug|sair da conta",
+      /* "não consigo entrar" / "não carrega nada aqui" são as duas frases de
+         suporte mais comuns e nenhuma casava: `entrar` está fora da lista de
+         propósito (entrar na piscina) e `carrega` só existia no infinitivo. A
+         forma NEGADA desfaz a ambiguidade — "não consigo entrar" não é sobre
+         piscina, e ninguém escreve "não consigo entrar" sobre o próprio corpo
+         sem citar uma parte dele (aí `TERMOS_CLINICOS` desempata). */
+      "n(?:ã|a)o (?:consigo|estou conseguindo|to conseguindo|d(?:á|a) para) \\w+",
+      "n(?:ã|a)o (?:carrega|abre|funciona|recebo|recebi|chega\\w*|aparece)",
     ].join("|"),
   ),
   "i",
@@ -348,7 +378,14 @@ const ELOGIOS = new RegExp(
     "gostei|gostando|adorei|adorando|amei|amando|curti|bacana\\w*|legal|legais|" +
       "(?:ó|o)tim\\w*|excelente\\w*|maravilhos\\w*|perfeit\\w*|top|show|" +
       "incr(?:í|i)ve\\w*|sensacional|sensacionais|parab(?:é|e)ns|muito bom|muito boa|" +
-      "melhor app|ajudou muito|me ajudou|salvou",
+      /* Gíria e superlativo são metade do elogio real que chega. "vcs sao
+         demais", "melhor coisa que já usei" e "vocês arrasam" viravam lacuna
+         clínica — e disparavam o e-mail "sua IA não soube responder" para o
+         médico, por um agradecimento. */
+      "demais|arras\\w*|fant(?:á|a)stic\\w*|(?:ó|o)tima ideia|nota 10|nota dez|" +
+      "melhor (?:app|aplicativo|coisa|programa)|melhor que|" +
+      "ajudou muito|me ajudou|ajudando muito|salvou|salvando|" +
+      "recomendo|indiquei|indico|amando (?:o|a)\\w*",
   ),
   "i",
 );
@@ -436,10 +473,32 @@ export function logBrainGap(
    */
   embedding?: number[] | null,
 ): void {
+  void logBrainGapAgora(doctorId, question, channel, patientId, embedding);
+}
+
+/**
+ * A MESMA coisa, aguardável — e quem promete à paciente TEM que aguardar.
+ *
+ * O chat instrui a IA a dizer, com todas as letras, *"registrei aqui para ela
+ * ver"*. Essa frase é uma promessa feita a uma gestante, e a gravação que a
+ * torna verdadeira era disparada e esquecida: em servidor sem servidor a
+ * invocação congela quando a resposta termina, então a promessa dependia de a
+ * escrita ganhar a corrida contra o fim do streaming.
+ *
+ * Aguardar de dentro do `onFinish` resolve, porque a SDK aguarda o `onFinish` —
+ * é a mesma trava que já mantém `registrarUsoAgora` vivo.
+ */
+export async function logBrainGapAgora(
+  doctorId: string,
+  question: string,
+  channel: BrainChannel,
+  patientId?: string,
+  embedding?: number[] | null,
+): Promise<void> {
   const clean = question.trim().slice(0, 300);
   const norm = normalizeGapQuestion(clean);
   if (!mereceFila(question)) return;
-  void (async () => {
+  {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const sb = supabaseAdmin as any;
@@ -581,7 +640,7 @@ export function logBrainGap(
     } catch {
       /* best-effort — nunca afeta a resposta ao paciente */
     }
-  })();
+  }
 }
 
 /** Quantas lacunas cegas se cura por abertura do painel. */
@@ -602,18 +661,9 @@ const CURA_POR_VEZ = 20;
 const CURA_TIMEOUT_MS = 6000;
 const CURA_POR_LOTE = 4;
 
-/**
- * Roda em lotes: paralelo o bastante para ser rápido, gentil o bastante para
- * não bater no limite de taxa do modelo — que é o que transformava uma falha
- * de uma chamada em falha de todas.
- */
-async function emLotes<T, R>(itens: T[], tamanho: number, fn: (item: T) => Promise<R>) {
-  const saida: R[] = [];
-  for (let i = 0; i < itens.length; i += tamanho) {
-    saida.push(...(await Promise.all(itens.slice(i, i + tamanho).map(fn))));
-  }
-  return saida;
-}
+/* `emLotes` mora em `embeddings.server.ts` — a razão de existir é o limite de
+   taxa da API de vetores, então a regra é de lá. Havia uma cópia aqui; duas
+   cópias de uma regra é exatamente como os dois filtros de lacuna divergiram. */
 
 /**
  * Dá vetor às lacunas que nasceram sem um.
@@ -644,9 +694,15 @@ async function emLotes<T, R>(itens: T[], tamanho: number, fn: (item: T) => Promi
  * Este arquivo vizinho (`embeddings.server.ts`) já tinha essa cicatriz escrita
  * em cima do `embedBrainEntry`. Copiei o padrão errado do lado dela.
  *
- * Para o `await` não custar caro, os embeddings saem TODOS de uma vez e com
- * teto curto: o pior caso é ~2,5s na primeira abertura, e zero nas seguintes,
- * porque depois não sobra lacuna cega.
+ * O custo do `await` é limitado pelo TETO, não pela paralelização total: vinte
+ * por visita, em lotes de quatro, com 6s cada — típico ~1,5s, pior caso ~30s
+ * se toda chamada estourar o tempo. Cabe porque isto tem requisição própria e
+ * ninguém espera por ela; nas visitas seguintes é zero, porque não sobra
+ * lacuna cega.
+ *
+ * (A versão anterior deste comentário dizia "todos de uma vez, pior caso 2,5s".
+ * Era descrição do código ANTIGO, mantida por cima do novo — e um comentário
+ * que descreve o que o código deixou de fazer engana melhor que nenhum.)
  *
  * Devolve quantas curou — quem chama pode ignorar, mas o número é o que torna
  * o efeito verificável de fora.
@@ -671,7 +727,7 @@ export async function curarLacunasSemVetor(doctorId: string): Promise<number> {
     /* Coluna ainda não existe (SQL não aplicado) → `error`, e nada acontece. */
     if (error || !cegas?.length) return 0;
 
-    const { embedText } = await import("./embeddings.server");
+    const { embedText, emLotes } = await import("./embeddings.server");
     const linhas = cegas as { id: string; question: string }[];
     /* Mesma limpeza dos outros dois caminhos. Curar com o texto cru deixaria
        as lacunas antigas num tratamento e as novas noutro — e duas perguntas
@@ -720,10 +776,19 @@ export async function curarLacunasSemVetor(doctorId: string): Promise<number> {
  * muito encanamento para um caminho raro. Refazer a busca com a mesma pergunta
  * acha a mesma entrada, porque é exatamente o que o chat fez segundos antes.
  *
- * Usa o corte de ATRIBUIÇÃO, não o de cobertura: abaixo dele a resposta não
- * era "a orientação do médico" — era material próximo do assunto. Corrigir uma
- * entrada por causa de uma resposta que não foi atribuída a ela seria punir o
- * texto errado, e o médico veria uma correção que não faz sentido.
+ * ─── O CORTE É O DE COBERTURA, e isto foi um conserto ───────────────────────
+ *
+ * Usava o corte de ATRIBUIÇÃO (0,74), que é o de "posso dizer que seu médico
+ * orienta isso". A pergunta aqui é outra e mais frouxa: "esta entrada ENTROU na
+ * resposta?" — e quem decide isso é o corte de COBERTURA (0,62), porque é ele
+ * que faz o bloco ser injetado no prompt.
+ *
+ * A diferença não era teórica: TODA resposta montada com uma entrada entre 0,62
+ * e 0,74 caía na fila de LACUNAS ao levar 👎. O médico lia "sua IA não soube
+ * responder" sobre algo que ela respondeu com o material dele, respondia de
+ * novo, e criava uma SEGUNDA entrada sobre o mesmo assunto — deixando a
+ * primeira aprovada e competindo com a nova na busca. É exatamente o defeito
+ * que a fila de revisão foi criada para matar, sobrevivendo numa faixa inteira.
  *
  * `null` em qualquer falha: sem chave de IA, sem vetores, sem match. Nunca
  * lança — o voto da paciente não pode depender disto.
@@ -742,9 +807,19 @@ export async function entradaQueRespondeu(
       p_embedding: qvec,
       p_limit: 1,
     });
-    if (error || !Array.isArray(data) || !data.length) return null;
+    if (error) {
+      /* A RPC não existe (migration pendente) → 100% dos 👎 voltam a virar
+         lacuna, que é precisamente o defeito que a fila de revisão fechou. Sem
+         este log, a regressão é invisível. */
+      console.error(
+        `[cerebro] match_brain_entries_id falhou (${error.code ?? "?"}) — ` +
+          `rode supabase/APLICAR_REVISAO.sql. Todo 👎 vira lacuna até lá.`,
+      );
+      return null;
+    }
+    if (!Array.isArray(data) || !data.length) return null;
     const melhor = data[0] as { id: string; similarity: number };
-    return melhor.similarity >= ATRIBUICAO_MIN_SIMILARITY ? melhor.id : null;
+    return melhor.similarity >= SEMANTIC_MIN_SIMILARITY ? melhor.id : null;
   } catch {
     return null;
   }
@@ -997,7 +1072,6 @@ export async function getBrainContext(
       const { cotaDoMedico } = await import("./cota-ia.server");
       const cota = await cotaDoMedico(target, ent.aiRepliesPerCycle);
       if (cota.estado === "estourada") {
-        logBrainGap(target, userMessage, channel, patientId, null);
         return {
           block: "",
           enabledApp,
@@ -1006,6 +1080,7 @@ export async function getBrainContext(
           melhorSimilaridade: null,
           cotaEsgotada: true,
           podeAtribuir: false,
+          gravacaoDaLacuna: logBrainGapAgora(target, userMessage, channel, patientId, null),
         };
       }
     }
@@ -1082,6 +1157,8 @@ export async function getBrainContext(
       selected = rankEntriesByKeywords(userMessage, entries, MAX_ENTRIES_SCORED);
     }
 
+    /* A promessa em voo: quem chama aguarda no `onFinish`. */
+    let gravacaoDaLacuna: Promise<void> | undefined;
     if (selected.length === 0 && channel !== "teste") {
       /* O vetor da lacuna é calculado por ela, e NÃO reaproveitado daqui.
 
@@ -1094,7 +1171,7 @@ export async function getBrainContext(
          O que se paga é uma chamada de embedding a mais, só quando não houve
          cobertura. É a chamada mais barata do sistema — só entrada, texto
          curto — e correção vale mais que a economia. */
-      logBrainGap(target, userMessage, channel, patientId, null);
+      gravacaoDaLacuna = logBrainGapAgora(target, userMessage, channel, patientId, null);
     }
 
     // Montagem do bloco pelo núcleo DoctorThink (rótulos de domínio da
@@ -1117,6 +1194,7 @@ export async function getBrainContext(
         melhorSimilaridade: null,
         cotaEsgotada: false,
         podeAtribuir: false,
+        gravacaoDaLacuna,
       };
     }
 
@@ -1138,6 +1216,7 @@ export async function getBrainContext(
         selected.length > 0 &&
         melhorSimilaridade !== null &&
         melhorSimilaridade >= ATRIBUICAO_MIN_SIMILARITY,
+      gravacaoDaLacuna,
     };
   } catch {
     // Falha de banco não pode derrubar o chat: segue sem o segundo cérebro.

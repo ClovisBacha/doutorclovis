@@ -47,11 +47,25 @@ describe("medir nunca derruba a resposta", () => {
   });
 });
 
-describe("zero não vira linha", () => {
-  test("uso sem tokens é descartado", () => {
-    /* Quando o provedor não reporta `usage`, gravar zeros faria o custo médio
-       por resposta cair sozinho — e esse é o número que define o plano. */
-    expect(uso).toContain("if (entrada === 0 && saida === 0) return;");
+describe("zero não vira linha — exceto quando a linha É a cota", () => {
+  test("sem tokens, só o que NÃO é resposta é descartado", () => {
+    /* Era `if (entrada === 0 && saida === 0) return;` para tudo, e isso tinha
+       um custo escondido: a cota do médico conta LINHAS de `especie='chat'`,
+       não tokens. Toda resposta em que o provedor não reportou `usage` sumia
+       do medidor E não consumia o plano — sub-contagem silenciosa, na direção
+       que dá prejuízo. Embedding e memória continuam sendo descartados: eles
+       são custo, não unidade vendida. */
+    expect(uso).toContain('if (entrada === 0 && saida === 0 && u.especie !== "chat") return;');
+  });
+
+  test("a coluna que não existe não pode levar a linha inteira junto", () => {
+    /* `cobertura`/`similaridade` vieram numa migration recente. O PostgREST
+       rejeita a linha TODA por uma coluna ausente (42703) e o supabase-js
+       devolve {error} sem lançar — então `ai_usage` ficava vazia, a cota nunca
+       estourava e quatro telas do painel morriam sem um log. */
+    expect(uso).toContain("if (res?.error)");
+    expect(uso).toContain('.from("ai_usage").insert(linha)');
+    expect(uso).toContain("APLICAR_COBERTURA.sql");
   });
 
   test("tokens negativos ou fracionários não passam", () => {

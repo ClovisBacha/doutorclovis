@@ -22,6 +22,16 @@
 
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { readFileSync } from "node:fs";
+/* O `emLotes` REAL, capturado ANTES de qualquer `mock.module`.
+   Ele saiu de dentro do `secondbrain.server.ts` e passou a morar aqui (a razão
+   de existir é o limite de taxa da API de vetores, então a regra é de lá). O
+   stub da cura precisa dele de verdade: com uma reimplementação, este arquivo
+   mediria a cópia — o lote poderia virar 40 em produção e continuar verde. Foi
+   exatamente assim que o teste do filtro de lacunas passou o dia inteiro
+   afirmando o oposto do que o produto fazia.
+   Estático e no topo de propósito: `rodarLacuna` também substitui este módulo,
+   e um `await import` lá dentro pegaria o mock dela, não o original. */
+import { emLotes as emLotesReal } from "./embeddings.server";
 
 /** Fonte sem comentários: o cabeçalho acima explica o defeito citando os
     próprios nomes que os testes cobram. O que vale é o código. */
@@ -171,6 +181,7 @@ async function rodarCura(opts: {
   mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sb }));
   let ativos = 0;
   mock.module("./embeddings.server", () => ({
+    emLotes: emLotesReal,
     embedText: async (texto: string) => {
       const i = reg.embeds.length;
       reg.embeds.push(texto);
@@ -388,7 +399,13 @@ describe("cada vetor é gerado para o uso que ele terá", () => {
    * — o mesmo tipo de erro mudo que já custou uma noite nesta base.
    */
   test("a lacuna calcula o dela, e não herda o da busca", () => {
-    expect(fonte).toContain("logBrainGap(target, userMessage, channel, patientId, null);");
+    /* `logBrainGapAgora` — a versão aguardável. A promessa "registrei aqui
+       para ela ver" é feita a uma gestante, e a escrita que a torna verdadeira
+       era disparada e esquecida: em serverless a invocação congela com a
+       resposta, então a promessa dependia de a gravação ganhar a corrida.
+       O `null` no fim continua sendo o ponto do teste: a lacuna calcula o
+       vetor DELA (simétrico), em vez de herdar o da busca (de consulta). */
+    expect(fonte).toContain("logBrainGapAgora(target, userMessage, channel, patientId, null)");
     expect(fonte).not.toContain("vetorDaPergunta");
   });
 

@@ -16,17 +16,21 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { normalizeGapQuestion } from "./doctorthink/core";
-import { isCortesia, isElogio, isSuporteDoApp } from "./secondbrain.server";
+import { mereceFila } from "./secondbrain.server";
 
-/** A condição, escrita uma vez. É esta que os dois lados têm que respeitar. */
-function viraLacuna(pergunta: string): boolean {
-  return (
-    normalizeGapQuestion(pergunta).length >= 8 &&
-    !isSuporteDoApp(pergunta) &&
-    !isCortesia(pergunta) &&
-    !isElogio(pergunta)
-  );
-}
+/**
+ * A FUNÇÃO DE PRODUÇÃO, importada. Não uma cópia dela.
+ *
+ * Aqui morava uma reimplementação da regra — as mesmas quatro condições
+ * escritas à mão neste arquivo. Ela usava `isSuporteDoApp` (UM sinal) enquanto
+ * a de produção passou a usar `ehSoSuporte` (DOIS), e as duas divergiram em
+ * 6 de 6 casos medidos: "o app travou e estou com dor de cabeça" dava `false`
+ * aqui e `true` no ar. Um teste verde afirmando o oposto do que o produto faz
+ * é pior que teste nenhum — foi ele que me deixou declarar o item pronto.
+ *
+ * Nome local mantido só pela legibilidade das asserções abaixo.
+ */
+const viraLacuna = mereceFila;
 
 describe("o que vira lacuna na fila do médico", () => {
   test("dúvida clínica de verdade entra", () => {
@@ -117,20 +121,53 @@ describe("elogio à IA não vira fila do médico", () => {
     expect(viraLacuna("que legal isso, é normal sentir enjoo assim")).toBe(true);
   });
 
-  /* DEFEITO PRÉ-EXISTENTE, achado ao escrever o teste acima e deixado à
-     mostra de propósito.
+  /* CONSERTADO — e este teste é a prova de que foi.
 
-     "adorei O APP, mas posso tomar dipirona?" NÃO vira lacuna — e não é culpa
-     do filtro de elogio: `isSuporteDoApp` casa com a palavra "app" em
-     qualquer posição, então basta citar o aplicativo para a dúvida clínica ser
-     descartada. O comentário do filtro promete o contrário ("na dúvida
-     REGISTRA"), e aqui ele faz o oposto: perde a pergunta.
+     Ele nasceu invertido, documentando o defeito: citar o app derrubava a
+     dúvida clínica junto, porque `isSuporteDoApp` casa com "app" em qualquer
+     posição. A promessa do filtro era "na dúvida REGISTRA" e ele fazia o
+     oposto: perdia a pergunta.
 
-     Este teste documenta o comportamento ATUAL. Quando o filtro for
-     consertado, ele falha — e é isso que se quer. */
-  test("HOJE: citar o app derruba até pergunta clínica (a consertar)", () => {
-    expect(viraLacuna("adorei o app, mas posso tomar dipirona?")).toBe(false);
-    expect(viraLacuna("no app não achei: posso tomar dipirona?")).toBe(false);
+     A regra passou a exigir DOIS sinais (fala de app E não fala de corpo), e o
+     teste virou junto. Note que ele só falhou — revelando o conserto — quando
+     passou a importar a função de produção; enquanto reimplementava a regra
+     aqui dentro, continuou verde afirmando o defeito que já não existia. */
+  test("citar o app não derruba a pergunta clínica que vem junto", () => {
+    expect(viraLacuna("adorei o app, mas posso tomar dipirona?")).toBe(true);
+    expect(viraLacuna("no app não achei: posso tomar dipirona?")).toBe(true);
+  });
+
+  /* As frases de suporte que o verificador mediu vazando para a fila CLÍNICA
+     do médico. Cada uma delas gerava o e-mail "sua IA não soube responder"
+     sobre uma pergunta que ele não tem como responder. */
+  test("cobrança e conta, em qualquer conjugação, são da plataforma", () => {
+    expect(viraLacuna("como cancelo?")).toBe(false);
+    expect(viraLacuna("como cancelo minha conta")).toBe(false);
+    expect(viraLacuna("quero desativar minha conta")).toBe(false);
+    expect(viraLacuna("como excluo meus dados")).toBe(false);
+    expect(viraLacuna("vocês cobram alguma coisa?")).toBe(false);
+  });
+
+  test("falha técnica descrita na negativa é suporte", () => {
+    expect(viraLacuna("não estou conseguindo entrar")).toBe(false);
+    expect(viraLacuna("não carrega nada aqui")).toBe(false);
+    expect(viraLacuna("não recebo as notificações")).toBe(false);
+  });
+
+  test("gíria de elogio também não vira trabalho clínico", () => {
+    expect(viraLacuna("vcs sao demais")).toBe(false);
+    expect(viraLacuna("melhor coisa que já usei")).toBe(false);
+    expect(viraLacuna("vocês arrasam")).toBe(false);
+  });
+
+  /* O contrapeso das duas listas acima: alargar o filtro de suporte não pode
+     começar a comer queixa de corpo. Toda frase aqui menciona algo clínico e
+     TEM que continuar chegando ao médico. */
+  test("alargar o suporte não pode engolir queixa clínica", () => {
+    expect(viraLacuna("não estou conseguindo sentir o bebê mexer")).toBe(true);
+    expect(viraLacuna("não carrega o resultado do meu exame de sangue")).toBe(true);
+    expect(viraLacuna("quero cancelar minha cesárea, é possível?")).toBe(true);
+    expect(viraLacuna("estou com dor demais na barriga")).toBe(true);
   });
 
   test("elogio junto de relato clínico continua sendo lacuna", () => {

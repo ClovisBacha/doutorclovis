@@ -7025,21 +7025,25 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
     setLoading(true);
 
     try {
-      const uiMessages = [...messages.filter((m) => m.content || m.image), displayMsg].map(
-        (m, i) => {
-          const msgText = m === displayMsg ? enrichedText : m.content;
-          return {
-            id: String(i),
-            role: m.role,
-            parts: [
-              ...(m.image
-                ? [{ type: "file", mediaType: dataUrlMediaType(m.image), url: m.image }]
-                : []),
-              ...(msgText ? [{ type: "text", text: msgText }] : []),
-            ],
-          };
-        },
-      );
+      /* SÓ TEXTO VAI PARA A IA — e isso resolve dois problemas de uma vez.
+
+         1. A IA não analisa exame. É ato médico: o anexo vai para a aba do
+            médico, e mandá-lo junto convidaria a IA a opinar sobre ele.
+         2. O anexo ficava no estado da conversa PARA SEMPRE e era reenviado em
+            toda mensagem seguinte, reconstruído como parte `file` com o data
+            URL inteiro. Uma foto de laudo de 3,8 MB vira ~5,1 MB de base64 no
+            corpo do POST — acima do limite de 4,5 MB de função da Vercel. A
+            partir dali TODO o chat falhava até a paciente recarregar a página,
+            e cada turno anterior já gastava megabytes que o servidor descarta
+            (ele reconstrói o histórico do banco de qualquer forma). */
+      const uiMessages = [...messages.filter((m) => m.content?.trim()), displayMsg].map((m, i) => {
+        const msgText = m === displayMsg ? enrichedText : m.content;
+        return {
+          id: String(i),
+          role: m.role,
+          parts: msgText ? [{ type: "text", text: msgText }] : [],
+        };
+      });
       // Envia o token da paciente para o /api/chat resolver o médico dela e
       // usar a IA do consultório correto (cada conta é individual).
       const { data: sess } = await supabase.auth.getSession();

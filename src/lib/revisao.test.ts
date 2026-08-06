@@ -61,7 +61,11 @@ describe("as duas filas não se misturam", () => {
   test("com entrada identificada, NÃO vira lacuna", () => {
     /* Este é o defeito central. Mandar para lacuna diria ao médico que "a IA
        não soube responder" sobre algo que ela soube. */
-    expect(fn).toContain("if (!data.helpful && doctorId && !entryId) {");
+    expect(fn).toContain("if (!data.helpful && doctorId && !entryIdEfetivo) {");
+    /* `entryIdEfetivo`, e não `entryId`: quando a migration da revisão não foi
+       aplicada, a gravação cai na forma antiga (sem `entry_id`) e o item TEM
+       que seguir para a fila de lacunas — senão o 👎 não chega a lugar nenhum. */
+    expect(fn).toContain("entryIdEfetivo = null;");
   });
 
   test("sem entrada, continua virando lacuna", () => {
@@ -78,7 +82,15 @@ describe("as duas filas não se misturam", () => {
   test("a entrada só é identificada acima do corte de ATRIBUIÇÃO", () => {
     /* Abaixo dele a resposta não foi apresentada como orientação do médico —
        corrigir uma entrada por causa dela seria punir o texto errado. */
-    expect(cerebro).toContain("melhor.similarity >= ATRIBUICAO_MIN_SIMILARITY");
+    /* CORTE DE COBERTURA, não o de atribuição — e isto foi um conserto.
+       A pergunta aqui é "esta entrada ENTROU na resposta?", que é o corte que
+       faz o bloco ser injetado (0,62). Com o de atribuição (0,74), TODA
+       resposta montada com uma entrada entre os dois caía na fila de LACUNAS
+       ao levar 👎: o médico lia "sua IA não soube responder" sobre algo que ela
+       respondeu com o material dele, respondia de novo, e criava uma segunda
+       entrada sobre o mesmo assunto — o defeito que esta fila veio matar,
+       sobrevivendo numa faixa inteira. */
+    expect(cerebro).toContain("melhor.similarity >= SEMANTIC_MIN_SIMILARITY");
   });
 });
 
