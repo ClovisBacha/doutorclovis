@@ -303,6 +303,8 @@ function PainelPage() {
      Numa plataforma multi-médico isso não é um detalhe de layout: é dinheiro
      indo para a conta errada e documento assinado por quem não atendeu. */
   const [euMedico, setEuMedico] = useState<DoctorProfile | null>(null);
+  /** Perguntas pendentes contadas no banco, não filtradas de uma amostra. */
+  const [pendingExato, setPendingExato] = useState<number | null>(null);
   /* Está dentro do app nativo? Lido em efeito porque `ehNativo()` olha um
      global do Capacitor, que não existe no SSR. */
   const [noApp, setNoApp] = useState(false);
@@ -576,6 +578,7 @@ function PainelPage() {
         setAllowed(true);
         setAppointments(res.appointments);
         setQuestions(res.questions);
+        setPendingExato("pendingQuestions" in res ? res.pendingQuestions : null);
         setFonteFalhou((f) => ({ ...f, consultasEPerguntas: false }));
         /* Carrega o próprio perfil também no caminho felizes: é dele que saem
            a chave PIX e o CRM do recibo. Best-effort — o painel abre sem. */
@@ -864,7 +867,10 @@ function PainelPage() {
      enquanto uma paciente esperava resposta do outro lado. Um número que diz
      zero quando há alguém esperando é pior que número nenhum. */
   const pendingAppts = appointments.filter((a) => a.status === "pending").length;
-  const pendingQs = questions.filter((q) => !q.answered).length;
+  /* A contagem EXATA quando o servidor conseguiu fazê-la; senão, o cálculo por
+     amostra de antes — que subconta, mas é melhor que mostrar zero e dizer que
+     não há trabalho. */
+  const pendingQs = pendingExato ?? questions.filter((q) => !q.answered).length;
   const unseenForms = preForms.filter((f) => !f.seen_by_doctor).length;
   const novasPacientes = pedidosVinculo.length;
   const sosNaoAtendidos = sosPendentes.length;
@@ -5168,11 +5174,12 @@ function CerebroSection({
             existe. Uma linha aqui custa nada e é o que dá nome às duas coisas
             que ele vai encontrar rolando a página. */}
         <p className="mt-2 rounded-xl border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
-          Abaixo há <strong>duas filas</strong>, e elas pedem coisas diferentes:{" "}
+          Abaixo há <strong>três filas</strong>, e elas pedem coisas diferentes:{" "}
           <strong>🕳️ Lacunas</strong> é o que a IA <em>não soube</em> responder —{" "}
           {asDoctor ? "ele ensina" : "você ensina"} algo novo. <strong>✋ Revisão</strong> é o que
           ela <em>soube</em> e a paciente reprovou — {asDoctor ? "ele corrige" : "você corrige"} o
-          que já existe.
+          que já existe. <strong>❓ Perguntas</strong> são dúvidas que a paciente mandou direto —{" "}
+          {asDoctor ? "ele responde" : "você responde"} e a IA aprende junto.
         </p>
       </div>
       <ComecePorAqui tokenFn={tokenFn} asDoctor={asId} />
@@ -7080,14 +7087,27 @@ function BrainTrainCard({
   // dados pessoais) fica só no histórico da paciente.
   const [editedQuestions, setEditedQuestions] = useState<Record<string, string>>({});
   const [sendingId, setSendingId] = useState<string | null>(null);
+  /* Distingue "não deu para olhar" de "não há perguntas" — o servidor devolvia
+     `ok: true` com lista vazia no erro, e a tela dizia "Tudo respondido! 🎉"
+     durante uma falha de banco. */
+  const [falhouQ, setFalhouQ] = useState(false);
+  /** Quantas existem NO TOTAL — a tela mostra as 50 mais antigas. */
+  const [totalQ, setTotalQ] = useState(0);
 
   useEffect(() => {
     (async () => {
       const res = await listUnansweredQuestions({
         data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
       });
-      if (res.ok) setQuestions(res.questions);
-      else toast.error("Não foi possível carregar as perguntas das pacientes.");
+      if (res.ok) {
+        setQuestions(res.questions);
+        setTotalQ(res.total);
+        setFalhouQ(false);
+      } else {
+        /* ESQUELETO ETERNO era o que acontecia: `questions` ficava `null` para
+           sempre, com um toast que some em 4 segundos e nada na tela. */
+        setFalhouQ(true);
+      }
     })();
   }, [tokenFn]);
 
@@ -7130,18 +7150,31 @@ function BrainTrainCard({
     <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
       <p className="font-serif text-xl">
         ❓ Perguntas das pacientes esperando você
-        {questions && questions.length > 0 && (
+        {totalQ > 0 && (
           <span className="ml-2 rounded-full bg-primary px-2 py-0.5 align-middle text-xs font-semibold text-primary-foreground">
-            {questions.length}
+            {totalQ}
           </span>
         )}
       </p>
+      {/* A tela mostra as mais ANTIGAS — dizer isso evita o médico concluir que
+          resolveu a fila ao terminar as 50. */}
+      {questions && totalQ > questions.length && (
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Mostrando as {questions.length} mais antigas de {totalQ}.
+        </p>
+      )}
       <p className="mt-0.5 text-sm text-muted-foreground">
         Cada resposta sua vira conhecimento: a paciente recebe a resposta e o cérebro aprende a
         conduta para as próximas.
       </p>
 
-      {questions === null ? (
+      {falhouQ ? (
+        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-sm leading-snug text-amber-900">
+          Não consegui carregar as perguntas agora —{" "}
+          <strong>isto não quer dizer que não há nenhuma</strong>. Atualize a página antes de
+          concluir que a fila está vazia.
+        </p>
+      ) : questions === null ? (
         <div className="mt-4 space-y-3">
           <div className="h-24 animate-pulse rounded-xl bg-secondary" />
           <div className="h-24 animate-pulse rounded-xl bg-secondary" />

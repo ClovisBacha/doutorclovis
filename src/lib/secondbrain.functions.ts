@@ -464,14 +464,35 @@ export const listUnansweredQuestions = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await query;
     if (error) {
-      // 42703 (doctor_id ainda não migrado) ou falha: fail-closed p/ escopado.
+      /* FAIL-CLOSED NO ESCOPO, e NÃO na mensagem.
+         Devolver lista vazia está certo: sem `doctor_id` migrado não dá para
+         garantir que as perguntas são deste médico, e mostrar as de outro seria
+         vazamento. Mas devolver `ok: true` fazia a tela dizer "Tudo respondido
+         por aqui! 🎉" durante um erro de banco — o médico lia que não há
+         trabalho quando o que houve foi não conseguir olhar.
+         São coisas diferentes e precisam de telas diferentes. */
+      console.error(
+        `[cerebro] perguntas não carregaram (${(error as { code?: string })?.code ?? "?"})`,
+      );
       return {
-        ok: true as const,
+        ok: false as const,
         questions: [] as { id: string; question: string; created_at: string }[],
+        total: 0,
       };
     }
+    /* A CONTAGEM EXATA, além das 50 que a tela mostra.
+       O badge da fita contava não-respondidas entre as 200 mais RECENTES; este
+       card lista as 50 mais ANTIGAS. Com 73 na fila, a fita dizia 73 e o card
+       mostrava 50, um do lado do outro — dois números para a mesma coisa, e
+       nenhum dos dois exato. `head: true` traz só o número. */
+    const { count } = await (supabaseAdmin as any)
+      .from("doctor_questions")
+      .select("id", { count: "exact", head: true })
+      .eq("answered", false)
+      .eq("doctor_id", target.doctorId);
     return {
       ok: true as const,
+      total: typeof count === "number" ? count : ((rows ?? []) as unknown[]).length,
       questions: (rows ?? []) as { id: string; question: string; created_at: string }[],
     };
   });

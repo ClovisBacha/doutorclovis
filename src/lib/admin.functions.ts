@@ -203,11 +203,32 @@ export const getAdminData = createServerFn({ method: "POST" })
         }),
       );
 
+    /* A CONTAGEM EXATA de perguntas pendentes.
+       O badge da fita de abas era `questions.filter(q => !q.answered).length`
+       sobre as 200 mais RECENTES — e o card do Cérebro lista as mais ANTIGAS.
+       Com 73 na fila, a fita dizia um número e o card outro, na mesma tela; e
+       num consultório com mais de 200 perguntas no histórico, o badge podia
+       contar MENOS que a realidade, escondendo trabalho.
+       `head: true` traz só o número, sem as linhas. */
+    const pendentes = await scopedBy(
+      sb
+        .from("doctor_questions")
+        .select("id", { count: "exact", head: true })
+        .eq("answered", false),
+      scope,
+    );
+
     return {
       ok: true as const,
       isTeam: scope.isTeam,
       appointments: (appts.data ?? []) as AdminAppointment[],
       questions: questionsWithName,
+      /* `null` quando a contagem falhou — a tela cai no cálculo por amostra em
+         vez de mostrar zero, que seria dizer "não há trabalho". */
+      pendingQuestions:
+        typeof (pendentes as { count?: number })?.count === "number"
+          ? ((pendentes as { count?: number }).count as number)
+          : null,
     };
   });
 

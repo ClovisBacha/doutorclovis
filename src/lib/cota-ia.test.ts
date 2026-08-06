@@ -600,3 +600,48 @@ describe("o Cérebro é a primeira coisa que ele vê", () => {
     expect((lista.match(/"Cérebro 🧠"/g) ?? []).length).toBe(1);
   });
 });
+
+/**
+ * A ABA DO CÉREBRO NÃO PODE MENTIR SOBRE SI MESMA.
+ *
+ * Três defeitos de FATO — não de gosto — que um avaliador encontrou lendo a aba
+ * como se fosse o médico abrindo pela primeira vez.
+ */
+describe("o painel do cérebro conta a verdade", () => {
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+  const fns = readFileSync("src/lib/secondbrain.functions.ts", "utf8");
+  const admin = readFileSync("src/lib/admin.functions.ts", "utf8");
+
+  test("o texto de orientação conta as filas certas", () => {
+    /* Dizia "duas filas" e havia três: eu movi o card de perguntas das
+       pacientes para o grupo de trabalho e não atualizei o parágrafo que
+       existe justamente para dar nome às filas. O texto que orienta era o
+       único errado da tela. */
+    const cabecalho = painel.slice(painel.indexOf("Abaixo há"), painel.indexOf("Abaixo há") + 700);
+    expect(cabecalho).toContain("três filas");
+    expect(cabecalho).toContain("❓ Perguntas");
+  });
+
+  test("erro de banco NÃO vira 'tudo respondido 🎉'", () => {
+    /* `listUnansweredQuestions` devolvia `ok: true` com lista vazia no erro. O
+       comentário dizia "fail-closed p/ escopado" — e era fail-closed no escopo
+       e fail-OPEN na mensagem: o médico lia que não há trabalho quando o que
+       houve foi não conseguir olhar. */
+    const trecho = fns.slice(fns.indexOf("export const listUnansweredQuestions"));
+    expect(trecho.slice(0, 2500)).toContain("ok: false as const");
+    expect(painel).toContain("isto não quer dizer que não há");
+  });
+
+  test("os dois contadores de perguntas são a MESMA contagem exata", () => {
+    /* O badge da fita filtrava não-respondidas entre as 200 mais RECENTES; o
+       card lista as 50 mais ANTIGAS. Com 73 na fila, a fita dizia um número e
+       o card outro, lado a lado — e num histórico grande o badge contava MENOS
+       que a realidade, escondendo trabalho. */
+    expect(admin).toContain('.select("id", { count: "exact", head: true })');
+    expect(admin).toContain("pendingQuestions:");
+    expect(painel).toContain("const pendingQs = pendingExato ??");
+    /* E a tela diz que está mostrando um recorte, em vez de deixar o médico
+       concluir que resolveu a fila ao terminar as 50. */
+    expect(painel).toContain("Mostrando as {questions.length} mais antigas de {totalQ}");
+  });
+});
