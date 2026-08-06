@@ -973,8 +973,13 @@ async function fecharLacunasParecidas(
  * vez de inventar uma caixa de entrada nova. E marca `avisada_em` para que
  * reprocessar não mande o mesmo push de novo: aviso repetido sobre dúvida
  * antiga é o que faz a paciente desligar as notificações.
+ *
+ * EXPORTADA para poder ser testada com um banco de mentira — mesmo motivo de
+ * `entregarCorrecao`. A ordem "entrega primeiro, marca depois" é a única coisa
+ * que separa "ela recebeu" de "achamos que ela recebeu", e uma contagem de
+ * escritas sem `error` não consegue verificar ordem nenhuma.
  */
-async function entregarRespostaDaLacuna(
+export async function entregarRespostaDaLacuna(
   sb: any,
   args: { gapId: string; doctorId: string; perguntaDela: string; resposta: string },
 ): Promise<number> {
