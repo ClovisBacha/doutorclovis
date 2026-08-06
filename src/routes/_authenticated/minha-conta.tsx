@@ -23,6 +23,7 @@ import { TabErrorBoundary } from "@/components/tab-error-boundary";
 import { TabSkeleton } from "@/components/tab-skeleton";
 import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
+import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
 import { formatarDinheiro } from "@/lib/dinheiro";
 import { DOCTOR } from "@/lib/doctor.config";
 import drPortrait from "@/assets/dr-clovis-portrait.jpg";
@@ -6649,8 +6650,19 @@ function WABubble({
               }
         }
       >
-        {/* Imagem */}
-        {msg.image && <img src={msg.image} alt="" className="block w-full max-h-52 object-cover" />}
+        {/* Anexo. PDF NÃO é imagem: `<img src="data:application/pdf…">` desenha
+            o ícone de arquivo quebrado, e o app passou a aceitar laudo em PDF.
+            A miniatura de PDF é um cartão com o nome do formato — ela sabe o
+            que mandou, e quem vai LER é o médico. */}
+        {msg.image &&
+          (msg.image.startsWith("data:application/pdf") ? (
+            <div className="flex items-center gap-2 px-3 py-2.5 text-sm">
+              <span aria-hidden>📄</span>
+              <span className="text-muted-foreground">Laudo em PDF enviado</span>
+            </div>
+          ) : (
+            <img src={msg.image} alt="" className="block w-full max-h-52 object-cover" />
+          ))}
 
         {/* Áudio */}
         {msg.audioUrl && (
@@ -7095,8 +7107,11 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
            "Muitas mensagens em pouco tempo. Aguarde um instante." — e ela
            recebia o genérico, que ainda sugere que ela fez algo errado.
            Guardado num ref porque o `catch` monta a bolha e não enxerga isto. */
-        const corpo = (await res.text().catch(() => "")).trim();
-        avisoDoServidorRef.current = corpo.length > 0 && corpo.length < 300 ? corpo : null;
+        /* SÓ O QUE FOI FEITO PARA ELA LER.
+           Aceitar qualquer corpo com menos de 300 caracteres fazia a gestante
+           ler "Missing GOOGLE_GENERATIVE_AI_API_KEY" numa bolha de chat. */
+        const corpo = await res.text().catch(() => "");
+        avisoDoServidorRef.current = avisoQuePodeAparecer(corpo);
         throw new Error(corpo || "http");
       }
       if (!res.body) throw new Error("no stream");
@@ -7150,17 +7165,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
              O piso de 2/quadro é o que faz parecer escrita; o teto solto é o
              que impede que "parecer escrita" vire "fazer esperar". Quando o
              stream fechou, a cauda inteira sai em no máximo ~1s. */
-          const passo = streamAbertoRef.current
-            ? /* CHEGANDO: ritmo de leitura. 2 por quadro no mínimo, até 12
-                 quando há texto represado — é isto que parece escrita. */
-              Math.min(12, Math.max(2, Math.ceil(atraso / 45)))
-            : /* JÁ CHEGOU TUDO: acabar. Aqui não há mais nada a "revelar" —
-                 só a paciente esperando por texto que o navegador já tem.
-                 Piso de 40 por quadro para a cauda não se arrastar quando
-                 sobra pouco; a régua inteira fecha 8.000 caracteres em ~40
-                 quadros (~0,7s). Antes eram 12,3s, com o teto de 12 valendo
-                 nos dois regimes. */
-              Math.max(40, Math.ceil(atraso / 10));
+          const passo = passoDaDigitacao(atraso, streamAbertoRef.current);
           mostradoRef.current = Math.min(alvo.length, mostradoRef.current + passo);
           /* Atualização FUNCIONAL, e isto é conserto de um apagão real.
              Era `setMessages([...displayNext, …])` — um retrato capturado
@@ -7183,32 +7188,20 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
       if (!semAnimacao) quadroRef.current = requestAnimationFrame(digitar);
 
       const processLine = (line: string) => {
-        if (!line.startsWith("data: ")) return;
-        try {
-          const json = JSON.parse(line.slice(6));
-          if (json.type === "text-delta" && json.delta) acc += json.delta;
-          /* A PARTE QUE FALTAVA LER.
-             Quando o provedor falha depois de o fluxo começar, o HTTP já é 200
-             e o servidor não pode mais mudar o código: ele manda uma parte
-             `error` com o texto. Este `if` não existia — a parte era descartada
-             em silêncio, `acc` ficava vazio, e a paciente via uma bolha em
-             branco. Ela lia aquilo como "a IA não soube responder", que é a
-             leitura errada, e o único registro ficava no console da Vercel. */ else if (
-            json.type === "error" &&
-            (json.errorText || json.error)
-          ) {
-            acc = String(json.errorText ?? json.error);
-            /* A BOLHA DE ERRO NÃO PODE SER VOTÁVEL.
-               Ler a parte `error` consertou a bolha vazia — e abriu um buraco
-               por baixo: a mensagem final passou a TER conteúdo (o texto do
-               erro) e continuava sem a marca `error`, então os polegares
-               apareciam. Um 👎 num 429 do Gemini virava lacuna ou revisão na
-               fila do médico, com "o que ela leu" = "Estou recebendo muitas
-               perguntas neste momento". É o cenário que o `canVote` foi escrito
-               para impedir, reaberto pelo caminho novo. */
-            houveErro = true;
-          }
-        } catch {}
+        /* A leitura mora em `src/lib/chat-stream.ts` porque aqui dentro nenhum
+           teste alcançava: é a peça que decide se a paciente vê a resposta, o
+           texto do erro, ou uma bolha em branco — o defeito mais caro deste
+           chat — e não tinha um único teste. */
+        const p = lerLinhaDoStream(line);
+        if (p.tipo === "texto") acc += p.texto;
+        else if (p.tipo === "erro") {
+          acc = p.texto;
+          /* A BOLHA DE ERRO NÃO PODE SER VOTÁVEL. Ler a parte `error`
+             consertou a bolha vazia e abriu um buraco por baixo: a mensagem
+             passou a TER conteúdo e continuava sem a marca, então os polegares
+             apareciam. Um 👎 num 429 do Gemini virava lacuna na fila do médico. */
+          houveErro = true;
+        }
       };
       while (true) {
         const { done, value } = await reader.read();
@@ -7304,31 +7297,69 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
     }
   }
 
+  /**
+   * O ARQUIVO DO EXAME — redimensionado, como todos os outros deste app.
+   *
+   * Este era o ÚNICO caminho de imagem do arquivo sem canvas. O avatar
+   * redimensiona a 256px, o álbum a 800px, a aba Exames a 1200px — e a foto de
+   * laudo, que é a maior de todas, ia crua.
+   *
+   * O preço eram duas coisas somadas:
+   *
+   * - **A conta não fechava.** base64 cresce 4/3, então o teto de 3,3 MiB
+   *   virava ~4,61 MB de data URL contra um limite de corpo de 4,5 MB na
+   *   Vercel. Ficava EM CIMA da ambiguidade de unidade (MB decimal × MiB), com
+   *   ±2% de folga.
+   * - **A instrução era impossível de seguir.** Foto de celular de 48MP tem
+   *   8–15 MB: a paciente era recusada com "tente uma foto com menos
+   *   resolução", que quase ninguém sabe executar — e o laudo não chegava.
+   *
+   * Com o canvas, a foto típica cai ~10×, o HEIC do iPhone vira JPEG, e a
+   * conta sai da borda. PDF passa direto: não é imagem, e comprimir laudo
+   * vetorial só destruiria o texto.
+   */
   function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     setShowAttach(false);
     if (!file) return;
-    /* PDF TAMBÉM. O botão chama-se "Exame", e laudo em PDF é o formato que
-       todo laboratório entrega por e-mail — recusá-lo deixava sem caminho
-       justamente o arquivo mais comum. Foto continua valendo: é assim que
-       exame de papel chega. */
     const ehPdf = file.type === "application/pdf";
     if (!file.type.startsWith("image/") && !ehPdf) {
       toast.error("Envie uma foto ou um PDF do exame.");
       return;
     }
-    /* 3,5 MB, e não 4: o data URL em base64 cresce ~33% sobre o arquivo, e o
-       limite de corpo de requisição da Vercel é 4,5 MB. Com o teto em 4 MB, um
-       arquivo de 3,8 MB virava ~5,1 MB e a requisição era recusada — a
-       paciente via "não consegui enviar" para o exame que mais importa, o
-       fotografado em alta resolução. */
-    if (file.size > 3.3 * 1024 * 1024) {
-      toast.error("Arquivo muito grande — o limite é 3,3 MB. Tente uma foto com menos resolução.");
+    /* PDF não passa por canvas — e por isso continua com teto de tamanho.
+       3,0 MiB × 4/3 = 4,19 MB, abaixo do limite sob qualquer leitura da
+       unidade (4,5 MB decimal ou 4,5 MiB). */
+    if (ehPdf && file.size > 3.0 * 1024 * 1024) {
+      toast.error("PDF muito grande — o limite é 3 MB.");
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => void enviarParaOMedico(reader.result as string);
+    reader.onload = (ev) => {
+      const bruto = ev.target?.result as string;
+      if (ehPdf) {
+        void enviarParaOMedico(bruto);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        /* 1600px: laudo fotografado precisa de mais resolução que um avatar —
+           é texto impresso, e o médico vai LER. Qualidade 0,85 pelo mesmo
+           motivo. */
+        const canvas = document.createElement("canvas");
+        const maxSize = 1600;
+        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        void enviarParaOMedico(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      /* Arquivo que o navegador não decodifica (HEIC em Android antigo): não
+         some em silêncio — ela precisa saber para tirar outra foto. */
+      img.onerror = () => toast.error("Não consegui ler essa imagem. Tente tirar a foto de novo.");
+      img.src = bruto;
+    };
     reader.readAsDataURL(file);
   }
 
@@ -9132,28 +9163,47 @@ function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         },
         body: JSON.stringify({ messages: uiMessages }),
       });
-      if (!res.body) throw new Error("no stream");
+      /* `res.ok` ANTES do corpo — e isto era um "..." eterno.
+         O código checava só `!res.body`, e 429 (limitador), 401 (sessão) e o
+         500 de chave ausente TÊM corpo: o laço lia texto sem prefixo `data: `,
+         `acc` ficava vazio, e a bolha renderizava `{m.content || "..."}` para
+         sempre — sem erro, sem retry, sem nada dizendo o que houve. É o mesmo
+         defeito que o chat principal e o widget do site já corrigiram; este
+         ficou. */
+      if (!res.ok) {
+        const corpo = await res.text().catch(() => "");
+        throw new Error(avisoQuePodeAparecer(corpo) ?? "");
+      }
+      if (!res.body) throw new Error("");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let acc = "";
+      let erroNoFluxo = "";
       setMessages([...next, { role: "assistant", content: "" }]);
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value);
+        /* O MESMO leitor do chat principal. Duas cópias de um parser divergem,
+           e foi assim que a parte `error` ficou sem ser lida aqui: falha do
+           provedor depois do HTTP 200 continuava virando bolha vazia. */
         chunk.split("\n").forEach((line) => {
-          if (!line.startsWith("data: ")) return;
-          try {
-            const json = JSON.parse(line.slice(6));
-            if (json.type === "text-delta" && json.delta) acc += json.delta;
-          } catch {}
+          const parte = lerLinhaDoStream(line);
+          if (parte.tipo === "texto") acc += parte.texto;
+          else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
         });
         setMessages([...next, { role: "assistant", content: acc }]);
       }
-    } catch {
+      if (erroNoFluxo && !acc.trim()) throw new Error(erroNoFluxo);
+    } catch (e) {
       setMessages([
         ...next,
-        { role: "assistant", content: "Desculpe, ocorreu um erro. Tente novamente." },
+        {
+          role: "assistant",
+          /* O aviso do servidor manda quando existe: ele sabe o que houve
+             (limite de mensagens, sessão vencida) e a tela não. */
+          content: (e as Error)?.message?.trim() || "Desculpe, ocorreu um erro. Tente novamente.",
+        },
       ]);
     } finally {
       setLoading(false);
@@ -18611,13 +18661,23 @@ function ExamesTab({ gest }: { gest: Gest }) {
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((exam) => (
             <div key={exam.id} className="flex gap-3 rounded-2xl border border-border bg-card p-4">
-              {exam.image_data ? (
+              {exam.image_data && !exam.image_data.startsWith("data:application/pdf") ? (
                 <button onClick={() => setPreview(exam)} className="flex-shrink-0">
                   <img
                     src={exam.image_data}
                     alt={exam.name}
                     className="h-16 w-16 rounded-xl object-cover ring-1 ring-border"
                   />
+                </button>
+              ) : exam.image_data ? (
+                /* PDF: cartão clicável, não `<img>` — que desenharia o ícone de
+                   arquivo quebrado desde que o app passou a aceitar laudo. */
+                <button
+                  onClick={() => setPreview(exam)}
+                  className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-secondary ring-1 ring-border"
+                >
+                  <span className="text-xl">📄</span>
+                  <span className="text-[9px] font-semibold text-muted-foreground">PDF</span>
                 </button>
               ) : (
                 <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-secondary text-2xl">
@@ -18655,7 +18715,27 @@ function ExamesTab({ gest }: { gest: Gest }) {
           onClick={() => setPreview(null)}
         >
           <div className="relative max-h-[90vh] max-w-2xl overflow-auto rounded-2xl bg-white p-2">
-            <img src={preview.image_data!} alt={preview.name} className="max-w-full rounded-xl" />
+            {preview.image_data!.startsWith("data:application/pdf") ? (
+              <object
+                data={preview.image_data!}
+                type="application/pdf"
+                className="h-[75vh] w-[85vw] max-w-2xl rounded-xl"
+                aria-label={preview.name}
+              >
+                {/* Celular nem sempre embute PDF — abrir em aba nova funciona
+                    em todos. */}
+                <a
+                  href={preview.image_data!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block p-6 text-center text-sm text-primary underline"
+                >
+                  Abrir o PDF
+                </a>
+              </object>
+            ) : (
+              <img src={preview.image_data!} alt={preview.name} className="max-w-full rounded-xl" />
+            )}
             <p className="mt-2 text-center text-sm font-medium text-foreground">{preview.name}</p>
           </div>
         </div>

@@ -133,8 +133,10 @@ describe("a cauda não pode fazer a paciente esperar", () => {
        60fps): 4.000 caracteres deixavam 6,7s de cauda DEPOIS de o texto
        inteiro já estar no navegador; 8.000 deixavam 12,3s. O teste antigo só
        cobria até 2.000 e passava por 0,03s de folga. */
-    expect(codigo).toContain("const passo = streamAbertoRef.current");
-    expect(codigo).toContain("Math.max(40, Math.ceil(atraso / 10))");
+    /* A régua saiu para `src/lib/chat-stream.ts` e agora é IMPORTADA pelo
+       teste — antes este arquivo validava uma CÓPIA declarada "copiada de
+       propósito", e dividir por 45.000 na tela real não quebrava nada. */
+    expect(codigo).toContain("passoDaDigitacao(atraso, streamAbertoRef.current)");
   });
 
   test("uma resposta longa termina de aparecer em ~1s depois de chegar", () => {

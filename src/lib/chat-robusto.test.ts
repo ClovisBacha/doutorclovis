@@ -40,9 +40,14 @@ describe("erro do provedor vira mensagem, não bolha vazia", () => {
 
   test("o cliente aprendeu a LER a parte de erro", () => {
     /* As duas pontas: sem a mensagem não há o que mostrar, e sem o leitor a
-       mensagem não chega. Consertar só um lado não conserta nada. */
-    expect(app).toContain('json.type === "error"');
-    expect(app).toContain("acc = String(json.errorText ?? json.error)");
+       mensagem não chega. Consertar só um lado não conserta nada.
+
+       O leitor saiu para `src/lib/chat-stream.ts` e agora tem teste de
+       COMPORTAMENTO (`chat-stream.test.ts`) — este aqui só confere que a tela
+       usa aquele leitor, em vez de ter reimplementado um por dentro. */
+    expect(app).toContain("const p = lerLinhaDoStream(line)");
+    expect(app).toContain('p.tipo === "erro"');
+    expect(app).toContain("houveErro = true");
   });
 
   test("429 recebe um texto ACIONÁVEL, não um genérico", () => {

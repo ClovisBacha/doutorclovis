@@ -41,7 +41,7 @@ describe("o anexo vai para o médico", () => {
   test("o chat NÃO manda mais a imagem para a IA", () => {
     /* `sendText(input, dataURL)` era o caminho antigo: a imagem viajava e era
        descartada no servidor. */
-    expect(app).toContain("void enviarParaOMedico(reader.result as string)");
+    expect(appBruto).toContain('void enviarParaOMedico(canvas.toDataURL("image/jpeg", 0.85))');
     expect(app).not.toContain("void sendText(input, reader.result as string)");
   });
 
@@ -77,12 +77,27 @@ describe("o anexo vai para o médico", () => {
     expect(visor).toContain('type="application/pdf"');
   });
 
-  test("o teto do cliente cabe no limite de corpo da Vercel", () => {
-    /* base64 cresce ~33%: com teto de 4 MB, um arquivo de 3,8 MB virava ~5,1
-       MB de data URL e a requisição era recusada pelo limite de 4,5 MB. A
-       paciente via "não consegui enviar" justamente para a foto de laudo em
-       alta resolução, que é a que mais importa. */
-    expect(appBruto).toContain("file.size > 3.3 * 1024 * 1024");
+  test("a foto do exame é redimensionada, como todas as outras do app", () => {
+    /* Era o ÚNICO caminho de imagem do arquivo sem canvas — e é a maior foto
+       do produto. Avatar 256px, álbum 800px, aba Exames 1200px, laudo… cru.
+       Consequência dupla: a conta de tamanho não fechava, e a instrução de
+       recusa ("tente uma foto com menos resolução") era impossível de seguir
+       para uma foto de celular de 48MP. */
+    expect(appBruto).toContain("const maxSize = 1600;");
+    expect(appBruto).toContain('canvas.toDataURL("image/jpeg", 0.85)');
+  });
+
+  test("A CONTA, não o literal: base64 cabe no limite da Vercel", () => {
+    /* Isto é a propriedade, e não a string do fonte — um avaliador mediu que
+       trocar o teto por 300 MiB só quebrava um `toContain`, que detecta
+       QUALQUER mudança e não detecta a errada.
+       PDF não passa por canvas, então é ele que define o teto. base64 cresce
+       4/3, e o limite da Vercel é 4,5 MB — ambíguo entre decimal e MiB, então
+       a conta tem que caber na leitura MENOR. */
+    const TETO_PDF = 3.0 * 1024 * 1024;
+    const base64 = Math.ceil(TETO_PDF * (4 / 3));
+    expect(base64).toBeLessThan(4_500_000);
+    expect(appBruto).toContain("file.size > 3.0 * 1024 * 1024");
   });
 });
 
