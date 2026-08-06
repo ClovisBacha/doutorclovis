@@ -1223,7 +1223,10 @@ export async function entregarCorrecao(
     });
     const { sendPushToUser } = await import("./push.server");
     await sendPushToUser(args.userId, {
-      title: "Sua médica revisou a resposta",
+      /* Sem gênero: o irmão em `entregarRespostaDaLacuna` diz "Seu médico
+         respondeu", este dizia "Sua médica" — e o dono desta instalação é
+         homem. Uma plataforma multi-médico não pode chutar. */
+      title: "Sua resposta foi revisada",
       body: args.pergunta.slice(0, 90),
       url: "/minha-conta?tab=Consultas&sub=perguntas",
     }).catch(() => {});
@@ -1356,7 +1359,13 @@ export const submitBrainFeedback = createServerFn({ method: "POST" })
           ...base,
           answer: data.answer?.slice(0, 4000) ?? null,
           entry_id: entryId,
-          ...(entryId ? { status: "aberta" } : {}),
+          /* SEM ENTRADA, A LINHA NASCE FECHADA.
+             Era `...(entryId ? { status: "aberta" } : {})` — e num 👎 repetido
+             que desta vez não acha entrada, o `upsert` deixa `entry_id` nulo e
+             `status` no default `'aberta'`. `listBrainReviews` filtra
+             `.not("entry_id","is",null)`, então a linha some da fila do médico
+             e NUNCA MAIS fecha: fica aberta para sempre, invisível. */
+          status: entryId ? "aberta" : "resolvida",
         },
         { onConflict: "user_id,question,helpful" },
       );

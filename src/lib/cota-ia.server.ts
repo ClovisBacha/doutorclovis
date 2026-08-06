@@ -35,6 +35,15 @@ export type SituacaoDaCota = {
   /** 0 a 1+; `0` quando o teto é ilimitado (não há fração de infinito). */
   fracao: number;
   estado: "ok" | "aviso" | "estourada";
+  /**
+   * A contagem foi ZERO porque não deu para medir?
+   *
+   * `respostasNoCiclo` devolve 0 em qualquer falha — o que está certo (na
+   * dúvida o médico é atendido) e fazia "não consegui medir" e "você não usou
+   * nada" produzirem a MESMA tela. Com a migration pendente, o médico lia
+   * "nenhuma resposta ainda neste ciclo" enquanto as pacientes conversavam.
+   */
+  falha?: "rede" | "migracao" | null;
 };
 
 /**
@@ -105,11 +114,33 @@ export async function respostasNoCiclo(doctorId: string, agora = new Date()): Pr
     /* Tabela ausente ou falha de rede → 0, ou seja, NÃO estoura.
        Na dúvida o médico é atendido: uma cota que se fecha sozinha por um
        soluço de banco tiraria o cérebro dele do ar sem ele ter feito nada. */
-    if (error) return 0;
+    if (error) {
+      /* O MOTIVO SOBE JUNTO. Devolver 0 está certo (na dúvida o médico é
+         atendido) — mas devolver 0 CALADO faz "não consegui medir" e "você não
+         usou nada" produzirem a mesma tela, e é o médico com a migration
+         pendente que lê "nenhuma resposta ainda" enquanto as pacientes
+         conversam. `42P01` é tabela ausente; o resto é rede. */
+      ultimaFalha = (error as { code?: string })?.code === "42P01" ? "migracao" : "rede";
+      return 0;
+    }
+    ultimaFalha = null;
     return typeof count === "number" ? count : 0;
   } catch {
+    ultimaFalha = "rede";
     return 0;
   }
+}
+
+/**
+ * Por que a última contagem foi zero — se é que foi por falha.
+ *
+ * Módulo-escopo em vez de retorno composto porque `respostasNoCiclo` é chamada
+ * de quatro lugares e só um deles (a tela) precisa do motivo; mudar a
+ * assinatura obrigaria os outros três a carregar um campo que ignoram.
+ */
+let ultimaFalha: "rede" | "migracao" | null = null;
+export function motivoDaUltimaContagem(): "rede" | "migracao" | null {
+  return ultimaFalha;
 }
 
 /** Junta consumo e teto numa decisão. Puro — o teste não precisa de banco. */
@@ -143,7 +174,8 @@ export async function cotaDoMedico(
      paga contrato aberto era o único que não enxergava o próprio uso. E o
      teste que deveria pegar isso só procurava a string "plano sem limite" no
      arquivo — passava por cima de um ramo inalcançável. */
-  return situacaoDaCota(await respostasNoCiclo(doctorId, agora), teto);
+  const usadas = await respostasNoCiclo(doctorId, agora);
+  return { ...situacaoDaCota(usadas, teto), falha: motivoDaUltimaContagem() };
 }
 
 /** Uma paciente na lista de quem mais consome. */

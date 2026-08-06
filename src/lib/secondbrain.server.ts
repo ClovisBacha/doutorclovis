@@ -219,7 +219,11 @@ const TERMOS_SUPORTE = new RegExp(
       /* Formas de pagar, e sair. `cartão` sozinho fica FORA de propósito — é o
          cartão de pré-natal —, mas "cartão de crédito" não é ambíguo. */
       "pix|boleto|fatura|comprovante|cart(?:ã|a)o de cr(?:é|e)dito|nota fiscal",
-      "sai(?:r|o|u)[0-9a-zà-ÿ]* da conta|desconectar|deslogar|trocar de senha",
+      "sai(?:r|o|u)[0-9a-zà-ÿ]* da conta|desconect\\w*|deslog[0-9a-zà-ÿ]*|logout|trocar de senha",
+      /* Conjugação de novo, e a mesma lição: a lista tinha `deslogar` e não
+         `deslogo`. Radical + sufixo cobre a família inteira. */
+      "fatura[0-9a-zà-ÿ]*|plano anual|plano mensal|teste gr(?:á|a)tis|per(?:í|i)odo de teste",
+      "modo escuro|modo claro|tema escuro|dois (?:celulares|aparelhos)|outro (?:celular|aparelho)|dispositiv\\w*",
       /* Trocar de médico é da plataforma por definição: é a única pergunta que
          o médico atual não pode responder sem conflito de interesse. */
       "trocar de m(?:é|e)dico|mudar de m(?:é|e)dico|trocar de obstetra|desvincular",
@@ -764,6 +768,9 @@ export function logBrainGap(
    */
   embedding?: number[] | null,
 ): void {
+  /* DISPARA-E-ESQUECE AUTORIZADO: este é o invólucro para quem NÃO pode
+     aguardar (o 👎, a API do DoctorThink). O caminho do chat usa a versão
+     aguardável e a entrega no `gravacaoDaLacuna`. */
   void logBrainGapAgora(doctorId, question, channel, patientId, embedding);
 }
 
@@ -1377,7 +1384,12 @@ export async function getBrainContext(
       const cota = await cotaDoMedico(target, ent.aiRepliesPerCycle);
       /* Ele descobria pela paciente, ou abrindo o painel por conta própria.
          Uma vez por marco, por ciclo — a guarda mora dentro da função. */
-      void avisarMedicoDaCota(target, cota);
+      /* AGUARDADO. Eu tinha escrito `void` — no caminho quente do chat, num
+         servidor que congela quando a resposta sai. E a trava não via, porque
+         a regex só reconhecia a forma `void (async () => …)()`.
+         Custa quase nada: com a cota em dia a função retorna na primeira
+         linha, sem tocar no banco; só a partir dos 80% ela consulta. */
+      await avisarMedicoDaCota(target, cota);
       if (cota.estado === "estourada") {
         return {
           block: "",

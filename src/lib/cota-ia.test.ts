@@ -80,8 +80,13 @@ describe("na dúvida, o médico é atendido", () => {
   test("falha de banco devolve ZERO, não estouro", () => {
     /* Uma cota que se fecha sozinha por um soluço de rede tiraria o cérebro do
        médico do ar sem ele ter feito nada — e ele descobriria pela paciente. */
-    expect(fonte).toContain("if (error) return 0;");
-    expect(fonte).toMatch(/catch \{\s*return 0;\s*\}/);
+    expect(fonte).toContain("return 0;");
+    expect(fonte).toContain('ultimaFalha = (error as { code?: string })?.code === "42P01"');
+    /* Devolver 0 na falha continua certo — o que mudou é que o MOTIVO sobe
+       junto. Sem ele, "não consegui medir" e "você não usou nada" produziam a
+       mesma tela, e o médico com migration pendente lia "nenhuma resposta
+       ainda neste ciclo" enquanto as pacientes conversavam. */
+    expect(fonte).toContain("export function motivoDaUltimaContagem()");
   });
 
   test("conta só a RESPOSTA, não memória nem embedding", () => {
@@ -266,8 +271,15 @@ describe("a paciente é avisada com honestidade, não com jargão", () => {
     expect(chat).toContain("? avisoDeCota");
   });
 
-  test("PROÍBE explicitamente a promessa que não se cumpre", () => {
-    expect(chat).toContain("NÃO diga que registrou a pergunta para ${medico} responder no app");
+  test("diz a VERDADE sobre o registro — que é o que acontece", () => {
+    /* O prompt mandava a IA dizer que NÃO registrou. Mas
+       `getBrainContext` grava a lacuna mesmo com a cota estourada
+       (`secondbrain.server.ts`, no ramo `estourada`), e ao respondê-la o médico
+       dispara `entregarRespostaDaLacuna` → a paciente RECEBE.
+       Ou seja: o produto fazia certo e mentia sobre isso. O que não se pode
+       prometer é resposta pelo app NESTE ciclo — não o registro. */
+    expect(chat).toContain("A dúvida FICA REGISTRADA para ${medico}");
+    expect(chat).toContain("O que você NÃO promete é resposta pelo app agora");
   });
 
   test("não fala de cota, plano nem pagamento com a paciente", () => {
@@ -307,7 +319,11 @@ describe("a paciente é avisada com honestidade, não com jargão", () => {
        a verdade, dá prazo, e não diz uma palavra sobre dinheiro. */
     const aviso = chat.slice(chat.indexOf("const avisoDeCota"));
     expect(aviso.slice(0, 1400)).toContain("até a virada do mês");
-    expect(aviso.slice(0, 1400)).toContain("continua acompanhando a gestação normalmente");
+    /* SEM GÊNERO: "Ela continua acompanhando" era feminino fixo, enquanto
+       `${medico}` é montado como "o(a) …". Numa plataforma multi-médico — e
+       com o dono desta instalação sendo homem — a frase saía errada. */
+    expect(aviso.slice(0, 1400)).toContain("O acompanhamento da gestação segue normalmente");
+    expect(aviso.slice(0, 1400)).not.toContain("Ela continua acompanhando");
   });
 
   test("a pergunta é respondida ANTES de qualquer aviso", () => {

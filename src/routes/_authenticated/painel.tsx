@@ -5851,8 +5851,11 @@ function ConsumoDaIACard({
     usadas: number;
     teto: number | null;
     estado: "ok" | "aviso" | "estourada";
+    falha?: "rede" | "migracao" | null;
     pacientes?: { patientId: string; nome: string; respostas: number; fatia: number }[];
   } | null>(null);
+  /** A leitura em si falhou (não a medição): sem isto, o card fica em esqueleto para sempre. */
+  const [naoCarregou, setNaoCarregou] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -5861,8 +5864,11 @@ function ConsumoDaIACard({
           data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
         });
         if (res.ok && "estado" in res) setCota(res);
+        else setNaoCarregou(true);
       } catch {
-        /* sem cota, sem card — mas sem derrubar o resto da aba */
+        /* ESQUELETO ETERNO era o comportamento antigo: `cota` ficava `null`
+           para sempre, sem retry e sem texto. */
+        setNaoCarregou(true);
       }
     })();
     /* `asDoctor` NAS DEPENDÊNCIAS. O efeito lê essa prop, e o componente é
@@ -5877,8 +5883,33 @@ function ConsumoDaIACard({
      seja: o card sumia exatamente no cenário que o refator dele veio corrigir,
      só que por outro caminho. "Não tenho como medir" e "você não usou nada"
      não podem produzir a mesma tela. */
+  if (naoCarregou) {
+    return (
+      <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-xs text-amber-900">
+        Não consegui medir o consumo agora.{" "}
+        <button type="button" onClick={() => window.location.reload()} className="underline">
+          Tentar de novo
+        </button>
+      </p>
+    );
+  }
   if (cota === null) {
     return <div className="skeleton h-24 rounded-3xl" />;
+  }
+  if (cota.falha) {
+    /* Mediu e não conseguiu — diferente de "não usou". */
+    return (
+      <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-xs leading-snug text-amber-900">
+        {cota.falha === "migracao" ? (
+          <>
+            Não consigo medir o consumo: falta a tabela de uso no banco. Rode{" "}
+            <code>supabase/APLICAR_USO_IA.sql</code> no SQL Editor do Supabase.
+          </>
+        ) : (
+          <>O banco não respondeu agora — o número do mês pode estar incompleto.</>
+        )}
+      </p>
+    );
   }
 
   const temTeto = cota.teto != null && cota.teto > 0;
@@ -5913,7 +5944,11 @@ function ConsumoDaIACard({
   const diaDoCiclo = Math.max(1, parteSP("day"));
   const diasDoMes = new Date(Date.UTC(parteSP("year"), parteSP("month"), 0)).getUTCDate();
   const projecao = Math.round((cota.usadas / diaDoCiclo) * diasDoMes);
-  const vaiEstourar = temTeto && projecao > (cota.teto as number) && cota.estado !== "estourada";
+  /* Piso de 5 dias: no dia 1, a regra de três multiplica ruído por 31 — vinte
+     respostas viram "você chega a ~620 das 500", o que é chute com cara de
+     medida. */
+  const vaiEstourar =
+    temTeto && diaDoCiclo >= 5 && projecao > (cota.teto as number) && cota.estado !== "estourada";
   /* A barra de cada paciente é proporcional à MAIOR, não ao total.
      Proporcional ao total, numa fila de cinquenta gestantes, a maior fatia dá
      ~12% da largura e todas as outras colapsam no piso — seis barrinhas do

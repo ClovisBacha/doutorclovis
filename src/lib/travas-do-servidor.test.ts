@@ -65,7 +65,14 @@ describe("dispare-e-esqueça não volta ao servidor", () => {
     const semJustificativa = DO_SERVIDOR.filter((f) => {
       const bruto = readFileSync(f, "utf8");
       const marcas = (bruto.match(/DISPARA-E-ESQUECE AUTORIZADO/g) ?? []).length;
-      const usos = (codigoDe(f).match(/void \(async \(\) =>/g) ?? []).length;
+      /* DUAS FORMAS, e a regex só via uma. `void (async () => {…})()` é a que
+         o repo escreveu três vezes; `void minhaFuncao(...)` faz exatamente a
+         mesma coisa e passava livre — inclusive no `void avisarMedicoDaCota()`
+         que eu tinha acabado de escrever no caminho quente do chat. */
+      const codigo = codigoDe(f);
+      const usos =
+        (codigo.match(/void \(async \(\) =>/g) ?? []).length +
+        (codigo.match(/^\s*void [a-zA-Z_$][\w$]*\(/gm) ?? []).length;
       return usos > marcas;
     });
     expect(semJustificativa).toEqual([]);

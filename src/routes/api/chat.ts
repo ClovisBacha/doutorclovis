@@ -4,6 +4,8 @@ import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server"
 import {
   getBrainContextResolved,
   ehSoSuporte,
+  isCortesia,
+  isElogio,
   mereceFila,
   normalizeGapQuestion,
 } from "@/lib/secondbrain.server";
@@ -33,6 +35,7 @@ Regras de resposta:
 - Responda **apenas à ÚLTIMA mensagem**. As anteriores são contexto, não perguntas pendentes. Cumprimento sozinho recebe cumprimento curto de volta.
 - Responda em português brasileiro, com tom acolhedor, claro e conciso (3 a 6 frases).
 - NÃO dê diagnóstico, prescrição ou conduta médica. Para dúvidas clínicas, oriente falar com o obstetra pelo app; em urgência, ligar 192 (SAMU) ou ir ao pronto-socorro.
+- NUNCA descreva telas, abas, seções ou fluxos do app que não estejam escritos nestas instruções. Inventar onde algo fica ("vá em Configurações › Assinatura") é pior que admitir que não sabe: manda a paciente procurar o que não existe. Se não souber onde fica, diga que não sabe e ofereça ajudar a encontrar.
 - Não invente dados (telefone, endereço, valores) além dos listados acima. Se não souber, encaminhe para o suporte pelo e-mail ${DOCTOR.supportEmail}.
 
 Preços do Premium da paciente (pode informar quando perguntarem; nunca invente outros):
@@ -692,6 +695,8 @@ export const Route = createFileRoute("/api/chat")({
            `cobertura`: ela nasce dentro do ramo da paciente e é aguardada no
            `onFinish`, que está fora daquele escopo. */
         let gravacaoDaLacuna: Promise<void> | undefined;
+        /** A gravação da pergunta da paciente, aguardada no `onFinish`. */
+        let gravacaoDaPergunta: Promise<void> | undefined;
 
         let system: string;
         /* CAMINHO ENXUTO — pergunta que é da PLATAFORMA, não do médico.
@@ -716,7 +721,15 @@ export const Route = createFileRoute("/api/chat")({
            `ehSoSuporte` exige DOIS sinais (fala de app E não fala de corpo). Na
            dúvida, é clínica: perder contexto clínico é muito pior que gastar
            tokens à toa. */
-        const soSuporte = !!patient && ehSoSuporte(lastUserText(messages));
+        /* CORTESIA E ELOGIO TAMBÉM NÃO SÃO DELE.
+           `mereceFila` já os reconhece e os mantém fora da fila do médico — mas
+           o caminho do CHAT só olhava `ehSoSuporte`, então "obrigada" e "vocês
+           são ótimos" (sem palavra de app) atravessavam inteiros: embedding,
+           busca vetorial, leitura das entradas dele e uma unidade do plano. O
+           médico pagava pela IA agradecer de volta. */
+        const textoAtual = lastUserText(messages);
+        const soSuporte =
+          !!patient && (ehSoSuporte(textoAtual) || isCortesia(textoAtual) || isElogio(textoAtual));
         if (soSuporte) {
           system =
             SUPPORT_SYSTEM_PROMPT +
@@ -789,14 +802,14 @@ export const Route = createFileRoute("/api/chat")({
           const comoFalarComEle = patient.doctorWhatsapp
             ? `pelo WhatsApp do consultório (${patient.doctorWhatsapp})`
             : "pela aba Consultas do app, que chega direto ao consultório";
-          const avisoDeCota = `IMPORTANTE — as respostas pessoais de ${medico} pelo app estão pausadas até a virada do mês. Ela continua acompanhando a gestação normalmente; o que muda é só este canal.
+          const avisoDeCota = `IMPORTANTE — as respostas pessoais de ${medico} pelo app estão pausadas até a virada do mês. O acompanhamento da gestação segue normalmente; o que muda é só este canal.
 
 Como agir, nesta ordem:
 1. Responda a pergunta com informação obstétrica consolidada e geral, com cuidado e sem inventar conduta.
-2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico}, e que as respostas dela voltam na virada do mês — sem falar em cota, plano, pagamento ou limite.
+2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico}, e que as respostas pessoais voltam na virada do mês — sem falar em cota, plano, pagamento ou limite.
 3. SEMPRE ofereça o caminho até ela: para qualquer coisa do caso dela, falar com ${medico} ${comoFalarComEle}. Isto não é opcional nem depende do tipo de pergunta — é o que impede a paciente de ficar sem saída.
 
-NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai responder por aqui neste momento, e prometer isso deixaria a paciente esperando.`;
+A dúvida FICA REGISTRADA para ${medico} — isso acontece de verdade, e você pode dizer. O que você NÃO promete é resposta pelo app agora: diga que ele vê quando puder, e que para hoje o caminho é o contato direto acima. Prometer resposta por aqui deixaria a paciente esperando por algo que não vem neste ciclo.`;
 
           const confianca = brain.cotaEsgotada
             ? avisoDeCota
@@ -849,7 +862,13 @@ NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai
 
         if (persistFor) {
           const { saveChatMessage } = await import("@/lib/chat-memory.server");
-          void saveChatMessage(
+          /* A PERGUNTA DELA TAMBÉM É AGUARDADA — no `onFinish`.
+             Era o único `void` da conversa sem ninguém guardando: se morresse,
+             a pergunta sumia do histórico e a próxima abertura mostrava
+             respostas sem perguntas. Aqui ela COMEÇA (antes do streaming, para
+             a poda de duplicata funcionar) e é aguardada no fim, junto do
+             resto. */
+          gravacaoDaPergunta = saveChatMessage(
             persistFor.patientId,
             persistFor.doctorId,
             "user",
@@ -1055,8 +1074,9 @@ NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai
                mesma trava que mantém `registrarUsoAgora` vivo — e aqui não
                custa nada à paciente, porque ela já terminou de ler. */
             const lacuna = gravacaoDaLacuna ?? Promise.resolve();
+            const pergunta = gravacaoDaPergunta ?? Promise.resolve();
             if (!persistFor) {
-              await Promise.all([registro, lacuna]);
+              await Promise.all([registro, lacuna, pergunta]);
               return;
             }
             try {
@@ -1065,6 +1085,7 @@ NÃO diga que registrou a pergunta para ${medico} responder no app: ele não vai
               await Promise.all([
                 registro,
                 lacuna,
+                pergunta,
                 /* Só com conteúdo. Gravar resposta vazia envenena a conversa
                    inteira: ela volta no histórico da próxima pergunta, e o
                    Gemini recusa mensagem de assistente sem texto — o que

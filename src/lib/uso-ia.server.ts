@@ -72,6 +72,9 @@ export type Uso = {
  * por ela no meio do streaming da resposta.
  */
 export function registrarUso(u: Uso): void {
+  /* DISPARA-E-ESQUECE AUTORIZADO: telemetria pura, e é o invólucro que existe
+     para quem não pode aguardar. Quem está no `onFinish` chama a versão
+     aguardável — é ela que mantém a medição viva em serverless. */
   void registrarUsoAgora(u);
 }
 
