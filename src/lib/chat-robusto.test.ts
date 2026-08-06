@@ -203,14 +203,32 @@ describe("os três chats leem erro do mesmo jeito", () => {
 });
 
 describe("a busca por significado não morre calada", () => {
-  test("a RPC do cérebro registra a própria falha", () => {
-    /* Sem este log, `match_brain_entries` ausente derruba a busca semântica
-       INTEIRA e o chat cai no ranking por palavras para sempre — com o painel
-       verde e nenhum sinal. As duas RPCs irmãs já logavam; a mais importante
-       das três era a única muda. */
+  /* Sem log, `match_brain_entries` ausente derruba a busca semântica INTEIRA e
+     o chat cai no ranking por palavras para sempre — com o painel verde e
+     nenhum sinal.
+
+     ─── ESTE TESTE JÁ QUEBROU POR SER FRÁGIL ─────────────────────────────────
+     Ele fazia `indexOf` e olhava os 1.200 caracteres seguintes: media a PRIMEIRA
+     ocorrência da RPC no arquivo. Quando a checagem de duplicata passou a usar
+     a mesma RPC e ficou acima no arquivo, o teste reprovou sem que nada tivesse
+     regredido — a alegação continuava verdadeira no lugar que ele queria medir.
+     A correção não é reancorar em outra posição (o próximo `insert` desloca de
+     novo): é cobrar de TODAS as ocorrências. Assim o teste fica mais forte e
+     para de depender de ordem no arquivo. */
+  test("toda chamada de match_brain_entries loga a própria falha", () => {
     const cerebro = readFileSync("src/lib/secondbrain.server.ts", "utf8");
-    const trecho = cerebro.slice(cerebro.indexOf('rpc("match_brain_entries"'));
-    expect(trecho.slice(0, 1200)).toContain("[cerebro] match_brain_entries falhou");
-    expect(trecho.slice(0, 1200)).toContain("APLICAR_PENDENTES.sql");
+    const pedacos = cerebro.split('rpc("match_brain_entries"').slice(1);
+    expect(pedacos.length).toBeGreaterThan(0);
+    for (const p of pedacos) {
+      /* A janela cobre o `if (error)` imediatamente seguinte; um log a 1.200
+         caracteres de distância estaria noutra função. */
+      expect(p.slice(0, 1200)).toContain("console.error");
+    }
+  });
+
+  test("a busca do chat diz QUAL SQL falta — o log só serve se acionar", () => {
+    const cerebro = readFileSync("src/lib/secondbrain.server.ts", "utf8");
+    expect(cerebro).toContain("[cerebro] match_brain_entries falhou");
+    expect(cerebro).toContain("APLICAR_PENDENTES.sql");
   });
 });

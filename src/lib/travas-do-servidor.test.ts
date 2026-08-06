@@ -87,6 +87,87 @@ describe("dispare-e-esqueça não volta ao servidor", () => {
   });
 });
 
+describe("chamada paga de modelo tem que ser medida", () => {
+  /**
+   * ─── O DEFEITO QUE ISTO IMPEDE DE VOLTAR ─────────────────────────────────
+   *
+   * O agente de WhatsApp chamava `generateText` a cada mensagem de paciente e
+   * NUNCA passava por `registrarUsoAgora`. O consumo daquele canal simplesmente
+   * não existia em `ai_usage`: nem no card de consumo, nem em "quem consome
+   * mais", nem na projeção do mês. Um consultório podia estar gastando o dobro
+   * do que a tela mostrava, indefinidamente, sem um único sinal.
+   *
+   * E não foi por descuido de quem escreveu: o arquivo é de AGENDA, e medir uso
+   * de IA "é assunto do chat". É exatamente assim que o próximo endpoint que
+   * chamar um modelo vai nascer — perto do problema dele, longe deste.
+   *
+   * Por isso a trava é sobre o PADRÃO, não sobre o arquivo: todo `generateText`
+   * / `streamText` / `generateObject` de servidor precisa ter uma medição por
+   * perto, ou uma isenção escrita por quem decidiu que ali não se mede.
+   */
+  const CHAMADAS_DE_MODELO = /\b(generateText|streamText|generateObject|embedContent)\s*\(/g;
+
+  test("todo modelo chamado no servidor é medido, ou tem isenção declarada", () => {
+    /* Isenções legítimas existem: o próprio medidor, o gerador de embeddings
+       (que já tem contabilidade própria por espécie) e o transcritor. O que a
+       trava cobra é que a isenção esteja ESCRITA — a decisão aparece no diff,
+       em vez de ser herdada por acidente do arquivo vizinho. */
+    const semMedicao = DO_SERVIDOR.filter((f) => {
+      const codigo = codigoDe(f);
+      const chamadas = (codigo.match(CHAMADAS_DE_MODELO) ?? []).length;
+      if (chamadas === 0) return false;
+      const bruto = readFileSync(f, "utf8");
+      const isencoes = (bruto.match(/SEM MEDICAO AUTORIZADO/g) ?? []).length;
+      const medicoes = (codigo.match(/registrarUso(Agora)?\s*\(/g) ?? []).length;
+      return medicoes + isencoes === 0;
+    });
+    expect(semMedicao).toEqual([]);
+  });
+
+  test("só o chat da paciente grava no canal que a cota conta", () => {
+    /* ─── O OUTRO LADO DA MOEDA ────────────────────────────────────────────
+       A cota virou lista de PERMISSÃO: conta `canal: "app"` e nada mais. Isso
+       impede um canal novo de entrar na franquia por omissão — mas não impede
+       alguém de rotular o canal novo COMO "app", que produz o mesmo estrago
+       com uma linha de aparência inocente.
+       Uma busca de médico ou uma carta do bebê marcadas como "app" comeriam a
+       franquia de dúvidas clínicas da gestante, e ela ficaria sem resposta
+       clínica por causa disso. O chat dela é o único que pode cobrar. */
+    const gravamNoCanalDaCota = DO_SERVIDOR.filter(
+      (f) => /canal:\s*"app"/.test(codigoDe(f)) && !f.endsWith("api/chat.ts"),
+    );
+    expect(gravamNoCanalDaCota).toEqual([]);
+  });
+
+  test("a varredura acha chamadas de modelo de verdade (o teste testa algo)", () => {
+    /* Se a regex parar de casar — porque a SDK renomeou, porque alguém passou a
+       chamar via variável — o teste acima passa com zero arquivos e vira
+       decoração. Este é o mesmo par de segurança do bloco de cima. */
+    const comModelo = DO_SERVIDOR.filter((f) => CHAMADAS_DE_MODELO.test(codigoDe(f)));
+    expect(comModelo.length).toBeGreaterThan(2);
+  });
+});
+
+describe("o Segundo Cérebro vive só no chat do app", () => {
+  /**
+   * Decisão de produto do Clóvis (ago/2026), e ela precisa de trava porque o
+   * caminho de volta é fácil: "é só passar o bloco de estilo para o WhatsApp
+   * também".
+   *
+   * O cérebro é conduta clínica assinada com o nome do médico, e isso pede o
+   * ciclo inteiro — cobertura medida, lacuna que vira resposta, 👎 que vira
+   * revisão, correção que volta para quem reclamou. Esse ciclo só existe dentro
+   * do app. No WhatsApp, o cérebro gravava lacunas a partir de conversa de
+   * marcação, prometia "registrei aqui para ele ver" sem ter onde entregar a
+   * resposta, e não tinha 👎 nenhum.
+   */
+  test("o agente de WhatsApp não importa o cérebro", () => {
+    const wa = readFileSync("src/lib/whatsapp-agent.server.ts", "utf8");
+    expect(wa).not.toContain("secondbrain.server");
+    expect(wa).not.toContain("getBrainContext");
+  });
+});
+
 describe("escrita no banco não pode falhar em silêncio", () => {
   /**
    * O `supabase-js` NÃO lança quando o Postgres recusa: devolve `{ error }`.

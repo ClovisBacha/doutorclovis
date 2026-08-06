@@ -111,6 +111,7 @@ import {
   curarLacunasDoMedico,
   embedarEntradasDoMedico,
   listBrainGaps,
+  reabrirLacuna,
   resolveBrainGap,
   dismissBrainGap,
   draftGapAnswer,
@@ -123,6 +124,7 @@ import {
   getBrainConversation,
   getBrainScore,
   type BrainGap,
+  type LacunaQueVoltou,
   type BrainEntry,
   type BrainSettings,
   type BrainConversation,
@@ -6536,6 +6538,19 @@ function BrainReviewCard({
  * pelas mais perguntadas. O médico responde aqui e vira conhecimento aprovado
  * na hora.
  */
+/**
+ * Há quanto tempo a primeira paciente está esperando.
+ *
+ * Texto e não número puro: "há 26 dias" pesa, "26" não. Hoje some — dizer "há
+ * 0 dias" numa dúvida de agora seria ruído em toda linha nova da fila.
+ */
+function esperaDe(criadaEm?: string | null): string {
+  if (!criadaEm) return "";
+  const dias = Math.floor((Date.now() - new Date(criadaEm).getTime()) / 86_400_000);
+  if (!Number.isFinite(dias) || dias <= 0) return "";
+  return dias === 1 ? " · há 1 dia" : ` · há ${dias} dias`;
+}
+
 function BrainGapsCard({
   tokenFn,
   asDoctor,
@@ -6548,6 +6563,10 @@ function BrainGapsCard({
   onContar?: (n: number) => void;
 }) {
   const [gaps, setGaps] = useState<BrainGap[]>([]);
+  /* As IGNORADAS que continuaram sendo perguntadas. Lista separada de
+     propósito: misturá-las com a fila desfaria a decisão dele sem avisar. */
+  const [voltaram, setVoltaram] = useState<LacunaQueVoltou[]>([]);
+  const [reabrindo, setReabrindo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // Erro/tabela ausente NÃO pode se disfarçar de "nenhuma lacuna ✅"
   const [loadError, setLoadError] = useState<"rede" | "migracao" | null>(null);
@@ -6597,6 +6616,7 @@ function BrainGapsCard({
       });
       if (res.ok) {
         setGaps(res.gaps);
+        setVoltaram(("voltaram" in res ? res.voltaram : []) ?? []);
         onContar?.(res.gaps.length);
         setLoadError(null);
         /* Lacuna sem vetor não agrupa nem é agrupada, e toda lacuna anterior à
@@ -6684,6 +6704,25 @@ function BrainGapsCard({
     }
   }
 
+  async function reabrir(gapId: string) {
+    if (reabrindo) return;
+    setReabrindo(gapId);
+    try {
+      const tk = await tokenFn();
+      const res = await reabrirLacuna({
+        data: { accessToken: tk, gapId, ...(asDoctor ? { asDoctor } : {}) },
+      });
+      if (res.ok) {
+        setVoltaram((vs) => vs.filter((v) => v.id !== gapId));
+        await load();
+      } else toast.error("Não foi possível trazer de volta.");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setReabrindo(null);
+    }
+  }
+
   async function installKit() {
     setInstalling(true);
     try {
@@ -6762,8 +6801,14 @@ function BrainGapsCard({
             <div key={g.id} className="rounded-2xl border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="min-w-0 flex-1 text-sm font-medium">"{g.question}"</p>
+                {/* A IDADE, ao lado da repetição.
+                    "3× perguntada" não distingue três pacientes ontem de três
+                    ao longo de um mês — e a segunda é alguém esperando há um
+                    mês por uma resposta que a IA prometeu. Sem a idade, a fila
+                    ordenava por volume e a espera mais longa sumia. */}
                 <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
-                  {g.hits}× perguntada{g.channel === "whatsapp" ? " · WhatsApp" : ""}
+                  {g.hits}× perguntada{esperaDe(g.created_at)}
+                  {g.channel === "whatsapp" ? " · WhatsApp" : ""}
                 </span>
               </div>
               {answering === g.id ? (
@@ -6844,6 +6889,46 @@ function BrainGapsCard({
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ─── IGNORADAS QUE VOLTARAM ────────────────────────────────────────
+          "Ignorar" tinha virado "nunca mais": a busca por texto encontra a
+          lacuna em qualquer status e incrementa `hits`, mas só `respondida`
+          volta para `aberta` — e a fila lê `aberta`. Ele ignorava quando UMA
+          paciente tinha perguntado e nunca mais via aquilo, enquanto cada
+          paciente seguinte ouvia "registrei aqui para ele ver".
+          Lista SEPARADA, e volta só com o clique dele: reabrir sozinha
+          desfaria a decisão na cara dura. */}
+      {voltaram.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50/60 p-4">
+          <p className="text-sm font-medium text-amber-900">
+            🔁 Você ignorou, e continuaram perguntando
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-amber-800">
+            Cada uma dessas pacientes ouviu da IA que a dúvida ficou registrada para você.
+          </p>
+          <div className="mt-3 space-y-2">
+            {voltaram.map((g) => (
+              <div
+                key={g.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-white/70 px-3 py-2"
+              >
+                <p className="min-w-0 flex-1 text-sm text-foreground">{g.question}</p>
+                <span className="shrink-0 text-[11px] font-semibold tabular-nums text-amber-800">
+                  +{g.perguntaramDepois} {g.perguntaramDepois === 1 ? "paciente" : "pacientes"}{" "}
+                  depois
+                </span>
+                <button
+                  onClick={() => reabrir(g.id)}
+                  disabled={reabrindo === g.id}
+                  className="shrink-0 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {reabrindo === g.id ? "…" : "Trazer de volta"}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -7157,9 +7242,23 @@ function BrainKnowledgeCard({
   const [newAnswer, setNewAnswer] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [adding, setAdding] = useState(false);
+  /* A entrada parecida que o servidor achou — o aviso antes de criar uma
+     segunda verdade sobre o mesmo assunto. */
+  const [parecida, setParecida] = useState<{
+    id: string;
+    question: string;
+    answer: string;
+    similaridade: number;
+  } | null>(null);
   // Edição inline: revisar/generalizar pergunta e resposta (ex.: rascunho do
   // kit ou de transcrição com detalhe pessoal) sem excluir e recriar.
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** Abre a edição de uma entrada já existente — usado pelo aviso de duplicata. */
+  function startEdit(id: string, question: string, answer: string) {
+    setEditingId(id);
+    setEditQ(question);
+    setEditA(answer);
+  }
   const [editQ, setEditQ] = useState("");
   const [editA, setEditA] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -7287,7 +7386,7 @@ function BrainKnowledgeCard({
     toast.success("Entrada excluída.");
   }
 
-  async function add() {
+  async function add(mesmoAssim = false) {
     if (!newQuestion.trim() || !newAnswer.trim() || adding) return;
     setAdding(true);
     try {
@@ -7297,13 +7396,23 @@ function BrainKnowledgeCard({
           question: newQuestion.trim(),
           answer: newAnswer.trim(),
           category: newCategory.trim() || null,
+          ...(mesmoAssim ? { mesmoAssim: true } : {}),
           ...(asDoctor ? { asDoctor } : {}),
         },
       });
+      /* JÁ EXISTE ALGO PARECIDO. Não é erro — é a informação que faltava para
+         ele decidir entre editar o que já escreveu e criar uma segunda
+         verdade sobre o mesmo assunto. Editar é quase sempre o certo, e era
+         justamente a opção que não existia. */
+      if (!res.ok && "reason" in res && res.reason === "parecida" && "parecida" in res) {
+        setParecida(res.parecida);
+        return;
+      }
       if (!res.ok || !res.entry) {
         toast.error("Não foi possível adicionar a entrada. Tente novamente.");
         return;
       }
+      setParecida(null);
       const entry = res.entry;
       // Com busca ativa, limpa o filtro (o effect recarrega a lista completa,
       // já com a nova entrada); sem busca, insere direto no topo.
@@ -7369,13 +7478,62 @@ function BrainKnowledgeCard({
               className="w-44 rounded-xl border border-input bg-background px-3 py-2 text-sm"
             />
             <button
-              onClick={add}
+              onClick={() => add()}
               disabled={adding || !newQuestion.trim() || !newAnswer.trim()}
               className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
             >
               {adding ? "Adicionando..." : "+ Adicionar ao cérebro"}
             </button>
           </div>
+
+          {/* ─── VOCÊ JÁ ESCREVEU ALGO PARECIDO ─────────────────────────────
+              A base não deduplicava nada, e a faixa do meio empurra para a
+              duplicata: material próximo não assina, vira lacuna, ele
+              responde, e nasce uma segunda entrada competindo com a primeira.
+              Duas verdades sobre o mesmo tema, e a busca devolvendo a que
+              estiver por um fio mais perto — às vezes a versão velha.
+              Aviso, e não bloqueio: "1º trimestre" e "3º trimestre" são
+              legitimamente parecidos e precisam coexistir. */}
+          {parecida && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4 text-amber-900">
+              <p className="text-sm font-medium">
+                Você já escreveu algo muito parecido ({Math.round(parecida.similaridade * 100)}% de
+                semelhança)
+              </p>
+              <div className="mt-2 rounded-xl border border-amber-200 bg-white/70 px-3 py-2">
+                <p className="text-sm font-medium">"{parecida.question}"</p>
+                <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{parecida.answer}</p>
+              </div>
+              <p className="mt-2 text-[11px] leading-snug">
+                Duas entradas sobre o mesmo assunto competem entre si na busca — e a IA pode acabar
+                usando a versão antiga. Editar a que existe costuma ser o certo.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    startEdit(parecida.id, parecida.question, parecida.answer);
+                    setParecida(null);
+                  }}
+                  className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white"
+                >
+                  Editar a que existe
+                </button>
+                <button
+                  onClick={() => add(true)}
+                  disabled={adding}
+                  className="rounded-full border border-amber-400 px-4 py-2 text-xs font-medium disabled:opacity-40"
+                >
+                  {adding ? "Adicionando..." : "Criar mesmo assim"}
+                </button>
+                <button
+                  onClick={() => setParecida(null)}
+                  className="rounded-full px-3 py-2 text-xs text-amber-800 underline"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

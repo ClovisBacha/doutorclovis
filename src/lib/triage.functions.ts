@@ -51,6 +51,15 @@ Regras absolutas:
           } Escreva uma orientação curta e acolhedora.`,
         });
         if (text?.trim()) message = text.trim();
+        /* MEDIDO. Uma trava mecânica achou oito chamadas pagas de modelo que ninguém
+     media — esta era uma delas. O consumo não existia em `ai_usage`: nem no
+     card, nem na projeção do mês. Canal próprio, e a cota conta só `app`. */
+        const { registrarUsoAgora } = await import("./uso-ia.server");
+        await registrarUsoAgora({
+          especie: "chat",
+          modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          canal: "triagem",
+        });
       } catch (e) {
         console.error("triage AI failed", e);
       }

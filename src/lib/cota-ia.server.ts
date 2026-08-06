@@ -88,29 +88,49 @@ export function inicioDoCiclo(agora = new Date()): Date {
  *
  * `head: true` traz só o número, sem as linhas — isto roda a cada mensagem.
  */
+/**
+ * ─── A COTA CONTA UM CANAL SÓ ───────────────────────────────────────────────
+ *
+ * O portão que interrompe as respostas do cérebro vive em `getBrainContext`, e
+ * ele protege UM caminho: o chat da paciente no app (`canal: "app"`). A cota
+ * tem que contar exatamente o que esse portão consegue parar — nada mais.
+ *
+ * ─── POR QUE ERA UMA LISTA DE EXCLUSÕES, E POR QUE ISSO ERRAVA ──────────────
+ *
+ * Antes o recorte era `.neq("canal","suporte").neq("canal","teste")…`: contava
+ * TUDO menos o que estivesse na lista. Ou seja, todo canal novo entrava na cota
+ * do médico por omissão — sem ninguém decidir, sem aparecer em revisão.
+ *
+ * E aconteceu. Uma trava mecânica encontrou OITO chamadas pagas de modelo que
+ * ninguém media (agenda do WhatsApp, triagem de sintomas, carta semanal, busca
+ * de médicos, teleconsulta, conselheiro, nutrição, rascunho do cérebro).
+ * Passar a medi-las com a régua antiga faria a franquia de dúvidas clínicas da
+ * gestante ser consumida por uma busca de médico ou uma carta do bebê — e a
+ * paciente ficaria sem resposta clínica por causa disso.
+ *
+ * Invertido, o erro fica impossível por construção: quem quiser que um canal
+ * novo conte precisa dizer isso aqui, de propósito.
+ *
+ * O consumo — o que custa dinheiro — continua medindo TODOS os canais. São
+ * perguntas diferentes: "quanto isto gasta" e "quanto do plano dele já foi".
+ */
+export const CANAL_DA_COTA = "app";
+
+export function aplicarRecorteDaCota<T>(q: T): T {
+  const query = q as unknown as { eq: (c: string, v: string) => unknown };
+  return query.eq("canal", CANAL_DA_COTA) as T;
+}
+
 export async function respostasNoCiclo(doctorId: string, agora = new Date()): Promise<number> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { count, error } = await (supabaseAdmin as any)
-      .from("ai_usage")
-      .select("id", { count: "exact", head: true })
-      .eq("doctor_id", doctorId)
-      .eq("especie", "chat")
-      /* SUPORTE NÃO É DELE. "Onde vejo minhas notificações?" é pergunta da
-         plataforma, respondida pela plataforma, sem o cérebro do médico e sem
-         a memória clínica — e mesmo assim queimava uma unidade do plano dele,
-         porque a linha é gravada com o `doctor_id` da paciente. O caminho
-         enxuto economizava tokens e não economizava cota. */
-      .neq("canal", "suporte")
-      /* E o canal "teste" TAMBÉM não é dela: é o médico exercitando o próprio
-         cérebro no playground e no rascunho de lacuna. Cobrar dele por treinar
-         a IA é cobrar pelo trabalho que melhora o produto — e `getBrainContext`
-         já isenta o canal "teste" do portão de cota pelo mesmo motivo. */
-      .neq("canal", "teste")
-      /* E as MARCAS de aviso ("cota-80"/"cota-100"), que moram nesta tabela
-         por não haver coluna melhor. Não são resposta a paciente nenhuma. */
-      .not("canal", "like", "cota-%")
-      .gte("created_at", inicioDoCiclo(agora).toISOString());
+    const { count, error } = await aplicarRecorteDaCota(
+      (supabaseAdmin as any)
+        .from("ai_usage")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .eq("especie", "chat"),
+    ).gte("created_at", inicioDoCiclo(agora).toISOString());
     /* Tabela ausente ou falha de rede → 0, ou seja, NÃO estoura.
        Na dúvida o médico é atendido: uma cota que se fecha sozinha por um
        soluço de banco tiraria o cérebro dele do ar sem ele ter feito nada. */
@@ -207,22 +227,9 @@ export async function consumoPorPaciente(
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
-    const { data, error } = await sb
-      .from("ai_usage")
-      .select("patient_id")
-      .eq("doctor_id", doctorId)
-      .eq("especie", "chat")
-      /* Mesmo recorte de `respostasNoCiclo` — se as duas leituras divergirem,
-         a soma das fatias não fecha com o número grande logo acima delas. */
-      .neq("canal", "suporte")
-      /* E o canal "teste" TAMBÉM não é dela: é o médico exercitando o próprio
-         cérebro no playground e no rascunho de lacuna. Cobrar dele por treinar
-         a IA é cobrar pelo trabalho que melhora o produto — e `getBrainContext`
-         já isenta o canal "teste" do portão de cota pelo mesmo motivo. */
-      .neq("canal", "teste")
-      /* E as MARCAS de aviso ("cota-80"/"cota-100"), que moram nesta tabela
-         por não haver coluna melhor. Não são resposta a paciente nenhuma. */
-      .not("canal", "like", "cota-%")
+    const { data, error } = await aplicarRecorteDaCota(
+      sb.from("ai_usage").select("patient_id").eq("doctor_id", doctorId).eq("especie", "chat"),
+    )
       .gte("created_at", inicioDoCiclo(agora).toISOString())
       /* Teto de leitura: a agregação acontece aqui, não no banco, porque o
          PostgREST não faz GROUP BY. Com milhares de linhas isto viraria uma

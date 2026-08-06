@@ -986,6 +986,15 @@ async function parseCriteria(q: string): Promise<ParsedCriteria> {
       prompt: q,
       maxOutputTokens: 300,
     });
+    /* MEDIDO. Uma trava mecânica achou oito chamadas pagas de modelo que
+     ninguém media — esta era uma delas. Canal próprio: a cota conta só
+     `app`, então isto aparece no consumo sem comer a franquia clínica. */
+    const { registrarUsoAgora } = await import("./uso-ia.server");
+    await registrarUsoAgora({
+      especie: "chat",
+      modelo: process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL,
+      canal: "busca-medicos",
+    });
     const raw = result.text.trim().replace(/^```json?\s*|\s*```$/g, "");
     const p = JSON.parse(raw) as Record<string, unknown>;
     return {

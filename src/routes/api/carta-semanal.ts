@@ -79,6 +79,15 @@ Regras:
           prompt,
         });
 
+        /* MEDIDO. Uma trava mecânica achou oito chamadas pagas de modelo que
+       ninguém media — esta era uma delas. Canal próprio: a cota conta só
+       `app`, então isto aparece no consumo sem comer a franquia clínica. */
+        const { registrarUsoAgora } = await import("@/lib/uso-ia.server");
+        await registrarUsoAgora({
+          especie: "chat",
+          modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          canal: "carta-semanal",
+        });
         return new Response(JSON.stringify({ ok: true, letter: text.trim() }), {
           headers: { "Content-Type": "application/json" },
         });

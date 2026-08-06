@@ -1139,6 +1139,73 @@ export async function entradaQueRespondeu(
 }
 
 /**
+ * Corte para AVISAR que já existe algo parecido na base.
+ *
+ * 0,80 e não `SEMANTIC_MIN_SIMILARITY` (0,62): aqui o custo do falso positivo é
+ * o médico ser interrompido no meio de um trabalho legítimo. "Enjoo no primeiro
+ * trimestre" e "azia no terceiro" casam em 0,65 e são coisas diferentes; a
+ * 0,80 o que aparece é praticamente a mesma pergunta escrita de outro jeito.
+ *
+ * Abaixo do corte de ATRIBUIÇÃO (0,74) seria contraditório: um par que o chat
+ * considera bom o bastante para assinar com o nome dele não pode ser tratado
+ * aqui como assunto distinto.
+ */
+export const DUPLICATA_MIN_SIMILARITY = 0.8;
+
+/**
+ * Já existe algo parecido? Devolve a entrada mais próxima acima do corte.
+ *
+ * ─── POR QUE ISTO PRECISOU EXISTIR ──────────────────────────────────────────
+ *
+ * `addBrainEntry` inseria sem `onConflict` e sem nenhuma checagem de
+ * semelhança. E a faixa do meio EMPURRA para a duplicata: material próximo →
+ * não assina → vira lacuna → ele responde → nasce uma SEGUNDA entrada sobre o
+ * mesmo assunto, competindo com a primeira na busca vetorial.
+ *
+ * As lacunas se agrupam por vetor (`match_brain_gaps`) desde sempre. As
+ * entradas — que são o ativo, o que ele realmente escreveu — não tinham nada.
+ * Com o tempo o cérebro passa a ter duas verdades sobre o mesmo tema e nada
+ * escolhe entre elas: a busca devolve a que estiver por um fio mais perto,
+ * inclusive a versão velha que ele já teria corrigido se soubesse que existia.
+ *
+ * `null` em qualquer falha — sem chave de IA, sem RPC, sem coluna. Isto é um
+ * AVISO, não um portão: bloquear o médico de gravar conhecimento porque um
+ * embedding não respondeu seria trocar um problema pequeno por um grande.
+ */
+export async function entradaParecida(
+  doctorId: string,
+  pergunta: string,
+  resposta: string,
+): Promise<{ id: string; question: string; answer: string; similarity: number } | null> {
+  try {
+    const { embedText } = await import("./embeddings.server");
+    /* O vetor de DOCUMENTO, não de consulta: os dois lados aqui são entradas
+       do médico (pergunta + resposta), e comparar documento com consulta
+       produziria um número que parece similaridade e não é — o mesmo erro que
+       a lacuna já cometeu com o `taskType`. */
+    const vec = await embedText(textoParaVetor(`${pergunta}\n${resposta}`), 4000, "documento");
+    if (!vec) return null;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any).rpc("match_brain_entries", {
+      p_doctor_id: doctorId,
+      p_embedding: vec,
+      p_limit: 1,
+    });
+    if (error) {
+      console.error("[cérebro] checagem de duplicata indisponível", error);
+      return null;
+    }
+    const melhor = (Array.isArray(data) ? data[0] : null) as
+      | { id: string; question: string; answer: string; similarity: number }
+      | undefined;
+    if (!melhor || melhor.similarity < DUPLICATA_MIN_SIMILARITY) return null;
+    return melhor;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * E-mail "sua IA tem perguntas sem resposta" (fire-and-forget, ≤1/dia).
  * Sem RESEND_API_KEY vira no-op (o painel continua sendo a fonte).
  */

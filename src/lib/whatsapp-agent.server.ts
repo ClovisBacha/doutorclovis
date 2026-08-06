@@ -16,7 +16,7 @@ import { createChatProvider, DEFAULT_CHAT_MODEL } from "./ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DOCTOR } from "./doctor.config";
 import { waSendText, waSendButtons } from "./whatsapp.server";
-import { getBrainContextResolved } from "./secondbrain.server";
+import { registrarUsoAgora } from "./uso-ia.server";
 
 /* ------------------------------------------------------------------ */
 /* Tipos                                                                */
@@ -111,7 +111,7 @@ LÍNGUA: Português brasileiro coloquial mas educado.
 REGRAS:
 - Você é uma INTELIGÊNCIA ARTIFICIAL de apoio — NÃO é o médico e NÃO substitui a consulta. Se a paciente tratar você como médica, esclareça com gentileza.
 - NUNCA dê diagnóstico, prescrição, dose de medicamento ou conduta clínica.
-- Responda SOMENTE dentro do que o médico já validou (bloco de estilo/conduta, se houver). Fora disso, NÃO improvise: diga que vai encaminhar ao médico e sugira consulta.
+- Este canal é de AGENDA e informação geral do consultório. Você NÃO tem acesso às orientações clínicas que o médico validou — elas vivem no app. Não improvise conduta: diga que vai encaminhar ao médico e sugira consulta ou o chat do app.
 - Para sintomas preocupantes → oriente urgência: SAMU 192 ou UPA/pronto-socorro AGORA.
 - Para perguntas clínicas → informação geral acolhedora e sugira consulta com o médico.
 - Seja CONCISA: máx 3 frases por mensagem no fluxo de agendamento.
@@ -139,19 +139,29 @@ async function callAgent(
   const google = createChatProvider(key);
   const history = conv.context.history ?? [];
 
-  // Segundo Cérebro: contexto adicional de estilo/conduta do médico.
-  // getBrainContext é safe (falha vira block vazio) — nunca derruba o agente.
-  // O block só influencia o TOM do campo "reply"; o formato JSON da resposta
-  // e o fluxo de estados continuam regidos pelo prompt abaixo.
-  const [brain, identity] = await Promise.all([
-    getBrainContextResolved(userMessage, doctorId ?? undefined, "whatsapp"),
-    resolveDoctorIdentity(doctorId),
-  ]);
-  const baseSystem = buildSystem(identity);
-  const system =
-    brain.enabledWhatsapp && brain.block
-      ? `${baseSystem}\n\n${brain.block}\nO bloco acima orienta apenas o estilo e a conduta do texto enviado ao paciente. Continue seguindo o fluxo de estados e o formato de resposta em JSON exigidos na mensagem do usuário.`
-      : baseSystem;
+  /* ─── O SEGUNDO CÉREBRO SAIU DAQUI (decisão do Clóvis, ago/2026) ──────────
+   *
+   * Este agente é de AGENDA: coleta nome, motivo e preferência de horário num
+   * fluxo de estados com resposta em JSON. O cérebro entrava só para dar tom —
+   * e trazia junto o pacote inteiro que o app tem e este canal não:
+   *
+   *   · lacunas gravadas na fila do médico a partir de uma conversa de
+   *     marcação, misturadas com as dúvidas clínicas reais do chat;
+   *   · a promessa "registrei aqui para ele ver" saindo de um bot que não tem
+   *     onde entregar a resposta — o WhatsApp não tem a aba Perguntas dela;
+   *   · nenhum 👎, então nada do que saísse errado por aqui voltava para a
+   *     fila de revisão;
+   *   · o portão de cota esvaziava o bloco e a chamada paga acontecia igual.
+   *
+   * O cérebro é conduta clínica assinada com o nome do médico. Isso pede o
+   * ciclo completo — cobertura medida, lacuna que vira resposta, correção que
+   * volta para quem reclamou — e esse ciclo só existe dentro do app.
+   *
+   * `enabled_whatsapp` continua na tabela e na tela como estava, mas deixou de
+   * mandar aqui: a coluna vira histórico, não comportamento.
+   */
+  const identity = await resolveDoctorIdentity(doctorId);
+  const system = buildSystem(identity);
 
   const stateInstructions: Record<ConvState, string> = {
     start: `O paciente acabou de mandar a primeira mensagem. Cumprimenta-o pelo nome se disponível, apresente-se brevemente e pergunte como pode ajudar. Se a intenção for agendamento, mova para collecting_name.`,
@@ -195,11 +205,38 @@ Responda OBRIGATORIAMENTE em JSON válido com este formato exato:
   "create_appointment": <true se next_state é "done" E paciente confirmou, senão false>
 }`;
 
+  const modelo = process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL;
   const result = await generateText({
-    model: google(process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL),
+    model: google(modelo),
     system,
     prompt,
     maxOutputTokens: 512, // AI SDK v5+ renomeou maxTokens → maxOutputTokens
+  });
+
+  /* ─── ESTA CHAMADA ERA GRÁTIS PARA QUEM MEDE ─────────────────────────────
+   *
+   * Toda mensagem de WhatsApp acionava o modelo e NÃO passava por
+   * `registrarUsoAgora`. O consumo do canal não existia em `ai_usage`: nem no
+   * card de consumo, nem em "quem consome mais", nem na projeção do mês. Um
+   * consultório podia estar gastando o dobro do que a tela mostrava.
+   *
+   * `canal: "agenda-whatsapp"` e não `"whatsapp"`, de propósito: a cota do
+   * plano conta RESPOSTAS DE IA À PACIENTE, e isto é um bot de marcação. Fazer
+   * a marcação de horário consumir a franquia de dúvidas clínicas seria trocar
+   * uma medição ausente por uma medição errada — e deixaria a gestante sem
+   * resposta clínica porque alguém pediu horário.
+   *
+   * Aguardado, e não disparado: o webhook responde 200 antes, então o que não
+   * for aguardado aqui morre com o congelamento da invocação. É o mesmo
+   * defeito de servidor sem servidor que já matou três recursos nesta base.
+   */
+  await registrarUsoAgora({
+    especie: "chat",
+    modelo,
+    inputTokens: result.usage?.inputTokens,
+    outputTokens: result.usage?.outputTokens,
+    doctorId: doctorId ?? null,
+    canal: "agenda-whatsapp",
   });
 
   try {

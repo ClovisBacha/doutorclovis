@@ -78,7 +78,25 @@ async function handle(request: Request): Promise<Response> {
       if (res.sent > 0) notified++;
     }
 
-    return new Response(JSON.stringify({ ok: true, notified }), {
+    /* ─── E A FILA DO MÉDICO, QUE NÃO ENVELHECIA ──────────────────────────
+     *
+     * `notifyDoctorOfGap` avisa UMA vez, no instante em que a lacuna nasce, e
+     * deduplica. Depois disso, nada: uma dúvida que ficou 40 dias parada
+     * produzia exatamente o mesmo silêncio de uma respondida ontem. Enquanto
+     * isso, cada paciente que repetia a pergunta ouvia "registrei aqui para
+     * ele ver".
+     *
+     * Aproveita este cron porque ele já roda diariamente e já é protegido —
+     * criar um segundo agendamento para a mesma cadência seria mais uma coisa
+     * para configurar e esquecer.
+     *
+     * A cadência é SEMANAL sem tabela de controle: só dispara na segunda-feira.
+     * Um lembrete diário sobre a mesma fila é como a paciente que desliga as
+     * notificações — o aviso perde o sentido de aviso.
+     */
+    const medicosAvisados = await cobrarLacunasParadas();
+
+    return new Response(JSON.stringify({ ok: true, notified, medicosAvisados }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -89,6 +107,79 @@ async function handle(request: Request): Promise<Response> {
       headers: { "content-type": "application/json" },
     });
   }
+}
+
+/**
+ * Quantos dias uma lacuna precisa esperar para virar cobrança.
+ *
+ * Sete: menos que isso atropela o médico que viaja ou tira folga, e o aviso de
+ * nascimento (`notifyDoctorOfGap`) já cobriu o dia zero. Mais que isso é
+ * tempo demais para uma gestante esperar uma resposta que lhe foi prometida.
+ */
+const DIAS_PARA_COBRAR = 7;
+
+/**
+ * Avisa cada médico que tem lacuna parada há mais de uma semana.
+ *
+ * Stateless de propósito — não há tabela de "já cobrei". O controle é o dia da
+ * semana: só roda na segunda-feira, então cada médico recebe no máximo um
+ * lembrete por semana, exatamente como a dica semanal da paciente ao lado.
+ */
+async function cobrarLacunasParadas(): Promise<number> {
+  /* Segunda-feira no fuso de Brasília, e não no do processo: a Vercel roda em
+     UTC, e um cron das 21h BRT de domingo cairia na segunda de lá. É o mesmo
+     defeito de fuso que já fez dois "este mês" começarem com três horas de
+     diferença na mesma tela. */
+  const hojeBR = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  if (hojeBR.getDay() !== 1) return 0;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { sendPushToUser } = await import("@/lib/push.server");
+  const limite = new Date(Date.now() - DIAS_PARA_COBRAR * 86_400_000).toISOString();
+
+  const { data: rows, error } = await (supabaseAdmin as any)
+    .from("brain_gaps")
+    .select("doctor_id,created_at,hits")
+    .eq("status", "aberta")
+    .lt("created_at", limite)
+    .limit(2000);
+  if (error) {
+    console.error("[lacunas paradas] não consegui ler a fila", error);
+    return 0;
+  }
+
+  /* Agrupa por médico: um push por consultório, com o total e a espera mais
+     longa. Uma notificação por lacuna transformaria a cobrança em spam, e o
+     médico com vinte lacunas — que é justamente quem mais precisa ver — seria
+     o mais castigado. */
+  const porMedico = new Map<string, { quantas: number; maisAntiga: string }>();
+  for (const g of (rows ?? []) as { doctor_id: string | null; created_at: string }[]) {
+    if (!g.doctor_id) continue;
+    const atual = porMedico.get(g.doctor_id);
+    if (!atual) porMedico.set(g.doctor_id, { quantas: 1, maisAntiga: g.created_at });
+    else {
+      atual.quantas++;
+      if (g.created_at < atual.maisAntiga) atual.maisAntiga = g.created_at;
+    }
+  }
+
+  let avisados = 0;
+  for (const [doctorId, info] of porMedico) {
+    const dias = Math.floor((Date.now() - new Date(info.maisAntiga).getTime()) / 86_400_000);
+    const res = await sendPushToUser(doctorId, {
+      title:
+        info.quantas === 1
+          ? "1 paciente esperando sua resposta"
+          : `${info.quantas} pacientes esperando sua resposta`,
+      /* Sem gênero e sem alarme: é um lembrete de fila, não uma urgência
+         clínica. A urgência tem outro caminho, e confundir os dois faz o
+         médico deixar de abrir os dois. */
+      body: `A dúvida mais antiga está há ${dias} dias no seu Segundo Cérebro.`,
+      url: "/painel?tab=Cérebro",
+    });
+    if (res.sent > 0) avisados++;
+  }
+  return avisados;
 }
 
 export const Route = createFileRoute("/api/push-weekly-tick")({

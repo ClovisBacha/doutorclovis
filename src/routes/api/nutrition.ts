@@ -82,6 +82,20 @@ export const Route = createFileRoute("/api/nutrition")({
             },
           },
           maxOutputTokens: 900,
+          /* MEDIDO no `onFinish`, e não antes: com streaming o número de tokens
+             só existe quando o stream fecha. Aguardar aqui é o que mantém a
+             gravação viva em serverless — a SDK espera o `onFinish`, e foi
+             assim que a medição do chat principal parou de morrer congelada. */
+          onFinish: async ({ usage }) => {
+            const { registrarUsoAgora } = await import("@/lib/uso-ia.server");
+            await registrarUsoAgora({
+              especie: "chat",
+              modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+              inputTokens: usage?.inputTokens,
+              outputTokens: usage?.outputTokens,
+              canal: "nutricao",
+            });
+          },
         });
 
         return result.toUIMessageStreamResponse({

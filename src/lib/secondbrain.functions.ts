@@ -350,6 +350,10 @@ const AddSchema = z.object({
   category: z.string().nullable().optional(),
   source: z.string().optional(),
   asDoctor: z.string().uuid().optional(),
+  /* "Já vi o aviso, grava assim mesmo." Sem isto o aviso viraria um portão, e
+     duas orientações legitimamente parecidas — 1º e 3º trimestre, por exemplo —
+     seriam impossíveis de cadastrar. */
+  mesmoAssim: z.boolean().optional(),
 });
 
 /** Adiciona uma entrada de conhecimento (pergunta + resposta do médico). */
@@ -364,6 +368,30 @@ export const addBrainEntry = createServerFn({ method: "POST" })
     if (!(await brainPlanAllows(user, target)))
       return { ok: false as const, reason: "plan" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    /* ─── JÁ EXISTE ALGO PARECIDO? ────────────────────────────────────────
+       A base não deduplicava nada: sem `onConflict`, sem checagem de
+       semelhança. E a faixa do meio empurra para a duplicata — material
+       próximo não assina, vira lacuna, ele responde, e nasce uma SEGUNDA
+       entrada competindo com a primeira na busca vetorial.
+       AVISO, não portão: `mesmoAssim` grava. Bloquear seria impedir duas
+       orientações legitimamente parecidas (1º e 3º trimestre) de coexistir. */
+    if (!data.mesmoAssim) {
+      const { entradaParecida } = await import("./secondbrain.server");
+      const parecida = await entradaParecida(target.doctorId, data.question, data.answer);
+      if (parecida) {
+        return {
+          ok: false as const,
+          reason: "parecida" as const,
+          parecida: {
+            id: parecida.id,
+            question: parecida.question,
+            answer: parecida.answer,
+            similaridade: parecida.similarity,
+          },
+        };
+      }
+    }
 
     const { data: row, error } = await (supabaseAdmin as any)
       .from("brain_entries")
@@ -686,9 +714,119 @@ export type BrainGap = {
   hits: number;
   status: string;
   updated_at: string;
+  /** Quando a PRIMEIRA paciente perguntou — é a idade da espera dela. */
+  created_at?: string | null;
 };
 
-/** Lacunas abertas DO médico logado, mais perguntadas primeiro. */
+/**
+ * AS DÚVIDAS DELA QUE A IA DISSE TER REGISTRADO.
+ *
+ * ─── O BURACO QUE ISTO FECHA ────────────────────────────────────────────────
+ *
+ * A IA promete, com todas as letras, *"registrei aqui para ele ver"*. E até
+ * agora não havia UM ÚNICO LUGAR no app dela onde essa dúvida aparecesse.
+ *
+ * A aba Perguntas lê `doctor_questions`, e essa linha só nasce quando o médico
+ * RESPONDE. Entre a promessa e a resposta — que pode demorar dias ou nunca vir
+ * — existia o nada: nem "aguardando", nem data, nem contagem. Do lado dela, a
+ * frase da IA era indistinguível de uma frase de consolo.
+ *
+ * É o mesmo defeito que a solicitação de vínculo já teve ("o cartão mudava
+ * sozinho e ninguém lhe dizia"), vivo no caminho mais frequente do produto.
+ *
+ * ─── POR QUE LEITURA, E NÃO UMA LINHA GRAVADA ───────────────────────────────
+ *
+ * A alternativa seria criar a linha em `doctor_questions` já ao registrar a
+ * lacuna. Mas aí `entregarRespostaDaLacuna`, que INSERE a resposta, produziria
+ * uma segunda linha sobre a mesma dúvida — e a aba dela mostraria a pergunta
+ * duas vezes, uma esperando para sempre. Lendo, o item pendente some no exato
+ * instante em que a resposta chega, porque a entrega marca `avisada_em`.
+ *
+ * Roda no servidor com a chave de serviço: `brain_gaps` é a fila do MÉDICO, e
+ * abrir a RLS dela para pacientes exporia a fila inteira do consultório para
+ * ler quem quisesse. O recorte é `brain_gap_askers.user_id = ela`.
+ */
+export const minhasDuvidasRegistradas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (authErr || !u.user) return { ok: false as const, duvidas: [] as DuvidaRegistrada[] };
+    const sb = supabaseAdmin as any;
+
+    /* `avisada_em IS NULL` é o filtro que importa: é a marca que a entrega
+       carimba. Sem ela, a dúvida respondida continuaria aparecendo como
+       pendente ao lado da própria resposta. */
+    const { data: linhas, error } = await sb
+      .from("brain_gap_askers")
+      .select("gap_id,created_at,brain_gaps(question,status)")
+      .eq("user_id", u.user.id)
+      .is("avisada_em", null)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    /* Tabela/coluna ausente → lista vazia, sem quebrar a aba dela. Ela perde o
+       aviso, não o resto. */
+    if (error) return { ok: false as const, duvidas: [] as DuvidaRegistrada[] };
+
+    const duvidas: DuvidaRegistrada[] = ((linhas ?? []) as any[])
+      /* `respondida` sem `avisada_em` acontece quando ela trocou de médico no
+         meio: a entrega pula quem não é mais paciente dele. Mostrar
+         "aguardando" ali seria prometer de novo o que não vai vir. */
+      .filter((l) => l.brain_gaps && l.brain_gaps.status !== "respondida")
+      .map((l) => ({
+        id: String(l.gap_id),
+        pergunta: String(l.brain_gaps.question ?? ""),
+        quando: String(l.created_at),
+      }));
+    return { ok: true as const, duvidas };
+  });
+
+export type DuvidaRegistrada = { id: string; pergunta: string; quando: string };
+
+/**
+ * Quantas pacientes precisam perguntar DEPOIS de ele ignorar para a lacuna
+ * voltar a aparecer.
+ *
+ * Três, e não uma: ignorar tem que continuar significando alguma coisa. Uma
+ * repetição isolada é ruído — a mesma paciente voltando, ou uma dúvida que ele
+ * já decidiu tratar na consulta. Três pessoas diferentes fazendo a mesma
+ * pergunta é padrão, e padrão é exatamente o que a fila existe para mostrar.
+ */
+export const LACUNA_VOLTA_APOS = 3;
+
+/** Ignorada que continuou sendo perguntada — com quanta gente veio depois. */
+export type LacunaQueVoltou = BrainGap & { perguntaramDepois: number };
+
+/**
+ * Separa as ignoradas que ganharam gente nova. Puro: o teste não precisa de
+ * banco, e é aqui que mora o juízo que decide o que reaparece na tela dele.
+ */
+export function ignoradasQueVoltaram(
+  linhas: (BrainGap & { hits_ao_ignorar?: number | null })[],
+  limiar = LACUNA_VOLTA_APOS,
+): LacunaQueVoltou[] {
+  return linhas
+    .map((g) => ({
+      ...g,
+      /* `null` = ignorada antes da coluna existir. Tratar como 0 é o lado
+         seguro: ela reaparece UMA vez, e ignorar de novo já grava a marca —
+         em vez de ficar invisível para sempre, que é o defeito original. */
+      perguntaramDepois: (g.hits ?? 0) - (g.hits_ao_ignorar ?? 0),
+    }))
+    .filter((g) => g.perguntaramDepois >= limiar)
+    .sort((a, b) => b.perguntaramDepois - a.perguntaramDepois);
+}
+
+/**
+ * Lacunas abertas DO médico logado, mais perguntadas primeiro — e as IGNORADAS
+ * que continuaram sendo perguntadas.
+ *
+ * A segunda lista existe porque "ignorar" tinha virado "nunca mais": a busca
+ * por texto acha a lacuna em qualquer status e incrementa `hits`, mas só
+ * `respondida` volta para `aberta`, e a fila lê `status = 'aberta'`. Ele
+ * ignorava quando UMA paciente tinha perguntado e nunca mais via aquilo —
+ * enquanto cada paciente seguinte ouvia "registrei aqui para ele ver".
+ */
 export const listBrainGaps = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))
   .handler(async ({ data }) => {
@@ -700,16 +838,45 @@ export const listBrainGaps = createServerFn({ method: "POST" })
     const doctorId = target.doctorId;
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("brain_gaps")
-      .select("id,question,channel,hits,status,updated_at")
+      .select("id,question,channel,hits,status,updated_at,created_at")
       .eq("doctor_id", doctorId)
       .eq("status", "aberta")
       .order("hits", { ascending: false })
-      .order("updated_at", { ascending: false })
+      /* DESEMPATE PELO MAIS ANTIGO, e não pelo mais recente.
+         Era `updated_at` decrescente: entre duas lacunas igualmente pedidas, a
+         que subia era a que acabou de acontecer, e a que estava esperando há
+         três semanas afundava. Numa FILA isso é o avesso — quem espera mais
+         atende primeiro. E `updated_at` piorava de propósito: ele é tocado a
+         cada nova paciente, então a lacuna antiga que continua sendo
+         perguntada rejuvenescia a cada pergunta. */
+      .order("created_at", { ascending: true })
       .limit(50);
     if (error?.code === "42P01")
       return { ok: false as const, gaps: [] as BrainGap[], missingTable: true as const };
     if (error) return { ok: false as const, gaps: [] as BrainGap[] };
-    return { ok: true as const, gaps: (rows ?? []) as BrainGap[] };
+
+    /* As ignoradas vêm numa segunda consulta e não num `.in("status", …)`:
+       a comparação é entre DUAS COLUNAS (`hits` × `hits_ao_ignorar`), e o
+       PostgREST não sabe fazer isso — o filtro acontece em JS.
+       Falhar aqui não pode derrubar a fila principal, que é o trabalho do dia:
+       sem a coluna migrada, a lista volta vazia e o resto continua de pé. */
+    let voltaram: LacunaQueVoltou[] = [];
+    const ign = await (supabaseAdmin as any)
+      .from("brain_gaps")
+      .select("id,question,channel,hits,status,updated_at,hits_ao_ignorar")
+      .eq("doctor_id", doctorId)
+      .eq("status", "ignorada")
+      .order("hits", { ascending: false })
+      .limit(200);
+    if (ign.error) {
+      if (!colunaAusente(ign.error)) {
+        console.error("[lacuna] ignoradas não puderam ser lidas", ign.error);
+      }
+    } else {
+      voltaram = ignoradasQueVoltaram(ign.data ?? []);
+    }
+
+    return { ok: true as const, gaps: (rows ?? []) as BrainGap[], voltaram };
   });
 
 /**
@@ -1072,12 +1239,89 @@ export const dismissBrainGap = createServerFn({ method: "POST" })
     if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const doctorId = target.doctorId;
-    const { error } = await (supabaseAdmin as any)
+    /* GUARDA O CONTADOR NO INSTANTE DE IGNORAR.
+       Sem esta marca, "12 pacientes perguntaram" e "eu ignorei quando já eram
+       12" são indistinguíveis — e a lacuna volta na cara dele sem ninguém novo
+       ter perguntado. Com ela, o que volta é só o que ganhou gente depois. */
+    const { data: atual } = await (supabaseAdmin as any)
       .from("brain_gaps")
-      .update({ status: "ignorada", updated_at: new Date().toISOString() })
+      .select("hits")
+      .eq("id", data.gapId)
+      .eq("doctor_id", doctorId)
+      .maybeSingle();
+    const agora = new Date().toISOString();
+    let { error } = await (supabaseAdmin as any)
+      .from("brain_gaps")
+      .update({
+        status: "ignorada",
+        updated_at: agora,
+        hits_ao_ignorar: (atual?.hits as number | undefined) ?? 0,
+      })
       .eq("id", data.gapId)
       .eq("doctor_id", doctorId);
+    /* Coluna ainda não migrada: ignorar continua funcionando como sempre
+       funcionou. O que se perde é a marca, e o `COALESCE(…, 0)` da leitura
+       trata isso como "ignorada quando ninguém tinha perguntado" — o lado
+       seguro: ela reaparece uma vez, e o próximo ignorar já grava a marca. */
+    if (colunaAusente(error)) {
+      ({ error } = await (supabaseAdmin as any)
+        .from("brain_gaps")
+        .update({ status: "ignorada", updated_at: agora })
+        .eq("id", data.gapId)
+        .eq("doctor_id", doctorId));
+    }
     return { ok: !error };
+  });
+
+/**
+ * "IGNORAR" É "NÃO AGORA", E ELE DECIDE QUANDO VOLTA.
+ *
+ * Traz a lacuna de volta para a fila. Existe porque a alternativa — reabrir
+ * sozinha ao cruzar o limiar — desfaria a decisão dele sem avisar, e o médico
+ * que ignorou de propósito veria o mesmo item ressurgindo sem explicação.
+ *
+ * A tela mostra quantas pacientes perguntaram DEPOIS de ele ignorar; o clique
+ * é dele.
+ */
+export const reabrirLacuna = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        gapId: z.string().uuid(),
+        asDoctor: z.string().uuid().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const agora = new Date().toISOString();
+    /* `hits_ao_ignorar` volta a NULL: se ele ignorar de novo mais tarde, a
+       marca é regravada com o contador daquele momento. Deixar o valor velho
+       faria a lacuna voltar na hora seguinte. */
+    let { error } = await (supabaseAdmin as any)
+      .from("brain_gaps")
+      .update({ status: "aberta", updated_at: agora, hits_ao_ignorar: null })
+      .eq("id", data.gapId)
+      .eq("doctor_id", target.doctorId)
+      .eq("status", "ignorada");
+    if (colunaAusente(error)) {
+      ({ error } = await (supabaseAdmin as any)
+        .from("brain_gaps")
+        .update({ status: "aberta", updated_at: agora })
+        .eq("id", data.gapId)
+        .eq("doctor_id", target.doctorId)
+        .eq("status", "ignorada"));
+    }
+    if (error) {
+      console.error("[lacuna] não voltou para a fila", data.gapId, error);
+      return { ok: false as const };
+    }
+    return { ok: true as const };
   });
 
 /**
@@ -1593,6 +1837,16 @@ export const draftGapAnswer = createServerFn({ method: "POST" })
       });
       const draft = result.text.trim();
       if (!draft) return { ok: false as const };
+      /* MEDIDO. Rascunho que o médico ainda vai revisar — canal próprio, e a
+         cota conta só `app`: cobrar dele por preparar o próprio conhecimento
+         seria cobrar pelo trabalho que melhora o produto. */
+      const { registrarUsoAgora } = await import("./uso-ia.server");
+      await registrarUsoAgora({
+        especie: "chat",
+        modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+        doctorId,
+        canal: "rascunho-lacuna",
+      });
       return { ok: true as const, draft };
     } catch {
       return { ok: false as const };

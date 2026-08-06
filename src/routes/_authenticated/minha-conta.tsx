@@ -57,7 +57,11 @@ import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
 import { ExcluirConta } from "@/components/excluir-conta";
 import { sendTestPushToMe } from "@/lib/push.functions";
-import { submitBrainFeedback } from "@/lib/secondbrain.functions";
+import {
+  minhasDuvidasRegistradas,
+  submitBrainFeedback,
+  type DuvidaRegistrada,
+} from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
 import { sinalGlicemia, sinalPressao, validaRegistro, vozDaPaciente } from "@/lib/sinais-clinicos";
 import { checkIsAdmin } from "@/lib/admin.functions";
@@ -5744,6 +5748,29 @@ function QuestionsTab({ gest }: { gest: Gest }) {
     load();
   }, []);
 
+  /* ─── O QUE A IA DISSE TER REGISTRADO ────────────────────────────────────
+     A IA promete "registrei aqui para ele ver" — e até agora não havia um
+     único lugar no app dela onde isso aparecesse. A linha em
+     `doctor_questions` só nasce quando o médico RESPONDE; entre a promessa e a
+     resposta existia o nada, e a frase da IA era indistinguível de consolo.
+     Ler (em vez de gravar a linha na hora do registro) é o que impede a
+     pergunta de aparecer DUAS vezes quando a resposta chega. */
+  const [registradas, setRegistradas] = useState<DuvidaRegistrada[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session) return;
+        const res = await minhasDuvidasRegistradas({
+          data: { accessToken: s.session.access_token },
+        });
+        if (res.ok) setRegistradas(res.duvidas);
+      } catch {
+        /* sem o aviso ela perde o aviso, não a aba */
+      }
+    })();
+  }, [items]);
+
   async function add(question?: string) {
     const q = (question ?? text).trim();
     if (!q) return;
@@ -5794,6 +5821,28 @@ function QuestionsTab({ gest }: { gest: Gest }) {
 
   return (
     <div className="space-y-6">
+      {registradas.length > 0 && (
+        <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
+          <p className="font-serif text-lg">Sua dúvida está com o seu médico</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quando você perguntou no chat, a IA registrou aqui para ele. Assim que ele responder, a
+            resposta aparece na lista abaixo — e você recebe um aviso.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {registradas.map((d) => (
+              <li
+                key={d.id}
+                className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-background/70 px-3 py-2"
+              >
+                <span className="min-w-0 flex-1 text-sm">{d.pergunta}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">
+                  registrada em {new Date(d.quando).toLocaleDateString("pt-BR")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="rounded-3xl border border-border bg-card p-6">
         <p className="font-serif text-lg">Anote para a próxima consulta</p>
         <p className="mt-1 text-sm text-muted-foreground">

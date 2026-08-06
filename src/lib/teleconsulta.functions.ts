@@ -286,6 +286,16 @@ Gere a nota SOAP. Use formatação clara com cabeçalhos em negrito. Seja espec�
       maxOutputTokens: 600,
     });
 
+    /* MEDIDO. Uma trava mecânica achou oito chamadas pagas de modelo que ninguém
+     media — esta era uma delas. O consumo não existia em `ai_usage`: nem no
+     card, nem na projeção do mês. Canal próprio, e a cota conta só `app`. */
+    const { registrarUsoAgora } = await import("./uso-ia.server");
+    await registrarUsoAgora({
+      especie: "chat",
+      modelo: process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL,
+      doctorId: scope.doctorId,
+      canal: "teleconsulta",
+    });
     return { ok: true as const, note: result.text };
   });
 
