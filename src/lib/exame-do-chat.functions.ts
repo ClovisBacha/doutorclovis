@@ -29,6 +29,17 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+/* `ymdBrasilia`, e não `toLocaleDateString`: isto roda no SERVIDOR, que na
+   Vercel está em UTC. Um exame enviado às 21h30 de Brasília ganhava a data do
+   dia seguinte — e o médico procurava na lista pelo dia errado. A função já
+   existe neste repo, criada por causa deste mesmo defeito. */
+import { ymdBrasilia } from "./utils";
+/* O escape CANÔNICO do repo, e não uma cópia. `email.server.ts` exporta
+   `escEmail` justamente para isto — o comentário de lá diz "exportado porque
+   nome de paciente e de médico entram no corpo de vários e-mails". Aqui havia
+   uma reimplementação sem as aspas: funciona (o nome entra em nó de texto, não
+   em atributo) e é uma segunda verdade sobre escape esperando divergir. */
+import { escEmail as escapar } from "./email.server";
 
 export const enviarExameDoChat = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -76,7 +87,7 @@ export const enviarExameDoChat = createServerFn({ method: "POST" })
         user_id: u.user.id,
         /* Nome com a data porque é o que a lista do médico mostra, e "Exame"
            repetido dez vezes não distingue nada. */
-        name: `Enviado no chat — ${new Date().toLocaleDateString("pt-BR")}`,
+        name: `Enviado no chat — ${ymdBrasilia()}`,
         category: "outros",
         notes: data.nota?.slice(0, 500) || null,
         image_data: data.imagem,
@@ -113,7 +124,7 @@ async function avisarDoExame(doctorId: string, nomeDela: string): Promise<void> 
     await sendEmail({
       to: destino.para[0],
       subject: "📄 Uma paciente enviou um exame",
-      html: emailLayout("Exame recebido pelo chat", corpo),
+      html: emailLayout("Exame recebido pelo chat", corpo, destino.marca),
     });
     const { sendPushToEmail } = await import("./push.server");
     await sendPushToEmail(destino.para[0], {
@@ -124,9 +135,4 @@ async function avisarDoExame(doctorId: string, nomeDela: string): Promise<void> 
   } catch {
     /* o exame está salvo; o aviso é enriquecimento */
   }
-}
-
-/** Campo livre no corpo do e-mail: um "<" no nome quebraria a moldura. */
-function escapar(s: string): string {
-  return s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] ?? c);
 }

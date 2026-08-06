@@ -507,6 +507,18 @@ describe("nenhuma aba fica órfã", () => {
     expect(orfas).toEqual([]);
   });
 
+  test("toda aba do menu TEM bloco de renderização", () => {
+    /* A direção contrária da de cima, e igualmente muda: uma aba acrescentada
+       a `DOCTOR_TABS` sem bloco correspondente dá tela em BRANCO — o médico
+       toca no botão e não acontece nada, sem erro nenhum. */
+    const codigo = painel.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    const comRender = new Set([...codigo.matchAll(/\{tab === "([^"]+)"/g)].map((m) => m[1]));
+    const noMenu = [...listaDeAbas(painel).matchAll(/"([^"]+)",/g)].map((m) => m[1]);
+    expect(noMenu.filter((aba) => !comRender.has(aba))).toEqual([]);
+    /* E a lista não pode estar vazia, senão o teste acima é decoração. */
+    expect(noMenu.length).toBeGreaterThan(10);
+  });
+
   test("o Calendário está ligado — decisão do Clóvis", () => {
     /* Implementado (`CalendárioSection`, grade do mês) e fora da lista: não
        havia UM `setTab("Calendário")` em lugar nenhum do arquivo. */

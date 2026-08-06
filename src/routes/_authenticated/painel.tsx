@@ -6183,6 +6183,8 @@ function BrainReviewCard({
     }[]
   >([]);
   const [editando, setEditando] = useState<string | null>(null);
+  /* Distingue "não deu para olhar" de "não há nada" — ver `carregar`. */
+  const [falhou, setFalhou] = useState<"rede" | "migracao" | null>(null);
   const [texto, setTexto] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -6192,9 +6194,21 @@ function BrainReviewCard({
       const res = await listBrainReviews({
         data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
       });
-      if (res.ok) setItens(res.itens);
+      if (res.ok) {
+        setItens(res.itens);
+        setFalhou(null);
+      } else {
+        /* ERRO NÃO PODE SE DISFARÇAR DE FILA VAZIA.
+           `res.ok === false` era descartado e o card caía no estado "nenhuma
+           resposta reprovada ✅" — dizendo ao médico que está tudo bem quando
+           na verdade não deu para olhar. O irmão `BrainGapsCard` distingue
+           "migracao" de "rede" justamente porque, nas palavras do comentário
+           dele, isso "não pode se disfarçar de 'nenhuma lacuna ✅'". E o
+           servidor JÁ devolve `semTabela` — o campo existia sem consumidor. */
+        setFalhou("semTabela" in res && res.semTabela ? "migracao" : "rede");
+      }
     } catch {
-      /* a fila de revisão é enriquecimento — sem ela o painel segue inteiro */
+      setFalhou("rede");
     }
   }
   useEffect(() => {
@@ -6242,6 +6256,26 @@ function BrainReviewCard({
      descobrir que ela existe — enquanto a de lacunas aparece sempre, com
      estado vazio explicativo. Assimetria pura.
      Uma linha discreta não é "caixa vazia": é o nome da coisa. */
+  if (falhou) {
+    return (
+      <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-xs leading-snug text-amber-900">
+        {falhou === "migracao" ? (
+          <>
+            ✋ <strong>Revisão</strong> — a fila existe, mas o banco ainda não tem as colunas dela.
+            Rode <code>supabase/APLICAR_REVISAO.sql</code> no SQL Editor do Supabase.
+          </>
+        ) : (
+          <>
+            ✋ <strong>Revisão</strong> — não consegui carregar agora.{" "}
+            <button type="button" onClick={carregar} className="underline">
+              Tentar de novo
+            </button>
+          </>
+        )}
+      </p>
+    );
+  }
+
   if (!itens.length) {
     return (
       <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">

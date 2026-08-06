@@ -6981,6 +6981,8 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
      resposta HTTP — sem este ref, a mensagem acionável era descartada e a
      paciente recebia o genérico. */
   const avisoDoServidorRef = useRef<string | null>(null);
+  /** O que cancela a resposta em andamento (botão "Parar"). */
+  const pararRef = useRef<AbortController | null>(null);
 
   /* Quem pede menos movimento recebe o texto inteiro de uma vez. A animação
      aqui é conforto, nunca informação — nada se perde ao desligá-la. */
@@ -7091,8 +7093,14 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
       // usar a IA do consultório correto (cada conta é individual).
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
+      /* A SAÍDA DE EMERGÊNCIA. Sem ela, uma resposta longa e errada obrigava a
+         paciente a esperar os ~19s até o fim — sem parar, sem perguntar de
+         novo. Todo chat de IA tem esse botão. */
+      const parar = new AbortController();
+      pararRef.current = parar;
       const res = await fetch("/api/chat", {
         method: "POST",
+        signal: parar.signal,
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -7244,7 +7252,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
         });
         escreverNaBolha(acc, houveErro ? { error: true } : undefined);
       }
-    } catch {
+    } catch (e) {
       /* O QUE ELA JÁ ESTAVA LENDO NÃO SE PERDE.
          Antes a lista era reconstruída a partir de `displayNext` — o retrato
          anterior à resposta. Se a rede caísse no meio, o texto que ela estava
@@ -7257,6 +7265,21 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
          Cortar em `mostradoRef` jogava fora o texto que o servidor já tinha
          mandado e o laço ainda não tinha desenhado — e o comentário acima diz
          "o que chegou fica". Agora diz a verdade. */
+      /* Cancelamento pedido POR ELA não é falha: o que já apareceu fica, e não
+         há aviso de erro nenhum. */
+      if ((e as Error)?.name === "AbortError") {
+        const lido = alvoRef.current.trim();
+        if (lido) {
+          setMessages((atuais) => {
+            const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
+            if (i < 0) return atuais;
+            const copia = [...atuais];
+            copia[i] = { ...copia[i], content: lido };
+            return copia;
+          });
+        }
+        return;
+      }
       const parcial = alvoRef.current.trim();
       const aviso: WAMsg = {
         role: "assistant",
@@ -7293,6 +7316,7 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
       streamAbertoRef.current = false;
       if (quadroRef.current !== null) cancelAnimationFrame(quadroRef.current);
       quadroRef.current = null;
+      pararRef.current = null;
       setLoading(false);
     }
   }
@@ -7532,7 +7556,17 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
       </div>
 
       {/* Área de mensagens */}
-      <div ref={scrollRef} className="relative flex-1 overflow-y-auto space-y-0.5 px-3 py-3">
+      {/* `role="log"` + `aria-live="polite"`: sem isto, para quem usa leitor de
+          tela a resposta aparecia em SILÊNCIO, caractere a caractere, sem
+          começo nem fim declarados. `polite` e não `assertive` de propósito —
+          a resposta não deve interromper o que ela está lendo. */}
+      <div
+        ref={scrollRef}
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        className="relative flex-1 overflow-y-auto space-y-0.5 px-3 py-3"
+      >
         {/* Enquanto o histórico não respondeu, a lista está vazia de propósito.
             Três pontinhos discretos são melhores que uma tela em branco — e
             muito melhores que uma saudação que aparece e é trocada. */}
@@ -7632,7 +7666,13 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
                     "linear-gradient(90deg, transparent, rgba(139,92,246,0.55), transparent)",
                 }}
               />
-              <span className="sr-only">Pensando</span>
+              {/* `role="status"`: o `sr-only` era inserido e removido do DOM sem
+                  live region nenhuma, então NUNCA era anunciado. Quem usa
+                  leitor de tela mandava a pergunta e ficava sem saber se algo
+                  estava acontecendo. */}
+              <span role="status" className="sr-only">
+                Pensando
+              </span>
               <span
                 aria-hidden
                 className="relative block h-2 w-12 rounded-full"
@@ -7785,8 +7825,18 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
           )}
         </div>
 
-        {/* Enviar ou Microfone */}
-        {input.trim() ? (
+        {/* PARAR — a saída de emergência. Enquanto a resposta corre, o botão de
+            enviar não serve para nada (o envio já está barrado por `loading`),
+            e o que ela precisa é interromper. */}
+        {loading ? (
+          <button
+            onClick={() => pararRef.current?.abort()}
+            aria-label="Parar a resposta"
+            className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground/85 text-background transition-transform active:scale-95"
+          >
+            <span className="block h-3 w-3 rounded-[3px] bg-current" />
+          </button>
+        ) : input.trim() ? (
           <button
             onClick={() => sendText()}
             disabled={loading}
@@ -18482,11 +18532,30 @@ function ExamesTab({ gest }: { gest: Gest }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
+    /* SEM `image_data` NA LISTA — e isto virou obrigatório, não otimização.
+       `select("*")` puxava o base64 de TODA linha. Enquanto os uploads dela
+       vinham a 1200px (~250 KB) era só desperdício; desde que o chat passou a
+       gravar laudo aqui, são arquivos de megabytes: vinte exames viram dezenas
+       de MB de JSON num navegador de celular.
+       É exatamente a decisão que o lado do MÉDICO já documenta ter tomado
+       (`examesRecebidos` exclui `image_data` de propósito) — a tela dela tinha
+       ficado para trás. A imagem é buscada só ao abrir um exame. */
     const { data } = await (supabase as any)
       .from("exam_files")
-      .select("*")
+      .select("id,name,category,week,notes,created_at,user_id")
       .order("created_at", { ascending: false });
     setExams(data ?? []);
+  }
+
+  /** A imagem de UM exame, sob demanda — é o que a lista não carrega. */
+  async function abrirExame(exam: ExamFile) {
+    setPreview(exam);
+    const { data } = await (supabase as any)
+      .from("exam_files")
+      .select("image_data")
+      .eq("id", exam.id)
+      .maybeSingle();
+    if (data?.image_data) setPreview({ ...exam, image_data: data.image_data });
   }
   useEffect(() => {
     load();
@@ -18661,29 +18730,15 @@ function ExamesTab({ gest }: { gest: Gest }) {
         <div className="grid gap-4 sm:grid-cols-2">
           {filtered.map((exam) => (
             <div key={exam.id} className="flex gap-3 rounded-2xl border border-border bg-card p-4">
-              {exam.image_data && !exam.image_data.startsWith("data:application/pdf") ? (
-                <button onClick={() => setPreview(exam)} className="flex-shrink-0">
-                  <img
-                    src={exam.image_data}
-                    alt={exam.name}
-                    className="h-16 w-16 rounded-xl object-cover ring-1 ring-border"
-                  />
-                </button>
-              ) : exam.image_data ? (
-                /* PDF: cartão clicável, não `<img>` — que desenharia o ícone de
-                   arquivo quebrado desde que o app passou a aceitar laudo. */
-                <button
-                  onClick={() => setPreview(exam)}
-                  className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-secondary ring-1 ring-border"
-                >
-                  <span className="text-xl">📄</span>
-                  <span className="text-[9px] font-semibold text-muted-foreground">PDF</span>
-                </button>
-              ) : (
-                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl bg-secondary text-2xl">
-                  📄
-                </div>
-              )}
+              {/* Sem miniatura: a lista não carrega mais o base64 (ver `load`).
+                  O cartão abre o exame, e a imagem chega aí. */}
+              <button
+                onClick={() => abrirExame(exam)}
+                className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-secondary ring-1 ring-border"
+              >
+                <span className="text-xl">🔍</span>
+                <span className="text-[9px] font-semibold text-muted-foreground">Abrir</span>
+              </button>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm text-foreground truncate">{exam.name}</p>
                 <p className="text-xs text-primary mt-0.5">

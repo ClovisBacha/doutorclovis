@@ -201,3 +201,40 @@ describe("o texto final é o texto completo", () => {
     expect(fim).toContain("content: acc }");
   });
 });
+
+/**
+ * O CHAT PARA QUEM NÃO ENXERGA A TELA — e para quem quer desistir da resposta.
+ *
+ * Duas coisas que um avaliador mediu como ausentes e que não custam nada:
+ * a resposta aparecia em SILÊNCIO absoluto para leitor de tela, e uma resposta
+ * longa e errada obrigava a paciente a esperar ~19 segundos sem saída.
+ */
+describe("a resposta é anunciada, e pode ser interrompida", () => {
+  test("a lista de mensagens é uma live region", () => {
+    /* Sem `role="log"` + `aria-live`, o texto chegando caractere a caractere
+       não é anunciado nem no começo nem no fim: a paciente cega manda a
+       pergunta e não sabe se algo aconteceu.
+       `polite`, não `assertive` — a resposta não deve interromper o que ela
+       está lendo. */
+    expect(codigo).toContain('role="log"');
+    expect(codigo).toContain('aria-live="polite"');
+  });
+
+  test('o "Pensando" está numa região que o leitor anuncia', () => {
+    /* O `sr-only` existia e era inserido/removido do DOM sem live region
+       nenhuma — ou seja, nunca era lido em voz alta. */
+    expect(codigo).toContain('<span role="status" className="sr-only">');
+  });
+
+  test("existe botão de PARAR durante a resposta", () => {
+    expect(codigo).toContain("const parar = new AbortController();");
+    expect(codigo).toContain("signal: parar.signal");
+    expect(codigo).toContain("onClick={() => pararRef.current?.abort()}");
+  });
+
+  test("parar NÃO é erro — o que já apareceu fica", () => {
+    /* Cancelamento pedido por ela não pode virar "ocorreu um erro": ela sabe o
+       que fez, e o texto lido até ali continua valendo. */
+    expect(codigo).toContain('if ((e as Error)?.name === "AbortError")');
+  });
+});
