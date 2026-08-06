@@ -1218,6 +1218,10 @@ function PainelPage() {
             tokenFn={token}
             asDoctor={brainAsDoctor}
             onExitAsDoctor={() => setBrainAsDoctor(null)}
+            onAbrirPaciente={(id) => {
+              setTab("Pacientes 👩‍🍼");
+              setAbrirPaciente(id);
+            }}
             onTrained={(id) =>
               setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered: true } : x)))
             }
@@ -5099,12 +5103,15 @@ function CerebroSection({
   onTrained,
   asDoctor,
   onExitAsDoctor,
+  onAbrirPaciente,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   asDoctor?: { id: string; name: string } | null;
   onExitAsDoctor?: () => void;
+  /** Da lista "quem mais conversou" direto para o prontuário dela. */
+  onAbrirPaciente?: (patientId: string) => void;
 }) {
   const asId = asDoctor?.id;
   return (
@@ -5148,18 +5155,42 @@ function CerebroSection({
           que já existe.
         </p>
       </div>
+      {/* ─── ① O QUE ESTÁ ESPERANDO ELE ──────────────────────────────────
+          O argumento para pôr o Cérebro na PRIMEIRA aba foi "a fila de lacunas
+          e a de revisão são trabalho que rende". Dentro da aba, as filas eram o
+          4º e o 5º card: ~1.200px de placar e fatura antes do que ele tem para
+          fazer. A tese e o layout diziam coisas opostas. */}
+      <h3 className="pt-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        O que está esperando você
+      </h3>
+      <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainReviewCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} asDoctor={asId} />
+
+      {/* ─── ② COMO ESTÁ O CÉREBRO ───────────────────────────────────────── */}
+      <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Como está o seu cérebro
+      </h3>
       <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
-      <ConsumoDaIACard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainReviewCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
+      <ConsumoDaIACard tokenFn={tokenFn} asDoctor={asId} onAbrirPaciente={onAbrirPaciente} />
+
+      {/* ─── ③ FERRAMENTAS ───────────────────────────────────────────────── */}
+      <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Ferramentas
+      </h3>
       <BrainConversationsCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainConsultaCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainEvalCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainSettingsCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} asDoctor={asId} />
       <BrainKnowledgeCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainPlaygroundCard tokenFn={tokenFn} asDoctor={asId} />
+
+      {/* ─── ④ AJUSTES ───────────────────────────────────────────────────
+          Por último de propósito: é o que ele mexe uma vez e não volta. */}
+      <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Ajustes
+      </h3>
+      <BrainSettingsCard tokenFn={tokenFn} asDoctor={asId} />
     </div>
   );
 }
@@ -5730,10 +5761,20 @@ function BrainLevelCard({
             {level}
             {pct >= 90 && " 🏆"}
           </p>
+          {/* A FRASE MAIS ERRADA POSSÍVEL NO PRIMEIRO CARD DA TELA.
+              `items` começa `[]`, então `pending.length === 0` é verdadeiro
+              durante TODO o carregamento — e o card afirmava "Cérebro
+              completo" ao mesmo tempo em que o anel mostrava "…/100" e o
+              título dizia "Iniciante". Um médico no primeiro acesso lia que o
+              cérebro dele estava pronto.
+              `score == null` é o sinal de que ainda não chegou nada; é o mesmo
+              que o anel já usa duas linhas acima. */}
           <p className="mt-1 text-sm text-white/70">
-            {pending.length === 0
-              ? "Cérebro completo — continue respondendo lacunas para mantê-lo afiado."
-              : `${pending.length} ${pending.length === 1 ? "item pendente" : "itens pendentes"} para evoluir o cérebro.`}
+            {score == null
+              ? "Conferindo o estado do seu cérebro…"
+              : pending.length === 0
+                ? "Cérebro completo — continue respondendo lacunas para mantê-lo afiado."
+                : `${pending.length} ${pending.length === 1 ? "item pendente" : "itens pendentes"} para evoluir o cérebro.`}
           </p>
           <button
             onClick={() => setExpanded((e) => !e)}
@@ -5799,9 +5840,12 @@ function BrainLevelCard({
 function ConsumoDaIACard({
   tokenFn,
   asDoctor,
+  onAbrirPaciente,
 }: {
   tokenFn: () => Promise<string>;
   asDoctor?: string;
+  /** Abre o prontuário daquela paciente — sem isto a lista é só um relatório. */
+  onAbrirPaciente?: (patientId: string) => void;
 }) {
   const [cota, setCota] = useState<{
     usadas: number;
@@ -5827,12 +5871,49 @@ function ConsumoDaIACard({
        número de plano atribuído à pessoa errada. */
   }, [tokenFn, asDoctor]);
 
-  /* Nada consumido ainda: não há o que mostrar, e um card zerado no topo do
-     Cérebro só ocuparia a tela do médico que ainda nem começou. */
-  if (!cota || cota.usadas <= 0) return null;
+  /* ESTADOS EXPLÍCITOS, e isto é conserto de um silêncio.
+     Era `if (!cota || cota.usadas <= 0) return null` — e `respostasNoCiclo`
+     devolve 0 quando a tabela `ai_usage` não existe (migration pendente). Ou
+     seja: o card sumia exatamente no cenário que o refator dele veio corrigir,
+     só que por outro caminho. "Não tenho como medir" e "você não usou nada"
+     não podem produzir a mesma tela. */
+  if (cota === null) {
+    return <div className="skeleton h-24 rounded-3xl" />;
+  }
 
   const temTeto = cota.teto != null && cota.teto > 0;
   const pct = temTeto ? Math.min(100, Math.round((cota.usadas / (cota.teto as number)) * 100)) : 0;
+
+  if (cota.usadas <= 0) {
+    return (
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Respostas da IA neste mês
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Nenhuma resposta ainda neste ciclo
+          {temTeto ? ` — seu plano dá ${cota.teto} por mês.` : "."}
+        </p>
+      </div>
+    );
+  }
+
+  /* ─── VOU ESTOURAR ANTES DO FIM DO MÊS? ─────────────────────────────────
+     A barra respondia "quanto usei"; esta é a pergunta seguinte, e a única
+     acionável — subir de plano no dia 10 é decisão, descobrir no dia 30 é
+     constatação. Regra de três sobre o ritmo do ciclo, no fuso de Brasília
+     (mesmo de `inicioDoCiclo`, senão a projeção vira no dia errado). */
+  const hojeSP = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const parteSP = (t: string) => Number(hojeSP.find((p) => p.type === t)?.value ?? 0);
+  const diaDoCiclo = Math.max(1, parteSP("day"));
+  const diasDoMes = new Date(Date.UTC(parteSP("year"), parteSP("month"), 0)).getUTCDate();
+  const projecao = Math.round((cota.usadas / diaDoCiclo) * diasDoMes);
+  const vaiEstourar = temTeto && projecao > (cota.teto as number) && cota.estado !== "estourada";
   /* A barra de cada paciente é proporcional à MAIOR, não ao total.
      Proporcional ao total, numa fila de cinquenta gestantes, a maior fatia dá
      ~12% da largura e todas as outras colapsam no piso — seis barrinhas do
@@ -5873,6 +5954,12 @@ function ConsumoDaIACard({
         </div>
       )}
 
+      {vaiEstourar && (
+        <p className="mt-2 text-xs text-amber-700">
+          No seu ritmo, você chega a <strong>~{projecao}</strong> das {cota.teto} até o fim do mês.
+        </p>
+      )}
+
       {/* QUEM está consumindo. O total responde "quanto"; esta lista responde a
           pergunta seguinte, que é a que ele de fato faz. Numa fila de cinquenta
           gestantes, três costumam responder por metade das conversas — e saber
@@ -5883,25 +5970,64 @@ function ConsumoDaIACard({
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Quem mais conversou
           </p>
-          {cota.pacientes.map((p) => (
-            <div key={p.patientId} className="flex items-center gap-3">
-              <p className="w-28 shrink-0 truncate text-xs" title={p.nome}>
-                {p.nome}
+          {/* Dois denominadores na mesma linha pediam reconciliação toda vez:
+              a barra compara com quem mais conversou, o número é a fatia do
+              mês. Uma legenda custa uma linha. */}
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            A barra compara com quem mais conversou; a porcentagem é a fatia do seu mês. Toque para
+            abrir o prontuário.
+          </p>
+          {cota.pacientes.map((p) => {
+            /* A COR DIZ ALGUMA COISA. O pedido falava em "barra colorida" e
+               todas eram `bg-primary/70` — monocromático. Quem sozinha
+               responde por um quarto do mês merece um olhar; por 40%, dois. */
+            const cor =
+              p.fatia >= 0.4
+                ? "bg-destructive"
+                : p.fatia >= 0.25
+                  ? "bg-amber-500"
+                  : "bg-primary/70";
+            return (
+              /* CLICÁVEL. `patientId` é o `auth.users.id` — exatamente o que
+                 `setAbrirPaciente` espera. A ponte não estava ligada: o card
+                 mostrava "Maria — 87 · 31%" e o médico ia procurar Maria pelo
+                 nome na aba Pacientes. É a diferença entre relatório e
+                 ferramenta. */
+              <button
+                type="button"
+                key={p.patientId}
+                onClick={() => onAbrirPaciente?.(p.patientId)}
+                className="flex w-full items-center gap-3 rounded-lg py-0.5 text-left transition-colors hover:bg-secondary/60"
+              >
+                <span className="w-28 shrink-0 truncate text-xs" title={p.nome}>
+                  {p.nome}
+                </span>
+                <span className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                  <span
+                    className={`block h-full rounded-full ${cor}`}
+                    /* Piso de 4%: uma paciente com 1 de 300 respostas
+                       desenharia uma barra invisível, e barra invisível diz
+                       "zero" quando o número diz "um". */
+                    style={{ width: `${Math.max(4, Math.round((p.respostas / maior) * 100))}%` }}
+                  />
+                </span>
+                <span className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {p.respostas} · {Math.round(p.fatia * 100)}%
+                </span>
+              </button>
+            );
+          })}
+          {/* FECHA A SOMA. Seis linhas somando 58% deixavam o médico sem saber
+              se tinha visto tudo — e sem nada dizendo que a lista é um recorte. */}
+          {(() => {
+            const somaFatias = cota.pacientes.reduce((a, p) => a + p.fatia, 0);
+            const resto = Math.round((1 - somaFatias) * 100);
+            return resto >= 1 ? (
+              <p className="pt-0.5 text-[11px] text-muted-foreground">
+                Outras pacientes · {resto}%
               </p>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-primary/70"
-                  /* Piso de 4%: uma paciente com 1 de 300 respostas desenharia
-                     uma barra invisível, e uma barra invisível diz "zero"
-                     quando o número diz "um". */
-                  style={{ width: `${Math.max(4, Math.round((p.respostas / maior) * 100))}%` }}
-                />
-              </div>
-              <p className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                {p.respostas} · {Math.round(p.fatia * 100)}%
-              </p>
-            </div>
-          ))}
+            ) : null;
+          })()}
         </div>
       )}
 
@@ -6010,12 +6136,12 @@ function BrainScoreCard({
             Respostas com seu cérebro
           </p>
         </div>
-        <div className={tile}>
-          <p className="font-serif text-3xl leading-none">{stats.gapsOpen}</p>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Lacunas abertas
-          </p>
-        </div>
+        {/* O TILE "Lacunas abertas" SAIU.
+            O mesmo número aparecia em três lugares da mesma tela: aqui, no
+            badge do card de lacunas 200px abaixo, e implicitamente nos "itens
+            pendentes" do anel logo acima. Três lugares, um número — e o médico
+            tinha que decidir qual era o verdadeiro. A fila fica onde o trabalho
+            está, que é no card dela. */}
       </div>
       {stats.coveragePct != null && stats.coveragePct < 70 && (
         <p className="mt-3 text-xs text-muted-foreground">
@@ -6731,8 +6857,20 @@ function BrainTrainCard({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <p className="font-medium">Treinar respondendo</p>
+    /* MESMO PESO DAS OUTRAS DUAS FILAS.
+       Esta é a terceira fila de trabalho — perguntas REAIS que pacientes
+       mandaram — e era o card mais fraco da página: `p-5` e `font-medium`,
+       enquanto "Prova de qualidade" e o playground ganhavam `p-6` e
+       `font-serif text-xl`. Ferramenta gritava, trabalho sussurrava. */
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-xl">
+        ❓ Perguntas das pacientes esperando você
+        {questions && questions.length > 0 && (
+          <span className="ml-2 rounded-full bg-primary px-2 py-0.5 align-middle text-xs font-semibold text-primary-foreground">
+            {questions.length}
+          </span>
+        )}
+      </p>
       <p className="mt-0.5 text-sm text-muted-foreground">
         Cada resposta sua vira conhecimento: a paciente recebe a resposta e o cérebro aprende a
         conduta para as próximas.
@@ -7148,7 +7286,10 @@ function BrainPlaygroundCard({
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <p className="font-medium">Playground</p>
+      {/* "Playground" era a única palavra em inglês de um painel inteiramente
+          em português, feito para médicos brasileiros. E o nome não dizia o que
+          a ferramenta faz. */}
+      <p className="font-medium">🧪 Testar antes de a paciente perguntar</p>
       <p className="mt-0.5 text-sm text-muted-foreground">
         Pergunte como se fosse uma paciente e veja o que o cérebro responde hoje.
       </p>

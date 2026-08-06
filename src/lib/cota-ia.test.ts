@@ -177,7 +177,9 @@ describe("o médico vê antes de estourar", () => {
       limpo.indexOf("function ConsumoDaIACard("),
       limpo.indexOf("function BrainScoreCard("),
     );
-    expect(card).toContain("if (!cota || cota.usadas <= 0) return null;");
+    /* Nenhuma condição de sumiço vinda do PLACAR. As dele são sobre a própria
+       cota — e são três estados distintos, não um `return null` para tudo. */
+    expect(card).toContain("if (cota === null)");
     expect(card).not.toContain("stats");
   });
 
@@ -319,8 +321,39 @@ describe("o consumo aparece antes de virar problema", () => {
 
   test("a barra aparece com qualquer uso, não só no aviso", () => {
     /* Descobrir o limite só quando ele está perto é descobrir tarde. */
-    expect(painel).toContain("if (!cota || cota.usadas <= 0) return null;");
     expect(painel).toContain("const temTeto = cota.teto != null && cota.teto > 0;");
+  });
+
+  test('"não sei medir" e "você não usou" são telas DIFERENTES', () => {
+    /* `respostasNoCiclo` devolve 0 quando `ai_usage` não existe (migration
+       pendente). Com `usadas <= 0 → null`, o card sumia exatamente no cenário
+       que o refator dele veio corrigir — só que por outro caminho. */
+    expect(painel).toContain('<div className="skeleton h-24 rounded-3xl" />');
+    expect(painel).toContain("Nenhuma resposta ainda neste ciclo");
+  });
+
+  test("responde 'vou estourar antes do fim do mês?'", () => {
+    /* A barra respondia "quanto usei". Esta é a pergunta seguinte, e a única
+       acionável: subir de plano no dia 10 é decisão, descobrir no dia 30 é
+       constatação. */
+    expect(painel).toContain(
+      "const projecao = Math.round((cota.usadas / diaDoCiclo) * diasDoMes);",
+    );
+    expect(painel).toContain("No seu ritmo, você chega a");
+  });
+
+  test("a lista leva ao prontuário — é ferramenta, não relatório", () => {
+    /* `patientId` é o `auth.users.id`, exatamente o que `setAbrirPaciente`
+       espera. A ponte existia dos dois lados e não estava ligada: o card
+       mostrava "Maria — 87 · 31%" e ele ia procurar Maria pelo nome. */
+    expect(painel).toContain("onClick={() => onAbrirPaciente?.(p.patientId)}");
+    expect(painel).toContain('setTab("Pacientes 👩‍🍼");');
+  });
+
+  test("a cor da barra significa alguma coisa", () => {
+    /* O pedido dizia "barra colorida" e todas eram `bg-primary/70`. */
+    expect(painel).toContain("p.fatia >= 0.4");
+    expect(painel).toContain("p.fatia >= 0.25");
   });
 
   test("a barra muda de cor conforme a régua", () => {
