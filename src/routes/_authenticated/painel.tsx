@@ -116,6 +116,7 @@ import {
   draftGapAnswer,
   installStarterPack,
   getBrainQualityStats,
+  diagnosticoDaBusca,
   extractKnowledgeFromTranscript,
   evalBrainQuestion,
   listBrainConversations,
@@ -4962,6 +4963,7 @@ function CerebroSection({
         Como está o seu cérebro
       </h3>
       <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
+      <BuscaPorSignificadoCard tokenFn={tokenFn} asDoctor={asId} />
       <ConsumoDaIACard
         tokenFn={tokenFn}
         asDoctor={asId}
@@ -5453,6 +5455,176 @@ function BrainConsultaCard({
           {extracting ? "Extraindo…" : "🧠 Extrair conhecimento"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * "A MINHA RESPOSTA CHEGOU A SER ENCONTRADA?"
+ *
+ * Nasceu de um caso real: a paciente perguntou "pode comer comida japonesa",
+ * recebeu informação geral e, no fim, *"registrei sua pergunta para a Dra."* —
+ * com a médica já tendo escrito sobre peixe cru. A leitura dela foi a única
+ * possível: o que eu respondi não valeu de nada.
+ *
+ * A causa está em `podeAtribuir`: assinar o nome do médico exige uma
+ * similaridade MEDIDA, e o ranking por palavras não produz número nenhum. Sem
+ * a busca vetorial, atribuir é impossível e toda pergunta vira lacuna — o
+ * cérebro responde e parece vazio.
+ *
+ * O que este card faz é tirar isso do log do servidor e pôr na tela dele. Os
+ * três estados são deliberadamente diferentes em CONSEQUÊNCIA, não em tom:
+ *
+ *   · desligada  → nada que ele escrever será encontrado por significado;
+ *   · com dívida → parte da base está invisível, e a barra diz quanto;
+ *   · funcionando→ a distribuição real, e o que a faixa do meio significa.
+ *
+ * O número não vem de uma chamada de teste ("o serviço responde agora?") — vem
+ * de `ai_usage.similaridade`, o que aconteceu com as pacientes DELE.
+ */
+function BuscaPorSignificadoCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  asDoctor?: string;
+}) {
+  const [d, setD] = useState<{
+    respostas: number;
+    comNumero: number;
+    assinadas: number;
+    faixaDoMeio: number;
+    semNada: number;
+    cegas: number;
+    entradas: number;
+  } | null>(null);
+  const [semTabela, setSemTabela] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await diagnosticoDaBusca({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+        });
+        if (res.ok) setD(res);
+        else setSemTabela(true);
+      } catch {
+        setSemTabela(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenFn]);
+
+  if (semTabela) {
+    return (
+      <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-5 text-amber-900 shadow-[var(--shadow-card)]">
+        <p className="font-medium">🔎 Busca por significado</p>
+        <p className="mt-1 text-sm leading-relaxed">
+          Não consigo medir ainda — falta rodar{" "}
+          <code className="rounded bg-amber-100 px-1">supabase/APLICAR_USO_IA.sql</code> e{" "}
+          <code className="rounded bg-amber-100 px-1">supabase/APLICAR_PENDENTES.sql</code> no
+          Supabase. Sem eles, a busca cai no ranking por palavras e nenhuma resposta pode levar o
+          seu nome.
+        </p>
+      </div>
+    );
+  }
+  if (!d) return null;
+
+  /* SEM BASE, NENHUM NÚMERO QUER DIZER ALGO. Um cérebro vazio tem 0 assinadas e
+     0 cegas — os mesmos números de um cérebro perfeito sem uso. */
+  if (d.entradas === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+        <p className="font-medium">🔎 Busca por significado</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ainda não há nada na sua base para encontrar. Responda uma pergunta na fila ou adicione
+          uma entrada — a partir da primeira, este card passa a medir.
+        </p>
+      </div>
+    );
+  }
+
+  const desligada = d.comNumero === 0 && d.respostas > 0;
+  const pctCegas = d.entradas > 0 ? Math.round((d.cegas / d.entradas) * 100) : 0;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <p className="font-medium">🔎 Busca por significado</p>
+
+      {desligada ? (
+        /* O ESTADO QUE CUSTA CARO, e o único em que o card grita. Não é um
+           aviso de configuração: é a explicação de por que o trabalho dele
+           parece não valer nada para a paciente. */
+        <div className="mt-2 rounded-xl border border-rose-300 bg-rose-50/70 px-3 py-2.5 text-sm leading-relaxed text-rose-900">
+          <strong>Está desligada.</strong> Nenhuma das {d.respostas} respostas deste ciclo conseguiu
+          comparar a pergunta da paciente com o seu material por significado — só por palavra exata.
+          Por isso <em>“pode comer comida japonesa?”</em> não encontra a sua orientação sobre peixe
+          cru, e a IA diz que registrou a dúvida para você mesmo quando você já respondeu.
+          <br />
+          <span className="mt-1 inline-block">
+            Abra <strong>Base de conhecimento</strong> logo abaixo e deixe a aba aberta: ela prepara
+            20 entradas por visita.
+          </span>
+        </div>
+      ) : d.cegas > 0 ? (
+        <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50/70 px-3 py-2.5 text-sm leading-relaxed text-amber-900">
+          <strong>
+            {d.cegas} de {d.entradas} entradas ({pctCegas}%) ainda não são encontráveis
+          </strong>{" "}
+          por significado. O que estiver nelas só aparece se a paciente usar as mesmas palavras.
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Funcionando — toda a sua base está encontrável por significado.
+        </p>
+      )}
+
+      {d.comNumero > 0 && (
+        <>
+          <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+            <div
+              className="bg-emerald-500"
+              style={{ width: `${(d.assinadas / d.comNumero) * 100}%` }}
+            />
+            <div
+              className="bg-amber-400"
+              style={{ width: `${(d.faixaDoMeio / d.comNumero) * 100}%` }}
+            />
+            <div
+              className="bg-slate-300"
+              style={{ width: `${(d.semNada / d.comNumero) * 100}%` }}
+            />
+          </div>
+          <dl className="mt-3 grid grid-cols-3 gap-3 text-center">
+            <div>
+              <dt className="text-[11px] text-muted-foreground">com o seu nome</dt>
+              <dd className="text-lg font-semibold tabular-nums text-emerald-600">{d.assinadas}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-muted-foreground">usaram, sem assinar</dt>
+              <dd className="text-lg font-semibold tabular-nums text-amber-600">{d.faixaDoMeio}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-muted-foreground">nada parecido</dt>
+              <dd className="text-lg font-semibold tabular-nums text-muted-foreground">
+                {d.semNada}
+              </dd>
+            </div>
+          </dl>
+          {/* A COLUNA DO MEIO É A QUE GERA A DÚVIDA DELE. Sem esta linha, ver
+              "usaram, sem assinar: 7" não explica por que sete pacientes
+              ouviram "registrei sua pergunta" sobre coisas que ele escreveu. */}
+          {d.faixaDoMeio > 0 && (
+            <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+              As do meio casaram de assunto, mas não o bastante para eu afirmar que aquela é a
+              conduta que <strong>você</strong> daria àquela pergunta. Nelas o seu material entra na
+              resposta, sem o seu nome, e a dúvida vai para a sua fila. Confirmando uma vez, a
+              próxima igual já sai assinada.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

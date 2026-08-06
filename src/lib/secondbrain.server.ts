@@ -1755,3 +1755,136 @@ export async function computeBrainQualityStats(doctorId: string): Promise<{
     return null;
   }
 }
+
+/**
+ * A BUSCA POR SIGNIFICADO ESTÁ MESMO LIGADA?
+ *
+ * ─── POR QUE ISTO PRECISOU EXISTIR ──────────────────────────────────────────
+ *
+ * Uma paciente perguntou "pode comer comida japonesa", recebeu uma resposta
+ * geral e, no fim, "registrei sua pergunta para a Dra." — sendo que a médica já
+ * tinha orientação escrita sobre peixe cru. Do lado dela, a leitura foi a
+ * única possível: *o que eu respondi não valeu de nada*.
+ *
+ * A causa é estrutural e está em `podeAtribuir`, logo acima: assinar o nome do
+ * médico exige `melhorSimilaridade !== null`. O ranking por palavras não
+ * produz número nenhum. Então, enquanto a busca vetorial não funcionar,
+ * atribuir é IMPOSSÍVEL e TODA pergunta vira lacuna — por melhor que a base
+ * dele cubra o assunto. O cérebro fica ligado, respondendo, e parecendo vazio.
+ *
+ * E isso pode estar acontecendo há meses sem um único sinal: a falha de
+ * embedding é best-effort (devolve null), o `console.error` mora num servidor
+ * que o médico não lê, e o contador de entradas sem vetor só aparece se ele
+ * abrir uma aba específica.
+ *
+ * ─── POR QUE `ai_usage`, E NÃO UM TESTE NOVO ────────────────────────────────
+ *
+ * `registrarUsoAgora` já grava `similaridade` em toda resposta do chat desde o
+ * `APLICAR_USO_IA.sql`. A coluna era ESCRITA E NUNCA LIDA — a quarta coluna
+ * morta desta base. Ela responde à pergunta com dados reais, do consultório
+ * dele, sem gastar uma chamada de modelo: `similaridade IS NULL` em toda linha
+ * significa que a busca vetorial não devolveu nada, nem uma vez.
+ *
+ * Uma "chamada de teste" diria se o serviço responde AGORA. Isto diz o que
+ * aconteceu com as pacientes DELE — que é a pergunta que ele tem.
+ */
+export type DiagnosticoDaBusca = {
+  /** Respostas do chat no ciclo (a mesma janela do resto do painel). */
+  respostas: number;
+  /** Quantas tiveram similaridade MEDIDA — ou seja, a busca vetorial rodou. */
+  comNumero: number;
+  /** ≥ ATRIBUICAO: a resposta pôde levar o nome dele. */
+  assinadas: number;
+  /** Entre SEMANTIC e ATRIBUICAO: material usado, sem assinatura, vira lacuna. */
+  faixaDoMeio: number;
+  /** Abaixo de SEMANTIC: nada casou. */
+  semNada: number;
+  /** Entradas sem vetor — invisíveis para a busca por significado. */
+  cegas: number;
+  /** Total de entradas aprovadas. Sem base, nenhum número acima quer dizer algo. */
+  entradas: number;
+};
+
+export async function diagnosticarBusca(doctorId: string): Promise<DiagnosticoDaBusca | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    const { inicioDoCiclo } = await import("./cota-ia.server");
+    const since = inicioDoCiclo().toISOString();
+
+    const [usoRes, cegasRes, entradasRes] = await Promise.all([
+      /* Só o canal do app: o WhatsApp e o `teste` do painel têm caminhos
+         próprios e responderiam por um cérebro que não é o que a paciente vê. */
+      sb
+        .from("ai_usage")
+        .select("similaridade")
+        .eq("doctor_id", doctorId)
+        .eq("especie", "chat")
+        .eq("canal", "app")
+        .gte("created_at", since)
+        .limit(1000),
+      sb
+        .from("brain_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .eq("approved", true)
+        .is("embedding", null),
+      sb
+        .from("brain_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("doctor_id", doctorId)
+        .eq("approved", true),
+    ]);
+    /* `cegas` depende da coluna `embedding` existir. Onde ela não existe, a
+       resposta certa não é "0 cegas" (que soaria saudável) — é não responder,
+       e deixar a tela dizer que falta rodar o SQL. */
+    if (usoRes.error || cegasRes.error || entradasRes.error) return null;
+
+    return {
+      ...distribuirPorFaixa((usoRes.data ?? []) as { similaridade: number | null }[]),
+      cegas: cegasRes.count ?? 0,
+      entradas: entradasRes.count ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Separa as respostas do ciclo nas três faixas — a parte que decide o que o
+ * médico lê, isolada do banco para poder ser exercitada.
+ *
+ * ─── O `null` NÃO É ZERO ────────────────────────────────────────────────────
+ *
+ * `similaridade: null` significa "a busca vetorial não rodou", não "não achei
+ * nada parecido". Contá-lo como `semNada` seria o erro caro: um cérebro com a
+ * busca DESLIGADA apareceria como um cérebro cuja base simplesmente não cobre
+ * as dúvidas — o médico concluiria que precisa escrever mais, quando o que ele
+ * escreveu já está lá e é invisível. Exatamente o diagnóstico errado.
+ *
+ * Por isso os nulos ficam de fora de `comNumero`, e é a diferença entre
+ * `respostas` e `comNumero` que denuncia o problema.
+ */
+export function distribuirPorFaixa(linhas: { similaridade: number | null }[]): {
+  respostas: number;
+  comNumero: number;
+  assinadas: number;
+  faixaDoMeio: number;
+  semNada: number;
+} {
+  const numeros = linhas
+    .map((l) => l.similaridade)
+    .filter((s): s is number => typeof s === "number" && Number.isFinite(s));
+  return {
+    respostas: linhas.length,
+    comNumero: numeros.length,
+    /* Os MESMOS cortes que o chat usa para decidir, importados daqui mesmo.
+       Um número no painel que não seja o número da decisão é pior que nenhum:
+       ele descreveria um produto que não existe. */
+    assinadas: numeros.filter((s) => s >= ATRIBUICAO_MIN_SIMILARITY).length,
+    faixaDoMeio: numeros.filter(
+      (s) => s >= SEMANTIC_MIN_SIMILARITY && s < ATRIBUICAO_MIN_SIMILARITY,
+    ).length,
+    semNada: numeros.filter((s) => s < SEMANTIC_MIN_SIMILARITY).length,
+  };
+}

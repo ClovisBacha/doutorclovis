@@ -1622,6 +1622,31 @@ export const getBrainQualityStats = createServerFn({ method: "POST" })
   });
 
 /**
+ * "A minha resposta valeu de alguma coisa?"
+ *
+ * A pergunta que o médico faz quando vê a paciente receber uma resposta geral e
+ * um "registrei sua dúvida" sobre um assunto que ele JÁ escreveu. Até aqui, não
+ * havia um lugar no produto que respondesse — nem a ele, nem a mim.
+ *
+ * Ver `diagnosticarBusca`: a resposta sai de `ai_usage.similaridade`, que era
+ * gravada em toda conversa e nunca lida.
+ */
+export const diagnosticoDaBusca = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const target = await resolveBrainDoctor(user, data.asDoctor);
+    if (!target) return { ok: false as const };
+    const { diagnosticarBusca } = await import("./secondbrain.server");
+    const d = await diagnosticarBusca(target.doctorId);
+    /* `ok: false` quando falta migration — a tela pede o SQL em vez de mostrar
+       zeros, que é o mesmo defeito que o card de consumo já corrigiu. */
+    if (!d) return { ok: false as const };
+    return { ok: true as const, ...d };
+  });
+
+/**
  * Consulta → conhecimento: recebe a TRANSCRIÇÃO de uma consulta e extrai os
  * pares pergunta→resposta que o MÉDICO efetivamente deu, como RASCUNHOS
  * (approved=false, source='consulta') para revisão na Base de conhecimento.
