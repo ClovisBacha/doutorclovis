@@ -867,7 +867,21 @@ export const Route = createFileRoute("/api/chat")({
              cabem folgadas aqui. */
           maxOutputTokens: 900,
           onError: ({ error }) => {
-            console.error("[chat] stream falhou:", error);
+            /* O log da Vercel corta a linha na largura da coluna, e o objeto de
+               erro do SDK põe o que interessa NO FIM: "RetryError: Failed after
+               3 attempts…" e só depois a causa real. Resultado, a primeira
+               tentativa de diagnóstico mostrou "Failed a…" e mais nada.
+               Então o resumo vem primeiro: status HTTP e mensagem do provedor,
+               que é o que separa cota estourada (429) de indisponibilidade
+               (5xx) de pedido inválido (400). */
+            const e = error as any;
+            const causa = e?.lastError ?? e?.cause ?? e;
+            const status = causa?.statusCode ?? causa?.status ?? "?";
+            const corpo = String(causa?.responseBody ?? causa?.message ?? causa ?? "").slice(
+              0,
+              300,
+            );
+            console.error(`[chat] stream falhou — HTTP ${status} | ${corpo}`);
           },
           /* O `onFinish` roda SEMPRE agora, e não só quando há paciente para
              persistir: a conversa anônima do site também custa tokens, e um

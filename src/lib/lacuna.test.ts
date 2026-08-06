@@ -268,7 +268,7 @@ describe("a resposta nunca chega vazia", () => {
   });
 
   test("falha no streaming também é registrada", () => {
-    expect(chat).toContain("[chat] stream falhou:");
+    expect(chat).toContain("[chat] stream falhou — HTTP");
   });
 
   test("a tela mostra uma frase honesta em vez de bolha muda", () => {
@@ -317,5 +317,30 @@ describe("o filtro de segurança do provedor não engole a obstetrícia", () => 
        A regra continua valendo — mudou só a forma de dizê-la. */
     expect(chat).not.toContain("diagnosticar, prescrever, dar dose, mudar tratamento");
     expect(chat).toContain("NUNCA dê diagnóstico, prescrição, dose de medicamento");
+  });
+});
+
+describe("o log do erro cabe na primeira linha", () => {
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+
+  /* O log da Vercel corta na largura da coluna, e o objeto de erro do SDK põe
+     o que interessa NO FIM — "RetryError: Failed after 3 attempts…" e só
+     depois a causa real. A primeira tentativa de diagnóstico mostrou
+     "Failed a…" e mais nada: uma hora perdida por causa de ordem de texto. */
+  test("status HTTP vem antes de qualquer prosa", () => {
+    expect(chat).toContain("[chat] stream falhou — HTTP ${status}");
+  });
+
+  test("desembrulha o erro do SDK até a causa", () => {
+    /* `RetryError` embrulha o erro real em `lastError`. Logar o de fora conta
+       que houve tentativa; só o de dentro conta POR QUÊ. */
+    expect(chat).toContain("e?.lastError ?? e?.cause ?? e");
+  });
+
+  test("o corpo da resposta é truncado", () => {
+    /* Alguns provedores devolvem HTML de página de erro inteiro. */
+    /* O prettier quebra a chamada em várias linhas, então a asserção olha o
+       corte sem depender de onde a quebra caiu. */
+    expect(chat.replace(/\s+/g, " ")).toContain(".slice( 0, 300, )");
   });
 });
