@@ -6596,6 +6596,11 @@ function BrainGapsCard({
   const [editedQuestion, setEditedQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
+  /* ─── RESPONDER SÓ PARA ELA ─────────────────────────────────────────────
+     A mesma alavanca que a aba Perguntas já tinha, com o padrão INVERTIDO: lá
+     o caso comum é a dúvida específica de uma paciente, aqui é a dúvida que
+     várias fizeram. O padrão segue o caso comum, não a simetria. */
+  const [soParaEla, setSoParaEla] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [drafted, setDrafted] = useState<string | null>(null); // gapId com rascunho da IA
@@ -6675,6 +6680,7 @@ function BrainGapsCard({
           gapId,
           answer: answer.trim(),
           ...(q.length >= 8 ? { question: q.slice(0, 300) } : {}),
+          ...(soParaEla ? { soParaEla: true } : {}),
           ...(asDoctor ? { asDoctor } : {}),
         },
       });
@@ -6832,16 +6838,44 @@ function BrainGapsCard({
               </div>
               {answering === g.id ? (
                 <div className="mt-3">
-                  <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                    Pergunta que entra no cérebro — generalize e remova nomes/dados pessoais
+                  {/* ─── SÓ PARA ELA, OU PARA TODAS ──────────────────────────
+                      A lacuna nasce de várias pacientes, então o padrão é
+                      virar conhecimento. Mas o contador ao lado pode dizer
+                      "1× perguntada" — e aí a resposta pode ser "pode continuar
+                      o remédio que passei na consulta", que não é conduta geral
+                      e não pode ser publicada no cérebro.
+                      Quando é UMA só, a tela sugere; a decisão continua dele. */}
+                  <label className="mb-2 flex items-start gap-2 text-[12px] leading-snug text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={soParaEla}
+                      onChange={(e) => setSoParaEla(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Responder <strong>só para ela</strong> — a resposta chega a quem perguntou e
+                      NÃO vira conhecimento do consultório.
+                      {g.hits === 1 && !soParaEla ? (
+                        <em className="ml-1 not-italic text-amber-700">
+                          Só uma paciente perguntou isto — talvez seja do caso dela.
+                        </em>
+                      ) : null}
+                    </span>
                   </label>
-                  <input
-                    value={editedQuestion}
-                    onChange={(e) => setEditedQuestion(e.target.value)}
-                    maxLength={300}
-                    placeholder="Ex: Posso tomar dipirona na gestação?"
-                    className="mb-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-                  />
+                  {!soParaEla && (
+                    <>
+                      <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                        Pergunta que entra no cérebro — generalize e remova nomes/dados pessoais
+                      </label>
+                      <input
+                        value={editedQuestion}
+                        onChange={(e) => setEditedQuestion(e.target.value)}
+                        maxLength={300}
+                        placeholder="Ex: Posso tomar dipirona na gestação?"
+                        className="mb-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                      />
+                    </>
+                  )}
                   <textarea
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
@@ -6870,7 +6904,11 @@ function BrainGapsCard({
                       disabled={busy || answer.trim().length < 5}
                       className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                     >
-                      {busy ? "Salvando…" : "Responder e treinar 🧠"}
+                      {busy
+                        ? "Salvando…"
+                        : soParaEla
+                          ? "Responder só para ela"
+                          : "Responder e treinar 🧠"}
                     </button>
                     <button
                       onClick={() => {

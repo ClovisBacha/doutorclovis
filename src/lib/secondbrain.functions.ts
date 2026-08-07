@@ -1036,6 +1036,25 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
         gapId: z.string().uuid(),
         answer: z.string().min(5).max(4000),
         question: z.string().min(8).max(300).optional(),
+        /* ─── RESPONDER SÓ PARA ELA ────────────────────────────────────────
+         * `false` (o padrão) mantém o comportamento de sempre: a resposta vira
+         * conhecimento aprovado do consultório.
+         *
+         * O controle já existia no OUTRO caminho — quando a paciente pergunta
+         * direto, "ensinar à minha IA" vem DESLIGADO e exige que o médico
+         * reescreva a pergunta. Na lacuna não existia: toda resposta virava
+         * conduta geral, sempre.
+         *
+         * A assimetria tinha lógica — a lacuna nasce de várias pacientes, então
+         * por construção já é uma dúvida geral. Só que a dedução nem sempre
+         * vale: o contador ao lado pode dizer `1× perguntada`, e aí a resposta
+         * pode ser "pode continuar o remédio que passei na consulta" — que não
+         * é conduta geral e não pode ser publicada no cérebro.
+         *
+         * Padrão INVERTIDO em relação ao outro caminho, de propósito: lá o caso
+         * comum é a pergunta específica; aqui é a dúvida repetida. O padrão
+         * segue o caso comum, não a simetria. */
+        soParaEla: z.boolean().optional(),
         asDoctor: z.string().uuid().optional(),
       })
       .parse(i),
@@ -1062,19 +1081,26 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
     if (!gap) return { ok: false as const };
 
     const questionText = data.question?.trim() || (gap.question as string);
-    const { data: entry, error: insErr } = await sb
-      .from("brain_entries")
-      .insert({
-        doctor_id: doctorId,
-        question: questionText,
-        answer: data.answer,
-        source: "lacuna",
-        approved: true,
-      })
-      .select("id")
-      .single();
-    if (insErr || !entry) return { ok: false as const };
-    {
+
+    /* ─── SÓ PARA ELA: A RESPOSTA SAI, O CONHECIMENTO NÃO ────────────────────
+       Sem entrada no cérebro, sem vetor, sem fechar as parecidas. A lacuna é
+       marcada como respondida e a entrega segue igual — quem perguntou recebe.
+       É a mesma alavanca que o caminho da aba Perguntas já tinha; aqui faltava. */
+    let entry: { id: string } | null = null;
+    if (!data.soParaEla) {
+      const { data: nova, error: insErr } = await sb
+        .from("brain_entries")
+        .insert({
+          doctor_id: doctorId,
+          question: questionText,
+          answer: data.answer,
+          source: "lacuna",
+          approved: true,
+        })
+        .select("id")
+        .single();
+      if (insErr || !nova) return { ok: false as const };
+      entry = nova as { id: string };
       // A lacuna respondida já nasce encontrável por significado.
       const { embedBrainEntry } = await import("./embeddings.server");
       await embedBrainEntry(entry.id, questionText, data.answer);
@@ -1086,9 +1112,12 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
       .eq("id", gap.id);
     if (updErr) {
       // Compensação: não deixa conhecimento duplicar num retry.
-      const { error: delErr } = await sb.from("brain_entries").delete().eq("id", entry.id);
-      if (delErr)
-        console.error("[cérebro] compensação falhou; entrada duplicável", entry.id, delErr);
+      // (Sem entrada criada — "só para ela" — não há o que compensar.)
+      if (entry) {
+        const { error: delErr } = await sb.from("brain_entries").delete().eq("id", entry.id);
+        if (delErr)
+          console.error("[cérebro] compensação falhou; entrada duplicável", entry.id, delErr);
+      }
       return { ok: false as const };
     }
 
@@ -1127,12 +1156,18 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
        É aqui que o agrupamento vale mais: não economiza uma linha na fila,
        economiza as OUTRAS respostas que ele escreveria. E cada paciente das
        parecidas recebe a orientação dele, em vez de continuar esperando. */
-    const parecidas = await fecharLacunasParecidas(sb, {
-      doctorId,
-      gapIdRespondida: gap.id as string,
-      pergunta: questionText,
-      resposta: data.answer,
-    });
+    /* "Só para ela" NÃO fecha as parecidas. Fechá-las mandaria a mesma
+       resposta a outras pacientes — e o médico acabou de dizer que aquela
+       resposta é do caso DESTA. É a diferença entre uma orientação geral e uma
+       conduta individual, que é exatamente o que a opção existe para separar. */
+    const parecidas = data.soParaEla
+      ? 0
+      : await fecharLacunasParecidas(sb, {
+          doctorId,
+          gapIdRespondida: gap.id as string,
+          pergunta: questionText,
+          resposta: data.answer,
+        });
     return { ok: true as const, avisadas, parecidas };
   });
 

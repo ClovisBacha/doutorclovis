@@ -118,7 +118,17 @@ export const Route = createFileRoute("/api/nutrition")({
         const ultima = ultimaPergunta(paraOModelo);
         const { getBrainContextResolved } = await import("@/lib/secondbrain.server");
         const brain =
-          doctorId && ultima ? await getBrainContextResolved(ultima, doctorId, "app") : null;
+          doctorId && ultima
+            ? /* `patientId` NO QUARTO ARGUMENTO — sem ele a lacuna nasce ÓRFÃ.
+                 `logBrainGapAgora` usa esse id para gravar `brain_gap_askers`,
+                 que é a única ligação entre a dúvida dela e a resposta que o
+                 médico vai escrever. Eu tinha esquecido de passá-lo ao ligar a
+                 nutrição ao cérebro: a IA dizia "registrei para ele ver", a
+                 lacuna entrava na fila, ele respondia — e a resposta não
+                 chegava a ninguém. Exatamente a promessa quebrada que o resto
+                 deste ciclo existe para impedir. */
+              await getBrainContextResolved(ultima, doctorId, "app", patientId)
+            : null;
 
         const blocoDoMedico =
           brain?.enabledApp && brain.block

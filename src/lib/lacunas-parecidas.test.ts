@@ -976,8 +976,26 @@ describe("responder uma lacuna fecha as parecidas", () => {
   const fonte = codigoDe("src/lib/secondbrain.functions.ts");
 
   test("`resolveBrainGap` fecha as parecidas e devolve quantas", () => {
-    expect(fonte).toContain("const parecidas = await fecharLacunasParecidas(sb, {");
+    expect(fonte).toContain("await fecharLacunasParecidas(sb, {");
     expect(fonte).toContain("return { ok: true as const, avisadas, parecidas };");
+  });
+
+  test('"só para ela" NÃO fecha as parecidas', () => {
+    /* Fechá-las mandaria a mesma resposta a outras pacientes — e o médico
+       acabou de dizer que aquela resposta é do caso DESTA. É a diferença entre
+       orientação geral e conduta individual, que é exatamente o que a opção
+       existe para separar. */
+    const i = fonte.indexOf("const parecidas = data.soParaEla");
+    expect(i).toBeGreaterThan(-1);
+    expect(fonte.slice(i, i + 120)).toContain("? 0");
+  });
+
+  test('"só para ela" também não cria entrada nem vetor', () => {
+    /* Sem isto a opção seria só um rótulo: o conhecimento entraria no cérebro
+       do mesmo jeito e responderia a outras pacientes na próxima pergunta. */
+    expect(fonte).toContain("if (!data.soParaEla) {");
+    const i = fonte.indexOf("if (!data.soParaEla) {");
+    expect(fonte.slice(i, i + 900)).toContain("embedBrainEntry(entry.id");
   });
 
   test("compara o vetor da PERGUNTA, não o da entrada", () => {
