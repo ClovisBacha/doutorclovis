@@ -82,7 +82,7 @@ dele.
 **Desenvolvedores → Webhooks → Adicionar endpoint**
 
 - URL: `https://www.obstetrica.com.br/api/stripe-webhook`
-- Eventos (exatamente estes seis, que é o que o código trata):
+- Eventos (exatamente estes sete, que é o que o código trata):
   - `checkout.session.completed`
   - `customer.subscription.created`
   - `customer.subscription.updated`
