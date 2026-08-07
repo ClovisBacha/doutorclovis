@@ -36,18 +36,14 @@ import { toast } from "sonner";
 import { ehNativo } from "@/lib/nativo";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { brl } from "@/lib/promo";
-import type { OfertaBoasVindas } from "@/lib/promo.functions";
+import type { PrecosDaPaciente } from "@/lib/promo.functions";
 import { useVoltar } from "@/lib/use-voltar";
 
-const PRECO_MENSAL = 19.9;
-const PRECO_ANUAL_MES = 9.9;
-/** O total do anual, cobrado DE UMA VEZ — é o valor que sai do cartão dela. */
-const PRECO_ANUAL_TOTAL = PRECO_ANUAL_MES * 12;
-
-/* Reais → texto. O `brl` de `promo.ts` recebe CENTAVOS; misturar os dois é a
-   forma mais fácil de mostrar R$ 4.633,00 no lugar de R$ 46,33, então o nome
-   diz a unidade. */
-const reaisBRL = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
+/* Os preços vêm TODOS de `promo.ts`, e nenhum é escrito aqui.
+   Antes havia três constantes locais (`PRECO_MENSAL`, `PRECO_ANUAL_MES`,
+   `PRECO_ANUAL_TOTAL`) convivendo com os valores do servidor — duas fontes
+   para o mesmo preço, na mesma tela, e a diferença só apareceria quando uma
+   das duas mudasse. */
 
 export type MotivoOferta = "item" | "aula" | "geral";
 
@@ -70,7 +66,7 @@ export function OfertaPremium({
   onFechar: () => void;
   motivo?: MotivoOferta;
   itemNome?: string;
-  ofertaDeProva?: OfertaBoasVindas;
+  ofertaDeProva?: PrecosDaPaciente;
 }) {
   const [plano, setPlano] = useState<"monthly" | "annual">("annual");
   const [indo, setIndo] = useState(false);
@@ -92,13 +88,12 @@ export function OfertaPremium({
 
   /* A oferta. Sem contador: quem tem direito é quem nunca assinou, e isso não
      tem prazo — ver `promo.functions.ts`. */
-  const [oferta, setOferta] = useState<OfertaBoasVindas | null>(null);
+  const [oferta, setOferta] = useState<PrecosDaPaciente | null>(null);
 
   useEffect(() => {
     if (!aberto) return;
     if (ofertaDeProva) {
       setOferta(ofertaDeProva);
-      if (ofertaDeProva.ativa) setPlano("annual");
       return;
     }
     let vivo = true;
@@ -107,18 +102,17 @@ export function OfertaPremium({
         const { supabase } = await import("@/integrations/supabase/client");
         const { data: s } = await supabase.auth.getSession();
         if (!s.session) return;
-        const { getOfertaBoasVindas } = await import("@/lib/promo.functions");
-        const o = await getOfertaBoasVindas({
+        const { getPrecosDaPaciente } = await import("@/lib/promo.functions");
+        const o = await getPrecosDaPaciente({
           data: { accessToken: s.session.access_token },
         });
         if (!vivo) return;
         setOferta(o);
-        /* Oferta ativa pré-seleciona o anual: é o único plano com desconto, e
-           deixar o mensal marcado enquanto o cartaz fala do anual faria ela
-           pagar cheio achando que pegou a promoção. */
-        if (o.ativa) setPlano("annual");
+        /* O anual já vem pré-selecionado no `useState`. Antes isto era
+           condicional à promoção; agora o anual é SEMPRE o de melhor valor,
+           então não há estado em que faça sentido abrir no mensal. */
       } catch {
-        /* Sem oferta: a folha mostra os planos normais. */
+        /* Sem os preços do servidor, a folha não inventa: ver `promoViva`. */
       }
     })();
     return () => {
@@ -126,7 +120,12 @@ export function OfertaPremium({
     };
   }, [aberto, ofertaDeProva]);
 
-  const promoViva = Boolean(oferta?.ativa);
+  /* A folha só mostra preço quando o SERVIDOR respondeu. Antes ela tinha
+     constantes locais para cair de volta, e um erro de rede virava "preço
+     cheio" sem ninguém saber se era verdade. Preço é a única coisa desta tela
+     que não pode ser adivinhada. */
+  const temPrecos = Boolean(oferta);
+  const comCupom = Boolean(oferta?.temCupom);
 
   /* Trava o fundo enquanto a folha está aberta — sem isso, o dedo arrasta a
      lista de trás e a folha parece descolada da tela. */
@@ -260,25 +259,25 @@ export function OfertaPremium({
             vai assinar dentro do app, e o molde da loja para "desconto de
             primeira assinatura" não tem prazo por pessoa. Contador que a loja
             não consegue honrar depois é promessa que vira reclamação. */}
-        {promoViva && oferta && (
+        {temPrecos && oferta && (
           <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-rose-500 p-4 text-white shadow-lg">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/85">
-                  Oferta de boas-vindas
+                  Plano anual
                 </p>
-                <p className="mt-0.5 font-serif text-3xl leading-none">{oferta.descontoPct}% OFF</p>
-                <p className="mt-1 text-[12px] text-white/90">no primeiro ano do plano anual</p>
+                <p className="mt-0.5 font-serif text-3xl leading-none">
+                  {oferta.descontoAnualPct}% OFF
+                </p>
+                <p className="mt-1 text-[12px] text-white/90">comparado a pagar mês a mês</p>
               </div>
             </div>
-            {/* O riscado EM CIMA, o preço da promoção EMBAIXO — o olho lê de
-                cima para baixo, e é nessa ordem que a queda de preço se
-                percebe.
+            {/* O riscado EM CIMA, o preço EMBAIXO — o olho lê de cima para
+                baixo, e é nessa ordem que a queda de preço se percebe.
 
-                E o riscado vem com legenda. R$ 238,80 é um preço REAL (o
-                plano mensal por doze meses), mas o anual normal custa
-                R$ 118,80 — riscar 238,80 sem dizer o que é faria parecer que
-                o anual foi inflado para a promoção, que é o "preço de
+                E o riscado vem com LEGENDA. R$ 238,80 é um preço REAL (o plano
+                mensal por doze meses); riscá-lo sem dizer o que é faria parecer
+                que o anual foi inflado para a promoção, que é o "preço de
                 referência" que o CDC proíbe. Com a legenda é comparação
                 verdadeira; sem ela é propaganda enganosa. */}
             <div className="mt-3 rounded-xl bg-white/15 px-3 py-2.5">
@@ -289,23 +288,51 @@ export function OfertaPremium({
                 pagando mês a mês
               </p>
               <p className="mt-0.5 whitespace-nowrap font-serif text-[30px] leading-none">
-                {brl(oferta.promoCentavos)}
+                {brl(oferta.anualCentavos)}
               </p>
-              {/* "equivale a", nunca "×12": R$ 7,49 × 12 = R$ 89,88, dois
-                  centavos abaixo do que ela paga. Quem fizer a conta encontra
-                  o texto certo em vez de uma diferença inexplicada. */}
+              {/* ─── O EQUIVALENTE MENSAL NUNCA É UM PREÇO ──────────────────
+                  Decisão do dono: R$ 9,16 só aparece DENTRO da comparação, ao
+                  lado do que ela pagaria mês a mês e da porcentagem. O que sai
+                  do cartão dela é R$ 109,90, de uma vez, e é esse o número
+                  grande acima.
+                  E "equivale a", nunca "×12": R$ 9,16 × 12 = R$ 109,92, dois
+                  centavos ACIMA do cobrado. Quem fizer a conta encontra o texto
+                  certo em vez de uma diferença inexplicada. */}
               <p className="mt-0.5 text-[12px] text-white/85">
-                no primeiro ano · equivale a{" "}
+                cobrado uma vez · equivale a{" "}
                 <span className="whitespace-nowrap font-semibold">
-                  {brl(oferta.promoMensalCentavos)}/mês
+                  {brl(oferta.anualMensalEquivCentavos)}/mês
                 </span>
               </p>
               <p className="mt-1.5 text-[12px] font-semibold text-white/95">
                 você economiza{" "}
-                <span className="whitespace-nowrap">{brl(oferta.economiaCentavos)}</span> no
-                primeiro ano
+                <span className="whitespace-nowrap">{brl(oferta.economiaCentavos)}</span> no ano
               </p>
             </div>
+
+            {/* ─── O CUPOM DO MÉDICO, CREDITADO A ELE ─────────────────────
+                A faixa é separada de propósito: o desconto do anual é da
+                plataforma, este é DELE. Misturar os dois num número só faria o
+                médico dar 20% e ninguém saber que veio dele — e é justamente
+                esse crédito que dá a ele um motivo para distribuir o código. */}
+            {comCupom && (
+              <div className="mt-2 rounded-xl bg-white px-3 py-2.5 text-violet-800">
+                <p className="text-[11px] font-bold uppercase tracking-wide">
+                  + {oferta.cupomPct}% de desconto
+                  {oferta.medicoDoCupom ? ` de ${oferta.medicoDoCupom}` : ""}
+                </p>
+                <p className="mt-0.5 whitespace-nowrap font-serif text-2xl leading-none">
+                  {brl(oferta.anualFinalCentavos)}
+                </p>
+                <p className="mt-0.5 text-[12px] text-violet-700">
+                  equivale a{" "}
+                  <span className="whitespace-nowrap font-semibold">
+                    {brl(Math.round(oferta.anualFinalCentavos / 12))}/mês
+                  </span>{" "}
+                  · {oferta.descontoAnualComCupomPct}% no total
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -339,13 +366,30 @@ export function OfertaPremium({
             <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               Mensal
             </span>
-            <span className="mt-0.5 block font-serif text-lg tabular-nums">
-              {reaisBRL(PRECO_MENSAL)}
-            </span>
-            <span className="block text-[11px] text-muted-foreground">por mês</span>
-            <span className="mt-1 block text-[10px] text-muted-foreground">
-              cancela quando quiser
-            </span>
+            {comCupom && oferta ? (
+              <>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground line-through">
+                  {brl(oferta.mensalCentavos)}
+                </span>
+                <span className="block font-serif text-lg tabular-nums text-violet-700">
+                  {brl(oferta.mensalFinalCentavos)}
+                </span>
+                <span className="block text-[11px] text-muted-foreground">por mês</span>
+                <span className="mt-1 block text-[10px] text-violet-700">
+                  −{oferta.cupomPct}% enquanto for assinante
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="mt-0.5 block font-serif text-lg tabular-nums">
+                  {oferta ? brl(oferta.mensalCentavos) : "—"}
+                </span>
+                <span className="block text-[11px] text-muted-foreground">por mês</span>
+                <span className="mt-1 block text-[10px] text-muted-foreground">
+                  cancela quando quiser
+                </span>
+              </>
+            )}
           </button>
           <button
             onClick={() => setPlano("annual")}
@@ -358,20 +402,17 @@ export function OfertaPremium({
           >
             <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-primary">
               Anual
-              {promoViva && oferta && (
+              {oferta && (
                 <span className="rounded-full bg-violet-600 px-1.5 py-px text-[9px] text-white">
-                  −{oferta.descontoPct}%
+                  −{comCupom ? oferta.descontoAnualComCupomPct : oferta.descontoAnualPct}%
                 </span>
               )}
             </span>
-            {promoViva && oferta ? (
+            {/* O anual mostra sempre o preço À VISTA — é o número que sai do
+                cartão dela. O equivalente mensal vem abaixo e SÓ dentro da
+                comparação, nunca como preço: decisão do dono. */}
+            {oferta ? (
               <>
-                {/* Com a promoção, o card mostra o preço À VISTA do primeiro
-                    ano — que é o número que sai do cartão dela hoje. O "por
-                    mês" continua abaixo, porque é como ela compara com o
-                    mensal, e a renovação aparece por extenso: o desconto
-                    acaba, e esconder isso é a mentira que este arquivo
-                    inteiro existe para não cometer. */}
                 <span className="mt-0.5 block text-[11px] text-muted-foreground">
                   <span className="whitespace-nowrap line-through">
                     {brl(oferta.referenciaCentavos)}
@@ -379,26 +420,23 @@ export function OfertaPremium({
                   mês a mês
                 </span>
                 <span className="block whitespace-nowrap font-serif text-2xl leading-tight tabular-nums text-violet-700">
-                  {brl(oferta.promoCentavos)}
+                  {brl(oferta.anualFinalCentavos)}
                 </span>
                 <span className="block text-[11px] text-muted-foreground">
-                  no 1º ano · equivale a{" "}
-                  <span className="whitespace-nowrap">{brl(oferta.promoMensalCentavos)}/mês</span>
+                  cobrado uma vez · equivale a{" "}
+                  <span className="whitespace-nowrap">
+                    {brl(Math.round(oferta.anualFinalCentavos / 12))}/mês
+                  </span>
                 </span>
-                <span className="mt-1 block text-[10px] text-muted-foreground">
-                  depois <span className="whitespace-nowrap">{brl(oferta.listaCentavos)}/ano</span>
-                </span>
+                {comCupom && (
+                  <span className="mt-1 block text-[10px] text-violet-700">
+                    já com os {oferta.cupomPct}%
+                    {oferta.medicoDoCupom ? ` de ${oferta.medicoDoCupom}` : ""}
+                  </span>
+                )}
               </>
             ) : (
-              <>
-                <span className="mt-0.5 block font-serif text-lg tabular-nums">
-                  {reaisBRL(PRECO_ANUAL_MES)}
-                </span>
-                <span className="block text-[11px] text-muted-foreground">por mês</span>
-                <span className="mt-1 block text-[10px] text-muted-foreground">
-                  {reaisBRL(PRECO_ANUAL_TOTAL)} cobrados de uma vez
-                </span>
-              </>
+              <span className="mt-0.5 block font-serif text-lg tabular-nums">—</span>
             )}
           </button>
         </div>
@@ -422,29 +460,40 @@ export function OfertaPremium({
             onClick={assinar}
             disabled={indo}
             className={`press mt-4 w-full rounded-full px-6 py-3 text-sm font-bold disabled:opacity-60 ${
-              promoViva && plano === "annual"
+              plano === "annual"
                 ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg"
                 : "bg-primary text-primary-foreground"
             }`}
           >
+            {/* O botão repete o VALOR. É o último lugar antes de sair do app
+                para o Stripe, e a paciente confere ali o número que vai ver na
+                tela de pagamento — se divergir, ela desiste. Vale para os dois
+                planos: antes só o anual em promoção mostrava o preço, e quem
+                escolhia o mensal saía sem nunca ter lido o número. */}
             {indo
               ? "Abrindo…"
-              : promoViva && plano === "annual" && oferta
-                ? /* O botão repete o valor. É o último lugar antes de sair do
-                     app para o Stripe, e a paciente confere ali o número que
-                     vai ver na tela de pagamento — se divergir, ela desiste. */
-                  `Garantir por ${brl(oferta.promoCentavos)}`
+              : oferta
+                ? `Assinar por ${brl(
+                    plano === "annual" ? oferta.anualFinalCentavos : oferta.mensalFinalCentavos,
+                  )}${plano === "annual" ? "" : "/mês"}`
                 : "Assinar o Premium"}
           </button>
         )}
 
-        {/* A letra miúda que não é miúda. O desconto vale UMA cobrança; a
-            renovação é cheia. Dizer isso antes do clique é o que impede o
-            estorno de daqui a doze meses. */}
-        {promoViva && oferta && plano === "annual" && (
+        {/* A letra miúda que não é miúda.
+            ─── O QUE MUDOU AQUI ────────────────────────────────────────────
+            A oferta antiga valia UMA cobrança e a renovação voltava cheia, e
+            este parágrafo existia para dizer isso antes do clique — era o que
+            impedia o estorno de daqui a doze meses.
+            O cupom do médico é `duration: forever`: ela mantém os 20% enquanto
+            for assinante. Então não há renovação surpresa a avisar, e a letra
+            miúda passa a dizer a verdade nova — que é melhor, e por isso mesmo
+            precisa estar escrita. */}
+        {oferta && plano === "annual" && (
           <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
-            O desconto vale para o primeiro ano. Daqui a 12 meses a renovação é o preço normal do
-            plano anual, {brl(oferta.listaCentavos)} — e você pode cancelar antes, quando quiser.
+            Cobrança única de {brl(oferta.anualFinalCentavos)}, renovada a cada 12 meses
+            {comCupom ? ` — o desconto de ${oferta.cupomPct}% continua valendo na renovação` : ""}.
+            Você pode cancelar quando quiser.
           </p>
         )}
 

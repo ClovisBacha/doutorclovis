@@ -237,20 +237,19 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       }
     }
 
-    /* Libera o premium — e o código JÁ está marcado como resgatado por ela.
-       Falhar em silêncio aqui é o pior desfecho possível: o convite foi
-       consumido e ela não ganhou nada.
-       Não desfaço o resgate (limpar `redeemed_by` reabre a corrida de uso
-       único). Devolvo erro, e tentar de novo é seguro: com `redeemed_by`
-       apontando para ela, o bloco acima é pulado e o fluxo cai direto aqui. */
-    const { error: premErr } = await (supabaseAdmin as any)
-      .from("patient_profiles")
-      .update({ quiz_premium: true })
-      .eq("id", u.user.id);
-    if (premErr) {
-      console.error("[convite] código resgatado sem liberar premium", row.id, premErr);
-      return { ok: false as const, error: "falha_ao_liberar" };
-    }
+    /* ─── O CÓDIGO DO MÉDICO VIROU DESCONTO, NÃO PREMIUM DE GRAÇA ─────────
+       DECISÃO DO DONO (ago/2026). Aqui havia um
+       `patient_profiles.update({ quiz_premium: true })`: o médico dava a
+       assinatura inteira, de graça, para um punhado de pacientes por mês.
+
+       Agora ele dá 20% de desconto, nos dois planos, enquanto ela for
+       assinante. Nada é concedido neste ponto — `redeemed_by`, marcado logo
+       acima, É o cupom: `lerPrecos` procura por ele e o checkout aplica a
+       porcentagem no Stripe.
+
+       Ou seja, esta etapa deixou de ter uma escrita que podia falhar em
+       silêncio e deixar o convite consumido sem ela receber nada. O que ela
+       ganha passou a ser consequência da MESMA linha que marca o resgate. */
 
     let semVaga = false;
     // Vincula ao médico só se a paciente ainda não tem um (não "rouba").

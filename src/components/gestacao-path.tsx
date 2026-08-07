@@ -252,7 +252,7 @@ import { BabyIllustration } from "@/components/baby-illustration";
 import { ehNativo, tocarPadrao } from "@/lib/nativo";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { brl as brlPromo } from "@/lib/promo";
-import type { OfertaBoasVindas } from "@/lib/promo.functions";
+import type { PrecosDaPaciente } from "@/lib/promo.functions";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
@@ -3174,7 +3174,7 @@ function QuizPaywall({
      preço cheio no outro acharia que um dos dois está mentindo — e o desconto
      seria aplicado no checkout de qualquer jeito, porque quem decide é o
      servidor. Melhor ela saber o que está levando. */
-  const [oferta, setOferta] = useState<OfertaBoasVindas | null>(null);
+  const [oferta, setOferta] = useState<PrecosDaPaciente | null>(null);
   useEffect(() => {
     let vivo = true;
     (async () => {
@@ -3182,20 +3182,27 @@ function QuizPaywall({
         const { supabase } = await import("@/integrations/supabase/client");
         const { data: s } = await supabase.auth.getSession();
         if (!s.session) return;
-        const { getOfertaBoasVindas } = await import("@/lib/promo.functions");
-        const o = await getOfertaBoasVindas({ data: { accessToken: s.session.access_token } });
+        const { getPrecosDaPaciente } = await import("@/lib/promo.functions");
+        const o = await getPrecosDaPaciente({ data: { accessToken: s.session.access_token } });
         if (!vivo) return;
         setOferta(o);
-        if (o.ativa) setPlan("annual");
+        /* O anual é SEMPRE o de melhor valor agora — antes isto era
+           condicional à promoção estar viva. Não há mais estado em que faça
+           sentido abrir no mensal. */
+        setPlan("annual");
       } catch {
-        /* sem oferta: preços normais */
+        /* Sem resposta do servidor, os cartões ficam com "—": preço é a única
+           coisa desta tela que não pode ser adivinhada. */
       }
     })();
     return () => {
       vivo = false;
     };
   }, []);
-  const promoViva = Boolean(oferta?.ativa);
+  /* Os preços vêm do servidor; a tela não inventa nenhum. `comCupom` só muda
+     QUANTO, nunca o layout — o cartaz do anual aparece sempre, porque o
+     desconto contra pagar mês a mês existe com ou sem cupom. */
+  const comCupom = Boolean(oferta?.temCupom);
 
   // Código do médico Elite: a paciente digita e ganha o premium na hora.
   async function redeem() {
@@ -3389,13 +3396,17 @@ function QuizPaywall({
         </div>
       )}
 
-      {promoViva && oferta && (
+      {oferta && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-2.5 text-white">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/85">
-              Oferta de boas-vindas
+              {comCupom && oferta.medicoDoCupom
+                ? `Plano anual + ${oferta.cupomPct}% de ${oferta.medicoDoCupom}`
+                : "Plano anual"}
             </p>
-            <p className="font-serif text-xl leading-tight">{oferta.descontoPct}% no 1º ano</p>
+            <p className="font-serif text-xl leading-tight">
+              {comCupom ? oferta.descontoAnualComCupomPct : oferta.descontoAnualPct}% de desconto
+            </p>
             {/* O riscado com legenda: R$ 238,80 é o plano mensal por doze
                 meses, não um preço anual inflado. Sem a legenda, comparação
                 vira propaganda enganosa. */}
@@ -3405,7 +3416,7 @@ function QuizPaywall({
               </span>{" "}
               mês a mês →{" "}
               <span className="whitespace-nowrap font-bold text-white">
-                {brlPromo(oferta.promoCentavos)}
+                {brlPromo(oferta.anualFinalCentavos)}
               </span>
             </p>
           </div>
@@ -3416,23 +3427,30 @@ function QuizPaywall({
         <PlanCard
           id="monthly"
           label="Mensal"
-          price={`R$ ${QUIZ_PRICE_MONTHLY.toFixed(2).replace(".", ",")}`}
+          price={oferta ? brlPromo(oferta.mensalFinalCentavos) : "—"}
           sub="por mês"
         />
+        {/* O anual mostra o valor À VISTA e o equivalente mensal só na
+            legenda — decisão do dono: R$ 9,16 nunca é apresentado como preço.
+            O selo carrega a porcentagem real, e ela é DERIVADA do preço em
+            `promo.ts` (nunca escrita à mão), então não há como a etiqueta
+            prometer um desconto que a fatura não dá. */}
         <PlanCard
           id="annual"
           label="Anual"
-          price={
-            promoViva && oferta
-              ? brlPromo(oferta.promoCentavos)
-              : `R$ ${QUIZ_PRICE_ANNUAL_MONTH.toFixed(2).replace(".", ",")}`
-          }
+          price={oferta ? brlPromo(oferta.anualFinalCentavos) : "—"}
           sub={
-            promoViva && oferta
-              ? `no 1º ano · depois ${brlPromo(oferta.listaCentavos)}/ano`
-              : `por mês · R$ ${QUIZ_PRICE_ANNUAL_TOTAL.toFixed(2).replace(".", ",")} por ano`
+            oferta
+              ? `cobrado uma vez · equivale a ${brlPromo(
+                  Math.round(oferta.anualFinalCentavos / 12),
+                )}/mês`
+              : ""
           }
-          badge={promoViva && oferta ? `−${oferta.descontoPct}%` : "ECONOMIZE 50%"}
+          badge={
+            oferta
+              ? `−${comCupom ? oferta.descontoAnualComCupomPct : oferta.descontoAnualPct}%`
+              : ""
+          }
         />
       </div>
 

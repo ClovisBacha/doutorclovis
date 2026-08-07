@@ -128,38 +128,48 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
       }
     }
 
-    /* ── Oferta de boas-vindas ────────────────────────────────────────
-       61% no PRIMEIRO ANO do plano anual, e só enquanto a janela de 2h59
-       estiver aberta — conferida AQUI, no servidor, relendo o instante do
-       banco. Se a decisão morasse no cliente, bastaria uma requisição forjada
-       para comprar com desconto meses depois de a promoção ter acabado.
+    /* ── O CUPOM DO MÉDICO ────────────────────────────────────────────
+       20% nos DOIS planos, mensal e anual.
 
-       Só o anual: o desconto existe para trocar o compromisso de um ano por
-       um preço melhor, e num plano mensal ele viraria um mês barato seguido
-       de onze cheios — que é a versão que gera estorno.
+       ─── O QUE ESTAVA AQUI ANTES ────────────────────────────────────────
+       A oferta de boas-vindas: 62% no primeiro ano do anual, automática, para
+       quem nunca tinha assinado. Foi aposentada junto com a mudança do anual
+       para R$ 109,90 — com o preço novo ela entregava R$ 89,90 e o cupom do
+       médico entrega R$ 87,92, praticamente a mesma coisa. Manter as duas
+       faria o cupom do médico não valer nada; empilhá-las levaria a assinatura
+       a R$ 71,92.
 
-       O cupom de convite tem prioridade: ele é `duration: forever` e vale
-       mais para ela do que 61% numa cobrança só. */
-    if (!discountCoupon && data.product === "quiz_premium" && data.plan === "annual") {
+       ─── POR QUE PORCENTAGEM AQUI, E VALOR FIXO LÁ ──────────────────────
+       A oferta antiga usava cupom de VALOR FIXO de propósito: os 62% incidiam
+       sobre o preço de pagar mês a mês (R$ 238,80) enquanto o Stripe cobrava o
+       Price do anual (R$ 118,80), então uma porcentagem obrigaria o Stripe a
+       arredondar — e um centavo de diferença entre a tela e a fatura é uma
+       reclamação.
+
+       Aqui os 20% incidem sobre o PRÓPRIO preço cobrado, e as duas contas
+       fecham exatas em centavos: 1990 × 0,8 = 1592 e 10990 × 0,8 = 8792. Sem
+       arredondamento no meio, porcentagem é o instrumento certo — e é o único
+       que funciona nos dois planos com um cupom só.
+
+       ─── NOS DOIS PLANOS, E ISSO É DECISÃO ──────────────────────────────
+       A oferta antiga era só no anual, com um motivo escrito: desconto num
+       plano mensal vira "um mês barato seguido de onze cheios", que é a versão
+       que gera estorno. O cupom do médico é `duration: forever` — ela mantém os
+       20% enquanto for assinante —, então esse defeito não existe aqui.
+
+       O cupom de convite-de-paciente (no plano do MÉDICO) continua com
+       prioridade sobre este: são produtos diferentes e nunca colidem. */
+    if (!discountCoupon && data.product === "quiz_premium") {
       try {
-        const { lerOferta } = await import("@/lib/promo.functions");
-        const oferta = await lerOferta(u.user.id);
-        if (oferta.ativa) {
-          const { ABATIMENTO_CENTAVOS, CUPOM_ID, DESCONTO_PCT } = await import("@/lib/promo");
-          const { ensureAmountCoupon } = await import("@/lib/stripe.server");
-          /* Valor FIXO, não porcentagem: os 61% incidem sobre o preço de
-             pagar mês a mês (R$ 238,80), e o que o Stripe cobra é o Price do
-             anual (R$ 118,80). Abater R$ 25,67 fecha a fatura exatamente nos
-             R$ 93,13 que a tela promete — sem arredondamento no meio. */
-          discountCoupon = await ensureAmountCoupon(
-            CUPOM_ID,
-            ABATIMENTO_CENTAVOS,
-            `Boas-vindas (-${DESCONTO_PCT}% no 1º ano)`,
-          );
+        const { lerPrecos } = await import("@/lib/promo.functions");
+        const precos = await lerPrecos(u.user.id);
+        if (precos.temCupom) {
+          const { CUPOM_MEDICO_ID, CUPOM_MEDICO_PCT } = await import("@/lib/promo");
+          discountCoupon = await ensurePercentCoupon(CUPOM_MEDICO_ID, CUPOM_MEDICO_PCT);
         }
       } catch {
         /* Falhou? Segue SEM desconto. Preferir não descontar a descontar
-           errado: o checkout nunca é bloqueado por causa da promoção. */
+           errado: o checkout nunca é bloqueado por causa do cupom. */
       }
     }
 
