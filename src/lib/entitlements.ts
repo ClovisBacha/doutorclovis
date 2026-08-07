@@ -100,15 +100,33 @@ const FREE: Entitlements = {
  * Segundo Cérebro sem saltar direto para o plano de R$149 — e é justamente ele
  * quem traz as primeiras pacientes para a plataforma.
  *
- * ─── Por que o limite é PACIENTE, e não uso da IA ───────────────────────
+ * ─── SÃO DOIS LIMITES, e este texto dizia que era um ───────────────────
  *
- * Racionar a IA ("100 perguntas/mês") exigiria contador, tela de saldo e um
- * novo jeito de falhar. Pior: ensinaria o médico que a IA é escassa, e ele
- * pararia de indicar o app às pacientes — o oposto do que a plataforma quer.
+ * O parágrafo aqui defendia limitar por PACIENTE e não por uso da IA — e
+ * argumentava que racionar "ensinaria o médico que a IA é escassa". Vinte e seis
+ * linhas abaixo, o código raciona: `aiRepliesPerCycle: 500`.
  *
- * `maxPatients` já é aplicado em todo lugar, custa zero, e o upgrade acontece
- * SOZINHO: quem gosta chega a 15 pacientes em poucas semanas e sobe sem se
- * sentir punido.
+ * O comentário descrevia uma versão do plano que não existe mais, e ficou. Numa
+ * base em que a prosa é longa e confiante, isso é pior que não ter comentário:
+ * quem lê acredita.
+ *
+ * O que vale hoje: **15 pacientes E 500 respostas de IA por ciclo**, e os dois
+ * fazem trabalho diferente.
+ *
+ * `maxPatients` é o limite de NEGÓCIO — ele define para quantas gestantes este
+ * preço faz sentido, é aplicado em todo lugar e custa zero para checar. O
+ * upgrade acontece SOZINHO: quem gosta chega a 15 pacientes em poucas semanas e
+ * sobe sem se sentir punido.
+ *
+ * `aiRepliesPerCycle` é o limite de CUSTO — ele existe porque cada resposta é
+ * uma chamada de modelo que a plataforma paga, e 500 delas a R$ 49,90 dão
+ * cerca de R$ 0,10 por resposta. Sem esse teto, uma única gestante muito
+ * conversadora tornaria o plano deficitário sozinha.
+ *
+ * A preocupação do texto antigo continua válida e virou desenho: quando as 500
+ * acabam, a IA NÃO some para a paciente — ela continua respondendo com
+ * informação obstétrica consolidada, sem a voz do médico, com prazo e caminho
+ * até ele. O médico nunca descobre o limite pelo silêncio dela.
  *
  * ─── E por que ele NÃO tem as ferramentas avançadas ─────────────────────
  *
@@ -171,21 +189,6 @@ const PRO: Entitlements = {
   aiRepliesPerCycle: 4_000,
 };
 
-// Clínica = plano personalizado (orçamento por contrato). Sem tetos rígidos:
-// pacientes e médicos são acordados no fechamento, então null/null (a conta é
-// provisionada pela nossa equipe já com o combinado).
-const CLINICA: Entitlements = {
-  ...PRO,
-  label: "Clínica",
-  maxPatients: null,
-  maxBrains: null,
-  teamSeats: true,
-  prioritySupport: true,
-  dedicatedManager: true,
-  /* Contrato sob medida: o teto é combinado, não tabelado. */
-  aiRepliesPerCycle: null,
-};
-
 // Elite = Pro + equipe + 25 convites premium/mês + selo "Elite".
 const ELITE: Entitlements = {
   ...PRO,
@@ -209,6 +212,28 @@ const BLACK: Entitlements = {
   badge: "Black",
   dedicatedManager: true,
   aiRepliesPerCycle: 30_000,
+};
+
+// Clínica = plano personalizado (orçamento por contrato). Sem tetos rígidos:
+// pacientes e médicos são acordados no fechamento, então null/null (a conta é
+// provisionada pela nossa equipe já com o combinado).
+const CLINICA: Entitlements = {
+  /* ─── HERDA DE BLACK, NÃO DE PRO ─────────────────────────────────────────
+   * A escada não era monotônica: `Clínica` fica ACIMA de `Elite` no
+   * `PLAN_RANK` e herdava de `PRO` — ou seja, entregava `premiumInvitesPerMonth: 0`
+   * e o selo "Pro" enquanto o Elite, abaixo dela, dá 25 convites e o selo
+   * "Elite". Subir de plano rebaixava o médico em dois eixos.
+   * Era também a causa da exceção "só sobe quem está abaixo do Elite" no
+   * assento de clínica: a exceção existia para contornar a escada quebrada. */
+  ...BLACK,
+  label: "Clínica",
+  maxPatients: null,
+  maxBrains: null,
+  teamSeats: true,
+  prioritySupport: true,
+  dedicatedManager: true,
+  /* Contrato sob medida: o teto é combinado, não tabelado. */
+  aiRepliesPerCycle: null,
 };
 
 // Trial = experimenta o Pro por 14 dias (mesmas capacidades do Pro), mas SEM
@@ -293,15 +318,27 @@ export const PLAN_RANK: Record<PlanKey, number> = {
   starter: 3,
   pro: 4,
   elite: 5,
-  /* `clinica` fica ABAIXO de black, e isto é uma correção.
-     
-     Ela estava em 6, no topo, com o comentário "o plano mais caro". Mas o preço
-     dela é "sob consulta" (`PLAN_PRICE.clinica = 0`) e o Black custa R$ 1.499 —
-     e o assento de clínica é concedido automaticamente a qualquer membro de uma
-     clínica ativa. Ou seja: um assento de valor indefinido passava na frente de
-     quem paga o plano mais caro da tabela, na busca que a paciente vê. */
-  clinica: 6,
-  black: 7, // o mais caro da tabela — topo da escada
+  black: 7, // o mais caro da TABELA
+  /* ─── `clinica` VOLTA AO TOPO, e a razão da demoção deixou de existir ─────
+   *
+   * Ela tinha sido movida para BAIXO do Black com este argumento: "o preço dela
+   * é sob consulta e o Black custa R$ 1.499 — e o assento de clínica é
+   * concedido AUTOMATICAMENTE a qualquer membro de uma clínica ativa; um
+   * assento de valor indefinido passava na frente de quem paga o plano mais
+   * caro da tabela, na busca que a paciente vê".
+   *
+   * O argumento estava certo, e atacava o sintoma. O problema real era o
+   * assento: `planRowFor` escrevia `plan = "clinica"` fixo para qualquer membro
+   * de clínica ativa — ou seja, IA ilimitada e pacientes ilimitadas, de graça.
+   * Agora o assento herda o plano do DONO da clínica, com o vencimento dele
+   * junto. Ninguém mais ganha `clinica` sem que alguém tenha contratado.
+   *
+   * Com isso, manter `clinica` abaixo do Black passou a produzir o defeito que
+   * a demoção queria evitar, invertido: o de cima (Black) entrega 500 pacientes
+   * e 30.000 respostas, e o de baixo (Clínica) entrega ilimitado nos dois. Um
+   * teste de pares — `escada-de-planos.test.ts` — encontrou isso.
+   */
+  clinica: 8,
 };
 
 /** Normaliza um valor livre de `doctors.plan` para uma PlanKey conhecida. */

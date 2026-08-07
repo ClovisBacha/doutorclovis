@@ -159,12 +159,18 @@ describe("médico novo não nasce mais em trial", () => {
     expect(servidor).toMatch(/camposDeEntrada = existing\s*\?\s*\{\}/);
   });
 
-  test("quem já está em trial continua expirando pela regra antiga", () => {
+  test("quem já está em trial continua expirando — agora pela régua ÚNICA", () => {
     /* Tirar o trial dos novos não pode deixar os antigos presos nele para
-       sempre — nem cortá-los antes do prazo prometido. */
+       sempre — nem cortá-los antes do prazo prometido.
+       A regra deixou de ser "só o trial vence" e passou a valer para TODO
+       plano: havia duas réguas para a mesma coluna, e a mais cara era a
+       permissiva — um `pro` vencido mantinha a IA para sempre enquanto o
+       diretório de busca já o rebaixava. O trial continua expirando; o que
+       mudou é que os pagos também. */
     const ent = codigoDe("src/lib/entitlements.server.ts");
-    expect(ent).toContain('data.plan === "trial"');
-    expect(ent).toContain('plan = "free"');
+    expect(ent).toContain("export function planoVigente(");
+    expect(ent).toContain('return venc + CARENCIA_DE_RENOVACAO_MS < agora ? "free" : plan;');
+    expect(ent).toContain("let plan: string | null = planoVigente(");
   });
 });
 

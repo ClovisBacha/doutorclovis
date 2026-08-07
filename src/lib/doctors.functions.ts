@@ -784,11 +784,16 @@ export const searchDoctors = createServerFn({ method: "POST" })
        `entitlements.server` derruba o trial vencido, mas a lista usava a coluna
        crua: um Elite cujo cartão falhou continuava no topo de toda busca
        indefinidamente, na frente de quem está pagando. Aqui a data manda. */
-    const planoValido = (d: { plan: string; plan_expires_at?: string | null }) => {
-      const venc = d.plan_expires_at ? new Date(d.plan_expires_at).getTime() : null;
-      if (venc != null && venc < Date.now()) return "free";
-      return d.plan;
-    };
+    /* A MESMA régua do resto do sistema, importada — não uma cópia.
+       Esta função e `planRowFor` respondiam à mesma pergunta com regras
+       opostas: aqui qualquer plano vencido caía; lá, só o trial. O médico com o
+       cartão recusado perdia a posição na busca e mantinha a IA.
+       `planoVigente` ainda acrescenta a carência de renovação, que aqui também
+       é o certo: quem está renovando não deve sumir da busca por um webhook
+       atrasado. */
+    const { planoVigente } = await import("./entitlements.server");
+    const planoValido = (d: { plan: string; plan_expires_at?: string | null }) =>
+      planoVigente(d.plan, d.plan_expires_at) ?? "free";
     list.sort((a, b) => {
       const pr =
         PLAN_RANK[normalizePlan(planoValido(b))] - PLAN_RANK[normalizePlan(planoValido(a))];

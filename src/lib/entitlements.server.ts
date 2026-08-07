@@ -32,6 +32,45 @@ export function isPlatformTeamEmail(email?: string | null): boolean {
   return !!email && adminEmails().includes(email.toLowerCase());
 }
 
+/**
+ * O PLANO QUE VALE HOJE — régua única de vencimento.
+ *
+ * ─── HAVIA DUAS, E A MAIS CARA ERA A PERMISSIVA ─────────────────────────────
+ *
+ * `planRowFor` rebaixava só o `trial`: um `pro` com `plan_expires_at` no
+ * passado mantinha todas as capacidades pagas, indefinidamente.
+ *
+ * E a MESMA coluna, com a MESMA pergunta, já tinha resposta OPOSTA no
+ * diretório de médicos (`planoValido`, em `doctors.functions.ts`), com a
+ * justificativa escrita ao lado: "um Elite cujo cartão falhou continuava no
+ * topo de toda busca indefinidamente, na frente de quem está pagando".
+ *
+ * Resultado: o médico com o cartão recusado perdia a posição na busca e
+ * mantinha a IA — a régua barata era rigorosa e a cara era frouxa.
+ *
+ * ─── A CARÊNCIA É DE PROPÓSITO ──────────────────────────────────────────────
+ *
+ * Três dias. A renovação da Stripe não é instantânea: webhook atrasado, retry,
+ * cartão que aprova na segunda tentativa. Sem carência, um assinante em dia
+ * perderia a IA por algumas horas por um atraso que não é dele — e quem sente
+ * isso é a gestante do outro lado, que de repente para de receber a voz do
+ * médico. Errar por três dias de generosidade é muito mais barato.
+ */
+export const CARENCIA_DE_RENOVACAO_MS = 3 * 24 * 60 * 60 * 1000;
+
+export function planoVigente(
+  plan: string | null,
+  expiraEm: string | null | undefined,
+  agora = Date.now(),
+): string | null {
+  if (!expiraEm) return plan;
+  const venc = new Date(expiraEm).getTime();
+  /* Data ilegível não rebaixa ninguém: na dúvida o médico é atendido, e o
+     estrago de rebaixar por engano recai sobre a paciente. */
+  if (!Number.isFinite(venc)) return plan;
+  return venc + CARENCIA_DE_RENOVACAO_MS < agora ? "free" : plan;
+}
+
 async function planRowFor(doctorId: string): Promise<string | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const sb = supabaseAdmin as any;
@@ -51,27 +90,55 @@ async function planRowFor(doctorId: string): Promise<string | null> {
   }
   // Médico inativo (assinatura suspensa) perde as capacidades pagas → free.
   if (!data || data.active === false) return "free";
-  let plan: string | null = (data.plan ?? null) as string | null;
-  // Trial expirado (14 dias) cai para free — o "grátis por 14 dias" tem fim.
-  if (
-    data.plan === "trial" &&
-    data.plan_expires_at &&
-    new Date(data.plan_expires_at).getTime() < Date.now()
-  ) {
-    plan = "free";
-  }
+  /* Vencimento vale para TODO plano — trial e pago. Ver `planoVigente`. */
+  let plan: string | null = planoVigente(
+    (data.plan ?? null) as string | null,
+    data.plan_expires_at as string | null | undefined,
+  );
   // Assento de clínica: membro de clínica ATIVA herda as capacidades do
   // plano Clínica. SÓ sobe quem está abaixo do Elite — Elite/Black mantêm o
   // próprio plano (têm convites premium e selo que o Clínica não substitui;
   // trocar seria rebaixar por outro eixo).
   if (data.clinic_id && PLAN_RANK[normalizePlan(plan)] < PLAN_RANK["elite"]) {
     try {
+      /* ─── O ASSENTO HERDA O PLANO DO DONO, NÃO UM CHEQUE EM BRANCO ───────
+       *
+       * Era `plan = "clinica"` fixo. E `clinica` tem `aiRepliesPerCycle: null`
+       * (ilimitado, "contrato sob medida") e `maxPatients: null`. Ou seja:
+       * qualquer médico adicionado a uma clínica ativa ganhava IA ILIMITADA e
+       * pacientes ilimitadas — de graça, para sempre, e sem ninguém decidir.
+       * Como a associação era por e-mail e sem aceite, bastava um admin
+       * adicionar um médico para a plataforma passar a bancar o uso dele.
+       *
+       * O assento agora vale o plano do DONO da clínica, com o vencimento dele
+       * também aplicado. Se o dono é Clínica, o membro tem Clínica; se o dono
+       * caiu para free porque o cartão falhou, o assento cai junto — que é o
+       * único jeito de o contrato fechar.
+       */
       const { data: clinic } = await sb
         .from("clinics")
-        .select("active")
+        .select("active,owner_user_id")
         .eq("id", data.clinic_id)
         .maybeSingle();
-      if (clinic?.active) plan = "clinica";
+      if (clinic?.active && clinic.owner_user_id) {
+        const { data: dono } = await sb
+          .from("doctors")
+          .select("plan,plan_expires_at,active")
+          .eq("id", clinic.owner_user_id)
+          .maybeSingle();
+        const planoDoDono =
+          dono && dono.active !== false
+            ? planoVigente(
+                (dono.plan ?? null) as string | null,
+                dono.plan_expires_at as string | null | undefined,
+              )
+            : "free";
+        /* Só SOBE. Um membro Pro numa clínica cujo dono é Starter não é
+           rebaixado — ele paga o próprio plano. */
+        if (PLAN_RANK[normalizePlan(planoDoDono)] > PLAN_RANK[normalizePlan(plan)]) {
+          plan = planoDoDono;
+        }
+      }
     } catch {
       /* tabela clinics ainda não migrada */
     }
