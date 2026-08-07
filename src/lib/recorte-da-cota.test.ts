@@ -22,6 +22,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync, readdirSync } from "node:fs";
 import { CANAIS_DA_COTA, aplicarRecorteDaCota } from "./cota-ia.server";
 
 type Filtro = { op: string; coluna: string; valor: string };
@@ -87,33 +88,84 @@ describe("o recorte da cota", () => {
 });
 
 describe("os canais que NÃO podem consumir a franquia clínica", () => {
-  /* Cada um destes grava em `ai_usage`. Nenhum é dúvida clínica respondida pelo
-     cérebro do médico, e nenhum é interrompível pelo portão de cota. */
-  const FORA = [
-    "suporte", // pergunta sobre a plataforma, respondida pela plataforma
-    "teste", // o médico exercitando o próprio cérebro
-    "cota-80", // marca de aviso
-    "cota-100", // marca de aviso
-    "agenda-whatsapp", // bot de marcação de horário
-    "triagem", // orientação de sintoma — caminho de segurança, não freável
-    "carta-semanal", // a carta do bebê
-    "busca-medicos", // interpretar o texto de quem procura obstetra
-    "teleconsulta", // resumo da consulta
-    "conselheiro", // diagnóstico do consultório, para o médico
-    "rascunho-lacuna", // o rascunho que o médico revisa antes de publicar
-    "teste-cerebro", // o playground do médico
-    "extracao-consulta", // transcrição de consulta virando rascunhos
-    "eval-cerebro", // a auto-avaliação do cérebro
-    "eval-juiz", // o juiz independente da auto-avaliação
-    "embedding", // vetores — medidos, e nunca resposta a paciente
-  ];
+  /**
+   * ─── A LISTA ESCRITA À MÃO NÃO PROVAVA NADA ────────────────────────────────
+   *
+   * A versão anterior era uma lista fixa de 15 nomes, escrita à mão. Alguns dos
+   * nomes não correspondem a nenhum literal do código (`teste`, `cota-80`,
+   * `cota-100`, `embedding` — os dois de cota são montados dinamicamente), e
+   * nada garantia que ela acompanhasse os canais reais.
+   *
+   * E o defeito estrutural é maior que os oito nomes errados: um canal NOVO
+   * nasceria sem teste nenhum, porque ninguém lembraria de vir aqui escrevê-lo.
+   * O portão de cota é `allow-list`, então um canal novo já nasce fora da cota —
+   * o que este teste tem de garantir é que ele nasça fora DE PROPÓSITO, e que
+   * ninguém amplie a allow-list sem passar por aqui.
+   *
+   * A lista passa a ser DESCOBERTA na fonte. Um canal novo entra sozinho.
+   */
+  const CANAIS_NA_FONTE = (() => {
+    const achados = new Set<string>();
+    const arquivos = readdirSync("src/lib")
+      .filter((f) => f.endsWith(".ts") && !f.includes(".test."))
+      .map((f) => `src/lib/${f}`)
+      .concat(
+        readdirSync("src/routes/api")
+          .filter((f) => f.endsWith(".ts"))
+          .map((f) => `src/routes/api/${f}`),
+      );
+    for (const f of arquivos) {
+      const bruto = readFileSync(f, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/^\s*\/\/.*$/gm, "");
+      /* TODOS os literais da linha, e não só o que vem logo depois dos
+         dois-pontos: o canal do chat é um TERNÁRIO —
+         `canal: soSuporte ? "suporte" : patient ? "app" : "site"` — e uma
+         regex ancorada em `canal:\s*"` perdia os três de uma vez, incluindo o
+         `app`, que é o canal principal do produto. */
+      for (const linha of bruto.split("\n")) {
+        if (!/\bcanal:/.test(linha)) continue;
+        for (const m of linha.matchAll(/"([a-z0-9-]+)"/g)) achados.add(m[1]);
+      }
+    }
+    return [...achados].sort();
+  })();
 
-  for (const canal of FORA) {
+  test("a varredura acha canais de verdade — senão o resto é decoração", () => {
+    /* Se a descoberta quebrar, todos os testes abaixo passam com zero itens e
+       este arquivo vira enfeite, que é o que ele existe para não ser. */
+    expect(CANAIS_NA_FONTE.length).toBeGreaterThanOrEqual(10);
+    expect(CANAIS_NA_FONTE).toContain("app");
+  });
+
+  test("os canais do ternário do chat entram — eram os que sumiam", () => {
+    /* `app` é o canal principal do produto e não estava na varredura enquanto
+       a regex ficou ancorada em `canal:\s*"`. Um teste de inventário que perde
+       o item mais importante é pior que não ter inventário. */
+    expect(CANAIS_NA_FONTE).toContain("app");
+    expect(CANAIS_NA_FONTE).toContain("site");
+    expect(CANAIS_NA_FONTE).toContain("suporte");
+  });
+
+  for (const canal of CANAIS_NA_FONTE.filter(
+    (c) => !([...CANAIS_DA_COTA] as string[]).includes(c),
+  )) {
     test(`"${canal}" não conta na cota`, () => {
       const { q, filtros } = consultaFalsa();
       aplicarRecorteDaCota(q);
       const permitidos = (filtros.find((f) => f.op === "in")?.valor ?? "").split(",");
       expect(permitidos).not.toContain(canal);
+    });
+  }
+
+  for (const canal of CANAIS_DA_COTA) {
+    test(`"${canal}" CONTA na cota — o simétrico`, () => {
+      /* Sem isto, esvaziar a allow-list passaria em todos os testes acima:
+         "nenhum canal conta" satisfaz "este canal não conta". */
+      const { q, filtros } = consultaFalsa();
+      aplicarRecorteDaCota(q);
+      const permitidos = (filtros.find((f) => f.op === "in")?.valor ?? "").split(",");
+      expect(permitidos).toContain(canal);
     });
   }
 });
