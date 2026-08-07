@@ -157,11 +157,28 @@ async function planRowFor(doctorId: string): Promise<string | null> {
     (data.plan ?? null) as string | null,
     data.plan_expires_at as string | null | undefined,
   );
-  // Assento de clínica: membro de clínica ATIVA herda as capacidades do
-  // plano Clínica. SÓ sobe quem está abaixo do Elite — Elite/Black mantêm o
-  // próprio plano (têm convites premium e selo que o Clínica não substitui;
-  // trocar seria rebaixar por outro eixo).
-  if (data.clinic_id && PLAN_RANK[normalizePlan(plan)] < PLAN_RANK["elite"]) {
+  /* Assento de clínica: membro de clínica ATIVA herda o plano do DONO.
+   *
+   * ─── A EXCEÇÃO "SÓ SOBE QUEM ESTÁ ABAIXO DO ELITE" FOI EMBORA ────────────
+   *
+   * Ela era `PLAN_RANK[plan] < PLAN_RANK["elite"]`, e a justificativa escrita
+   * ao lado dizia: "Elite/Black mantêm o próprio plano — têm convites premium e
+   * selo que o Clínica não substitui; trocar seria rebaixar por outro eixo".
+   *
+   * Isso era verdade enquanto `CLINICA` herdava de `PRO`: subir para Clínica
+   * zerava os convites premium e devolvia o selo "Pro". A escada foi consertada
+   * (`CLINICA` herda de `BLACK`), e o comentário do conserto já dizia que esta
+   * exceção existia só para contornar a escada quebrada — mas a exceção ficou.
+   *
+   * E aí ela virou a inversão: `clinica` é rank 8, ACIMA de elite (6) e black
+   * (7). Um Elite entrando numa clínica cujo dono é Clínica ficava de fora do
+   * assento que o ELEVARIA — a exceção passou a impedir exatamente o que ela
+   * dizia proteger.
+   *
+   * O que garante que ninguém é rebaixado não é este portão: é o "só sobe" lá
+   * embaixo, que compara os ranks antes de trocar. Com ele, este era redundante
+   * quando concordava e errado quando discordava. */
+  if (data.clinic_id) {
     try {
       /* ─── O ASSENTO HERDA O PLANO DO DONO, NÃO UM CHEQUE EM BRANCO ───────
        *

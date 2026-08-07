@@ -421,7 +421,17 @@ export function buildClinicalBlock(
  * a IA contaria a esta paciente a dúvida de outra — e "você perguntou sobre
  * sangramento" para quem nunca perguntou é um vazamento com cara de bug.
  */
-async function buildPendenciasBlock(
+/**
+ * EXPORTADA para ser EXERCITADA, e não grepada.
+ *
+ * Os quatro testes que "provavam" o conserto do vazamento liam o arquivo com
+ * `readFileSync` e casavam strings. Um verificador reintroduziu o vazamento por
+ * uma variável intermediária — mantendo a linha que os testes procuram intacta
+ * e acrescentando `const citada = minha || String(g.question ?? "")` — e os
+ * 1.108 testes passaram. Casar texto prova que uma linha existe; não prova o
+ * que a função faz.
+ */
+export async function buildPendenciasBlock(
   patientId: string,
   doctorId: string,
   careMode = false,

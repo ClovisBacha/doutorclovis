@@ -1722,11 +1722,32 @@ export async function getBrainContext(
      * esse número que ele usa para decidir se o Segundo Cérebro está
      * funcionando.
      *
-     * `selected.length > 0` é a mesma condição de `hadCoverage`, logo abaixo:
-     * as duas respondem "alguma orientação dele entrou nesta resposta?" e não
-     * podiam discordar.
+     * ─── E O CONSERTO ANTERIOR PAROU NO MEIO ────────────────────────────────
+     *
+     * Trocar para `selected.length > 0` matou o caso do médico com persona
+     * preenchida e conhecimento zero, mas NÃO fez os dois lados da fração serem
+     * complementares. A lacuna é gravada quando `!podeAtribuir` (similaridade
+     * abaixo de 0,74, ou o caminho por palavras, que não produz número nenhum).
+     * `selected.length > 0` é estritamente mais fraca que `podeAtribuir` — então
+     * toda pergunta da FAIXA DO MEIO (0,62–0,74) e todo o caminho por palavras
+     * continuavam contando dos DOIS lados.
+     *
+     * E é justamente nessa faixa que o `chat.ts` manda a IA dizer à gestante que
+     * "registrou a dúvida para ele confirmar". Se foi para a fila dele, é
+     * lacuna; contar como acerto ao mesmo tempo infla o denominador e faz o
+     * placar SUBESTIMAR a cobertura de quem está bem — o oposto do defeito
+     * anterior, no mesmo número.
+     *
+     * A condição passa a ser o complemento exato da lacuna, `channel` inclusive:
+     * uma pergunta ou foi respondida no nome dele, ou foi para a fila. O teste
+     * do próprio médico não entra em nenhum dos dois lados.
+     *
+     * `hadCoverage`, logo abaixo, CONTINUA sendo `selected.length > 0` — e não
+     * é contradição: ela responde outra pergunta ("alguma orientação dele entrou
+     * no prompt?"), que é o que o `chat.ts` precisa saber para escolher o tom.
+     * O placar mede outra coisa: quem respondeu.
      */
-    if (selected.length > 0) logBrainHit(target, channel);
+    if (podeAtribuir && channel !== "teste") logBrainHit(target, channel);
 
     return {
       block,

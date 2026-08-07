@@ -32,15 +32,39 @@ describe("a mesma mensagem não conta como acerto E como lacuna", () => {
    * cobertura subia sozinha conforme ele preenchia a persona, sem uma única
    * entrada de conhecimento.
    */
-  test("o hit exige que alguma orientação dele tenha casado", () => {
-    expect(cerebro).toContain("if (selected.length > 0) logBrainHit(target, channel);");
+  /* ─── O CONSERTO ANTERIOR PAROU NO MEIO ────────────────────────────────
+     `selected.length > 0` matou o caso do médico com persona preenchida e
+     conhecimento zero, mas não tornou os dois lados COMPLEMENTARES: a lacuna é
+     gravada quando `!podeAtribuir`, e `selected.length > 0` é estritamente mais
+     fraca que `podeAtribuir`. Toda pergunta da faixa 0,62–0,74 e todo o caminho
+     por palavras continuavam nos dois lados — e é justamente nessa faixa que a
+     IA diz à gestante que "registrou para ele confirmar". */
+  test("o hit é o complemento EXATO da lacuna", () => {
+    expect(cerebro).toContain(
+      'if (podeAtribuir && channel !== "teste") logBrainHit(target, channel);',
+    );
   });
 
-  test("é a MESMA condição de hadCoverage — as duas não podem discordar", () => {
-    /* As duas respondem "alguma orientação dele entrou nesta resposta?". Se
-       divergirem, o placar volta a mentir por outro caminho. */
-    const i = cerebro.indexOf("if (selected.length > 0) logBrainHit");
-    expect(cerebro.slice(i, i + 600)).toContain("hadCoverage: selected.length > 0");
+  test("e a lacuna é a outra metade da mesma partição", () => {
+    /* Se um dos dois lados mudar de critério sozinho, a fração volta a mentir —
+       agora subestimando em vez de inflar. */
+    expect(cerebro).toContain('if (!podeAtribuir && channel !== "teste") {');
+  });
+
+  test("o teste do próprio médico não entra em nenhum dos dois lados", () => {
+    /* Sem o `channel !== "teste"` no hit, o médico inflaria a própria cobertura
+       clicando em "testar o cérebro" — e a lacuna já excluía o canal, então os
+       dois lados discordariam de novo. */
+    const i = cerebro.indexOf("logBrainHit(target, channel);");
+    expect(cerebro.slice(Math.max(0, i - 120), i)).toContain('channel !== "teste"');
+  });
+
+  test("`hadCoverage` CONTINUA sendo `selected.length > 0` — e não é contradição", () => {
+    /* Ela responde outra pergunta: "alguma orientação dele entrou no prompt?",
+       que é o que o `chat.ts` usa para escolher o tom. O placar mede quem
+       respondeu. Confundir as duas foi o que produziu as duas versões erradas
+       deste contador. */
+    expect(cerebro).toContain("hadCoverage: selected.length > 0");
   });
 
   test("o hit não é mais registrado só por o bloco existir", () => {
