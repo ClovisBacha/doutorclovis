@@ -385,8 +385,13 @@ describe("a paciente é avisada com honestidade, não com jargão", () => {
        médica", sem causa e sem prazo, conclui a coisa mais assustadora
        disponível: que a médica parou de acompanhá-la. "Até a virada do mês" é
        a verdade, dá prazo, e não diz uma palavra sobre dinheiro. */
-    const aviso = chat.slice(chat.indexOf("const avisoDeCota"));
-    expect(aviso.slice(0, 1400)).toContain("até a virada do mês");
+    /* A janela cresceu: entre a declaração e o texto entrou `seguirAcompanhamento`,
+       que existe porque os dois avisos afirmavam "o acompanhamento da GESTAÇÃO
+       segue normalmente" — no mesmo prompt do bloco que proíbe falar em
+       gestação, e marcado com IMPORTANTE, ou seja, ganhando dele. Bastava a
+       cota estourar para a IA anunciar a gestação a quem a perdeu. */
+    const aviso = chat.slice(chat.indexOf("const seguirAcompanhamento"));
+    expect(aviso.slice(0, 1800)).toContain("até a virada do mês");
     /* SEM GÊNERO: "Ela continua acompanhando" era feminino fixo, enquanto
        `${medico}` é montado como "o(a) …". Numa plataforma multi-médico — e
        com o dono desta instalação sendo homem — a frase saía errada. */

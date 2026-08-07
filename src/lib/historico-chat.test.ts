@@ -213,7 +213,7 @@ describe("o estado das dúvidas encaminhadas ao médico", () => {
   });
 
   test("o bloco entra no prompt clínico", () => {
-    expect(chat).toContain("buildPendenciasBlock(patient.patientId, patient.doctorId)");
+    expect(chat).toContain("buildPendenciasBlock(patient.patientId, patient.doctorId,");
     expect(chat).toMatch(/memoria,\s*\n\s*pendencias,/);
   });
 

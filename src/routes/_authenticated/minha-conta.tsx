@@ -1178,14 +1178,40 @@ function MinhaContaPage() {
       </>
     );
 
-  const gest = profile
-    ? computeGestation({
-        lmp: profile.lmp_date,
-        referenceDate: profile.reference_date,
-        referenceWeeks: profile.reference_weeks,
-        referenceDays: profile.reference_days,
-      })
-    : null;
+  /* ─── EM MODO CUIDADO, A IDADE GESTACIONAL DEIXA DE EXISTIR NA TELA ──────
+   *
+   * Eu tinha consertado isto tapando buraco: escondi a semana na saudação do
+   * Chat IA e da Nutrição, e escrevi no commit que "eram as únicas duas abas
+   * que não recebiam `careMode`". Era falso. Um verificador adversarial listou
+   * o que sobrou:
+   *
+   *   · o CABEÇALHO do desktop — "Acompanhando Lucas · 24s 3d de gestação" —
+   *     em cima de TODA aba, inclusive das que eu tinha "consertado";
+   *   · o DIÁRIO, que é onde uma mulher em luto escreve, abrindo com
+   *     "como você está se sentindo hoje? / Semana 24 — 2º trimestre";
+   *   · a carteirinha de emergência com "GESTANTE", nome do bebê e IG;
+   *   · o corpo inteiro da Nutrição ("Formação óssea do bebê");
+   *   · o contexto que o cliente manda ao servidor na primeira mensagem
+   *     ("Estou na semana 24... o nome do meu bebê é Lucas");
+   *   · e mais sete abas.
+   *
+   * Quinze lugares. Gatear um por um sempre deixaria o décimo sexto — e o
+   * décimo sexto é uma mulher lendo o nome do bebê que ela perdeu.
+   *
+   * `gest` é a FONTE de todos eles. Nula, a idade gestacional some da tela
+   * inteira de uma vez, e cada `{gest && ...}` que já existe passa a fazer a
+   * coisa certa sozinho. O servidor não depende disto: ele recalcula do perfil
+   * e já trata o Modo Cuidado em `buildClinicalBlock`.
+   */
+  const gest =
+    profile && !careMode
+      ? computeGestation({
+          lmp: profile.lmp_date,
+          referenceDate: profile.reference_date,
+          referenceWeeks: profile.reference_weeks,
+          referenceDays: profile.reference_days,
+        })
+      : null;
 
   const firstName = profile?.display_name?.split(" ")[0] ?? "mamãe";
 
@@ -1447,7 +1473,9 @@ function MinhaContaPage() {
               <h1 className="mt-2 font-serif text-3xl md:text-4xl">
                 {dayGreeting()}, {firstName} 💛
               </h1>
-              {(profile?.baby_name || gest) && (
+              {/* O nome do bebê some junto. `gest` nulo já tira a semana, mas
+            "Acompanhando Lucas" sozinho é pior que a semana. */}
+              {!careMode && (profile?.baby_name || gest) && (
                 <p className="mt-1.5 text-sm text-muted-foreground">
                   {profile?.baby_name && <>Acompanhando {profile.baby_name}</>}
                   {profile?.baby_name && gest && <span className="mx-2 opacity-40">·</span>}
@@ -6580,12 +6608,20 @@ type ChatMsg = { role: "user" | "assistant"; content: string };
 
 function buildPatientContext(profile: Profile | null, gest: Gest): string {
   if (!profile) return "";
+  /* ─── O CAMINHO EM QUE O SERVIDOR NÃO SABE DE NADA ───────────────────────
+   * Este prefixo vai na PRIMEIRA mensagem e é a única coisa que o modelo sabe
+   * sobre ela quando `resolvePatientDoctor` devolve null (token expirado,
+   * soluço no Auth): ali o `clinicalBlock` nem é calculado e o system vira o
+   * prompt público. Sem esta guarda, a mulher em luto mandava, com as próprias
+   * palavras aparentes, "estou na semana 24 e o nome do meu bebê é Lucas".
+   * `gest` já vem nulo em Modo Cuidado; o NOME não vinha. */
+  const emLuto = Boolean((profile as { care_mode?: boolean }).care_mode);
   const parts: string[] = [];
   if (profile.display_name) parts.push(`Meu nome é ${profile.display_name}.`);
   if (gest) {
     parts.push(`Estou na semana ${gest.weeks} e ${gest.days} dias de gestação.`);
   }
-  if (profile.baby_name) parts.push(`O nome do meu bebê é ${profile.baby_name}.`);
+  if (profile.baby_name && !emLuto) parts.push(`O nome do meu bebê é ${profile.baby_name}.`);
   return parts.join(" ");
 }
 
@@ -9532,19 +9568,27 @@ function NutricaoTab({
 
   return (
     <div className="space-y-6">
-      {/* Nutrient reference card */}
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="font-serif text-lg">Nutrientes em destaque — {trimester}º trimestre</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {tips.map((t) => (
-            <div key={t.nutrient} className="rounded-2xl border border-border bg-secondary/40 p-3">
-              <p className="text-sm font-semibold text-primary">{t.nutrient}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{t.why}</p>
-              <p className="mt-1 text-xs">{t.foods}</p>
-            </div>
-          ))}
+      {/* ─── O CARTÃO DE NUTRIENTES SOME EM MODO CUIDADO ──────────────────
+          "Formação óssea do bebê" e "Desenvolvimento do cérebro fetal" são o
+          conteúdo dele. Eu tinha calado só a saudação e deixado a tela inteira
+          falando do bebê logo abaixo. */}
+      {!careMode && (
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <p className="font-serif text-lg">Nutrientes em destaque — {trimester}º trimestre</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {tips.map((t) => (
+              <div
+                key={t.nutrient}
+                className="rounded-2xl border border-border bg-secondary/40 p-3"
+              >
+                <p className="text-sm font-semibold text-primary">{t.nutrient}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t.why}</p>
+                <p className="mt-1 text-xs">{t.foods}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Chat */}
       <div
@@ -9554,8 +9598,9 @@ function NutricaoTab({
         <div className="border-b border-border p-4">
           <p className="font-serif text-lg">Nutricionista Virtual</p>
           <p className="text-xs text-muted-foreground">
-            Orientações personalizadas para sua gestação — não substitui avaliação nutricional
-            individual.
+            {careMode
+              ? "Orientações de alimentação para você — não substitui avaliação nutricional individual."
+              : "Orientações personalizadas para sua gestação — não substitui avaliação nutricional individual."}
           </p>
         </div>
 
@@ -9601,8 +9646,9 @@ function NutricaoTab({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Suggestion chips */}
-        {messages.length <= 1 && (
+        {/* Sugestões: em Modo Cuidado somem. NUTRITION_CHIPS traz "Posso comer
+            tâmara para preparar o parto?" e coisas do tipo. */}
+        {!careMode && messages.length <= 1 && (
           <div className="flex flex-wrap gap-2 border-t border-border px-4 py-2">
             {chips.map((c) => (
               <button
@@ -9621,7 +9667,11 @@ function NutricaoTab({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder="Pergunte sobre alimentação na gestação..."
+            placeholder={
+              careMode
+                ? "Pergunte sobre alimentação..."
+                : "Pergunte sobre alimentação na gestação..."
+            }
             className="flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm"
           />
           <button

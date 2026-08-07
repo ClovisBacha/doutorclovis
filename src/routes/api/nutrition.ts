@@ -25,18 +25,25 @@ Regras absolutas:
  */
 async function consultorioDaPaciente(
   userId: string,
-): Promise<{ doctorId: string | null; patientId: string }> {
+): Promise<{ doctorId: string | null; patientId: string; careMode: boolean }> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await (supabaseAdmin as any)
       .from("patient_profiles")
-      .select("doctor_id")
+      /* `care_mode` VEM JUNTO. Este endpoint consultava o mesmo perfil que o
+         chat e não perguntava pelo luto — e o system prompt abaixo instrui a
+         tratar a paciente como gestante e a adaptar tudo ao trimestre. */
+      .select("doctor_id,care_mode")
       .eq("id", userId)
       .maybeSingle();
-    return { doctorId: (data?.doctor_id as string | null) ?? null, patientId: userId };
+    return {
+      doctorId: (data?.doctor_id as string | null) ?? null,
+      patientId: userId,
+      careMode: Boolean(data?.care_mode),
+    };
   } catch {
     /* Falha de banco não pode derrubar o chat dela: segue sem o cérebro. */
-    return { doctorId: null, patientId: userId };
+    return { doctorId: null, patientId: userId, careMode: false };
   }
 }
 
@@ -59,6 +66,28 @@ function ultimaPergunta(mensagens: UIMessage[]): string {
   }
   return "";
 }
+
+/**
+ * O MESMO PAPEL, PARA QUEM PERDEU A GESTAÇÃO.
+ *
+ * `NUTRITION_SYSTEM` diz "orientar gestantes", "adapte as orientações ao
+ * trimestre" e fala em peixe cru na gravidez. Eu tinha calado a saudação da
+ * tela e deixado o servidor intacto — o mesmo defeito do Chat IA, com os papéis
+ * trocados: a tela calava e o servidor anunciava.
+ *
+ * Alimentação continua sendo assunto legítimo e importante depois de uma perda:
+ * recuperação, anemia, leite que desceu, vontade de comer ou falta dela. O que
+ * sai é a moldura de gestação em curso.
+ */
+const NUTRICAO_EM_LUTO = `Você é uma nutricionista vinculada ao consultório de um obstetra. Esta paciente ESTÁ EM LUTO: a gestação dela terminou em perda.
+
+Regras absolutas:
+- NUNCA fale em semanas, trimestre, evolução do bebê, amamentação do bebê, enxoval ou preparo para o parto. Nada disso existe para ela agora.
+- Não pergunte como está a gestação e não parabenize.
+- Alimentação continua sendo assunto legítimo e importante: recuperação depois da perda, anemia e reposição de ferro, apetite que sumiu ou aumentou, leite que desceu, hidratação, e — se ELA trouxer — preparo do corpo para uma gestação futura.
+- Português brasileiro, tom acolhedor e prático. Frases curtas. Acolha antes de orientar.
+- NUNCA prescreva dieta formal, dose de suplemento ou conduta clínica: isso é do médico.
+- Sinal de alarme continua valendo: sangramento intenso, febre, dor forte → orientar procurar atendimento agora.`;
 
 export const Route = createFileRoute("/api/nutrition")({
   server: {
@@ -114,7 +143,7 @@ export const Route = createFileRoute("/api/nutrition")({
            ligou ("usar no chat do app"), e a nutrição é o app. Inventar um
            canal novo faria o cérebro nascer DESLIGADO aqui por default-deny,
            e ninguém entenderia por quê. */
-        const { doctorId, patientId } = await consultorioDaPaciente(usuario.id);
+        const { doctorId, patientId, careMode } = await consultorioDaPaciente(usuario.id);
         const ultima = ultimaPergunta(paraOModelo);
         const { getBrainContextResolved } = await import("@/lib/secondbrain.server");
         const brain =
@@ -144,7 +173,7 @@ export const Route = createFileRoute("/api/nutrition")({
         const google = createChatProvider(key);
         const result = streamText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
-          system: NUTRITION_SYSTEM + blocoDoMedico,
+          system: (careMode ? NUTRICAO_EM_LUTO : NUTRITION_SYSTEM) + blocoDoMedico,
           messages: await convertToModelMessages(comTeto),
           providerOptions: {
             google: {

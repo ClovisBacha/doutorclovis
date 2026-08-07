@@ -87,8 +87,17 @@ Preços do Premium da paciente (pode informar quando perguntarem; nunca invente 
 - Cancelamento a qualquer momento, pelo próprio app.`;
 
 /** Assistente médico do consultório de UM médico (usado no app da paciente). */
-function medicalSystemPrompt(doctorName?: string | null): string {
+function medicalSystemPrompt(doctorName?: string | null, careMode = false): string {
   const consultorio = doctorName ? `do consultório do(a) ${doctorName}` : "do seu obstetra";
+  /* ─── A LISTA DE URGÊNCIA MENCIONAVA O BEBÊ ──────────────────────────────
+   * Sangramento é o sintoma mais provável de quem acabou de sofrer uma perda, e
+   * o bloco de Modo Cuidado manda tratá-lo. Só que a instrução de urgência que
+   * a IA cita ao responder sobre sangramento vinha emparelhada com "redução dos
+   * movimentos do bebê" — o conserto tinha tirado a semana do prompt e deixado
+   * o bebê nele. Os sinais continuam os mesmos; o que sai é a menção. */
+  const urgencia = careMode
+    ? "sangramento intenso, dor intensa, febre, pressão muito alta"
+    : "sangramento, dor intensa, redução dos movimentos do bebê, pressão muito alta";
   return `Você é o assistente virtual ${consultorio}, no app de acompanhamento de gestação da paciente.
 
 Regras de resposta:
@@ -100,7 +109,7 @@ Regras de resposta:
   · **Registro** — se ela escreve informal, com abreviação ou emoji, responda no mesmo tom; se ela escreve formal, mantenha a formalidade. Nunca imite gíria que ela não usou.
   O que NÃO muda com o estilo dela: o conteúdo clínico, os limites de conduta e o sinal de alarme. Adaptar a forma nunca é motivo para informar menos.
 - E há DOIS donos de estilo aqui, em eixos diferentes — não os confunda: o bloco do médico (quando houver) governa a VOZ CLÍNICA, o que se diz e como ele diria; a paciente governa a FORMA, o tamanho e a formalidade. Um não sobrescreve o outro.
-- NUNCA dê diagnóstico, prescrição, dose de medicamento ou conduta médica. Para qualquer sintoma ou decisão clínica, oriente falar com o obstetra pelo app; em urgência (sangramento, dor intensa, redução dos movimentos do bebê, pressão muito alta), ligar 192 (SAMU) ou ir ao pronto-socorro AGORA.
+- NUNCA dê diagnóstico, prescrição, dose de medicamento ou conduta médica. Para qualquer sintoma ou decisão clínica, oriente falar com o obstetra pelo app; em urgência (${urgencia}), ligar 192 (SAMU) ou ir ao pronto-socorro AGORA.
 - Dúvida CLÍNICA tem DUAS camadas, e confundi-las é o erro mais caro deste app:
   · **Informação consolidada** — o que a obstetrícia já sabe e está em qualquer material de pré-natal: peixe cru não na gestação, o que costuma ser normal em cada fase, quais são os sinais de alerta. Isso você RESPONDE, de verdade e com conteúdo. Recusar aqui não é prudência: é deixar a paciente sem nada às 3 da manhã, e ela vai procurar num grupo de WhatsApp, que é pior.
   · **Decisão sobre o caso DELA** — o que só quem acompanha a gestação pode definir, olhando o histórico e os exames dela. Isso é do médico, sempre. Não improvise: diga que registrou a pergunta para ele.
@@ -388,7 +397,20 @@ export function buildClinicalBlock(
  * a IA contaria a esta paciente a dúvida de outra — e "você perguntou sobre
  * sangramento" para quem nunca perguntou é um vazamento com cara de bug.
  */
-async function buildPendenciasBlock(patientId: string, doctorId: string): Promise<string> {
+async function buildPendenciasBlock(
+  patientId: string,
+  doctorId: string,
+  careMode = false,
+): Promise<string> {
+  /* ─── A PORTA AO LADO DA MEMÓRIA ─────────────────────────────────────────
+   * A memória foi apagada inteira em Modo Cuidado com esta justificativa: "não
+   * há como saber quais linhas de um resumo livre falam da gestação". O
+   * argumento vale palavra por palavra aqui: este bloco cita, entre aspas e sob
+   * rótulo de fonte confiável, as perguntas que ELA fez antes da perda —
+   * "quando começo o enxoval", "posso viajar de avião no 3º trimestre" — com
+   * instrução explícita de retomar o assunto.
+   * Trancar a janela e deixar a porta, de novo. */
+  if (careMode) return "";
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
@@ -930,13 +952,13 @@ export const Route = createFileRoute("/api/chat")({
             // à fase do ciclo e a como ela vem se sentindo.
             buildCycleMoodBlock(patient.patientId),
             buildMedidasBlock(patient.patientId),
-            buildPendenciasBlock(patient.patientId, patient.doctorId),
+            buildPendenciasBlock(patient.patientId, patient.doctorId, patient.careMode),
           ]);
           cobertura = brain.hadCoverage;
           similaridade = brain.melhorSimilaridade;
           gravacaoDaLacuna = brain.gravacaoDaLacuna;
           const memoria = memoryBlock(memorySummary, patient.careMode);
-          const base = medicalSystemPrompt(patient.doctorName);
+          const base = medicalSystemPrompt(patient.doctorName, patient.careMode);
           const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
           // Confiança visível: com cobertura, cite a fonte; sem cobertura,
           // escale. O claim "já registrei" só entra quando a lacuna FOI de
@@ -978,10 +1000,19 @@ export const Route = createFileRoute("/api/chat")({
           const comoFalarComEle = patient.doctorWhatsapp
             ? `pelo WhatsApp do consultório (${patient.doctorWhatsapp})`
             : "pela aba Consultas do app, que chega direto ao consultório";
-          const avisoDeCota = `IMPORTANTE — as respostas pessoais de ${medico} pelo app estão pausadas até a virada do mês. O acompanhamento da gestação segue normalmente; o que muda é só este canal.
+          /* ─── "A GESTAÇÃO SEGUE NORMALMENTE" NÃO PODE SER DITO A TODAS ────
+             Os dois avisos abaixo entram no MESMO system prompt que o bloco de
+             Modo Cuidado, que proíbe falar em gestação — e este, marcado com
+             IMPORTANTE, ganharia. Bastava a cota estourar ou o plano vencer,
+             que são estados comuns, para a IA anunciar a gestação a quem a
+             perdeu. */
+          const seguirAcompanhamento = patient.careMode
+            ? `O acompanhamento com ${medico} segue normalmente`
+            : "O acompanhamento da gestação segue normalmente";
+          const avisoDeCota = `IMPORTANTE — as respostas pessoais de ${medico} pelo app estão pausadas até a virada do mês. ${seguirAcompanhamento}; o que muda é só este canal.
 
 Como agir, nesta ordem:
-1. Responda a pergunta com informação obstétrica consolidada e geral, com cuidado e sem inventar conduta.
+1. Responda a pergunta com informação consolidada e geral, com cuidado e sem inventar conduta — respeitando integralmente o contexto clínico acima.
 2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico}, e que as respostas pessoais voltam na virada do mês — sem falar em cota, plano, pagamento ou limite.
 3. SEMPRE ofereça o caminho até ela: para qualquer coisa do caso dela, falar com ${medico} ${comoFalarComEle}. Isto não é opcional nem depende do tipo de pergunta — é o que impede a paciente de ficar sem saída.
 
@@ -1000,10 +1031,10 @@ A dúvida FICA REGISTRADA para ${medico} — isso acontece de verdade, e você p
 
              A dúvida FICA registrada — isso passou a acontecer de verdade — e
              é por isso que a IA pode dizer. */
-          const avisoSemPlano = `IMPORTANTE — as respostas pessoais de ${medico} pelo app não estão disponíveis neste momento. O acompanhamento da gestação segue normalmente com ele; o que muda é só este canal.
+          const avisoSemPlano = `IMPORTANTE — as respostas pessoais de ${medico} pelo app não estão disponíveis neste momento. ${seguirAcompanhamento} com ele; o que muda é só este canal.
 
 Como agir, nesta ordem:
-1. Responda a pergunta com informação obstétrica consolidada e geral, com cuidado e sem inventar conduta.
+1. Responda a pergunta com informação consolidada e geral, com cuidado e sem inventar conduta — respeitando integralmente o contexto clínico acima.
 2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico} — sem falar em plano, assinatura, pagamento ou limite.
 3. SEMPRE ofereça o caminho até ele: para qualquer coisa do caso dela, falar com ${medico} ${comoFalarComEle}. Isto não é opcional — é o que impede a paciente de ficar sem saída.
 
@@ -1063,7 +1094,7 @@ A dúvida FICA REGISTRADA para ${medico}, e você pode dizer isso. O que você N
            * se desfaz sozinha.
            */
           system = [
-            medicalSystemPrompt(),
+            medicalSystemPrompt(null, patient.careMode),
             patient.clinicalBlock,
             "A paciente ainda NÃO tem obstetra vinculado no app. Duas consequências, e as duas são obrigatórias:",
             "- NÃO diga que registrou a pergunta para o médico dela, nem que alguém vai responder: não há para quem registrar, e a promessa não seria cumprida.",
