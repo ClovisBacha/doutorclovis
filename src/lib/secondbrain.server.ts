@@ -1706,9 +1706,27 @@ export async function getBrainContext(
       };
     }
 
-    // Bloco não-vazio realmente montado → o cérebro vai ser usado: registra o
-    // hit (fire-and-forget; 'teste' é ignorado dentro de logBrainHit).
-    logBrainHit(target, channel);
+    /* ─── HIT SÓ QUANDO ALGUMA ORIENTAÇÃO DELE CASOU ─────────────────────
+     *
+     * Era "bloco não-vazio → registra o hit". Mas o bloco nasce não-vazio só
+     * com persona, frases ou regras preenchidas (`assembleBrainBlock` devolve
+     * "" apenas quando os TRÊS estão vazios E nada casou). Ou seja: para todo
+     * médico que configurou o estilo — que é o que o produto pede no primeiro
+     * acesso — QUALQUER pergunta contava um acerto, inclusive as que não
+     * casaram com nada.
+     *
+     * E a mesma mensagem já tinha agendado uma LACUNA algumas linhas acima.
+     * O placar do painel faz `hits / (hits + lacunas)`: a mesma pergunta
+     * entrava nos dois lados da fração. A cobertura subia sozinha conforme o
+     * médico preenchia a persona, sem uma única entrada de conhecimento — e é
+     * esse número que ele usa para decidir se o Segundo Cérebro está
+     * funcionando.
+     *
+     * `selected.length > 0` é a mesma condição de `hadCoverage`, logo abaixo:
+     * as duas respondem "alguma orientação dele entrou nesta resposta?" e não
+     * podiam discordar.
+     */
+    if (selected.length > 0) logBrainHit(target, channel);
 
     return {
       block,

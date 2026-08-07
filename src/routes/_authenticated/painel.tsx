@@ -6704,7 +6704,14 @@ function BrainGapsCard({
       setDrafted(null);
       setAnswer("");
       setEditedQuestion("");
-      setGaps((gs) => gs.filter((g) => g.id !== gapId));
+      /* A caixa "só para ela" é do item, não da tela: deixá-la marcada faria a
+         PRÓXIMA lacuna ser respondida em modo individual sem ele perceber. */
+      setSoParaEla(false);
+      setGaps((gs) => {
+        const restantes = gs.filter((g) => g.id !== gapId);
+        onContar?.(restantes.length); // o badge desce junto com a fila
+        return restantes;
+      });
     } catch {
       toast.error("Falha de conexão — tente novamente.");
     } finally {
@@ -6720,8 +6727,18 @@ function BrainGapsCard({
       const res = await dismissBrainGap({
         data: { accessToken: tk, gapId, ...(asDoctor ? { asDoctor } : {}) },
       });
-      if (res.ok) setGaps((gs) => gs.filter((g) => g.id !== gapId));
-      else toast.error("Não foi possível ignorar.");
+      if (res.ok) {
+        /* O CONTADOR DA FAIXA TAMBÉM DESCE.
+           `onContar` só era chamado no CARREGAMENTO. O médico trabalhava a
+           fila inteira e o badge "O que está esperando você" continuava no
+           número de quando ele abriu a tela — até recarregar. Um número que não
+           responde ao trabalho ensina a ignorar o número. */
+        setGaps((gs) => {
+          const restantes = gs.filter((g) => g.id !== gapId);
+          onContar?.(restantes.length);
+          return restantes;
+        });
+      } else toast.error("Não foi possível ignorar.");
     } catch {
       toast.error("Falha de conexão — tente novamente.");
     } finally {
@@ -7219,6 +7236,11 @@ function BrainTrainCard({
         return;
       }
       setQuestions((prev) => (prev ?? []).filter((x) => x.id !== q.id));
+      /* O TOTAL desce junto com a lista. `totalQ` vem de uma contagem exata do
+         servidor e ficava parado: o médico respondia as cinquenta da tela e o
+         cabeçalho continuava dizendo o número de quando abriu. */
+      setTotalQ((n) => Math.max(0, n - 1));
+      onContar?.(Math.max(0, totalQ - 1));
       // Reflete o "respondida" também na aba Perguntas e no contador do topo.
       onTrained(q.id);
       toast.success("🧠 O cérebro aprendeu mais uma");
