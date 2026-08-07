@@ -205,8 +205,27 @@ async function planRowFor(doctorId: string): Promise<string | null> {
           .select("plan,plan_expires_at,active")
           .eq("id", clinic.owner_user_id)
           .maybeSingle();
-        const planoDoDono =
-          dono && dono.active !== false
+        /* ─── O DONO TAMBÉM PASSA PELO ADMIN_EMAILS ────────────────────────
+         * Todo outro caminho deste arquivo consulta `isPlatformTeamEmail` antes
+         * de olhar a coluna `plan` — menos este. A clínica da PRÓPRIA equipe
+         * (cuja linha em `doctors` costuma ser `free`, porque a promoção dela
+         * vive na variável de ambiente e não no banco) não dava assento nenhum
+         * aos membros. A regra do dono tem de ser a mesma regra de todo mundo.
+         *
+         * O `getUserById` é uma chamada a mais, e só acontece quando o médico
+         * TEM clínica — que é o caminho raro. */
+        let emailDoDono: string | null = null;
+        try {
+          const { data: u } = await (supabaseAdmin as any).auth.admin.getUserById(
+            clinic.owner_user_id,
+          );
+          emailDoDono = (u?.user?.email as string | null) ?? null;
+        } catch {
+          /* sem o e-mail, segue pela coluna — nunca pior que antes */
+        }
+        const planoDoDono = isPlatformTeamEmail(emailDoDono)
+          ? "clinica"
+          : dono && dono.active !== false
             ? planoVigente(
                 (dono.plan ?? null) as string | null,
                 dono.plan_expires_at as string | null | undefined,

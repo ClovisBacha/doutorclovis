@@ -642,13 +642,31 @@ export const answerAndTrain = createServerFn({ method: "POST" })
     // duplo clique/duas abas respondendo a mesma pergunta.
     let qQuery = (supabaseAdmin as any)
       .from("doctor_questions")
-      .select("id,question")
+      .select("id,question,user_id")
       .eq("id", data.questionId)
       .eq("answered", false);
     // Multi-inquilino: a pergunta TEM que ser de paciente do médico-alvo.
     qQuery = qQuery.eq("doctor_id", target.doctorId);
     const { data: question, error: qErr } = await qQuery.maybeSingle();
     if (qErr || !question) return { ok: false as const };
+
+    /* ─── VÍNCULO ATUAL, E NÃO O CARIMBO DA LINHA ───────────────────────────
+     * `.eq("doctor_id", ...)` acima é o carimbo HISTÓRICO de quando a pergunta
+     * foi feita, não a relação de hoje. Sem este recorte, um médico de quem a
+     * paciente se desvinculou — inclusive porque teve motivo — continuava
+     * lendo a pergunta dela e gravando texto arbitrário como resposta na aba
+     * dela. Um canal de mensagem para uma ex-paciente, com a marca do produto
+     * por cima.
+     * O gêmeo mais novo (`responderPergunta`, em `clinical.functions.ts`) já
+     * tinha esta checagem, com este mesmo comentário. Esta função ficou para
+     * trás — o mesmo padrão da queda para o texto cru, duas funções acima. */
+    const { data: aindaDele } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("id")
+      .eq("doctor_id", target.doctorId)
+      .eq("id", question.user_id)
+      .maybeSingle();
+    if (!aindaDele) return { ok: false as const, reason: "sem_vinculo" as const };
 
     /* ─── A QUINTA SUPERFÍCIE DO VAZAMENTO ──────────────────────────────────
      *

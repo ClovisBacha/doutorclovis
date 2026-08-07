@@ -53,8 +53,16 @@ export const Route = createFileRoute("/api/carta-semanal")({
           });
         }
 
-        const babyName = body.babyName?.trim() || null;
-        const babyDesc = body.babyDesc?.trim() || "";
+        /* ─── OS DOIS TETOS QUE FALTAVAM ────────────────────────────────────
+           O comentário do topo deste arquivo já dizia: "é a pior das três nesse
+           aspecto: `babyDesc` não tem teto de tamanho (não há zod aqui, só um
+           cast) e entra cru no prompt". Metade do conserto foi feita nos outros
+           endpoints e este ficou: qualquer pessoa logada mandava um `babyDesc`
+           de um megabyte e ele ia inteiro para o modelo, na nossa chave.
+           Os dois campos são DESCRITIVOS — nome de bebê e uma frase sobre a
+           semana. Estes tetos não cortam nada que o app mande de verdade. */
+        const babyName = (body.babyName?.trim() || "").slice(0, 60) || null;
+        const babyDesc = (body.babyDesc?.trim() || "").slice(0, 600);
 
         const addressee = babyName ? `Mamãe ${babyName}` : "Mamãe";
 
@@ -77,6 +85,10 @@ Regras:
         const { text, usage } = await generateText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           prompt,
+          /* E O TETO DE SAÍDA. O prompt pede "máximo 180 palavras", mas isso é
+             pedido, não limite: um modelo que entra em laço gera até o teto do
+             provedor e a conta é nossa. 180 palavras cabem folgadamente aqui. */
+          maxOutputTokens: 800,
         });
 
         /* MEDIDO. Uma trava mecânica achou oito chamadas pagas de modelo que

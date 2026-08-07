@@ -1027,8 +1027,13 @@ export const aiSearchDoctors = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    /* `plan_expires_at` ENTRA. Sem ele, a busca por IA ranqueava pela coluna
+       crua: um Elite com o cartao recusado seguia no topo indefinidamente — o
+       defeito que o caminho irmao (`planoValido`) ja tinha consertado, vivo no
+       outro. A regua e' uma so'; o que faltava era a coluna chegar aqui. */
+    const { planoVigente: vigente } = await import("./entitlements.server");
     const DIR_BASE =
-      "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,slug,bio,whatsapp";
+      "id,display_name,title,specialty,subspecialty,city,state,years_experience,has_masters,has_doctorate,plan,plan_expires_at,slug,bio,whatsapp";
     let { data: rows, error } = await (supabaseAdmin as any)
       .from("doctors")
       .select(`${DIR_BASE},${RICH_COLS}`)
@@ -1101,8 +1106,11 @@ export const aiSearchDoctors = createServerFn({ method: "POST" })
           score += 20;
           reasons.push(`🏥 ${crit.insurance}`);
         }
-        // Desempate leve por plano/selo/experiência (mesma lógica do diretório)
-        score += PLAN_RANK[normalizePlan(d.plan)] ?? 0;
+        /* Desempate leve por plano/selo/experiência (mesma lógica do diretório).
+           Pela régua ÚNICA de vencimento — era a coluna crua, e o comentário
+           dizia "mesma lógica do diretório" enquanto o diretório já usava
+           `planoVigente`. Duas lógicas com o mesmo rótulo. */
+        score += PLAN_RANK[normalizePlan(vigente(d.plan, d.plan_expires_at) ?? "free")] ?? 0;
         score += (d as { verified?: boolean }).verified ? 3 : 0;
         score += Math.min(5, (d.years_experience ?? 0) / 10);
         return { d, score, reasons };
@@ -1158,17 +1166,18 @@ export const chooseDoctor = createServerFn({ method: "POST" })
        enquanto toda paciente que o escolhia pela busca pública levava "este
        médico já atingiu o limite" a partir da quinta. Duas verdades sobre o
        mesmo médico, e a paciente perdida no caminho mais usado. */
-    const { getEntitlements } = await import("./entitlements.server");
+    const { getEntitlements, planoVigente } = await import("./entitlements.server");
     const { data: docUser } = await supabaseAdmin.auth.admin.getUserById(data.doctorId);
     /* O fallback também respeita o vencimento: `TRIAL` herda os limites de PRO,
        então usar a coluna crua dava 150 pacientes a um trial expirado — falhando
-       ABERTO no caminho que acabamos de fechar. */
-    const planoEfetivo =
-      doc.plan === "trial" &&
-      doc.plan_expires_at &&
-      new Date(doc.plan_expires_at).getTime() < Date.now()
-        ? "free"
-        : doc.plan;
+       ABERTO no caminho que acabamos de fechar.
+       ─── E ERA A QUARTA RÉGUA ─────────────────────────────────────────────
+       O que estava escrito aqui era literalmente a regra que `planoVigente`
+       nasceu para substituir: rebaixava SÓ o `trial` e não tinha a carência de
+       três dias. Ou seja, discordava da régua nova nos dois eixos — deixava um
+       `pro` vencido com 150 pacientes e derrubava um assinante em dia por um
+       webhook atrasado. Uma "régua única" com quatro cópias não é única. */
+    const planoEfetivo = planoVigente(doc.plan, doc.plan_expires_at) ?? doc.plan;
     const entDoc = docUser?.user
       ? await getEntitlements(docUser.user)
       : entitlementsFor(planoEfetivo);

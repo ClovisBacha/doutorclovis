@@ -11,7 +11,6 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { entitlementsFor } from "@/lib/entitlements";
 
 /** Início do mês corrente (UTC) em ISO — para contar a cota do mês. */
 function monthStartISO(): string {
@@ -30,13 +29,28 @@ function genCode(): string {
 async function loadDoctor(accessToken: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: u } = await supabaseAdmin.auth.getUser(accessToken);
-  if (!u.user) return { supabaseAdmin, user: null, doc: null as any };
+  if (!u.user) return { supabaseAdmin, user: null, doc: null as any, convitesPorMes: 0 };
   const { data: doc } = await (supabaseAdmin as any)
     .from("doctors")
     .select("id,plan,active")
     .eq("id", u.user.id)
     .maybeSingle();
-  return { supabaseAdmin, user: u.user, doc };
+  /* ─── O TETO VEM DO RESOLVEDOR, NÃO DA COLUNA CRUA ──────────────────────────
+   * Era `entitlementsFor(doc.plan)` nos dois pontos que leem a cota. A coluna
+   * `plan` sozinha ignora TRÊS coisas que só o resolvedor conhece:
+   *   · o vencimento (`plan_expires_at` nem era selecionado aqui) — um Elite
+   *     com o cartão recusado seguia com 25 convites premium por mês;
+   *   · o assento de clínica — um membro cuja clínica é Clínica não recebia;
+   *   · o dono da instalação (ADMIN_EMAILS).
+   * A assimetria estava no MESMO arquivo: o caminho de RESGATE já consultava o
+   * resolvedor. Duas verdades sobre o mesmo médico, uma em cada ponta do
+   * mesmo recurso.
+   * Calculado UMA vez aqui para que os dois chamadores não possam divergir —
+   * foi assim que eles divergiram do resgate. */
+  const { getEntitlements } = await import("./entitlements.server");
+  const ent = doc ? await getEntitlements(u.user) : null;
+  const convitesPorMes: number = doc?.active && ent ? (ent.premiumInvitesPerMonth ?? 0) : 0;
+  return { supabaseAdmin, user: u.user, doc, convitesPorMes };
 }
 
 async function monthlyUsed(supabaseAdmin: any, doctorId: string): Promise<number> {
@@ -58,9 +72,9 @@ export type InviteInfo = {
 export const getMyInviteInfo = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }): Promise<{ ok: false } | ({ ok: true } & InviteInfo)> => {
-    const { supabaseAdmin, doc } = await loadDoctor(data.accessToken);
+    const { supabaseAdmin, doc, convitesPorMes } = await loadDoctor(data.accessToken);
     if (!doc) return { ok: false as const };
-    const limit = doc.active ? entitlementsFor(doc.plan).premiumInvitesPerMonth : 0;
+    const limit = convitesPorMes;
     if (limit <= 0) return { ok: true as const, eligible: false, limit: 0, used: 0, remaining: 0 };
     const used = await monthlyUsed(supabaseAdmin, doc.id);
     return {
@@ -75,9 +89,9 @@ export const getMyInviteInfo = createServerFn({ method: "POST" })
 export const generateInviteCode = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
-    const { supabaseAdmin, doc } = await loadDoctor(data.accessToken);
+    const { supabaseAdmin, doc, convitesPorMes } = await loadDoctor(data.accessToken);
     if (!doc) return { ok: false as const, error: "sem_perfil" };
-    const limit = doc.active ? entitlementsFor(doc.plan).premiumInvitesPerMonth : 0;
+    const limit = convitesPorMes;
     if (limit <= 0) return { ok: false as const, error: "sem_convites" };
 
     const used = await monthlyUsed(supabaseAdmin, doc.id);
