@@ -135,15 +135,25 @@ describe("a resposta da IA precisa sobreviver ao fim do fluxo", () => {
     expect(chat).toContain("usoIa.registrarUsoAgora({");
   });
 
-  test("a MEMÓRIA fica de fora do await, e isso é proposital", () => {
-    /* É uma chamada de modelo inteira (~2s) e faria o "digitando…" persistir
-       depois de a resposta já estar lida. Perdê-la não custa: ela conta as
-       mensagens desde a última atualização, então uma execução morta é retomada
-       na mensagem seguinte. A resposta da IA, não — essa se perde para sempre. */
-    const awaitPromise = chat.indexOf("await Promise.all([");
-    const memChamada = chat.indexOf("maybeUpdateChatMemory(persistFor.patientId");
-    expect(awaitPromise).toBeGreaterThan(0);
-    expect(memChamada).toBeGreaterThan(awaitPromise);
+  test("a MEMÓRIA é disparada ANTES do stream, não no fim do onFinish", () => {
+    /* ─── ESTE TESTE PROTEGIA O CONTRÁRIO DO CERTO ─────────────────────────
+       Ele afirmava que a memória vinha DEPOIS do `await Promise.all` do
+       `onFinish`, e chamava isso de proposital. A justificativa era que perdê-la
+       não custa nada, porque "se conserta sozinha na mensagem seguinte".
+       Não se conserta: a retomada cai na MESMA janela de congelamento. E o
+       trabalho começava depois de a resposta ter terminado de sair —
+       entitlements, cota, duas consultas, uma chamada de modelo de ~2s e um
+       upsert, no instante exato em que a invocação serverless congela.
+       Disparada ANTES do `streamText`, ela tem a resposta inteira de prazo (a
+       invocação fica viva enquanto o stream está aberto) e a paciente não
+       espera nada, porque continua sem `await`. */
+    const disparo = chat.indexOf("maybeUpdateChatMemory(");
+    const stream = chat.indexOf("const result = streamText({");
+    const onFinish = chat.indexOf("onFinish:");
+    expect(disparo).toBeGreaterThan(0);
+    expect(disparo).toBeLessThan(stream);
+    expect(disparo).toBeLessThan(onFinish);
+    // Continua sem `await`: aguardar poria 2s no caminho da resposta dela.
     expect(chat).not.toContain("await maybeUpdateChatMemory(");
   });
 });

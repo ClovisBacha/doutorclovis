@@ -1766,7 +1766,9 @@ function MinhaContaPage() {
                 {tab === "Saúde" && (
                   <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />
                 )}
-                {tab === "Nutrição" && <NutricaoTab profile={profile} gest={gest} />}
+                {tab === "Nutrição" && (
+                  <NutricaoTab profile={profile} gest={gest} careMode={careMode} />
+                )}
                 {tab === "Bem-estar" && (
                   <BemEstarHub gest={gest} onNavigate={goToTab} careMode={careMode} />
                 )}
@@ -1790,7 +1792,7 @@ function MinhaContaPage() {
                 {tab === "Saúde da mulher" && <SaudeMulherHub />}
                 {tab === "Médico" && <MédicoTab />}
                 {tab === "Exames" && <ExamesTab gest={gest} />}
-                {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} />}
+                {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} careMode={careMode} />}
                 {tab === "Perfil" && (
                   <ProfileTab
                     profile={profile}
@@ -6922,7 +6924,22 @@ function WABubble({
 }
 
 /** Exportado só para a bancada de design `/preview-chat` (ver o arquivo). */
-export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+export function ChatTab({
+  profile,
+  gest,
+  careMode = false,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  /* ─── O CHAT ERA A ÚNICA ABA QUE NÃO RECEBIA ISTO ────────────────────────
+     Todas as outras recebem `careMode`. O Chat IA e a Nutrição não recebiam —
+     e são justamente as duas que FALAM com ela.
+     O servidor foi reescrito para que, em Modo Cuidado, a semana e o trimestre
+     nunca entrem no prompt. E a primeira bolha da tela, escrita como se fosse
+     a IA, abria com "Você está na semana 24". A proibição do servidor e o
+     texto da tela se contradiziam na mesma conversa. */
+  careMode?: boolean;
+}) {
   const ctx = buildPatientContext(profile, gest);
   const firstName = profile?.display_name?.split(" ")[0];
 
@@ -6965,7 +6982,12 @@ export function ChatTab({ profile, gest }: { profile: Profile | null; gest: Gest
 
   const greeting = [
     firstName ? `Olá, ${firstName}!` : "Olá!",
-    gest ? `Você está na semana ${gest.weeks} — vou responder levando em conta sua gestação.` : "",
+    /* Em Modo Cuidado a semana some daqui também. Não é detalhe de texto: é a
+       PRIMEIRA coisa que ela lê ao abrir o chat, e dizia "você está na semana
+       24" para quem acabou de perder o bebê. */
+    !careMode && gest
+      ? `Você está na semana ${gest.weeks} — vou responder levando em conta sua gestação.`
+      : "",
     "Sou o assistente virtual do consultório do seu obstetra. Como posso ajudar?",
   ]
     .filter(Boolean)
@@ -9322,7 +9344,16 @@ function semAnimacaoNutricao(): boolean {
   );
 }
 
-function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest }) {
+function NutricaoTab({
+  profile,
+  gest,
+  careMode = false,
+}: {
+  profile: Profile | null;
+  gest: Gest;
+  /** Mesma razão do Chat IA: em Modo Cuidado, nada de semana nem trimestre. */
+  careMode?: boolean;
+}) {
   const trimester = gest ? trimesterForWeek(gest.weeks) : 2;
   const tips = NUTRIENT_TIPS[trimester as 1 | 2 | 3];
   const chips = NUTRITION_CHIPS[trimester as 1 | 2 | 3];
@@ -9330,8 +9361,13 @@ function NutricaoTab({ profile, gest }: { profile: Profile | null; gest: Gest })
 
   const greeting = [
     firstName ? `Olá, ${firstName}!` : "Olá!",
-    gest ? `No ${trimester}º trimestre, vou focar nas necessidades da semana ${gest.weeks}.` : "",
-    "Sou sua nutricionista gestacional virtual. Como posso ajudar com sua alimentação hoje?",
+    // Mesma regra do Chat IA: em Modo Cuidado, nada de semana nem trimestre.
+    !careMode && gest
+      ? `No ${trimester}º trimestre, vou focar nas necessidades da semana ${gest.weeks}.`
+      : "",
+    careMode
+      ? "Sou sua nutricionista virtual. Estou aqui para o que você precisar sobre alimentação."
+      : "Sou sua nutricionista gestacional virtual. Como posso ajudar com sua alimentação hoje?",
   ]
     .filter(Boolean)
     .join(" ");

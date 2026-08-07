@@ -128,6 +128,15 @@ async function resolvePatientDoctor(request: Request): Promise<{
    */
   doctorWhatsapp: string | null;
   clinicalBlock: string;
+  /**
+   * A gestação dela terminou em perda.
+   *
+   * Sobe até aqui como CAMPO, e não só embutido no `clinicalBlock`, porque
+   * outros dois blocos precisam saber: a memória (o resumo é prosa sobre a
+   * gestação) e o sumarizador que a escreve. A proteção existia num bloco e era
+   * desfeita pelo vizinho.
+   */
+  careMode: boolean;
 } | null> {
   const auth = request.headers.get("authorization") || request.headers.get("Authorization");
   const token = auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : null;
@@ -186,6 +195,7 @@ async function resolvePatientDoctor(request: Request): Promise<{
         doctorName: null,
         doctorWhatsapp: null,
         clinicalBlock,
+        careMode: Boolean(prof?.care_mode),
       };
     const { data: doc } = await (supabaseAdmin as any)
       .from("doctors")
@@ -198,6 +208,7 @@ async function resolvePatientDoctor(request: Request): Promise<{
       doctorName: (doc?.display_name || null) as string | null,
       doctorWhatsapp: (doc?.whatsapp || null) as string | null,
       clinicalBlock,
+      careMode: Boolean(prof?.care_mode),
     };
   } catch {
     return null;
@@ -872,7 +883,7 @@ export const Route = createFileRoute("/api/chat")({
           cobertura = brain.hadCoverage;
           similaridade = brain.melhorSimilaridade;
           gravacaoDaLacuna = brain.gravacaoDaLacuna;
-          const memoria = memoryBlock(memorySummary);
+          const memoria = memoryBlock(memorySummary, patient.careMode);
           const base = medicalSystemPrompt(patient.doctorName);
           const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
           // Confiança visível: com cobertura, cite a fonte; sem cobertura,
@@ -981,10 +992,34 @@ A dúvida FICA REGISTRADA para ${medico}, e você pode dizer isso. O que você N
             .filter(Boolean)
             .join("\n\n");
         } else if (patient) {
-          // App, mas a paciente ainda não se vinculou a um médico → sem cérebro.
-          system =
-            medicalSystemPrompt() +
-            "\n\nA paciente ainda não está vinculada a um obstetra. Se fizer sentido, convide-a a buscar o médico dela no app e enviar uma solicitação de vínculo.";
+          /* ─── SEM MÉDICO VINCULADO ────────────────────────────────────────
+           *
+           * Este ramo jogava fora o `clinicalBlock` INTEIRO — que já estava
+           * calculado, três linhas acima. Com ele iam embora a semana
+           * gestacional, o histórico obstétrico de risco (pré-eclâmpsia
+           * prévia, prematuridade) e, o pior, as cinco linhas de MODO CUIDADO.
+           *
+           * E não é um caso de borda: é o estado de ENTRADA de toda paciente,
+           * e o estado de quem teve o acompanhamento encerrado. A IA conversava
+           * com uma gestante de 32 semanas sem saber disso, e com uma mulher em
+           * luto como se a gestação seguisse.
+           *
+           * A segunda parte é a promessa impossível: `medicalSystemPrompt`
+           * manda "diga que registrou a pergunta para ele" — e não há "ele".
+           * Nenhuma lacuna é gravada neste caminho. A instrução abaixo cancela
+           * a promessa explicitamente, porque uma regra genérica anterior não
+           * se desfaz sozinha.
+           */
+          system = [
+            medicalSystemPrompt(),
+            patient.clinicalBlock,
+            "A paciente ainda NÃO tem obstetra vinculado no app. Duas consequências, e as duas são obrigatórias:",
+            "- NÃO diga que registrou a pergunta para o médico dela, nem que alguém vai responder: não há para quem registrar, e a promessa não seria cumprida.",
+            "- Convide-a a buscar o médico dela no app e enviar uma solicitação de vínculo — é o caminho real para ela ter as orientações do próprio obstetra aqui.",
+            "Informação obstétrica consolidada você continua respondendo normalmente, e sinal de alarme continua mandando procurar atendimento agora.",
+          ]
+            .filter(Boolean)
+            .join("\n\n");
         } else {
           // Site público (anônimo): assistente geral / suporte da plataforma.
           system = SUPPORT_SYSTEM_PROMPT;
@@ -994,7 +1029,14 @@ A dúvida FICA REGISTRADA para ${medico}, e você pode dizer isso. O que você N
         // no onFinish; depois atualiza a memória dela (tudo fire-and-forget —
         // tabela ausente ou falha nunca afeta a resposta).
         const persistFor = patient
-          ? { patientId: patient.patientId, doctorId: patient.doctorId ?? null }
+          ? {
+              patientId: patient.patientId,
+              doctorId: patient.doctorId ?? null,
+              /* Sobe junto para o sumarizador: sem isto, o resumo continuaria
+                 sendo escrito em termos de gestação para quem está em luto — e
+                 ele é regravado a cada seis mensagens. */
+              careMode: patient.careMode,
+            }
           : null;
 
         if (persistFor) {
@@ -1085,6 +1127,34 @@ A dúvida FICA REGISTRADA para ${medico}, e você pode dizer isso. O que você N
            alguém trocasse a variável no meio. */
         const modeloEmUso = process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL;
         const usoIa = await import("@/lib/uso-ia.server");
+
+        /* ─── A MEMÓRIA É DISPARADA AQUI, ANTES DO STREAM ────────────────────
+         *
+         * Ela estava na ÚLTIMA linha do `onFinish`, disparada-e-esquecida, com
+         * a marca "DISPARA-E-ESQUECE AUTORIZADO: telemetria pura". A marca
+         * existe porque três recursos já morreram desse jeito neste servidor —
+         * e a justificativa era falsa: isto não é telemetria, é o recurso que
+         * dá continuidade à conversa da paciente, e pesa ~20% da conta de IA.
+         *
+         * Lá, o trabalho COMEÇAVA depois de a resposta ter terminado de sair:
+         * entitlements, cota, duas consultas, uma chamada de modelo de ~2s e um
+         * upsert — tudo no instante exato em que a invocação congela. O
+         * comentário alegava que "se conserta sozinha na mensagem seguinte", e
+         * não se conserta: a retomada cai na mesma janela.
+         *
+         * Aqui, o disparo acontece ANTES do streaming. A invocação fica viva
+         * enquanto o stream está aberto, então a memória tem a resposta inteira
+         * de prazo — e a paciente não espera um milissegundo a mais, porque
+         * nada disto é aguardado.
+         *
+         * Uma mensagem de atraso não muda nada: o gatilho é "seis mensagens
+         * novas desde o último resumo", e o resumo desta rodada entra na
+         * próxima. */
+        if (persistFor) {
+          const { maybeUpdateChatMemory } = await import("@/lib/chat-memory.server");
+          maybeUpdateChatMemory(persistFor.patientId, persistFor.doctorId, persistFor.careMode);
+        }
+
         const result = streamText({
           model: google(modeloEmUso),
           system,
@@ -1203,8 +1273,7 @@ A dúvida FICA REGISTRADA para ${medico}, e você pode dizer isso. O que você N
               return;
             }
             try {
-              const { saveChatMessage, maybeUpdateChatMemory } =
-                await import("@/lib/chat-memory.server");
+              const { saveChatMessage } = await import("@/lib/chat-memory.server");
               await Promise.all([
                 registro,
                 lacuna,
@@ -1218,15 +1287,10 @@ A dúvida FICA REGISTRADA para ${medico}, e você pode dizer isso. O que você N
                   ? saveChatMessage(persistFor.patientId, persistFor.doctorId, "assistant", text)
                   : Promise.resolve(),
               ]);
-              /* A memória fica de fora do `await` de propósito: ela é uma
-                 chamada de modelo inteira (~2s) e faria a paciente ver o
-                 "digitando…" persistir depois de a resposta já estar lida.
-                 Perdê-la de vez em quando não custa nada, porque ela se
-                 conserta sozinha: `maybeUpdateChatMemory` conta as mensagens
-                 desde a última atualização, então uma execução morta é
-                 retomada na mensagem seguinte. A gravação da resposta, não —
-                 essa se perde para sempre. */
-              maybeUpdateChatMemory(persistFor.patientId, persistFor.doctorId);
+              /* A MEMÓRIA SAIU DAQUI. Ver o disparo antes do `streamText`.
+                 Aqui era o pior instante possível: começava depois de a
+                 resposta ter terminado de sair, no exato momento em que a
+                 invocação congela. */
             } catch {
               /* best-effort */
             }

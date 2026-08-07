@@ -115,7 +115,24 @@ function memoriaSegura(bruto: string): string {
   );
 }
 
-export function memoryBlock(summary: string | null): string {
+export function memoryBlock(summary: string | null, careMode = false): string {
+  /* ─── O MODO CUIDADO CONTORNADO PELO BLOCO VIZINHO ───────────────────────
+   *
+   * `buildClinicalBlock` foi reescrito para que, em Modo Cuidado, a semana e o
+   * trimestre nunca entrem no prompt. Mas o resumo da memória é prosa
+   * construída sobre as conversas de GESTAÇÃO dela — "preocupada com o
+   * enxoval", "perguntou sobre o parto", "relata movimentos do bebê" — e
+   * continuava entrando, sob o rótulo "fonte: sistema", com instrução
+   * explícita de retomar o que ela contou antes.
+   *
+   * Ou seja: a proteção existia num bloco e era desfeita pelo de baixo, que
+   * podia ser o ÚNICO conteúdo do prompt falando do bebê.
+   *
+   * Some inteiro, e não "filtrado": não há como saber quais linhas de um resumo
+   * livre falam da gestação, e errar aqui custa mais que perder a continuidade
+   * da conversa. Ela volta a existir quando a paciente desliga o Modo Cuidado —
+   * nada é apagado, só pausado, como o resto do produto faz. */
+  if (careMode) return "";
   if (!summary) return "";
   const seguro = memoriaSegura(summary);
   if (!seguro) return "";
@@ -130,7 +147,11 @@ export function memoryBlock(summary: string | null): string {
  * Atualiza o resumo da paciente quando acumulou mensagens novas suficientes
  * (fire-and-forget). Usa o mesmo modelo do chat; sem chave de IA vira no-op.
  */
-export function maybeUpdateChatMemory(patientId: string, doctorId: string | null): void {
+export function maybeUpdateChatMemory(
+  patientId: string,
+  doctorId: string | null,
+  careMode = false,
+): void {
   /* DISPARA-E-ESQUECE AUTORIZADO: telemetria pura. Perder uma linha não muda
      nada para ninguém, e aguardar poria uma escrita no caminho da resposta. */
   void (async () => {
@@ -211,7 +232,9 @@ export function maybeUpdateChatMemory(patientId: string, doctorId: string | null
       const result = await generateText({
         model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
         system: [
-          "Você mantém a MEMÓRIA de uma paciente gestante para o assistente do obstetra dela.",
+          careMode
+            ? "Você mantém a MEMÓRIA de uma paciente do obstetra dela. A GESTAÇÃO DELA TERMINOU EM PERDA: não escreva nada em termos de semanas, trimestre, evolução do bebê ou expectativa de nascimento — nem para 'contextualizar'. Registre o que ela relata AGORA: sintomas, o corpo depois da perda, o luto, dúvidas sobre tentar de novo."
+            : "Você mantém a MEMÓRIA de uma paciente gestante para o assistente do obstetra dela.",
           "A partir do histórico (e do resumo anterior, se houver), produza um resumo ATUALIZADO do que a paciente relatou: sintomas e quando, preocupações recorrentes, o que já foi perguntado e orientado, preferências de comunicação.",
           "REGRAS: use SOMENTE o que está no histórico (nada inventado); sem diagnósticos; máximo 10 linhas curtas, uma informação por linha, começando com '- '; escreva em português.",
         ].join("\n"),
@@ -295,7 +318,28 @@ export async function historicoConfiavel(
       .eq("patient_id", patientId)
       .order("created_at", { ascending: false })
       .limit(limite);
-    if (doctorId) q = q.eq("doctor_id", doctorId);
+    /* ─── SEM `else`, O HISTÓRICO VAZAVA ENTRE CONSULTÓRIOS ────────────────
+     *
+     * Era `if (doctorId) q = q.eq(...)`. Sem médico vinculado — o estado depois
+     * de `encerrarAcompanhamento`, e o estado de entrada de toda paciente — o
+     * filtro simplesmente não era aplicado, e vinham as 12 últimas mensagens de
+     * QUALQUER médico.
+     *
+     * O que volta ali não é conversa neutra: são respostas gravadas com a
+     * conduta do consultório anterior, assinadas ("a Dra. X orienta que..."). O
+     * modelo as lê como coisa que ele mesmo disse e continua repetindo e
+     * ampliando a conduta de um médico que não acompanha mais a paciente — fora
+     * de qualquer plano, cota, lacuna ou 👎.
+     *
+     * O lado do MÉDICO já tinha sido consertado para exatamente este cenário
+     * (`listBrainConversations` recorta por `vinculadasAgora`, porque encerrar
+     * o acompanhamento deixava a transcrição aberta ao médico anterior). O lado
+     * da PACIENTE tinha ficado de fora.
+     *
+     * A forma certa está no irmão deste arquivo, 100 linhas acima, e é a que
+     * este código passa a usar: `null` filtra por `IS NULL`, não por "não
+     * filtra". */
+    q = doctorId ? q.eq("doctor_id", doctorId) : q.is("doctor_id", null);
     const { data, error } = await q;
     if (error) {
       /* Devolver `[]` está certo — o chat não pode cair por causa do
