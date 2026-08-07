@@ -86,11 +86,30 @@ async function rodar(opts: {
   };
 
   mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sb }));
+  /* Espalha o real e sobrescreve o que interessa — ver o comentário do dublê
+     de `entitlements.server` logo abaixo: um objeto literal APAGA os outros
+     exports (`embedBrainEntry`, `priorizarAprovadas`, `backfillBrainEmbeddings`)
+     no registro compartilhado entre arquivos de teste. */
+  const embeddingsReal = await import("./embeddings.server");
   mock.module("./embeddings.server", () => ({
+    ...embeddingsReal,
     embedText: async () => VETOR,
     emLotes: emLotesReal,
   }));
+  /* ─── O DUBLÊ SUBSTITUI O MÓDULO INTEIRO, NÃO A FUNÇÃO ────────────────────
+     O mesmo defeito que o comentário logo abaixo descreve para `cota-ia.server`
+     — e que voltou a acontecer, com `entitlements.server`, quando o arquivo
+     ganhou exports novos (`planoVigente`, `vencimentoDaConcessao`,
+     `planoEfetivo`). Um dublê feito de um objeto literal APAGA todo o resto do
+     módulo no registro compartilhado entre arquivos de teste: quem importasse
+     qualquer outro export depois estourava com "Export named 'X' not found" no
+     escopo de módulo, e os 23 testes daquele arquivo SUMIAM da contagem — não
+     falhavam, desapareciam.
+     Espalhar o módulo real e sobrescrever só o que interessa mata a classe
+     inteira do problema: nenhum export futuro precisa ser lembrado aqui. */
+  const entitlementsReal = await import("./entitlements.server");
   mock.module("./entitlements.server", () => ({
+    ...entitlementsReal,
     getEntitlementsByDoctorId: async () => ({
       aiApp: true,
       aiWhatsapp: true,

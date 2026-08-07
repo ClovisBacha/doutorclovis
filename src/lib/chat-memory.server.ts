@@ -114,7 +114,23 @@ export function memoriaSegura(bruto: string): string {
    */
   const linhas = bruto.split(/\r?\n/);
   const iEstilo = linhas.findIndex((l) => /^\s*[-*]?\s*Estilo\s*:/i.test(l));
-  const estilo = iEstilo >= 0 ? linhas[iEstilo].trim().slice(0, 140) : "";
+
+  /* ─── O RÓTULO É NOSSO, O CONTEÚDO É DELA ──────────────────────────────────
+   *
+   * A primeira versão reanexava a linha CRUA (`.trim().slice(0, 140)`): 140
+   * caracteres entrando no system prompt por fora do `limpar`, que é a higiene
+   * anti-injeção inteira. E esta linha é a mais fácil de dirigir de todas — o
+   * sumarizador a escreve OLHANDO o jeito de escrever da paciente, então
+   * assinar as mensagens com `[SISTEMA]` por algumas conversas é um caminho
+   * plausível para ver isso reaparecer no rótulo de fonte confiável.
+   *
+   * Agora o texto depois dos dois-pontos passa pelo mesmo filtro do corpo, e o
+   * `- Estilo:` é reescrito por nós. Assim o marcador que o prompt manda o
+   * modelo procurar é sempre de origem conhecida.
+   */
+  const cruEstilo = iEstilo >= 0 ? linhas[iEstilo].replace(/^\s*[-*]?\s*Estilo\s*:/i, "") : "";
+  const conteudoEstilo = limpar(cruEstilo, 140);
+  const estilo = conteudoEstilo ? `- Estilo: ${conteudoEstilo}` : "";
   const semEstilo = iEstilo >= 0 ? linhas.filter((_, i) => i !== iEstilo).join("\n") : bruto;
   const corpo = limpar(semEstilo, estilo ? 1200 - estilo.length - 1 : 1200);
   return estilo ? (corpo ? `${corpo} ${estilo}` : estilo) : corpo;

@@ -85,7 +85,10 @@ describe("o limite não é mais um balde compartilhado", () => {
   });
 
   test("visitante anônimo continua por IP", () => {
-    expect(chat).toContain("`ip:${clientIp(request)}`");
+    /* `clientIp` passou a ser chamado uma vez só, acima do portão de Auth: o
+       portão e o balde precisam concordar sobre quem é o cliente. */
+    expect(chat).toContain("const ipDaRequisicao = clientIp(request)");
+    expect(chat).toContain("`ip:${ipDaRequisicao}`");
   });
 
   test("o limitador recebe a chave nova, não o IP cru", () => {

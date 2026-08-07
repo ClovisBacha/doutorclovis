@@ -832,7 +832,7 @@ export const minhasDuvidasRegistradas = createServerFn({ method: "POST" })
     /* `avisada_em IS NULL` é o filtro que importa: é a marca que a entrega
        carimba. Sem ela, a dúvida respondida continuaria aparecendo como
        pendente ao lado da própria resposta. */
-    const { data: linhas, error } = await sb
+    let { data: linhas, error } = await sb
       .from("brain_gap_askers")
       /* `pergunta` é o texto DELA. Eu tinha escrito `brain_gaps(question)` —
          o enunciado da lacuna, que é o texto cru da PRIMEIRA paciente. A aba
@@ -844,8 +844,21 @@ export const minhasDuvidasRegistradas = createServerFn({ method: "POST" })
       .is("avisada_em", null)
       .order("created_at", { ascending: false })
       .limit(20);
-    /* Tabela/coluna ausente → lista vazia, sem quebrar a aba dela. Ela perde o
-       aviso, não o resto. */
+    /* ─── A COLUNA `pergunta` PODE NÃO EXISTIR ─────────────────────────────
+       Ela vem do `APLICAR_PERGUNTA_DE_CADA_UMA.sql` e não está em migration
+       numerada. Sem esta rede, o select falhava com 42703 e a aba ficava
+       vazia — o conserto quebrando a tela que ele conserta. Sem o texto dela,
+       a tela mostra a frase neutra (nunca o enunciado da lacuna, que é o texto
+       cru da primeira paciente). */
+    if (colunaAusente(error)) {
+      ({ data: linhas, error } = await sb
+        .from("brain_gap_askers")
+        .select("gap_id,created_at,brain_gaps(question,status)")
+        .eq("user_id", u.user.id)
+        .is("avisada_em", null)
+        .order("created_at", { ascending: false })
+        .limit(20));
+    }
     if (error) return { ok: false as const, duvidas: [] as DuvidaRegistrada[] };
 
     const duvidas: DuvidaRegistrada[] = ((linhas ?? []) as any[])
@@ -1098,6 +1111,44 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
 
     const questionText = data.question?.trim() || (gap.question as string);
 
+    /* ─── "SÓ PARA ELA" EXIGE QUE EXISTA UMA "ELA" ───────────────────────────
+     *
+     * Eu tinha escrito a opção pela metade: ela impedia o conhecimento de nascer
+     * e NÃO tocava na entrega. `entregarRespostaDaLacuna` varre a fila inteira
+     * da lacuna, até 200 pacientes.
+     *
+     * O resultado era o oposto exato do que a opção existe para fazer: o médico
+     * marca "só para ela" numa lacuna de cinco pacientes, escreve "pode
+     * continuar o remédio que passei na sua consulta", e as CINCO recebem —
+     * em `doctor_questions` e no push da tela de bloqueio. Conduta individual
+     * entregue a quatro gestantes para quem ela não vale.
+     *
+     * A lacuna é COMPARTILHADA por construção; "ela" só existe quando há uma
+     * pessoa só esperando. Com mais de uma, o pedido é recusado com motivo — e
+     * a tela explica. Recusar é a única resposta honesta: entregar a todas é o
+     * dano, e escolher uma por conta própria seria adivinhar qual.
+     *
+     * A contagem é de PACIENTES (`brain_gap_askers`), e não de `hits`: `hits`
+     * conta re-perguntas, então a mesma paciente perguntando três vezes fazia
+     * a tela dizer "3 pacientes".
+     */
+    if (data.soParaEla) {
+      const { count, error: cntErr } = await sb
+        .from("brain_gap_askers")
+        .select("user_id", { count: "exact", head: true })
+        .eq("gap_id", gap.id)
+        .is("avisada_em", null);
+      /* Falha na contagem → recusa. Na dúvida, não entrega conduta individual
+         a quem talvez não seja o caso dela. */
+      if (cntErr) {
+        console.error("[lacuna] não deu para contar quem espera", gap.id, cntErr);
+        return { ok: false as const, reason: "varias_pacientes" as const, quantas: null };
+      }
+      if ((count ?? 0) > 1) {
+        return { ok: false as const, reason: "varias_pacientes" as const, quantas: count ?? 0 };
+      }
+    }
+
     /* ─── SÓ PARA ELA: A RESPOSTA SAI, O CONHECIMENTO NÃO ────────────────────
        Sem entrada no cérebro, sem vetor, sem fechar as parecidas. A lacuna é
        marcada como respondida e a entrega segue igual — quem perguntou recebe.
@@ -1282,14 +1333,27 @@ export async function entregarRespostaDaLacuna(
   },
 ): Promise<number> {
   try {
-    const { data: esperando } = await sb
+    /* `pergunta` é o texto que CADA UMA escreveu. A lacuna é compartilhada
+       (deduplicada por texto e por vetor); a pergunta não é.
+       A coluna vem do `APLICAR_PERGUNTA_DE_CADA_UMA.sql` e não está em
+       migration numerada: sem esta rede, o select falhava com 42703, `esperando`
+       vinha vazio e a RESPOSTA DO MÉDICO NÃO CHEGAVA A NINGUÉM — o conserto
+       causando exatamente o silêncio que ele existe para acabar. */
+    const primeira = await sb
       .from("brain_gap_askers")
-      /* `pergunta` é o texto que CADA UMA escreveu. A lacuna é compartilhada
-         (deduplicada por texto e por vetor); a pergunta não é. */
       .select("user_id,pergunta")
       .eq("gap_id", args.gapId)
       .is("avisada_em", null)
       .limit(200);
+    let esperando = primeira.data;
+    if (colunaAusente(primeira.error)) {
+      ({ data: esperando } = await sb
+        .from("brain_gap_askers")
+        .select("user_id")
+        .eq("gap_id", args.gapId)
+        .is("avisada_em", null)
+        .limit(200));
+    }
     /* Coluna ainda não migrada: sem o texto de cada uma, TODAS recebem a versão
        generalizada do médico. Nunca o texto cru de outra. */
     const comTexto = (esperando ?? []) as { user_id: string; pergunta?: string | null }[] | null;

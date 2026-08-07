@@ -1013,12 +1013,26 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
       data: { accessToken: await token(), doctorId: d.id, ...patch },
     });
     setBusy(false);
-    if (res.ok) {
-      toast.success("Atualizado ✓");
-      onChanged();
-    } else {
+    if (!res.ok) {
       toast.error("Não foi possível atualizar.");
+      return;
     }
+    /* ─── O AVISO DIZ O QUE VALE, NÃO O QUE FOI PEDIDO ─────────────────────
+       "Atualizado ✓" era verdade sobre a ESCRITA e mentira sobre o efeito: o
+       plano concedido a um médico desativado (ou com data vencida no banco)
+       era rebaixado para `free` pela régua de capacidades, e esta tela
+       comemorava. O servidor agora devolve o plano EFETIVO — passado pela
+       mesma régua — e quando ele não bate com o pedido, isso aparece. */
+    const efetivo = "planoEfetivo" in res ? (res.planoEfetivo as string | null) : null;
+    if (patch.plan && efetivo && efetivo !== patch.plan) {
+      toast.warning(`Salvo, mas vale como "${efetivo}"`, {
+        description:
+          "O médico está inativo ou o plano está vencido. Reative a conta para o plano valer.",
+      });
+    } else {
+      toast.success("Atualizado ✓");
+    }
+    onChanged();
   }
 
   return (

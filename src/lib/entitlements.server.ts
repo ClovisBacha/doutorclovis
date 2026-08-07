@@ -71,6 +71,68 @@ export function planoVigente(
   return venc + CARENCIA_DE_RENOVACAO_MS < agora ? "free" : plan;
 }
 
+/**
+ * ATÉ QUANDO VALE UMA CONCESSÃO MANUAL — a metade que faltava da régua.
+ *
+ * ─── A RÉGUA NOVA QUEBROU O ÚNICO CAMINHO QUE NÃO SABIA RENOVAR ─────────────
+ *
+ * `planoVigente` passou a rebaixar TODO plano vencido, e não só o `trial`. Foi
+ * o conserto certo — e ele quebrou o vizinho. O console do fundador
+ * (`setDoctorStatus`) escrevia `plan` e nunca tocava em `plan_expires_at`; antes
+ * isso funcionava porque um `pro` vencido continuava valendo.
+ *
+ * O alvo típico de uma concessão manual é justamente quem já tem data no
+ * passado: a migration `20260730040000` carimbou `created_at + 14 dias` em todo
+ * médico legado. Ou seja, o fundador concedia `black` de cortesia, o audit log
+ * registrava `plan: "black"`, o `ok: true` voltava — e o médico seguia com
+ * capacidades de `free`. Sem erro, sem log, duas telas discordando.
+ *
+ * Toda escrita de plano passa a escrever também o vencimento. As duas colunas
+ * são um estado só; separá-las foi o que permitiu a contradição.
+ *
+ * ─── POR QUE NÃO "SEM VENCIMENTO" ───────────────────────────────────────────
+ *
+ * Seria a linha mais curta e ressuscitaria o defeito que `planoVigente` existe
+ * para matar: plano pago eterno, sem ninguém decidir de novo. Uma cortesia tem
+ * prazo; o fundador pode passar `expiraEm: null` de propósito, e aí é escolha
+ * registrada, não descuido.
+ */
+export const CORTESIA_PADRAO_DIAS = 365;
+export const TRIAL_PADRAO_DIAS = 14; // o mesmo prazo do backfill da migration
+
+export function vencimentoDaConcessao(
+  plano: string,
+  escolhido: string | null | undefined,
+  agora = Date.now(),
+): string | null {
+  /* `undefined` é "não escolhi"; `null` é "escolhi que não vence". A diferença
+     importa: sem ela não há como conceder de propósito uma cortesia sem prazo. */
+  if (escolhido !== undefined) return escolhido;
+  /* `free` é o piso: não há do que rebaixar, e uma data ali só confundiria a
+     próxima pessoa a ler a linha. */
+  if (plano === "free") return null;
+  const dias = plano === "trial" ? TRIAL_PADRAO_DIAS : CORTESIA_PADRAO_DIAS;
+  return new Date(agora + dias * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/**
+ * O plano que a régua enxerga DEPOIS de uma escrita — para a tela poder dizer a
+ * verdade em vez de repetir o que foi pedido.
+ *
+ * `active === false` derruba tudo para `free` em `planRowFor`, e essa é a
+ * segunda forma da mesma contradição: conceder `black` a um médico desativado
+ * também é um `ok: true` que não vale nada.
+ */
+export function planoEfetivo(
+  plan: string | null,
+  expiraEm: string | null | undefined,
+  active: boolean | null | undefined,
+  agora = Date.now(),
+): string {
+  if (active === false) return "free";
+  return planoVigente(plan, expiraEm, agora) ?? "free";
+}
+
 async function planRowFor(doctorId: string): Promise<string | null> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const sb = supabaseAdmin as any;

@@ -70,12 +70,22 @@ describe("o contador da faixa desce quando o médico trabalha", () => {
 });
 
 describe('a caixa "só para ela" é do item, não da tela', () => {
+  test("cancelar e abrir OUTRA lacuna também limpam", () => {
+    /* Um verificador apontou que só o caminho de sucesso limpava — e o
+       comentário afirmava o contrário. Cancelar deixava a caixa marcada, e
+       abrir a lacuna seguinte a herdava: ele responderia em modo individual sem
+       saber, ou seria recusado sem entender por quê. */
+    expect(painel).toContain("setSoParaEla(false); // cancelar também limpa");
+    const i = painel.indexOf("setAnswering(g.id);");
+    expect(painel.slice(i, i + 600)).toContain("setSoParaEla(false)");
+  });
+
   test("ela é desmarcada ao terminar uma lacuna", () => {
     /* Ficar marcada faria a PRÓXIMA lacuna ser respondida em modo individual
        sem ele perceber — e aí o conhecimento que ele achou que estava criando
        simplesmente não existe. */
     const i = painel.indexOf("async function resolve(gapId: string)");
     expect(i).toBeGreaterThan(-1);
-    expect(painel.slice(i, i + 2000)).toContain("setSoParaEla(false)");
+    expect(painel.slice(i, i + 3200)).toContain("setSoParaEla(false)");
   });
 });

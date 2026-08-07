@@ -28,8 +28,12 @@ describe("o limitador do chat não é desligável por uma string inventada", () 
   });
 
   test("token inválido cai no balde de IP", () => {
+    /* O IP passou a ser calculado UMA vez, acima, para que o portão de Auth e
+       o balde não possam discordar sobre quem é o cliente. A asserção é sobre
+       o invariante — anônimo vai para um balde de IP —, não sobre a grafia. */
     const i = chat.indexOf("const usuarioDoLimite");
-    expect(chat.slice(i, i + 300)).toContain("`ip:${clientIp(request)}`");
+    expect(chat.slice(i, i + 300)).toContain("`ip:${ipDaRequisicao}`");
+    expect(chat).toContain("const ipDaRequisicao = clientIp(request)");
   });
 
   test("o sufixo do header não é usado em lugar nenhum", () => {

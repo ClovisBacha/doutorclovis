@@ -336,12 +336,39 @@ describe("o vazamento tinha QUATRO superfícies, não uma", () => {
     expect(chat.slice(i, i + 500)).toContain("Uma dúvida que ela encaminhou");
   });
 
+  /* A janela é o CORPO da função, não um número de bytes. A versão anterior
+     media 2500 caracteres a partir do nome; ao ganhar a rede do `colunaAusente`
+     a função cresceu, o mapeamento saiu da janela e o teste reprovou sem que
+     nada tivesse quebrado. Um teste que encolhe a própria cobertura quando o
+     código cresce é um teste que um dia deixa de olhar para o que importa. */
+  const corpoDasDuvidas = (() => {
+    const i = fns.indexOf("export const minhasDuvidasRegistradas");
+    const fim = fns.indexOf("\nexport ", i + 10);
+    return fns.slice(i, fim === -1 ? fns.length : fim);
+  })();
+
   test("a aba da paciente lê o texto DELA", () => {
-    const i = fns.indexOf("minhasDuvidasRegistradas");
-    expect(i).toBeGreaterThan(-1);
-    const janela = fns.slice(i, i + 2500);
-    expect(janela).toContain('.select("gap_id,created_at,pergunta,brain_gaps(question,status)")');
-    expect(janela).toContain('pergunta: String(l.pergunta ?? "").trim()');
+    expect(corpoDasDuvidas.length).toBeGreaterThan(200);
+    expect(corpoDasDuvidas).toContain(
+      '.select("gap_id,created_at,pergunta,brain_gaps(question,status)")',
+    );
+    expect(corpoDasDuvidas).toContain('pergunta: String(l.pergunta ?? "").trim()');
+  });
+
+  /* ─── A COLUNA QUE NÃO EXISTE NO BANCO DE PRODUÇÃO ────────────────────────
+     `pergunta` veio de um SQL avulso (`APLICAR_PERGUNTA_DE_CADA_UMA.sql`), não
+     de migration numerada. O PostgREST recusa a LINHA INTEIRA quando uma coluna
+     do select não existe (42703) — então, num banco sem o SQL aplicado, o
+     conserto do vazamento apagava a aba que ele conserta. E o fallback não pode
+     ser `brain_gaps.question`: esse é o texto cru da PRIMEIRA paciente, ou seja,
+     o próprio vazamento voltando pela porta dos fundos. */
+  test("e sobrevive ao banco que ainda não tem a coluna", () => {
+    expect(corpoDasDuvidas).toContain("colunaAusente(error)");
+    const i = corpoDasDuvidas.indexOf("colunaAusente(error)");
+    const retentativa = corpoDasDuvidas.slice(i, i + 400);
+    expect(retentativa).toContain('.select("gap_id,created_at,brain_gaps(question,status)")');
+    /* a retentativa NÃO pede `pergunta` — se pedisse, falharia de novo */
+    expect(retentativa).not.toContain("created_at,pergunta");
   });
 
   test("nenhuma das duas leituras usa brain_gaps.question como texto da paciente", () => {

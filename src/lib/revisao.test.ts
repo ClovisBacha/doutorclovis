@@ -214,7 +214,12 @@ describe("a correção volta para quem reclamou", () => {
   test("editar a resposta entrega em doctor_questions e dispara push", async () => {
     const { sb, reg } = bancoFalso({ vinculoAtual: true });
     const empurrados: string[] = [];
+    /* Espalha o real: um literal apagaria `pushConfigured` e `sendPushToEmail`
+       do registro compartilhado entre arquivos de teste, e quem os importasse
+       depois sumiria da contagem em vez de falhar. */
+    const pushReal = await import("./push.server");
     mock.module("./push.server", () => ({
+      ...pushReal,
       sendPushToUser: async (uid: string) => {
         empurrados.push(uid);
       },
@@ -233,7 +238,8 @@ describe("a correção volta para quem reclamou", () => {
 
   test("quem trocou de médico NÃO recebe correção do consultório anterior", async () => {
     const { sb, reg } = bancoFalso({ vinculoAtual: false });
-    mock.module("./push.server", () => ({ sendPushToUser: async () => {} }));
+    const pushReal = await import("./push.server");
+    mock.module("./push.server", () => ({ ...pushReal, sendPushToUser: async () => {} }));
     const { entregarCorrecao } = await import("./secondbrain.functions");
 
     const avisada = await entregarCorrecao(sb, { ...args, resposta: "corrigida" });
@@ -245,7 +251,8 @@ describe("a correção volta para quem reclamou", () => {
   test('"está certa, manter" não avisa ninguém', async () => {
     /* Nada mudou para ela — dizer que mudou seria ruído com cara de novidade. */
     const { sb, reg } = bancoFalso({ vinculoAtual: true });
-    mock.module("./push.server", () => ({ sendPushToUser: async () => {} }));
+    const pushReal = await import("./push.server");
+    mock.module("./push.server", () => ({ ...pushReal, sendPushToUser: async () => {} }));
     const { entregarCorrecao } = await import("./secondbrain.functions");
 
     const avisada = await entregarCorrecao(sb, { ...args, resposta: null });

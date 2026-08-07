@@ -6684,6 +6684,18 @@ function BrainGapsCard({
           ...(asDoctor ? { asDoctor } : {}),
         },
       });
+      if (!res.ok && "reason" in res && res.reason === "varias_pacientes") {
+        /* A lacuna é COMPARTILHADA: "só para ela" não tem uma "ela". Entregar a
+           todas seria o dano que a opção existe para impedir, e escolher uma por
+           conta própria seria adivinhar qual. */
+        const q = "quantas" in res && typeof res.quantas === "number" ? res.quantas : null;
+        toast.error(
+          q && q > 1
+            ? `${q} pacientes estão esperando esta resposta — "só para ela" não vale aqui. Responda de forma geral, ou fale com ela pela aba Perguntas.`
+            : "Não consegui confirmar quem está esperando. Tente de novo.",
+        );
+        return;
+      }
       if (!res.ok) {
         toast.error(
           "reason" in res && res.reason === "plan"
@@ -6933,6 +6945,7 @@ function BrainGapsCard({
                         setDrafted(null);
                         setAnswer("");
                         setEditedQuestion("");
+                        setSoParaEla(false); // cancelar também limpa
                       }}
                       className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground"
                     >
@@ -6947,6 +6960,11 @@ function BrainGapsCard({
                       setAnswering(g.id);
                       setAnswer("");
                       setEditedQuestion(g.question.slice(0, 300));
+                      /* ABRIR outra lacuna também limpa. Sem isto, a caixa
+                         marcada na lacuna anterior valia para esta — e o
+                         médico responderia em modo individual sem saber, ou
+                         seria recusado sem entender por quê. */
+                      setSoParaEla(false);
                     }}
                     className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
                   >

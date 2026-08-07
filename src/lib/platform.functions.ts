@@ -24,6 +24,7 @@ import {
   safe,
 } from "@/lib/platform-admin.server";
 import { writeAudit } from "@/lib/audit.server";
+import { planoEfetivo, vencimentoDaConcessao } from "@/lib/entitlements.server";
 
 export type PlatformDoctor = {
   id: string;
@@ -677,6 +678,9 @@ const SetStatusSchema = z.object({
   plan: z
     .enum(["trial", "free", "essencial", "starter", "pro", "clinica", "elite", "black"])
     .optional(),
+  /* Até quando vale a concessão. Ausente = o padrão do plano (ver
+     `vencimentoDaConcessao`); `null` = de propósito sem vencimento. */
+  expiraEm: z.string().datetime().nullable().optional(),
 });
 
 /** Ativa/desativa ou muda o plano de um médico (super-admin). */
@@ -690,18 +694,45 @@ export const setDoctorStatus = createServerFn({ method: "POST" })
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (data.active !== undefined) patch.active = data.active;
     if (data.verified !== undefined) patch.verified = data.verified;
-    if (data.plan !== undefined) patch.plan = data.plan;
+    /* ─── PLANO E VENCIMENTO SÃO UM ESTADO SÓ ──────────────────────────────
+       Escrever `plan` sem `plan_expires_at` era um no-op silencioso desde que
+       `planoVigente` passou a rebaixar todo plano vencido — e o alvo típico de
+       uma concessão manual é justamente quem já tem data no passado. Ver
+       `vencimentoDaConcessao`. */
+    if (data.plan !== undefined) {
+      patch.plan = data.plan;
+      patch.plan_expires_at = vencimentoDaConcessao(data.plan, data.expiraEm);
+    }
     const { error } = await (supabaseAdmin as any)
       .from("doctors")
       .update(patch)
       .eq("id", data.doctorId);
-    if (!error)
-      await writeAudit({ id: user.id, email: user.email }, "doctor.status", data.doctorId, {
-        active: data.active ?? null,
-        verified: data.verified ?? null,
-        plan: data.plan ?? null,
-      });
-    return { ok: !error };
+    if (error) return { ok: false as const };
+
+    /* ─── A TELA PRECISA DIZER O QUE VALE, NÃO O QUE FOI PEDIDO ────────────
+       Relemos e passamos pela MESMA régua das capacidades. É o que impede a
+       outra forma da contradição: conceder `black` a um médico desativado
+       também devolvia `ok: true` sem mudar nada — `planRowFor` derruba para
+       `free` quando `active === false`. Agora isso volta visível. */
+    const { data: depois } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("plan,active,plan_expires_at")
+      .eq("id", data.doctorId)
+      .maybeSingle();
+    const efetivo = depois
+      ? planoEfetivo(depois.plan ?? null, depois.plan_expires_at, depois.active)
+      : null;
+
+    await writeAudit({ id: user.id, email: user.email }, "doctor.status", data.doctorId, {
+      active: data.active ?? null,
+      verified: data.verified ?? null,
+      plan: data.plan ?? null,
+      /* O audit log registrava o PEDIDO. Registrar só o pedido foi o que deixou
+         a concessão morta parecer bem-sucedida na única trilha que existia. */
+      expira_em: (patch.plan_expires_at as string | null | undefined) ?? null,
+      plano_efetivo: efetivo,
+    });
+    return { ok: true as const, planoEfetivo: efetivo, expiraEm: patch.plan_expires_at ?? null };
   });
 
 // ─────────────────────────────────────────────────────────────────────────────

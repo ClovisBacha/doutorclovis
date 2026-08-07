@@ -180,7 +180,9 @@ async function rodarCura(opts: {
   const { sb, reg } = bancoDeCura(opts);
   mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sb }));
   let ativos = 0;
+  const embeddingsReal1 = await import("./embeddings.server");
   mock.module("./embeddings.server", () => ({
+    ...embeddingsReal1,
     emLotes: emLotesReal,
     embedText: async (texto: string) => {
       const i = reg.embeds.length;
@@ -217,7 +219,9 @@ async function rodarLacuna(opts: {
 }) {
   const { sb, reg } = supabaseDeMentira(opts);
   mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sb }));
+  const embeddingsReal2 = await import("./embeddings.server");
   mock.module("./embeddings.server", () => ({
+    ...embeddingsReal2,
     embedText: async (texto: string) => {
       reg.embeds.push(texto);
       return opts.embedTextDevolve ?? null;

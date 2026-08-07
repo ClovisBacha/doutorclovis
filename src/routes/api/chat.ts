@@ -13,6 +13,7 @@ import { computeGestation } from "@/lib/gestacao";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
 import { usuarioDaRequisicao } from "@/lib/api-auth.server";
 import { memoriaSegura } from "@/lib/chat-memory.server";
+import { colunaAusente } from "@/lib/postgrest";
 import { limitarEntrada, soTexto } from "@/lib/chat-stream";
 /* Preço e contato de suporte vêm daqui, não de literal solto: "quanto custa o
    plano?" era classificado como suporte (correto — o médico não é incomodado)
@@ -63,6 +64,29 @@ export function criarTetoAnonimo(teto = TETO_ANONIMO_POR_MINUTO) {
 }
 
 const tetoGlobalAnonimoEstourado = criarTetoAnonimo();
+
+/**
+ * ─── O LIMITADOR TINHA VIRADO O AMPLIFICADOR ────────────────────────────────
+ *
+ * Tirar a chave do limite do SUFIXO do header e passar a tirá-la do usuário
+ * RESOLVIDO fechou o furo de burlar os dois limitadores — e abriu outro: a ida
+ * ao Supabase Auth passou a acontecer ANTES do limitador. Quem manda um
+ * `Authorization` inválido em rajada paga uma viagem de rede por requisição,
+ * INCLUSIVE nas que vão levar 429. O 429 existe justamente para ser a resposta
+ * barata; ele tinha virado a cara, e o limitador, em vez de conter a rajada,
+ * passou a multiplicá-la em chamadas ao Auth.
+ *
+ * A forma de JWT (em `usuarioDaRequisicao`) já joga fora o lixo sem custo. Este
+ * portão cobre o resto: token bem-formado e inválido, ou token real repetido.
+ *
+ * O teto é FOLGADO de propósito. Ele não é o limite de conversa — esse continua
+ * sendo o de baixo, por usuária. Aqui só se limita quantas VIAGENS AO AUTH um
+ * mesmo IP consegue provocar por minuto, e por isso precisa caber o wifi de uma
+ * clínica inteira sem encostar. Só conta requisição que TRAZ `Authorization`:
+ * sem header não há rede nenhuma, e o widget público não é tocado.
+ */
+export const AUTH_POR_IP_POR_MINUTO = 120;
+const portaoDeAuth = makeRateLimiter(AUTH_POR_IP_POR_MINUTO, 60_000);
 
 // Chat do SITE PÚBLICO: assistente geral da plataforma (dúvidas do app e do
 // site, suporte). NÃO fala como um médico específico e NÃO dá conduta clínica.
@@ -415,15 +439,29 @@ async function buildPendenciasBlock(
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    const { data: askers } = await sb
+    /* `pergunta` é o texto que ELA escreveu. A lacuna é compartilhada
+       (deduplicada por texto e por vetor); a pergunta não é. Sem isto, o bloco
+       abaixo dizia "você perguntou X" com o texto CRU da PRIMEIRA paciente —
+       dentro do system prompt da conversa de outra.
+       ─── E A COLUNA PODE NÃO EXISTIR ────────────────────────────────────────
+       Ela vem do `APLICAR_PERGUNTA_DE_CADA_UMA.sql` e não está em migration
+       numerada nenhuma; o CLAUDE.md avisa que produção fica atrás. Sem esta
+       rede, o select inteiro falhava com 42703 e o bloco sumia do prompt — ou
+       seja, o conserto QUEBRAVA a tela que ele conserta, em todo banco que
+       ainda não rodou o arquivo. */
+    const primeira = await sb
       .from("brain_gap_askers")
-      /* `pergunta` é o texto que ELA escreveu. A lacuna é compartilhada
-         (deduplicada por texto e por vetor); a pergunta não é. Sem isto, o
-         bloco abaixo dizia "você perguntou X" com o texto CRU da PRIMEIRA
-         paciente — dentro do system prompt da conversa de outra. */
       .select("gap_id,pergunta")
       .eq("user_id", patientId)
       .limit(40);
+    let askers = primeira.data;
+    if (colunaAusente(primeira.error)) {
+      ({ data: askers } = await sb
+        .from("brain_gap_askers")
+        .select("gap_id")
+        .eq("user_id", patientId)
+        .limit(40));
+    }
     const linhasDela = (askers ?? []) as { gap_id: string; pergunta?: string | null }[];
     const ids = linhasDela.map((a) => a.gap_id);
     const textoDela = new Map(linhasDela.map((l) => [l.gap_id, (l.pergunta ?? "").trim()]));
@@ -847,10 +885,18 @@ export const Route = createFileRoute("/api/chat")({
          *
          * A chave passa a sair do usuário RESOLVIDO. Token inválido cai para o
          * balde de IP, que é onde ele pertence. */
+        const ipDaRequisicao = clientIp(request);
+        /* O portão de Auth vem ANTES da rede, e só para quem traz o header —
+           sem `Authorization` não há viagem nenhuma a limitar, e o widget
+           público não deve pagar por um portão que existe por causa de token
+           inválido. Ver `AUTH_POR_IP_POR_MINUTO`. */
+        if (request.headers.get("authorization") && portaoDeAuth(ipDaRequisicao)) {
+          return new Response("Muitas mensagens em pouco tempo. Aguarde um instante.", {
+            status: 429,
+          });
+        }
         const usuarioDoLimite = await usuarioDaRequisicao(request).catch(() => null);
-        const chaveDoLimite = usuarioDoLimite
-          ? `u:${usuarioDoLimite.id}`
-          : `ip:${clientIp(request)}`;
+        const chaveDoLimite = usuarioDoLimite ? `u:${usuarioDoLimite.id}` : `ip:${ipDaRequisicao}`;
         if (rateLimited(chaveDoLimite)) {
           return new Response("Muitas mensagens em pouco tempo. Aguarde um instante.", {
             status: 429,
