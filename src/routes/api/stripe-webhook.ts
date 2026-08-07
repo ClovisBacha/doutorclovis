@@ -304,12 +304,51 @@ async function applySubscription(subscriptionId: string): Promise<void> {
        bug nosso, e bug de cobrança deve conceder de MENOS, nunca de mais. */
     const { normalizePlan } = await import("@/lib/entitlements");
     const planKey = normalizePlan((plan ?? "").replace(/_annual$/, ""));
+
+    /* ─── A QUANTIDADE DE MENSAGENS, LIDA DO ITEM ─────────────────────────
+     *
+     * A escada nova tem um eixo só: o plano do médico é um NÚMERO (mensagens de
+     * IA por ciclo), não um nome. O Price é um só, com faixas graduadas, e o que
+     * define preço e entrega é `items.data[0].quantity`.
+     *
+     * DO `items`, NUNCA DO `metadata` — o próprio arquivo já defende isso ao
+     * creditar Sementinhas ("o metadata é pista, não autoridade"). Aqui o valor
+     * É a fatura: lê-lo do metadata deixaria forjar 20.000 mensagens num POST.
+     *
+     * Só grava quando a quantidade é PLAUSÍVEL. Uma auditoria mediu o que
+     * acontece sem esta gravação: `normalizePlan("mensagens")` devolve `"free"`,
+     * o médico paga R$ 295,40 e recebe o plano grátis, sem erro em lugar nenhum
+     * e com 200 devolvido ao Stripe, que nunca reenvia.
+     *
+     * `null` quando não dá para confiar: a coluna volta a significar "não
+     * comprou", e o leitor da cota trata isso como cota estourada — falha
+     * fechada. Conceder de menos por engano o médico reclama e a gente
+     * conserta; conceder de mais ninguém reclama e ninguém descobre. */
+    const qtd = sub.items?.data?.[0]?.quantity;
+    const mensagens =
+      typeof qtd === "number" && Number.isFinite(qtd) && qtd > 0 && qtd <= 20_000
+        ? Math.floor(qtd)
+        : null;
+    if (qtd !== undefined && mensagens === null) {
+      console.error("[stripe] quantidade fora da faixa; plano de mensagens NÃO concedido", {
+        userId,
+        qtd,
+      });
+    }
+
     if (grants) {
       await gravar(
         "doctors.plan(conceder)",
         (supabaseAdmin as any)
           .from("doctors")
-          .update({ plan: planKey, active: true, plan_expires_at: periodEnd })
+          .update({
+            plan: planKey,
+            active: true,
+            plan_expires_at: periodEnd,
+            /* Só entra no update quando existe. Mandar `null` aqui APAGARIA a
+               quantidade de um médico que renovou por um caminho antigo. */
+            ...(mensagens !== null ? { ai_messages_per_cycle: mensagens } : {}),
+          })
           .eq("id", userId),
       );
       // Indicação: se este médico foi indicado e ainda não gerou recompensa,
@@ -335,7 +374,11 @@ async function applySubscription(subscriptionId: string): Promise<void> {
         "doctors.plan(rebaixar)",
         (supabaseAdmin as any)
           .from("doctors")
-          .update({ plan: "free", plan_expires_at: null })
+          /* Revogar zera a QUANTIDADE junto. Sem isto, o médico que cancelou
+             ficava com `ai_messages_per_cycle` cheio — e como o teto da cota
+             passou a sair dessa coluna, ele manteria a IA inteira depois de
+             parar de pagar. */
+          .update({ plan: "free", plan_expires_at: null, ai_messages_per_cycle: null })
           .eq("id", userId),
       );
     }

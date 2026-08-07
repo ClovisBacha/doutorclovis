@@ -61,9 +61,16 @@ export async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 export { PLAN_PRICE } from "./entitlements";
 import { mensalidadeCentavos } from "./entitlements";
 
-/** Preço mensal do plano do médico em centavos (anual normalizado ao mensal). */
-export function doctorPlanMonthlyCents(plan: string): number {
-  return mensalidadeCentavos(plan);
+/**
+ * Preço mensal do plano do médico em centavos (anual normalizado ao mensal).
+ *
+ * `mensagensCompradas` é `doctors.ai_messages_per_cycle`. Sem ele, o plano
+ * `mensagens` conta sempre a ENTRADA (R$ 29,90) — o que subestima quem comprou
+ * mais, em até dez vezes. Quem tem a coluna à mão passa; quem não tem recebe o
+ * piso, nunca um número inventado para cima.
+ */
+export function doctorPlanMonthlyCents(plan: string, mensagensCompradas?: number | null): number {
+  return mensalidadeCentavos(plan, mensagensCompradas);
 }
 
 /** Premium da paciente: R$19,90/mês; anual equivale a ~R$9,90/mês. */

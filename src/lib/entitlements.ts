@@ -18,11 +18,19 @@
  *   - Clínica: personalizado (orçamento por contrato) — vários médicos,
  *              sem tetos rígidos; painel operando cada cérebro individualmente.
  *   - Trial:   experimenta o Pro por tempo limitado.
+ *
+ * ─── O QUE SE VENDE HOJE É `mensagens` ──────────────────────────────────────
+ * Os planos nomeados acima são LEGADO: continuam na tabela porque há médicos
+ * gravados neles. A escada nova tem um eixo só — mensagens de IA por mês,
+ * R$ 29,90 na entrada (150) até R$ 295,40 (2.500) — e vive em
+ * `src/lib/planos-medico.ts`. Acima do topo, é contrato de Clínica.
  */
+import { ENTRADA_MENSAGENS, precoDe } from "./planos-medico";
 
 export type PlanKey =
   | "trial"
   | "free"
+  | "mensagens"
   | "essencial"
   | "starter"
   | "pro"
@@ -244,9 +252,55 @@ const CLINICA: Entitlements = {
    trial — isto vale só para quem já estava dentro quando a porta fechou. */
 const TRIAL: Entitlements = { ...PRO, label: "Trial", badge: "", aiRepliesPerCycle: 500 };
 
+/**
+ * MENSAGENS — o plano que está no ar, e o único que ainda se vende.
+ *
+ * ─── ELE NÃO É UM DEGRAU DA ESCADA ACIMA; ELE A SUBSTITUI ───────────────────
+ *
+ * Essencial/Starter/Pro/Elite/Black vendiam DOIS eixos ao mesmo tempo: número
+ * de pacientes e capacidades. Os dois foram retirados por decisão de produto —
+ * "não vai ter mais número de pacientes" — e o que sobrou foi um eixo só:
+ * quantas mensagens de IA o médico compra por mês.
+ *
+ * Por isso `maxPatients: null`. Não é generosidade de plano caro: é que o teto
+ * de pacientes deixou de existir como produto. Os planos nomeados continuam na
+ * tabela porque há médicos gravados neles, e um plano que some da tabela vira
+ * `free` em silêncio — o defeito que o comentário do webhook descreve.
+ *
+ * ─── `aiRepliesPerCycle` AQUI É PISO, NÃO ENTREGA ───────────────────────────
+ *
+ * O que ele realmente recebe é `doctors.ai_messages_per_cycle`, escrito pelo
+ * webhook a partir de `subscription.items.data[0].quantity`, e aplicado por
+ * `comMensagensCompradas` (`entitlements.server.ts`) nos dois pontos de entrada.
+ *
+ * O valor aqui é o que vale quando a coluna não pode ser lida — migration ainda
+ * não aplicada, falha de rede. Ser a ENTRADA da escada (150) e não zero é
+ * deliberado: quem pagou fica com o degrau mínimo, nunca sem IA nenhuma. E ser
+ * a entrada, e não o topo, mantém a direção que esta base já escolheu — errar
+ * concedendo de MENOS, que o médico reclama e a gente conserta.
+ */
+const MENSAGENS: Entitlements = {
+  label: "Obstetrícia",
+  maxPatients: null,
+  maxBrains: 1,
+  aiApp: true,
+  aiWhatsapp: true,
+  clinicalToolsAdvanced: true,
+  dashboardAdvanced: true,
+  prioritySupport: true,
+  /* Equipe e gerente dedicado são o que separa este plano do contrato de
+     Clínica — sem isso, Clínica não teria o que vender. */
+  teamSeats: false,
+  premiumInvitesPerMonth: 0,
+  badge: "Pro",
+  dedicatedManager: false,
+  aiRepliesPerCycle: ENTRADA_MENSAGENS,
+};
+
 export const PLAN_ENTITLEMENTS: Record<PlanKey, Entitlements> = {
   trial: TRIAL,
   free: FREE,
+  mensagens: MENSAGENS,
   essencial: ESSENCIAL,
   starter: STARTER,
   pro: PRO,
@@ -281,6 +335,11 @@ export const OWNER_ENTITLEMENTS: Entitlements = {
 export const PLAN_PRICE: Record<string, number> = {
   trial: 0,
   free: 0,
+  /* A ENTRADA da escada, e só ela. O que o médico paga de verdade depende de
+     quantas mensagens comprou — quem sabe disso é `mensalidadeCentavos`, que
+     recebe a quantidade. Este número é o piso, usado quando a quantidade não é
+     conhecida (por exemplo, um médico cuja coluna ainda não foi preenchida). */
+  mensagens: 29.9,
   /* R$102 existe só como âncora riscada na tela de vendas — o preço COBRADO é
      este. Ancorar em 102 e cobrar 102 colocaria o plano a 31% do Starter, perto
      demais para abrir um segmento: por paciente sairia R$6,80 contra R$2,98 do
@@ -302,18 +361,49 @@ export const PLAN_PRICE: Record<string, number> = {
  * sumia da tela de um assinante pagante. Duas normalizações diferentes para a
  * mesma coluna, a vinte linhas de distância.
  */
-export function mensalidadeCentavos(plan: string): number {
+export function mensalidadeCentavos(
+  plan: string,
+  /**
+   * `doctors.ai_messages_per_cycle` — quantas mensagens ele comprou.
+   *
+   * ─── POR QUE ESTE PARÂMETRO PRECISOU EXISTIR ────────────────────────────
+   * `PLAN_PRICE` é uma tabela de plano→preço, e o plano `mensagens` não tem UM
+   * preço: tem uma escada de R$ 29,90 a R$ 295,40. Sem a quantidade, os dois
+   * lugares que usam esta função passariam a mentir na mesma direção — o painel
+   * diria "sua mensalidade é R$ 29,90" a quem paga R$ 295,40, e o MRR do
+   * fundador contaria um décimo do que entra.
+   */
+  mensagensCompradas?: number | null,
+): number {
   const p = (plan ?? "")
     .trim()
     .toLowerCase()
     .replace(/_annual$/, "");
   const chave = /^(enterprise|equipe|clinic)$/.test(p) ? "clinica" : p;
+  if (chave === "mensagens" && typeof mensagensCompradas === "number") {
+    /* `precoDe` já trava nas duas pontas da escada; um valor fora dela não vira
+       preço absurdo, vira a ponta mais próxima. */
+    return precoDe(mensagensCompradas);
+  }
   return (PLAN_PRICE[chave] ?? 0) * 100;
 }
 
 export const PLAN_RANK: Record<PlanKey, number> = {
   free: 0,
   trial: 1,
+  /* ─── `mensagens` FICA ACIMA DOS NOMEADOS, E ABAIXO DE BLACK/CLÍNICA ───────
+   *
+   * O rank ordena a busca que a PACIENTE vê. `mensagens` é o único plano que
+   * ainda se vende, então ele precisa passar à frente dos legados que ninguém
+   * mais assina. Não passa à frente de Black nem de Clínica porque esses dois
+   * são contratos ativos de valor maior, e rebaixá-los seria punir quem paga
+   * mais por uma mudança de tabela que não foi escolha deles.
+   *
+   * O teste de pares (`escada-de-planos.test.ts`) NÃO compara este plano com os
+   * nomeados, e o motivo está escrito lá: os eixos são outros. Comparar 150
+   * mensagens de piso com as 10.000 do Elite compara o número errado — a
+   * entrega dele vem da coluna, não desta tabela. */
+  mensagens: 6,
   essencial: 2,
   starter: 3,
   pro: 4,
@@ -347,6 +437,7 @@ export function normalizePlan(plan: string | null | undefined): PlanKey {
   if (
     p === "trial" ||
     p === "free" ||
+    p === "mensagens" ||
     p === "essencial" ||
     p === "starter" ||
     p === "pro" ||

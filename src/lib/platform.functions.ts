@@ -15,7 +15,6 @@ import {
   MAX_ROWS,
   PAID_STATUS,
   PAYING_STATUS,
-  PLAN_PRICE,
   TokenSchema,
   doctorPlanMonthlyCents,
   patientPremiumMonthlyCents,
@@ -25,7 +24,7 @@ import {
 } from "@/lib/platform-admin.server";
 import { writeAudit } from "@/lib/audit.server";
 import { planoEfetivo, planoVigente, vencimentoDaConcessao } from "@/lib/entitlements.server";
-import { normalizePlan } from "@/lib/entitlements";
+import { mensalidadeCentavos, normalizePlan } from "@/lib/entitlements";
 
 export type PlatformDoctor = {
   id: string;
@@ -147,18 +146,35 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
       active: boolean | null;
       verified: boolean | null;
       created_at: string | null;
+      /** Ausente quando a migration ainda não rodou — o retry abaixo cobre. */
+      ai_messages_per_cycle?: number | null;
     };
-    const docRows = await safe<DocRow[]>(
-      async () =>
-        ((
-          await sb
-            .from("doctors")
-            .select("id,display_name,plan,plan_expires_at,active,verified,created_at")
-            .order("created_at", { ascending: false })
-            .limit(MAX_ROWS)
-        ).data ?? []) as DocRow[],
-      [],
-    );
+    /* ─── A COLUNA NOVA ENTRA COM RETRY, NUNCA DIRETO ────────────────────────
+       `ai_messages_per_cycle` é o que transforma o plano `mensagens` num preço:
+       sem ela, o MRR conta R$ 29,90 para quem paga R$ 295,40.
+
+       Mas o PostgREST recusa a LINHA INTEIRA quando uma coluna do `select` não
+       existe (42703), e o `safe` aqui cai para `[]` — ou seja, pedir a coluna
+       sem rede faria a lista de médicos sumir por completo do painel da
+       plataforma enquanto a migration estivesse pendente, que é exatamente o
+       estado que o CLAUDE.md avisa ser o normal em produção. */
+    const colunas = "id,display_name,plan,plan_expires_at,active,verified,created_at";
+    const docRows = await safe<DocRow[]>(async () => {
+      const { colunaAusente } = await import("./postgrest");
+      const comQtd = await sb
+        .from("doctors")
+        .select(`${colunas},ai_messages_per_cycle`)
+        .order("created_at", { ascending: false })
+        .limit(MAX_ROWS);
+      if (!comQtd.error) return (comQtd.data ?? []) as DocRow[];
+      if (!colunaAusente(comQtd.error)) throw comQtd.error;
+      const semQtd = await sb
+        .from("doctors")
+        .select(colunas)
+        .order("created_at", { ascending: false })
+        .limit(MAX_ROWS);
+      return (semQtd.data ?? []) as DocRow[];
+    }, []);
 
     // Contagens auxiliares por médico (pacientes vinculadas e entradas de cérebro)
     const patientsByDoctor = await safe<Map<string, number>>(async () => {
@@ -229,12 +245,20 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
          no `?? 0` e o médico sumia da conta em silêncio — o erro no sentido
          oposto, no mesmo lugar.
        Pela régua ÚNICA, e com a chave normalizada. */
+    /* O plano `mensagens` não tem UM preço — tem a escada de R$ 29,90 a
+       R$ 295,40. Por isso passa pela `mensalidadeCentavos`, que recebe a
+       quantidade comprada; `PLAN_PRICE` sozinho contaria a entrada para todo
+       mundo e o MRR sairia até dez vezes menor. */
     const mrrEstimate = docRows
       .filter((d) => d.active)
       .reduce(
         (soma, d) =>
           soma +
-          (PLAN_PRICE[normalizePlan(planoVigente(d.plan, d.plan_expires_at) ?? "free")] ?? 0),
+          mensalidadeCentavos(
+            normalizePlan(planoVigente(d.plan, d.plan_expires_at) ?? "free"),
+            d.ai_messages_per_cycle,
+          ) /
+            100,
         0,
       );
 

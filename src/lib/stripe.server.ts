@@ -70,6 +70,14 @@ export function priceIdFor(product: BillingProduct, plan: string): string | null
   const map: Record<string, string | undefined> = {
     "quiz_premium:monthly": env.STRIPE_PRICE_QUIZ_MONTHLY,
     "quiz_premium:annual": env.STRIPE_PRICE_QUIZ_ANNUAL,
+    /* ─── O PLANO QUE SE VENDE HOJE ───────────────────────────────────────
+       Um Price só, com faixas GRADUADAS (`tiers_mode: graduated`), cobrado por
+       unidade = mensagem de IA. A primeira faixa é `flat_amount` R$ 29,90 até
+       150; depois R$ 0,15 / R$ 0,12 / R$ 0,09. Quem calcula o mesmo número do
+       nosso lado é `precoDe` (`src/lib/planos-medico.ts`), e há teste que trava
+       os dois juntos — se as faixas do Stripe mudarem sem a função, a tela
+       promete um preço e a fatura cobra outro. */
+    "doctor_plan:mensagens": env.STRIPE_PRICE_DOCTOR_MENSAGENS,
     "doctor_plan:essencial": env.STRIPE_PRICE_DOCTOR_ESSENCIAL_MONTHLY,
     "doctor_plan:essencial_annual": env.STRIPE_PRICE_DOCTOR_ESSENCIAL_ANNUAL,
     "doctor_plan:starter": env.STRIPE_PRICE_DOCTOR_STARTER_MONTHLY,
@@ -98,11 +106,32 @@ export async function createCheckoutSession(opts: {
   refCode?: string | null;
   /** Cupom Stripe a aplicar (ex.: convite de paciente = 15% off p/ sempre). */
   discountCoupon?: string | null;
+  /**
+   * QUANTAS UNIDADES — para o plano do médico, é o número de MENSAGENS de IA.
+   *
+   * O plano deixou de ser um nome e passou a ser um número: o Price é um só,
+   * com faixas graduadas (`tiers_mode: graduated`), e o que define o preço é a
+   * quantidade. Ver `src/lib/planos-medico.ts`.
+   *
+   * Ausente = 1, que é o certo para tudo o que não é escada (Premium da
+   * paciente, Sementinhas).
+   */
+  quantity?: number;
+  /**
+   * Deixa a pessoa mexer na quantidade DENTRO do checkout do Stripe.
+   *
+   * É o slider, de graça: o Stripe mostra o seletor, recalcula o preço pelas
+   * faixas e devolve a quantidade final no webhook. Escrever o nosso próprio
+   * slider seria manter uma segunda tabela de preços do lado do cliente — e
+   * duas tabelas de preço para a mesma compra é exatamente o tipo de coisa que
+   * este projeto já viu divergir quatro vezes.
+   */
+  quantityRange?: { min: number; max: number };
 }): Promise<{ url: string | null }> {
   const params: Record<string, unknown> = {
     mode: "subscription",
     "line_items[0][price]": opts.priceId,
-    "line_items[0][quantity]": 1,
+    "line_items[0][quantity]": Math.max(1, Math.floor(opts.quantity ?? 1)),
     success_url: opts.successUrl,
     cancel_url: opts.cancelUrl,
     client_reference_id: opts.userId,
@@ -114,6 +143,11 @@ export async function createCheckoutSession(opts: {
     "subscription_data[metadata][product]": opts.product,
     "subscription_data[metadata][plan]": opts.plan,
   };
+  if (opts.quantityRange) {
+    params["line_items[0][adjustable_quantity][enabled]"] = "true";
+    params["line_items[0][adjustable_quantity][minimum]"] = opts.quantityRange.min;
+    params["line_items[0][adjustable_quantity][maximum]"] = opts.quantityRange.max;
+  }
   if (opts.refCode) {
     params["metadata[ref_code]"] = opts.refCode;
     params["subscription_data[metadata][ref_code]"] = opts.refCode;
@@ -264,7 +298,15 @@ export type StripeSubscription = {
   status: string;
   customer: string;
   current_period_end?: number;
-  items?: { data?: { price?: { id?: string } }[] };
+  /**
+   * `quantity` entra aqui, e NÃO no metadata.
+   *
+   * O próprio webhook já defende esse princípio ao creditar Sementinhas: "o
+   * metadata é pista, não autoridade". Aqui o valor É a fatura inteira — a
+   * quantidade define quanto o médico pagou e quantas mensagens ele recebe.
+   * Lê-la do metadata deixaria qualquer um forjar um POST com 20.000.
+   */
+  items?: { data?: { price?: { id?: string }; quantity?: number }[] };
   metadata?: Record<string, string>;
 };
 

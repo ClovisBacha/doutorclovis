@@ -13,10 +13,12 @@ import { z } from "zod";
 import { DOCTOR } from "@/lib/doctor.config";
 
 const PRODUCTS = ["quiz_premium", "doctor_plan"] as const;
-// quiz: monthly|annual · médico: essencial|starter|pro|elite|black (+ _annual)
+/* quiz: monthly|annual · médico: `mensagens` (o que se vende) + os nomeados,
+   que continuam aceitos só porque há médicos gravados neles. */
 const PLANS = [
   "monthly",
   "annual",
+  "mensagens",
   "essencial",
   "essencial_annual",
   "starter",
@@ -47,6 +49,16 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
         returnPath: z.string().default("/minha-conta"),
         // código de afiliado (influenciador) capturado do link ?ref= no site
         refCode: z.string().max(40).optional(),
+        /**
+         * Quantas mensagens de IA por mês ele está comprando (plano `mensagens`).
+         *
+         * A faixa é validada de novo no servidor, contra a MESMA escada que
+         * calcula o preço — não contra números escritos aqui. O Stripe cobra
+         * pelo Price graduado, então mandar 99.999 não daria um plano de graça;
+         * daria uma fatura de milhares de reais e um teto de IA que a plataforma
+         * não consegue pagar. A trava existe para o segundo caso.
+         */
+        mensagens: z.number().int().positive().optional(),
       })
       .parse(i),
   )
@@ -79,6 +91,33 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
 
     const priceId = priceIdFor(data.product, data.plan);
     if (!priceId) return { ok: false as const, error: "plano_indisponivel" };
+
+    /* ─── A QUANTIDADE, QUE É O PLANO ────────────────────────────────────────
+     *
+     * Este é o elo que faltava. `createCheckoutSession` ganhou `quantity` e o
+     * webhook aprendeu a ler `items.data[0].quantity` — mas ninguém MANDAVA a
+     * quantidade, então todo checkout ia com 1. Uma mensagem de IA por mês, ao
+     * preço da faixa fixa: o médico paga R$ 29,90 e recebe uma resposta.
+     *
+     * É a quinta vez nesta base que o teste prova a função extraída e não o
+     * CHAMADOR. Por isso `cadeia-do-stripe.test.ts` agora afirma esta linha.
+     *
+     * A faixa vem da escada, nunca de literais: um número escrito aqui seria a
+     * segunda tabela de preços, e é assim que a tela e a fatura divergem.
+     */
+    let quantity: number | undefined;
+    let quantityRange: { min: number; max: number } | undefined;
+    if (data.product === "doctor_plan" && data.plan === "mensagens") {
+      const { ENTRADA_MENSAGENS, TETO_AUTOATENDIMENTO } = await import("@/lib/planos-medico");
+      const pedido = data.mensagens ?? ENTRADA_MENSAGENS;
+      if (pedido < ENTRADA_MENSAGENS || pedido > TETO_AUTOATENDIMENTO) {
+        /* Acima do teto do autoatendimento é contrato de Clínica, provisionado
+           à mão — não é um checkout que alguém fecha sozinho no site. */
+        return { ok: false as const, error: "fora_da_escada" as const };
+      }
+      quantity = pedido;
+      quantityRange = { min: ENTRADA_MENSAGENS, max: TETO_AUTOATENDIMENTO };
+    }
 
     // ── Afiliado (Premium da paciente): valida o código contra a tabela e
     // carimba na assinatura — o webhook credita 50% de cada fatura paga.
@@ -197,6 +236,8 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
         cancelUrl: `${base}${ret}?assinatura=cancelada`,
         refCode,
         discountCoupon,
+        quantity,
+        quantityRange,
       });
       if (!url) return { ok: false as const, error: "checkout_sem_url" };
       return { ok: true as const, url };

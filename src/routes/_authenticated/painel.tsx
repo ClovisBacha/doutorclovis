@@ -330,6 +330,8 @@ function PainelPage() {
      fato. Fechar por falta de resposta seria mostrar um paywall a quem paga. */
   const [podeEquipe, setPodeEquipe] = useState(true);
   const [rotuloPlano, setRotuloPlano] = useState("");
+  /** Mensagens de IA por ciclo do plano vigente — define a mensalidade da escada. */
+  const [mensagensDoPlano, setMensagensDoPlano] = useState<number | null>(null);
 
   /* A aba que abre é a do Cérebro. O painel de números diz o que ACONTECEU; o
      cérebro é onde ele MUDA o que vai acontecer. Abrir no primeiro faz o
@@ -555,12 +557,21 @@ function PainelPage() {
    * lacuna, e foi assim aqui.
    */
   function aplicarPlano(
-    ent: { aiApp?: boolean; teamSeats?: unknown; label?: string } | undefined,
+    ent:
+      | { aiApp?: boolean; teamSeats?: unknown; label?: string; aiRepliesPerCycle?: number | null }
+      | undefined,
     ehRefresh: boolean,
   ) {
     setPodeIA(ent?.aiApp !== false);
     setPodeEquipe(!!ent?.teamSeats);
     setRotuloPlano(ent?.label ?? "");
+    /* ─── QUANTAS MENSAGENS ELE COMPROU ──────────────────────────────────────
+       No plano `mensagens` o preço é uma escada, então a mensalidade só pode
+       ser calculada com a quantidade. Ela vem daqui, e não de uma segunda
+       leitura de `doctors.ai_messages_per_cycle`: `comMensagensCompradas` já
+       resolveu a coluna no servidor e a colocou neste campo. Ler a coluna de
+       novo na tela criaria a segunda fonte que esta base já viu divergir. */
+    setMensagensDoPlano(typeof ent?.aiRepliesPerCycle === "number" ? ent.aiRepliesPerCycle : null);
     /* Só na entrada: arrancar o médico da aba em que ele está, a cada
        atualização de três minutos, seria pior que o problema que isto resolve. */
     if (ent?.aiApp === false && !ehRefresh) setTab(ABA_DE_ENTRADA_SEM_IA);
@@ -1209,6 +1220,7 @@ function PainelPage() {
             onNavigate={setTab}
             medico={euMedico}
             rotuloPlano={rotuloPlano}
+            mensagensDoPlano={mensagensDoPlano}
           />
         )}
         {tab === "Calendário" && (
@@ -1391,6 +1403,7 @@ function DashboardSection({
   onNavigate,
   medico,
   rotuloPlano,
+  mensagensDoPlano,
 }: {
   tokenFn: () => Promise<string>;
   onNavigate: (tab: PanelTab) => void;
@@ -1399,6 +1412,12 @@ function DashboardSection({
   /** Rótulo do plano já resolvido (entitlements) — a coluna crua não conhece o
       assento de clínica. */
   rotuloPlano?: string | null;
+  /**
+   * Mensagens de IA por ciclo do plano vigente. No plano `mensagens` o preço é
+   * uma escada (R$ 29,90 a R$ 295,40), então sem este número a prova de valor
+   * mostraria a entrada para quem paga o topo.
+   */
+  mensagensDoPlano?: number | null;
 }) {
   const [data, setData] = useState<DoctorDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1449,6 +1468,7 @@ function DashboardSection({
       onRefresh={load}
       medico={medico}
       rotuloPlano={rotuloPlano}
+      mensagensDoPlano={mensagensDoPlano}
     />
   );
 }
@@ -1672,12 +1692,19 @@ export function DashboardView({
   onRefresh,
   medico,
   rotuloPlano,
+  mensagensDoPlano,
 }: {
   data: DoctorDashboard;
   onNavigate: (tab: PanelTab) => void;
   onRefresh?: () => void;
   medico?: DoctorProfile | null;
   rotuloPlano?: string | null;
+  /**
+   * Mensagens de IA por ciclo do plano vigente. No plano `mensagens` o preço é
+   * uma escada (R$ 29,90 a R$ 295,40), então sem este número a prova de valor
+   * mostraria a entrada para quem paga o topo.
+   */
+  mensagensDoPlano?: number | null;
 }) {
   const { patients, questions, brain, appointments, engagement } = data;
   const stageTotal = STAGE_META.reduce((s, m) => s + patients.stages[m.key], 0);
@@ -1722,7 +1749,7 @@ export function DashboardView({
           medico?.consultation_price_cents ?? (medico?.consultation_price_brl ?? 0) * 100
         }
         moedaDoMedico={medico?.consultation_currency}
-        mensalidadeDoPlanoCentavos={mensalidadeCentavos(medico?.plan ?? "")}
+        mensalidadeDoPlanoCentavos={mensalidadeCentavos(medico?.plan ?? "", mensagensDoPlano)}
         plano={medico?.plan}
         rotuloPlano={rotuloPlano}
       />

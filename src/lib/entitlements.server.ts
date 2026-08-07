@@ -256,7 +256,7 @@ export async function getEntitlements(user: {
   email?: string | null;
 }): Promise<Entitlements> {
   if (isPlatformTeamEmail(user.email)) return OWNER_ENTITLEMENTS;
-  return entitlementsFor(await planRowFor(user.id));
+  return comMensagensCompradas(user.id, entitlementsFor(await planRowFor(user.id)));
 }
 
 /**
@@ -270,5 +270,47 @@ export async function getEntitlementsByDoctorId(
   isOwner = false,
 ): Promise<Entitlements> {
   if (isOwner) return OWNER_ENTITLEMENTS;
-  return entitlementsFor(await planRowFor(doctorId));
+  return comMensagensCompradas(doctorId, entitlementsFor(await planRowFor(doctorId)));
+}
+
+/**
+ * O TETO DE MENSAGENS VEM DA COLUNA, quando ela tem valor.
+ *
+ * ─── POR QUE AQUI, E NÃO NOS CINCO LEITORES ─────────────────────────────────
+ *
+ * `aiRepliesPerCycle` é lido em cinco lugares (`chat-memory`, duas vezes em
+ * `secondbrain.functions`, duas em `secondbrain.server`). Trocar a fonte em cada
+ * um é exatamente como a régua de vencimento desta base ganhou quatro cópias
+ * discordantes, e como o teto de pacientes existia em dois caminhos e vazava no
+ * terceiro. Uma fonte, cinco leitores que não mudam.
+ *
+ * ─── A ORDEM DE PRECEDÊNCIA, E POR QUE ELA É ESTA ───────────────────────────
+ *
+ * A coluna GANHA do plano quando tem valor, porque ela é o que o médico
+ * comprou de fato — o nome do plano é o que ele comprou no modelo antigo.
+ * Enquanto os dois convivem, quem pagou pela escada nova recebe o que pagou, e
+ * quem está num plano antigo continua com o teto dele.
+ *
+ * `null` na coluna significa "não comprou pela escada", e aí NADA muda: o
+ * plano antigo decide. Isso é o que permite a migration entrar sem tocar em
+ * ninguém — todo médico de hoje tem `NULL` e continua exatamente como está.
+ */
+async function comMensagensCompradas(doctorId: string, base: Entitlements): Promise<Entitlements> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("ai_messages_per_cycle")
+      .eq("id", doctorId)
+      .maybeSingle();
+    /* Coluna ainda não migrada (42703) ou falha de rede: segue pelo plano. É a
+       mesma rede de `colunaAusente` que o resto da base usa, e o efeito de errar
+       aqui é o médico continuar com o teto que já tinha. */
+    if (error) return base;
+    const n = data?.ai_messages_per_cycle;
+    if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) return base;
+    return { ...base, aiRepliesPerCycle: n, aiApp: true };
+  } catch {
+    return base;
+  }
 }

@@ -53,12 +53,46 @@ describe("nenhum plano fica pela metade", () => {
   });
 
   test("quem paga mais nunca fica abaixo de quem paga menos", () => {
-    const pagos = TODOS.filter((p) => PLAN_PRICE[p] > 0).sort(
+    /**
+     * `mensagens` fica de fora, e o motivo é que ele quebra a PREMISSA da
+     * invariante, não a invariante: ela ordena por `PLAN_PRICE[p]`, um número
+     * por plano, e o preço dele é uma FAIXA — R$ 29,90 (150 mensagens) a
+     * R$ 295,40 (2.500). `PLAN_PRICE.mensagens` guarda só a entrada.
+     *
+     * A faixa dele atravessa quase toda a escada nomeada: começa abaixo do
+     * Essencial (R$ 49,90) e termina praticamente no Pro (R$ 297). Qualquer
+     * posto único seria certo para uma ponta e errado para a outra, então
+     * ordená-lo pela entrada seria escolher a leitura mais errada das duas — a
+     * de que o plano que substituiu a escada vale menos que todos os degraus
+     * que ele aposentou, na busca que a paciente vê.
+     */
+    const pagos = TODOS.filter((p) => p !== "mensagens" && PLAN_PRICE[p] > 0).sort(
       (a, b) => PLAN_PRICE[a] - PLAN_PRICE[b],
     );
     for (let i = 1; i < pagos.length; i++) {
       expect(PLAN_RANK[pagos[i]]).toBeGreaterThan(PLAN_RANK[pagos[i - 1]]);
     }
+  });
+
+  test("`mensagens` é uma FAIXA de preço, e é por isso que ele sai da regra acima", () => {
+    /* Se um dia ele virar preço único, a exclusão acima perde a justificativa e
+       este teste é o que avisa. */
+    expect(PLAN_PRICE.mensagens).toBe(29.9);
+    expect(mensalidadeCentavos("mensagens", 2_500)).toBe(29_540);
+    expect(mensalidadeCentavos("mensagens", 2_500)).toBeGreaterThan(PLAN_PRICE.mensagens * 100);
+  });
+
+  test("e ele fica acima dos nomeados que aposentou — só não acima dos contratos", () => {
+    /* Ele é o único plano que ainda se vende: rankear todo médico novo abaixo
+       dos legados esvaziaria a busca de quem está entrando. Black e Clínica
+       ficam acima porque são contratos ativos de valor maior, e rebaixá-los
+       seria punir quem paga mais por uma mudança de tabela que não foi escolha
+       dele. */
+    for (const legado of ["essencial", "starter", "pro", "elite"] as const) {
+      expect(PLAN_RANK.mensagens).toBeGreaterThan(PLAN_RANK[legado]);
+    }
+    expect(PLAN_RANK.mensagens).toBeLessThan(PLAN_RANK.black);
+    expect(PLAN_RANK.mensagens).toBeLessThan(PLAN_RANK.clinica);
   });
 });
 

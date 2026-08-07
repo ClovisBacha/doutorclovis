@@ -390,12 +390,12 @@ Cada 30s vira **4 gerações de 8s encadeadas pelo último quadro**, exatamente
 como o `roteiro-comercial.md` já faz. Os cortes de tempo (`0:00-0:06`,
 `0:06-0:12`…) nos prompts acima já estão escritos em blocos que dividem bem:
 
-| Clipe | Corta em                     |
-| ----- | ---------------------------- |
-| A1    | 0:00 / 0:10 / 0:20 / 0:26    |
-| A2    | 0:00 / 0:06 / 0:18 / 0:24    |
-| A3    | 0:00 / 0:08 / 0:15 / 0:22    |
-| B1    | 0:00 / 0:06 / 0:16 / 0:22    |
+| Clipe | Corta em                  |
+| ----- | ------------------------- |
+| A1    | 0:00 / 0:10 / 0:20 / 0:26 |
+| A2    | 0:00 / 0:06 / 0:18 / 0:24 |
+| A3    | 0:00 / 0:08 / 0:15 / 0:22 |
+| B1    | 0:00 / 0:06 / 0:16 / 0:22 |
 
 O custo é gerar 16 clipes em vez de 4. O ganho é que o rosto não tem chance de
 mudar, porque cada geração começa do último quadro da anterior.
