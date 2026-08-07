@@ -78,7 +78,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-jardim",
     name: "Bolinhas Jardim",
     emoji: "🌱",
-    price: 5,
+    price: 10,
     type: "trilha",
     premium: false,
   },
@@ -102,7 +102,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "tema-ceu-v1",
     name: "Céu Clássico",
     emoji: "🌅",
-    price: 5,
+    price: 12,
     type: "tema",
     premium: false,
   },
@@ -112,7 +112,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "planta-suculenta",
     name: "Suculenta",
     emoji: "🌱",
-    price: 5,
+    price: 15,
     type: "planta",
     premium: false,
   },
@@ -120,7 +120,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-cestinho",
     name: "Cestinho",
     emoji: "🧺",
-    price: 5,
+    price: 18,
     type: "objeto",
     premium: false,
   },
@@ -128,11 +128,11 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "ceu-estrelinhas",
     name: "Estrelinhas",
     emoji: "✨",
-    price: 8,
+    price: 20,
     type: "ceu",
     premium: false,
   },
-  { id: "ceu-nuvem", name: "Nuvem fofa", emoji: "☁️", price: 15, type: "ceu", premium: false },
+  { id: "ceu-nuvem", name: "Nuvem fofa", emoji: "☁️", price: 70, type: "ceu", premium: false },
   {
     id: "planta-vaso",
     name: "Vaso de flores",
@@ -145,7 +145,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "bicho-borboleta",
     name: "Borboleta",
     emoji: "🦋",
-    price: 15,
+    price: 74,
     type: "bicho",
     premium: false,
   },
@@ -177,7 +177,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-amanhecer",
     name: "Campo ao amanhecer",
     emoji: "🌅",
-    price: 10,
+    price: 30,
     type: "fundo",
     premium: false,
   },
@@ -315,7 +315,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-lotus",
     name: "Bolinhas Lótus",
     emoji: "🪷",
-    price: 10,
+    price: 35,
     type: "trilha",
     premium: false,
   },
@@ -369,7 +369,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   },
 
   // ── Luzes (+5) — categoria nova, animação `dcTwinkle` ──────────────────
-  { id: "luz-vela", name: "Velinha", emoji: "🕯️", price: 10, type: "luz", premium: false },
+  { id: "luz-vela", name: "Velinha", emoji: "🕯️", price: 40, type: "luz", premium: false },
   { id: "luz-lampiao", name: "Lampião", emoji: "🏮", price: 70, type: "luz", premium: true },
   { id: "luz-pisca", name: "Pisca-pisca", emoji: "🎇", price: 95, type: "luz", premium: true },
   { id: "luz-lanterna", name: "Lanterninha", emoji: "🔦", price: 110, type: "luz", premium: true },
@@ -383,7 +383,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   },
 
   // ── Águas (+5) — categoria nova, animação `dcRipple` ───────────────────
-  { id: "agua-poca", name: "Pocinha", emoji: "💧", price: 10, type: "agua", premium: false },
+  { id: "agua-poca", name: "Pocinha", emoji: "💧", price: 45, type: "agua", premium: false },
   { id: "agua-fonte", name: "Fontinha", emoji: "⛲", price: 90, type: "agua", premium: true },
   { id: "agua-peixinho", name: "Peixinho", emoji: "🐠", price: 120, type: "agua", premium: true },
   { id: "agua-concha", name: "Conchinha", emoji: "🐚", price: 140, type: "agua", premium: true },
@@ -403,7 +403,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   { id: "ceu-cometa", name: "Cometa", emoji: "☄️", price: 160, type: "ceu", premium: true },
 
   // ── Plantas (+4) ───────────────────────────────────────────────────────
-  { id: "planta-trevo", name: "Trevo", emoji: "🍀", price: 12, type: "planta", premium: false },
+  { id: "planta-trevo", name: "Trevo", emoji: "🍀", price: 50, type: "planta", premium: false },
   { id: "planta-tulipa", name: "Tulipa", emoji: "🌷", price: 50, type: "planta", premium: true },
   {
     id: "planta-cerejeira",
@@ -420,7 +420,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-livrinho",
     name: "Livrinho de história",
     emoji: "📖",
-    price: 12,
+    price: 60,
     type: "objeto",
     premium: false,
   },
@@ -450,7 +450,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   },
 
   // ── Bichinhos (+4) ─────────────────────────────────────────────────────
-  { id: "bicho-joaninha", name: "Joaninha", emoji: "🐞", price: 8, type: "bicho", premium: false },
+  { id: "bicho-joaninha", name: "Joaninha", emoji: "🐞", price: 25, type: "bicho", premium: false },
   { id: "bicho-abelha", name: "Abelhinha", emoji: "🐝", price: 55, type: "bicho", premium: true },
   {
     id: "bicho-tartaruga",

@@ -450,12 +450,12 @@ export const getWellnessProgress = createServerFn({ method: "POST" })
  * régua de vencimento tinha quatro cópias discordantes). Uma função, três
  * chamadas.
  *
- * ─── IDEMPOTENTE POR (PACIENTE, MÉDICO) ─────────────────────────────────────
+ * ─── UMA VEZ NA VIDA DELA, E ESSA FOI UMA CORREÇÃO ──────────────────────────
  *
- * A `dedupeKey` carrega o id do médico. Isso resolve dois casos de uma vez:
- * repetir o vínculo com o MESMO médico não paga de novo (é o mesmo evento), e
- * trocar de médico paga uma vez — o que está certo, porque é um vínculo novo, e
- * é o médico novo que ela está trazendo para o produto.
+ * A `dedupeKey` é fixa (`vinculo-medico`), não carrega o médico. A primeira
+ * versão carregava, com o argumento de que "trocar de médico é um vínculo novo"
+ * — e isso abria um farm de um minuto pela busca pública. Ver o comentário no
+ * corpo. O bônus é do evento "ela passou a ter um médico", que acontece uma vez.
  *
  * Nunca lança e nunca bloqueia o vínculo: um bônus que falha é um bônus a
  * menos; um vínculo que falha por causa do bônus é uma paciente sem médico.
@@ -471,11 +471,27 @@ export async function bonusDeVinculo(
        Dar Sementinhas a quem acabou de perder a gestação é o oposto do cuidado
        que o Modo Cuidado existe para prestar. */
     if (await isCareModeActive(supabaseAdmin as never, patientId)) return;
+    /* ─── UMA VEZ POR PACIENTE, NÃO POR MÉDICO ────────────────────────────
+     *
+     * A chave era `vinculo:${doctorId}` — única por PAR. Um verificador mediu o
+     * buraco: `/encontrar-medico` é rota pública e a troca de médico é livre e
+     * sem carência, então quatro toques na lista pagavam quatro bônus. Com o
+     * bônus em 200, isso dá 800 🌱 — mais que a loja grátis inteira (704), em
+     * menos de um minuto. A parede de quinze dias, que é a razão de existir de
+     * todo este desenho, caía antes de existir.
+     *
+     * (E cada toque ainda dispara push e e-mail "Nova paciente" para um médico
+     * que a perde no toque seguinte.)
+     *
+     * A chave passa a ser fixa: `vinculo-medico`. O bônus é do EVENTO "ela
+     * passou a ter um médico", que acontece uma vez na vida dela no app — não
+     * de cada médico. Trocar de médico continua livre; o que não se repete é o
+     * pagamento. */
     await grantSementinhas(typedDb(supabaseAdmin as never), patientId, [
       {
         amount: BONUS_VINCULO_MEDICO,
         reason: "vinculo-medico",
-        dedupeKey: `vinculo:${doctorId}`,
+        dedupeKey: "vinculo-medico",
       },
     ]);
   } catch (e) {

@@ -108,6 +108,40 @@ export const Route = createFileRoute("/api/transcribe")({
         const geminiData = (await geminiRes.json()) as any;
         const raw = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
+        /* ─── ESTA CHAMADA NÃO ERA MEDIDA. NEM UMA VEZ. ──────────────────────
+         *
+         * Uma auditoria achou: era o ÚNICO endpoint de IA da base sem
+         * `registrarUsoAgora`. E é o mais caro de todos — aceita 20 MB de áudio,
+         * e áudio no Gemini custa ~32 tokens por segundo: 20 MB de webm/opus dá
+         * mais de cem minutos, ou seja centenas de milhares de tokens EM UMA
+         * REQUISIÇÃO.
+         *
+         * O efeito de não medir é pior que o custo em si: como não entrava em
+         * `ai_usage`, isso não aparecia no card de consumo, nem na projeção do
+         * mês, nem em nenhuma conta de margem. O dono descobriria pela fatura do
+         * Google, sem ter como saber de onde veio.
+         *
+         * Medido no canal próprio: transcrição é ferramenta do consultório, não
+         * resposta à paciente, então fica FORA de `CANAIS_DA_COTA` — não come a
+         * franquia clínica dela. Mas aparece no custo, que é o ponto.
+         *
+         * `usageMetadata` é o campo da API REST (o SDK chama de `usage`); os
+         * nomes são outros e por isso não dá para copiar do resto da base. */
+        try {
+          const uso = geminiData?.usageMetadata ?? {};
+          const { registrarUsoAgora } = await import("@/lib/uso-ia.server");
+          await registrarUsoAgora({
+            especie: "chat",
+            modelo: model,
+            inputTokens: uso.promptTokenCount,
+            outputTokens: uso.candidatesTokenCount,
+            canal: "transcricao",
+            doctorId: usuario.id,
+          });
+        } catch {
+          /* medir é opcional; transcrever não pode falhar por causa da medição */
+        }
+
         try {
           const cleaned = raw.replace(/```json\n?|```\n?/g, "").trim();
           const parsed = JSON.parse(cleaned);

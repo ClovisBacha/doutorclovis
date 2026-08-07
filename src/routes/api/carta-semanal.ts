@@ -21,7 +21,13 @@ export const Route = createFileRoute("/api/carta-semanal")({
            tem o próprio Map, então N invocações concorrentes valem N × o
            limite. É o que o próprio `api-auth.server.ts` já explica. */
         const { naoAutorizado, usuarioDaRequisicao } = await import("@/lib/api-auth.server");
-        if (!(await usuarioDaRequisicao(request))) return naoAutorizado();
+        /* O USUÁRIO É GUARDADO, e não descartado. Estava escrito
+           `if (!(await usuarioDaRequisicao(request)))` — o id existia e ia para
+           o lixo, e por isso a linha em `ai_usage` nascia sem `doctor_id`: o
+           gasto aparecia no total da plataforma e em médico nenhum. Existe um
+           `custo-sem-dono.test.ts` nesta base sobre exatamente esse padrão. */
+        const usuaria = await usuarioDaRequisicao(request);
+        if (!usuaria) return naoAutorizado();
 
         const ip = clientIp(request);
 
@@ -103,6 +109,24 @@ Regras:
           inputTokens: usage?.inputTokens,
           outputTokens: usage?.outputTokens,
           canal: "carta-semanal",
+          /* O DONO DO GASTO. `patient_profiles.doctor_id` é o vínculo ATUAL —
+             a mesma régua do resto da base. Sem médico vinculado, a linha
+             continua sem dono, e aí ela É da plataforma de verdade: é o card
+             de custo sem dono que existe justamente para mostrar isso. */
+          doctorId: await (async () => {
+            try {
+              const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+              const { data } = await (supabaseAdmin as any)
+                .from("patient_profiles")
+                .select("doctor_id")
+                .eq("id", usuaria.id)
+                .maybeSingle();
+              return (data?.doctor_id as string | null) ?? null;
+            } catch {
+              return null;
+            }
+          })(),
+          patientId: usuaria.id,
         });
         return new Response(JSON.stringify({ ok: true, letter: text.trim() }), {
           headers: { "Content-Type": "application/json" },

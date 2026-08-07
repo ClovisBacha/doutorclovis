@@ -77,17 +77,29 @@ export type EstadoDaMesada = {
  * e devolver 0 aqui seria pior que estimar: o médico veria "mesada zerada" sem
  * ter feito nada.
  */
-async function mensagensContratadas(sb: any, doctorId: string): Promise<number> {
-  const { getEntitlementsByDoctorId } = await import("@/lib/entitlements.server");
-  const ent = await getEntitlementsByDoctorId(doctorId);
-  /* `null` = ilimitado (contrato de Clínica). A mesada não pode ser infinita:
-     ali o combinado é do contrato, e o teto entra pela mesma porta que o resto
-     do acordo. Até lá, o topo do autoatendimento é o limite honesto. */
-  if (ent.aiRepliesPerCycle === null) {
-    const { TETO_AUTOATENDIMENTO } = await import("@/lib/planos-medico");
-    return TETO_AUTOATENDIMENTO;
-  }
-  return ent.aiRepliesPerCycle ?? 0;
+async function mensagensContratadas(_sb: any, _doctorId: string): Promise<number> {
+  /* ─── POR QUE ISTO NÃO LÊ O PLANO ANTIGO ────────────────────────────────
+   *
+   * A primeira versão devolvia `ent.aiRepliesPerCycle`, e um verificador mediu
+   * o estrago: os planos ANTIGOS têm tetos de outra ordem de grandeza (Black =
+   * 30.000), então a mesada saía **90.000 🌱/mês** — doze vezes o topo que a
+   * escada nova pretende (2.500 × 3 = 7.500).
+   *
+   * Sementinha não custa dinheiro, então isso não quebraria a fatura. Quebraria
+   * coisa pior: a economia da loja. `economia-sementinhas.ts` calibra dia a dia
+   * para a paciente zerar os 15 itens grátis no 15º dia — com 90.000 no bolso
+   * do médico, ela zera no PRIMEIRO, e o mecanismo inteiro (moeda parada sem ter
+   * o que comprar) deixa de existir.
+   *
+   * A fonte certa é a coluna que o Stripe vai gravar com a quantidade comprada
+   * (`doctors.ai_messages_per_cycle`), e ela ainda não existe. Até lá, o
+   * fallback honesto é a ENTRADA da escada — 150 mensagens = 450 🌱. Errar para
+   * o lado de dar de menos mantém a economia de pé; errar para o outro a
+   * destrói em silêncio, e ninguém veria, porque 90.000 é um número plausível
+   * ao lado de 7.500.
+   */
+  const { ENTRADA_MENSAGENS } = await import("@/lib/planos-medico");
+  return ENTRADA_MENSAGENS;
 }
 
 /** Lê a mesada do ciclo — exportada para o checkout do presente reusar. */
@@ -194,23 +206,54 @@ export const presentearPaciente = createServerFn({ method: "POST" })
           e o índice único de `sementinhas_ledger` recusa o segundo. */
     const dedupeKey = `presente:${doctorId}:${data.patientId}:${ciclo}`;
 
+    /* ─── CONFERE O TETO ANTES, E NÃO DESFAZ DEPOIS ───────────────────────
+     *
+     * A primeira versão gravava, relia e APAGAVA a linha se estourasse. Duas
+     * coisas erradas nisso, as duas achadas por um verificador:
+     *
+     *  · o `delete` viola a invariante escrita na própria migration
+     *    (`20260722120000_sementinhas.sql`: "o saldo NUNCA zera, nada é
+     *    deletado"). Numa corrida, ele podia apagar o presente ANTERIOR da
+     *    paciente — que ela já pode ter GASTO, deixando o saldo negativo;
+     *  · e dois cliques que estourassem juntos desfaziam OS DOIS, inclusive o
+     *    que cabia.
+     *
+     * A conferência de `lerMesada` logo acima já barra o caso normal. A corrida
+     * que sobra — dois presentes simultâneos que juntos estouram — custa no
+     * máximo UM presente a mais que o teto, e isso é Sementinha, que não custa
+     * dinheiro. Aceitar um erro de 50 🌱 é muito melhor que manter uma escrita
+     * destrutiva num livro-caixa que o produto inteiro assume ser append-only. */
     const { grantSementinhas } = await import("@/lib/sementinhas.functions");
     const { typedDb } = await import("@/integrations/supabase/types.extended");
     await grantSementinhas(typedDb(supabaseAdmin as never), data.patientId, [
       { amount: quanto, reason: RAZAO_PRESENTE, dedupeKey },
     ]);
 
-    /* 2. O TETO, CONFERIDO DEPOIS. Se dois cliques simultâneos passaram, o
-          segundo desfaz o próprio presente — a mesma correção de TOCTOU que o
-          resgate de cupom de plataforma já tinha. */
+    /* ─── "ENVIADO" SÓ SE FOI MESMO ───────────────────────────────────────
+     * `grantSementinhas` usa `ignoreDuplicates: true`: um segundo presente à
+     * mesma paciente no mesmo ciclo é DO NOTHING, sem erro. A versão anterior
+     * devolvia `ok: true, quantidade: 500` e o médico lia "500 🌱 enviadas"
+     * enquanto a paciente recebia ZERO — sem log, sem tela, sem nada.
+     * Relemos a linha: se ela não é deste presente, ele já tinha sido feito. */
+    const { data: gravou } = await sb
+      .from("sementinhas_ledger")
+      .select("amount")
+      .eq("user_id", data.patientId)
+      .eq("dedupe_key", dedupeKey)
+      .maybeSingle();
     const depois = await lerMesada(sb, doctorId);
-    if (depois.usado > depois.total) {
-      await sb
-        .from("sementinhas_ledger")
-        .delete()
-        .eq("user_id", data.patientId)
-        .eq("dedupe_key", dedupeKey);
-      return { ok: false as const, error: "mesada_esgotada" as const, mesada: depois };
+    if (!gravou) {
+      return { ok: false as const, error: "nao_gravou" as const, mesada: depois };
+    }
+    if ((gravou.amount as number) !== quanto) {
+      /* Já havia um presente deste ciclo, de outro valor: o dedupe ignorou o
+         novo. Dizer a verdade — ela já foi presenteada este mês. */
+      return {
+        ok: false as const,
+        error: "ja_presenteada" as const,
+        mesada: depois,
+        quantidade: gravou.amount as number,
+      };
     }
 
     return { ok: true as const, mesada: depois, quantidade: quanto };

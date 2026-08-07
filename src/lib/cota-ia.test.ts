@@ -49,13 +49,30 @@ describe("a régua", () => {
     expect(situacaoDaCota(999_999, null).estado).toBe("ok");
   });
 
-  test("teto ZERO é plano sem IA, e não cota estourada", () => {
-    /* Quem barra o plano sem IA é o entitlement, muito antes daqui. Tratar
-       como "estourada" faria o painel dizer "sua cota acabou" a quem nunca
-       teve o recurso — e sugerir que subir de plano devolveria algo que ele
-       nunca teve. */
-    expect(situacaoDaCota(0, 0).estado).toBe("ok");
-    expect(situacaoDaCota(10, 0).estado).toBe("ok");
+  test("teto ZERO é NADA COMPRADO — falha fechada", () => {
+    /* ─── ESTE TESTE MUDOU DE LADO, E O MOTIVO IMPORTA ────────────────────
+       Ele exigia `"ok"`, com o argumento de que "quem barra o plano sem IA é o
+       entitlement, muito antes daqui". O argumento era verdadeiro e está
+       prestes a deixar de ser: com a escada de mensagens, `aiApp` sai de cena e
+       o teto passa a vir de uma COLUNA — a quantidade comprada no Stripe.
+
+       No dia da troca, todo médico sem linha na coluna (migration recém
+       aplicada, webhook atrasado, cadastro novo, `NULL` por padrão) cairia em
+       `teto = 0` → `"ok"` → cérebro liberado SEM LIMITE. Um verificador chamou
+       isso de fail-open num arquivo que falha fechado em todo o resto, e tinha
+       razão.
+
+       Zero passa a significar o que ele significa: nada comprado, nada a
+       gastar. Ilimitado continua sendo `null`, no teste acima. */
+    expect(situacaoDaCota(0, 0).estado).toBe("estourada");
+    expect(situacaoDaCota(10, 0).estado).toBe("estourada");
+  });
+
+  test("e ilimitado continua sendo NULL — os dois não se confundem", () => {
+    /* O simétrico. Uma "correção" que tratasse os dois como estourados cortaria
+       justamente o cliente de contrato, que é quem paga mais. */
+    expect(situacaoDaCota(999_999, null).estado).toBe("ok");
+    expect(situacaoDaCota(0, 0).estado).not.toBe(situacaoDaCota(0, null).estado);
   });
 });
 

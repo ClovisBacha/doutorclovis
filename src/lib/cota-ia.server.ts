@@ -173,10 +173,24 @@ export function motivoDaUltimaContagem(): "rede" | "migracao" | null {
 /** Junta consumo e teto numa decisão. Puro — o teste não precisa de banco. */
 export function situacaoDaCota(usadas: number, teto: number | null): SituacaoDaCota {
   if (teto === null) return { usadas, teto, fracao: 0, estado: "ok" };
-  /* Teto zero é plano SEM IA, e aí não há o que estourar: quem barra é o
-     entitlement (`aiApp`), muito antes daqui. Tratar como "estourada" faria a
-     mensagem errada aparecer no painel de quem nunca teve o recurso. */
-  if (teto <= 0) return { usadas, teto, fracao: 0, estado: "ok" };
+  /* ─── TETO ZERO É "NÃO COMPROU", E NÃO "TUDO BEM" ─────────────────────────
+   *
+   * Isto devolvia `estado: "ok"`, com a justificativa de que "quem barra é o
+   * entitlement (`aiApp`), muito antes daqui". A justificativa era verdadeira e
+   * está prestes a deixar de ser: com a escada de mensagens, `aiApp` sai de
+   * cena e o teto passa a vir de uma COLUNA (a quantidade comprada no Stripe).
+   *
+   * No dia dessa troca, todo médico sem linha na coluna — migration recém
+   * aplicada, webhook atrasado, cadastro novo, `NULL` por padrão — cairia em
+   * `teto = 0` → `"ok"` → **cérebro liberado sem limite nenhum**. Um verificador
+   * chamou isso de fail-open num arquivo que se orgulha, com razão, de falhar
+   * fechado em todo o resto.
+   *
+   * Zero passa a ser `estourada`, que é o que ele significa: nada comprado,
+   * nada a gastar. Quem NUNCA teve o recurso é outro estado — `teto === null`
+   * (ilimitado) sai acima, e o painel de quem não tem IA não chega aqui porque
+   * o card só aparece com plano. */
+  if (teto <= 0) return { usadas, teto, fracao: 1, estado: "estourada" };
   const fracao = usadas / teto;
   return {
     usadas,
@@ -192,8 +206,8 @@ export async function cotaDoMedico(
   teto: number | null,
   agora = new Date(),
 ): Promise<SituacaoDaCota> {
-  /* TETO ZERO é plano sem IA: não há consumo porque não há recurso. Sai antes
-     de consultar o banco, e isso está certo. */
+  /* TETO ZERO: nada comprado. Sai antes de consultar o banco — não há consumo
+     a contar — mas agora devolve `estourada`, não `ok`. Ver `situacaoDaCota`. */
   if (teto !== null && teto <= 0) return situacaoDaCota(0, teto);
   /* TETO NULO é plano ILIMITADO — e ilimitado não quer dizer INVISÍVEL.
      Este ramo também devolvia `usadas: 0` sem consultar nada, então o card de

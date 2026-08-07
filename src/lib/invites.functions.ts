@@ -297,14 +297,23 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
           .from("patient_profiles")
           .update({ doctor_id: row.doctor_id })
           .eq("id", u.user.id);
-        /* O bônus de vínculo — mesma função dos outros dois caminhos. */
-        {
-          const { bonusDeVinculo } = await import("@/lib/sementinhas.functions");
-          await bonusDeVinculo(supabaseAdmin, u.user.id, row.doctor_id as string);
-        }
         if (vincErr) {
           console.error("[convite] premium liberado, vínculo não gravou", row.id, vincErr);
           semVaga = true;
+        } else {
+          /* ─── O BÔNUS SÓ DEPOIS DE O VÍNCULO GRAVAR ────────────────────────
+           * Estava ANTES do `if (vincErr)`, e os outros dois caminhos já
+           * conferiam o erro primeiro — a divergência entre os três que a
+           * própria `bonusDeVinculo` existe para impedir, reaparecendo na
+           * ORDEM em vez de no conteúdo.
+           *
+           * O estrago era duplo e silencioso: com falha de escrita ela recebia
+           * 200 🌱 sem médico nenhum, E a chave `vinculo:${doctorId}` ficava
+           * gravada — então quando ela vinculasse de verdade AQUELE médico, o
+           * dedupe engoliria o bônus e ela o perderia para sempre, sem log e
+           * sem tela. */
+          const { bonusDeVinculo } = await import("@/lib/sementinhas.functions");
+          await bonusDeVinculo(supabaseAdmin, u.user.id, row.doctor_id as string);
         }
       } else {
         /* Não vinculou porque o plano dele está no teto. Ela precisa saber:

@@ -14,8 +14,12 @@
 
 import { describe, expect, test } from "bun:test";
 import { CANTINHO_ITEMS } from "./cantinho";
+import { SEMENTINHAS } from "./sementinhas.functions";
 import {
   BONUS_VINCULO_MEDICO,
+  GANHO_DIA_MINIMO,
+  GANHO_DIA_TETO,
+  GANHO_DIA_TIPICO,
   CURVA_GRATIS,
   CUSTO_LOJA_GRATIS,
   ITENS_GRATIS,
@@ -26,24 +30,60 @@ import {
   saldoParado,
 } from "./economia-sementinhas";
 
-describe("1. o alvo do dono: 15 dias", () => {
-  test("COM médico, ela zera a loja grátis em 15 dias", () => {
-    /* O número que o dono pediu, literal. */
-    expect(diasParaZerarLoja({ comMedico: true, presenteMensal: PRESENTE_SUGERIDO })).toBe(15);
+describe("1. o alvo do dono: 15 dias — contra o ganho REAL", () => {
+  /**
+   * ─── O ERRO QUE ESTE BLOCO CORRIGE ────────────────────────────────────────
+   *
+   * A primeira versão afirmava `toBe(15)` e passava — contra um modelo de ganho
+   * que enxergava SÓ o check-in (5 🌱/dia). Existem quatro ganhos diários no
+   * app; três estavam fora da conta. O teto real é ~68 🌱/dia, quase cinco vezes
+   * o modelado, e a loja de 330 🌱 que "dava 15 dias" sumia em SEIS.
+   *
+   * O teste passava porque o arquivo concordava consigo mesmo. É o mesmo defeito
+   * que este projeto já viu no `triagem-clinica.test.ts`: derivar a expectativa
+   * da mesma expressão que a implementação usa.
+   *
+   * Agora a projeção recebe o ganho como PARÂMETRO e os três perfis são
+   * cobrados separadamente.
+   */
+  const COM_MEDICO = { comMedico: true, presenteMensal: PRESENTE_SUGERIDO };
+
+  test("a paciente TÍPICA zera a loja perto do 15º dia", () => {
+    const dias = diasParaZerarLoja({ ...COM_MEDICO, ganhoDiario: GANHO_DIA_TIPICO });
+    expect(dias).toBeGreaterThanOrEqual(13);
+    expect(dias).toBeLessThanOrEqual(18);
   });
 
-  test("SEM médico demora bem mais — e isso é de propósito", () => {
-    /* A diferença é o que faz o vínculo com o médico valer alguma coisa no
-       primeiro minuto. Se fossem iguais, o bônus seria enfeite. */
-    const com = diasParaZerarLoja({ comMedico: true, presenteMensal: PRESENTE_SUGERIDO });
-    const sem = diasParaZerarLoja({ comMedico: false });
-    expect(sem).toBeGreaterThan(com + 5);
+  test("a mais ENGAJADA não zera antes de uma semana", () => {
+    /* O limite que impede a loja de sumir no primeiro fim de semana. Quem faz
+       tudo todo dia ganha ~68 🌱; se ela zerar em três dias, a curva de
+       recompensa acaba antes de virar hábito. */
+    expect(
+      diasParaZerarLoja({ ...COM_MEDICO, ganhoDiario: GANHO_DIA_TETO }),
+    ).toBeGreaterThanOrEqual(7);
   });
 
-  test("e nenhum dos dois passa de 30 dias", () => {
-    /* O teto que impede o retorno ao estado antigo. Passando de um mês, a
-       moeda deixa de acumular e a parede nunca chega. */
-    expect(diasParaZerarLoja({ comMedico: false })).toBeLessThanOrEqual(30);
+  test("e para quem só faz check-in a loja não vira inalcançável", () => {
+    /* O outro limite. Calibrar para o teto empurraria a loja para meses de
+       quem entra pouco — e aí ela nunca compra nada, nunca sente o laço, e sai. */
+    expect(diasParaZerarLoja({ ...COM_MEDICO, ganhoDiario: GANHO_DIA_MINIMO })).toBeLessThanOrEqual(
+      90,
+    );
+  });
+
+  test("o médico ACELERA — sempre, em qualquer perfil", () => {
+    for (const g of [GANHO_DIA_MINIMO, GANHO_DIA_TIPICO, GANHO_DIA_TETO]) {
+      const com = diasParaZerarLoja({ ...COM_MEDICO, ganhoDiario: g });
+      const sem = diasParaZerarLoja({ comMedico: false, ganhoDiario: g });
+      expect(com).toBeLessThan(sem);
+    }
+  });
+
+  test("o modelo conhece os QUATRO ganhos diários, não só o check-in", () => {
+    /* A asserção que descreve o defeito. `SEMENTINHAS.dailyCheckin` é 5; se o
+       típico voltar a ser 5, o modelo voltou a enxergar só o check-in. */
+    expect(GANHO_DIA_TIPICO).toBeGreaterThan(SEMENTINHAS.dailyCheckin * 3);
+    expect(GANHO_DIA_TETO).toBeGreaterThan(GANHO_DIA_TIPICO);
   });
 });
 
@@ -52,8 +92,16 @@ describe("2. A PAREDE — moeda parada sem ter o que comprar", () => {
    * O mecanismo inteiro. Se o saldo parado nunca sobe, o desenho não faz nada:
    * ela compra devagar para sempre e nunca sente falta de nada.
    */
-  test("no dia 15 ainda não há saldo parado — ela acabou de zerar", () => {
-    expect(saldoParado(15, { comMedico: true, presenteMensal: PRESENTE_SUGERIDO })).toBe(0);
+  test("por volta do 15º dia a parede chega — nem antes, nem muito depois", () => {
+    /* O dia exato se move quando a curva é recalibrada, e prender a um valor
+       só faria o teste reprovar por ajuste em vez de por defeito. O que importa
+       é a JANELA: antes do 10º dia a loja acabou cedo demais (a recompensa some
+       antes de virar hábito); depois do 25º a moeda nunca acumula e a parede
+       nunca chega. */
+    expect(saldoParado(10, { comMedico: true, presenteMensal: PRESENTE_SUGERIDO })).toBe(0);
+    expect(saldoParado(25, { comMedico: true, presenteMensal: PRESENTE_SUGERIDO })).toBeGreaterThan(
+      0,
+    );
   });
 
   test("no dia 30 já há moeda parada", () => {
@@ -88,15 +136,20 @@ describe("3. a curva tem forma de jogo, não de planilha", () => {
     expect(CURVA_GRATIS).toHaveLength(15);
   });
 
-  test("catorze vitórias baratas — nenhuma passa de 20 🌱", () => {
+  test("os primeiros são comprados no MESMO dia em que ela ganha", () => {
     /* O laço "ganhei → gastei → mudou a minha tela" precisa fechar várias vezes
-       na primeira semana. Um primeiro item caro mata isso. */
-    for (const p of CURVA_GRATIS.slice(0, 14)) expect(p).toBeLessThanOrEqual(20);
+       na primeira semana. O critério é relativo ao GANHO, não a um número fixo:
+       um item de 20 🌱 era vitória imediata no modelo antigo (5 🌱/dia) e virou
+       troco no real (35 🌱/dia). */
+    expect(CURVA_GRATIS[0]).toBeLessThanOrEqual(GANHO_DIA_TIPICO / 2);
+    expect(CURVA_GRATIS[3]).toBeLessThanOrEqual(GANHO_DIA_TIPICO);
   });
 
-  test("e UM troféu, que é o último", () => {
+  test("e UM troféu, que é o último e custa vários dias", () => {
     const trofeu = CURVA_GRATIS[14];
-    expect(trofeu).toBeGreaterThan(CURVA_GRATIS[13] * 5);
+    expect(trofeu).toBeGreaterThan(CURVA_GRATIS[13] * 2);
+    /* Pelo menos três dias de ganho típico só nele — é o que faz ser troféu. */
+    expect(trofeu).toBeGreaterThan(GANHO_DIA_TIPICO * 3);
   });
 
   test("o troféu custa o MEIO da faixa premium — é âncora de preço", () => {
@@ -201,11 +254,21 @@ describe("5. a mesada do médico", () => {
     expect(mesadaDoMedico(-500)).toBe(0);
   });
 
-  test("o bônus de vínculo é pago uma vez e vale a pena", () => {
-    /* Precisa ser grande o suficiente para ela SENTIR — 100 🌱 compra os sete
-       primeiros itens de uma vez. */
-    expect(BONUS_VINCULO_MEDICO).toBe(100);
-    const setePrimeiros = CURVA_GRATIS.slice(0, 7).reduce((s, p) => s + p, 0);
-    expect(BONUS_VINCULO_MEDICO).toBeGreaterThan(setePrimeiros);
+  test("o bônus de vínculo vale VÁRIOS DIAS, não um punhado de moedas", () => {
+    /* A régua é relativa ao ganho, não um número fixo — foi o número fixo que
+       fez o bônus valer 20 dias no modelo errado e menos de três no real.
+       Cinco dias de ganho típico é o que faz valer a pena pedir o código. */
+    expect(BONUS_VINCULO_MEDICO / GANHO_DIA_TIPICO).toBeGreaterThanOrEqual(5);
+  });
+
+  test("e ele encurta a corrida em pelo menos 4 dias", () => {
+    /* A prova do efeito, não do valor. */
+    const com = diasParaZerarLoja({
+      comMedico: true,
+      presenteMensal: PRESENTE_SUGERIDO,
+      ganhoDiario: GANHO_DIA_TIPICO,
+    });
+    const sem = diasParaZerarLoja({ comMedico: false, ganhoDiario: GANHO_DIA_TIPICO });
+    expect(sem - com).toBeGreaterThanOrEqual(4);
   });
 });

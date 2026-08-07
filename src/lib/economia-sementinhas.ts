@@ -60,16 +60,21 @@ export const ITENS_GRATIS = 15;
 /**
  * A curva de preços dos grátis, em Sementinhas, do mais barato ao troféu.
  *
- * Catorze degraus curtos e um salto. Somam 330 🌱 — calibrado para que a
- * paciente COM médico zere tudo no 15º dia, que é o alvo que o dono pediu.
- * Sem médico ela leva 24 dias, e essa diferença é de propósito: é o que faz o
- * vínculo com o médico valer alguma coisa no primeiro minuto.
+ * Catorze degraus e um salto. Somam 704 🌱 — calibrado contra o ganho TÍPICO
+ * (35 🌱/dia), não contra o teto, para a paciente COM médico zerar a loja no
+ * 15º dia.
+ *
+ * A primeira versão somava 330 e "dava 15 dias" — mas contra um modelo de
+ * ganho que só enxergava o check-in. Com os quatro ganhos diários reais, aquela
+ * loja sumia em SEIS dias. Os preços daqui dobraram para caber no ganho de
+ * verdade; a FORMA da curva (muitos degraus curtos, um salto no fim) é a mesma,
+ * porque a forma é o que faz o laço "ganhei → gastei → mudou minha tela" fechar
+ * várias vezes na primeira semana.
  */
 export const CURVA_GRATIS = [
-  5, 5, 5, 5, 8, 8, 10, 10, 10, 10, 12, 12, 15, 15,
-  /* O troféu — mediana EXATA dos itens premium, de propósito. Ver o cabeçalho:
-     é âncora de preço, não enfeite. Os catorze de cima somam 130, e o total de
-     330 é calibrado para a paciente COM médico zerar a loja no 15º dia. */
+  10, 12, 15, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 74,
+  /* O troféu, no meio da faixa premium (mediana 160, Q3 250). Ver o cabeçalho:
+     é âncora de preço, não enfeite. */
   200,
 ] as const;
 
@@ -77,30 +82,51 @@ export const CURVA_GRATIS = [
 export const CUSTO_LOJA_GRATIS = CURVA_GRATIS.reduce((s, p) => s + p, 0);
 
 /**
- * O que ela ganha por dia sem nenhum evento especial.
+ * ─── O GANHO DIÁRIO REAL, E O ERRO QUE ISTO CORRIGE ─────────────────────────
  *
- * Só o check-in (5 🌱). Os marcos e conquistas entram por fora porque não
- * acontecem todo dia — e uma média diluída esconderia que a primeira semana é
- * mais generosa que a terceira, que é justamente onde o desenho age.
+ * A primeira versão deste arquivo modelava **só o check-in (5 🌱/dia)** e
+ * calibrava a loja em cima disso. Um verificador mediu: existem QUATRO ganhos
+ * diários no app, e três estavam fora da conta.
+ *
+ *   · check-in ................................  5 🌱   (`SEMENTINHAS.dailyCheckin`)
+ *   · aula do dia (5 + 3 × acertos) ...........  ~18 🌱  (`grantDailyQuizReward`)
+ *   · bem-estar (5 × 5 atividades) ............  25 🌱  (`grantWellnessReward`)
+ *   · bônus das 3 estrelas ....................  20 🌱  (`grantDayStarsBonus`)
+ *
+ * O modelo dizia 13,9 🌱/dia. O teto real é **~68 🌱/dia** — quase cinco vezes.
+ * Com o número errado, a loja de 330 🌱 "levava 15 dias" no papel e some em
+ * MENOS DE CINCO na vida real. O dono pediu quinze e teria recebido quatro.
+ *
+ * ─── POR QUE UMA FAIXA, E NÃO UM NÚMERO ─────────────────────────────────────
+ *
+ * 68 🌱/dia é o TETO: exige check-in, aula respondida, as cinco atividades de
+ * bem-estar e as três estrelas fechadas, TODO dia. Quase ninguém faz isso.
+ * Modelar o teto como se fosse a média é o mesmo erro de sinal trocado —
+ * calibraria a loja para quem não existe.
+ *
+ * A calibragem usa o TÍPICO. O teto e o mínimo entram como limites, e é assim
+ * que o teste os cobra: a loja não pode sumir em três dias para a mais
+ * engajada, nem virar inalcançável para a que só faz check-in.
  */
-export const GANHO_DIARIO_BASE = 5;
+export const GANHO_DIA_TETO = 68;
+/** Check-in + aula + parte do bem-estar. É esta que calibra a curva. */
+export const GANHO_DIA_TIPICO = 35;
+/** Só o check-in — quem abre o app e sai. */
+export const GANHO_DIA_MINIMO = 5;
 
-/** Marco de semana: 25 🌱 a cada sete dias. */
+/** Marco de semana: 25 🌱 a cada sete dias, por fora dos diários. */
 export const GANHO_SEMANAL = 25;
 
 /**
- * Conquistas nos primeiros quinze dias, estimado.
+ * Bônus de vincular um médico — pago uma vez, por médico.
  *
- * ESTIMATIVA, e marcada como tal: depende de quanto ela usa o app. Vinte por
- * conquista é o valor real (`SEMENTINHAS.achievementDefault`); quatro em quinze
- * dias é o meu chute para uso normal. Se a projeção abaixo passar a decidir
- * preço de verdade, este número tem de virar medição.
+ * Subiu de 100 para 200 junto com a correção do ganho diário. Com a loja em
+ * 704 🌱 e um ganho típico de ~38 🌱/dia, cem Sementinhas valiam menos de três
+ * dias — ou seja, o vínculo com o médico não mudava nada de perceptível, e o
+ * bônus virava enfeite. Com 200 a diferença é de cinco dias (14 contra 19), que
+ * é o que faz valer a pena pedir o código a ele.
  */
-export const CONQUISTAS_EM_15_DIAS = 4;
-export const GANHO_POR_CONQUISTA = 20;
-
-/** Bônus de vincular um médico — pago uma vez, na hora do vínculo. */
-export const BONUS_VINCULO_MEDICO = 100;
+export const BONUS_VINCULO_MEDICO = 200;
 
 /**
  * A mesada do médico: quantas Sementinhas ele pode distribuir por mês.
@@ -130,14 +156,15 @@ export function diasParaZerarLoja(opts: {
   comMedico: boolean;
   /** Sementinhas que o médico presenteia por mês, se presentear. */
   presenteMensal?: number;
+  /** Quanto ela ganha por dia. O padrão é o TÍPICO — ver o bloco acima. */
+  ganhoDiario?: number;
 }): number {
   const alvo = CUSTO_LOJA_GRATIS - (opts.comMedico ? BONUS_VINCULO_MEDICO : 0);
   if (alvo <= 0) return 0;
 
   const porDia =
-    GANHO_DIARIO_BASE +
+    (opts.ganhoDiario ?? GANHO_DIA_TIPICO) +
     GANHO_SEMANAL / 7 +
-    (CONQUISTAS_EM_15_DIAS * GANHO_POR_CONQUISTA) / 15 +
     (opts.comMedico ? (opts.presenteMensal ?? 0) / 30 : 0);
 
   if (porDia <= 0) return Infinity;
@@ -152,13 +179,12 @@ export function diasParaZerarLoja(opts: {
  */
 export function saldoParado(
   dia: number,
-  opts: { comMedico: boolean; presenteMensal?: number },
+  opts: { comMedico: boolean; presenteMensal?: number; ganhoDiario?: number },
 ): number {
   const ganho =
     (opts.comMedico ? BONUS_VINCULO_MEDICO : 0) +
-    dia * GANHO_DIARIO_BASE +
+    dia * (opts.ganhoDiario ?? GANHO_DIA_TIPICO) +
     Math.floor(dia / 7) * GANHO_SEMANAL +
-    Math.min(dia, 15) * ((CONQUISTAS_EM_15_DIAS * GANHO_POR_CONQUISTA) / 15) +
     (opts.comMedico ? Math.floor(dia / 30) * (opts.presenteMensal ?? 0) : 0);
   return Math.max(0, Math.round(ganho - CUSTO_LOJA_GRATIS));
 }
