@@ -69,9 +69,19 @@ describe("o limite não é mais um balde compartilhado", () => {
    * mesmo valia para CGNAT de operadora e wifi de clínica, que é justamente
    * onde várias pacientes do mesmo médico se encontram.
    */
-  test("paciente logada tem balde próprio", () => {
-    expect(chat).toContain('const chaveDoLimite = auth.toLowerCase().startsWith("bearer ")');
-    expect(chat).toContain("`u:${auth.slice(-32)}`");
+  test("paciente logada tem balde próprio — pelo usuário RESOLVIDO", () => {
+    /* ─── A CHAVE SAÍA DO HEADER, SEM VALIDAR NADA ─────────────────────────
+       Era `u:${auth.slice(-32)}`: o sufixo do que o cliente mandou. Bastava
+       `Bearer <32 aleatórios>` a cada requisição para o balde nunca acumular —
+       e, de quebra, o teto global do site anônimo era pulado, porque ele só
+       vale para chaves que NÃO começam com `u:`. Duas defesas de custo
+       desligadas por uma string inventada, com o modelo sendo chamado do mesmo
+       jeito na nossa chave.
+       Agora a chave é o id do usuário resolvido; token inválido cai no balde de
+       IP, que é onde ele pertence. */
+    expect(chat).toContain("const usuarioDoLimite = await usuarioDaRequisicao(request)");
+    expect(chat).toContain("`u:${usuarioDoLimite.id}`");
+    expect(chat).not.toContain("`u:${auth.slice(-32)}`");
   });
 
   test("visitante anônimo continua por IP", () => {

@@ -331,7 +331,7 @@ describe("o vazamento tinha QUATRO superfícies, não uma", () => {
 
   test("e nunca cai para o enunciado da lacuna", () => {
     /* O fallback tem que ser a AUSÊNCIA da citação, não o texto de outra. */
-    const i = chat.indexOf("const minha = textoDela.get(g.id)");
+    const i = chat.indexOf("const minha = memoriaSegura(textoDela.get(g.id)");
     expect(i).toBeGreaterThan(-1);
     expect(chat.slice(i, i + 500)).toContain("Uma dúvida que ela encaminhou");
   });

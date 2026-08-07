@@ -11,6 +11,8 @@ import {
 } from "@/lib/secondbrain.server";
 import { computeGestation } from "@/lib/gestacao";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
+import { usuarioDaRequisicao } from "@/lib/api-auth.server";
+import { memoriaSegura } from "@/lib/chat-memory.server";
 import { soTexto } from "@/lib/chat-stream";
 /* Preço e contato de suporte vêm daqui, não de literal solto: "quanto custa o
    plano?" era classificado como suporte (correto — o médico não é incomodado)
@@ -434,7 +436,14 @@ async function buildPendenciasBlock(patientId: string, doctorId: string): Promis
            Sem texto guardado (banco antes da migration), some a citação e fica
            só o estado — melhor uma frase mais pobre que a intimidade de outra
            pessoa dita como se fosse dela. */
-        const minha = textoDela.get(g.id) || "";
+        /* ─── TEXTO LIVRE DELA, DENTRO DO SYSTEM PROMPT ────────────────────
+           `brain_gaps.question` e `brain_gap_askers.pergunta` são o que ela
+           digitou, cortado em 300 caracteres e mais nada. Interpolado cru aqui,
+           sob o rótulo "fonte: sistema", ele podia trazer quebra de linha, `#`
+           e marcadores de papel — o mesmo vetor que `memoriaSegura` já fecha
+           para o resumo. Trancar a janela e deixar a porta.
+           Reusa a MESMA função, e não uma cópia: duas higienes divergem. */
+        const minha = memoriaSegura(textoDela.get(g.id) || "").slice(0, 160);
         if (!minha) {
           return g.status === "respondida"
             ? `- Uma dúvida que ela encaminhou JÁ FOI RESPONDIDA pelo médico (em ${quando}).`
@@ -802,9 +811,23 @@ export const Route = createFileRoute("/api/chat")({
            `resolvePatientDoctor`) porque não precisa: trocar de token não
            burla nada além do próprio limite, e para isso seria preciso ter
            outra conta de verdade. Visitante anônimo continua por IP. */
-        const auth = request.headers.get("authorization") || "";
-        const chaveDoLimite = auth.toLowerCase().startsWith("bearer ")
-          ? `u:${auth.slice(-32)}`
+        /* ─── UM HEADER INVÁLIDO DESLIGAVA OS DOIS LIMITADORES ────────────
+         *
+         * A chave saía do SUFIXO do header, sem nenhuma validação. Bastava
+         * mandar `Authorization: Bearer <32 caracteres aleatórios>` a cada
+         * requisição para que:
+         *   · o balde por IP nunca acumulasse (chave nova toda vez), e
+         *   · o teto global do site anônimo fosse pulado, porque ele só vale
+         *     para chaves que NÃO começam com `u:`.
+         * Depois disso `resolvePatientDoctor` devolve null, o fluxo segue com o
+         * prompt público e o modelo é chamado — na nossa chave, sem limite.
+         * As duas defesas de custo desligadas por uma string inventada.
+         *
+         * A chave passa a sair do usuário RESOLVIDO. Token inválido cai para o
+         * balde de IP, que é onde ele pertence. */
+        const usuarioDoLimite = await usuarioDaRequisicao(request).catch(() => null);
+        const chaveDoLimite = usuarioDoLimite
+          ? `u:${usuarioDoLimite.id}`
           : `ip:${clientIp(request)}`;
         if (rateLimited(chaveDoLimite)) {
           return new Response("Muitas mensagens em pouco tempo. Aguarde um instante.", {

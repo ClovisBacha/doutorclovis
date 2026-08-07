@@ -145,6 +145,7 @@ import {
 } from "@/lib/doctors.functions";
 import {
   getMyClinic,
+  sairDaClinica,
   createClinic,
   addClinicDoctor,
   removeClinicDoctor,
@@ -1300,7 +1301,20 @@ function PainelPage() {
         )}
         {tab === "Lives" && <LivesSection tokenFn={token} />}
         {tab === "Meu Perfil" && (
-          <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
+          <>
+            {/* ─── A PORTA DE SAÍDA DA CLÍNICA ─────────────────────────────
+                Um admin de clínica adiciona qualquer médico só com o e-mail —
+                sem convite, sem aceite — e a partir daí opera o Segundo Cérebro
+                dele e lê as CONVERSAS das pacientes dele com a IA.
+                `sairDaClinica` existia, escrevia `clinic_role: null` numa
+                coluna NOT NULL (ou seja, falhava sempre) e não era chamada por
+                tela nenhuma. A saída fica em Meu Perfil, e não na aba Clínica:
+                a aba Clínica é do plano Pro Equipe, e o médico ANEXADO pode não
+                ter esse plano — ele veria um cartão de "não liberado" em vez da
+                porta. */}
+            <SairDaClinicaCard tokenFn={token} />
+            <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
+          </>
         )}
         {tab === "Exames" && <ExamesRecebidos tokenFn={token} />}
         {tab === "Pré-consultas" && (
@@ -7788,6 +7802,75 @@ function BrainPlaygroundCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * A saída da clínica, para quem foi posto nela.
+ *
+ * Aparece só para MEMBRO (nunca para o dono — a clínica ficaria sem
+ * administrador e os outros presos de vez). Fica em Meu Perfil de propósito: a
+ * aba Clínica exige o plano Pro Equipe, e quem foi anexado pode não tê-lo.
+ */
+function SairDaClinicaCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [clinica, setClinica] = useState<{ name: string; role: string } | null>(null);
+  const [saindo, setSaindo] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getMyClinic({ data: { accessToken: await tokenFn() } });
+        if (res.ok && res.clinic && res.clinic.role === "member") {
+          setClinica({ name: res.clinic.name, role: res.clinic.role });
+        }
+      } catch {
+        /* sem clínica, sem cartão */
+      }
+    })();
+  }, [tokenFn]);
+
+  if (!clinica) return null;
+
+  async function sair() {
+    if (saindo) return;
+    if (
+      !window.confirm(
+        `Sair da clínica ${clinica?.name}? A administração dela deixa de operar o seu Segundo Cérebro e de ver as conversas das suas pacientes. Suas pacientes, sua base de conhecimento e seus dados continuam seus.`,
+      )
+    )
+      return;
+    setSaindo(true);
+    try {
+      const res = await sairDaClinica({ data: { accessToken: await tokenFn() } });
+      if (res.ok) {
+        setClinica(null);
+        toast.success("Você saiu da clínica.");
+      } else {
+        toast.error("Não foi possível sair agora. Tente de novo.");
+      }
+    } catch {
+      toast.error("Não foi possível sair agora. Tente de novo.");
+    } finally {
+      setSaindo(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50/60 p-5 text-amber-900">
+      <p className="font-medium">🏥 Você faz parte da clínica {clinica.name}</p>
+      <p className="mt-1 text-sm leading-relaxed">
+        A administração dela opera o seu Segundo Cérebro e vê as conversas das suas pacientes com a
+        IA. Se você não pediu isso, pode sair agora — suas pacientes, sua base de conhecimento e
+        seus dados continuam seus.
+      </p>
+      <button
+        onClick={sair}
+        disabled={saindo}
+        className="mt-3 rounded-full border border-amber-400 px-5 py-2 text-sm font-medium disabled:opacity-50"
+      >
+        {saindo ? "Saindo…" : "Sair da clínica"}
+      </button>
     </div>
   );
 }

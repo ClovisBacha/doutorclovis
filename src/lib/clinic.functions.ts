@@ -340,9 +340,26 @@ export const sairDaClinica = createServerFn({ method: "POST" })
        de vez. Ele remove os membros e apaga a clínica, nessa ordem. */
     if (eu.clinic_role === "admin") return { ok: false as const, reason: "e_admin" as const };
 
+    /* ─── A PORTA DE SAÍDA NÃO ABRIA ──────────────────────────────────────
+     *
+     * `clinic_role` é `text NOT NULL DEFAULT 'member'` (APLICAR_PENDENTES.sql:
+     * 2023). Escrever `null` viola a constraint: o update falhava, e a única
+     * forma de o médico sair de uma clínica em que foi posto sem consentimento
+     * simplesmente não funcionava.
+     *
+     * Agravante: `sairDaClinica` não é chamada por nenhuma tela — a função
+     * existia, quebrada, e inalcançável.
+     *
+     * `member` é o valor certo para quem não está em clínica nenhuma: é o
+     * DEFAULT da coluna, e o gatilho `protect_doctor_billing` já força esse
+     * valor quando alguém tenta se auto-promover. */
     const { error } = await sb
       .from("doctors")
-      .update({ clinic_id: null, clinic_role: null })
+      .update({ clinic_id: null, clinic_role: "member" })
       .eq("id", user.id);
-    return error ? { ok: false as const } : { ok: true as const };
+    if (error) {
+      console.error("[clínica] o médico não conseguiu sair", user.id, error);
+      return { ok: false as const };
+    }
+    return { ok: true as const };
   });
