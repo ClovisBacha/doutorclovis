@@ -8568,8 +8568,12 @@ function DoctorBilling({
   const [busy, setBusy] = useState<string | null>(null);
   // Convite de paciente: +15% em qualquer plano (aplicado no checkout).
   const [inviteDiscount, setInviteDiscount] = useState(false);
+  /* `mensagens` ENTRA AQUI, e a falta dele não era cosmética: um médico que
+     acabou de assinar a escada nova seria tratado como não-assinante no próprio
+     painel — banner de venda no lugar da gestão da assinatura. */
   const isPaid =
-    active && ["essencial", "starter", "pro", "clinica", "elite", "black"].includes(plan);
+    active &&
+    ["mensagens", "essencial", "starter", "pro", "clinica", "elite", "black"].includes(plan);
   const isTeam = plan === "clinica";
 
   useEffect(() => {

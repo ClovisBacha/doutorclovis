@@ -23,12 +23,15 @@ export const Route = createFileRoute("/medicos")({
   component: MedicosPage,
 });
 
-// Promoção de lançamento: enquanto ativa, o anual dá 25% off (em vez dos
-// 2 meses grátis ≈ 17%). Basta trocar active para false quando encerrar.
-const LAUNCH_PROMO = { active: true, off: 0.25, label: "🚀 Lançamento" };
-
-// monthly = preço no plano mensal (0 = grátis). No plano ANUAL o médico paga
-// 10 meses e usa 12 (2 meses grátis ≈ 17% off) → mensal equivalente arredondado.
+// monthly = preço MENSAL do degrau, em reais. Não há plano anual: a escada tem
+// um Price graduado só, mensal — e mostrar um preço anual sem Price atrás dele
+// seria a tela prometer o que o checkout não cobra.
+//
+// Os três degraus pagos são recortes da MESMA escada (150 / 600 / 1.500
+// mensagens); o checkout do Stripe deixa ajustar para qualquer número até
+// 2.500. Os preços vêm de `precoDe` em `src/lib/planos-medico.ts`, e há teste
+// que trava os dois juntos.
+//
 // Regra de ouro dos planos: cada bullet é algo que o produto FAZ hoje (ou é
 // entregue com implantação assistida, e diz isso). Nada de promessa vaga,
 // número inventado ou recurso de roadmap vendido como pronto.
@@ -43,99 +46,63 @@ const PLANS = [
     highlight: false,
     desc: "Saia do caderno e do zap pessoal — de graça, para sempre.",
     features: [
-      "👩‍🍼 Até 5 pacientes ativas · 1 médico",
       "App de pré-natal completo para as suas pacientes",
       "Solicitações de consulta organizadas em um só lugar",
       "Calculadoras e ferramentas clínicas básicas",
+      "Sem a IA respondendo pela sua voz — é o que os planos pagos abrem",
     ],
     cta: "Criar conta grátis",
   },
   {
-    key: "essencial",
-    name: "Essencial",
-    tagline: "O Segundo Cérebro, sem salto",
-    monthly: 49.9,
-    isFrom: false,
-    perSuffix: "",
-    highlight: false,
-    desc: "O primeiro passo pago: a sua IA atendendo as pacientes no app, por um terço do Starter. Para quem está começando e ainda não tem volume.",
-    features: [
-      "👩‍🍼 Até 15 pacientes · 🧠 1 cérebro (o seu) — sai a R$ 3,33/paciente",
-      "IA com as suas respostas, 24h no app",
-      "Pré-consulta digital + monitoramento (peso, pressão, chutes)",
-      "As ferramentas clínicas avançadas ficam no Starter",
-    ],
-    cta: "Começar por R$ 49,90",
-  },
-  {
-    key: "starter",
-    name: "Starter",
-    tagline: "A sua IA no app",
-    monthly: 149,
+    key: "mensagens_150",
+    name: "Consultório",
+    tagline: "A sua IA atendendo",
+    monthly: 29.9,
     isFrom: false,
     perSuffix: "",
     highlight: false,
     desc: "Uma IA treinada nas SUAS respostas atende suas pacientes no app — você para de repetir as mesmas orientações.",
     features: [
-      "👩‍🍼 Até 50 pacientes · 🧠 1 cérebro (o seu) — sai a R$ 2,98/paciente",
+      "💬 150 mensagens de IA por mês — sai a R$ 0,20 por resposta sua",
+      "👩‍🍼 Pacientes ILIMITADAS — o teto é de mensagens, não de gente",
       "IA com as suas respostas, 24h no app",
       "Pré-consulta digital + monitoramento (peso, pressão, chutes)",
-      "Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia)",
     ],
-    cta: "Assinar o Starter",
+    cta: "Começar por R$ 29,90",
   },
   {
-    key: "pro",
-    name: "Pro",
-    tagline: "A IA também no WhatsApp",
-    monthly: 297,
+    key: "mensagens_600",
+    name: "Movimento",
+    tagline: "Para quem já tem volume",
+    monthly: 97.4,
     isFrom: false,
     perSuffix: "",
     highlight: true,
-    desc: "A mesma IA atende e agenda no WhatsApp do consultório — implantada junto com a nossa equipe.",
+    desc: "O mesmo produto inteiro, com quatro vezes mais conversa — e a mensagem 18% mais barata.",
     features: [
-      "👩‍🍼 Até 150 pacientes · 🧠 1 cérebro — sai a R$ 1,98/paciente",
-      "Tudo do Starter",
-      "💬 IA atende e agenda no WhatsApp (implantação assistida)",
-      "Triagem de urgência com orientação SAMU/UPA",
+      "💬 600 mensagens de IA por mês — R$ 0,16 por resposta (18% off)",
+      "👩‍🍼 Pacientes ilimitadas · 🧠 o seu cérebro",
+      "Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia)",
       "Dashboard do consultório: dúvidas frequentes e engajamento",
     ],
-    cta: "Assinar Pro",
+    cta: "Assinar Movimento",
   },
   {
-    key: "elite",
-    name: "Reconhecido",
-    tagline: "Seja encontrado primeiro",
-    monthly: 597,
+    key: "mensagens_1500",
+    name: "Alto risco",
+    tagline: "Conversa o dia inteiro",
+    monthly: 205.4,
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "O plano de visibilidade: selo verificado, topo na busca de médicos e convites premium para fidelizar pacientes.",
+    desc: "Para quem acompanha gestação de alto risco: a paciente pergunta quando precisa, e você não paga por isso duas vezes.",
     features: [
-      "🧠 Até 5 cérebros (R$ 119/médico) · 👩‍🍼 300 pacientes por médico",
-      "Tudo do Pro, para cada médico da equipe",
-      "🎟️ 25 convites premium/mês — gere o código e envie para a paciente",
-      "✓ Selo verificado + prioridade na busca — as pacientes te acham primeiro",
+      "💬 1.500 mensagens de IA por mês — R$ 0,14 por resposta (31% off)",
+      "👩‍🍼 Pacientes ilimitadas · triagem de urgência com orientação SAMU/UPA",
+      "💬 IA atende e agenda no WhatsApp (implantação assistida)",
+      "🎚️ Precisa de mais? Ajuste até 2.500 (R$ 295,40) no próprio checkout",
     ],
-    cta: "Assinar Reconhecido",
-  },
-  {
-    key: "black",
-    name: "Black",
-    tagline: "Alto volume",
-    monthly: 1499,
-    isFrom: false,
-    perSuffix: "",
-    highlight: false,
-    desc: "Para equipes grandes: presenteie centenas de pacientes e tenha prioridade máxima.",
-    features: [
-      "🧠 Até 20 cérebros (R$ 75/médico) · 👩‍🍼 500 pacientes por médico",
-      "Tudo do Reconhecido",
-      "🖤 250 convites premium/mês (gerados na hora)",
-      "👤 Gerente de conta dedicado + selo Black + topo absoluto na busca",
-      "🚀 Acesso antecipado a novos recursos + treinamento da equipe",
-    ],
-    cta: "Assinar Black",
+    cta: "Assinar Alto risco",
   },
   {
     key: "enterprise",
@@ -149,9 +116,8 @@ const PLANS = [
     desc: "A clínica inteira num painel só: vários médicos, cada um com o próprio Segundo Cérebro — operados individualmente. Preço personalizado pelo tamanho da sua equipe.",
     features: [
       "🏥 Painel da clínica: opere o cérebro de cada médico individualmente",
-      "🧠 Conversas ilimitadas com a IA para todas as pacientes",
+      "💬 Acima de 2.500 mensagens/mês, o volume é contratado — não tabelado",
       "📊 Relatório mensal por médico (cobertura e satisfação da IA)",
-      "💬 Orçamento sob medida pelo número de médicos — fale com a gente",
       "👤 Gerente dedicado + onboarding e migração assistidos",
     ],
     cta: "Pedir orçamento",
@@ -227,18 +193,15 @@ const FAQS = [
   },
   {
     q: "Existe limite de mensagens da IA?",
-    a: "Não. As pacientes conversam com a IA quantas vezes precisarem — sem cota, sem bloqueio. O que muda entre os planos é quantas pacientes e quantos médicos a conta comporta. Para clínicas grandes, o preço é personalizado (fale com a gente).",
+    a: "Existe, e é justamente o que você contrata: o plano é medido em mensagens de IA por mês (150, 600, 1.500 — ou qualquer número até 2.500, ajustável no checkout). Quanto mais você contrata, mais barata fica a mensagem: de R$ 0,20 na entrada a R$ 0,12 no topo. Se o mês acabar antes da cota, a paciente não fica sem resposta nem sem saída: ela é avisada de que o limite é DA PLATAFORMA (nunca seu) e recebe o caminho direto até você. E urgência nunca tem cota — sinal de alarme é sempre respondido e sempre encaminhado.",
   },
   {
     q: "Quantas pacientes posso ter?",
-    a: "Cada plano tem um teto que cresce com você: Free até 5 (para testar), Starter até 50, Pro até 150, Reconhecido até 300 por médico e Black até 500 por médico. No plano Clínica é sob medida, sem teto rígido. Ao chegar perto do limite, é só subir de plano — as solicitações das pacientes ficam guardadas esperando você aceitar.",
+    a: "Quantas você quiser — não há teto de pacientes em nenhum plano pago. Esse limite existia e foi retirado: cobrar por cabeça punia justamente quem traz mais gestantes para a plataforma. O que você dimensiona é o volume de conversa com a IA, que é o que realmente custa. Uma paciente que não usa o chat não custa nada.",
   },
 ];
 
 function MedicosPage() {
-  // Anual é o padrão: é o melhor negócio para os dois lados (2 meses grátis
-  // ≈ 17% off) e sempre rotulado "cobrado anualmente" — sem pegadinha.
-  const [billing, setBilling] = useState<"mensal" | "anual">("anual");
   const [leadForm, setLeadForm] = useState({
     name: "",
     email: "",
@@ -468,7 +431,7 @@ function MedicosPage() {
               <div className="mt-8 grid gap-5 md:grid-cols-2">
                 <div className="rounded-3xl border border-border bg-card p-6">
                   <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
-                    Nível 1 · plano Starter
+                    Nível 1 · a partir de R$ 29,90
                   </span>
                   <p className="mt-4 text-3xl">📱</p>
                   <p className="mt-2 font-serif text-xl">Atende dentro do app</p>
@@ -485,7 +448,7 @@ function MedicosPage() {
                 </div>
                 <div className="relative rounded-3xl border-2 border-primary/30 bg-primary/5 p-6 shadow-[var(--shadow-card)]">
                   <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                    Nível 2 · plano Pro
+                    Nível 2 · a partir de R$ 205,40
                   </span>
                   <p className="mt-4 text-3xl">📱 + 💬</p>
                   <p className="mt-2 font-serif text-xl">Atende também no WhatsApp</p>
@@ -757,40 +720,34 @@ function MedicosPage() {
           </Reveal>
 
           {(() => {
-            const annual = billing === "anual";
-            const promo = LAUNCH_PROMO.active;
-            // Anual: com promoção de lançamento = 25% off; sem = 2 meses grátis (≈17%).
-            const annualFactor = promo ? 1 - LAUNCH_PROMO.off : 10 / 12;
+            /* ─── SEM ALTERNADOR ANUAL, E ISSO É CORREÇÃO ────────────────────
+               A escada de mensagens é MENSAL: existe um Price graduado só, e
+               nenhum Price anual atrás dele. O alternador continuava mostrando
+               "25% OFF no anual" sobre os preços novos — ou seja, a tela
+               anunciava um valor que o checkout não tem como cobrar.
+
+               É o defeito que esta base já perseguiu quatro vezes com outro
+               nome: duas tabelas de preço para a mesma compra. Aqui a segunda
+               tabela era uma multiplicação na hora de renderizar.
+
+               Sem fidelidade continua valendo, e é o que a nota diz. */
             const glassTiers: PricingGlassTier[] = PLANS.map((plan) => {
               const customPrice = (plan as { customPrice?: string }).customPrice;
-              const shown =
-                plan.monthly === 0
-                  ? 0
-                  : annual
-                    ? Math.round(plan.monthly * annualFactor)
-                    : plan.monthly;
-              // Economia no ano inteiro (12 meses do cheio − 12 meses do promocional).
-              const savings = plan.monthly === 0 ? 0 : (plan.monthly - shown) * 12;
+              const shown = plan.monthly;
               return {
                 name: plan.name,
                 tagline: plan.tagline,
-                price: String(shown),
+                price: shown % 1 === 0 ? String(shown) : shown.toFixed(2).replace(".", ","),
                 customPrice,
-                oldPrice:
-                  !customPrice && annual && promo && plan.monthly > 0
-                    ? String(plan.monthly)
-                    : undefined,
                 // O sufixo por assento (ex.: "/médico") vai para a nota — inline,
                 // ao lado do número de 60px, estouraria o card estreito.
                 period: plan.monthly === 0 ? "/sempre" : "/mês",
                 fromPrefix: plan.isFrom,
                 footnote: customPrice
                   ? "orçamento pelo tamanho da equipe"
-                  : (plan.monthly === 0
-                      ? "grátis, para sempre"
-                      : annual
-                        ? `cobrado anualmente · economize R$ ${savings.toLocaleString("pt-BR")}/ano`
-                        : "sem fidelidade") + (plan.perSuffix ? " · por médico" : ""),
+                  : plan.monthly === 0
+                    ? "grátis, para sempre"
+                    : "por mês · sem fidelidade, cancele quando quiser",
                 isPopular: plan.highlight,
                 features: plan.features,
                 ctaLabel: plan.cta,
@@ -801,14 +758,7 @@ function MedicosPage() {
               <PricingGlass
                 className="mt-8"
                 tiers={glassTiers}
-                annual={annual}
-                onAnnualChange={(a) => setBilling(a ? "anual" : "mensal")}
-                saveBadge={promo ? "25% OFF" : "2 MESES"}
-                toggleNote={
-                  promo
-                    ? "🚀 Promoção de lançamento — 25% OFF no plano anual, por tempo limitado"
-                    : "💚 No anual, 2 meses grátis — economize ~17%"
-                }
+                toggleNote="🎚️ Precisa de um número no meio? Ajuste as mensagens no próprio checkout — o preço acompanha, de R$ 29,90 a R$ 295,40."
               />
             );
           })()}

@@ -162,27 +162,79 @@ describe("o webhook concede o plano que foi pago", () => {
   });
 });
 
-describe("o Essencial existe em todos os lugares que enumeram plano", () => {
-  const arquivos = {
+/**
+ * ─── UM PLANO PRECISA EXISTIR EM TODO LUGAR QUE ENUMERA PLANO ───────────────
+ *
+ * Este varredor nasceu para o Essencial e pegou, de graça, o defeito de verdade
+ * quando a escada nova entrou: `mensagens` estava em quatro sítios de menos.
+ * O pior deles não era cosmético — `painel.tsx` decide com uma lista literal se
+ * o médico É assinante, e um médico que acabou de pagar a escada aparecia como
+ * não-assinante no próprio painel, com o banner de venda no lugar da gestão da
+ * assinatura.
+ *
+ * A lista de arquivos é a mesma para os dois planos, com UMA diferença que é
+ * decisão de produto e não descuido: a página de VENDAS. Ela mostra o que se
+ * vende hoje, e o Essencial deixou de ser vendido — continua existindo para
+ * quem já assinou, e é por isso que ele segue em todos os outros.
+ */
+describe("todo plano vivo existe em todos os lugares que enumeram plano", () => {
+  const SISTEMA = {
     "mapa de Price do Stripe": "src/lib/stripe.server.ts",
     "lista aceita no checkout": "src/lib/billing.functions.ts",
     "enum do console": "src/lib/platform.functions.ts",
     "seletor do admin": "src/routes/_authenticated/admin.tsx",
     "card do painel": "src/routes/_authenticated/painel.tsx",
-    "página de vendas": "src/routes/medicos.tsx",
     "variáveis de ambiente": ".env.example",
   };
 
-  for (const [onde, caminho] of Object.entries(arquivos)) {
-    test(`aparece em: ${onde}`, () => {
-      expect(readFileSync(caminho, "utf8").toLowerCase()).toContain("essencial");
-    });
-  }
+  describe("`mensagens` — o que se vende hoje", () => {
+    for (const [onde, caminho] of Object.entries({
+      ...SISTEMA,
+      "página de vendas": "src/routes/medicos.tsx",
+    })) {
+      test(`aparece em: ${onde}`, () => {
+        expect(readFileSync(caminho, "utf8").toLowerCase()).toContain("mensagens");
+      });
+    }
 
-  test("tem os dois Price — mensal e anual", () => {
-    const fonte = readFileSync("src/lib/stripe.server.ts", "utf8");
-    expect(fonte).toContain("STRIPE_PRICE_DOCTOR_ESSENCIAL_MONTHLY");
-    expect(fonte).toContain("STRIPE_PRICE_DOCTOR_ESSENCIAL_ANNUAL");
+    test("o painel o conta como plano PAGO", () => {
+      /* A asserção que descreve o defeito: sem ele nesta lista, quem pagou vê a
+         tela de quem não pagou. */
+      const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+      const i = painel.indexOf("const isPaid =");
+      expect(i).toBeGreaterThan(-1);
+      expect(painel.slice(i, i + 300)).toContain('"mensagens"');
+    });
+
+    test("tem Price próprio no ambiente", () => {
+      expect(readFileSync("src/lib/stripe.server.ts", "utf8")).toContain(
+        "STRIPE_PRICE_DOCTOR_MENSAGENS",
+      );
+      expect(readFileSync(".env.example", "utf8")).toContain("STRIPE_PRICE_DOCTOR_MENSAGENS");
+    });
+  });
+
+  describe("`essencial` — aposentado da venda, vivo para quem assinou", () => {
+    for (const [onde, caminho] of Object.entries(SISTEMA)) {
+      test(`aparece em: ${onde}`, () => {
+        expect(readFileSync(caminho, "utf8").toLowerCase()).toContain("essencial");
+      });
+    }
+
+    test("tem os dois Price — mensal e anual", () => {
+      const fonte = readFileSync("src/lib/stripe.server.ts", "utf8");
+      expect(fonte).toContain("STRIPE_PRICE_DOCTOR_ESSENCIAL_MONTHLY");
+      expect(fonte).toContain("STRIPE_PRICE_DOCTOR_ESSENCIAL_ANNUAL");
+    });
+
+    test("e SAIU da página de vendas — a escada nova a substituiu", () => {
+      /* Deixar os dois na tela venderia dois modelos de cobrança ao mesmo
+         tempo, e o médico escolheria pelo número menor sem saber o que muda. */
+      const vendas = readFileSync("src/routes/medicos.tsx", "utf8").toLowerCase();
+      for (const aposentado of ["essencial", "starter", "reconhecido"]) {
+        expect(vendas).not.toContain(aposentado);
+      }
+    });
   });
 });
 

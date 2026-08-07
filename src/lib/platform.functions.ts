@@ -716,7 +716,17 @@ const SetStatusSchema = z.object({
   active: z.boolean().optional(),
   verified: z.boolean().optional(),
   plan: z
-    .enum(["trial", "free", "essencial", "starter", "pro", "clinica", "elite", "black"])
+    .enum([
+      "trial",
+      "free",
+      "mensagens",
+      "essencial",
+      "starter",
+      "pro",
+      "clinica",
+      "elite",
+      "black",
+    ])
     .optional(),
   /* Até quando vale a concessão. Ausente = o padrão do plano (ver
      `vencimentoDaConcessao`); `null` = de propósito sem vencimento. */

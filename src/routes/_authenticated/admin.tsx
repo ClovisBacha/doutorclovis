@@ -147,6 +147,9 @@ function LinkCard({ path, label }: { path: string; label: string }) {
 const PLANS = [
   "trial",
   "free",
+  /* O único que ainda se vende. Sem ele aqui, o console não consegue corrigir à
+     mão o plano de quem comprou a escada nova. */
+  "mensagens",
   "essencial",
   "starter",
   "pro",
