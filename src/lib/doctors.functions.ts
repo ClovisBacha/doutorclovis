@@ -1203,6 +1203,12 @@ export const chooseDoctor = createServerFn({ method: "POST" })
     if (!updated || updated.length === 0) {
       return { ok: false as const, error: "vinculo_falhou" };
     }
+    /* O bônus de vínculo. Uma função só para os TRÊS caminhos de vínculo —
+       ver `bonusDeVinculo`. */
+    {
+      const { bonusDeVinculo } = await import("@/lib/sementinhas.functions");
+      await bonusDeVinculo(supabaseAdmin, user.id, data.doctorId);
+    }
 
     /* AVISA O MÉDICO.
        

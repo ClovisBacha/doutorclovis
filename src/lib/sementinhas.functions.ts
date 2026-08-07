@@ -433,3 +433,52 @@ export const getWellnessProgress = createServerFn({ method: "POST" })
 // (ver cantinho.functions.ts) — com advisory lock por usuário, sem risco de
 // saldo negativo. Não há função genérica de gasto de propósito, pra evitar um
 // caminho não-atômico que furasse essa garantia.
+
+/**
+ * O BÔNUS DE VINCULAR UM MÉDICO — pago uma vez, por médico.
+ *
+ * ─── POR QUE UMA FUNÇÃO, E NÃO TRÊS LINHAS ──────────────────────────────────
+ *
+ * Existem TRÊS caminhos que gravam `patient_profiles.doctor_id`:
+ *
+ *   · `chooseDoctor`        — ela escolhe no diretório;
+ *   · `respondPatientRequest` — ele aceita o pedido dela;
+ *   · `redeemInviteCode`    — ela resgata o código dele.
+ *
+ * Copiar a concessão nos três é a receita de divergência que esta base já viveu
+ * mais de uma vez (o teto de pacientes existia em dois e vazava no terceiro; a
+ * régua de vencimento tinha quatro cópias discordantes). Uma função, três
+ * chamadas.
+ *
+ * ─── IDEMPOTENTE POR (PACIENTE, MÉDICO) ─────────────────────────────────────
+ *
+ * A `dedupeKey` carrega o id do médico. Isso resolve dois casos de uma vez:
+ * repetir o vínculo com o MESMO médico não paga de novo (é o mesmo evento), e
+ * trocar de médico paga uma vez — o que está certo, porque é um vínculo novo, e
+ * é o médico novo que ela está trazendo para o produto.
+ *
+ * Nunca lança e nunca bloqueia o vínculo: um bônus que falha é um bônus a
+ * menos; um vínculo que falha por causa do bônus é uma paciente sem médico.
+ */
+export async function bonusDeVinculo(
+  supabaseAdmin: unknown,
+  patientId: string,
+  doctorId: string,
+): Promise<void> {
+  try {
+    const { BONUS_VINCULO_MEDICO } = await import("@/lib/economia-sementinhas");
+    /* Modo Cuidado não recebe gamificação — mesma regra do resto do arquivo.
+       Dar Sementinhas a quem acabou de perder a gestação é o oposto do cuidado
+       que o Modo Cuidado existe para prestar. */
+    if (await isCareModeActive(supabaseAdmin as never, patientId)) return;
+    await grantSementinhas(typedDb(supabaseAdmin as never), patientId, [
+      {
+        amount: BONUS_VINCULO_MEDICO,
+        reason: "vinculo-medico",
+        dedupeKey: `vinculo:${doctorId}`,
+      },
+    ]);
+  } catch (e) {
+    console.error("[sementinhas] bônus de vínculo não foi pago", patientId, doctorId, e);
+  }
+}

@@ -444,6 +444,11 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
         await desfazer();
         return { ok: false as const };
       }
+      /* O bônus de vínculo — mesma função dos outros dois caminhos. */
+      {
+        const { bonusDeVinculo } = await import("@/lib/sementinhas.functions");
+        await bonusDeVinculo(supabaseAdmin, req.patient_id as string, user.id);
+      }
     }
 
     /* AVISA A PACIENTE da decisão.

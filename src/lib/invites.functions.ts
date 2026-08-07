@@ -297,6 +297,11 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
           .from("patient_profiles")
           .update({ doctor_id: row.doctor_id })
           .eq("id", u.user.id);
+        /* O bônus de vínculo — mesma função dos outros dois caminhos. */
+        {
+          const { bonusDeVinculo } = await import("@/lib/sementinhas.functions");
+          await bonusDeVinculo(supabaseAdmin, u.user.id, row.doctor_id as string);
+        }
         if (vincErr) {
           console.error("[convite] premium liberado, vínculo não gravou", row.id, vincErr);
           semVaga = true;
