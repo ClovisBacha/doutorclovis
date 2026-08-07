@@ -5845,7 +5845,12 @@ function QuestionsTab({ gest }: { gest: Gest }) {
                 key={d.id}
                 className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-background/70 px-3 py-2"
               >
-                <span className="min-w-0 flex-1 text-sm">{d.pergunta}</span>
+                {/* Sem o texto dela guardado (banco antes da migration), mostra
+                    uma frase neutra em vez de cair para o enunciado da lacuna —
+                    que é o texto cru da PRIMEIRA paciente que fez aquela dúvida. */}
+                <span className="min-w-0 flex-1 text-sm">
+                  {d.pergunta || "Uma dúvida que você mandou pelo chat"}
+                </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">
                   registrada em {new Date(d.quando).toLocaleDateString("pt-BR")}
                 </span>

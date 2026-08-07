@@ -21,6 +21,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { entregarCorrecao, entregarRespostaDaLacuna } from "./secondbrain.functions";
 import { grantSementinhas } from "./sementinhas.functions";
 
@@ -300,5 +301,53 @@ describe("sementinhas: falhar não pode derrubar quem chamou", () => {
     const { sb, escritas } = bancoFalso({});
     await grantSementinhas(sb, "p1", [{ amount: 0, reason: "nada", dedupeKey: "k0" }]);
     expect(escritas).toEqual([]);
+  });
+});
+
+describe("o vazamento tinha QUATRO superfícies, não uma", () => {
+  /**
+   * A entrega (doctor_questions + push) foi consertada primeiro. Uma varredura
+   * encontrou o MESMO texto — o enunciado da lacuna, que é o que a PRIMEIRA
+   * paciente escreveu — vazando por mais três lugares:
+   *
+   *  · o bloco de pendências, dentro do system prompt da conversa de outra
+   *    paciente, na forma "você perguntou X";
+   *  · a aba "sua dúvida está com o seu médico" — a tela que eu criei para
+   *    consertar a entrega repetia o defeito da entrega;
+   *  · o campo pré-preenchido no painel do médico (esse é dele, e ele pode ver
+   *    a pergunta da própria paciente — não é vazamento).
+   *
+   * Consertar a entrega e deixar as leituras é consertar o cano e deixar a
+   * torneira aberta.
+   */
+  const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+  const fns = readFileSync("src/lib/secondbrain.functions.ts", "utf8");
+
+  test("o bloco de pendências lê o texto DELA", () => {
+    const i = chat.indexOf('.from("brain_gap_askers")');
+    expect(i).toBeGreaterThan(-1);
+    expect(chat.slice(i, i + 400)).toContain('.select("gap_id,pergunta")');
+  });
+
+  test("e nunca cai para o enunciado da lacuna", () => {
+    /* O fallback tem que ser a AUSÊNCIA da citação, não o texto de outra. */
+    const i = chat.indexOf("const minha = textoDela.get(g.id)");
+    expect(i).toBeGreaterThan(-1);
+    expect(chat.slice(i, i + 500)).toContain("Uma dúvida que ela encaminhou");
+  });
+
+  test("a aba da paciente lê o texto DELA", () => {
+    const i = fns.indexOf("minhasDuvidasRegistradas");
+    expect(i).toBeGreaterThan(-1);
+    const janela = fns.slice(i, i + 2500);
+    expect(janela).toContain('.select("gap_id,created_at,pergunta,brain_gaps(question,status)")');
+    expect(janela).toContain('pergunta: String(l.pergunta ?? "").trim()');
+  });
+
+  test("nenhuma das duas leituras usa brain_gaps.question como texto da paciente", () => {
+    /* A asserção que descreve o defeito: `l.brain_gaps.question` como valor de
+       `pergunta` foi exatamente o que eu escrevi ontem. */
+    expect(fns).not.toContain("pergunta: String(l.brain_gaps.question");
+    expect(chat).not.toContain('`- "${g.question}" — JÁ RESPONDIDA');
   });
 });

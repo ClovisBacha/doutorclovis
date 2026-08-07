@@ -389,21 +389,34 @@ async function buildPendenciasBlock(patientId: string, doctorId: string): Promis
 
     const { data: askers } = await sb
       .from("brain_gap_askers")
-      .select("gap_id")
+      /* `pergunta` é o texto que ELA escreveu. A lacuna é compartilhada
+         (deduplicada por texto e por vetor); a pergunta não é. Sem isto, o
+         bloco abaixo dizia "você perguntou X" com o texto CRU da PRIMEIRA
+         paciente — dentro do system prompt da conversa de outra. */
+      .select("gap_id,pergunta")
       .eq("user_id", patientId)
       .limit(40);
-    const ids = ((askers ?? []) as { gap_id: string }[]).map((a) => a.gap_id);
+    const linhasDela = (askers ?? []) as { gap_id: string; pergunta?: string | null }[];
+    const ids = linhasDela.map((a) => a.gap_id);
+    const textoDela = new Map(linhasDela.map((l) => [l.gap_id, (l.pergunta ?? "").trim()]));
     if (!ids.length) return "";
 
     const { data: gaps } = await sb
       .from("brain_gaps")
-      .select("question, status, updated_at")
+      .select("id, question, status, updated_at")
       .eq("doctor_id", doctorId)
       .in("id", ids)
       .order("updated_at", { ascending: false })
       .limit(6);
 
-    const linhas = ((gaps ?? []) as { question: string; status: string; updated_at: string }[])
+    const linhas = (
+      (gaps ?? []) as {
+        id: string;
+        question: string;
+        status: string;
+        updated_at: string;
+      }[]
+    )
       /* `ignorada` não entra: o médico decidiu que aquilo não vira orientação, e
          dizer "ele ignorou a sua pergunta" seria péssimo e nem verdadeiro — o
          motivo costuma ser que a dúvida não cabia num conselho geral. Para a
@@ -411,9 +424,21 @@ async function buildPendenciasBlock(patientId: string, doctorId: string): Promis
       .filter((g) => g.status === "aberta" || g.status === "respondida")
       .map((g) => {
         const quando = new Date(g.updated_at).toLocaleDateString("pt-BR");
+        /* O TEXTO DELA, e não o da lacuna. A lacuna guarda o enunciado da
+           primeira paciente que fez aquela dúvida; este bloco entra no system
+           prompt da conversa DE OUTRA, dizendo "você perguntou X".
+           Sem texto guardado (banco antes da migration), some a citação e fica
+           só o estado — melhor uma frase mais pobre que a intimidade de outra
+           pessoa dita como se fosse dela. */
+        const minha = textoDela.get(g.id) || "";
+        if (!minha) {
+          return g.status === "respondida"
+            ? `- Uma dúvida que ela encaminhou JÁ FOI RESPONDIDA pelo médico (em ${quando}).`
+            : `- Uma dúvida que ela encaminhou AINDA AGUARDA o médico (em ${quando}).`;
+        }
         return g.status === "respondida"
-          ? `- "${g.question}" — JÁ RESPONDIDA pelo médico (em ${quando}). A orientação dele já faz parte do que você sabe: se ela retomar o assunto, responda com ela.`
-          : `- "${g.question}" — AINDA AGUARDANDO o médico (encaminhada em ${quando}).`;
+          ? `- "${minha}" — JÁ RESPONDIDA pelo médico (em ${quando}). Se ela retomar o assunto, use a orientação dele caso esteja no bloco do médico acima; se não estiver, diga que ele já respondeu e que a resposta está na aba Perguntas dela.`
+          : `- "${minha}" — AINDA AGUARDANDO o médico (encaminhada em ${quando}).`;
       });
     if (!linhas.length) return "";
 

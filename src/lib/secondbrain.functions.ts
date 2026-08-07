@@ -818,7 +818,12 @@ export const minhasDuvidasRegistradas = createServerFn({ method: "POST" })
        pendente ao lado da própria resposta. */
     const { data: linhas, error } = await sb
       .from("brain_gap_askers")
-      .select("gap_id,created_at,brain_gaps(question,status)")
+      /* `pergunta` é o texto DELA. Eu tinha escrito `brain_gaps(question)` —
+         o enunciado da lacuna, que é o texto cru da PRIMEIRA paciente. A aba
+         "sua dúvida está com o seu médico" mostrava, para cada gestante, a
+         pergunta íntima de outra. Mesmo defeito que a entrega tinha, na tela
+         que eu criei para consertar a entrega. */
+      .select("gap_id,created_at,pergunta,brain_gaps(question,status)")
       .eq("user_id", u.user.id)
       .is("avisada_em", null)
       .order("created_at", { ascending: false })
@@ -834,7 +839,10 @@ export const minhasDuvidasRegistradas = createServerFn({ method: "POST" })
       .filter((l) => l.brain_gaps && l.brain_gaps.status !== "respondida")
       .map((l) => ({
         id: String(l.gap_id),
-        pergunta: String(l.brain_gaps.question ?? ""),
+        /* Sem o texto dela (banco antes da migration), NÃO cai para o
+           enunciado da lacuna: some a citação e fica só a data. Uma frase mais
+           pobre é melhor que a intimidade de outra pessoa. */
+        pergunta: String(l.pergunta ?? "").trim(),
         quando: String(l.created_at),
       }));
     return { ok: true as const, duvidas };
