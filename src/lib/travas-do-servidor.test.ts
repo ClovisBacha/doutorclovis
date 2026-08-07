@@ -137,7 +137,12 @@ describe("chamada paga de modelo tem que ser medida", () => {
       const bruto = readFileSync(f, "utf8");
       const isencoes = (bruto.match(/SEM MEDICAO AUTORIZADO/g) ?? []).length;
       const medicoes = (codigo.match(/registrarUso(Agora)?\s*\(/g) ?? []).length;
-      return medicoes + isencoes === 0;
+      /* ─── CONTAVA POR ARQUIVO, E O CERTO É POR CHAMADA ──────────────────
+         Era `medicoes + isencoes === 0`: bastava UMA medição em qualquer
+         ponto do arquivo para todas as chamadas dele ficarem verdes.
+         `secondbrain.functions.ts` tem cinco chamadas de modelo e uma única
+         medição — que pertence a outra função. Quatro passavam. */
+      return medicoes + isencoes < chamadas;
     });
     expect(semMedicao).toEqual([]);
   });

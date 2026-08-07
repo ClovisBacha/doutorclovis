@@ -38,7 +38,7 @@ export const assessSymptoms = createServerFn({ method: "POST" })
             : level === "amarelo"
               ? "Oriente entrar em contato com o consultório ainda hoje."
               : "Tranquilize e oriente manter o pré-natal.";
-        const { text } = await generateText({
+        const { text, usage } = await generateText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           system: `Você é um assistente de orientação de um consultório de obstetrícia especializado em gestação de alto risco.
 Regras absolutas:
@@ -58,6 +58,10 @@ Regras absolutas:
         await registrarUsoAgora({
           especie: "chat",
           modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          /* OS TOKENS, que estavam na mao e nao eram passados: a linha era gravada
+             com zero e a tabela media a RESPOSTA, nunca o custo. */
+          inputTokens: usage?.inputTokens,
+          outputTokens: usage?.outputTokens,
           canal: "triagem",
         });
       } catch (e) {

@@ -74,7 +74,7 @@ Regras:
 - NÃO use formatação markdown, apenas texto simples com quebras de linha`;
 
         const google = createChatProvider(key);
-        const { text } = await generateText({
+        const { text, usage } = await generateText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           prompt,
         });
@@ -86,6 +86,10 @@ Regras:
         await registrarUsoAgora({
           especie: "chat",
           modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          /* OS TOKENS, que estavam na mao e nao eram passados: a linha era gravada
+             com zero e a tabela media a RESPOSTA, nunca o custo. */
+          inputTokens: usage?.inputTokens,
+          outputTokens: usage?.outputTokens,
           canal: "carta-semanal",
         });
         return new Response(JSON.stringify({ ok: true, letter: text.trim() }), {

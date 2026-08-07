@@ -998,6 +998,10 @@ async function parseCriteria(q: string): Promise<ParsedCriteria> {
     await registrarUsoAgora({
       especie: "chat",
       modelo: process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL,
+      /* OS TOKENS, que estavam na mao e nao eram passados: a linha era gravada
+         com zero e a tabela media a RESPOSTA, nunca o custo. */
+      inputTokens: result.usage?.inputTokens,
+      outputTokens: result.usage?.outputTokens,
       canal: "busca-medicos",
     });
     const raw = result.text.trim().replace(/^```json?\s*|\s*```$/g, "");

@@ -147,7 +147,7 @@ export const getBusinessAdvice = createServerFn({ method: "POST" })
     ].join("\n");
 
     try {
-      const { object } = await generateObject({
+      const { object, usage } = await generateObject({
         model: provider(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
         schema: AdviceSchema,
         system,
@@ -162,6 +162,8 @@ export const getBusinessAdvice = createServerFn({ method: "POST" })
       await registrarUsoAgora({
         especie: "chat",
         modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
         canal: "conselheiro",
       });
       return {

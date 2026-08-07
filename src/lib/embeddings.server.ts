@@ -126,7 +126,43 @@ export async function embedText(
       avisarFalha(`HTTP ${res.status}`);
       return null;
     }
-    const data = (await res.json()) as { embedding?: { values?: number[] } };
+    const data = (await res.json()) as {
+      embedding?: { values?: number[] };
+      usageMetadata?: { totalTokenCount?: number };
+    };
+
+    /* ─── OS EMBEDDINGS NUNCA FORAM MEDIDOS ────────────────────────────────
+     *
+     * `especie: "embedding"` existe no tipo desde sempre, e `cota-ia.server`
+     * afirma, com todas as letras: "as três custam dinheiro e as três estão
+     * medidas". Uma busca por `especie: "embedding"` no repo inteiro não
+     * devolvia NADA — este arquivo nem importava `uso-ia.server`.
+     *
+     * E não é volume desprezível: cada mensagem da paciente paga um embedding
+     * de consulta, cada entrada do médico paga um de documento, cada lacuna
+     * paga um de semelhança, e o backfill paga vinte por visita ao painel.
+     *
+     * Disparado e não aguardado de propósito: aqui não é o `onFinish`, e sim o
+     * meio de uma leitura que a paciente está esperando — aguardar poria uma
+     * escrita no caminho da resposta dela. Perder uma linha de medição de
+     * embedding não muda decisão nenhuma; atrasar a resposta, sim.
+     *
+     * `totalTokenCount` quando o Gemini manda; senão, a estimativa de 4
+     * caracteres por token, que é a régua usual e erra para menos.
+     */
+    try {
+      const { registrarUso } = await import("./uso-ia.server");
+      registrarUso({
+        especie: "embedding",
+        modelo: EMBEDDING_MODEL,
+        inputTokens: data.usageMetadata?.totalTokenCount ?? Math.ceil(clean.length / 4),
+        outputTokens: 0,
+        canal: `embedding-${uso}`,
+      });
+    } catch {
+      /* medir nunca derruba a busca */
+    }
+
     const values = data.embedding?.values;
     if (!Array.isArray(values)) {
       avisarFalha("resposta sem vetor");

@@ -101,6 +101,11 @@ describe("os canais que NÃO podem consumir a franquia clínica", () => {
     "teleconsulta", // resumo da consulta
     "conselheiro", // diagnóstico do consultório, para o médico
     "rascunho-lacuna", // o rascunho que o médico revisa antes de publicar
+    "teste-cerebro", // o playground do médico
+    "extracao-consulta", // transcrição de consulta virando rascunhos
+    "eval-cerebro", // a auto-avaliação do cérebro
+    "eval-juiz", // o juiz independente da auto-avaliação
+    "embedding", // vetores — medidos, e nunca resposta a paciente
   ];
 
   for (const canal of FORA) {

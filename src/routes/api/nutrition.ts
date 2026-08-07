@@ -135,11 +135,17 @@ export const Route = createFileRoute("/api/nutrition")({
             ? `\n\n${brain.block}\nO bloco acima é do médico que acompanha esta gestante. Use como referência de conduta e tom. Quando a dúvida dela não estiver coberta por ele, responda com informação nutricional consolidada e diga, com acolhimento, que registrou a pergunta para ele.`
             : "";
 
+        /* O TETO DE ENTRADA. Este endpoint manda `body.messages` direto ao
+           modelo: nada impedia um POST com mil mensagens de dez mil
+           caracteres. Uma "resposta" na cota, um milhão de tokens na fatura. */
+        const { limitarEntrada } = await import("@/lib/chat-stream");
+        const comTeto = limitarEntrada(paraOModelo);
+
         const google = createChatProvider(key);
         const result = streamText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           system: NUTRITION_SYSTEM + blocoDoMedico,
-          messages: await convertToModelMessages(paraOModelo),
+          messages: await convertToModelMessages(comTeto),
           providerOptions: {
             google: {
               /* O raciocínio sai do MESMO orçamento da resposta: sem isto, ele

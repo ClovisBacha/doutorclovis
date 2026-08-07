@@ -117,6 +117,52 @@ export function avisoQuePodeAparecer(corpo: string): string | null {
  * inteira num teste de mutação e **nenhum teste quebrou**: era a defesa mais
  * importante do produto e a única sem cobertura.
  */
+/**
+ * O TETO DE ENTRADA — o que impede uma resposta de custar mil.
+ *
+ * ─── O DEFEITO ──────────────────────────────────────────────────────────────
+ *
+ * A cota do plano conta RESPOSTAS. O custo de uma resposta, porém, é dominado
+ * pela ENTRADA — e a entrada vinha do corpo do POST, inteira, sem corte de
+ * quantidade nem de tamanho.
+ *
+ * No chat da paciente logada o histórico é reconstruído do banco e limitado a
+ * 12 mensagens, então ali havia proteção. Mas o caminho ANÔNIMO (site público)
+ * e o chat de nutrição mandavam `body.messages` direto: nada impede um POST com
+ * mil mensagens de dez mil caracteres. Uma "resposta" na conta do plano, um
+ * milhão de tokens na fatura.
+ *
+ * ─── OS DOIS CORTES ─────────────────────────────────────────────────────────
+ *
+ * Doze mensagens é o mesmo teto que o histórico do banco já usa — manter os
+ * dois iguais evita que o caminho anônimo fique mais generoso que o da
+ * paciente identificada, que seria o avesso do razoável.
+ *
+ * Quatro mil caracteres por mensagem é o mesmo teto de `MAX_SAVED_CHARS`, o que
+ * a paciente consegue gravar. Nada que ela escreva de verdade é cortado.
+ */
+export const MAX_MENSAGENS_DO_CLIENTE = 12;
+export const MAX_CHARS_POR_MENSAGEM = 4000;
+
+export function limitarEntrada<T extends { parts?: { type: string; text?: string }[] | undefined }>(
+  mensagens: T[],
+): T[] {
+  return mensagens.slice(-MAX_MENSAGENS_DO_CLIENTE).map((m) => {
+    const parts = m.parts;
+    if (!parts?.some((p) => p.type === "text" && (p.text?.length ?? 0) > MAX_CHARS_POR_MENSAGEM)) {
+      return m;
+    }
+    return {
+      ...m,
+      parts: parts.map((p) =>
+        p.type === "text" && p.text && p.text.length > MAX_CHARS_POR_MENSAGEM
+          ? { ...p, text: p.text.slice(0, MAX_CHARS_POR_MENSAGEM) }
+          : p,
+      ),
+    } as T;
+  });
+}
+
 export function soTexto<T extends { parts?: { type: string; text?: string }[] }>(
   mensagens: T[],
 ): T[] {

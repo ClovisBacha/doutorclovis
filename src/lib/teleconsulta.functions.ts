@@ -294,6 +294,10 @@ Gere a nota SOAP. Use formatação clara com cabeçalhos em negrito. Seja espec�
       especie: "chat",
       modelo: process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL,
       doctorId: scope.doctorId,
+      /* OS TOKENS, que estavam na mao e nao eram passados: a linha era gravada
+         com zero e a tabela media a RESPOSTA, nunca o custo. */
+      inputTokens: result.usage?.inputTokens,
+      outputTokens: result.usage?.outputTokens,
       canal: "teleconsulta",
     });
     return { ok: true as const, note: result.text };

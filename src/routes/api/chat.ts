@@ -13,7 +13,7 @@ import { computeGestation } from "@/lib/gestacao";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
 import { usuarioDaRequisicao } from "@/lib/api-auth.server";
 import { memoriaSegura } from "@/lib/chat-memory.server";
-import { soTexto } from "@/lib/chat-stream";
+import { limitarEntrada, soTexto } from "@/lib/chat-stream";
 /* Preço e contato de suporte vêm daqui, não de literal solto: "quanto custa o
    plano?" era classificado como suporte (correto — o médico não é incomodado)
    e a plataforma NÃO respondia, porque o prompt proibia inventar valores e
@@ -1172,6 +1172,10 @@ A dúvida FICA REGISTRADA para ${medico}, e você pode dizer isso. O que você N
            mais importante do produto — a que impede a IA de receber laudo — e a
            única sem cobertura. */
         paraOModelo = soTexto(paraOModelo);
+        /* QUARTA TRAVA: o teto de ENTRADA. A cota conta respostas, e sem isto
+           uma resposta podia custar um milhão de tokens — o caminho anônimo
+           manda o array do cliente sem passar pelo histórico do banco. */
+        paraOModelo = limitarEntrada(paraOModelo);
 
         const google = createChatProvider(key);
         /* Lido uma vez: o medidor precisa gravar o MESMO modelo que respondeu,

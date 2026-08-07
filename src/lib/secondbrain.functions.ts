@@ -751,6 +751,22 @@ export const testBrain = createServerFn({ method: "POST" })
         system,
         prompt: data.question,
       });
+      /* MEDIDO. A trava contava por ARQUIVO: bastava UMA medição em qualquer
+         ponto para todas as chamadas dele ficarem verdes — e este arquivo tem
+         cinco chamadas de modelo e tinha uma medição, de outra função.
+         Canal próprio, fora de CANAIS_DA_COTA: nenhuma destas é resposta à
+         paciente. */
+      {
+        const { registrarUsoAgora } = await import("./uso-ia.server");
+        await registrarUsoAgora({
+          especie: "chat",
+          modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          inputTokens: result.usage?.inputTokens,
+          outputTokens: result.usage?.outputTokens,
+          doctorId,
+          canal: "teste-cerebro",
+        });
+      }
       return { ok: true as const, answer: result.text };
     } catch {
       return { ok: false as const, answer: "Falha ao consultar o modelo. Tente novamente." };
@@ -1997,6 +2013,8 @@ export const draftGapAnswer = createServerFn({ method: "POST" })
       await registrarUsoAgora({
         especie: "chat",
         modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
         doctorId,
         canal: "rascunho-lacuna",
       });
@@ -2104,6 +2122,17 @@ export const extractKnowledgeFromTranscript = createServerFn({ method: "POST" })
         prompt: data.transcript,
         maxOutputTokens: 4096,
       });
+      {
+        const { registrarUsoAgora } = await import("./uso-ia.server");
+        await registrarUsoAgora({
+          especie: "chat",
+          modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          inputTokens: result.usage?.inputTokens,
+          outputTokens: result.usage?.outputTokens,
+          doctorId: target.doctorId,
+          canal: "extracao-consulta",
+        });
+      }
       const raw = result.text.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
       const parsed = JSON.parse(raw) as { pairs?: unknown };
       if (Array.isArray(parsed.pairs)) {
@@ -2218,6 +2247,17 @@ export const evalBrainQuestion = createServerFn({ method: "POST" })
         prompt: data.question,
         maxOutputTokens: 400,
       });
+      {
+        const { registrarUsoAgora } = await import("./uso-ia.server");
+        await registrarUsoAgora({
+          especie: "chat",
+          modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          inputTokens: r.usage?.inputTokens,
+          outputTokens: r.usage?.outputTokens,
+          doctorId: target.doctorId,
+          canal: "eval-cerebro",
+        });
+      }
       answer = r.text.trim();
     } catch {
       return { ok: false as const, reason: "ai" as const };
@@ -2243,6 +2283,17 @@ export const evalBrainQuestion = createServerFn({ method: "POST" })
         prompt: judgePrompt,
         maxOutputTokens: 200,
       });
+      {
+        const { registrarUsoAgora } = await import("./uso-ia.server");
+        await registrarUsoAgora({
+          especie: "chat",
+          modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          inputTokens: j.usage?.inputTokens,
+          outputTokens: j.usage?.outputTokens,
+          doctorId: target.doctorId,
+          canal: "eval-juiz",
+        });
+      }
       const raw = j.text.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
       const parsed = JSON.parse(raw) as { approved?: unknown; issue?: unknown };
       const approved = parsed.approved === true;
