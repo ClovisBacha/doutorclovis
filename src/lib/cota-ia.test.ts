@@ -390,26 +390,70 @@ describe("a paciente é avisada com honestidade, não com jargão", () => {
        segue normalmente" — no mesmo prompt do bloco que proíbe falar em
        gestação, e marcado com IMPORTANTE, ou seja, ganhando dele. Bastava a
        cota estourar para a IA anunciar a gestação a quem a perdeu. */
-    const aviso = chat.slice(chat.indexOf("const seguirAcompanhamento"));
+    /* SEM COMENTÁRIOS: a janela é medida em bytes a partir de um marcador, e o
+       bloco que explica a decisão do dono entrou entre os dois. É a terceira
+       vez hoje que uma janela fixa encolhe a própria cobertura quando o código
+       ganha explicação. */
+    const semComentarios = chat.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const aviso = semComentarios.slice(semComentarios.indexOf("const seguirAcompanhamento"));
     expect(aviso.slice(0, 1800)).toContain("até a virada do mês");
     /* SEM GÊNERO: "Ela continua acompanhando" era feminino fixo, enquanto
        `${medico}` é montado como "o(a) …". Numa plataforma multi-médico — e
        com o dono desta instalação sendo homem — a frase saía errada. */
     expect(aviso.slice(0, 1400)).toContain("O acompanhamento da gestação segue normalmente");
     expect(aviso.slice(0, 1400)).not.toContain("Ela continua acompanhando");
+    /* ─── O PRAZO NA PRIMEIRA FRASE, e não em algum lugar do bloco ──────────
+       Uma mutação sobreviveu à bateria: tirar o prazo do cabeçalho e deixá-lo
+       só no item 3 mantinha o teste verde. A propriedade continuava tecnicamente
+       verdadeira, mas o motivo escrito no código é sobre O QUE ELA LÊ PRIMEIRO —
+       "uma gestante ansiosa que lê aquilo sem causa e sem prazo conclui a coisa
+       mais assustadora disponível". Um prazo enterrado no terceiro item não
+       cumpre isso. */
+    const abertura = aviso.slice(
+      aviso.indexOf("const avisoDeCota"),
+      aviso.indexOf("Como agir, NESTA ORDEM"),
+    );
+    expect(abertura).toContain("virada do mês");
   });
 
-  test("a pergunta é respondida ANTES de qualquer aviso", () => {
-    /* A ordem importa: primeiro serve, depois explica. Uma resposta que abre
-       com "não posso te ajudar" já perdeu a paciente. */
+  /* ─── DECISÃO DO DONO (ago/2026): O LIMITE PASSA A SER DITO ───────────────
+     Antes, a IA respondia a dúvida com informação consolidada e nunca
+     mencionava limite — "primeiro serve, depois explica". O efeito colateral
+     era que NINGUÉM sentia o limite: o médico recebia o push de 80% e 100% e
+     podia ignorar os dois, porque nada mudava para ele.
+     Agora a dúvida COMUM não é respondida — a paciente vai ao WhatsApp dele, e
+     é ele quem sente. O que NÃO mudou, e não pode mudar, é a urgência. */
+  test("URGÊNCIA é respondida antes de tudo, e sem mencionar limite", () => {
+    /* A trava que substitui a antiga. Um app de gestação de ALTO RISCO que cala
+       às 3 da manhã por causa de uma fatura não é um produto, é um risco. */
     const aviso = chat.slice(
       chat.indexOf("const avisoDeCota"),
       chat.indexOf("const avisoSemPlano"),
     );
-    const posResponda = aviso.indexOf("1. Responda a pergunta");
-    const posDiga = aviso.indexOf("2. Diga com naturalidade");
-    expect(posResponda).toBeGreaterThan(0);
-    expect(posResponda).toBeLessThan(posDiga);
+    const posUrgencia = aviso.indexOf("1. URGÊNCIA VEM ANTES DE TUDO E NÃO TEM LIMITE");
+    const posDemais = aviso.indexOf("3. Para as demais dúvidas");
+    expect(posUrgencia).toBeGreaterThan(0);
+    expect(posUrgencia).toBeLessThan(posDemais);
+    /* E na urgência o limite é INVISÍVEL — não é só "responda também". */
+    expect(aviso).toContain("você NÃO menciona limite nenhum");
+  });
+
+  test("a lista de urgência vem da fonte única, não de uma cópia", () => {
+    /* O CLAUDE.md proíbe duplicar limite clínico. A lista vivia como variável
+       local dentro de `medicalSystemPrompt`; quando o aviso de cota passou a
+       precisar dela, copiá-la teria criado uma segunda régua. */
+    expect(chat).toContain("sinaisDeUrgencia(patient.careMode)");
+    expect(chat).toContain("export function sinaisDeUrgencia(");
+  });
+
+  test("e o limite nunca é apresentado como escolha do médico", () => {
+    /* A IA carrega a marca dele. Dizer à cliente dele que ele "cortou custo" no
+       cuidado dela custa mais caro que a diferença entre dois planos. */
+    const aviso = chat.slice(
+      chat.indexOf("const avisoDeCota"),
+      chat.indexOf("const avisoSemPlano"),
+    );
+    expect(aviso).toContain("O limite é DA PLATAFORMA, não dele");
   });
 
   test("o WhatsApp vem da coluna das PACIENTES, não do pessoal", () => {

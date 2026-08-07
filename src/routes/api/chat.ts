@@ -119,9 +119,7 @@ function medicalSystemPrompt(doctorName?: string | null, careMode = false): stri
    * a IA cita ao responder sobre sangramento vinha emparelhada com "redução dos
    * movimentos do bebê" — o conserto tinha tirado a semana do prompt e deixado
    * o bebê nele. Os sinais continuam os mesmos; o que sai é a menção. */
-  const urgencia = careMode
-    ? "sangramento intenso, dor intensa, febre, pressão muito alta"
-    : "sangramento, dor intensa, redução dos movimentos do bebê, pressão muito alta";
+  const urgencia = sinaisDeUrgencia(careMode);
   return `Você é o assistente virtual ${consultorio}, no app de acompanhamento de gestação da paciente.
 
 Regras de resposta:
@@ -285,6 +283,24 @@ function historicoObstetrico(prof: {
  * Monta o bloco de contexto clínico para o system prompt. Só entra o que
  * existe no perfil; sem nome (privacidade no prompt) e com instrução de uso.
  */
+/**
+ * OS SINAIS QUE FAZEM A IA MANDAR PROCURAR ATENDIMENTO — uma lista só.
+ *
+ * Ela vivia como variável local dentro de `medicalSystemPrompt`. Quando o aviso
+ * de cota passou a precisar da MESMA lista (porque urgência não pode ser
+ * barrada por limite de plano), copiá-la para lá criaria uma segunda régua
+ * clínica — exatamente o que o CLAUDE.md proíbe. Extraída para que os dois
+ * leiam do mesmo lugar e não possam divergir.
+ *
+ * Em Modo Cuidado sai a menção ao bebê: os sinais continuam os mesmos, o que
+ * muda é o que se diz a quem acabou de perder a gestação.
+ */
+export function sinaisDeUrgencia(careMode = false): string {
+  return careMode
+    ? "sangramento intenso, dor intensa, febre, pressão muito alta"
+    : "sangramento, dor intensa, redução dos movimentos do bebê, pressão muito alta";
+}
+
 export function buildClinicalBlock(
   prof: {
     care_mode?: boolean | null;
@@ -1065,14 +1081,44 @@ export const Route = createFileRoute("/api/chat")({
           const seguirAcompanhamento = patient.careMode
             ? `O acompanhamento com ${medico} segue normalmente`
             : "O acompanhamento da gestação segue normalmente";
-          const avisoDeCota = `IMPORTANTE — as respostas pessoais de ${medico} pelo app estão pausadas até a virada do mês. ${seguirAcompanhamento}; o que muda é só este canal.
+          /* ─── O LIMITE PASSA A SER DITO — E A URGÊNCIA NUNCA É BARRADA ───
+             DECISÃO DO DONO (ago/2026). Antes, a IA respondia a dúvida com
+             informação consolidada e nunca mencionava limite. O motivo escrito
+             era bom: "uma gestante ansiosa que lê aquilo sem causa e sem prazo
+             conclui a coisa mais assustadora disponível". Mas o efeito colateral
+             era que NINGUÉM sentia o limite — o médico recebia o push de 80% e
+             100% e podia ignorar os dois, porque nada mudava para ele.
 
-Como agir, nesta ordem:
-1. Responda a pergunta com informação consolidada e geral, com cuidado e sem inventar conduta — respeitando integralmente o contexto clínico acima.
-2. Diga com naturalidade, UMA vez e sem drama, que esta resposta é da plataforma e não é a orientação pessoal de ${medico}, e que as respostas pessoais voltam na virada do mês — sem falar em cota, plano, pagamento ou limite.
-3. SEMPRE ofereça o caminho até ela: para qualquer coisa do caso dela, falar com ${medico} ${comoFalarComEle}. Isto não é opcional nem depende do tipo de pergunta — é o que impede a paciente de ficar sem saída.
+             Agora a paciente é avisada e vai ao WhatsApp dele. É ele quem sente.
 
-A dúvida FICA REGISTRADA para ${medico} — isso acontece de verdade, e você pode dizer. O que você NÃO promete é resposta pelo app agora: diga que ele vê quando puder, e que para hoje o caminho é o contato direto acima. Prometer resposta por aqui deixaria a paciente esperando por algo que não vem neste ciclo.`;
+             DUAS TRAVAS, e nenhuma é opcional:
+
+             1. URGÊNCIA NÃO TEM COTA. Se ela descrever um sinal de alarme, a
+                resposta sai igual e manda procurar atendimento — o limite não
+                é sequer mencionado. Um app de gestação de ALTO RISCO que cala
+                às 3h da manhã por causa de uma fatura não é um produto, é um
+                risco. A lista vem de `sinaisDeUrgencia`, a mesma que o prompt
+                base usa: uma régua só.
+
+             2. O LIMITE É DA PLATAFORMA, NUNCA DELE. A IA carrega a marca do
+                médico; dizer à cliente dele que "o limite DELE acabou" o faz
+                parecer que economizou no cuidado dela, e isso custa mais caro
+                que a diferença entre dois planos. */
+          const avisoDeCota = `IMPORTANTE — as respostas personalizadas de ${medico} pelo app chegaram ao limite deste mês e voltam na virada do mês. ${seguirAcompanhamento}; o que muda é só este canal.
+
+Como agir, NESTA ORDEM — a ordem importa:
+
+1. URGÊNCIA VEM ANTES DE TUDO E NÃO TEM LIMITE. Se a mensagem dela mencionar ${sinaisDeUrgencia(patient.careMode)} ou qualquer outro sinal que peça avaliação imediata: responda normalmente e por completo, respeitando integralmente o contexto clínico acima, oriente PROCURAR ATENDIMENTO AGORA (192/SAMU ou a maternidade) e ligar para ${medico} ${comoFalarComEle}. Neste caso você NÃO menciona limite nenhum — nem uma palavra.
+
+2. Se ela estiver preocupada com um sintoma que NÃO é sinal de alarme: diga com acolhimento para falar com ${medico}, porque quem conhece o caso dela é ele. Pode mencionar o limite, uma vez e sem drama.
+
+3. Para as demais dúvidas: NÃO responda o conteúdo da pergunta. Diga, uma vez e com naturalidade, que as respostas personalizadas de ${medico} pelo app chegaram ao limite deste mês e voltam até a virada do mês.
+
+4. SEMPRE ofereça o caminho até ela: falar com ${medico} ${comoFalarComEle}. Isto não é opcional e vale nos TRÊS casos acima — é o que impede a paciente de ficar sem saída.
+
+NUNCA diga nem sugira que ${medico} não pagou, não renovou, cortou custo ou economizou. O limite é DA PLATAFORMA, não dele — e você jamais o apresenta como uma escolha dele.
+
+A dúvida FICA REGISTRADA para ${medico} — isso acontece de verdade e você pode dizer. O que você NÃO promete é resposta pelo app agora: diga que ele vê quando puder, e que para hoje o caminho é o contato direto acima.`;
 
           /* ─── O PLANO DELE NÃO COBRE MAIS A IA ────────────────────────
              A cota estourada tem prazo e volta na virada do mês. Isto não

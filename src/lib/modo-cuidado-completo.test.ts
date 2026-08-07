@@ -226,11 +226,17 @@ describe("8. os dois últimos vizinhos", () => {
        IA cita ao responder sobre sangramento vinha emparelhada com "redução dos
        movimentos do bebê". Os sinais continuam os mesmos; o que sai é a
        menção. */
-    const i = chat.indexOf("const urgencia = careMode");
+    /* A lista foi EXTRAÍDA para `sinaisDeUrgencia`, porque o aviso de cota
+       passou a precisar dela e uma segunda cópia seria uma segunda régua
+       clínica — o que o CLAUDE.md proíbe. A asserção acompanha a fonte. */
+    const i = chat.indexOf("export function sinaisDeUrgencia(");
     expect(i).toBeGreaterThan(-1);
     const janela = chat.slice(i, i + 400);
     expect(janela).toContain("sangramento intenso, dor intensa, febre, pressão muito alta");
     expect(janela).toContain("redução dos movimentos do bebê"); // o ramo normal
+    /* E a ordem do ternário: invertida, a paciente em luto ouviria falar do
+       bebê e a gestante não. */
+    expect(janela).toContain('careMode\n    ? "sangramento intenso');
   });
 
   test("o bloco de pendências some — a porta ao lado da memória", () => {
