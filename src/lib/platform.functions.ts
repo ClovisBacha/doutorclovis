@@ -24,7 +24,8 @@ import {
   safe,
 } from "@/lib/platform-admin.server";
 import { writeAudit } from "@/lib/audit.server";
-import { planoEfetivo, vencimentoDaConcessao } from "@/lib/entitlements.server";
+import { planoEfetivo, planoVigente, vencimentoDaConcessao } from "@/lib/entitlements.server";
+import { normalizePlan } from "@/lib/entitlements";
 
 export type PlatformDoctor = {
   id: string;
@@ -142,6 +143,7 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
       id: string;
       display_name: string | null;
       plan: string | null;
+      plan_expires_at?: string | null;
       active: boolean | null;
       verified: boolean | null;
       created_at: string | null;
@@ -151,7 +153,7 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
         ((
           await sb
             .from("doctors")
-            .select("id,display_name,plan,active,verified,created_at")
+            .select("id,display_name,plan,plan_expires_at,active,verified,created_at")
             .order("created_at", { ascending: false })
             .limit(MAX_ROWS)
         ).data ?? []) as DocRow[],
@@ -218,9 +220,23 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
     }, 0);
 
     const doctorsActive = doctors.filter((d) => d.active).length;
-    const mrrEstimate = doctors
+    /* ─── O MRR CONTAVA ASSINATURA VENCIDA E PLANO NÃO-NORMALIZADO ──────────
+       Duas coisas, na mesma linha:
+       · `PLAN_PRICE[d.plan]` lia a coluna crua — um `pro` com o cartão recusado
+         há meses seguia somando ao MRR indefinidamente, e é o número que o
+         fundador usa para saber como o negócio vai;
+       · e a chave não era normalizada, então qualquer variante de escrita caía
+         no `?? 0` e o médico sumia da conta em silêncio — o erro no sentido
+         oposto, no mesmo lugar.
+       Pela régua ÚNICA, e com a chave normalizada. */
+    const mrrEstimate = docRows
       .filter((d) => d.active)
-      .reduce((s, d) => s + (PLAN_PRICE[d.plan] ?? 0), 0);
+      .reduce(
+        (soma, d) =>
+          soma +
+          (PLAN_PRICE[normalizePlan(planoVigente(d.plan, d.plan_expires_at) ?? "free")] ?? 0),
+        0,
+      );
 
     const overview: PlatformOverview = {
       isSuperAdmin: true,

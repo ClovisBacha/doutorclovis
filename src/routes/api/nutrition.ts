@@ -170,9 +170,16 @@ export const Route = createFileRoute("/api/nutrition")({
               await getBrainContextResolved(ultima, doctorId, "app", patientId)
             : null;
 
+        /* ─── "ESTA GESTANTE", COLADO LOGO DEPOIS DO PROMPT DE LUTO ─────────
+           O `NUTRICAO_EM_LUTO` proíbe, em maiúsculas, falar da gestação — e
+           esta frase, concatenada imediatamente abaixo dele, chamava a paciente
+           de gestante. Duas instruções contraditórias no mesmo prompt: exatamente
+           o defeito que os avisos de cota tinham, no arquivo ao lado.
+           A palavra sai; o resto da instrução vale igual nos dois casos. */
+        const quemE = careMode ? "paciente" : "gestante";
         const blocoDoMedico =
           brain?.enabledApp && brain.block
-            ? `\n\n${brain.block}\nO bloco acima é do médico que acompanha esta gestante. Use como referência de conduta e tom. Quando a dúvida dela não estiver coberta por ele, responda com informação nutricional consolidada e diga, com acolhimento, que registrou a pergunta para ele.`
+            ? `\n\n${brain.block}\nO bloco acima é do médico que acompanha esta ${quemE}. Use como referência de conduta e tom, respeitando integralmente o contexto clínico acima. Quando a dúvida dela não estiver coberta por ele, responda com informação nutricional consolidada e diga, com acolhimento, que registrou a pergunta para ele.`
             : "";
 
         /* O TETO DE ENTRADA. Este endpoint manda `body.messages` direto ao

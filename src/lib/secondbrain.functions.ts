@@ -842,6 +842,18 @@ export type BrainGap = {
   updated_at: string;
   /** Quando a PRIMEIRA paciente perguntou — é a idade da espera dela. */
   created_at?: string | null;
+  /**
+   * QUANTAS PACIENTES DISTINTAS estão esperando — que NÃO é `hits`.
+   *
+   * `hits` conta re-perguntas: a mesma gestante perguntando três vezes fazia a
+   * tela dizer "3 pacientes". A tela usava esse número para sugerir "só uma
+   * paciente perguntou isto — talvez seja do caso dela", que é a única
+   * orientação que ela dá sobre a decisão mais delicada do painel; e o
+   * SERVIDOR já recusava "só para ela" contando `brain_gap_askers`. Tela e
+   * servidor contando coisas diferentes sobre a mesma decisão.
+   * `undefined` quando a contagem falhou — a tela então não afirma nada.
+   */
+  pacientes?: number;
 };
 
 /**
@@ -1002,6 +1014,33 @@ export const listBrainGaps = createServerFn({ method: "POST" })
       return { ok: false as const, gaps: [] as BrainGap[], missingTable: true as const };
     if (error) return { ok: false as const, gaps: [] as BrainGap[] };
 
+    /* ─── QUANTAS PACIENTES, E NÃO QUANTAS VEZES ────────────────────────────
+       Uma consulta só para as 50 lacunas da tela, contando `user_id` DISTINTO.
+       O teto de 4.000 linhas é folga larga (50 × 80) e existe só para o caso
+       patológico; se ele for atingido, a contagem fica menor que a verdade e a
+       tela erra para o lado de sugerir cuidado, que é o lado certo aqui. */
+    const gapsBase = (rows ?? []) as BrainGap[];
+    const porLacuna = new Map<string, Set<string>>();
+    if (gapsBase.length) {
+      const { data: quem } = await (supabaseAdmin as any)
+        .from("brain_gap_askers")
+        .select("gap_id,user_id")
+        .in(
+          "gap_id",
+          gapsBase.map((g) => g.id),
+        )
+        .limit(4000);
+      for (const l of (quem ?? []) as { gap_id: string; user_id: string }[]) {
+        const set = porLacuna.get(l.gap_id) ?? new Set<string>();
+        set.add(l.user_id);
+        porLacuna.set(l.gap_id, set);
+      }
+    }
+    for (const g of gapsBase) {
+      const set = porLacuna.get(g.id);
+      if (set) g.pacientes = set.size;
+    }
+
     /* As ignoradas vêm numa segunda consulta e não num `.in("status", …)`:
        a comparação é entre DUAS COLUNAS (`hits` × `hits_ao_ignorar`), e o
        PostgREST não sabe fazer isso — o filtro acontece em JS.
@@ -1023,7 +1062,7 @@ export const listBrainGaps = createServerFn({ method: "POST" })
       voltaram = ignoradasQueVoltaram(ign.data ?? []);
     }
 
-    return { ok: true as const, gaps: (rows ?? []) as BrainGap[], voltaram };
+    return { ok: true as const, gaps: gapsBase, voltaram };
   });
 
 /**

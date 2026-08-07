@@ -180,11 +180,27 @@ export const createClinic = createServerFn({ method: "POST" })
       .single();
     if (error || !clinic) return { ok: false as const };
 
-    // Se o dono também é médico, entra como admin da própria clínica.
-    await sb
+    /* Se o dono também é médico, entra como admin da própria clínica.
+       ─── E SÓ SE ELE NÃO ESTIVER EM OUTRA ────────────────────────────────
+       `sairDaClinica` foi escrita para ser a porta de saída, e este caminho
+       passava por fora dela: criar uma clínica sobrescrevia `clinic_id` em
+       silêncio, tirando o médico da clínica anterior sem avisar ninguém — nem
+       ele, nem o admin de lá, que perde um membro sem um evento sequer.
+       Com vínculo existente, a criação segue e o assento NÃO troca: ele decide
+       sair pela porta que existe para isso. */
+    const { data: atual } = await sb
       .from("doctors")
-      .update({ clinic_id: clinic.id, clinic_role: "admin" })
-      .eq("id", user.id);
+      .select("clinic_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!atual?.clinic_id) {
+      await sb
+        .from("doctors")
+        .update({ clinic_id: clinic.id, clinic_role: "admin" })
+        .eq("id", user.id);
+    } else {
+      console.error("[clínica] dono já pertence a outra clínica; assento não trocado", user.id);
+    }
     return { ok: true as const, clinicId: clinic.id as string };
   });
 

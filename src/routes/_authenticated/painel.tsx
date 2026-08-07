@@ -6897,9 +6897,23 @@ function BrainGapsCard({
                     <span>
                       Responder <strong>só para ela</strong> — a resposta chega a quem perguntou e
                       NÃO vira conhecimento do consultório.
-                      {g.hits === 1 && !soParaEla ? (
+                      {/* PACIENTES DISTINTAS, não `hits`. `hits` conta
+                          re-perguntas: a mesma gestante perguntando três vezes
+                          fazia a tela dizer "3 pacientes" e esconder esta
+                          sugestão — a única orientação que ela dá sobre a
+                          decisão mais delicada do painel. E o servidor já
+                          contava `brain_gap_askers` para recusar "só para ela":
+                          tela e servidor contavam coisas diferentes sobre a
+                          mesma decisão. Sem a contagem, a tela não afirma. */}
+                      {g.pacientes === 1 && !soParaEla ? (
                         <em className="ml-1 not-italic text-amber-700">
                           Só uma paciente perguntou isto — talvez seja do caso dela.
+                        </em>
+                      ) : null}
+                      {(g.pacientes ?? 0) > 1 && soParaEla ? (
+                        <em className="ml-1 not-italic text-rose-700">
+                          {g.pacientes} pacientes estão esperando — &quot;só para ela&quot; não vale
+                          aqui.
                         </em>
                       ) : null}
                     </span>
