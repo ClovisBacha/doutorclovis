@@ -30,7 +30,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { memoriaSegura, memoryBlock } from "./chat-memory.server";
+import { cortarPreservandoEstilo, memoriaSegura, memoryBlock } from "./chat-memory.server";
 
 const chat = readFileSync("src/routes/api/chat.ts", "utf8");
 /* SEM COMENTÁRIOS, para as asserções sobre o PROMPT. Nenhuma delas distinguia
@@ -138,6 +138,55 @@ describe("a linha de estilo sobrevive ao corte", () => {
     const s = memoriaSegura(`- azia\n- Estilo: ${"muito ".repeat(80)}`);
     const linha = s.slice(s.indexOf("- Estilo:"));
     expect(linha.length).toBeLessThanOrEqual(150 /* "- Estilo: " + 140 */);
+  });
+});
+
+describe("o SEGUNDO corte, a montante, também preserva o estilo", () => {
+  /**
+   * `memoriaSegura` foi escrita para impedir que o corte de 1.200 da INJEÇÃO
+   * matasse a linha de estilo. Mas há um corte ANTES: o resumo é gravado com
+   * `slice(0, 2400)`. Num resumo longo — o das pacientes que mais conversam,
+   * que é exatamente para quem a adaptação mais importa — a linha morria ali,
+   * antes de `memoriaSegura` chegar a vê-la. Consertei a porta e deixei a
+   * janela.
+   */
+  const LONGO = "- fato clínico ".repeat(300) + "\n- Estilo: escreve curto e informal";
+
+  test("num resumo que estoura o teto de gravação, o estilo sobrevive", () => {
+    const r = cortarPreservandoEstilo(LONGO, 2400);
+    expect(r).toContain("Estilo: escreve curto e informal");
+  });
+
+  test("e o teto continua sendo respeitado", () => {
+    expect(cortarPreservandoEstilo(LONGO, 2400).length).toBeLessThanOrEqual(2400);
+  });
+
+  test("resumo que cabe não é tocado", () => {
+    /* Reconstruir sem necessidade mexeria na ordem das linhas de todo mundo.
+       A entrada tem a linha de estilo NO MEIO de propósito: com `- azia\n-
+       Estilo: curta` a reconstrução devolveria exatamente a mesma string, e o
+       teste não conseguiria distinguir os dois caminhos. */
+    const curto = "- azia\n- Estilo: curta\n- enjoo de manhã";
+    expect(cortarPreservandoEstilo(curto, 2400)).toBe(curto);
+  });
+
+  test("e o CHAMADOR usa o corte que preserva", () => {
+    /* Os testes acima provam a função e não quem a chama — e o mutante que
+       devolve o `slice(0, 2400)` seco sobreviveu à bateria. É a terceira vez
+       hoje que a mesma armadilha aparece (backfill, bloco do cérebro, aqui). */
+    expect(memoria).toContain("cortarPreservandoEstilo(result.text.trim(), 2400)");
+    expect(memoria).not.toContain("result.text.trim().slice(0, 2400)");
+  });
+
+  test("sem linha de estilo, corta como sempre cortou", () => {
+    const semEstilo = "- fato ".repeat(1000);
+    expect(cortarPreservandoEstilo(semEstilo, 100).length).toBe(100);
+  });
+
+  test("os dois cortes juntos: gravação e injeção", () => {
+    /* O caminho real. Se qualquer um dos dois perder a linha, ela não chega. */
+    const gravado = cortarPreservandoEstilo(LONGO, 2400);
+    expect(memoriaSegura(gravado)).toContain("Estilo: escreve curto e informal");
   });
 });
 

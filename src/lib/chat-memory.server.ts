@@ -100,6 +100,49 @@ export async function getChatMemory(
  * papel, quebra de linha) e limita o tamanho. O conteúdo continua livre; o
  * poder de reescrever o prompt, não.
  */
+/**
+ * Onde está a linha de estilo, e o que conta como uma.
+ *
+ * Compartilhado porque há DOIS cortes no caminho dela — o de 2.400 caracteres,
+ * quando o resumo é gravado, e o de 1.200, quando é injetado. Cada um tinha de
+ * saber preservá-la, e uma segunda cópia desta regra divergiria da primeira.
+ */
+function acharEstilo(linhas: string[]): {
+  iEstilo: number;
+  ehEstilo: (l: string) => boolean;
+} {
+  const ehEstilo = (l: string) => /^\s*[-*]?\s*Estilo\s*:/i.test(l);
+  let iEstilo = -1;
+  for (let i = linhas.length - 1; i >= 0; i--) {
+    if (ehEstilo(linhas[i])) {
+      iEstilo = i;
+      break;
+    }
+  }
+  return { iEstilo, ehEstilo };
+}
+
+/**
+ * Corta o resumo preservando a linha de estilo, que é a ÚLTIMA por contrato.
+ *
+ * ─── O SEGUNDO CORTE, A MONTANTE ────────────────────────────────────────────
+ *
+ * `memoriaSegura` foi escrita para impedir que o `slice(0, 1200)` da injeção
+ * matasse a linha de estilo. Mas há um corte ANTES dele: o resumo é gravado com
+ * `slice(0, 2400)`. Num resumo longo — o das pacientes que mais conversam, que
+ * é exatamente para quem a adaptação mais importa — a linha morria ali, antes
+ * de `memoriaSegura` chegar a vê-la. Consertei a porta e deixei a janela.
+ */
+export function cortarPreservandoEstilo(bruto: string, max: number): string {
+  if (bruto.length <= max) return bruto;
+  const linhas = bruto.split(/\r\n|\r|\n/);
+  const { iEstilo } = acharEstilo(linhas);
+  if (iEstilo < 0) return bruto.slice(0, max);
+  const estilo = linhas[iEstilo].trim().slice(0, 160);
+  const corpo = linhas.filter((_, i) => i !== iEstilo).join("\n");
+  return `${corpo.slice(0, Math.max(0, max - estilo.length - 1))}\n${estilo}`;
+}
+
 export function memoriaSegura(bruto: string): string {
   /* ─── A LINHA DE ESTILO SOBREVIVE AO CORTE ────────────────────────────────
    *
@@ -127,14 +170,7 @@ export function memoriaSegura(bruto: string): string {
    * das duas vale. Pior: a linha derrotada continuava no CORPO, então as duas
    * saíam, com a plantada por último no texto final.
    * `findLastIndex` faz o código concordar com a instrução. */
-  const ehEstilo = (l: string) => /^\s*[-*]?\s*Estilo\s*:/i.test(l);
-  let iEstilo = -1;
-  for (let i = linhas.length - 1; i >= 0; i--) {
-    if (ehEstilo(linhas[i])) {
-      iEstilo = i;
-      break;
-    }
-  }
+  const { iEstilo, ehEstilo } = acharEstilo(linhas);
 
   /* ─── O RÓTULO É NOSSO, O CONTEÚDO É DELA ──────────────────────────────────
    *
@@ -214,8 +250,18 @@ export function maybeUpdateChatMemory(
   doctorId: string | null,
   careMode = false,
 ): void {
-  /* DISPARA-E-ESQUECE AUTORIZADO: telemetria pura. Perder uma linha não muda
-     nada para ninguém, e aguardar poria uma escrita no caminho da resposta. */
+  /* DISPARA-E-ESQUECE AUTORIZADO — mas NÃO por ser "telemetria pura", que era
+     o que este comentário dizia e o comentário logo abaixo já contradizia na
+     mesma função. Isto é uma chamada de modelo inteira, ~20% da conta de IA.
+
+     A autorização é outra, e vale a pena escrevê-la certo: esperar aqui poria
+     uma chamada de modelo no caminho da resposta da paciente, e o que se perde
+     numa execução falha é a memória ficar parada até a próxima janela de 6
+     mensagens — degradação, não perda de dado dela.
+
+     O que torna isso seguro em serverless é o disparo acontecer ANTES do
+     `streamText`: a invocação fica viva enquanto o stream corre. Depois dele, a
+     invocação congela com a resposta e este trabalho morria pela metade. */
   void (async () => {
     try {
       const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
@@ -332,7 +378,10 @@ export function maybeUpdateChatMemory(
         /* medir é opcional */
       }
 
-      const summary = result.text.trim().slice(0, 2400);
+      /* Preservando a linha de estilo — ver `cortarPreservandoEstilo`. Era
+         `.slice(0, 2400)` seco, e nos resumos longos a linha morria AQUI, antes
+         de a proteção do outro corte existir. */
+      const summary = cortarPreservandoEstilo(result.text.trim(), 2400);
       if (!summary) return;
 
       /* Best-effort de verdade — perder um resumo não quebra a conversa. Mas
