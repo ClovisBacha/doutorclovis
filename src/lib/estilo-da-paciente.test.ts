@@ -33,6 +33,12 @@ import { readFileSync } from "node:fs";
 import { memoriaSegura, memoryBlock } from "./chat-memory.server";
 
 const chat = readFileSync("src/routes/api/chat.ts", "utf8");
+/* SEM COMENTÁRIOS, para as asserções sobre o PROMPT. Nenhuma delas distinguia
+   template literal de comentário: retirando o bloco do prompt e deixando o
+   texto numa explicação ao lado, a suíte continuava verde — e a adaptação de
+   estilo, que é o ponto que o dono do produto marcou como o mais importante,
+   deixava de existir sem um único teste falhar. */
+const chatSemComentarios = chat.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const memoria = readFileSync("src/lib/chat-memory.server.ts", "utf8");
 
 describe("a linha de estilo sobrevive ao corte", () => {
@@ -147,22 +153,22 @@ describe("o prompt espelha o jeito dela", () => {
   test("a trava fixa de comprimento virou faixa adaptativa", () => {
     /* "Seja conciso (3 a 6 frases)" sozinho era uma regra que anulava a
        adaptação antes de ela existir. */
-    expect(chat).toContain("ESPELHE O JEITO DELA");
-    expect(chat).toContain("pergunta de uma linha pede resposta curta");
+    expect(chatSemComentarios).toContain("ESPELHE O JEITO DELA");
+    expect(chatSemComentarios).toContain("pergunta de uma linha pede resposta curta");
     // O padrão antigo continua sendo o padrão quando não dá para dizer.
-    expect(chat).toContain("são 3 a 6 frases");
+    expect(chatSemComentarios).toContain("são 3 a 6 frases");
   });
 
   test("adaptar a forma nunca autoriza informar menos", () => {
     /* O risco óbvio da adaptação: "ela escreve curto" virar desculpa para
        responder pouco sobre um sinal de alarme. */
-    expect(chat).toContain("Adaptar a forma nunca é motivo para informar menos");
+    expect(chatSemComentarios).toContain("Adaptar a forma nunca é motivo para informar menos");
   });
 
   test("os dois eixos são declarados, e um não sobrescreve o outro", () => {
-    expect(chat).toContain("DOIS donos de estilo");
-    expect(chat).toContain("governa a VOZ CLÍNICA");
-    expect(chat).toContain("governa a FORMA");
+    expect(chatSemComentarios).toContain("DOIS donos de estilo");
+    expect(chatSemComentarios).toContain("governa a VOZ CLÍNICA");
+    expect(chatSemComentarios).toContain("governa a FORMA");
   });
 });
 
@@ -197,10 +203,10 @@ describe("o texto livre dela não reescreve o prompt", () => {
   test("o bloco de pendências usa a MESMA higiene, não uma cópia", () => {
     /* Duas higienes divergem — foi o que aconteceu com o filtro de lacuna e com
        o corte de similaridade nesta base. */
-    expect(chat).toContain("const minha = memoriaSegura(textoDela.get(g.id)");
+    expect(chatSemComentarios).toContain("const minha = memoriaSegura(textoDela.get(g.id)");
   });
 
   test("e ainda corta o comprimento — 300 caracteres dentro do prompt é muito", () => {
-    expect(chat).toContain(".slice(0, 160)");
+    expect(chatSemComentarios).toContain(".slice(0, 160)");
   });
 });

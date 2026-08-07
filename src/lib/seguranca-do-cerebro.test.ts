@@ -9,7 +9,16 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 const chat = readFileSync("src/routes/api/chat.ts", "utf8");
-const clinica = readFileSync("src/lib/clinic.functions.ts", "utf8");
+/* SEM COMENTÁRIOS. Um verificador burlou as asserções abaixo movendo o valor
+   para uma variável e deixando a linha original DENTRO de um comentário:
+     const papelDeSaida = null;
+     /* .update({ clinic_id: null, clinic_role: "member" }) *\/
+     ... .update({ clinic_id: null, clinic_role: papelDeSaida })
+   A porta de saída voltava a falhar sempre (a coluna é NOT NULL) e os testes
+   continuavam verdes. Asserção sobre CÓDIGO, nunca sobre prosa. */
+const clinica = readFileSync("src/lib/clinic.functions.ts", "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
 const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
 const sql = readFileSync("supabase/APLICAR_PENDENTES.sql", "utf8");
 
@@ -70,9 +79,20 @@ describe("a porta de saída da clínica abre", () => {
 
   test("a saída grava 'member', o DEFAULT da coluna", () => {
     const i = clinica.indexOf("export const sairDaClinica");
+    expect(i).toBeGreaterThan(-1);
     const janela = clinica.slice(i, i + 1800);
     expect(janela).toContain('.update({ clinic_id: null, clinic_role: "member" })');
     expect(janela).not.toContain("clinic_role: null");
+  });
+
+  test("e o papel é um LITERAL — nada de variável no meio do caminho", () => {
+    /* A forma exata da burla: `clinic_role: papelDeSaida`. Uma variável ali
+       significa que o valor escrito não é mais visível neste arquivo, e a
+       asserção de cima passa a provar um comentário. */
+    const i = clinica.indexOf("export const sairDaClinica");
+    const janela = clinica.slice(i, i + 1800);
+    const escritas = [...janela.matchAll(/clinic_role:\s*([^,}\s]+)/g)].map((m) => m[1]);
+    expect(escritas).toEqual(['"member"']);
   });
 
   test("e a falha não vira sucesso silencioso", () => {

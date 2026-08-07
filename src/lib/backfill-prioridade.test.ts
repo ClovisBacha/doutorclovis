@@ -23,6 +23,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { priorizarAprovadas } from "./embeddings.server";
 
 type Ordem = { coluna: string; ascendente: boolean };
@@ -65,5 +66,47 @@ describe("a prioridade do backfill", () => {
   test("duas ordenações, não mais — a cadeia continua para quem chama", () => {
     expect(ordens).toHaveLength(2);
     expect(priorizarAprovadas(q)).toBe(q);
+  });
+});
+
+describe("e o CHAMADOR realmente a usa", () => {
+  /**
+   * Tudo acima prova a função EXTRAÍDA e nada prova quem a chama. Um
+   * verificador mediu: trocando, em `backfillBrainEmbeddings`,
+   *
+   *   await priorizarAprovadas(sb.from("brain_entries").select(...).eq(...))
+   * por
+   *   sb.from("brain_entries").select(...).eq(...)
+   *
+   * — ou seja, o backfill volta a pegar qualquer entrada, gastando as 20 vagas
+   * com rascunhos que a busca nunca devolve — a suíte inteira continuava verde.
+   * Remover a priorização de novo era de graça.
+   *
+   * O chamador está dentro de uma função que fala com o Gemini e com o banco;
+   * exercitá-la aqui custaria um dublê para cada um. A asserção é sobre a
+   * LIGAÇÃO, que é o que estava sem prova nenhuma.
+   */
+  const fonte = readFileSync("src/lib/embeddings.server.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  test("o backfill lê `brain_entries` através de `priorizarAprovadas`", () => {
+    const i = fonte.indexOf("export async function backfillBrainEmbeddings");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = fonte.slice(i);
+    expect(corpo).toContain('priorizarAprovadas(\n      sb.from("brain_entries")');
+  });
+
+  test("e não existe uma segunda leitura de `brain_entries` sem prioridade", () => {
+    /* A forma da regressão: `sb.from("brain_entries").select(...)` solto, fora
+       da chamada. Se aparecer, é o caminho sem prioridade voltando. */
+    const i = fonte.indexOf("export async function backfillBrainEmbeddings");
+    const corpo = fonte.slice(i);
+    const leituras = [...corpo.matchAll(/sb\.from\("brain_entries"\)\s*\.select/g)];
+    /* Exatamente UMA leitura, e ela e' a que esta' DENTRO da chamada. Uma
+       segunda seria o caminho sem prioridade voltando por outra porta. */
+    expect(leituras).toHaveLength(1);
+    const antes = corpo.slice(Math.max(0, leituras[0].index - 40), leituras[0].index);
+    expect(antes).toContain("priorizarAprovadas(");
   });
 });
