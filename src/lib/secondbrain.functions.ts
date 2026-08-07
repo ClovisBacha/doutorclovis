@@ -650,20 +650,48 @@ export const answerAndTrain = createServerFn({ method: "POST" })
     const { data: question, error: qErr } = await qQuery.maybeSingle();
     if (qErr || !question) return { ok: false as const };
 
-    const questionText = data.question?.trim() || (question.question as string);
-    const { data: entry, error: insertError } = await (supabaseAdmin as any)
-      .from("brain_entries")
-      .insert({
-        doctor_id: target.doctorId,
-        question: questionText,
-        answer: data.answer,
-        source: "pergunta",
-        approved: true,
-      })
-      .select("id")
-      .single();
-    if (insertError || !entry) return { ok: false as const };
-    {
+    /* ─── A QUINTA SUPERFÍCIE DO VAZAMENTO ──────────────────────────────────
+     *
+     * Era `data.question?.trim() || (question.question as string)`: sem a versão
+     * generalizada, o texto CRU da paciente virava a entrada do cérebro. E o
+     * painel mandava justamente o texto cru por padrão, porque o campo nascia
+     * preenchido com ele — ou seja, o caminho de MENOR ESFORÇO publicava o
+     * literal.
+     *
+     * O alcance é maior que o das quatro superfícies já fechadas: aquelas
+     * vazavam para quem perguntou a mesma coisa; `brain_entries` é permanente e
+     * é interpolada como `P: ...` no system prompt de TODA paciente daquele
+     * médico cuja pergunta case por vetor ou palavra. "Posso continuar o
+     * antidepressivo? meu marido não sabe da gravidez" vira conhecimento do
+     * consultório.
+     *
+     * O docstring do schema, três linhas acima, já prometia o contrário: "a
+     * pergunta original da paciente pode conter dados pessoais e fica só em
+     * doctor_questions, nunca no cérebro reutilizável". O código contrariava o
+     * próprio contrato.
+     *
+     * A regra aplicada aqui não é nova: o gêmeo mais recente
+     * (`responderPergunta`, em `clinical.functions.ts`) já a tinha escrito —
+     * "só treina com a pergunta REESCRITA". Esta função e a `resolveBrainGap`
+     * ficaram para trás. Sem generalização, a paciente é respondida do mesmo
+     * jeito e o cérebro não aprende nada. */
+    const questionText = (data.question ?? "").trim();
+    const podeTreinar = questionText.length >= 8;
+    let entry: { id: string } | null = null;
+    if (podeTreinar) {
+      const { data: nova, error: insertError } = await (supabaseAdmin as any)
+        .from("brain_entries")
+        .insert({
+          doctor_id: target.doctorId,
+          question: questionText,
+          answer: data.answer,
+          source: "pergunta",
+          approved: true,
+        })
+        .select("id")
+        .single();
+      if (insertError || !nova) return { ok: false as const };
+      entry = nova as { id: string };
       const { embedBrainEntry } = await import("./embeddings.server");
       await embedBrainEntry(entry.id, questionText, data.answer);
     }
@@ -686,16 +714,21 @@ export const answerAndTrain = createServerFn({ method: "POST" })
          Se a própria compensação falhar em silêncio, ela produz exatamente o
          defeito que existe para impedir — e o médico, que só vê "não deu
          certo", responde de novo e passa a ter duas entradas dizendo a mesma
-         coisa para a IA. */
-      const { error: delErr } = await (supabaseAdmin as any)
-        .from("brain_entries")
-        .delete()
-        .eq("id", entry.id);
-      if (delErr)
-        console.error("[cérebro] compensação falhou; entrada duplicável", entry.id, delErr);
+         coisa para a IA.
+         (Sem generalização não há entrada criada — não há o que compensar.) */
+      if (entry) {
+        const { error: delErr } = await (supabaseAdmin as any)
+          .from("brain_entries")
+          .delete()
+          .eq("id", entry.id);
+        if (delErr)
+          console.error("[cérebro] compensação falhou; entrada duplicável", entry.id, delErr);
+      }
       return { ok: false as const };
     }
-    return { ok: true as const };
+    /* `treinou` é o que a tela precisa para não prometer o que não aconteceu —
+       o toast dizia "aprendida pelo cérebro" mesmo quando nada foi aprendido. */
+    return { ok: true as const, treinou: podeTreinar };
   });
 
 const TestSchema = z.object({
@@ -1109,7 +1142,17 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!gap) return { ok: false as const };
 
-    const questionText = data.question?.trim() || (gap.question as string);
+    /* ─── O TEXTO CRU DA PRIMEIRA PACIENTE NÃO VIRA CONHECIMENTO ────────────
+     * Era `data.question?.trim() || (gap.question as string)`, e `gap.question`
+     * é o enunciado cru de quem perguntou PRIMEIRO. Ver a explicação longa em
+     * `answerAndTrain`: mesma regra, mesmo motivo, e a mesma que
+     * `responderPergunta` já aplicava.
+     *
+     * `perguntaDela` continua existindo para a ENTREGA: a paciente precisa
+     * reconhecer a própria dúvida ao receber a resposta. O que muda é só o que
+     * entra em `brain_entries`. */
+    const questionText = (data.question ?? "").trim();
+    const temGeneralizada = questionText.length >= 8;
 
     /* ─── "SÓ PARA ELA" EXIGE QUE EXISTA UMA "ELA" ───────────────────────────
      *
@@ -1154,7 +1197,7 @@ export const resolveBrainGap = createServerFn({ method: "POST" })
        marcada como respondida e a entrega segue igual — quem perguntou recebe.
        É a mesma alavanca que o caminho da aba Perguntas já tinha; aqui faltava. */
     let entry: { id: string } | null = null;
-    if (!data.soParaEla) {
+    if (!data.soParaEla && temGeneralizada) {
       const { data: nova, error: insErr } = await sb
         .from("brain_entries")
         .insert({
@@ -1292,14 +1335,18 @@ async function fecharLacunasParecidas(
       if (!linha) continue;
       fechadas++;
       /* Quem perguntou a parecida recebe a MESMA orientação, com o PRÓPRIO
-         texto. A rede, para quem não tem texto guardado, é a pergunta desta
-         lacuna parecida — que é a mais próxima do que ela perguntou e continua
-         não sendo a de outra pessoa identificável, porque é o enunciado que
-         agrupou o conjunto. */
+         texto.
+         ─── A REDE NÃO PODE SER `linha.question` ──────────────────────────
+         O comentário anterior dizia que o enunciado da lacuna parecida "não é
+         de outra pessoa identificável, porque é o enunciado que agrupou o
+         conjunto". Não é verdade: `brain_gaps.question` é o texto CRU de quem
+         perguntou PRIMEIRO aquela lacuna — a mesma coisa que foi consertada
+         duas funções acima, entrando de volta pelo outro argumento.
+         Vazio aqui faz `entregarRespostaDaLacuna` cair na frase neutra. */
       await entregarRespostaDaLacuna(sb, {
         gapId: linha.id as string,
         doctorId: args.doctorId,
-        perguntaGeneralizada: linha.question as string,
+        perguntaGeneralizada: "",
         resposta: args.resposta,
       });
     }
@@ -1392,7 +1439,16 @@ export async function entregarRespostaDaLacuna(
        Sem o texto guardado, vai a versão do MÉDICO (generalizada, sem dado
        pessoal de ninguém). Ela reconhece menos, e não recebe a intimidade de
        outra pessoa — a troca é essa, e não tem meio-termo. */
-    const perguntaPara = (uid: string) => textoDe.get(uid) || args.perguntaGeneralizada;
+    /* ─── E A REDE DA REDE ────────────────────────────────────────────────
+       `perguntaGeneralizada` pode vir vazia agora: sem a versão reescrita, o
+       médico responde e o cérebro não aprende — e aí não há texto do médico
+       para usar. Antes o vazio nunca acontecia porque o padrão era o texto CRU
+       da paciente, que é justamente o que não pode sair daqui.
+       Uma frase neutra é pior de reconhecer e não é de ninguém. */
+    const perguntaPara = (uid: string) =>
+      textoDe.get(uid) ||
+      args.perguntaGeneralizada.trim() ||
+      "Uma dúvida que você encaminhou ao consultório";
     const { error: insErr } = await sb.from("doctor_questions").insert(
       destino.map((uid) => ({
         user_id: uid,

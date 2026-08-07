@@ -996,10 +996,24 @@ describe("responder uma lacuna fecha as parecidas", () => {
 
   test('"só para ela" também não cria entrada nem vetor', () => {
     /* Sem isto a opção seria só um rótulo: o conhecimento entraria no cérebro
-       do mesmo jeito e responderia a outras pacientes na próxima pergunta. */
-    expect(fonte).toContain("if (!data.soParaEla) {");
-    const i = fonte.indexOf("if (!data.soParaEla) {");
+       do mesmo jeito e responderia a outras pacientes na próxima pergunta.
+       A guarda ganhou um segundo termo — ver o teste logo abaixo. */
+    expect(fonte).toContain("if (!data.soParaEla && temGeneralizada) {");
+    const i = fonte.indexOf("if (!data.soParaEla && temGeneralizada) {");
     expect(fonte.slice(i, i + 900)).toContain("embedBrainEntry(entry.id");
+  });
+
+  test("e sem a pergunta GENERALIZADA também não — a quinta superfície", () => {
+    /* Era `data.question?.trim() || (gap.question as string)`: sem a versão
+       reescrita, o texto CRU da paciente virava a entrada permanente do
+       cérebro, lida no prompt de TODAS as outras. E o painel mandava o texto
+       cru por padrão, porque o campo nascia preenchido com ele — o caminho de
+       menor esforço publicava o literal. */
+    expect(fonte).toContain('const questionText = (data.question ?? "").trim();');
+    expect(fonte).toContain("const temGeneralizada = questionText.length >= 8;");
+    /* A asserção que descreve o defeito: a queda para o texto cru não existe. */
+    expect(fonte).not.toContain("data.question?.trim() || (gap.question as string)");
+    expect(fonte).not.toContain("data.question?.trim() || (question.question as string)");
   });
 
   test("compara o vetor da PERGUNTA, não o da entrada", () => {
@@ -1036,8 +1050,15 @@ describe("responder uma lacuna fecha as parecidas", () => {
        mandar `linha.question` como "a pergunta dela" entregava, a cada
        paciente, o texto cru da PRIMEIRA que perguntou — na aba Perguntas e no
        corpo do push. Agora cada uma recebe o próprio texto guardado, e este
-       campo é só a rede para quem não tem. */
-    expect(trecho).toContain("perguntaGeneralizada: linha.question as string,");
+       campo é só a rede para quem não tem.
+       ─── E A REDE NÃO PODE SER `linha.question` ─────────────────────────
+       Era o que estava aqui, com um comentário dizendo que o enunciado da
+       lacuna parecida "não é de ninguém identificável". É: `brain_gaps.question`
+       é o texto cru de quem perguntou PRIMEIRO aquela lacuna. O mesmo vazamento
+       consertado duas funções acima, voltando pelo outro argumento. Vazio faz
+       a entrega cair na frase neutra. */
+    expect(trecho).toContain('perguntaGeneralizada: "",');
+    expect(trecho).not.toContain("perguntaGeneralizada: linha.question");
   });
 
   test("falhar aqui não desfaz a resposta principal", () => {

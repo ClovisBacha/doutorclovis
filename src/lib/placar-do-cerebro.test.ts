@@ -11,6 +11,14 @@ import { readFileSync } from "node:fs";
 
 const cerebro = readFileSync("src/lib/secondbrain.server.ts", "utf8");
 const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+/* SEM COMENTÁRIOS, para as asserções POSICIONAIS. Uma janela medida em bytes a
+   partir de um marcador encolhe a própria cobertura quando o código ganha
+   explicação: este arquivo já reprovou uma vez por isso, sem nada ter
+   quebrado. E asserções sobre o texto casam com a prosa em vez do código. */
+const painelSemComentarios = painel
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
 
 describe("a mesma mensagem não conta como acerto E como lacuna", () => {
   /**
@@ -76,16 +84,17 @@ describe('a caixa "só para ela" é do item, não da tela', () => {
        abrir a lacuna seguinte a herdava: ele responderia em modo individual sem
        saber, ou seria recusado sem entender por quê. */
     expect(painel).toContain("setSoParaEla(false); // cancelar também limpa");
-    const i = painel.indexOf("setAnswering(g.id);");
-    expect(painel.slice(i, i + 600)).toContain("setSoParaEla(false)");
+    const i = painelSemComentarios.indexOf("setAnswering(g.id);");
+    expect(i).toBeGreaterThan(-1);
+    expect(painelSemComentarios.slice(i, i + 600)).toContain("setSoParaEla(false)");
   });
 
   test("ela é desmarcada ao terminar uma lacuna", () => {
     /* Ficar marcada faria a PRÓXIMA lacuna ser respondida em modo individual
        sem ele perceber — e aí o conhecimento que ele achou que estava criando
        simplesmente não existe. */
-    const i = painel.indexOf("async function resolve(gapId: string)");
+    const i = painelSemComentarios.indexOf("async function resolve(gapId: string)");
     expect(i).toBeGreaterThan(-1);
-    expect(painel.slice(i, i + 3200)).toContain("setSoParaEla(false)");
+    expect(painelSemComentarios.slice(i, i + 3200)).toContain("setSoParaEla(false)");
   });
 });

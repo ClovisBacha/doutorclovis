@@ -6707,11 +6707,24 @@ function BrainGapsCard({
       /* Diz quantas parecidas saíram junto. Sem isso, três linhas somem da
          fila e o médico fica sem saber se respondeu ou se perdeu alguma. */
       const juntas = "parecidas" in res && typeof res.parecidas === "number" ? res.parecidas : 0;
-      toast.success(
+      /* ─── O TOAST DIZIA "APRENDIDA" QUANDO NADA FOI APRENDIDO ────────────
+         Duas situações em que o cérebro não aprende: "só para ela" marcada, e
+         o campo da pergunta generalizada em branco (que agora é o padrão).
+         Em ambas o médico lia "Respondida e aprendida pelo cérebro 🧠". */
+      const aprendeu = !soParaEla && editedQuestion.trim().length >= 8;
+      const parecidasTxt =
         juntas > 0
-          ? `Respondida e aprendida 🧠 — ${juntas} pergunta${juntas > 1 ? "s" : ""} parecida${juntas > 1 ? "s" : ""} também ${juntas > 1 ? "foram respondidas" : "foi respondida"}`
-          : "Respondida e aprendida pelo cérebro 🧠",
-      );
+          ? ` — ${juntas} pergunta${juntas > 1 ? "s" : ""} parecida${juntas > 1 ? "s" : ""} também ${juntas > 1 ? "foram respondidas" : "foi respondida"}`
+          : "";
+      if (aprendeu) {
+        toast.success(`Respondida e aprendida pelo cérebro 🧠${parecidasTxt}`);
+      } else {
+        toast.success(`Respondida ✓${parecidasTxt}`, {
+          description: soParaEla
+            ? "Só para ela: não virou conhecimento do consultório."
+            : "O cérebro não aprendeu: o campo da pergunta generalizada ficou em branco.",
+        });
+      }
       setAnswering(null);
       setDrafted(null);
       setAnswer("");
@@ -6901,8 +6914,29 @@ function BrainGapsCard({
                         onChange={(e) => setEditedQuestion(e.target.value)}
                         maxLength={300}
                         placeholder="Ex: Posso tomar dipirona na gestação?"
-                        className="mb-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                        className="mb-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
                       />
+                      {/* O atalho para quando o texto dela já é genérico — que é
+                          o caso comum. Vira um clique consciente em vez de um
+                          padrão invisível. */}
+                      <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        {editedQuestion.trim().length >= 8 ? (
+                          <span className="text-emerald-700">
+                            ✓ vai virar conhecimento do consultório
+                          </span>
+                        ) : (
+                          <span className="text-amber-700">
+                            Em branco: ela recebe a resposta e o cérebro não aprende nada.
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setEditedQuestion(g.question.slice(0, 300))}
+                          className="ml-auto rounded-full border border-input px-2 py-0.5 hover:bg-muted"
+                        >
+                          usar o texto dela
+                        </button>
+                      </div>
                     </>
                   )}
                   <textarea
@@ -6959,7 +6993,16 @@ function BrainGapsCard({
                     onClick={() => {
                       setAnswering(g.id);
                       setAnswer("");
-                      setEditedQuestion(g.question.slice(0, 300));
+                      /* ─── O CAMPO NASCE VAZIO ────────────────────────────
+                         Era `setEditedQuestion(g.question.slice(0, 300))`: o
+                         campo cujo rótulo pede "generalize e remova nomes/dados
+                         pessoais" já nascia contendo exatamente o texto cru da
+                         paciente. Enviar sem tocar nele — o caminho de menor
+                         esforço — publicava o literal em `brain_entries`, que é
+                         permanente e é lida no prompt de TODAS as outras.
+                         Vazio, generalizar vira um ato; e quem quiser o texto
+                         dela tem o botão ao lado, que é uma escolha. */
+                      setEditedQuestion("");
                       /* ABRIR outra lacuna também limpa. Sem isto, a caixa
                          marcada na lacuna anterior valia para esta — e o
                          médico responderia em modo individual sem saber, ou
@@ -7239,7 +7282,12 @@ function BrainTrainCard({
     if (!answer || sendingId) return;
     setSendingId(q.id);
     try {
-      const edited = (editedQuestions[q.id] ?? q.question).trim();
+      /* ─── SEM QUEDA PARA O TEXTO CRU ────────────────────────────────────
+         Era `editedQuestions[q.id] ?? q.question`: o campo que pede para
+         generalizar tinha o texto da paciente como valor efetivo enquanto ela
+         não fosse editado, e o servidor publicava esse literal em
+         `brain_entries` — permanente, e lida no prompt de todas as outras. */
+      const edited = (editedQuestions[q.id] ?? "").trim();
       const res = await answerAndTrain({
         data: {
           accessToken: await tokenFn(),
@@ -7261,7 +7309,16 @@ function BrainTrainCard({
       onContar?.(Math.max(0, totalQ - 1));
       // Reflete o "respondida" também na aba Perguntas e no contador do topo.
       onTrained(q.id);
-      toast.success("🧠 O cérebro aprendeu mais uma");
+      /* O toast dizia "o cérebro aprendeu" mesmo quando nada foi aprendido —
+         e agora "nada aprendido" é o padrão de quem não generaliza. Quem
+         responde precisa saber qual das duas coisas aconteceu. */
+      if ("treinou" in res && res.treinou === false) {
+        toast.success("Respondida ✓", {
+          description: "O cérebro não aprendeu: o campo da pergunta generalizada ficou em branco.",
+        });
+      } else {
+        toast.success("🧠 O cérebro aprendeu mais uma");
+      }
     } catch {
       toast.error("Não foi possível treinar com essa resposta. Tente novamente.");
     } finally {
@@ -7328,11 +7385,30 @@ function BrainTrainCard({
                 Pergunta que entra no cérebro — generalize e remova nomes/dados pessoais
               </label>
               <input
-                value={editedQuestions[q.id] ?? q.question}
+                value={editedQuestions[q.id] ?? ""}
                 onChange={(e) => setEditedQuestions((eq) => ({ ...eq, [q.id]: e.target.value }))}
                 maxLength={300}
+                placeholder="Ex: Posso tomar dipirona na gestação?"
                 className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
               />
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                {(editedQuestions[q.id] ?? "").trim().length >= 8 ? (
+                  <span className="text-emerald-700">✓ vai virar conhecimento do consultório</span>
+                ) : (
+                  <span className="text-amber-700">
+                    Em branco: ela recebe a resposta e o cérebro não aprende nada.
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditedQuestions((eq) => ({ ...eq, [q.id]: q.question.slice(0, 300) }))
+                  }
+                  className="ml-auto rounded-full border border-input px-2 py-0.5 hover:bg-muted"
+                >
+                  usar o texto dela
+                </button>
+              </div>
               <textarea
                 value={answers[q.id] ?? ""}
                 onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}

@@ -24,12 +24,74 @@
 import { describe, expect, test } from "bun:test";
 import { ALL_SYMPTOMS, LEVEL_FALLBACK, assessLevel } from "./triage";
 
-const VERMELHOS = ALL_SYMPTOMS.filter((s) => s.severity === "vermelho").map((s) => s.id);
-const AMARELOS = ALL_SYMPTOMS.filter((s) => s.severity === "amarelo").map((s) => s.id);
+/**
+ * ─── A PRIMEIRA VERSÃO DESTE ARQUIVO ERA TAUTOLÓGICA ────────────────────────
+ *
+ * As duas listas eram DERIVADAS da tabela:
+ *
+ *   const VERMELHOS = ALL_SYMPTOMS.filter((s) => s.severity === "vermelho")...
+ *
+ * e o laço conferia que cada uma delas devolvia o próprio nível. É a mesma
+ * expressão que `assessLevel` usa para decidir (`if (s.severity === "vermelho")`)
+ * — então o laço não podia falhar, qualquer que fosse a classificação. O
+ * comentário dizia "se alguém marcar um deles como amarelo por engano, o teste
+ * diz QUAL", e era exatamente o contrário.
+ *
+ * Um verificador mediu na árvore limpa: trocar `febre` ("Febre acima de 38 °C")
+ * para amarelo e `tontura` ("Tonturas leves") para vermelho deixava a suíte
+ * inteira verde — 1108 pass, 0 fail. As contagens (10 e 6) se preservavam, e as
+ * contagens eram a única âncora real.
+ *
+ * As listas agora são ESCRITAS À MÃO. Elas repetem a tabela de propósito: é o
+ * segundo par de olhos, e é a única coisa que uma reclassificação silenciosa
+ * não muda junto. Se a tabela mudar por decisão clínica, este arquivo tem de ser
+ * editado junto — e é isso que faz alguém olhar.
+ */
+const VERMELHOS = [
+  "sangramento", // Sangramento vaginal
+  "perda_liquido", // Perda de líquido (bolsa rompida)
+  "dor_abdominal", // Dor abdominal forte e persistente
+  "movimentos", // Redução dos movimentos do bebê
+  "cefaleia_visao", // Dor de cabeça forte com visão turva
+  "convulsao", // Convulsão, desmaio ou confusão
+  "febre", // Febre acima de 38 °C
+  "falta_ar", // Falta de ar súbita ou dor no peito
+  "inchaco_subito", // Inchaço súbito no rosto e mãos
+  "contracoes", // Contrações regulares antes de 37 semanas
+];
+const AMARELOS = [
+  "vomito", // Vômitos persistentes
+  "ardor_urinar", // Ardor ou dor ao urinar
+  "dor_lombar", // Dor lombar contínua
+  "inchaco_pes", // Inchaço nos pés e tornozelos
+  "tontura", // Tonturas leves
+  "coceira", // Coceira intensa nas mãos e pés
+];
+
+describe("a tabela e este arquivo têm de concordar", () => {
+  /**
+   * O par de testes que dá sentido a todos os outros. Sem eles, as listas
+   * escritas à mão viram um documento paralelo que envelhece sozinho: um
+   * sintoma removido da tabela sumiria daqui sem ninguém reparar, e um sintoma
+   * NOVO nasceria sem teste nenhum.
+   */
+  test("nenhum sintoma da tabela ficou de fora deste arquivo", () => {
+    const escritos = new Set([...VERMELHOS, ...AMARELOS]);
+    const faltando = ALL_SYMPTOMS.filter((s) => !escritos.has(s.id)).map((s) => s.id);
+    expect(faltando).toEqual([]);
+  });
+
+  test("e nenhum id deste arquivo sumiu da tabela", () => {
+    const naTabela = new Set(ALL_SYMPTOMS.map((s) => s.id));
+    const sobrando = [...VERMELHOS, ...AMARELOS].filter((id) => !naTabela.has(id));
+    expect(sobrando).toEqual([]);
+  });
+});
 
 describe("cada sinal vermelho, sozinho, manda procurar atendimento", () => {
   /* Um a um, e não "os vermelhos em geral": se alguém marcar um deles como
-     amarelo por engano numa edição futura, o teste diz QUAL. */
+     amarelo por engano numa edição futura, o teste diz QUAL — e agora isso é
+     verdade, porque a lista não vem da tabela. */
   for (const id of VERMELHOS) {
     test(`"${id}" sozinho → vermelho`, () => {
       expect(assessLevel([id]).level).toBe("vermelho");
@@ -40,9 +102,6 @@ describe("cada sinal vermelho, sozinho, manda procurar atendimento", () => {
     /* A lista é a régua. Perder um item dela é perder a proteção inteira
        daquele sintoma, sem nenhum teste falhar. */
     expect(VERMELHOS).toHaveLength(10);
-    expect(VERMELHOS).toContain("sangramento");
-    expect(VERMELHOS).toContain("convulsao");
-    expect(VERMELHOS).toContain("movimentos");
   });
 });
 
