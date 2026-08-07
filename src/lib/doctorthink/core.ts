@@ -142,6 +142,21 @@ export function rankEntriesByKeywords(
  */
 export const MAX_CAMPO_DO_MEDICO = 1500;
 
+/**
+ * Neutraliza o que serve para forjar ESTRUTURA no prompt, preservando o texto.
+ *
+ * Mesma família do `memoriaSegura` do app da paciente, com um escopo menor de
+ * propósito: aqui o autor é o próprio médico, então o objetivo não é conter um
+ * adversário — é impedir que um `##` ou um `[SISTEMA]` vindos de um copiar-colar
+ * quebrem a moldura do bloco e desloquem o rodapé de limites.
+ */
+export function semEstrutura(texto: string): string {
+  return (texto ?? "")
+    .replace(/^\s*#{1,6}\s*/gm, "")
+    .replace(/\[(ia|paciente|assistant|system|user|sistema)\]/gi, "")
+    .trim();
+}
+
 /** Corta preservando palavra inteira — meia palavra no prompt lê como erro. */
 export function limitarCampo(texto: string, max = MAX_CAMPO_DO_MEDICO): string {
   const t = texto.trim();
@@ -172,7 +187,18 @@ export function assembleBrainBlock(
   if (phrases) parts.push(labels.phrasesLabel, phrases);
   if (rules) parts.push(labels.rulesLabel, rules);
   if (selected.length > 0) {
-    parts.push(labels.referenceLabel, ...selected.map((e) => `P: ${e.question}\nR: ${e.answer}`));
+    /* ─── A ESTRUTURA DO BLOCO NÃO PODE SER FORJADA PELO CONTEÚDO ───────────
+       As entradas eram interpoladas cruas. O texto é do MÉDICO (é o cérebro
+       dele), então não é injeção de terceiro — mas um `##` colado de um PDF, ou
+       um marcador de papel num texto copiado, forja um cabeçalho de seção e
+       empurra o rodapé (onde ficam os limites inegociáveis) para fora do que o
+       modelo lê como "regras deste bloco".
+       Só a ESTRUTURA é neutralizada; as quebras de linha continuam, porque a
+       resposta dele é para ser lida como ele escreveu. */
+    parts.push(
+      labels.referenceLabel,
+      ...selected.map((e) => `P: ${semEstrutura(e.question)}\nR: ${semEstrutura(e.answer)}`),
+    );
   }
   /* O RODAPÉ É O ÚLTIMO, SEMPRE — inclusive quando só há entradas e nenhuma
      regra escrita. É a única linha do bloco que não veio do médico, e ela vem
