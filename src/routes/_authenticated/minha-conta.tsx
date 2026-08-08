@@ -16799,7 +16799,15 @@ function CantinhoTab({
           {shopItems.map((i) => {
             const has = ownedSet.has(i.id);
             const isTrophy = i.id === CANTINHO_COMPLETIONIST_ID;
-            const locked = i.premium && !premium; // exclusivo do Premium
+            /* ─── `has` ENTRA AQUI, E A FALTA DELE DIZIA DUAS COISAS OPOSTAS
+                 O item já COMPRADO por ela aparecia cinza, com "🔒 Premium" no
+                 canto, e o botão embaixo dizia "No cantinho ✓" — no mesmo tile.
+
+                 Não é hipótese: vinte itens que eram grátis viraram Premium na
+                 recalibração da loja, e quem já os tinha comprado passou a ver
+                 exatamente isso. Comprar é DEFINITIVO; o cadeado é sobre o que
+                 ela ainda pode comprar, nunca sobre o que já é dela. */
+            const locked = i.premium && !premium && !has;
             const trophyLocked = isTrophy && !has; // troféu ainda não conquistado
             const cant = !has && !locked && saldo < i.price;
             return (
