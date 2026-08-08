@@ -151,7 +151,7 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
     };
     /* ─── A COLUNA NOVA ENTRA COM RETRY, NUNCA DIRETO ────────────────────────
        `ai_messages_per_cycle` é o que transforma o plano `mensagens` num preço:
-       sem ela, o MRR conta R$ 29,90 para quem paga R$ 339,40.
+       sem ela, o MRR conta R$ 29,90 para quem paga R$ 999,00.
 
        Mas o PostgREST recusa a LINHA INTEIRA quando uma coluna do `select` não
        existe (42703), e o `safe` aqui cai para `[]` — ou seja, pedir a coluna
@@ -246,7 +246,7 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
          oposto, no mesmo lugar.
        Pela régua ÚNICA, e com a chave normalizada. */
     /* O plano `mensagens` não tem UM preço — tem a escada de R$ 29,90 a
-       R$ 339,40. Por isso passa pela `mensalidadeCentavos`, que recebe a
+       R$ 999,00. Por isso passa pela `mensalidadeCentavos`, que recebe a
        quantidade comprada; `PLAN_PRICE` sozinho contaria a entrada para todo
        mundo e o MRR sairia até dez vezes menor. */
     const mrrEstimate = docRows

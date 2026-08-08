@@ -10322,6 +10322,19 @@ function ConsultasTab() {
         headers: { Authorization: `Bearer ${sess.session?.access_token ?? ""}` },
       });
       const json: TranscribeResult = await res.json();
+      /* ─── O GANCHO NÃO É DELA ────────────────────────────────────────────
+         Quando o 402 vem, quem não tem plano é o MÉDICO — e mandar a gestante
+         "assinar a partir de R$ 29,90" seria cobrar dela um plano que não é
+         dela. A mensagem do servidor é escrita para o painel dele; aqui ela é
+         trocada por uma que faça sentido do lado de cá. */
+      if (res.status === 402) {
+        setResult({
+          ok: false,
+          error:
+            "A transcrição não está disponível no acompanhamento do seu médico. Você pode escrever a sua dúvida normalmente 💛",
+        });
+        return;
+      }
       setResult(json);
     } catch {
       setResult({ ok: false, error: "Falha ao transcrever. Tente novamente." });

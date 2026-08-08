@@ -7,6 +7,7 @@ import { Reveal } from "@/components/reveal";
 import { SpotlightCard } from "@/components/motion-fx";
 import { PricingGlass, type PricingGlassTier } from "@/components/ui/pricing-glass";
 import { EscadaDeMensagens } from "@/components/escada-mensagens";
+import { FUNCOES_PAGAS, SELO_PAGO, precoDeEntrada } from "@/lib/gancho-de-upgrade";
 import {
   DEGRAUS_DESTAQUE,
   descontoVsEntrada,
@@ -198,7 +199,7 @@ const FAQS = [
   },
   {
     q: "O Segundo Cérebro dá diagnóstico ou conduta médica?",
-    a: "Não. Ele só responde o que você já validou (suas respostas de sempre) e, no Nível 2 (Pro), também agenda e orienta emergências ao SAMU/UPA. Qualquer coisa nova ou fora do que você ensinou, ele encaminha para você — nunca inventa conduta.",
+    a: "Não. Ele só responde o que você já validou (suas respostas de sempre) e, no WhatsApp, também agenda e orienta emergências ao SAMU/UPA. Qualquer coisa nova ou fora do que você ensinou, ele encaminha para você — nunca inventa conduta.",
   },
   {
     q: "Meus dados e os das pacientes ficam seguros?",
@@ -446,13 +447,14 @@ function MedicosPage() {
                 Um cérebro só, dois alcances
               </p>
               <p className="mx-auto mt-2 max-w-xl text-center text-sm text-muted-foreground">
-                Você treina <strong>uma vez</strong>. Onde ele atende depende só do seu plano — é o
-                mesmo cérebro ficando mais presente, não um segundo recurso para aprender.
+                Você treina <strong>uma vez</strong> e ele atende nos dois lugares — no app e no
+                WhatsApp — <strong>desde o plano de {precoDeEntrada()}</strong>. Não são dois
+                recursos para aprender, nem dois planos para comprar.
               </p>
               <div className="mt-8 grid gap-5 md:grid-cols-2">
                 <div className="rounded-3xl border border-border bg-card p-6">
                   <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
-                    Nível 1 · a partir de R$ 29,90
+                    No app · incluído em todo plano pago
                   </span>
                   <p className="mt-4 text-3xl">📱</p>
                   <p className="mt-2 font-serif text-xl">Atende dentro do app</p>
@@ -469,14 +471,14 @@ function MedicosPage() {
                 </div>
                 <div className="relative rounded-3xl border-2 border-primary/30 bg-primary/5 p-6 shadow-[var(--shadow-card)]">
                   <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                    Nível 2 · a partir de R$ 205,40
+                    No WhatsApp · incluído em todo plano pago
                   </span>
                   <p className="mt-4 text-3xl">📱 + 💬</p>
                   <p className="mt-2 font-serif text-xl">Atende também no WhatsApp</p>
                   <ul className="mt-4 space-y-2 text-sm text-foreground">
                     <li className="flex items-start gap-2">
-                      <span className="mt-0.5 text-primary">✓</span>Tudo do Nível 1, onde a paciente
-                      já está
+                      <span className="mt-0.5 text-primary">✓</span>Tudo do que ele faz no app, onde
+                      a paciente já está
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="mt-0.5 text-primary">✓</span>Agenda consulta sozinho, sem
@@ -496,11 +498,11 @@ function MedicosPage() {
             </div>
           </Reveal>
 
-          {/* Mock conversation — o Nível 2 em ação */}
+          {/* Mock conversation — o cérebro no WhatsApp */}
           <Reveal delay={0.16}>
             <div className="mx-auto mt-8 max-w-md rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
               <p className="mb-4 text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                O Nível 2 em ação, no WhatsApp
+                O cérebro em ação, no WhatsApp
               </p>
               <div className="space-y-3">
                 {[
@@ -738,6 +740,58 @@ function MedicosPage() {
                 qualquer plano, para sempre — aplicado automaticamente no checkout.
               </p>
             )}
+          </Reveal>
+
+          {/* ─── O QUE É GRÁTIS E O QUE PEDE PLANO ────────────────────────────
+              Pedido do dono: o gancho tem de estar NO SITE, não só numa tela
+              que o médico já pago vê. A linha é a mesma que a medição de custo
+              desenhou — o que chama modelo é pago, o resto é da casa — e dizer
+              isso antes do preço faz o R$ 29,90 parecer o que é: o preço da IA,
+              não o preço da plataforma. */}
+          <Reveal>
+            <div className="mt-10 grid gap-4 md:grid-cols-2">
+              <div className="rounded-3xl border border-white/15 bg-white/[0.04] p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+                  De graça, para sempre
+                </p>
+                <p className="mt-2 font-serif text-xl text-white">A plataforma inteira</p>
+                <ul className="mt-3 space-y-1.5 text-sm text-white/70">
+                  {[
+                    "Pacientes ilimitadas",
+                    "Agenda, consultas e fila de espera",
+                    "Prontuário e pré-consulta digital",
+                    "Receituário e ferramentas clínicas",
+                    "Exames recebidos e alerta de urgência",
+                    "O app de pré-natal completo para elas",
+                  ].map((t) => (
+                    <li key={t} className="flex gap-2">
+                      <span className="text-white/40">·</span>
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-3xl border border-[rgb(228,150,142)]/40 bg-[rgb(228,150,142)]/10 p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[rgb(228,150,142)]">
+                  {SELO_PAGO} · a partir de {precoDeEntrada()}/mês
+                </p>
+                <p className="mt-2 font-serif text-xl text-white">Tudo que a IA faz por você</p>
+                <ul className="mt-3 space-y-1.5 text-sm text-white/75">
+                  {Object.values(FUNCOES_PAGAS).map((f) => (
+                    <li key={f.nome} className="flex gap-2">
+                      <span className="text-[rgb(228,150,142)]">·</span>
+                      <span>
+                        <strong className="font-semibold text-white">{f.nome}</strong> — {f.oQueFaz}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs leading-relaxed text-white/50">
+                  Todos os planos pagos entregam as mesmas funções. O que muda de um para o outro é
+                  só quantas mensagens de IA você tem por mês.
+                </p>
+              </div>
+            </div>
           </Reveal>
 
           {/* ─── O SELETOR, ANTES DOS CARTÕES ──────────────────────────────

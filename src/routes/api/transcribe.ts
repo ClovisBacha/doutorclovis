@@ -28,6 +28,48 @@ export const Route = createFileRoute("/api/transcribe")({
         const usuario = await usuarioDaRequisicao(request);
         if (!usuario) return naoAutorizado();
 
+        /* ─── A TRANSCRIÇÃO É DO PLANO PAGO ──────────────────────────────────
+         *
+         * Decisão do dono (ago/2026), e com uma razão que vai além do custo: o
+         * que sai daqui vira BASE DE CONHECIMENTO do Segundo Cérebro. Transcrever
+         * a consulta é o jeito mais rápido de o médico ensinar a própria voz à IA
+         * — então é feature do produto de IA, não da plataforma de gestão.
+         *
+         * Antes não havia gate NENHUM: um médico no Free mandava 20 MB de áudio
+         * e a fatura ia para a nossa chave. É a mesma classe de buraco que o chat
+         * tinha, no endpoint ao lado.
+         *
+         * A paciente também transcreve (a aba dela grava áudio), e o gate é o
+         * plano do MÉDICO dela — é a cota dele que paga, e é o cérebro dele que
+         * o texto alimenta. Sem médico vinculado, não passa. */
+        const { getEntitlements, getEntitlementsByDoctorId } =
+          await import("@/lib/entitlements.server");
+        let ent = await getEntitlements(usuario);
+        if (!ent.aiApp) {
+          /* Quem chamou pode ser a PACIENTE, e ela não tem linha em `doctors` —
+             `getEntitlements` a resolveria como Free e barraria a transcrição
+             dela mesmo com o médico pagando. O plano que vale é o DELE: é a cota
+             dele que paga e é o cérebro dele que o texto alimenta. */
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: perfil } = await (supabaseAdmin as any)
+            .from("patient_profiles")
+            .select("doctor_id")
+            .eq("id", usuario.id)
+            .maybeSingle();
+          if (perfil?.doctor_id) ent = await getEntitlementsByDoctorId(perfil.doctor_id as string);
+        }
+        if (!ent.aiApp) {
+          /* A frase vem de `fraseDoGancho`, não escrita aqui. Escrevê-la à mão
+             já tinha acontecido: "a partir de R$ 29,90" digitado neste arquivo
+             era a segunda tabela de preços do médico, e a primeira mudança na
+             escada deixaria o servidor cotando um valor que não existe mais. */
+          const { fraseDoGancho } = await import("@/lib/gancho-de-upgrade");
+          return new Response(
+            JSON.stringify({ error: "sem_plano", mensagem: fraseDoGancho("transcricao") }),
+            { status: 402, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
         const ip = clientIp(request);
         if (rateLimited(ip)) {
           return new Response(JSON.stringify({ error: "Muitas requisições. Aguarde." }), {

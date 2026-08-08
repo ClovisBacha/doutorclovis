@@ -1420,7 +1420,7 @@ function DashboardSection({
   rotuloPlano?: string | null;
   /**
    * Mensagens de IA por ciclo do plano vigente. No plano `mensagens` o preço é
-   * uma escada (R$ 29,90 a R$ 295,40), então sem este número a prova de valor
+   * uma escada (da entrada ao topo do autoatendimento), então sem este número a prova de valor
    * mostraria a entrada para quem paga o topo.
    */
   mensagensDoPlano?: number | null;
@@ -1707,7 +1707,7 @@ export function DashboardView({
   rotuloPlano?: string | null;
   /**
    * Mensagens de IA por ciclo do plano vigente. No plano `mensagens` o preço é
-   * uma escada (R$ 29,90 a R$ 295,40), então sem este número a prova de valor
+   * uma escada (da entrada ao topo do autoatendimento), então sem este número a prova de valor
    * mostraria a entrada para quem paga o topo.
    */
   mensagensDoPlano?: number | null;
@@ -5404,6 +5404,23 @@ function BrainConsultaCard({
         headers: { Authorization: `Bearer ${sess.session?.access_token ?? ""}` },
       });
       if (!res.ok) {
+        /* 402 é o gate do plano, não uma falha. Dizer "tente novamente" a quem
+           esbarrou num plano faz ele tentar de novo e falhar de novo — e nunca
+           descobrir que existe um plano. */
+        if (res.status === 402) {
+          const { fraseDoGancho } = await import("@/lib/gancho-de-upgrade");
+          toast(fraseDoGancho("transcricao"), {
+            duration: 9000,
+            action: {
+              label: "Ver planos",
+              onClick: () =>
+                document
+                  .getElementById("cobranca")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+            },
+          });
+          return;
+        }
         toast.error("Não foi possível transcrever o áudio — tente novamente.");
         return;
       }
