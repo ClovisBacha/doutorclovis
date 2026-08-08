@@ -92,6 +92,28 @@ const brl = (centavos: number) =>
   (centavos / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
+ * O preço unitário, em CENTAVOS, com uma casa — e arredondado PARA CIMA.
+ *
+ * ─── DUAS RAZÕES, e as duas foram medidas ───────────────────────────────────
+ *
+ * 1. Em reais com duas casas, degraus vizinhos COLIDEM: 300 e 500 mostravam os
+ *    dois "R$ 0,19"; 1.750 e 2.000, os dois "R$ 0,15". Arrastar a barra mudava
+ *    o preço total e deixava o unitário parado — que é justamente o número que
+ *    deveria mostrar o desconto acontecendo.
+ *
+ * 2. E `Math.round` mostrava MENOS do que a fatura cobra. Em 2.100 mensagens o
+ *    real é 14,4476 centavos e a tela imprimia "R$ 0,14": 2.100 × 0,14 dá
+ *    R$ 294,00 contra os R$ 303,40 cobrados. É a mesma propaganda enganosa que
+ *    `descontoVsEntrada` evita com `floor` — aqui o sentido seguro é o oposto,
+ *    porque o número é um PREÇO e não um desconto.
+ */
+const centavosTexto = (centavos: number) =>
+  `${(Math.ceil(centavos * 10) / 10).toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })} centavos`;
+
+/**
  * Um número que ROLA até o valor novo.
  *
  * Sem isto o preço pisca de R$ 174,40 para R$ 209,40 e o salto não é sentido —
@@ -215,7 +237,7 @@ export function EscadaDeMensagens({
             <NumeroQueRola valor={dados.preco} />
           </p>
           <p className={`mt-1 text-sm ${t.apoio}`}>
-            por mês · R$ {brl(Math.round(dados.porMensagem * 100) / 100)} por mensagem
+            por mês · {centavosTexto(dados.porMensagem)} por mensagem
           </p>
         </div>
       </div>

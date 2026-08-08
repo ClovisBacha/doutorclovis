@@ -324,7 +324,22 @@ async function applySubscription(subscriptionId: string): Promise<void> {
      * comprou", e o leitor da cota trata isso como cota estourada — falha
      * fechada. Conceder de menos por engano o médico reclama e a gente
      * conserta; conceder de mais ninguém reclama e ninguém descobre. */
-    const qtd = sub.items?.data?.[0]?.quantity;
+    /* ─── SÓ O PLANO `mensagens` TEM QUANTIDADE ──────────────────────────
+     *
+     * Um verificador adversarial mediu o estrago da versão anterior, que lia a
+     * quantidade para QUALQUER plano de médico: nos planos NOMEADOS o item do
+     * Stripe tem `quantity: 1` sempre — é um assento, não uma escada. Então um
+     * médico no Pro (R$ 297, 4.000 respostas por ciclo) tinha a cota reescrita
+     * para **UMA mensagem por ciclo** no próximo evento da assinatura.
+     *
+     * E o gatilho é rotina, não exceção: renovação mensal, troca de cartão,
+     * qualquer `customer.subscription.updated`. Ele pagaria R$ 297 e o cérebro
+     * dele pararia de responder depois da primeira mensagem do mês, sem erro em
+     * lugar nenhum — porque 1 é um número perfeitamente válido.
+     *
+     * A quantidade só significa "mensagens" no plano que é medido em mensagens. */
+    const ehEscada = planKey === "mensagens";
+    const qtd = ehEscada ? sub.items?.data?.[0]?.quantity : undefined;
     const mensagens =
       typeof qtd === "number" && Number.isFinite(qtd) && qtd > 0 && qtd <= 20_000
         ? Math.floor(qtd)

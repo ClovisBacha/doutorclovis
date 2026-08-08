@@ -20,7 +20,12 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { ENTRADA_MENSAGENS, TETO_AUTOATENDIMENTO, precoDe } from "./planos-medico";
+import {
+  ENTRADA_MENSAGENS,
+  TETO_AUTOATENDIMENTO,
+  centavosPorMensagem,
+  precoDe,
+} from "./planos-medico";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -153,11 +158,28 @@ describe("2. o WEBHOOK lê do ITEM, nunca do metadata", () => {
 
 describe("3. quantidade implausível NÃO concede — falha fechada", () => {
   test("há faixa, e ela recusa fora dela", () => {
-    const i = webhook.indexOf("const qtd = sub.items");
+    const i = webhook.indexOf("const qtd = ehEscada");
     expect(i).toBeGreaterThan(-1);
     const bloco = webhook.slice(i, i + 700);
     expect(bloco).toContain("qtd > 0 && qtd <= 20_000");
     expect(bloco).toContain(": null");
+  });
+
+  test("e a quantidade SÓ é lida no plano que é medido em mensagens", () => {
+    /**
+     * ─── O DEFEITO QUE UM VERIFICADOR ADVERSARIAL ACHOU ────────────────────
+     *
+     * A leitura valia para QUALQUER plano de médico. Nos planos NOMEADOS o item
+     * do Stripe tem `quantity: 1` sempre — é um assento, não uma escada.
+     *
+     * Resultado: um médico no Pro (R$ 297/mês, 4.000 respostas por ciclo) tinha
+     * a cota reescrita para UMA mensagem por ciclo no próximo evento da
+     * assinatura. E o gatilho é rotina: renovação mensal, troca de cartão.
+     * Ele pagaria R$ 297 e o cérebro pararia depois da primeira mensagem do
+     * mês, sem erro nenhum — porque 1 é um número perfeitamente válido.
+     */
+    expect(webhook).toContain('const ehEscada = planKey === "mensagens"');
+    expect(webhook).toContain("const qtd = ehEscada ? sub.items?.data?.[0]?.quantity : undefined");
   });
 
   test("e avisa no log em vez de conceder calado", () => {
@@ -299,5 +321,57 @@ describe("6. o preço que o Stripe vai cobrar é o que a nossa conta diz", () =>
       250 * 10 +
       500 * 9;
     expect(soma).toBe(precoDe(2_500));
+  });
+});
+
+describe("7. o DOCUMENTO do Stripe é conferido contra a escada, linha por linha", () => {
+  /**
+   * ─── POR QUE ESTE BLOCO PRECISOU EXISTIR ──────────────────────────────────
+   *
+   * Um verificador adversarial achou uma linha errada na tabela "Confira antes
+   * de salvar": 1.750 mensagens estavam anotadas como R$ 0,1554 por mensagem,
+   * quando a escada entrega R$ 0,1539. Erro de digitação meu, ao compor a
+   * tabela à mão.
+   *
+   * E a linha errada era ativamente perigosa: o cabeçalho da seção manda
+   * "se algum não bater, uma camada está errada". Quem fosse conferir veria o
+   * site calcular 0,1539, concluiria que a camada 8 estava errada, e mexeria
+   * numa camada CERTA — o documento induzindo o erro que existe para evitar.
+   *
+   * Este documento vira digitação humana no painel do Stripe. Um número errado
+   * aqui não dá erro em lugar nenhum: vira cobrança errada.
+   */
+  const doc = readFileSync("docs/stripe-plano-medico.md", "utf8");
+
+  /** Uma linha da tabela markdown → números. */
+  const linhas = doc
+    .split("\n")
+    .filter((l) => /^\| [\d.]+ +\|/.test(l))
+    .map((l) => l.split("|").map((c) => c.trim()))
+    .filter((c) => (c.length >= 5 && c[2].startsWith("**R$") === false ? true : true));
+
+  test("a tabela de conferência existe e tem os dez degraus", () => {
+    const comFatura = linhas.filter((c) => /R\$/.test(c[2]));
+    expect(comFatura.length).toBeGreaterThanOrEqual(10);
+  });
+
+  test("cada linha bate com `precoDe` e `centavosPorMensagem`", () => {
+    const num = (t: string) => Number(t.replace(/[^\d,]/g, "").replace(",", "."));
+    let conferidas = 0;
+    for (const c of linhas) {
+      const mensagens = Number(c[1].replace(/\./g, ""));
+      if (!Number.isFinite(mensagens) || mensagens < 150 || mensagens > 2_500) continue;
+      if (!/R\$/.test(c[2])) continue;
+      const fatura = Math.round(num(c[2]) * 100);
+      expect(fatura).toBe(precoDe(mensagens));
+      /* O unitário do documento tem quatro casas: comparo em reais, com
+         tolerância de meio décimo de centavo. */
+      const unitario = num(c[3]);
+      expect(unitario).toBeCloseTo(centavosPorMensagem(mensagens) / 100, 4);
+      conferidas++;
+    }
+    /* Se o parser deixar de achar linhas, o teste passaria vazio — e um teste
+       que não confere nada é pior que nenhum teste. */
+    expect(conferidas).toBeGreaterThanOrEqual(10);
   });
 });

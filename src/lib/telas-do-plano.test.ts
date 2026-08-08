@@ -22,7 +22,13 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { CLASSES_DE_PRESENTE, CUSTO_LOJA_GRATIS, PRESENTE_SUGERIDO } from "./economia-sementinhas";
-import { DEGRAUS_DESTAQUE, TETO_AUTOATENDIMENTO, precoDe } from "./planos-medico";
+import {
+  DEGRAUS_DESTAQUE,
+  ENTRADA_MENSAGENS,
+  TETO_AUTOATENDIMENTO,
+  centavosPorMensagem,
+  precoDe,
+} from "./planos-medico";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -57,6 +63,50 @@ describe("1. o seletor NÃO tem uma segunda tabela de preços", () => {
   test("a faixa do slider é a da escada, não literais", () => {
     expect(seletor).toContain("min={ENTRADA_MENSAGENS}");
     expect(seletor).toContain("max={TETO_AUTOATENDIMENTO}");
+  });
+});
+
+describe("1c. o preço por mensagem NUNCA mostra menos do que a fatura cobra", () => {
+  /**
+   * Achado de um verificador adversarial. A tela imprimia o unitário em reais
+   * com DUAS casas e `Math.round`:
+   *
+   *  · degraus vizinhos colidiam — 300 e 500 mostravam os dois "R$ 0,19";
+   *    1.750 e 2.000, os dois "R$ 0,15". Arrastar mudava o total e deixava
+   *    parado justamente o número que mostra o desconto acontecendo;
+   *  · e em 21 das 48 posições ele mostrava MENOS do que a fatura implica. Em
+   *    2.100 mensagens: "R$ 0,14" × 2.100 = R$ 294,00 contra R$ 303,40 cobrados.
+   *
+   * É a mesma propaganda enganosa que `descontoVsEntrada` evita com `floor` —
+   * aqui o sentido seguro é o oposto, porque o número é PREÇO e não desconto.
+   */
+  const mostrado = (centavos: number) => Math.ceil(centavos * 10) / 10;
+
+  test("nenhuma das 48 posições do slider subestima", () => {
+    for (let n = ENTRADA_MENSAGENS; n <= TETO_AUTOATENDIMENTO; n += 50) {
+      expect(mostrado(centavosPorMensagem(n))).toBeGreaterThanOrEqual(centavosPorMensagem(n));
+    }
+  });
+
+  test("e o total implícito pelo unitário nunca fica abaixo da fatura", () => {
+    /* A conta que a paciente do médico — ou ele — faria de cabeça. */
+    for (let n = ENTRADA_MENSAGENS; n <= TETO_AUTOATENDIMENTO; n += 50) {
+      expect(mostrado(centavosPorMensagem(n)) * n).toBeGreaterThanOrEqual(precoDe(n));
+    }
+  });
+
+  test("degraus vizinhos mostram números DIFERENTES", () => {
+    /* Um unitário parado enquanto o total sobe faz o desconto parecer inexistente. */
+    const vistos = new Set<number>();
+    for (let n = ENTRADA_MENSAGENS; n <= TETO_AUTOATENDIMENTO; n += 50) {
+      vistos.add(mostrado(centavosPorMensagem(n)));
+    }
+    expect(vistos.size).toBe(48);
+  });
+
+  test("a tela usa `ceil`, não `round`", () => {
+    expect(seletor).toContain("Math.ceil(centavos * 10) / 10");
+    expect(seletor).not.toContain("Math.round(dados.porMensagem");
   });
 });
 
