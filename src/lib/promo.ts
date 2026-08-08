@@ -52,13 +52,27 @@ export const ANUAL_CENTAVOS = 10_990;
  */
 export const REFERENCIA_CENTAVOS = MENSAL_CENTAVOS * 12;
 
-/** Desconto que o médico pode dar, em porcentagem inteira. */
-export const CUPOM_MEDICO_PCT = 20;
-
-/** Arredonda uma vez, no fim, e em centavos. */
-export function comDesconto(centavos: number, pct: number): number {
-  return Math.round((centavos * (100 - pct)) / 100);
-}
+/* ─── O CUPOM DO MÉDICO FOI APOSENTADO (ago/2026) ──────────────────────────
+ *
+ * Ele dava 20% nos dois planos, e saiu inteiro por decisão do dono: **o médico
+ * não dá mais desconto, dá SEMENTINHAS**.
+ *
+ * A troca não é cosmética, e vale saber por quê:
+ *
+ *  · Desconto sai do BOLSO da plataforma — é a mesma assinatura, por menos.
+ *    Sementinha custa ZERO: compra conteúdo estático que já está no app.
+ *  · Cupom de Stripe não funciona dentro do iOS nem do Android, e o Premium da
+ *    paciente é comprado exatamente ali. O cupom só valia na web, que é o canal
+ *    que o `canal-de-venda` recusa para ela. Ou seja: ele prometia na tela um
+ *    desconto que a loja não tinha como dar.
+ *  · E o desconto ADIAVA a assinatura em vez de acelerá-la. Sementinha faz o
+ *    contrário: ela zera a loja grátis mais rápido e passa a olhar os 57 itens
+ *    que só o Premium abre.
+ *
+ * O que ocupa o lugar, na tela dela: `BONUS_VINCULO_MEDICO` (200 🌱 por
+ * vincular o médico) e a mesada mensal que ele distribui — ver
+ * `economia-sementinhas.ts` e `mesada.functions.ts`.
+ */
 
 /**
  * Desconto ANUNCIADO, em porcentagem inteira — arredondado PARA BAIXO.
@@ -84,11 +98,6 @@ export function descontoPct(precoFinal: number, referencia = REFERENCIA_CENTAVOS
 /** Anual sem cupom, contra pagar mês a mês: 53%. */
 export const DESCONTO_ANUAL_PCT = descontoPct(ANUAL_CENTAVOS);
 
-/** Anual COM o cupom do médico, contra pagar mês a mês: 63%. */
-export const DESCONTO_ANUAL_COM_CUPOM_PCT = descontoPct(
-  comDesconto(ANUAL_CENTAVOS, CUPOM_MEDICO_PCT),
-);
-
 /**
  * O equivalente mensal do anual, em centavos.
  *
@@ -107,27 +116,15 @@ export const ANUAL_MENSAL_EQUIV_CENTAVOS = Math.round(ANUAL_CENTAVOS / 12);
 export const ECONOMIA_ANUAL_CENTAVOS = REFERENCIA_CENTAVOS - ANUAL_CENTAVOS;
 
 /**
- * O id do cupom do médico no Stripe.
+ * Os DOIS preços que a paciente pode ver, em centavos.
  *
- * Carrega a porcentagem no nome de propósito: mudar `CUPOM_MEDICO_PCT` sem
- * mudar o id faria o Stripe reaproveitar o cupom ANTIGO, e a tela passaria a
- * prometer um desconto que a fatura não daria. Com a porcentagem no id, um
- * valor novo cria um cupom novo.
- */
-export const CUPOM_MEDICO_ID = `medico-${CUPOM_MEDICO_PCT}pct`;
-
-/**
- * Os quatro preços que a paciente pode ver, em centavos.
- *
- * Juntos num objeto só porque a tela precisa dos quatro ao mesmo tempo para
- * montar a comparação, e buscá-los em quatro lugares diferentes é como duas
- * telas passam a discordar sobre o mesmo preço.
+ * Eram quatro, com as variantes `…ComCupom`. Saíram junto com o cupom: manter
+ * um preço "com desconto" que nada mais aplica é a promessa morta que fica na
+ * tela depois de a decisão mudar — e esta base já perseguiu várias delas.
  */
 export const PRECOS_PREMIUM = {
   mensal: MENSAL_CENTAVOS,
-  mensalComCupom: comDesconto(MENSAL_CENTAVOS, CUPOM_MEDICO_PCT),
   anual: ANUAL_CENTAVOS,
-  anualComCupom: comDesconto(ANUAL_CENTAVOS, CUPOM_MEDICO_PCT),
 } as const;
 
 /** Centavos → "R$ 19,90". */

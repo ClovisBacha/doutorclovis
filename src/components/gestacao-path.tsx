@@ -252,6 +252,7 @@ import { BabyIllustration } from "@/components/baby-illustration";
 import { ehNativo, tocarPadrao } from "@/lib/nativo";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { brl as brlPromo } from "@/lib/promo";
+import { BONUS_VINCULO_MEDICO } from "@/lib/economia-sementinhas";
 import type { PrecosDaPaciente } from "@/lib/promo.functions";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
 
@@ -3199,10 +3200,11 @@ function QuizPaywall({
       vivo = false;
     };
   }, []);
-  /* Os preços vêm do servidor; a tela não inventa nenhum. `comCupom` só muda
-     QUANTO, nunca o layout — o cartaz do anual aparece sempre, porque o
-     desconto contra pagar mês a mês existe com ou sem cupom. */
-  const comCupom = Boolean(oferta?.temCupom);
+  /* Os preços vêm do servidor; a tela não inventa nenhum.
+
+     O `comCupom` que morava aqui saiu junto com o cupom do médico: o cartaz do
+     anual sempre apareceu, porque o desconto contra pagar mês a mês existe por
+     si — o cupom só mudava QUANTO. Agora há um preço só, para todas. */
 
   // Código do médico Elite: a paciente digita e ganha o premium na hora.
   async function redeem() {
@@ -3224,7 +3226,15 @@ function QuizPaywall({
         data: { accessToken: s.session.access_token, code: code.trim() },
       });
       if (res.ok) {
-        toast.success("Premium liberado pelo seu médico! 💛");
+        /* ─── O QUE O CÓDIGO DÁ MUDOU, E A FRASE TINHA FICADO ─────────────
+           Ela dizia "Premium liberado pelo seu médico". O resgate parou de
+           escrever `quiz_premium` quando o médico deixou de dar a assinatura,
+           e depois parou de dar desconto também: hoje ele vincula a paciente ao
+           médico e paga o bônus de Sementinhas.
+
+           Uma tela que anuncia Premium e entrega outra coisa é pior que uma que
+           não anuncia nada — ela vai procurar o Premium e não achar. */
+        toast.success(`Médico vinculado! Você ganhou ${BONUS_VINCULO_MEDICO} Sementinhas 🌱`);
         setTimeout(() => window.location.reload(), 1200);
         return;
       }
@@ -3400,12 +3410,10 @@ function QuizPaywall({
         <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-2.5 text-white">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/85">
-              {comCupom && oferta.medicoDoCupom
-                ? `Plano anual + ${oferta.cupomPct}% de ${oferta.medicoDoCupom}`
-                : "Plano anual"}
+              Plano anual
             </p>
             <p className="font-serif text-xl leading-tight">
-              {comCupom ? oferta.descontoAnualComCupomPct : oferta.descontoAnualPct}% de desconto
+              {oferta.descontoAnualPct}% de desconto
             </p>
             {/* O riscado com legenda: R$ 238,80 é o plano mensal por doze
                 meses, não um preço anual inflado. Sem a legenda, comparação
@@ -3416,7 +3424,7 @@ function QuizPaywall({
               </span>{" "}
               mês a mês →{" "}
               <span className="whitespace-nowrap font-bold text-white">
-                {brlPromo(oferta.anualFinalCentavos)}
+                {brlPromo(oferta.anualCentavos)}
               </span>
             </p>
           </div>
@@ -3427,7 +3435,7 @@ function QuizPaywall({
         <PlanCard
           id="monthly"
           label="Mensal"
-          price={oferta ? brlPromo(oferta.mensalFinalCentavos) : "—"}
+          price={oferta ? brlPromo(oferta.mensalCentavos) : "—"}
           sub="por mês"
         />
         {/* O anual mostra o valor À VISTA e o equivalente mensal só na
@@ -3438,19 +3446,13 @@ function QuizPaywall({
         <PlanCard
           id="annual"
           label="Anual"
-          price={oferta ? brlPromo(oferta.anualFinalCentavos) : "—"}
+          price={oferta ? brlPromo(oferta.anualCentavos) : "—"}
           sub={
             oferta
-              ? `cobrado uma vez · equivale a ${brlPromo(
-                  Math.round(oferta.anualFinalCentavos / 12),
-                )}/mês`
+              ? `cobrado uma vez · equivale a ${brlPromo(Math.round(oferta.anualCentavos / 12))}/mês`
               : ""
           }
-          badge={
-            oferta
-              ? `−${comCupom ? oferta.descontoAnualComCupomPct : oferta.descontoAnualPct}%`
-              : ""
-          }
+          badge={oferta ? `−${oferta.descontoAnualPct}%` : ""}
         />
       </div>
 
@@ -3481,19 +3483,20 @@ function QuizPaywall({
         <br />A aula de hoje continua grátis, todos os dias 💛
       </p>
 
-      {/* Código do médico Elite — libera o premium sem pagar */}
+      {/* Código do médico: vincula a paciente a ele e paga o bônus de
+          Sementinhas. NÃO dá Premium — isso saiu em ago/2026. */}
       <div className="mt-3 border-t border-amber-200/70 pt-3">
         {!codeOpen ? (
           <button
             onClick={() => setCodeOpen(true)}
             className="w-full text-center text-xs font-semibold text-amber-800 underline decoration-amber-300 underline-offset-2"
           >
-            Tenho um cupom
+            Tenho o código do meu médico
           </button>
         ) : (
           <div>
             <p className="text-xs font-semibold text-amber-900">
-              Digite o código que seu médico te passou:
+              Digite o código do seu médico e ganhe {BONUS_VINCULO_MEDICO} Sementinhas 🌱
             </p>
             <div className="mt-1.5 flex gap-2">
               <input

@@ -1,31 +1,43 @@
 /**
- * O CAMINHO DO DINHEIRO — do código que o médico dá até a fatura do Stripe.
+ * O CUPOM DO MÉDICO — a prova de que ele SAIU, e por onde não pode voltar.
  *
- * ─── POR QUE ESTE ARQUIVO EXISTE ────────────────────────────────────────────
+ * ─── A HISTÓRIA, EM DUAS VIRADAS ────────────────────────────────────────────
  *
- * `promo.test.ts` prova a CONTA e não prova nada sobre quem a usa. Uma bateria
- * de mutação mediu: desligar o cupom no checkout (`if (false)`), fazer o
- * resgate voltar a dar Premium de graça, e restringir o cupom só ao anual —
- * as três passaram com os 1.285 testes verdes. O dinheiro tem três pontos de
- * decisão e nenhum deles tinha uma linha de teste.
+ * Este arquivo nasceu para guardar o caminho do dinheiro. O médico dava Premium
+ * DE GRAÇA a algumas pacientes por mês; isso virou 20% de desconto nos dois
+ * planos, e uma bateria de mutação tinha mostrado que os três pontos de decisão
+ * do dinheiro não tinham uma linha de teste — desligar o cupom no checkout,
+ * voltar a dar Premium no resgate e restringir o cupom ao anual passavam os
+ * 1.285 testes verdes.
  *
- * É a quarta vez nesta base que a mesma armadilha aparece: o teste prova a
- * função extraída e nunca o CHAMADOR (as outras foram o backfill, o bloco do
- * cérebro e o corte da memória).
+ * Agora veio a segunda virada, e ela é maior: **o médico não dá mais desconto
+ * nenhum — dá SEMENTINHAS.** Decisão do dono, agosto de 2026.
  *
- * ─── A MUDANÇA QUE ELE GUARDA (ago/2026) ────────────────────────────────────
+ * ─── POR QUE O ARQUIVO NÃO FOI APAGADO ──────────────────────────────────────
  *
- * O médico dava Premium DE GRAÇA para algumas pacientes por mês. Passou a dar
- * 20% de desconto, nos dois planos, enquanto ela for assinante. E a oferta de
- * boas-vindas automática (62% no 1º ano) foi aposentada, porque com o anual a
- * R$ 109,90 ela entregava quase o mesmo que o cupom — manter as duas faria o
- * cupom do médico não valer nada, e empilhá-las levaria a assinatura a
- * R$ 71,92.
+ * Porque remover código não é o mesmo que remover um recurso. Se este arquivo
+ * sumir, some junto a única coisa no repositório que diz que aquilo acabou — e
+ * a promessa volta pela porta dos fundos no dia em que alguém achar
+ * `mensalComCupom` num componente antigo e "consertar" reintroduzindo a
+ * constante.
+ *
+ * Um teste que cobra AUSÊNCIA é o que faz uma remoção ficar de pé. Cada bloco
+ * abaixo trava uma das portas por onde o cupom entrava.
+ *
+ * ─── AS TRÊS RAZÕES DA APOSENTADORIA ────────────────────────────────────────
+ *
+ *  1. Desconto sai do BOLSO da plataforma — é a mesma assinatura, por menos.
+ *     Sementinha custa zero: compra conteúdo estático que já está no app.
+ *  2. Cupom de Stripe não funciona dentro do iOS nem do Android, e é ali que a
+ *     paciente compra. O cupom prometia na tela o que a loja não podia dar.
+ *  3. E desconto ADIA a assinatura; Sementinha ACELERA — ela zera a loja grátis
+ *     mais rápido e passa a olhar os 57 itens que só o Premium abre.
  */
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { CUPOM_MEDICO_ID, CUPOM_MEDICO_PCT, PRECOS_PREMIUM } from "./promo";
+import { PRECOS_PREMIUM } from "./promo";
+import { BONUS_VINCULO_MEDICO } from "./economia-sementinhas";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -36,153 +48,163 @@ const semComentarios = (p: string) =>
 const billing = semComentarios("src/lib/billing.functions.ts");
 const invites = semComentarios("src/lib/invites.functions.ts");
 const promoFns = semComentarios("src/lib/promo.functions.ts");
+const promo = semComentarios("src/lib/promo.ts");
+const oferta = semComentarios("src/components/oferta-premium.tsx");
+const trilha = semComentarios("src/components/gestacao-path.tsx");
+const preview = semComentarios("src/routes/preview-oferta.tsx");
 
-describe("1. o resgate do código NÃO dá mais Premium de graça", () => {
+describe("1. o resgate do código NÃO dá Premium de graça", () => {
   /**
-   * O mutante que sobreviveu: reintroduzir
-   * `patient_profiles.update({ quiz_premium: true })` no caminho do convite do
-   * médico. O médico voltaria a dar a assinatura inteira, de graça, e nada
-   * falharia.
+   * Esta trava é a mais antiga e continua valendo: era o desenho original, e é
+   * a que custa a assinatura inteira se voltar.
    */
-  /* A âncora é o RESGATE, não a geração. `invite_codes` aparece quatro vezes
-     no arquivo (duas em `generateInviteCode`), e ancorar na primeira olhava
-     para o pedaço errado — foi o que fez a primeira versão destes testes
-     reprovar sem nada estar quebrado. */
-  const doConvite = (() => {
-    const i = invites.indexOf("export const redeemInviteCode");
-    return invites.slice(i);
-  })();
-
   test("o caminho do convite do médico não escreve `quiz_premium`", () => {
-    /* Do ponto em que o cupom de plataforma termina até o fim da função. */
-    const i = doConvite.indexOf('.from("invite_codes")');
+    const i = invites.indexOf("export const redeemInviteCode");
     expect(i).toBeGreaterThan(-1);
-    expect(doConvite.slice(i)).not.toContain("quiz_premium: true");
+    const corpo = invites.slice(i);
+    const marca = corpo.indexOf("row.doctor_id");
+    expect(marca).toBeGreaterThan(-1);
+    expect(corpo.slice(marca, marca + 1500)).not.toContain("quiz_premium: true");
   });
 
   test("mas o cupom de PLATAFORMA continua concedendo — é outra coisa", () => {
-    /* O simétrico. Os cupons do super-admin (`platform_coupons`) são a
-       alavanca promocional do dono e continuam dando Premium de graça. Um
-       teste que apagasse os dois passaria no de cima e destruiria isso. */
-    const i = invites.indexOf('.from("platform_coupons")');
-    const j = invites.indexOf('.from("invite_codes")', i);
-    expect(i).toBeGreaterThan(-1);
-    expect(j).toBeGreaterThan(i);
-    expect(invites.slice(i, j)).toContain("quiz_premium: true");
-  });
-
-  test("o resgate continua marcando `redeemed_by` — é ELE o cupom", () => {
-    /* Nada é concedido no resgate: a marca de resgate É o direito ao desconto.
-       Se esta linha sumir, a paciente resgata e não ganha nada. */
-    expect(doConvite).toContain("redeemed_by: u.user.id");
+    /* Esse é NOSSO, não do médico: campanha da plataforma, e não um desconto
+       que um assinante distribui. Some junto seria remover demais. */
+    expect(invites).toContain("platform_coupons");
   });
 });
 
-describe("2. o servidor lê o cupom a partir do resgate", () => {
-  test("`lerPrecos` procura o convite resgatado por ela", () => {
-    expect(promoFns).toContain('.from("invite_codes")');
-    expect(promoFns).toContain('.eq("redeemed_by", uid)');
+describe("2. as constantes do cupom não existem mais", () => {
+  test("`promo.ts` não exporta nada de cupom", () => {
+    for (const morta of [
+      "CUPOM_MEDICO_PCT",
+      "CUPOM_MEDICO_ID",
+      "DESCONTO_ANUAL_COM_CUPOM_PCT",
+      "comDesconto",
+    ]) {
+      expect(promo).not.toContain(morta);
+    }
   });
 
-  test("quem já é Premium não recebe oferta nenhuma", () => {
-    /* Mostrar desconto a quem já assinou é o que faz a paciente achar que
-       pagou caro. */
-    const i = promoFns.indexOf("export async function lerPrecos");
-    const corpo = promoFns.slice(i, i + 900);
-    expect(corpo).toContain("quiz_premium");
-    expect(corpo).toContain("return SEM_CUPOM");
-  });
-
-  test("sem cupom, os preços FINAIS são os cheios", () => {
-    /* A asserção que impede o defeito silencioso: um `SEM_CUPOM` com os preços
-       descontados daria 20% a todo mundo, e ninguém notaria — os números
-       continuariam plausíveis. */
-    const i = promoFns.indexOf("const SEM_CUPOM");
-    const bloco = promoFns.slice(i, i + 300);
-    expect(bloco).toContain("mensalFinalCentavos: MENSAL_CENTAVOS");
-    expect(bloco).toContain("anualFinalCentavos: ANUAL_CENTAVOS");
-  });
-
-  test("falha de banco tira o desconto, nunca dá", () => {
-    /* Errar para o lado de não descontar é chato; errar para o outro é dar 20%
-       a quem não tem. */
-    const i = promoFns.indexOf("catch (e)");
-    expect(promoFns.slice(i, i + 200)).toContain("return SEM_CUPOM");
+  test("e sobraram DOIS preços, não quatro", () => {
+    expect(Object.keys(PRECOS_PREMIUM).sort()).toEqual(["anual", "mensal"]);
   });
 });
 
-describe("3. o checkout aplica o cupom — nos DOIS planos", () => {
+describe("3. o CHECKOUT não aplica cupom de médico", () => {
   /**
-   * Os dois mutantes que sobreviveram aqui: `if (false)` na condição, e
-   * restringir a `data.plan === "annual"`. O segundo é o mais traiçoeiro,
-   * porque era o comportamento da oferta ANTIGA e parece razoável — mas o
-   * cupom do médico é `duration: forever`, então o motivo que justificava
-   * limitar ao anual (um mês barato seguido de onze cheios) não existe aqui.
+   * Era aqui que os 20% entravam. A mutação que este bloco impede é a mais
+   * barata de todas: alguém reintroduz seis linhas e a plataforma passa a dar
+   * desconto que ninguém decidiu.
    */
-  /* A âncora é o bloco do CUPOM, e `quiz_premium` aparece três vezes antes
-     dele no arquivo. Ancorar na primeira olhava para a lista de produtos. */
-  const bloco = (() => {
-    const i = billing.indexOf('!discountCoupon && data.product === "quiz_premium"');
-    return billing.slice(i, i + 800);
-  })();
-
-  test("a condição é o cupom dela, e não um literal", () => {
-    expect(bloco).toContain("precos.temCupom");
-    expect(bloco).not.toContain("if (false)");
+  test("nenhuma leitura de cupom da paciente no checkout", () => {
+    expect(billing).not.toContain("temCupom");
+    expect(billing).not.toContain("CUPOM_MEDICO_ID");
   });
 
-  test("e NÃO é restrito ao anual", () => {
-    /* A asserção que descreve o defeito. */
-    const i = billing.indexOf('!discountCoupon && data.product === "quiz_premium"');
-    expect(i).toBeGreaterThan(-1);
-    const condicao = billing.slice(i, billing.indexOf(")", i));
-    expect(condicao).not.toContain('data.plan === "annual"');
-  });
-
-  test("usa o cupom de PORCENTAGEM, com o id e a % de `promo.ts`", () => {
-    /* Porcentagem só é segura porque as duas contas fecham exatas em centavos
-       — ver `promo.test.ts`. E o id/pct vêm da fonte única: escrever "20" aqui
-       criaria uma segunda régua. */
-    expect(bloco).toContain("ensurePercentCoupon(CUPOM_MEDICO_ID, CUPOM_MEDICO_PCT)");
-  });
-
-  test("falhar não bloqueia o checkout — segue sem desconto", () => {
-    expect(bloco).toContain("catch");
-  });
-
-  test("o cupom de convite-de-paciente continua com prioridade", () => {
-    /* São produtos diferentes (`doctor_plan` × `quiz_premium`) e nunca
-       colidem, mas a guarda `!discountCoupon` é o que garante isso. */
-    expect(billing).toContain('!discountCoupon && data.product === "quiz_premium"');
+  test("mas o convite-de-paciente do MÉDICO continua — é outro produto", () => {
+    /* Este é o desconto que o MÉDICO ganha por ter sido convidado por uma
+       paciente, no plano DELE, comprado no site. Nunca foi o cupom dela. */
+    expect(billing).toContain("convite-paciente-15");
+    expect(billing).toContain("invited_by_patient");
   });
 });
 
-describe("4. a oferta de boas-vindas não voltou por nenhuma porta", () => {
-  test("nenhum vestígio no checkout", () => {
-    /* Se ela reaparecer junto com o cupom, a assinatura vai a R$ 71,92 — 30%
-       do que uma paciente de doze meses no mensal vale. */
-    expect(billing).not.toContain("lerOferta");
-    expect(billing).not.toContain("ensureAmountCoupon");
+describe("4. o SERVIDOR de preços devolve um preço só", () => {
+  test("`lerPrecos` não consulta mais `invite_codes`", () => {
+    /* Duas consultas por abertura da tela de oferta, para decidir um desconto
+       que não existe mais. */
+    expect(promoFns).not.toContain("invite_codes");
+    expect(promoFns).not.toContain("redeemed_by");
   });
 
-  test("nem no servidor de preços", () => {
-    expect(promoFns).not.toContain("ativa:");
-    expect(promoFns).not.toContain("PROMO_CENTAVOS");
+  test("e não devolve `temCupom` nem `medicoDoCupom`", () => {
+    expect(promoFns).not.toContain("temCupom");
+    expect(promoFns).not.toContain("medicoDoCupom");
+  });
+
+  test("nem preços FINAIS separados dos cheios", () => {
+    /* `mensalFinalCentavos`/`anualFinalCentavos` existiam para o caso de haver
+       desconto. Sem cupom, "final" e "cheio" são a mesma coisa — e manter dois
+       nomes para o mesmo número é como duas telas passam a discordar. */
+    expect(promoFns).not.toContain("FinalCentavos");
   });
 });
 
-describe("5. os valores que a paciente vê batem com os que o Stripe cobra", () => {
-  /* O fecho: a tela promete estes números e o Stripe aplica `CUPOM_MEDICO_PCT`
-     sobre o Price. As duas contas têm de dar no mesmo lugar. */
-  test("mensal com cupom", () => {
-    expect(Math.round((1990 * (100 - CUPOM_MEDICO_PCT)) / 100)).toBe(PRECOS_PREMIUM.mensalComCupom);
+describe("5. e nenhuma TELA promete desconto do médico", () => {
+  /**
+   * O código do servidor pode estar limpo e a tela continuar prometendo: foi
+   * assim que a página `/medicos` ficou dizendo "sem cota, sem bloqueio"
+   * enquanto a cota era o produto.
+   */
+  for (const [onde, fonte] of [
+    ["a folha de oferta", oferta],
+    ["o cartaz da trilha", trilha],
+    ["a tela de prova do dono", preview],
+  ] as const) {
+    test(`${onde} não fala em cupom`, () => {
+      for (const morta of ["temCupom", "cupomPct", "medicoDoCupom", "ComCupom"]) {
+        expect(fonte).not.toContain(morta);
+      }
+    });
+  }
+
+  test("a tela de prova não simula mais um estado que não existe", () => {
+    /* Ela tinha um interruptor "com/sem cupom". Mostrar ao dono uma variante
+       que a paciente nunca vai ver é a pior coisa que uma tela de prova faz. */
+    expect(preview).not.toContain("comPromo");
+  });
+});
+
+describe("5b. o CÓDIGO do médico anuncia o que realmente entrega", () => {
+  /**
+   * ─── A PROMESSA QUE SOBREVIVEU A DUAS MUDANÇAS DE PRODUTO ─────────────────
+   *
+   * O toast dizia **"Premium liberado pelo seu médico! 💛"** — em duas telas.
+   *
+   * O resgate parou de escrever `quiz_premium` quando o médico deixou de dar a
+   * assinatura; depois parou de dar desconto também. A frase ficou nas duas
+   * viradas. A paciente resgatava o código, lia "Premium liberado", e ia
+   * procurar um Premium que não tinha sido liberado.
+   *
+   * É o mesmo defeito da `/medicos` dizendo "sem cota, sem bloqueio": a tela
+   * guarda a versão do produto que existia quando a frase foi escrita.
+   */
+  const telas = [
+    ["a trilha", trilha],
+    ["a jornada do bebê", semComentarios("src/components/baby-journey.tsx")],
+  ] as const;
+
+  for (const [onde, fonte] of telas) {
+    test(`${onde} não promete mais Premium pelo código`, () => {
+      expect(fonte).not.toContain("Premium liberado pelo seu médico");
+    });
+
+    test(`${onde} anuncia as Sementinhas, e o número vem da fonte única`, () => {
+      /* Escrever "200" à mão aqui seria a mesma divergência dos preços: mudar
+         o bônus e a tela continuar prometendo o valor velho. */
+      expect(fonte).toContain("BONUS_VINCULO_MEDICO");
+    });
+  }
+});
+
+describe("6. o que OCUPA o lugar do cupom existe de verdade", () => {
+  /**
+   * Uma remoção sem substituto é uma regressão. O que o médico dá agora é
+   * Sementinha, e a paciente ganha um bônus por vinculá-lo — as duas coisas
+   * precisam estar ligadas, não só escritas.
+   */
+  test("o bônus por vincular o médico existe e é generoso", () => {
+    expect(BONUS_VINCULO_MEDICO).toBeGreaterThan(0);
   });
 
-  test("anual com cupom", () => {
-    expect(Math.round((10990 * (100 - CUPOM_MEDICO_PCT)) / 100)).toBe(PRECOS_PREMIUM.anualComCupom);
+  test("a mesada tem tela no painel do médico", () => {
+    const painel = semComentarios("src/routes/_authenticated/painel.tsx");
+    expect(painel).toContain("<MesadaDoMedico");
   });
 
-  test("o id do cupom é estável enquanto a % não mudar", () => {
-    expect(CUPOM_MEDICO_ID).toBe(`medico-${CUPOM_MEDICO_PCT}pct`);
+  test("e o cartão de convites premium não voltou", () => {
+    const painel = semComentarios("src/routes/_authenticated/painel.tsx");
+    expect(painel).not.toContain("<DoctorInviteCard");
   });
 });

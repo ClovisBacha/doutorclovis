@@ -125,7 +125,6 @@ export function OfertaPremium({
      cheio" sem ninguém saber se era verdade. Preço é a única coisa desta tela
      que não pode ser adivinhada. */
   const temPrecos = Boolean(oferta);
-  const comCupom = Boolean(oferta?.temCupom);
 
   /* Trava o fundo enquanto a folha está aberta — sem isso, o dedo arrasta a
      lista de trás e a folha parece descolada da tela. */
@@ -310,29 +309,13 @@ export function OfertaPremium({
               </p>
             </div>
 
-            {/* ─── O CUPOM DO MÉDICO, CREDITADO A ELE ─────────────────────
-                A faixa é separada de propósito: o desconto do anual é da
-                plataforma, este é DELE. Misturar os dois num número só faria o
-                médico dar 20% e ninguém saber que veio dele — e é justamente
-                esse crédito que dá a ele um motivo para distribuir o código. */}
-            {comCupom && (
-              <div className="mt-2 rounded-xl bg-white px-3 py-2.5 text-violet-800">
-                <p className="text-[11px] font-bold uppercase tracking-wide">
-                  + {oferta.cupomPct}% de desconto
-                  {oferta.medicoDoCupom ? ` de ${oferta.medicoDoCupom}` : ""}
-                </p>
-                <p className="mt-0.5 whitespace-nowrap font-serif text-2xl leading-none">
-                  {brl(oferta.anualFinalCentavos)}
-                </p>
-                <p className="mt-0.5 text-[12px] text-violet-700">
-                  equivale a{" "}
-                  <span className="whitespace-nowrap font-semibold">
-                    {brl(Math.round(oferta.anualFinalCentavos / 12))}/mês
-                  </span>{" "}
-                  · {oferta.descontoAnualComCupomPct}% no total
-                </p>
-              </div>
-            )}
+            {/* ─── O CUPOM DO MÉDICO SAIU DAQUI ───────────────────────────
+                Havia uma faixa creditando 20% de desconto a ele. O médico não
+                dá mais desconto: dá SEMENTINHAS. As razões estão no cabeçalho
+                de `promo.ts`, e a mais dura é que cupom de Stripe não funciona
+                dentro do iOS nem do Android — que é exatamente onde ela compra.
+                A faixa prometia na tela um desconto que a loja não tinha como
+                dar. */}
           </div>
         )}
 
@@ -366,30 +349,13 @@ export function OfertaPremium({
             <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               Mensal
             </span>
-            {comCupom && oferta ? (
-              <>
-                <span className="mt-0.5 block text-[11px] text-muted-foreground line-through">
-                  {brl(oferta.mensalCentavos)}
-                </span>
-                <span className="block font-serif text-lg tabular-nums text-violet-700">
-                  {brl(oferta.mensalFinalCentavos)}
-                </span>
-                <span className="block text-[11px] text-muted-foreground">por mês</span>
-                <span className="mt-1 block text-[10px] text-violet-700">
-                  −{oferta.cupomPct}% enquanto for assinante
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="mt-0.5 block font-serif text-lg tabular-nums">
-                  {oferta ? brl(oferta.mensalCentavos) : "—"}
-                </span>
-                <span className="block text-[11px] text-muted-foreground">por mês</span>
-                <span className="mt-1 block text-[10px] text-muted-foreground">
-                  cancela quando quiser
-                </span>
-              </>
-            )}
+            <span className="mt-0.5 block font-serif text-lg tabular-nums">
+              {oferta ? brl(oferta.mensalCentavos) : "—"}
+            </span>
+            <span className="block text-[11px] text-muted-foreground">por mês</span>
+            <span className="mt-1 block text-[10px] text-muted-foreground">
+              cancela quando quiser
+            </span>
           </button>
           <button
             onClick={() => setPlano("annual")}
@@ -404,7 +370,7 @@ export function OfertaPremium({
               Anual
               {oferta && (
                 <span className="rounded-full bg-violet-600 px-1.5 py-px text-[9px] text-white">
-                  −{comCupom ? oferta.descontoAnualComCupomPct : oferta.descontoAnualPct}%
+                  −{oferta.descontoAnualPct}%
                 </span>
               )}
             </span>
@@ -420,20 +386,14 @@ export function OfertaPremium({
                   mês a mês
                 </span>
                 <span className="block whitespace-nowrap font-serif text-2xl leading-tight tabular-nums text-violet-700">
-                  {brl(oferta.anualFinalCentavos)}
+                  {brl(oferta.anualCentavos)}
                 </span>
                 <span className="block text-[11px] text-muted-foreground">
                   cobrado uma vez · equivale a{" "}
                   <span className="whitespace-nowrap">
-                    {brl(Math.round(oferta.anualFinalCentavos / 12))}/mês
+                    {brl(Math.round(oferta.anualCentavos / 12))}/mês
                   </span>
                 </span>
-                {comCupom && (
-                  <span className="mt-1 block text-[10px] text-violet-700">
-                    já com os {oferta.cupomPct}%
-                    {oferta.medicoDoCupom ? ` de ${oferta.medicoDoCupom}` : ""}
-                  </span>
-                )}
               </>
             ) : (
               <span className="mt-0.5 block font-serif text-lg tabular-nums">—</span>
@@ -474,7 +434,7 @@ export function OfertaPremium({
               ? "Abrindo…"
               : oferta
                 ? `Assinar por ${brl(
-                    plano === "annual" ? oferta.anualFinalCentavos : oferta.mensalFinalCentavos,
+                    plano === "annual" ? oferta.anualCentavos : oferta.mensalCentavos,
                   )}${plano === "annual" ? "" : "/mês"}`
                 : "Assinar o Premium"}
           </button>
@@ -485,15 +445,13 @@ export function OfertaPremium({
             A oferta antiga valia UMA cobrança e a renovação voltava cheia, e
             este parágrafo existia para dizer isso antes do clique — era o que
             impedia o estorno de daqui a doze meses.
-            O cupom do médico é `duration: forever`: ela mantém os 20% enquanto
-            for assinante. Então não há renovação surpresa a avisar, e a letra
-            miúda passa a dizer a verdade nova — que é melhor, e por isso mesmo
-            precisa estar escrita. */}
+            Não há mais desconto de cupom a explicar — o médico dá Sementinhas,
+            não desconto —, então o que resta a avisar é o essencial: o preço é
+            o mesmo na renovação. */}
         {oferta && plano === "annual" && (
           <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
-            Cobrança única de {brl(oferta.anualFinalCentavos)}, renovada a cada 12 meses
-            {comCupom ? ` — o desconto de ${oferta.cupomPct}% continua valendo na renovação` : ""}.
-            Você pode cancelar quando quiser.
+            Cobrança única de {brl(oferta.anualCentavos)}, renovada a cada 12 meses pelo mesmo
+            valor. Você pode cancelar quando quiser.
           </p>
         )}
 

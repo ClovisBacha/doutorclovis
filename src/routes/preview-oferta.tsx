@@ -12,17 +12,14 @@
  * `noindex`, e coberta pelo `Disallow: /preview-` do robots.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { OfertaPremium } from "@/components/oferta-premium";
 import {
   ANUAL_CENTAVOS,
   ANUAL_MENSAL_EQUIV_CENTAVOS,
-  CUPOM_MEDICO_PCT,
-  DESCONTO_ANUAL_COM_CUPOM_PCT,
   DESCONTO_ANUAL_PCT,
   ECONOMIA_ANUAL_CENTAVOS,
   MENSAL_CENTAVOS,
-  PRECOS_PREMIUM,
   REFERENCIA_CENTAVOS,
 } from "@/lib/promo";
 
@@ -32,39 +29,28 @@ export const Route = createFileRoute("/preview-oferta")({
 });
 
 function Preview() {
-  const [comPromo, setComPromo] = useState(true);
-  /* `useMemo` porque `ofertaDeProva` está na lista de dependências do efeito
-     que lê a oferta: um objeto novo a cada render faria o efeito rodar a cada
-     render, e o `setOferta` dentro dele voltaria a disparar o render. Não
-     explodiu na tela, mas é laço — e laço que não aparece é o que sobra para
-     alguém achar daqui a três meses. */
+  /**
+   * A tela tinha DOIS estados — com e sem o cupom do médico — e o interruptor
+   * que alternava entre eles. O cupom foi aposentado: há um preço só, para
+   * todas. Manter o interruptor mostraria ao dono uma variante que a paciente
+   * nunca vai ver, que é a pior coisa que uma tela de prova pode fazer.
+   */
   const oferta = useMemo(
     () => ({
-      /* Os dois estados da tela hoje: com e sem o cupom do médico. A oferta de
-         boas-vindas foi aposentada — ver `promo.ts`. */
-      temCupom: comPromo,
-      medicoDoCupom: comPromo ? "Dr. Clóvis Bacha" : null,
       mensalCentavos: MENSAL_CENTAVOS,
       anualCentavos: ANUAL_CENTAVOS,
-      mensalFinalCentavos: comPromo ? PRECOS_PREMIUM.mensalComCupom : MENSAL_CENTAVOS,
-      anualFinalCentavos: comPromo ? PRECOS_PREMIUM.anualComCupom : ANUAL_CENTAVOS,
       referenciaCentavos: REFERENCIA_CENTAVOS,
       economiaCentavos: ECONOMIA_ANUAL_CENTAVOS,
       anualMensalEquivCentavos: ANUAL_MENSAL_EQUIV_CENTAVOS,
       descontoAnualPct: DESCONTO_ANUAL_PCT,
-      descontoAnualComCupomPct: DESCONTO_ANUAL_COM_CUPOM_PCT,
-      cupomPct: CUPOM_MEDICO_PCT,
     }),
-    [comPromo],
+    [],
   );
   return (
     <div className="min-h-screen bg-neutral-300">
-      <button
-        onClick={() => setComPromo((v) => !v)}
-        className="fixed left-3 top-3 z-[80] rounded-full bg-black/80 px-3 py-1.5 text-xs font-bold text-white"
-      >
-        {comPromo ? "ver SEM cupom do médico" : "ver COM cupom do médico"}
-      </button>
+      {/* O interruptor "com/sem cupom do médico" saiu com o cupom. Havia um
+          estado só a partir daqui, e um botão que alterna entre um estado e ele
+          mesmo é pior que nenhum botão. */}
       <OfertaPremium
         aberto
         onFechar={() => {}}

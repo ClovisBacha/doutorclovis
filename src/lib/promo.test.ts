@@ -22,19 +22,16 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   ANUAL_CENTAVOS,
   ANUAL_MENSAL_EQUIV_CENTAVOS,
-  CUPOM_MEDICO_ID,
-  CUPOM_MEDICO_PCT,
-  DESCONTO_ANUAL_COM_CUPOM_PCT,
   DESCONTO_ANUAL_PCT,
   ECONOMIA_ANUAL_CENTAVOS,
   MENSAL_CENTAVOS,
   PRECOS_PREMIUM,
   REFERENCIA_CENTAVOS,
   brl,
-  comDesconto,
   descontoPct,
 } from "./promo";
 
@@ -47,10 +44,6 @@ describe("1. os preços decididos pelo dono", () => {
 
   test("anual é R$ 109,90 — cobrado de uma vez", () => {
     expect(ANUAL_CENTAVOS).toBe(10_990);
-  });
-
-  test("o cupom do médico é 20%", () => {
-    expect(CUPOM_MEDICO_PCT).toBe(20);
   });
 
   test("a referência é um ano pagando mês a mês: R$ 238,80", () => {
@@ -84,42 +77,53 @@ describe("2. o desconto anunciado nunca promete mais do que a fatura dá", () =>
     /* E o caso limite: exatamente 50% continua 50, não 49. */
     expect(descontoPct(1_000, 2_000)).toBe(50);
   });
-
-  test("anual + cupom anuncia 63%", () => {
-    expect(DESCONTO_ANUAL_COM_CUPOM_PCT).toBe(63);
-  });
-
-  test("e o de 63% também é conservador", () => {
-    const prometido = Math.round(REFERENCIA_CENTAVOS * 0.37);
-    expect(prometido).toBeGreaterThan(PRECOS_PREMIUM.anualComCupom);
-  });
 });
 
-describe("3. o cupom fecha exato em centavos — por isso é porcentagem no Stripe", () => {
+describe("3. o cupom do médico está APOSENTADO — e não deixou promessa na tela", () => {
   /**
-   * A oferta antiga usava cupom de VALOR FIXO de propósito: os 62% incidiam
-   * sobre R$ 238,80 enquanto o Stripe cobrava o Price de R$ 118,80, e uma
-   * porcentagem obrigaria o Stripe a arredondar — um centavo de diferença
-   * entre a tela e a fatura é uma reclamação.
+   * ─── O QUE ESTE BLOCO PROVAVA ANTES ───────────────────────────────────────
    *
-   * Aqui os 20% incidem sobre o PRÓPRIO preço cobrado, e as duas contas fecham
-   * exatas. É o que autoriza usar `ensurePercentCoupon` com um cupom só para os
-   * dois planos.
+   * Que os 20% do médico fechavam exato em centavos (1990 × 0,8 = 1592;
+   * 10990 × 0,8 = 8792), que era o argumento para usar porcentagem no Stripe em
+   * vez de valor fixo.
+   *
+   * O cupom saiu inteiro por decisão do dono: **o médico não dá mais desconto,
+   * dá Sementinhas.** O motivo que fecha o assunto é operacional — a paciente
+   * compra DENTRO do app iOS/Android, e cupom de Stripe não existe ali. A tela
+   * prometia um desconto que a loja não tinha como dar.
+   *
+   * ─── E POR QUE O BLOCO NÃO FOI SÓ APAGADO ─────────────────────────────────
+   *
+   * Apagar deixaria o repositório sem nada dizendo que aquilo acabou, e é
+   * assim que uma promessa morta volta: alguém acha `mensalComCupom` num
+   * componente antigo e "conserta" reintroduzindo a constante. Estes testes
+   * cobram a AUSÊNCIA, que é a única forma de a remoção ficar de pé.
    */
-  test("mensal com cupom: R$ 15,92, sem fração de centavo", () => {
-    expect(PRECOS_PREMIUM.mensalComCupom).toBe(1_592);
-    expect((MENSAL_CENTAVOS * 80) % 100).toBe(0);
+  const fonte = readFileSync("src/lib/promo.ts", "utf8");
+  const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  test("as constantes do cupom não existem mais", () => {
+    for (const morta of [
+      "CUPOM_MEDICO_PCT",
+      "CUPOM_MEDICO_ID",
+      "DESCONTO_ANUAL_COM_CUPOM_PCT",
+      "comDesconto",
+    ]) {
+      expect(codigo).not.toContain(morta);
+    }
   });
 
-  test("anual com cupom: R$ 87,92, sem fração de centavo", () => {
-    expect(PRECOS_PREMIUM.anualComCupom).toBe(8_792);
-    expect((ANUAL_CENTAVOS * 80) % 100).toBe(0);
+  test("há DOIS preços, não quatro", () => {
+    /* Eram `mensal`, `mensalComCupom`, `anual`, `anualComCupom`. Um preço "com
+       desconto" que nada aplica é a promessa morta que fica na tela. */
+    expect(Object.keys(PRECOS_PREMIUM).sort()).toEqual(["anual", "mensal"]);
   });
 
-  test("o id do cupom carrega a porcentagem", () => {
-    /* Sem isso, mudar `CUPOM_MEDICO_PCT` faria o Stripe reaproveitar o cupom
-       ANTIGO — a tela prometeria um desconto que a fatura não daria. */
-    expect(CUPOM_MEDICO_ID).toContain(String(CUPOM_MEDICO_PCT));
+  test("e o motivo está escrito onde quem for mexer vai ler", () => {
+    /* Sem o porquê registrado, a próxima pessoa reintroduz o cupom achando que
+       foi esquecimento. */
+    expect(fonte).toContain("APOSENTADO");
+    expect(fonte).toContain("SEMENTINHAS");
   });
 });
 
@@ -141,26 +145,6 @@ describe("4. o equivalente mensal é comparação, nunca preço", () => {
   });
 });
 
-describe("5. `comDesconto` arredonda uma vez, no fim, em centavos", () => {
-  test("20% de R$ 19,90 = R$ 15,92", () => {
-    expect(comDesconto(1_990, 20)).toBe(1_592);
-  });
-
-  test("desconto de 0% não muda nada", () => {
-    expect(comDesconto(10_990, 0)).toBe(10_990);
-  });
-
-  test("desconto de 100% zera", () => {
-    expect(comDesconto(10_990, 100)).toBe(0);
-  });
-
-  test("nunca devolve fração de centavo", () => {
-    for (const pct of [7, 13, 17, 33, 67]) {
-      expect(Number.isInteger(comDesconto(10_990, pct))).toBe(true);
-    }
-  });
-});
-
 describe("6. `brl` formata em português", () => {
   test("centavos viram vírgula", () => {
     expect(brl(10_990)).toBe("R$ 109,90");
@@ -174,22 +158,24 @@ describe("6. `brl` formata em português", () => {
 });
 
 describe("7. a escada de preços é coerente", () => {
-  /* Os quatro preços que a paciente pode ver, comparados entre si. É o teste
-     que pega uma edição que mexe num e esquece o outro. */
+  /* Os DOIS preços que a paciente pode ver, comparados entre si. É o teste que
+     pega uma edição que mexe num e esquece o outro. */
   test("o anual é sempre mais barato que doze mensais", () => {
     expect(ANUAL_CENTAVOS).toBeLessThan(MENSAL_CENTAVOS * 12);
   });
 
-  test("o cupom sempre desconta, nunca aumenta", () => {
-    expect(PRECOS_PREMIUM.mensalComCupom).toBeLessThan(PRECOS_PREMIUM.mensal);
-    expect(PRECOS_PREMIUM.anualComCupom).toBeLessThan(PRECOS_PREMIUM.anual);
+  test("e é ele o melhor negócio do quadro", () => {
+    expect(PRECOS_PREMIUM.anual).toBeLessThan(PRECOS_PREMIUM.mensal * 12);
+    expect(PRECOS_PREMIUM.anual).toBe(ANUAL_CENTAVOS);
+    expect(PRECOS_PREMIUM.mensal).toBe(MENSAL_CENTAVOS);
   });
 
-  test("o anual com cupom continua sendo o melhor negócio do quadro", () => {
-    expect(PRECOS_PREMIUM.anualComCupom).toBeLessThan(PRECOS_PREMIUM.mensalComCupom * 12);
-  });
-
-  test("e o desconto com cupom é maior que o sem", () => {
-    expect(DESCONTO_ANUAL_COM_CUPOM_PCT).toBeGreaterThan(DESCONTO_ANUAL_PCT);
+  test("o desconto anunciado é positivo e menor que o real", () => {
+    /* Um desconto de 0% ou negativo significaria que o anual deixou de ser
+       vantagem — e a tela continuaria anunciando "plano anual" mesmo assim. */
+    expect(DESCONTO_ANUAL_PCT).toBeGreaterThan(0);
+    expect(DESCONTO_ANUAL_PCT).toBeLessThanOrEqual(
+      (1 - ANUAL_CENTAVOS / REFERENCIA_CENTAVOS) * 100,
+    );
   });
 });

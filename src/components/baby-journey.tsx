@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { BONUS_VINCULO_MEDICO } from "@/lib/economia-sementinhas";
 import { X, Lock, Sparkles } from "lucide-react";
 import {
   BabyIllustration,
@@ -205,7 +206,7 @@ export function PremiumUpsellModal({
   onUnlocked,
 }: {
   onClose: () => void;
-  /** Chamado quando o Premium foi liberado por cupom (recarregar o perfil). */
+  /** Chamado quando o código do médico foi resgatado (recarregar o perfil). */
   onUnlocked: () => void;
 }) {
   const [busy, setBusy] = useState<"annual" | "monthly" | null>(null);
@@ -280,7 +281,7 @@ export function PremiumUpsellModal({
     // Mesmo formato do servidor (4–16 chars): valida aqui para o erro ser
     // claro ("código inválido") e não um falso "falha de conexão".
     if (code.length < 4 || code.length > 16) {
-      toast.error("Código inválido — confira o cupom que você recebeu (4 a 16 caracteres).");
+      toast.error("Código inválido — confira o código do seu médico (4 a 16 caracteres).");
       return;
     }
     setRedeeming(true);
@@ -288,7 +289,7 @@ export function PremiumUpsellModal({
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
       if (!s.session) {
-        toast.error("Entre na sua conta para usar o cupom.");
+        toast.error("Entre na sua conta para usar o código.");
         return;
       }
       const { redeemInviteCode } = await import("@/lib/invites.functions");
@@ -296,7 +297,11 @@ export function PremiumUpsellModal({
         data: { accessToken: s.session.access_token, code },
       });
       if (res.ok) {
-        toast.success("Premium liberado pelo seu médico! 💛");
+        /* Ela dizia "Premium liberado". O resgate parou de dar Premium quando
+           o médico deixou de dar a assinatura; hoje ele vincula e paga o bônus
+           de Sementinhas. Anunciar Premium e entregar outra coisa faz a
+           paciente ir procurar o que não existe. */
+        toast.success(`Médico vinculado! Você ganhou ${BONUS_VINCULO_MEDICO} Sementinhas 🌱`);
         onUnlocked();
         onClose();
         return;
@@ -380,7 +385,7 @@ export function PremiumUpsellModal({
             </div>
           </div>
 
-          {/* cupom do médico */}
+          {/* Código do médico: vincula e paga Sementinhas — não dá Premium. */}
           <div className="mt-4 text-center">
             {couponOpen ? (
               <div className="flex gap-2">
@@ -406,11 +411,12 @@ export function PremiumUpsellModal({
                 onClick={() => setCouponOpen(true)}
                 className="text-xs font-semibold text-cyan-200 underline underline-offset-4"
               >
-                🎟️ Tenho um cupom
+                🌱 Tenho o código do meu médico
               </button>
             )}
             <p className="mt-2 text-[10px] text-white/40">
-              Cancele quando quiser · tem um cupom? Aplique acima e libere na hora
+              Cancele quando quiser · tem o código do seu médico? Aplique acima e ganhe{" "}
+              {BONUS_VINCULO_MEDICO} Sementinhas
             </p>
           </div>
         </div>

@@ -167,50 +167,16 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
       }
     }
 
-    /* ── O CUPOM DO MÉDICO ────────────────────────────────────────────
-       20% nos DOIS planos, mensal e anual.
+    /* ─── O CUPOM DO MÉDICO SAIU DAQUI (ago/2026) ─────────────────────
+       Ele aplicava 20% ao Premium da paciente nos dois planos. O médico não dá
+       mais desconto: dá Sementinhas. As razões estão no cabeçalho de
+       `promo.ts`, e a que fecha o assunto é operacional — a paciente compra
+       DENTRO do app iOS/Android, e cupom de Stripe não existe ali. Este bloco
+       só teria efeito na venda web, que o `canal-de-venda` recusa para ela.
 
-       ─── O QUE ESTAVA AQUI ANTES ────────────────────────────────────────
-       A oferta de boas-vindas: 62% no primeiro ano do anual, automática, para
-       quem nunca tinha assinado. Foi aposentada junto com a mudança do anual
-       para R$ 109,90 — com o preço novo ela entregava R$ 89,90 e o cupom do
-       médico entrega R$ 87,92, praticamente a mesma coisa. Manter as duas
-       faria o cupom do médico não valer nada; empilhá-las levaria a assinatura
-       a R$ 71,92.
-
-       ─── POR QUE PORCENTAGEM AQUI, E VALOR FIXO LÁ ──────────────────────
-       A oferta antiga usava cupom de VALOR FIXO de propósito: os 62% incidiam
-       sobre o preço de pagar mês a mês (R$ 238,80) enquanto o Stripe cobrava o
-       Price do anual (R$ 118,80), então uma porcentagem obrigaria o Stripe a
-       arredondar — e um centavo de diferença entre a tela e a fatura é uma
-       reclamação.
-
-       Aqui os 20% incidem sobre o PRÓPRIO preço cobrado, e as duas contas
-       fecham exatas em centavos: 1990 × 0,8 = 1592 e 10990 × 0,8 = 8792. Sem
-       arredondamento no meio, porcentagem é o instrumento certo — e é o único
-       que funciona nos dois planos com um cupom só.
-
-       ─── NOS DOIS PLANOS, E ISSO É DECISÃO ──────────────────────────────
-       A oferta antiga era só no anual, com um motivo escrito: desconto num
-       plano mensal vira "um mês barato seguido de onze cheios", que é a versão
-       que gera estorno. O cupom do médico é `duration: forever` — ela mantém os
-       20% enquanto for assinante —, então esse defeito não existe aqui.
-
-       O cupom de convite-de-paciente (no plano do MÉDICO) continua com
-       prioridade sobre este: são produtos diferentes e nunca colidem. */
-    if (!discountCoupon && data.product === "quiz_premium") {
-      try {
-        const { lerPrecos } = await import("@/lib/promo.functions");
-        const precos = await lerPrecos(u.user.id);
-        if (precos.temCupom) {
-          const { CUPOM_MEDICO_ID, CUPOM_MEDICO_PCT } = await import("@/lib/promo");
-          discountCoupon = await ensurePercentCoupon(CUPOM_MEDICO_ID, CUPOM_MEDICO_PCT);
-        }
-      } catch {
-        /* Falhou? Segue SEM desconto. Preferir não descontar a descontar
-           errado: o checkout nunca é bloqueado por causa do cupom. */
-      }
-    }
+       O cupom de convite-de-paciente, acima, é OUTRO produto: é o desconto que
+       o MÉDICO ganha por ter sido convidado por uma paciente, no plano dele,
+       comprado no site. Esse continua. */
 
     // Reaproveita o customer do Stripe se o usuário já assinou algo antes.
     const { data: existing } = await (supabaseAdmin as any)
