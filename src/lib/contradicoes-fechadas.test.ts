@@ -124,7 +124,9 @@ describe("5. a escada de planos é monotônica de ponta a ponta", () => {
    * rank 6 para 8 passou sem nenhuma cobertura. E foi essa mudança que tornou a
    * exceção "só sobe quem está abaixo do Elite" uma inversão.
    */
-  const ESCADA = ["free", "essencial", "starter", "pro", "elite", "black", "clinica"];
+  /* Sobraram QUATRO: os cinco nomeados foram apagados por não terem nenhum
+   médico assinado. Em ordem de `PLAN_RANK`. */
+  const ESCADA = ["free", "trial", "mensagens", "clinica"];
 
   test("cada degrau tem rank estritamente maior que o anterior", () => {
     for (let i = 1; i < ESCADA.length; i++) {

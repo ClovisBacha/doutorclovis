@@ -94,20 +94,20 @@ afterEach(() => {
 describe("1. o assento herda o plano do DONO, não um cheque em branco", () => {
   test("dono Clínica → o membro sobe para Clínica", () => {
     return planoDe({
-      membro: { plan: "starter", clinicId: "cl-1" },
+      membro: { plan: "free", clinicId: "cl-1" },
       clinica: CLINICA_ATIVA,
       dono: { plan: "clinica" },
     }).then((p) => expect(p).toBe("clinica"));
   });
 
-  test("dono Pro → o membro sobe só até Pro, não até Clínica", () => {
+  test("dono no plano de mensagens → o membro sobe só até ele, não até Clínica", () => {
     /* A asserção que descreve o defeito: era `plan = "clinica"` fixo, e
        `clinica` tem IA e pacientes ILIMITADAS. */
     return planoDe({
       membro: { plan: "free", clinicId: "cl-1" },
       clinica: CLINICA_ATIVA,
-      dono: { plan: "pro" },
-    }).then((p) => expect(p).toBe("pro"));
+      dono: { plan: "mensagens" },
+    }).then((p) => expect(p).toBe("mensagens"));
   });
 
   test("dono com o cartão vencido → o assento cai junto", () => {
@@ -137,26 +137,26 @@ describe("1. o assento herda o plano do DONO, não um cheque em branco", () => {
   });
 
   test("sem clínica, o médico vale o próprio plano", () => {
-    return planoDe({ membro: { plan: "starter" } }).then((p) => expect(p).toBe("starter"));
+    return planoDe({ membro: { plan: "free" } }).then((p) => expect(p).toBe("free"));
   });
 });
 
 describe("2. o assento SÓ SOBE — nunca rebaixa", () => {
-  test("membro Pro numa clínica de dono Starter continua Pro", () => {
+  test("membro no plano de mensagens numa clínica de dono Free continua no dele", () => {
     /* Ele paga o próprio plano; o assento é um bônus, não um teto. */
     return planoDe({
-      membro: { plan: "pro", clinicId: "cl-1" },
+      membro: { plan: "mensagens", clinicId: "cl-1" },
       clinica: CLINICA_ATIVA,
-      dono: { plan: "starter" },
-    }).then((p) => expect(p).toBe("pro"));
+      dono: { plan: "free" },
+    }).then((p) => expect(p).toBe("mensagens"));
   });
 
-  test("membro Black numa clínica de dono Pro continua Black", () => {
+  test("membro Clínica numa clínica de dono no plano de mensagens continua Clínica", () => {
     return planoDe({
-      membro: { plan: "black", clinicId: "cl-1" },
+      membro: { plan: "clinica", clinicId: "cl-1" },
       clinica: CLINICA_ATIVA,
-      dono: { plan: "pro" },
-    }).then((p) => expect(p).toBe("black"));
+      dono: { plan: "mensagens" },
+    }).then((p) => expect(p).toBe("clinica"));
   });
 });
 
@@ -168,7 +168,7 @@ describe("3. a exceção 'só sobe quem está abaixo do Elite' não existe mais"
    */
   test("Elite numa clínica de dono Clínica SOBE para Clínica", () => {
     return planoDe({
-      membro: { plan: "elite", clinicId: "cl-1" },
+      membro: { plan: "mensagens", clinicId: "cl-1" },
       clinica: CLINICA_ATIVA,
       dono: { plan: "clinica" },
     }).then((p) => expect(p).toBe("clinica"));
@@ -176,7 +176,7 @@ describe("3. a exceção 'só sobe quem está abaixo do Elite' não existe mais"
 
   test("Black numa clínica de dono Clínica também", () => {
     return planoDe({
-      membro: { plan: "black", clinicId: "cl-1" },
+      membro: { plan: "clinica", clinicId: "cl-1" },
       clinica: CLINICA_ATIVA,
       dono: { plan: "clinica" },
     }).then((p) => expect(p).toBe("clinica"));
@@ -188,7 +188,7 @@ describe("3. a exceção 'só sobe quem está abaixo do Elite' não existe mais"
        herdar errado, a exceção volta a ser necessária — e este teste avisa. */
     const { PLAN_ENTITLEMENTS } = await import("./entitlements");
     const cl = PLAN_ENTITLEMENTS.clinica;
-    const el = PLAN_ENTITLEMENTS.elite;
+    const el = PLAN_ENTITLEMENTS.mensagens;
     expect(cl.premiumInvitesPerMonth ?? 0).toBeGreaterThanOrEqual(el.premiumInvitesPerMonth ?? 0);
     expect(cl.maxBrains === null || (cl.maxBrains ?? 0) >= (el.maxBrains ?? 0)).toBe(true);
   });

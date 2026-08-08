@@ -130,8 +130,12 @@ describe("1b. e ALGUÉM manda a quantidade — o elo que faltava", () => {
 
   test("`mensagens` é um plano que o validador aceita", () => {
     /* Sem isto o Zod recusa antes de qualquer coisa, com erro de validação —
-       e a tela de vendas mostraria um botão que nunca funciona. */
-    expect(billing).toContain('"mensagens",');
+       e a tela de vendas mostraria um botão que nunca funciona.
+
+       A lista encolheu para três quando os cinco nomeados foram apagados, então
+       a asserção deixou de poder casar `"mensagens",` com vírgula. */
+    expect(billing).toContain('"mensagens"');
+    expect(billing).toContain("const PLANS =");
   });
 });
 

@@ -79,16 +79,6 @@ export function priceIdFor(product: BillingProduct, plan: string): string | null
        os dois juntos — se as faixas do Stripe mudarem sem a função, a tela
        promete um preço e a fatura cobra outro. */
     "doctor_plan:mensagens": env.STRIPE_PRICE_DOCTOR_MENSAGENS,
-    "doctor_plan:essencial": env.STRIPE_PRICE_DOCTOR_ESSENCIAL_MONTHLY,
-    "doctor_plan:essencial_annual": env.STRIPE_PRICE_DOCTOR_ESSENCIAL_ANNUAL,
-    "doctor_plan:starter": env.STRIPE_PRICE_DOCTOR_STARTER_MONTHLY,
-    "doctor_plan:starter_annual": env.STRIPE_PRICE_DOCTOR_STARTER_ANNUAL,
-    "doctor_plan:pro": env.STRIPE_PRICE_DOCTOR_PRO_MONTHLY,
-    "doctor_plan:pro_annual": env.STRIPE_PRICE_DOCTOR_PRO_ANNUAL,
-    "doctor_plan:elite": env.STRIPE_PRICE_DOCTOR_ELITE_MONTHLY,
-    "doctor_plan:elite_annual": env.STRIPE_PRICE_DOCTOR_ELITE_ANNUAL,
-    "doctor_plan:black": env.STRIPE_PRICE_DOCTOR_BLACK_MONTHLY,
-    "doctor_plan:black_annual": env.STRIPE_PRICE_DOCTOR_BLACK_ANNUAL,
   };
   return map[`${product}:${plan}`] ?? null;
 }

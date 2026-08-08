@@ -150,12 +150,7 @@ const PLANS = [
   /* O único que ainda se vende. Sem ele aqui, o console não consegue corrigir à
      mão o plano de quem comprou a escada nova. */
   "mensagens",
-  "essencial",
-  "starter",
-  "pro",
   "clinica",
-  "elite",
-  "black",
 ] as const;
 
 type AdminTab =
@@ -533,11 +528,11 @@ const brl = (cents: number) =>
   `R$ ${(cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const brl0 = (cents: number) => `R$ ${Math.round(cents / 100).toLocaleString("pt-BR")}`;
 
+/* Quatro planos. Os cinco nomeados foram apagados — não havia médico em
+   nenhum. Um nome antigo que sobre no banco cai no `?? plano` abaixo e aparece
+   cru, que é melhor que um rótulo bonito para um plano que não existe. */
 const PLAN_LABEL: Record<string, string> = {
-  starter: "Starter",
-  pro: "Pro",
-  elite: "Reconhecido",
-  black: "Black",
+  mensagens: "Obstetrícia",
   clinica: "Clínica",
   trial: "Trial",
   free: "Grátis",

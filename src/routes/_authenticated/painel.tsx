@@ -8576,9 +8576,7 @@ function DoctorBilling({
   /* `mensagens` ENTRA AQUI, e a falta dele não era cosmética: um médico que
      acabou de assinar a escada nova seria tratado como não-assinante no próprio
      painel — banner de venda no lugar da gestão da assinatura. */
-  const isPaid =
-    active &&
-    ["mensagens", "essencial", "starter", "pro", "clinica", "elite", "black"].includes(plan);
+  const isPaid = active && ["mensagens", "clinica"].includes(plan);
   const isTeam = plan === "clinica";
 
   useEffect(() => {

@@ -715,19 +715,7 @@ const SetStatusSchema = z.object({
   doctorId: z.string().uuid(),
   active: z.boolean().optional(),
   verified: z.boolean().optional(),
-  plan: z
-    .enum([
-      "trial",
-      "free",
-      "mensagens",
-      "essencial",
-      "starter",
-      "pro",
-      "clinica",
-      "elite",
-      "black",
-    ])
-    .optional(),
+  plan: z.enum(["trial", "free", "mensagens", "clinica"]).optional(),
   /* Até quando vale a concessão. Ausente = o padrão do plano (ver
      `vencimentoDaConcessao`); `null` = de propósito sem vencimento. */
   expiraEm: z.string().datetime().nullable().optional(),

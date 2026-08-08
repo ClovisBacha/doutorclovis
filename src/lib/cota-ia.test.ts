@@ -263,28 +263,35 @@ describe("todo plano tem teto declarado", () => {
   });
 
   test("nenhum plano ficou sem valor", () => {
-    /* Oito planos. Um sem teto declarado herdaria `undefined`, que não é nem
-       ilimitado nem zero — é comportamento indefinido em cima de dinheiro. */
+    /**
+     * Eram oito planos; hoje são QUATRO — `free`, `trial`, `mensagens` e
+     * `clinica`. Os cinco nomeados foram apagados por não terem nenhum médico
+     * assinado, e um plano vazio no código é manutenção para zero receita.
+     *
+     * A regra que não mudou: um plano sem teto declarado herda `undefined`, que
+     * não é nem ilimitado nem zero — é comportamento indefinido em cima de
+     * dinheiro.
+     */
     const declarados = (ent.match(/^\s*aiRepliesPerCycle: /gm) ?? []).length;
-    expect(declarados).toBeGreaterThanOrEqual(8);
+    /* Quatro planos + a declaração do tipo. */
+    expect(declarados).toBeGreaterThanOrEqual(4);
   });
 
   test("plano sem IA tem teto ZERO, não nulo", () => {
-    /* `null` quer dizer ilimitado. Um plano Free com `null` daria IA infinita
-       de graça. */
-    const free = ent.slice(ent.indexOf("const FREE: Entitlements"), ent.indexOf("const ESSENCIAL"));
+    /* `null` quer dizer ilimitado. Um Free com `null` daria IA infinita de
+       graça — e é o Free que qualquer um cria em trinta segundos. */
+    const free = ent.slice(ent.indexOf("const FREE: Entitlements"), ent.indexOf("const CLINICA"));
     expect(free).toContain("aiRepliesPerCycle: 0,");
   });
 
-  test("o teto cresce junto com o preço", () => {
-    const teto = (nome: string) => {
+  test("e os três que TÊM IA a declaram", () => {
+    /* `mensagens` traz o piso da escada (a entrega real vem da coluna que o
+       Stripe grava), `trial` traz um teto de cortesia e `clinica` é `null`,
+       que aqui significa "combinado no contrato". */
+    for (const nome of ["MENSAGENS", "TRIAL", "CLINICA"]) {
       const bloco = ent.slice(ent.indexOf(`const ${nome}: Entitlements`));
-      return Number((bloco.match(/aiRepliesPerCycle: ([\d_]+)/)?.[1] ?? "0").replace(/_/g, ""));
-    };
-    expect(teto("ESSENCIAL")).toBeLessThan(teto("STARTER"));
-    expect(teto("STARTER")).toBeLessThan(teto("PRO"));
-    expect(teto("PRO")).toBeLessThan(teto("ELITE"));
-    expect(teto("ELITE")).toBeLessThan(teto("BLACK"));
+      expect(bloco.slice(0, 900)).toContain("aiRepliesPerCycle:");
+    }
   });
 });
 

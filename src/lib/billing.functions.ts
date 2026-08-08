@@ -13,23 +13,11 @@ import { z } from "zod";
 import { DOCTOR } from "@/lib/doctor.config";
 
 const PRODUCTS = ["quiz_premium", "doctor_plan"] as const;
-/* quiz: monthly|annual · médico: `mensagens` (o que se vende) + os nomeados,
-   que continuam aceitos só porque há médicos gravados neles. */
-const PLANS = [
-  "monthly",
-  "annual",
-  "mensagens",
-  "essencial",
-  "essencial_annual",
-  "starter",
-  "starter_annual",
-  "pro",
-  "pro_annual",
-  "elite",
-  "elite_annual",
-  "black",
-  "black_annual",
-] as const;
+/* quiz: monthly|annual · médico: `mensagens`, e só.
+   Os cinco nomeados foram apagados: não havia médico assinado em nenhum, e uma
+   lista de planos que o checkout aceita mas ninguém compra é superfície de
+   erro sem receita do outro lado. */
+const PLANS = ["monthly", "annual", "mensagens"] as const;
 
 function siteUrl(): string {
   return (process.env.SITE_URL || DOCTOR.siteUrl || "https://www.obstetrica.com.br").replace(

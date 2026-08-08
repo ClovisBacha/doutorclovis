@@ -35,29 +35,29 @@ const emDias = (d: number) => new Date(AGORA + d * DIA).toISOString();
 
 describe("1. `planoVigente` exercitada — não grepada", () => {
   test("plano pago vencido há muito vira free", () => {
-    expect(planoVigente("black", emDias(-30), AGORA)).toBe("free");
+    expect(planoVigente("clinica", emDias(-30), AGORA)).toBe("free");
   });
 
   test("e não só o trial — era esse o defeito original", () => {
     /* A versão antiga rebaixava apenas `trial`: um `pro` vencido mantinha
        todas as capacidades pagas, indefinidamente. */
-    expect(planoVigente("pro", emDias(-30), AGORA)).toBe("free");
-    expect(planoVigente("elite", emDias(-30), AGORA)).toBe("free");
+    expect(planoVigente("mensagens", emDias(-30), AGORA)).toBe("free");
+    expect(planoVigente("mensagens", emDias(-30), AGORA)).toBe("free");
   });
 
   test("plano em dia continua valendo", () => {
-    expect(planoVigente("pro", emDias(30), AGORA)).toBe("pro");
+    expect(planoVigente("mensagens", emDias(30), AGORA)).toBe("mensagens");
   });
 
   test("sem data de vencimento, nada é rebaixado", () => {
-    expect(planoVigente("black", null, AGORA)).toBe("black");
-    expect(planoVigente("black", undefined, AGORA)).toBe("black");
+    expect(planoVigente("clinica", null, AGORA)).toBe("clinica");
+    expect(planoVigente("clinica", undefined, AGORA)).toBe("clinica");
   });
 
   test("data ilegível não rebaixa ninguém", () => {
     /* Na dúvida o médico é atendido: o estrago de rebaixar por engano recai
        sobre a gestante do outro lado. */
-    expect(planoVigente("pro", "não é uma data", AGORA)).toBe("pro");
+    expect(planoVigente("mensagens", "não é uma data", AGORA)).toBe("mensagens");
   });
 });
 
@@ -69,15 +69,15 @@ describe("2. a carência de renovação é um intervalo, não um enfeite", () =>
    * passa quando a constante muda.
    */
   test("vencido ontem: ainda vale", () => {
-    expect(planoVigente("pro", emDias(-1), AGORA)).toBe("pro");
+    expect(planoVigente("mensagens", emDias(-1), AGORA)).toBe("mensagens");
   });
 
   test("vencido há 2 dias: ainda vale", () => {
-    expect(planoVigente("pro", emDias(-2), AGORA)).toBe("pro");
+    expect(planoVigente("mensagens", emDias(-2), AGORA)).toBe("mensagens");
   });
 
   test("vencido há 4 dias: acabou", () => {
-    expect(planoVigente("pro", emDias(-4), AGORA)).toBe("free");
+    expect(planoVigente("mensagens", emDias(-4), AGORA)).toBe("free");
   });
 
   test("a carência é de três dias", () => {
@@ -91,7 +91,7 @@ describe("3. toda escrita de plano escreve o vencimento junto", () => {
     expect(venc).not.toBeNull();
     /* A asserção que descreve o defeito: com `null` no lugar de `venc`, o
        médico legado (data no passado) continuaria em `free`. */
-    expect(planoVigente("black", venc, AGORA)).toBe("black");
+    expect(planoVigente("clinica", venc, AGORA)).toBe("clinica");
   });
 
   test("e o prazo é de um ano, não de um dia", () => {
@@ -122,21 +122,21 @@ describe("4. a outra forma da mesma contradição: médico desativado", () => {
   test("conceder black a quem está inativo não vale nada — e agora isso é dito", () => {
     /* `planRowFor` derruba para `free` quando `active === false`. Conceder um
        plano ali também devolvia `ok: true` sem mudar coisa alguma. */
-    expect(planoEfetivo("black", emDias(365), false, AGORA)).toBe("free");
+    expect(planoEfetivo("clinica", emDias(365), false, AGORA)).toBe("free");
   });
 
   test("ativo e em dia: vale o que foi concedido", () => {
-    expect(planoEfetivo("black", emDias(365), true, AGORA)).toBe("black");
+    expect(planoEfetivo("clinica", emDias(365), true, AGORA)).toBe("clinica");
   });
 
   test("ativo e vencido: vale free", () => {
-    expect(planoEfetivo("black", emDias(-30), true, AGORA)).toBe("free");
+    expect(planoEfetivo("clinica", emDias(-30), true, AGORA)).toBe("free");
   });
 
   test("`active` desconhecido não rebaixa — só `false` derruba", () => {
     /* `undefined` acontece quando a coluna não veio no select. Tratar ausência
        como desativação transformaria uma leitura incompleta em rebaixamento. */
-    expect(planoEfetivo("pro", null, undefined, AGORA)).toBe("pro");
+    expect(planoEfetivo("mensagens", null, undefined, AGORA)).toBe("mensagens");
   });
 
   test("plano nulo cai para free, nunca para nulo", () => {

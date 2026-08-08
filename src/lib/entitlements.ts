@@ -29,16 +29,23 @@
  */
 import { ENTRADA_MENSAGENS, precoDe } from "./planos-medico";
 
-export type PlanKey =
-  | "trial"
-  | "free"
-  | "mensagens"
-  | "essencial"
-  | "starter"
-  | "pro"
-  | "clinica"
-  | "elite"
-  | "black";
+/**
+ * ─── OS CINCO PLANOS NOMEADOS FORAM APAGADOS (ago/2026) ─────────────────────
+ *
+ * `essencial`, `starter`, `pro`, `elite` e `black` saíram do sistema inteiro:
+ * tipo, entitlements, preço, escada, normalizador, mapa de Price, lista do
+ * checkout, seletor do console e `.env.example`.
+ *
+ * A condição que permitiu APAGAR em vez de aposentar: não havia nenhum médico
+ * assinado neles. Um plano vazio que continua no código é pior que um removido
+ * — aparece em seletor de admin, entra na comparação de escada, exige Price no
+ * Stripe e obriga todo teste de pares a carregá-lo. Manutenção para zero receita.
+ *
+ * Se aparecer uma linha antiga em `doctors.plan` com um desses nomes,
+ * `normalizePlan` devolve `free`, que é o comportamento que já valia para
+ * qualquer nome desconhecido — e é a direção segura.
+ */
+export type PlanKey = "trial" | "free" | "mensagens" | "clinica";
 
 export type Entitlements = {
   /** Rótulo curto para UI. */
@@ -139,152 +146,29 @@ const FREE: Entitlements = {
 };
 
 /**
- * Essencial — o primeiro degrau pago.
+ * CLÍNICA — contrato sob medida, acima do topo do autoatendimento.
  *
- * ─── O buraco que ele preenche ──────────────────────────────────────────
+ * Herdava de `BLACK`, que não existe mais. Os valores passam a vir escritos, e
+ * isso é melhor do que era: a Clínica não é degrau de escada nenhuma — é o que
+ * se vende quando o volume passa de 11.100 mensagens e alguém precisa olhar o
+ * uso real antes de dar preço.
  *
- * Entre o Free (5 pacientes, SEM IA nenhuma) e o Starter (50 pacientes, R$149)
- * não havia nada. O obstetra que está começando não tinha como experimentar o
- * Segundo Cérebro sem saltar direto para o plano de R$149 — e é justamente ele
- * quem traz as primeiras pacientes para a plataforma.
- *
- * ─── SÃO DOIS LIMITES, e este texto dizia que era um ───────────────────
- *
- * O parágrafo aqui defendia limitar por PACIENTE e não por uso da IA — e
- * argumentava que racionar "ensinaria o médico que a IA é escassa". Vinte e seis
- * linhas abaixo, o código raciona: `aiRepliesPerCycle: 500`.
- *
- * O comentário descrevia uma versão do plano que não existe mais, e ficou. Numa
- * base em que a prosa é longa e confiante, isso é pior que não ter comentário:
- * quem lê acredita.
- *
- * O que vale hoje: **15 pacientes E 500 respostas de IA por ciclo**, e os dois
- * fazem trabalho diferente.
- *
- * `maxPatients` é o limite de NEGÓCIO — ele define para quantas gestantes este
- * preço faz sentido, é aplicado em todo lugar e custa zero para checar. O
- * upgrade acontece SOZINHO: quem gosta chega a 15 pacientes em poucas semanas e
- * sobe sem se sentir punido.
- *
- * `aiRepliesPerCycle` é o limite de CUSTO — ele existe porque cada resposta é
- * uma chamada de modelo que a plataforma paga, e 500 delas a R$ 49,90 dão
- * cerca de R$ 0,10 por resposta. Sem esse teto, uma única gestante muito
- * conversadora tornaria o plano deficitário sozinha.
- *
- * A preocupação do texto antigo continua válida e virou desenho: quando as 500
- * acabam, a IA NÃO some para a paciente — ela continua respondendo com
- * informação obstétrica consolidada, sem a voz do médico, com prazo e caminho
- * até ele. O médico nunca descobre o limite pelo silêncio dela.
- *
- * ─── E por que ele NÃO tem as ferramentas avançadas ─────────────────────
- *
- * É a segunda razão de o Starter existir — sem isso, a única diferença entre os
- * dois seria o número de pacientes, e aí a conta por paciente favorece tanto o
- * Starter (R$2,98 contra R$3,33) que o Essencial não venderia.
- *
- * A tensão é real e vale estar escrita: este é um app de alto risco, e biometria
- * fetal, EPDS, DMG e pré-eclâmpsia são o que um obstetra de alto risco usa. A
- * aposta é que o Essencial é para quem está começando NA PLATAFORMA, e que é o
- * primeiro caso de alto risco que empurra para o Starter — que é exatamente o
- * momento em que subir faz sentido para ele.
+ * `null` em pacientes, cérebros e mensagens quer dizer "combinado no contrato".
  */
-const ESSENCIAL: Entitlements = {
-  label: "Essencial",
-  maxPatients: null,
-  maxBrains: 1,
-  aiApp: true,
-  aiWhatsapp: false,
-  prioritySupport: false,
-  teamSeats: false,
-  premiumInvitesPerMonth: 0,
-  badge: "",
-  dedicatedManager: false,
-  /* 500 respostas ≈ R$ 0,10 por resposta no preço de R$ 49,90. */
-  aiRepliesPerCycle: 500,
-};
-
-const STARTER: Entitlements = {
-  label: "Starter",
-  maxPatients: null,
-  maxBrains: 1,
-  aiApp: true,
-  aiWhatsapp: false,
-  prioritySupport: false,
-  teamSeats: false,
-  premiumInvitesPerMonth: 0,
-  badge: "Starter",
-  dedicatedManager: false,
-  aiRepliesPerCycle: 1_500,
-};
-
-const PRO: Entitlements = {
-  label: "Pro",
-  maxPatients: null,
-  maxBrains: 1,
-  aiApp: true,
-  aiWhatsapp: true,
-  prioritySupport: true,
-  teamSeats: false,
-  premiumInvitesPerMonth: 0,
-  badge: "Pro",
-  dedicatedManager: false,
-  aiRepliesPerCycle: 4_000,
-};
-
-// Elite = Pro + equipe + 25 convites premium/mês + selo "Elite".
-const ELITE: Entitlements = {
-  ...PRO,
-  label: "Reconhecido",
-  maxPatients: null,
-  maxBrains: 5,
-  teamSeats: true,
-  premiumInvitesPerMonth: 25,
-  badge: "Elite",
-  aiRepliesPerCycle: 10_000,
-};
-
-// Black = o plano mais alto: tudo do Elite + 250 convites premium/mês, gerente
-// de conta dedicado e selo "Black" exclusivo. Topo absoluto da busca.
-const BLACK: Entitlements = {
-  ...ELITE,
-  label: "Black",
-  maxPatients: null,
-  maxBrains: 20,
-  premiumInvitesPerMonth: 250,
-  badge: "Black",
-  dedicatedManager: true,
-  aiRepliesPerCycle: 30_000,
-};
-
-// Clínica = plano personalizado (orçamento por contrato). Sem tetos rígidos:
-// pacientes e médicos são acordados no fechamento, então null/null (a conta é
-// provisionada pela nossa equipe já com o combinado).
 const CLINICA: Entitlements = {
-  /* ─── HERDA DE BLACK, NÃO DE PRO ─────────────────────────────────────────
-   * A escada não era monotônica: `Clínica` fica ACIMA de `Elite` no
-   * `PLAN_RANK` e herdava de `PRO` — ou seja, entregava `premiumInvitesPerMonth: 0`
-   * e o selo "Pro" enquanto o Elite, abaixo dela, dá 25 convites e o selo
-   * "Elite". Subir de plano rebaixava o médico em dois eixos.
-   * Era também a causa da exceção "só sobe quem está abaixo do Elite" no
-   * assento de clínica: a exceção existia para contornar a escada quebrada. */
-  ...BLACK,
   label: "Clínica",
   maxPatients: null,
   maxBrains: null,
-  teamSeats: true,
+  aiApp: true,
+  aiWhatsapp: true,
   prioritySupport: true,
+  teamSeats: true,
+  premiumInvitesPerMonth: 0,
+  badge: "Black",
   dedicatedManager: true,
   /* Contrato sob medida: o teto é combinado, não tabelado. */
   aiRepliesPerCycle: null,
 };
-
-// Trial = experimenta o Pro por 14 dias (mesmas capacidades do Pro), mas SEM
-// selo — quem está só testando não exibe "Pro verificado" às pacientes.
-/* O trial herda as CAPACIDADES do Pro, mas não o teto dele: são coisas
-   diferentes. Capacidade é o que ele pode experimentar; teto é quanto a
-   plataforma paga para que ele experimente. Médico novo não entra mais em
-   trial — isto vale só para quem já estava dentro quando a porta fechou. */
-const TRIAL: Entitlements = { ...PRO, label: "Trial", badge: "", aiRepliesPerCycle: 500 };
 
 /**
  * MENSAGENS — o plano que está no ar, e o único que ainda se vende.
@@ -329,16 +213,21 @@ const MENSAGENS: Entitlements = {
   aiRepliesPerCycle: ENTRADA_MENSAGENS,
 };
 
+/**
+ * TRIAL — em extinção, e por isso herda do plano que existe.
+ *
+ * Herdava de `PRO`. Médico novo não entra mais em trial: isto vale só para quem
+ * já estava dentro quando a porta fechou, e `planoVigente` garante que termina.
+ * As capacidades são as do plano vendido hoje; o teto, não — capacidade é o que
+ * ele experimenta, teto é quanto a plataforma paga para que experimente.
+ */
+const TRIAL: Entitlements = { ...MENSAGENS, label: "Trial", badge: "", aiRepliesPerCycle: 500 };
+
 export const PLAN_ENTITLEMENTS: Record<PlanKey, Entitlements> = {
   trial: TRIAL,
   free: FREE,
   mensagens: MENSAGENS,
-  essencial: ESSENCIAL,
-  starter: STARTER,
-  pro: PRO,
   clinica: CLINICA,
-  elite: ELITE,
-  black: BLACK,
 };
 
 /**
@@ -346,10 +235,11 @@ export const PLAN_ENTITLEMENTS: Record<PlanKey, Entitlements> = {
  * da plataforma (ex.: o médico fundador + secretária), nunca um assinante limitado.
  */
 export const OWNER_ENTITLEMENTS: Entitlements = {
-  ...BLACK,
+  /* Herdava de BLACK, que não existe mais. Passa a herdar da Clínica, que é o
+     plano mais alto que sobrou — e a conta da instalação precisa, por
+     definição, de tudo o que o mais alto tem. */
+  ...CLINICA,
   label: "Instalação",
-  maxPatients: null,
-  maxBrains: null,
 };
 
 /** Ordem de prioridade dos planos (maior = melhor) — usado no ranking da busca. */
@@ -372,16 +262,7 @@ export const PLAN_PRICE: Record<string, number> = {
      recebe a quantidade. Este número é o piso, usado quando a quantidade não é
      conhecida (por exemplo, um médico cuja coluna ainda não foi preenchida). */
   mensagens: 29.9,
-  /* R$102 existe só como âncora riscada na tela de vendas — o preço COBRADO é
-     este. Ancorar em 102 e cobrar 102 colocaria o plano a 31% do Starter, perto
-     demais para abrir um segmento: por paciente sairia R$6,80 contra R$2,98 do
-     Starter, e quem faz a conta sobe. A um terço do Starter, é outro público. */
-  essencial: 49.9,
-  starter: 149,
-  pro: 297,
   clinica: 0,
-  elite: 597,
-  black: 1499,
 };
 
 /**
@@ -436,11 +317,6 @@ export const PLAN_RANK: Record<PlanKey, number> = {
    * mensagens de piso com as 10.000 do Elite compara o número errado — a
    * entrega dele vem da coluna, não desta tabela. */
   mensagens: 6,
-  essencial: 2,
-  starter: 3,
-  pro: 4,
-  elite: 5,
-  black: 7, // o mais caro da TABELA
   /* ─── `clinica` VOLTA AO TOPO, e a razão da demoção deixou de existir ─────
    *
    * Ela tinha sido movida para BAIXO do Black com este argumento: "o preço dela
@@ -466,17 +342,7 @@ export const PLAN_RANK: Record<PlanKey, number> = {
 /** Normaliza um valor livre de `doctors.plan` para uma PlanKey conhecida. */
 export function normalizePlan(plan: string | null | undefined): PlanKey {
   const p = (plan ?? "").trim().toLowerCase();
-  if (
-    p === "trial" ||
-    p === "free" ||
-    p === "mensagens" ||
-    p === "essencial" ||
-    p === "starter" ||
-    p === "pro" ||
-    p === "clinica" ||
-    p === "elite" ||
-    p === "black"
-  ) {
+  if (p === "trial" || p === "free" || p === "mensagens" || p === "clinica") {
     return p;
   }
   // Aliases da página de vendas / legado → plano de clínica.

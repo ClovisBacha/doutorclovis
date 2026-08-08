@@ -82,49 +82,18 @@ describe("nenhum plano fica pela metade", () => {
     expect(mensalidadeCentavos("mensagens", 11_100)).toBeGreaterThan(PLAN_PRICE.mensagens * 100);
   });
 
-  test("e ele fica acima dos nomeados que aposentou — só não acima dos contratos", () => {
-    /* Ele é o único plano que ainda se vende: rankear todo médico novo abaixo
-       dos legados esvaziaria a busca de quem está entrando. Black e Clínica
-       ficam acima porque são contratos ativos de valor maior, e rebaixá-los
-       seria punir quem paga mais por uma mudança de tabela que não foi escolha
-       dele. */
-    for (const legado of ["essencial", "starter", "pro", "elite"] as const) {
-      expect(PLAN_RANK.mensagens).toBeGreaterThan(PLAN_RANK[legado]);
-    }
-    expect(PLAN_RANK.mensagens).toBeLessThan(PLAN_RANK.black);
+  test("e ele fica abaixo só do contrato de Clínica", () => {
+    /* Sobraram quatro planos: `free`, `trial` (em extinção), `mensagens` (o que
+       se vende) e `clinica` (contrato). Só a Clínica fica acima. */
+    expect(PLAN_RANK.mensagens).toBeGreaterThan(PLAN_RANK.free);
+    expect(PLAN_RANK.mensagens).toBeGreaterThan(PLAN_RANK.trial);
     expect(PLAN_RANK.mensagens).toBeLessThan(PLAN_RANK.clinica);
   });
-});
 
-describe("o Essencial é o primeiro degrau pago", () => {
-  const e = PLAN_ENTITLEMENTS.essencial;
-
-  test("custa um terço do Starter — perto demais não abriria segmento", () => {
-    /* A R$102 (31% abaixo do Starter) a conta por paciente favorecia tanto o
-       Starter que ninguém compraria o Essencial. R$102 virou âncora riscada. */
-    expect(PLAN_PRICE.essencial).toBe(49.9);
-    expect(PLAN_PRICE.essencial).toBeLessThan(PLAN_PRICE.starter / 2.5);
-    expect(mensalidadeCentavos("essencial")).toBe(4990);
-  });
-
-  test("INCLUI o Segundo Cérebro — é o motivo de comprar", () => {
-    /* Era o pedido explícito, e é o que separa o Essencial do Free: um plano de
-       entrada sem IA seria o Free com mais pacientes. */
-    expect(e.aiApp).toBe(true);
-    expect(PLAN_ENTITLEMENTS.free.aiApp).toBe(false);
-  });
-
-  test("não tem mais teto de pacientes — nenhum plano tem", () => {
-    /* Ele nasceu com 15 pacientes, e o eixo saiu do produto inteiro. Um plano
-       PAGO com teto enquanto o Free é ilimitado seria punir quem paga. */
-    for (const p of TODOS) expect(PLAN_ENTITLEMENTS[p].maxPatients).toBeNull();
-  });
-
-  test("não invade o que é do Pro para cima", () => {
-    expect(e.aiWhatsapp).toBe(false);
-    expect(e.teamSeats).toBe(false);
-    expect(e.premiumInvitesPerMonth).toBe(0);
-    expect(e.dedicatedManager).toBe(false);
+  test("e são QUATRO planos, não nove", () => {
+    /* Os cinco nomeados foram apagados porque não havia médico em nenhum. Um
+       plano vazio que fica no código é manutenção para zero receita. */
+    expect(TODOS.sort()).toEqual(["clinica", "free", "mensagens", "trial"]);
   });
 });
 
@@ -208,25 +177,68 @@ describe("todo plano vivo existe em todos os lugares que enumeram plano", () => 
     });
   });
 
-  describe("`essencial` — aposentado da venda, vivo para quem assinou", () => {
+  describe("os cinco nomeados foram APAGADOS, e não podem voltar por acidente", () => {
+    /**
+     * ─── APAGAR EM VEZ DE APOSENTAR ────────────────────────────────────────
+     *
+     * `essencial`, `starter`, `pro`, `elite` e `black` saíram do sistema
+     * inteiro. A condição que permitiu isso: não havia médico assinado em
+     * nenhum. Um plano vazio que fica no código aparece em seletor de admin,
+     * entra na comparação de escada, exige Price no Stripe e obriga todo teste
+     * de pares a carregá-lo — manutenção para zero receita.
+     *
+     * Este bloco cobra a AUSÊNCIA nos mesmos lugares onde o bloco anterior
+     * cobrava a presença. É a única forma de a remoção ficar de pé: sem ele,
+     * qualquer um reintroduz um nome num seletor e o resto do sistema não sabe.
+     */
+    const MORTOS = ["essencial", "starter", "elite", "black"] as const;
+
     for (const [onde, caminho] of Object.entries(SISTEMA)) {
-      test(`aparece em: ${onde}`, () => {
-        expect(readFileSync(caminho, "utf8").toLowerCase()).toContain("essencial");
+      test(`sumiram de: ${onde}`, () => {
+        /* Sem `toLowerCase`, e de propósito: "Elite" com maiúscula é um NÍVEL de
+           cobertura do cérebro no painel, e `installStarterPack` é o pacote
+           inicial de orientações. Nenhum dos dois é plano, e baixar tudo para
+           minúsculas transformava os dois em falso positivo — um teste que
+           acusa o que não é defeito é abandonado na terceira vez. */
+        const codigo = readFileSync(caminho, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+          .replace(/^\s*\/\/.*$/gm, "");
+        for (const morto of MORTOS) {
+          /* Como VALOR entre aspas (`plan: "starter"`) e como CHAVE de tabela
+             de planos (`starter:`) — as duas formas em que um plano aparece. */
+          expect(codigo).not.toContain(`"${morto}"`);
+          expect(codigo).not.toMatch(new RegExp(`^\\s{2}${morto}:`, "m"));
+        }
       });
     }
 
-    test("tem os dois Price — mensal e anual", () => {
-      const fonte = readFileSync("src/lib/stripe.server.ts", "utf8");
-      expect(fonte).toContain("STRIPE_PRICE_DOCTOR_ESSENCIAL_MONTHLY");
-      expect(fonte).toContain("STRIPE_PRICE_DOCTOR_ESSENCIAL_ANNUAL");
+    test("e os Price deles saíram do ambiente", () => {
+      const env = readFileSync(".env.example", "utf8");
+      for (const morto of ["ESSENCIAL", "STARTER", "PRO", "ELITE", "BLACK"]) {
+        expect(env).not.toContain(`STRIPE_PRICE_DOCTOR_${morto}`);
+      }
     });
 
-    test("e SAIU da página de vendas — a escada nova a substituiu", () => {
-      /* Deixar os dois na tela venderia dois modelos de cobrança ao mesmo
-         tempo, e o médico escolheria pelo número menor sem saber o que muda. */
-      const vendas = readFileSync("src/routes/medicos.tsx", "utf8").toLowerCase();
-      for (const aposentado of ["essencial", "starter", "reconhecido"]) {
-        expect(vendas).not.toContain(aposentado);
+    test("e o TIPO tem exatamente quatro nomes", () => {
+      /**
+       * A mutação que sobreviveu à primeira bateria: acrescentar `"black"` a
+       * `PlanKey` sem acrescentar à tabela. `TODOS` vem de
+       * `Object.keys(PLAN_ENTITLEMENTS)`, então não muda — e nenhum teste via.
+       *
+       * O `tsc` reclamaria (`Record<PlanKey, …>` ficaria incompleto), mas a
+       * suíte não roda o compilador. Um plano que existe no tipo e não na
+       * tabela é `undefined` em cima de dinheiro.
+       */
+      const ent = readFileSync("src/lib/entitlements.ts", "utf8");
+      expect(ent).toContain('export type PlanKey = "trial" | "free" | "mensagens" | "clinica";');
+    });
+
+    test("um nome antigo em `doctors.plan` cai em `free`, não quebra", () => {
+      /* Se sobrar uma linha no banco com um desses nomes, o normalizador a
+         trata como qualquer desconhecido: o plano mais restritivo. */
+      for (const morto of MORTOS) {
+        expect(normalizePlan(morto)).toBe("free");
       }
     });
   });
