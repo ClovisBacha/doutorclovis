@@ -38,6 +38,7 @@ import {
   centavosPorMensagem,
   precoDe,
 } from "./planos-medico";
+import { MINUTOS_PADRAO, tempoPoupado } from "./tempo-poupado";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -411,5 +412,61 @@ describe("6. as três classes de presente são calibradas contra a LOJA", () => 
       expect(c.emoji.length).toBeGreaterThan(0);
       expect(c.efeito.length).toBeGreaterThan(10);
     }
+  });
+});
+
+describe("as horas do slider saem da mesma régua do painel", () => {
+  /**
+   * Pedido do dono (ago/2026): junto dos centavos, o slider mostra quanto TEMPO
+   * volta para o médico — e sobe gradualmente, do mesmo jeito que o desconto.
+   *
+   * O risco não é a feature: é a conta. `tempo-poupado.ts` já decide isso no
+   * painel, com regras que custaram discussão — mediana e não média,
+   * arredondamento sempre para baixo, e a recusa deliberada de converter horas
+   * em "dias de consultório" (consulta é a renda dele; dizer que economizou
+   * seis dias de consultório é dizer que faturou menos).
+   *
+   * Escrever `mensagens * 3` na tela do slider recriaria tudo isso do zero,
+   * errado, e num lugar onde o número é uma PROMESSA de venda. Estas asserções
+   * cobram que a tela chame a régua em vez de reinventá-la.
+   */
+  const slider = readFileSync("src/components/escada-mensagens.tsx", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+
+  test("a tela chama `tempoPoupado`, não multiplica por conta própria", () => {
+    expect(slider).toContain("tempoPoupado(mensagens, MINUTOS_PADRAO)");
+    /* Nenhum "× 3 minutos" disfarçado, e nenhum minuto digitado: o 3 tem de
+       vir de `MINUTOS_PADRAO`. (Não dá para cobrar "/ 60" aqui — a classe
+       `text-white/60` do Tailwind casa com qualquer regex de divisão.) */
+    expect(slider).not.toMatch(/mensagens\s*\*\s*\d+/);
+    expect(slider).not.toMatch(/\b3 min por resposta/);
+  });
+
+  test("e sobe junto com a escada — nunca desce quando ele arrasta para cima", () => {
+    /* "Gradual" é o pedido; monotônico é o que torna o pedido verificável. */
+    const minutos = DEGRAUS.map((d) => d * MINUTOS_PADRAO);
+    for (let i = 1; i < minutos.length; i++) {
+      expect(minutos[i]).toBeGreaterThan(minutos[i - 1]);
+    }
+  });
+
+  test("no topo da escada, a promessa é grande — e é a conta conservadora", () => {
+    /**
+     * 11.100 mensagens a 3 min dão 555 horas. É um número enorme, e é
+     * exatamente por isso que ele não pode sair de um palpite: `MINUTOS_PADRAO`
+     * é o piso do módulo, o mesmo que o painel usa para quem ainda não tem
+     * resposta escrita para medir.
+     */
+    expect(tempoPoupado(TETO_AUTOATENDIMENTO, MINUTOS_PADRAO)).toBe("555 horas");
+    expect(tempoPoupado(ENTRADA_MENSAGENS, MINUTOS_PADRAO)).toBe("7h30");
+  });
+
+  test("o selo que não respondia ao slider saiu", () => {
+    /* "Teto de pacientes: nenhum" era o único dos três que mostrava a mesma
+       coisa em qualquer posição — e a frase já aparece acima, no resumo. */
+    expect(slider).not.toContain("Teto de pacientes");
+    expect(slider).toContain("pacientes ilimitadas");
   });
 });

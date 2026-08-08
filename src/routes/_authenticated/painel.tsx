@@ -71,6 +71,8 @@ import {
 import { pendenciasDoMedico, type Pendencia } from "@/lib/doctor-required";
 import { mensalidadeCentavos } from "@/lib/entitlements";
 import { EscadaDeMensagens } from "@/components/escada-mensagens";
+import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
+import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
 import { MesadaDoMedico } from "@/components/mesada-do-medico";
 import {
   listMyAddresses,
@@ -1248,12 +1250,20 @@ function PainelPage() {
           />
         )}
         {tab === "Cérebro 🧠" && !podeIA && (
-          <TrancadoCard
-            titulo="O Segundo Cérebro precisa de um plano com IA"
-            plano={rotuloPlano}
-            texto="É aqui que a IA aprende a responder como você: as respostas que você aprova passam a ser o que a paciente lê no app. No plano Free a IA fica desligada, então nada do que você treinar aqui seria usado."
-            onIrParaPlanos={() => setTab("Meu Perfil")}
-          />
+          <div className="space-y-4">
+            <TrancadoCard
+              titulo="O Segundo Cérebro precisa de um plano com IA"
+              plano={rotuloPlano}
+              texto="É aqui que a IA aprende a responder como você: as respostas que você aprova passam a ser o que a paciente lê no app. No plano Free a IA fica desligada, então nada do que você treinar aqui seria usado."
+              onIrParaPlanos={() => setTab("Meu Perfil")}
+            />
+            {/* A tranca sozinha dizia "você não tem" e mostrava uma parede. A
+                simulação mostra o que está do outro lado dela — e custa zero:
+                é texto local, nenhuma chamada de modelo. Foi a decisão tomada
+                no lugar de dar o teste ao vivo de graça, que seria a nossa
+                chave gastando por quem não paga, sem teto. */}
+            <SimulacaoDoCerebro tema="claro" />
+          </div>
         )}
         {tab === "Cérebro 🧠" && podeIA && (
           <CerebroSection
@@ -8654,7 +8664,7 @@ function DoctorBilling({
           : res.error === "plano_indisponivel"
             ? "O plano ainda não está disponível. Avisamos assim que abrir."
             : res.error === "fora_da_escada"
-              ? "Acima de 2.500 mensagens o plano é de Clínica — fale com a gente."
+              ? `Acima de ${TETO_AUTOATENDIMENTO.toLocaleString("pt-BR")} mensagens o plano é de Clínica — fale com a gente.`
               : "Não foi possível abrir o pagamento.",
       );
     } catch {

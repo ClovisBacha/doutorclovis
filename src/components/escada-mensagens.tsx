@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { MINUTOS_PADRAO, tempoPoupado } from "@/lib/tempo-poupado";
 import {
   DEGRAUS,
   ENTRADA_MENSAGENS,
@@ -235,6 +236,13 @@ export function EscadaDeMensagens({
       porMensagem: centavosPorMensagem(mensagens),
       desconto: descontoVsEntrada(mensagens),
       gestantes: gestantesAtendidas(mensagens),
+      /* O tempo que volta para ele, subindo junto com o resto da escada.
+         `MINUTOS_PADRAO` de propósito: quem ainda não assinou não tem resposta
+         escrita para medir, e `tempo-poupado` já define o piso conservador
+         para esse caso. Reimplementar a conta aqui — "×3 minutos" — seria a
+         segunda régua de tempo do produto, discordando do card do painel na
+         primeira vez que alguém afinasse uma das duas. */
+      tempo: tempoPoupado(mensagens, MINUTOS_PADRAO),
       /* Onde ele está na escada, de 0 a 1 — é o preenchimento da barra. */
       fracao: (mensagens - ENTRADA_MENSAGENS) / (TETO_AUTOATENDIMENTO - ENTRADA_MENSAGENS),
     };
@@ -342,8 +350,26 @@ export function EscadaDeMensagens({
         <Selo t={t} titulo="Gestantes acompanhadas">
           cerca de {dados.gestantes}
         </Selo>
-        <Selo t={t} titulo="Teto de pacientes">
-          <span className={t.forte}>nenhum</span>
+        {/* ── O TEMPO, NO LUGAR DO "TETO: NENHUM" ─────────────────────────
+            O selo antigo dizia "nenhum" em qualquer posição do slider — era o
+            único dos três que não respondia ao que ele arrastava, e a mesma
+            frase já aparece acima ("pacientes ilimitadas"), então nada se
+            perdeu. No lugar entra a única medida que fala a língua dele: um
+            preço em centavos ele compara com o concorrente; horas de noite e
+            de fim de semana ele compara com a própria vida. */}
+        <Selo t={t} titulo="Tempo que volta pra você">
+          <motion.span
+            key={dados.tempo}
+            initial={reduce ? false : { opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: EASE }}
+            className={t.forte}
+          >
+            {dados.tempo}
+          </motion.span>
+          <span className={`mt-0.5 block text-[11px] font-normal ${t.fraco}`}>
+            por mês, a {MINUTOS_PADRAO} min por resposta
+          </span>
         </Selo>
       </div>
 

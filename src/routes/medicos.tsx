@@ -7,6 +7,7 @@ import { Reveal } from "@/components/reveal";
 import { SpotlightCard } from "@/components/motion-fx";
 import { PricingGlass, type PricingGlassTier } from "@/components/ui/pricing-glass";
 import { EscadaDeMensagens } from "@/components/escada-mensagens";
+import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
 import { FUNCOES_PAGAS, SELO_PAGO, precoDeEntrada } from "@/lib/gancho-de-upgrade";
 import {
   DEGRAUS_DESTAQUE,
@@ -792,6 +793,16 @@ function MedicosPage() {
                 </p>
               </div>
             </div>
+          </Reveal>
+
+          {/* ─── A SIMULAÇÃO, LOGO DEPOIS DA LINHA ────────────────────────────
+              A coluna da direita acabou de dizer "Segundo Cérebro" a quem nunca
+              viu um. Descrever IA em bullet não vende IA — e o que trava um
+              obstetra não é duvidar que ela responde, é achar que ela responde
+              ERRADO. Por isso a simulação vem aqui, antes do preço, e por isso
+              dois dos três exemplos são a IA se RECUSANDO a responder. */}
+          <Reveal delay={100}>
+            <SimulacaoDoCerebro className="mt-4" />
           </Reveal>
 
           {/* ─── O SELETOR, ANTES DOS CARTÕES ──────────────────────────────
