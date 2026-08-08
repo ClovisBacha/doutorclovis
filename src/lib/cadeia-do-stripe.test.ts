@@ -10,7 +10,7 @@
  *
  * O desfecho, na palavra dela: criar hoje o Price graduado e mandar
  * `plan: "mensagens"` faz `normalizePlan` devolver `"free"` — **o médico paga
- * R$ 295,40 e recebe o plano grátis**, sem erro em lugar nenhum, com 200
+ * o topo da escada e recebe o plano grátis**, sem erro em lugar nenhum, com 200
  * devolvido ao Stripe, que nunca reenvia. Silencioso dos dois lados.
  *
  * É o mesmo defeito que o comentário de `stripe-webhook.ts` diz ter consertado
@@ -273,14 +273,31 @@ describe("6. o preço que o Stripe vai cobrar é o que a nossa conta diz", () =>
     expect(precoDe(150)).toBe(2_990);
   });
 
-  test("o topo: 2.500 mensagens = R$ 295,40", () => {
+  test("o topo: 2.500 mensagens = R$ 339,40", () => {
     expect(TETO_AUTOATENDIMENTO).toBe(2_500);
-    expect(precoDe(2_500)).toBe(29_540);
+    expect(precoDe(2_500)).toBe(33_940);
   });
 
-  test("e as faixas somam exatamente isso", () => {
-    /* A conta que a configuração do Stripe tem de reproduzir:
-       29,90 fixo + 450×0,15 + 900×0,12 + 1.000×0,09 */
-    expect(2_990 + 450 * 15 + 900 * 12 + 1_000 * 9).toBe(precoDe(2_500));
+  test("e o antigo topo (R$ 294,40) agora compra 2.000", () => {
+    /* A escada passou de quatro faixas para dez, com o desconto morando nas
+       mensagens de cima. O mesmo bolso de antes compra 2.000 em vez de 2.500 —
+       e é preciso que o Stripe reproduza os DOIS pontos, não só o topo. */
+    expect(precoDe(2_000)).toBe(29_440);
+  });
+
+  test("e as dez faixas somam exatamente isso", () => {
+    /* A conta que a configuração do Stripe tem de reproduzir, faixa a faixa. */
+    const soma =
+      2_990 +
+      150 * 19 +
+      200 * 18 +
+      250 * 17 +
+      250 * 15 +
+      250 * 14 +
+      250 * 13 +
+      250 * 11 +
+      250 * 10 +
+      500 * 9;
+    expect(soma).toBe(precoDe(2_500));
   });
 });

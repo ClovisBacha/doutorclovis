@@ -22,7 +22,7 @@
  * ─── O QUE SE VENDE HOJE É `mensagens` ──────────────────────────────────────
  * Os planos nomeados acima são LEGADO: continuam na tabela porque há médicos
  * gravados neles. A escada nova tem um eixo só — mensagens de IA por mês,
- * R$ 29,90 na entrada (150) até R$ 295,40 (2.500) — e vive em
+ * R$ 29,90 na entrada (150) até R$ 339,40 (2.500) — e vive em
  * `src/lib/planos-medico.ts`. Acima do topo, é contrato de Clínica.
  */
 import { ENTRADA_MENSAGENS, precoDe } from "./planos-medico";
@@ -368,9 +368,9 @@ export function mensalidadeCentavos(
    *
    * ─── POR QUE ESTE PARÂMETRO PRECISOU EXISTIR ────────────────────────────
    * `PLAN_PRICE` é uma tabela de plano→preço, e o plano `mensagens` não tem UM
-   * preço: tem uma escada de R$ 29,90 a R$ 295,40. Sem a quantidade, os dois
+   * preço: tem uma escada de R$ 29,90 a R$ 339,40. Sem a quantidade, os dois
    * lugares que usam esta função passariam a mentir na mesma direção — o painel
-   * diria "sua mensalidade é R$ 29,90" a quem paga R$ 295,40, e o MRR do
+   * diria "sua mensalidade é R$ 29,90" a quem paga R$ 339,40, e o MRR do
    * fundador contaria um décimo do que entra.
    */
   mensagensCompradas?: number | null,

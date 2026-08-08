@@ -173,7 +173,7 @@ describe("a escada tem os degraus que o produto vende", () => {
       /* Sem o parâmetro, o painel diria "sua mensalidade é R$ 29,90" a quem
          paga R$ 295,40, e o MRR contaria um décimo do que entra. */
       expect(mensalidadeCentavos("mensagens", ENTRADA_MENSAGENS)).toBe(2_990);
-      expect(mensalidadeCentavos("mensagens", TETO_AUTOATENDIMENTO)).toBe(29_540);
+      expect(mensalidadeCentavos("mensagens", TETO_AUTOATENDIMENTO)).toBe(33_940);
       /* Sem quantidade conhecida, o piso — subestima, nunca superestima. */
       expect(mensalidadeCentavos("mensagens")).toBe(2_990);
     });

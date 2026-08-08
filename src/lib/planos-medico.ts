@@ -39,11 +39,42 @@
  * `fixo`: R$ 29,90 fechados, não por unidade, e isso faz dois trabalhos de uma
  * vez — bate exato no preço de entrada que o dono escolheu e vira tíquete
  * mínimo (ninguém assina por R$ 5).
+ *
+ * ─── POR QUE DEZ FAIXAS, E NÃO QUATRO ───────────────────────────────────────
+ *
+ * A escada tinha quatro faixas (15 / 12 / 9) e o dono achou o degrau errado:
+ * **na mensagem 151 o desconto despencava de uma vez**. A entrada sai a
+ * R$ 0,1993 por mensagem (29,90 ÷ 150); a faixa seguinte cobrava R$ 0,15 — uma
+ * queda instantânea de 25% por comprar UMA mensagem a mais que o pacote mínimo.
+ * Quem comprasse 151 já levava quase todo o desconto que existia, e o resto da
+ * escada não motivava mais nada.
+ *
+ * Agora a segunda faixa é R$ 0,19: encosta na entrada (queda de 5%) e o
+ * desconto vai sendo conquistado faixa a faixa, um centavo por vez, até o piso.
+ * O desconto passa a viver ONDE ELE FOI PEDIDO — nas mensagens de cima.
+ *
+ * ─── O PISO COMEÇA EM 2.001, E ISSO É DECISÃO DO DONO ───────────────────────
+ *
+ * "Acima de dois mil, a gente coloca o preço de R$ 0,09 pra cima, e depois o
+ * preço da clínica." É exatamente o que a última faixa faz.
+ *
+ * ─── CUIDADO AO LER ESTES NÚMEROS ───────────────────────────────────────────
+ *
+ * `centavos` é o preço MARGINAL da faixa, não o que o médico paga por mensagem.
+ * Em preço graduado o efetivo nunca alcança o marginal do último degrau: quem
+ * compra 2.500 paga R$ 0,1358 por mensagem, não R$ 0,09. Quem quiser o número
+ * que aparece na tela use `centavosPorMensagem`, nunca esta tabela.
  */
 export const FAIXAS = [
   { ate: 150, fixo: 2_990 },
-  { ate: 600, centavos: 15 },
-  { ate: 1_500, centavos: 12 },
+  { ate: 300, centavos: 19 },
+  { ate: 500, centavos: 18 },
+  { ate: 750, centavos: 17 },
+  { ate: 1_000, centavos: 15 },
+  { ate: 1_250, centavos: 14 },
+  { ate: 1_500, centavos: 13 },
+  { ate: 1_750, centavos: 11 },
+  { ate: 2_000, centavos: 10 },
   { ate: 2_500, centavos: 9 },
 ] as const;
 
@@ -129,9 +160,14 @@ export function descontoVsEntrada(mensagens: number): number {
  * O slider é contínuo, mas ninguém compara oito números de cabeça — os cartões
  * âncora são três (o primeiro, o do meio e o topo) e o resto vive no slider.
  */
-export const DEGRAUS = [150, 300, 600, 1_000, 1_500, 2_000, 2_500] as const;
+export const DEGRAUS = [150, 300, 500, 750, 1_000, 1_250, 1_500, 1_750, 2_000, 2_500] as const;
 
-/** Os três que viram cartão. */
+/**
+ * Os três que viram cartão.
+ *
+ * O do meio é 1.000 e não 1.250 de propósito: é o primeiro degrau em que o
+ * desconto chega a dois dígitos (12%), que é o número que o cartão mostra.
+ */
 export const DEGRAUS_DESTAQUE = [150, 1_000, 2_500] as const;
 
 /**

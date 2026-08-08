@@ -142,26 +142,105 @@ describe("3. lucro em TODOS os degraus, nos TRÊS cenários", () => {
 
 describe("4. o preço graduado é o mesmo que o Stripe vai calcular", () => {
   /* Se estas contas divergirem, a tela promete um número e a fatura cobra
-     outro — que é a reclamação mais cara que existe. */
+     outro — que é a reclamação mais cara que existe. Cada linha aqui é uma
+     linha da configuração do Stripe. */
   test("150 → só a faixa fixa", () => {
     expect(precoDe(150)).toBe(2_990);
   });
 
-  test("300 → fixa + 150 × 15", () => {
-    expect(precoDe(300)).toBe(2_990 + 150 * 15);
+  test("300 → fixa + 150 × 19", () => {
+    expect(precoDe(300)).toBe(2_990 + 150 * 19);
+    expect(precoDe(300)).toBe(5_840);
   });
 
-  test("600 → fixa + 450 × 15", () => {
-    expect(precoDe(600)).toBe(2_990 + 450 * 15);
+  test("1.000 → fixa + 150×19 + 200×18 + 250×17 + 250×15", () => {
+    expect(precoDe(1_000)).toBe(2_990 + 150 * 19 + 200 * 18 + 250 * 17 + 250 * 15);
+    expect(precoDe(1_000)).toBe(17_440);
   });
 
-  test("1.500 → fixa + 450 × 15 + 900 × 12", () => {
-    expect(precoDe(1_500)).toBe(2_990 + 450 * 15 + 900 * 12);
+  test("2.000 → R$ 294,40, o teto que o dono já tinha aprovado", () => {
+    /* O antigo topo (R$ 295,40) valia 2.500 mensagens. Com a escada de dez
+       faixas o mesmo bolso compra 2.000 — e as outras 500 passaram a custar
+       R$ 0,09 cada, que é onde o dono pediu que o desconto morasse. */
+    expect(precoDe(2_000)).toBe(29_440);
   });
 
-  test("2.500 → fixa + 450 × 15 + 900 × 12 + 1.000 × 9", () => {
-    expect(precoDe(2_500)).toBe(2_990 + 450 * 15 + 900 * 12 + 1_000 * 9);
-    expect(precoDe(2_500)).toBe(29_540); // R$ 295,40
+  test("2.500 → R$ 339,40, com as últimas 500 no piso", () => {
+    expect(precoDe(2_500)).toBe(precoDe(2_000) + 500 * 9);
+    expect(precoDe(2_500)).toBe(33_940);
+  });
+
+  test("a soma das dez faixas fecha com o topo", () => {
+    /* A conta inteira, escrita de uma vez — é ela que vai para o painel do
+       Stripe, faixa por faixa. */
+    const soma =
+      2_990 +
+      150 * 19 +
+      200 * 18 +
+      250 * 17 +
+      250 * 15 +
+      250 * 14 +
+      250 * 13 +
+      250 * 11 +
+      250 * 10 +
+      500 * 9;
+    expect(soma).toBe(precoDe(2_500));
+  });
+});
+
+describe("4b. o desconto foi para as mensagens DE CIMA", () => {
+  /**
+   * A queixa que reescreveu a escada: "a partir do momento que a pessoa vai dos
+   * cento e cinquenta e uma mensagens, já aumenta muito o desconto".
+   *
+   * A entrada sai a R$ 0,1993/mensagem. A faixa seguinte cobrava R$ 0,15 — ou
+   * seja, comprar UMA mensagem a mais que o pacote mínimo derrubava o preço
+   * marginal em 25% de uma vez, e o resto da escada não motivava mais nada.
+   */
+  test("a mensagem 151 quase não é mais barata que a 150", () => {
+    const entradaPorMsg = centavosPorMensagem(ENTRADA_MENSAGENS);
+    const primeiraMarginal = FAIXAS[1].centavos!;
+    const queda = 1 - primeiraMarginal / entradaPorMsg;
+    expect(queda).toBeLessThan(0.1); // era 0,25
+  });
+
+  test("o desconto sobe DE POUCO EM POUCO, degrau a degrau", () => {
+    /* Nenhum salto maior que 6 pontos entre degraus vizinhos — antes o primeiro
+       salto sozinho valia mais que isso. */
+    for (let i = 1; i < DEGRAUS.length; i++) {
+      const salto = descontoVsEntrada(DEGRAUS[i]) - descontoVsEntrada(DEGRAUS[i - 1]);
+      expect(salto).toBeLessThanOrEqual(6);
+    }
+  });
+
+  test("o preço marginal NUNCA sobe de uma faixa para a seguinte", () => {
+    /* Uma faixa mais cara que a anterior faria comprar MENOS sair mais barato —
+       e o slider mostraria o preço caindo enquanto a pessoa arrasta para trás. */
+    const marginais = FAIXAS.slice(1).map((f) => f.centavos!);
+    for (let i = 1; i < marginais.length; i++) {
+      expect(marginais[i]).toBeLessThanOrEqual(marginais[i - 1]);
+    }
+  });
+
+  test("são dez faixas — o dono pediu de oito a dez", () => {
+    expect(FAIXAS.length).toBeGreaterThanOrEqual(8);
+    expect(FAIXAS.length).toBeLessThanOrEqual(10);
+  });
+
+  test("o piso de R$ 0,09 começa em 2.001, e não antes", () => {
+    /* "Acima de dois mil, a gente coloca o preço de zero vírgula zero nove pra
+       cima" — palavra do dono. */
+    const ultima = FAIXAS[FAIXAS.length - 1];
+    const penultima = FAIXAS[FAIXAS.length - 2];
+    expect(ultima.centavos).toBe(PISO_CENTAVOS_POR_MENSAGEM);
+    expect(penultima.ate).toBe(2_000);
+    expect(penultima.centavos).toBeGreaterThan(PISO_CENTAVOS_POR_MENSAGEM);
+  });
+
+  test("nenhuma faixa fura o piso", () => {
+    for (const f of FAIXAS) {
+      if ("centavos" in f) expect(f.centavos).toBeGreaterThanOrEqual(PISO_CENTAVOS_POR_MENSAGEM);
+    }
   });
 });
 
@@ -196,8 +275,11 @@ describe("5. os limites da escada", () => {
 });
 
 describe("6. o desconto anunciado nunca promete mais do que a fatura dá", () => {
-  test("o topo anuncia 40%", () => {
-    expect(descontoVsEntrada(2_500)).toBe(40);
+  test("o topo anuncia 31%", () => {
+    /* Caiu de 40% porque o desconto deixou de ser dado de uma vez na faixa 2.
+       O que se perdeu em número de vitrine se ganhou em curva: agora ele sobe
+       a cada degrau, que é o que faz a pessoa querer o degrau seguinte. */
+    expect(descontoVsEntrada(2_500)).toBe(31);
   });
 
   test("a entrada não tem desconto contra ela mesma", () => {

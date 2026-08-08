@@ -34,20 +34,35 @@ Ainda na tela do produto:
 
 > ⚠️ **Progressivo (graduated)**, não "Volume". No progressivo, cada faixa cobra
 > só as unidades que caem dentro dela — é o que faz 2.500 mensagens custarem
-> R$ 295,40. No volume, TODAS as unidades pegariam o preço da última faixa, e o
-> mesmo pedido sairia R$ 225,00. A diferença é de 24% na sua receita.
+> R$ 339,40. No volume, TODAS as unidades pegariam o preço da última faixa, e o
+> mesmo pedido sairia R$ 225,00. São **34% da sua receita** nessa única escolha,
+> e o erro é invisível: o Stripe aceita as duas configurações sem reclamar.
 
-### As quatro camadas
+### As dez camadas
 
 | Camada | De    | Até   | Por unidade | Taxa fixa da camada |
 | ------ | ----- | ----- | ----------- | ------------------- |
 | 1      | 1     | 150   | R$ 0,00     | **R$ 29,90**        |
-| 2      | 151   | 600   | **R$ 0,15** | R$ 0,00             |
-| 3      | 601   | 1.500 | **R$ 0,12** | R$ 0,00             |
-| 4      | 1.501 | ∞     | **R$ 0,09** | R$ 0,00             |
+| 2      | 151   | 300   | **R$ 0,19** | R$ 0,00             |
+| 3      | 301   | 500   | **R$ 0,18** | R$ 0,00             |
+| 4      | 501   | 750   | **R$ 0,17** | R$ 0,00             |
+| 5      | 751   | 1.000 | **R$ 0,15** | R$ 0,00             |
+| 6      | 1.001 | 1.250 | **R$ 0,14** | R$ 0,00             |
+| 7      | 1.251 | 1.500 | **R$ 0,13** | R$ 0,00             |
+| 8      | 1.501 | 1.750 | **R$ 0,11** | R$ 0,00             |
+| 9      | 1.751 | 2.000 | **R$ 0,10** | R$ 0,00             |
+| 10     | 2.001 | ∞     | **R$ 0,09** | R$ 0,00             |
 
 A camada 1 é a entrada: quem compra 150 mensagens paga R$ 29,90 e nada por
 unidade. A partir da 151 cada mensagem entra pelo preço da sua faixa.
+
+> **Por que dez camadas, e não quatro.** A escada anterior ia de R$ 0,15 direto,
+> e isso punha quase todo o desconto na mensagem 151: a entrada sai a R$ 0,1993
+> por mensagem, então comprar UMA a mais que o pacote mínimo derrubava o preço
+> marginal em 25% de uma vez. Quem comprava 151 já tinha levado o desconto, e o
+> resto da escada não motivava mais nada. Agora a segunda camada é R$ 0,19 —
+> encosta na entrada — e o desconto é conquistado camada a camada, que é onde
+> ele foi pedido: nas mensagens de cima.
 
 > A última camada fica em ∞ porque o Stripe exige. **O teto real é nosso**: o
 > checkout manda `adjustable_quantity.maximum = 2500` e o servidor recusa acima
@@ -55,15 +70,31 @@ unidade. A partir da 151 cada mensagem entra pelo preço da sua faixa.
 
 ### Confira antes de salvar
 
-Estes são os quatro números que o site mostra. Se algum não bater, a camada
-está errada:
+Estes são os números que o site mostra. Se algum não bater, uma camada está
+errada:
 
-| Mensagens | Fatura        | Por mensagem | Conta                 |
-| --------- | ------------- | ------------ | --------------------- |
-| 150       | **R$ 29,90**  | R$ 0,199     | taxa fixa             |
-| 600       | **R$ 97,40**  | R$ 0,162     | 29,90 + 450 × 0,15    |
-| 1.500     | **R$ 205,40** | R$ 0,137     | 97,40 + 900 × 0,12    |
-| 2.500     | **R$ 295,40** | R$ 0,118     | 205,40 + 1.000 × 0,09 |
+| Mensagens | Fatura        | Por mensagem | Desconto |
+| --------- | ------------- | ------------ | -------- |
+| 150       | **R$ 29,90**  | R$ 0,1993    | —        |
+| 300       | R$ 58,40      | R$ 0,1947    | 2%       |
+| 500       | R$ 94,40      | R$ 0,1888    | 5%       |
+| 750       | R$ 136,90     | R$ 0,1825    | 8%       |
+| 1.000     | **R$ 174,40** | R$ 0,1744    | 12%      |
+| 1.250     | R$ 209,40     | R$ 0,1675    | 15%      |
+| 1.500     | R$ 241,90     | R$ 0,1613    | 19%      |
+| 1.750     | R$ 269,40     | R$ 0,1554    | 22%      |
+| 2.000     | **R$ 294,40** | R$ 0,1472    | 26%      |
+| 2.500     | **R$ 339,40** | R$ 0,1358    | 31%      |
+
+> **O "R$ 0,09" é o preço MARGINAL da última camada, não a média.** Em preço
+> graduado o efetivo nunca alcança o marginal do fim: quem compra 2.500 paga
+> R$ 0,1358 por mensagem. É a coluna "Por mensagem" que pode ir para a tela —
+> nunca a tabela de camadas.
+
+> **Onde foi parar o R$ 295,40.** O topo antigo (quatro camadas) valia 2.500
+> mensagens por R$ 295,40. Com dez camadas, o mesmo bolso compra **2.000
+> mensagens por R$ 294,40** — e as 500 seguintes passaram a custar R$ 0,09 cada,
+> que é exatamente onde o desconto foi pedido.
 
 ## 3. Copiar o ID do Price
 
@@ -116,11 +147,11 @@ cota dele fica no piso da escada (150), não no que comprou. Não é catastrófi
 `STRIPE_PRICE_QUIZ_*` existem para o caso de a venda pela web voltar, e hoje o
 `canal-de-venda` recusa esse checkout no servidor.
 
-**O cupom de 20% do médico** vale para a assinatura da paciente — que é IAP.
-Cupom do Stripe **não funciona** dentro da App Store nem do Google Play; lá o
-instrumento é Offer Code (Apple) / código promocional (Google), com cota
-trimestral e regras próprias. O `CUPOM_MEDICO_ID` no Stripe só entra se a venda
-web for reativada.
+**Nenhum cupom do médico.** Ele não dá mais desconto — dá **Sementinhas**, a
+moeda do app, com uma mesada mensal dimensionada pelas mensagens que contratou.
+Isso não passa por Stripe nenhum: é escrita em `sementinhas_ledger`, dentro do
+produto. Se você encontrar `CUPOM_MEDICO_ID` num cupom antigo do painel do
+Stripe, pode arquivar — nada no código o pede mais.
 
 **Nada de plano anual** para o médico: a escada tem um Price mensal só. A página
 de vendas deixou de mostrar alternador anual justamente por isso.

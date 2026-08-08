@@ -57,10 +57,10 @@ describe("nenhum plano fica pela metade", () => {
      * `mensagens` fica de fora, e o motivo é que ele quebra a PREMISSA da
      * invariante, não a invariante: ela ordena por `PLAN_PRICE[p]`, um número
      * por plano, e o preço dele é uma FAIXA — R$ 29,90 (150 mensagens) a
-     * R$ 295,40 (2.500). `PLAN_PRICE.mensagens` guarda só a entrada.
+     * R$ 339,40 (2.500). `PLAN_PRICE.mensagens` guarda só a entrada.
      *
      * A faixa dele atravessa quase toda a escada nomeada: começa abaixo do
-     * Essencial (R$ 49,90) e termina praticamente no Pro (R$ 297). Qualquer
+     * Essencial (R$ 49,90) e termina acima do Pro (R$ 297). Qualquer
      * posto único seria certo para uma ponta e errado para a outra, então
      * ordená-lo pela entrada seria escolher a leitura mais errada das duas — a
      * de que o plano que substituiu a escada vale menos que todos os degraus
@@ -78,7 +78,7 @@ describe("nenhum plano fica pela metade", () => {
     /* Se um dia ele virar preço único, a exclusão acima perde a justificativa e
        este teste é o que avisa. */
     expect(PLAN_PRICE.mensagens).toBe(29.9);
-    expect(mensalidadeCentavos("mensagens", 2_500)).toBe(29_540);
+    expect(mensalidadeCentavos("mensagens", 2_500)).toBe(33_940);
     expect(mensalidadeCentavos("mensagens", 2_500)).toBeGreaterThan(PLAN_PRICE.mensagens * 100);
   });
 

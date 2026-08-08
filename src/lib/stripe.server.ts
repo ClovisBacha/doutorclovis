@@ -72,8 +72,9 @@ export function priceIdFor(product: BillingProduct, plan: string): string | null
     "quiz_premium:annual": env.STRIPE_PRICE_QUIZ_ANNUAL,
     /* ─── O PLANO QUE SE VENDE HOJE ───────────────────────────────────────
        Um Price só, com faixas GRADUADAS (`tiers_mode: graduated`), cobrado por
-       unidade = mensagem de IA. A primeira faixa é `flat_amount` R$ 29,90 até
-       150; depois R$ 0,15 / R$ 0,12 / R$ 0,09. Quem calcula o mesmo número do
+       unidade = mensagem de IA. São DEZ faixas: `flat_amount` R$ 29,90 até 150,
+       depois R$ 0,19 descendo de um em um centavo até o piso de R$ 0,09 (a
+       partir de 2.001). Quem calcula o mesmo número do
        nosso lado é `precoDe` (`src/lib/planos-medico.ts`), e há teste que trava
        os dois juntos — se as faixas do Stripe mudarem sem a função, a tela
        promete um preço e a fatura cobra outro. */
