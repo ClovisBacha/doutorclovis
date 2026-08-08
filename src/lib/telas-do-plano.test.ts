@@ -127,6 +127,23 @@ describe("2. o seletor é operável sem mouse", () => {
     expect(seletor).toContain("aria-valuetext=");
   });
 
+  test("o foco é visível em TODOS os navegadores", () => {
+    /* O `focus:outline-none` removia o contorno nativo e o anel de substituição
+       existia só no polegar do WebKit — no Firefox a barra recebia foco sem
+       nenhum sinal na tela, numa tela que decide uma compra. */
+    expect(seletor).not.toContain("focus:outline-none");
+    expect(seletor).toContain("focus-visible:outline-2");
+  });
+
+  test("o número que rola não parte de um valor vencido", () => {
+    /* O cleanup gravava `mostrado` — a variável capturada no render em que o
+       efeito nasceu, não o valor que a animação alcançou. Arrastar rápido dava
+       um solavanco de número andando para os dois lados. */
+    expect(seletor).toContain("anterior.current = agoraMostrado");
+    const i = seletor.indexOf("return () => {");
+    expect(seletor.slice(i, i + 400)).not.toContain("anterior.current = mostrado");
+  });
+
   test("respeita quem pediu menos movimento", () => {
     expect(seletor).toContain("useReducedMotion");
     /* E não só no enfeite: o número que rola precisa virar troca instantânea. */
@@ -217,6 +234,15 @@ describe("4b. a quantidade escolhida no site NÃO se perde no caminho", () => {
 
   test("e o seletor abre nela", () => {
     expect(seletor).toContain("localStorage.getItem(MENSAGENS_ESCOLHIDAS)");
+  });
+
+  test("mas a leitura é num efeito, NUNCA no primeiro render", () => {
+    /* A `/medicos` é renderizada no servidor. Ler `localStorage` no
+       inicializador do estado monta uma árvore diferente da que veio de lá —
+       hidratação divergente, que no pior caso remonta a seção inteira. */
+    const i = seletor.indexOf("const [mensagens, setMensagens]");
+    expect(seletor.slice(i, i + 120)).toContain("useState(PADRAO_MENSAGENS)");
+    expect(seletor).toContain("setMensagens(Math.round(n / PASSO) * PASSO)");
   });
 
   test("a chave é uma constante compartilhada, não uma string solta", () => {

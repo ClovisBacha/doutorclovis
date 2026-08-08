@@ -223,18 +223,45 @@ export const presentearPaciente = createServerFn({ method: "POST" })
      * máximo UM presente a mais que o teto, e isso é Sementinha, que não custa
      * dinheiro. Aceitar um erro de 50 🌱 é muito melhor que manter uma escrita
      * destrutiva num livro-caixa que o produto inteiro assume ser append-only. */
+    /* ─── "ENVIADO" SÓ SE FOI MESMO — E A VERSÃO ANTERIOR MENTIA ──────────
+     *
+     * `grantSementinhas` usa `ignoreDuplicates: true`: um segundo presente à
+     * mesma paciente no mesmo ciclo é DO NOTHING, sem erro.
+     *
+     * A conferência anterior relia a linha e só acusava repetição quando o
+     * valor gravado DIFERIA do novo. Ou seja, pegava "mandei Semente e agora
+     * Jardim", e deixava passar o caso mais comum de todos: **mandar o mesmo
+     * presente duas vezes**. Dois toques no mesmo botão devolviam `ok: true`
+     * nos dois, o médico lia "enviadas" duas vezes, e a segunda não escreveu
+     * nada — exatamente o defeito que o comentário anterior dizia ter
+     * consertado, e que um verificador adversarial achou de volta.
+     *
+     * A régua certa é a EXISTÊNCIA da linha antes da escrita, não o valor dela
+     * depois. */
+    const { data: jaExistia } = await sb
+      .from("sementinhas_ledger")
+      .select("amount")
+      .eq("user_id", data.patientId)
+      .eq("dedupe_key", dedupeKey)
+      .maybeSingle();
+    if (jaExistia) {
+      return {
+        ok: false as const,
+        error: "ja_presenteada" as const,
+        mesada,
+        quantidade: jaExistia.amount as number,
+      };
+    }
+
     const { grantSementinhas } = await import("@/lib/sementinhas.functions");
     const { typedDb } = await import("@/integrations/supabase/types.extended");
     await grantSementinhas(typedDb(supabaseAdmin as never), data.patientId, [
       { amount: quanto, reason: RAZAO_PRESENTE, dedupeKey },
     ]);
 
-    /* ─── "ENVIADO" SÓ SE FOI MESMO ───────────────────────────────────────
-     * `grantSementinhas` usa `ignoreDuplicates: true`: um segundo presente à
-     * mesma paciente no mesmo ciclo é DO NOTHING, sem erro. A versão anterior
-     * devolvia `ok: true, quantidade: 500` e o médico lia "500 🌱 enviadas"
-     * enquanto a paciente recebia ZERO — sem log, sem tela, sem nada.
-     * Relemos a linha: se ela não é deste presente, ele já tinha sido feito. */
+    /* E confere que a escrita aconteceu: entre a leitura acima e esta linha
+       cabe um clique simultâneo, e o índice único do ledger recusa o segundo.
+       Quem perder a corrida ouve "já presenteada", que é a verdade. */
     const { data: gravou } = await sb
       .from("sementinhas_ledger")
       .select("amount")
@@ -244,16 +271,6 @@ export const presentearPaciente = createServerFn({ method: "POST" })
     const depois = await lerMesada(sb, doctorId);
     if (!gravou) {
       return { ok: false as const, error: "nao_gravou" as const, mesada: depois };
-    }
-    if ((gravou.amount as number) !== quanto) {
-      /* Já havia um presente deste ciclo, de outro valor: o dedupe ignorou o
-         novo. Dizer a verdade — ela já foi presenteada este mês. */
-      return {
-        ok: false as const,
-        error: "ja_presenteada" as const,
-        mesada: depois,
-        quantidade: gravou.amount as number,
-      };
     }
 
     return { ok: true as const, mesada: depois, quantidade: quanto };

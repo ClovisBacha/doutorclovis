@@ -182,15 +182,40 @@ export const presentearAmiga = createServerFn({ method: "POST" })
     /* 4. UMA POR CICLO. A chave carrega quem dá, quem recebe e o mês. */
     const dedupeKey = `amiga:${uid}:${data.amigaId}:${ciclo}`;
 
+    /* ─── "ENVIADO" SÓ SE FOI MESMO — E A VERSÃO ANTERIOR MENTIA ──────────
+     *
+     * `grantSementinhas` usa `ignoreDuplicates: true`: um segundo presente à
+     * mesma pessoa no mesmo ciclo é DO NOTHING, sem erro.
+     *
+     * A conferência anterior relia a linha e só acusava repetição quando o
+     * valor gravado DIFERIA do novo — ou seja, ela pegava "mandei 50 e agora
+     * 300", e deixava passar o caso mais comum de todos: **mandar o mesmo valor
+     * duas vezes**. Dois toques no mesmo botão devolviam `ok: true` nas duas, a
+     * tela dizia "enviado" duas vezes, e a segunda não escreveu nada.
+     *
+     * Um verificador adversarial achou isso nos DOIS lados, com o comentário
+     * acima dele afirmando o contrário. A régua certa é a EXISTÊNCIA da linha
+     * antes da escrita, não o valor dela depois.
+     */
+    const { data: jaExistia } = await sb
+      .from("sementinhas_ledger")
+      .select("amount")
+      .eq("user_id", data.amigaId)
+      .eq("dedupe_key", dedupeKey)
+      .maybeSingle();
+    if (jaExistia) {
+      return { ok: false as const, error: "ja_presenteada" as const, mesada };
+    }
+
     const { grantSementinhas } = await import("@/lib/sementinhas.functions");
     const { typedDb } = await import("@/integrations/supabase/types.extended");
     await grantSementinhas(typedDb(supabaseAdmin as never), data.amigaId, [
       { amount: quanto, reason: RAZAO_PRESENTE_AMIGA, dedupeKey },
     ]);
 
-    /* "Enviado" só se foi mesmo — `grantSementinhas` ignora duplicata em
-       silêncio, e dizer "enviei" sem ter enviado é o defeito que a mesada do
-       médico já teve. */
+    /* E confere que a escrita aconteceu: entre a leitura acima e esta linha
+       cabe um clique simultâneo, e o índice único do ledger recusa o segundo.
+       Quem perder a corrida ouve "já presenteada", que é a verdade. */
     const { data: gravou } = await sb
       .from("sementinhas_ledger")
       .select("amount")
@@ -199,9 +224,6 @@ export const presentearAmiga = createServerFn({ method: "POST" })
       .maybeSingle();
     const depois = await lerMesadaDaAmiga(sb, uid);
     if (!gravou) return { ok: false as const, error: "nao_gravou" as const, mesada: depois };
-    if ((gravou.amount as number) !== quanto) {
-      return { ok: false as const, error: "ja_presenteada" as const, mesada: depois };
-    }
 
     return { ok: true as const, mesada: depois, quantidade: quanto };
   });

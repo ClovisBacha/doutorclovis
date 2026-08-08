@@ -167,6 +167,44 @@ describe("6. a tela existe e conta a mesma história", () => {
     expect(tela).toContain("!mesada?.assinante) return null");
   });
 
+  test("a recusa por Modo Cuidado NÃO conta nada sobre a amiga", () => {
+    /**
+     * ─── UMA MUTAÇÃO SOBREVIVEU AQUI, E ERA A PIOR DA NOITE ────────────────
+     *
+     * A frase era: "{nome} está passando por um momento delicado — o app não
+     * envia presentes agora."
+     *
+     * Modo Cuidado é perda gestacional. Aquilo contava a UMA usuária a perda de
+     * OUTRA, numa tela de presente, sem que ninguém tivesse escolhido contar —
+     * e a amiga que lesse aquilo saberia exatamente o que aconteceu.
+     *
+     * Do lado do MÉDICO a frase explícita continua, e está certa: ele é o
+     * obstetra dela, a informação é clínica e é dele por dever de ofício. Entre
+     * amigas, não.
+     *
+     * O servidor precisa recusar; a tela não precisa explicar.
+     */
+    const i = tela.indexOf('res.error === "modo_cuidado"');
+    expect(i).toBeGreaterThan(-1);
+    /* A janela do ramo, até o ternário seguinte. */
+    const ramo = tela.slice(i, tela.indexOf('res.error === "nao_indicada"', i));
+
+    /* Só o TEXTO que ela lê — a condição do ramo contém a palavra "cuidado"
+       por construção, e cobrar isso seria o teste batendo no próprio andaime
+       em vez de na frase. */
+    const frase = (ramo.match(/"([^"]{15,})"/) ?? ["", ""])[1].toLowerCase();
+    expect(frase.length).toBeGreaterThan(15);
+    expect(ramo).not.toContain("amiga.nome");
+    for (const palavra of ["delicado", "momento", "perda", "luto", "gesta"]) {
+      expect(frase).not.toContain(palavra);
+    }
+  });
+
+  test("mas o MÉDICO continua vendo o motivo — é informação clínica dele", () => {
+    const painel = semComentarios("src/components/mesada-do-medico.tsx");
+    expect(painel).toContain("Modo Cuidado");
+  });
+
   test("cada recusa tem frase própria", () => {
     for (const motivo of ["ja_presenteada", "mesada_esgotada", "modo_cuidado", "nao_indicada"]) {
       expect(tela).toContain(motivo);

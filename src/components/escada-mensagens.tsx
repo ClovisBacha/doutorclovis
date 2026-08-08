@@ -139,16 +139,26 @@ function NumeroQueRola({ valor, duracao = 420 }: { valor: number; duracao?: numb
       const t = Math.min(1, (agora - inicio) / duracao);
       /* easeOutExpo — o mesmo easing do resto do app. */
       const e = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-      setMostrado(Math.round(de + (ate - de) * e));
+      const agoraMostrado = Math.round(de + (ate - de) * e);
+      setMostrado(agoraMostrado);
+      /* A cada quadro, e não só no fim: é isto que faz um cancelamento no meio
+         do caminho deixar `anterior` no lugar CERTO. */
+      anterior.current = agoraMostrado;
       if (t < 1) raf.current = requestAnimationFrame(passo);
       else anterior.current = ate;
     };
     raf.current = requestAnimationFrame(passo);
     return () => {
       if (raf.current !== null) cancelAnimationFrame(raf.current);
-      /* Sem isto, arrastar rápido deixa `anterior` num valor intermediário e a
-         próxima animação parte do lugar errado. */
-      anterior.current = mostrado;
+      /* ─── O CLEANUP GRAVAVA UM VALOR VELHO ────────────────────────────────
+         Ele fazia `anterior.current = mostrado`, e `mostrado` é a variável
+         capturada no render em que o efeito NASCEU — não o valor que a
+         animação alcançou. Arrastando rápido, cada cancelamento reescrevia
+         `anterior` com um número já vencido e a animação seguinte partia de
+         trás, dando aquele solavanco de número que anda para os dois lados.
+
+         O ponto de parada verdadeiro já está em `anterior.current`, escrito a
+         cada quadro pelo laço. Não mexer nele é o conserto. */
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valor, reduce, duracao]);
@@ -185,20 +195,35 @@ export function EscadaDeMensagens({
    * e pular para 1.500 no primeiro quadro — e o número que rola trataria isso
    * como uma mudança dela, animando um salto que ninguém pediu.
    */
-  const [mensagens, setMensagens] = useState(() => {
+  /**
+   * Começa no PADRÃO e só depois pula para o que ela escolheu no site.
+   *
+   * ─── POR QUE NÃO NO INICIALIZADOR ────────────────────────────────────────
+   *
+   * A `/medicos` é renderizada no servidor. Ler `localStorage` durante o
+   * primeiro render do cliente faz o React montar uma árvore diferente da que
+   * veio do servidor — hidratação divergente, que no melhor caso é um aviso no
+   * console e no pior descarta a árvore inteira e remonta a seção.
+   *
+   * No `useEffect` o primeiro quadro é igual ao do servidor e a correção vem no
+   * seguinte. O salto é visível, e isso é bom: ele MOSTRA que a escolha dela
+   * atravessou o cadastro, em vez de a barra simplesmente já estar lá.
+   */
+  const [mensagens, setMensagens] = useState(PADRAO_MENSAGENS);
+
+  useEffect(() => {
     try {
       const bruto = localStorage.getItem(MENSAGENS_ESCOLHIDAS);
       const n = Number(bruto);
       /* A faixa é conferida aqui também: o `localStorage` é do navegador dela e
-         qualquer um edita. Fora da escada, cai no padrão. */
+         qualquer um edita. Fora da escada, fica no padrão. */
       if (Number.isFinite(n) && n >= ENTRADA_MENSAGENS && n <= TETO_AUTOATENDIMENTO) {
-        return Math.round(n / PASSO) * PASSO;
+        setMensagens(Math.round(n / PASSO) * PASSO);
       }
     } catch {
-      /* sem storage (SSR, aba privada): o padrão serve */
+      /* sem storage (aba privada): o padrão serve */
     }
-    return PADRAO_MENSAGENS;
-  });
+  }, []);
 
   const dados = useMemo(() => {
     const preco = precoDe(mensagens);
@@ -281,7 +306,7 @@ export function EscadaDeMensagens({
           onChange={(e) => setMensagens(Number(e.target.value))}
           aria-label="Mensagens de IA por mês"
           aria-valuetext={`${mensagens} mensagens por mês, R$ ${brl(dados.preco)}`}
-          className="absolute inset-0 w-full cursor-pointer appearance-none bg-transparent focus:outline-none [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:cursor-grab [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[rgb(228,150,142)] [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[rgb(228,150,142)] [&::-webkit-slider-thumb]:shadow-[0_2px_10px_rgba(0,0,0,0.35)] [&:focus-visible::-webkit-slider-thumb]:ring-4 [&:focus-visible::-webkit-slider-thumb]:ring-white/40"
+          className="absolute inset-0 w-full cursor-pointer appearance-none bg-transparent focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:cursor-grab [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[rgb(228,150,142)] [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[rgb(228,150,142)] [&::-webkit-slider-thumb]:shadow-[0_2px_10px_rgba(0,0,0,0.35)] [&:focus-visible::-webkit-slider-thumb]:ring-4 [&:focus-visible::-webkit-slider-thumb]:ring-white/40"
         />
       </div>
 

@@ -179,6 +179,52 @@ describe("5. a mesada não mente sobre o que enviou", () => {
   });
 });
 
+describe("5b. dizer «enviado» duas vezes era MENTIRA nos dois lados", () => {
+  /**
+   * ─── O DEFEITO QUE O PRÓPRIO COMENTÁRIO DIZIA TER CONSERTADO ──────────────
+   *
+   * A conferência relia a linha DEPOIS da escrita e só acusava repetição quando
+   * o valor gravado DIFERIA do novo. Ou seja: pegava "mandei Semente e agora
+   * Jardim", e deixava passar o caso mais comum de todos — **mandar o mesmo
+   * presente duas vezes**.
+   *
+   * Dois toques no mesmo botão devolviam `ok: true` nos dois. A tela dizia
+   * "enviado" duas vezes. A segunda não escreveu nada, porque
+   * `grantSementinhas` ignora duplicata em silêncio.
+   *
+   * Um verificador adversarial achou isso nas DUAS mesadas — com o comentário
+   * logo acima afirmando o contrário, o que é o pior jeito de um defeito
+   * sobreviver: quem lê acredita e não confere.
+   *
+   * A régua certa é a EXISTÊNCIA da linha ANTES da escrita.
+   */
+  const pacienteFns = semComentarios("src/lib/mesada-paciente.functions.ts");
+
+  for (const [onde, fonte] of [
+    ["a mesada do médico", mesada],
+    ["a mesada da paciente", pacienteFns],
+  ] as const) {
+    test(`${onde} lê a linha ANTES de gravar`, () => {
+      const iLeitura = fonte.indexOf("jaExistia");
+      const iEscrita = fonte.indexOf("grantSementinhas(typedDb");
+      expect(iLeitura).toBeGreaterThan(-1);
+      expect(iEscrita).toBeGreaterThan(-1);
+      expect(iLeitura).toBeLessThan(iEscrita);
+    });
+
+    test(`${onde} recusa quando a linha já existe`, () => {
+      const i = fonte.indexOf("if (jaExistia)");
+      expect(i).toBeGreaterThan(-1);
+      expect(fonte.slice(i, i + 260)).toContain('error: "ja_presenteada"');
+    });
+
+    test(`${onde} não decide repetição comparando VALORES`, () => {
+      /* A asserção que descreve o defeito: era `gravou.amount !== quanto`. */
+      expect(fonte).not.toContain("!== quanto");
+    });
+  }
+});
+
 describe("6. a mesada não sai do plano ANTIGO", () => {
   /**
    * Ela lia `ent.aiRepliesPerCycle`, e os planos antigos têm tetos de outra

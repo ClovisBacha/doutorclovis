@@ -81,7 +81,14 @@ export function PresentearAmigas() {
           : res.error === "mesada_esgotada"
             ? "Suas Sementinhas de presente acabaram. Voltam na virada do mês 🌱"
             : res.error === "modo_cuidado"
-              ? `${amiga.nome} está passando por um momento delicado — o app não envia presentes agora.`
+              ? /* ─── SEM DIZER POR QUÊ, E ISSO NÃO É VAGUEZA ────────────────
+                   A frase anterior era "{nome} está passando por um momento
+                   delicado". Modo Cuidado é perda gestacional: aquilo contava
+                   a UMA usuária a perda de OUTRA, numa tela de presente, sem
+                   que ninguém tivesse escolhido contar.
+
+                   O servidor precisa recusar; a tela não precisa explicar. */
+                "Não dá para enviar um presente agora. Tente de novo mais para frente 💛"
               : res.error === "nao_indicada"
                 ? `${amiga.nome} não entrou pelo seu link.`
                 : "Não deu para enviar agora.";
