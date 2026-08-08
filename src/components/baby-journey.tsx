@@ -402,7 +402,7 @@ export function PremiumUpsellModal({
                 disabled={busy !== null}
                 className="w-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-[0_8px_30px_rgba(167,139,250,0.4)] transition-transform hover:scale-[1.02] disabled:opacity-60"
               >
-                {busy === "annual" ? "Abrindo…" : "Assinar anual — 50% OFF"}
+                {busy === "annual" ? "Abrindo…" : `Assinar anual — ${DESCONTO_ANUAL_PCT}% OFF`}
               </button>
               <button
                 onClick={() => checkout("monthly")}

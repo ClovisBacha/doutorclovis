@@ -20,7 +20,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { BONUS_VINCULO_MEDICO, CUSTO_LOJA_GRATIS } from "./economia-sementinhas";
+import { BONUS_VINCULO_MEDICO, GANHO_DIA_TIPICO } from "./economia-sementinhas";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -76,11 +76,18 @@ describe("2. o bônus NÃO é farmável trocando de médico", () => {
     expect(sementinhas).not.toContain("dedupeKey: `vinculo:${doctorId}`");
   });
 
-  test("e um farm de quatro médicos não paga a loja", () => {
-    /* A aritmética que descreve o defeito: com a chave por par, quatro toques
-       davam mais que a loja inteira. Com a chave fixa, quatro toques dão UM. */
-    expect(BONUS_VINCULO_MEDICO * 4).toBeGreaterThan(CUSTO_LOJA_GRATIS);
-    expect(BONUS_VINCULO_MEDICO).toBeLessThan(CUSTO_LOJA_GRATIS);
+  test("e um farm de quatro médicos valeria mais que uma semana de jogo", () => {
+    /* A aritmética que descreve o defeito. O número do bônus caiu de 200 para
+       100 quando a economia foi recalibrada, então "quatro toques pagam a loja
+       inteira" deixou de ser verdade — mas o defeito não era o tamanho do
+       bônus, era a chave por par: `/encontrar-medico` é rota pública e a troca
+       de médico é livre e sem carência.
+
+       A régua que continua valendo, e que não depende do valor: um farm de um
+       minuto não pode valer mais que dias de uso honesto. */
+    const umaSemana = 7 * GANHO_DIA_TIPICO;
+    expect(BONUS_VINCULO_MEDICO * 4).toBeGreaterThan(umaSemana);
+    expect(BONUS_VINCULO_MEDICO).toBeLessThan(umaSemana);
   });
 });
 

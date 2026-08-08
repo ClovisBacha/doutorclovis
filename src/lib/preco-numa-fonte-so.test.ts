@@ -49,7 +49,18 @@ const semComentarios = (p: string) =>
     .replace(/^\s*\/\/.*$/gm, "");
 
 /** Os preços que já estiveram no ar e não valem mais. */
-const MORTOS = ["118,80", "118.80", "89,90", "7,49", "9,90/mês", "R$ 9,90"];
+const MORTOS = [
+  "118,80",
+  "118.80",
+  "89,90",
+  "7,49",
+  "9,90/mês",
+  "R$ 9,90",
+  /* Um botão dizia "Assinar anual — 50% OFF" oito linhas abaixo do mesmo cartão
+     que imprimia `{DESCONTO_ANUAL_PCT}%` = 53%. Dois números para o mesmo
+     desconto, na mesma tela — e o menor deles é o que a pessoa acredita. */
+  "50% OFF",
+];
 
 describe("1. as telas do Premium não escrevem preço à mão", () => {
   const telas = {

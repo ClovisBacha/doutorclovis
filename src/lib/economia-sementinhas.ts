@@ -126,7 +126,7 @@ export const GANHO_SEMANAL = 25;
  * bônus virava enfeite. Com 200 a diferença é de cinco dias (14 contra 19), que
  * é o que faz valer a pena pedir o código a ele.
  */
-export const BONUS_VINCULO_MEDICO = 200;
+export const BONUS_VINCULO_MEDICO = 100;
 
 /**
  * A mesada do médico: quantas Sementinhas ele pode distribuir por mês.
@@ -144,7 +144,7 @@ export function mesadaDoMedico(mensagensContratadas: number): number {
 }
 
 /** O presente sugerido para UMA paciente — o botão de um clique no painel. */
-export const PRESENTE_SUGERIDO = 50;
+export const PRESENTE_SUGERIDO = 30;
 
 /**
  * AS TRÊS CLASSES DE PRESENTE.
@@ -181,15 +181,15 @@ export const CLASSES_DE_PRESENTE = [
     chave: "buque",
     nome: "Buquê",
     emoji: "💐",
-    quantidade: 150,
+    quantidade: 60,
     efeito: "Um item de faixa média, sem esperar dias",
   },
   {
     chave: "jardim",
     nome: "Jardim",
     emoji: "🌷",
-    quantidade: 300,
-    efeito: "Passa do troféu da loja grátis — ela vai olhar o Premium",
+    quantidade: 100,
+    efeito: "Um item caro do Cantinho, ou quase dois médios",
   },
 ] as const;
 
@@ -213,7 +213,35 @@ export type ClasseDePresente = (typeof CLASSES_DE_PRESENTE)[number];
  *    importa: quem paga R$ 19,90 não pode presentear mais que o profissional
  *    que sustenta a conta dela.
  */
-export const MESADA_DA_ASSINANTE = 300;
+/**
+ * O TETO DO BLOCO DE BOAS-VINDAS — a invariante que segura o desenho inteiro.
+ *
+ * ─── O QUE UM VERIFICADOR ADVERSARIAL MEDIU ─────────────────────────────────
+ *
+ * Os presentes não pingam: eles CAEM JUNTOS, no dia em que ela chega. O médico
+ * presenteia quando vê a paciente, e ele a vê quando ela vincula — mesmo dia do
+ * bônus de vínculo. Se ela veio pelo link de uma amiga assinante, o presente
+ * dela chega ali também.
+ *
+ * Com os valores anteriores (bônus 200 + Jardim 300 + amiga 100) isso dava
+ * **600 dos 704 🌱 da loja no dia zero** — 85%. A paciente zerava os quinze
+ * itens grátis no TERCEIRO dia. Isso não acelera a parede; apaga ela, e com ela
+ * o mecanismo inteiro que faz a assinatura acontecer.
+ *
+ * ─── A RÉGUA ────────────────────────────────────────────────────────────────
+ *
+ * Sozinha, a paciente típica leva 19 dias. O bloco pode encurtar essa caminhada
+ * — é para isso que ele existe —, mas não pode cortá-la ao meio: o limite é
+ * **12 dias no arranjo mais generoso possível**, que dá um teto de 241 🌱.
+ *
+ * Os valores abaixo somam 240 no pior caso (100 + 100 + 40) e há teste que
+ * recusa qualquer combinação que passe daqui. Mexer num deles para cima obriga
+ * a mexer noutro para baixo — que é exatamente o tipo de amarra que faltava
+ * quando 600 entrou sem ninguém perceber.
+ */
+export const TETO_BLOCO_DE_BOAS_VINDAS = 241;
+
+export const MESADA_DA_ASSINANTE = 120;
 
 /**
  * Quanto vai em cada presente entre amigas.
@@ -222,29 +250,66 @@ export const MESADA_DA_ASSINANTE = 300;
  * presenteia duas ou três amigas. Um presente pequeno demais entre pessoas que
  * se conhecem soa como não ter dado nada.
  */
-export const PRESENTE_ENTRE_AMIGAS = 100;
+export const PRESENTE_ENTRE_AMIGAS = 40;
+
+/**
+ * O QUE ELA GANHA SEM TER FEITO NADA, no dia em que chega.
+ *
+ * ─── AS DUAS FUNÇÕES DESTE ARQUIVO DISCORDAVAM ──────────────────────────────
+ *
+ * `diasParaZerarLoja` AMORTIZAVA o presente do médico (`presenteMensal / 30`) e
+ * `saldoParado` o entregava em bloco no dia 30 (`Math.floor(dia / 30)`). Duas
+ * respostas diferentes para a mesma pergunta, no mesmo arquivo — e as duas
+ * erradas sobre o mundo, porque nenhuma modelava o instante em que o presente
+ * realmente acontece.
+ *
+ * Um verificador adversarial mediu o estrago: o presente do médico chega quando
+ * ele VÊ a paciente, e ele a vê quando ela vincula. Ou seja, no dia 0, junto com
+ * o bônus de vínculo. Amortizar isso em trinta dias fazia a simulação relatar
+ * 13 dias de caminhada onde a realidade dá 3.
+ *
+ * ─── POR QUE O PIOR CASO É O QUE IMPORTA AQUI ───────────────────────────────
+ *
+ * A pergunta que este arquivo existe para responder não é "quanto ela ganha em
+ * média" — é "existe algum arranjo em que a parede desaparece?". Se existe, ele
+ * vai acontecer, porque é o arranjo do médico mais engajado com a paciente mais
+ * engajada, que é justamente quem mais fala do app.
+ */
+export function entradaDeGraca(opts: {
+  comMedico: boolean;
+  /** O presente do médico, se ele presentear (Semente 50 · Buquê 150 · Jardim 300). */
+  presenteDoMedico?: number;
+  /** O presente de uma amiga assinante, se houver. */
+  presenteDeAmiga?: number;
+}): number {
+  return (
+    (opts.comMedico ? BONUS_VINCULO_MEDICO : 0) +
+    (opts.comMedico ? (opts.presenteDoMedico ?? 0) : 0) +
+    (opts.presenteDeAmiga ?? 0)
+  );
+}
+
+export type CenarioDaLoja = {
+  comMedico: boolean;
+  presenteDoMedico?: number;
+  presenteDeAmiga?: number;
+  /** Quanto ela ganha por dia. O padrão é o TÍPICO — ver o bloco acima. */
+  ganhoDiario?: number;
+};
 
 /**
  * Quantos dias até ela ter comprado TODOS os itens grátis.
  *
- * Devolve `Infinity` se o ganho for zero — nunca um número enganosamente
- * grande, porque "1.000 dias" e "nunca" são coisas diferentes para quem lê.
+ * Os presentes entram como BLOCO no dia 0, não amortizados: é quando eles
+ * acontecem. Devolve `Infinity` se o ganho diário for zero — nunca um número
+ * enganosamente grande, porque "1.000 dias" e "nunca" são coisas diferentes
+ * para quem lê.
  */
-export function diasParaZerarLoja(opts: {
-  comMedico: boolean;
-  /** Sementinhas que o médico presenteia por mês, se presentear. */
-  presenteMensal?: number;
-  /** Quanto ela ganha por dia. O padrão é o TÍPICO — ver o bloco acima. */
-  ganhoDiario?: number;
-}): number {
-  const alvo = CUSTO_LOJA_GRATIS - (opts.comMedico ? BONUS_VINCULO_MEDICO : 0);
+export function diasParaZerarLoja(opts: CenarioDaLoja): number {
+  const alvo = CUSTO_LOJA_GRATIS - entradaDeGraca(opts);
   if (alvo <= 0) return 0;
 
-  const porDia =
-    (opts.ganhoDiario ?? GANHO_DIA_TIPICO) +
-    GANHO_SEMANAL / 7 +
-    (opts.comMedico ? (opts.presenteMensal ?? 0) / 30 : 0);
-
+  const porDia = (opts.ganhoDiario ?? GANHO_DIA_TIPICO) + GANHO_SEMANAL / 7;
   if (porDia <= 0) return Infinity;
   return Math.ceil(alvo / porDia);
 }
@@ -255,14 +320,13 @@ export function diasParaZerarLoja(opts: {
  * É o número que mede a pressão do desenho. Zero significa que a loja grátis
  * ainda tem o que vender e a parede não chegou.
  */
-export function saldoParado(
-  dia: number,
-  opts: { comMedico: boolean; presenteMensal?: number; ganhoDiario?: number },
-): number {
+export function saldoParado(dia: number, opts: CenarioDaLoja): number {
   const ganho =
-    (opts.comMedico ? BONUS_VINCULO_MEDICO : 0) +
+    entradaDeGraca(opts) +
     dia * (opts.ganhoDiario ?? GANHO_DIA_TIPICO) +
     Math.floor(dia / 7) * GANHO_SEMANAL +
-    (opts.comMedico ? Math.floor(dia / 30) * (opts.presenteMensal ?? 0) : 0);
+    /* Os presentes se repetem a cada ciclo — o do dia 0 já entrou acima. */
+    Math.floor(dia / 30) *
+      ((opts.comMedico ? (opts.presenteDoMedico ?? 0) : 0) + (opts.presenteDeAmiga ?? 0));
   return Math.max(0, Math.round(ganho - CUSTO_LOJA_GRATIS));
 }

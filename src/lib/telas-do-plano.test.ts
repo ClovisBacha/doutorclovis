@@ -21,7 +21,15 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { CLASSES_DE_PRESENTE, CUSTO_LOJA_GRATIS, PRESENTE_SUGERIDO } from "./economia-sementinhas";
+import {
+  BONUS_VINCULO_MEDICO,
+  CLASSES_DE_PRESENTE,
+  CUSTO_LOJA_GRATIS,
+  PRESENTE_ENTRE_AMIGAS,
+  PRESENTE_SUGERIDO,
+  TETO_BLOCO_DE_BOAS_VINDAS,
+  diasParaZerarLoja,
+} from "./economia-sementinhas";
 import {
   DEGRAUS_DESTAQUE,
   ENTRADA_MENSAGENS,
@@ -322,11 +330,34 @@ describe("6. as três classes de presente são calibradas contra a LOJA", () => 
     }
   });
 
-  test("e a maior passa do troféu da loja grátis", () => {
-    /* É o que faz o Jardim valer a pena: ela cruza o item mais caro do grátis e
-       passa a olhar a prateleira que só o Premium abre. */
-    const TROFEU = 200;
-    expect(CLASSES_DE_PRESENTE[CLASSES_DE_PRESENTE.length - 1].quantidade).toBeGreaterThan(TROFEU);
+  test("e a maior cabe no TETO do bloco de boas-vindas", () => {
+    /**
+     * A régua mudou, e a antiga estava errada.
+     *
+     * Eu tinha calibrado o Jardim para "passar do troféu de 200 🌱 da loja
+     * grátis" — raciocínio meu, não seu. Um verificador adversarial mostrou o
+     * custo: bônus 200 + Jardim 300 + presente de amiga 100 caem JUNTOS no dia
+     * em que ela chega, e isso entregava 600 dos 704 🌱 da loja. Ela zerava os
+     * quinze itens no terceiro dia.
+     *
+     * A régua certa não é o troféu — é o bloco somado. Ver
+     * `TETO_BLOCO_DE_BOAS_VINDAS`.
+     */
+    const maior = Math.max(...CLASSES_DE_PRESENTE.map((c) => c.quantidade));
+    const bloco = BONUS_VINCULO_MEDICO + maior + PRESENTE_ENTRE_AMIGAS;
+    expect(bloco).toBeLessThanOrEqual(TETO_BLOCO_DE_BOAS_VINDAS);
+  });
+
+  test("o arranjo MAIS generoso ainda deixa doze dias de caminhada", () => {
+    /* É a invariante escrita em números, e é ela que impede um valor subir
+       sozinho: mexer num obriga a mexer noutro. */
+    const maior = Math.max(...CLASSES_DE_PRESENTE.map((c) => c.quantidade));
+    const dias = diasParaZerarLoja({
+      comMedico: true,
+      presenteDoMedico: maior,
+      presenteDeAmiga: PRESENTE_ENTRE_AMIGAS,
+    });
+    expect(dias).toBeGreaterThanOrEqual(12);
   });
 
   test("toda classe tem nome, emoji e efeito declarado", () => {

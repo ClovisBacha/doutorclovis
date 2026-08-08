@@ -17,15 +17,19 @@ import { CANTINHO_ITEMS } from "./cantinho";
 import { SEMENTINHAS } from "./sementinhas.functions";
 import {
   BONUS_VINCULO_MEDICO,
+  CLASSES_DE_PRESENTE,
+  CURVA_GRATIS,
+  CUSTO_LOJA_GRATIS,
   GANHO_DIA_MINIMO,
   GANHO_DIA_TETO,
   GANHO_DIA_TIPICO,
-  CURVA_GRATIS,
-  CUSTO_LOJA_GRATIS,
   ITENS_GRATIS,
+  PRESENTE_ENTRE_AMIGAS,
   PRESENTE_SUGERIDO,
   SEMENTINHAS_POR_MENSAGEM,
+  TETO_BLOCO_DE_BOAS_VINDAS,
   diasParaZerarLoja,
+  entradaDeGraca,
   mesadaDoMedico,
   saldoParado,
 } from "./economia-sementinhas";
@@ -46,7 +50,7 @@ describe("1. o alvo do dono: 15 dias — contra o ganho REAL", () => {
    * Agora a projeção recebe o ganho como PARÂMETRO e os três perfis são
    * cobrados separadamente.
    */
-  const COM_MEDICO = { comMedico: true, presenteMensal: PRESENTE_SUGERIDO };
+  const COM_MEDICO = { comMedico: true, presenteDoMedico: PRESENTE_SUGERIDO };
 
   test("a paciente TÍPICA zera a loja perto do 15º dia", () => {
     const dias = diasParaZerarLoja({ ...COM_MEDICO, ganhoDiario: GANHO_DIA_TIPICO });
@@ -98,16 +102,16 @@ describe("2. A PAREDE — moeda parada sem ter o que comprar", () => {
        é a JANELA: antes do 10º dia a loja acabou cedo demais (a recompensa some
        antes de virar hábito); depois do 25º a moeda nunca acumula e a parede
        nunca chega. */
-    expect(saldoParado(10, { comMedico: true, presenteMensal: PRESENTE_SUGERIDO })).toBe(0);
-    expect(saldoParado(25, { comMedico: true, presenteMensal: PRESENTE_SUGERIDO })).toBeGreaterThan(
-      0,
-    );
+    expect(saldoParado(10, { comMedico: true, presenteDoMedico: PRESENTE_SUGERIDO })).toBe(0);
+    expect(
+      saldoParado(25, { comMedico: true, presenteDoMedico: PRESENTE_SUGERIDO }),
+    ).toBeGreaterThan(0);
   });
 
   test("no dia 30 já há moeda parada", () => {
-    expect(saldoParado(30, { comMedico: true, presenteMensal: PRESENTE_SUGERIDO })).toBeGreaterThan(
-      0,
-    );
+    expect(
+      saldoParado(30, { comMedico: true, presenteDoMedico: PRESENTE_SUGERIDO }),
+    ).toBeGreaterThan(0);
   });
 
   test("e no dia 45 ela já pode pagar um item premium inteiro", () => {
@@ -115,15 +119,15 @@ describe("2. A PAREDE — moeda parada sem ter o que comprar", () => {
        assinatura destrava. */
     const premium = CANTINHO_ITEMS.filter((i) => i.premium).map((i) => i.price);
     const maisBarato = Math.min(...premium);
-    expect(saldoParado(45, { comMedico: true, presenteMensal: PRESENTE_SUGERIDO })).toBeGreaterThan(
-      maisBarato,
-    );
+    expect(
+      saldoParado(45, { comMedico: true, presenteDoMedico: PRESENTE_SUGERIDO }),
+    ).toBeGreaterThan(maisBarato);
   });
 
   test("o saldo parado só cresce — nunca volta a zero", () => {
     let anterior = -1;
     for (const dia of [20, 30, 45, 60, 90]) {
-      const s = saldoParado(dia, { comMedico: true, presenteMensal: PRESENTE_SUGERIDO });
+      const s = saldoParado(dia, { comMedico: true, presenteDoMedico: PRESENTE_SUGERIDO });
       expect(s).toBeGreaterThanOrEqual(anterior);
       anterior = s;
     }
@@ -255,20 +259,70 @@ describe("5. a mesada do médico", () => {
   });
 
   test("o bônus de vínculo vale VÁRIOS DIAS, não um punhado de moedas", () => {
-    /* A régua é relativa ao ganho, não um número fixo — foi o número fixo que
-       fez o bônus valer 20 dias no modelo errado e menos de três no real.
-       Cinco dias de ganho típico é o que faz valer a pena pedir o código. */
-    expect(BONUS_VINCULO_MEDICO / GANHO_DIA_TIPICO).toBeGreaterThanOrEqual(5);
+    /* Ele existe para a paciente SENTIR que vincular o médico valeu a pena.
+       Um bônus que vale meio dia de jogo não muda comportamento nenhum. */
+    const dias = BONUS_VINCULO_MEDICO / GANHO_DIA_TIPICO;
+    expect(dias).toBeGreaterThanOrEqual(2);
   });
 
-  test("e ele encurta a corrida em pelo menos 4 dias", () => {
-    /* A prova do efeito, não do valor. */
-    const com = diasParaZerarLoja({
-      comMedico: true,
-      presenteMensal: PRESENTE_SUGERIDO,
-      ganhoDiario: GANHO_DIA_TIPICO,
-    });
-    const sem = diasParaZerarLoja({ comMedico: false, ganhoDiario: GANHO_DIA_TIPICO });
-    expect(sem - com).toBeGreaterThanOrEqual(4);
+  test("mas ele NÃO paga metade da loja sozinho", () => {
+    /* Era 200 de 704 (28%) e, somado aos presentes, entregava 85% da loja no
+       dia zero — ver `TETO_BLOCO_DE_BOAS_VINDAS`. */
+    expect(BONUS_VINCULO_MEDICO).toBeLessThan(CUSTO_LOJA_GRATIS / 4);
+  });
+
+  test("e ele encurta a corrida sem encurtá-la demais", () => {
+    const sozinha = diasParaZerarLoja({ comMedico: false });
+    const comEle = diasParaZerarLoja({ comMedico: true });
+    expect(comEle).toBeLessThan(sozinha);
+    /* Pelo menos dois dias de diferença, senão não é sentido; e no máximo um
+       terço da caminhada, senão o vínculo vira o atalho. */
+    expect(sozinha - comEle).toBeGreaterThanOrEqual(2);
+    expect(sozinha - comEle).toBeLessThanOrEqual(Math.ceil(sozinha / 3));
+  });
+});
+
+describe("o BLOCO do dia 0 conta as três fontes — e nenhuma pode sumir", () => {
+  /**
+   * ─── A MUTAÇÃO QUE SOBREVIVEU ─────────────────────────────────────────────
+   *
+   * Tirar o presente do médico de `entradaDeGraca` passou verde: a caminhada
+   * ficou MAIOR, e todos os testes que cobram "pelo menos doze dias" ficaram
+   * mais folgados. Um modelo que subestima o ganho não dispara alarme nenhum —
+   * ele só faz a economia parecer mais segura do que é, que é exatamente como
+   * os 600 🌱 do dia zero entraram sem ninguém perceber.
+   *
+   * A régua tem de ser sobre o MODELO, não só sobre o resultado dele.
+   */
+  test("cada fonte entra, e some quando não existe", () => {
+    const nada = entradaDeGraca({ comMedico: false });
+    expect(nada).toBe(0);
+
+    const soVinculo = entradaDeGraca({ comMedico: true });
+    expect(soVinculo).toBe(BONUS_VINCULO_MEDICO);
+
+    const comPresente = entradaDeGraca({ comMedico: true, presenteDoMedico: 100 });
+    expect(comPresente).toBe(BONUS_VINCULO_MEDICO + 100);
+
+    const tudo = entradaDeGraca({ comMedico: true, presenteDoMedico: 100, presenteDeAmiga: 40 });
+    expect(tudo).toBe(BONUS_VINCULO_MEDICO + 100 + 40);
+  });
+
+  test("o presente do médico só conta se ela TEM médico", () => {
+    /* Sem vínculo não há quem presenteie. */
+    expect(entradaDeGraca({ comMedico: false, presenteDoMedico: 100 })).toBe(0);
+  });
+
+  test("mas o da amiga conta mesmo sem médico — são caminhos independentes", () => {
+    expect(entradaDeGraca({ comMedico: false, presenteDeAmiga: 40 })).toBe(40);
+  });
+
+  test("e o bloco máximo cabe no teto, com folga de no máximo dez", () => {
+    /* Folga grande demais significa que os valores poderiam ser mais
+       generosos; folga zero significa que o próximo ajuste estoura. */
+    const maior = Math.max(...CLASSES_DE_PRESENTE.map((c) => c.quantidade));
+    const bloco = BONUS_VINCULO_MEDICO + maior + PRESENTE_ENTRE_AMIGAS;
+    expect(bloco).toBeLessThanOrEqual(TETO_BLOCO_DE_BOAS_VINDAS);
+    expect(TETO_BLOCO_DE_BOAS_VINDAS - bloco).toBeLessThanOrEqual(10);
   });
 });
