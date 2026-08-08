@@ -147,6 +147,43 @@ describe("4. os cartões da página de vendas saem da escada", () => {
   });
 });
 
+describe("4b. a quantidade escolhida no site NÃO se perde no caminho", () => {
+  /**
+   * O seletor manda `/medicos/cadastro?mensagens=1500`. Um parâmetro de URL que
+   * ninguém lê é exatamente a promessa morta que este projeto passou a noite
+   * removendo — e esta eu criei sozinho, ao ligar o botão antes de existir quem
+   * o escutasse.
+   *
+   * Entre a escolha e a compra há um cadastro, um e-mail de confirmação e às
+   * vezes um desvio pelo Google. Por isso o número espera no `localStorage`, e
+   * não no estado da rota.
+   */
+  const cadastro = semComentarios("src/routes/medicos_.cadastro.tsx");
+
+  test("o cadastro LÊ o parâmetro e guarda", () => {
+    expect(cadastro).toContain('new URLSearchParams(window.location.search).get("mensagens")');
+    expect(cadastro).toContain("localStorage.setItem(MENSAGENS_ESCOLHIDAS");
+  });
+
+  test("e o seletor abre nela", () => {
+    expect(seletor).toContain("localStorage.getItem(MENSAGENS_ESCOLHIDAS)");
+  });
+
+  test("a chave é uma constante compartilhada, não uma string solta", () => {
+    /* Duas strings iguais em dois arquivos divergem por uma letra, um dia, e
+       ninguém descobre: o número simplesmente para de chegar. */
+    expect(cadastro).toContain("MENSAGENS_ESCOLHIDAS");
+    expect(seletor).toContain("MENSAGENS_ESCOLHIDAS");
+  });
+
+  test("e o valor guardado é conferido contra a escada ao ser lido", () => {
+    /* `localStorage` é do navegador dele e qualquer um edita. Um 99.999 ali
+       abriria a barra fora da faixa e mandaria ao checkout uma quantidade que o
+       servidor recusa — o botão levaria a um erro. */
+    expect(seletor).toContain("n >= ENTRADA_MENSAGENS && n <= TETO_AUTOATENDIMENTO");
+  });
+});
+
 describe("5. a mesada tem tela — e a tela conta a mesma história do servidor", () => {
   /**
    * `getMesada` e `presentearPaciente` estavam escritas, testadas e sem NENHUM

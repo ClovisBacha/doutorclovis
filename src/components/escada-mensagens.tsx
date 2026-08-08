@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   DEGRAUS,
   ENTRADA_MENSAGENS,
+  MENSAGENS_ESCOLHIDAS,
   TETO_AUTOATENDIMENTO,
   centavosPorMensagem,
   descontoVsEntrada,
@@ -79,6 +80,14 @@ const TEMAS = {
 /** Passo do slider. 50 é o maior passo que ainda encosta em todos os degraus. */
 const PASSO = 50;
 
+/**
+ * Onde a barra nasce quando não há escolha anterior.
+ *
+ * Mil, e não a entrada: é o primeiro degrau em que o desconto chega a dois
+ * dígitos, e uma barra que abre no mínimo faz o produto parecer menor do que é.
+ */
+const PADRAO_MENSAGENS = 1_000;
+
 const brl = (centavos: number) =>
   (centavos / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -143,7 +152,31 @@ export function EscadaDeMensagens({
 }) {
   const reduce = useReducedMotion();
   const t = TEMAS[tema];
-  const [mensagens, setMensagens] = useState(1_000);
+  /**
+   * Começa no que ela ESCOLHEU no site, quando houver.
+   *
+   * O seletor da `/medicos` grava a quantidade antes do cadastro; sem ler de
+   * volta aqui, quem arrastou até 1.500 abre o painel em 1.000 e não entende
+   * por quê. A escolha morreria entre a vitrine e a compra.
+   *
+   * Lazy initializer, não `useEffect`: um efeito faria a barra nascer em 1.000
+   * e pular para 1.500 no primeiro quadro — e o número que rola trataria isso
+   * como uma mudança dela, animando um salto que ninguém pediu.
+   */
+  const [mensagens, setMensagens] = useState(() => {
+    try {
+      const bruto = localStorage.getItem(MENSAGENS_ESCOLHIDAS);
+      const n = Number(bruto);
+      /* A faixa é conferida aqui também: o `localStorage` é do navegador dela e
+         qualquer um edita. Fora da escada, cai no padrão. */
+      if (Number.isFinite(n) && n >= ENTRADA_MENSAGENS && n <= TETO_AUTOATENDIMENTO) {
+        return Math.round(n / PASSO) * PASSO;
+      }
+    } catch {
+      /* sem storage (SSR, aba privada): o padrão serve */
+    }
+    return PADRAO_MENSAGENS;
+  });
 
   const dados = useMemo(() => {
     const preco = precoDe(mensagens);

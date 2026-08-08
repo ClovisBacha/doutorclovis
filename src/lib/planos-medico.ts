@@ -78,6 +78,19 @@ export const FAIXAS = [
   { ate: 2_500, centavos: 9 },
 ] as const;
 
+/**
+ * A chave do `localStorage` onde a quantidade escolhida no site espera.
+ *
+ * Entre o seletor da `/medicos` e o checkout do painel há um cadastro, um
+ * e-mail de confirmação e às vezes um desvio pelo Google. Sem um lugar para o
+ * número esperar, a escolha morre no caminho — e a pessoa que arrastou até
+ * 1.500 abre o painel em 1.000 sem entender por quê.
+ *
+ * Mora aqui, junto da escada, para não virar uma string solta repetida em dois
+ * arquivos que um dia divergem por uma letra.
+ */
+export const MENSAGENS_ESCOLHIDAS = "obstetrica:mensagens-escolhidas";
+
 /** O menor pacote — e o preço de entrada. */
 export const ENTRADA_MENSAGENS = 150;
 

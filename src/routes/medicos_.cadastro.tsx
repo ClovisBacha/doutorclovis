@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { MENSAGENS_ESCOLHIDAS } from "@/lib/planos-medico";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { registerDoctor, getMyDoctor } from "@/lib/doctors.functions";
@@ -165,6 +166,25 @@ function CadastroMedicoPage() {
       localStorage.setItem(INTENCAO_MEDICO, String(Date.now()));
     } catch {
       /* sem storage: os outros caminhos ainda funcionam */
+    }
+  }, []);
+
+  /* ─── A QUANTIDADE ESCOLHIDA NO SITE ATRAVESSA O CADASTRO ────────────────
+     O seletor da `/medicos` manda `?mensagens=1500`. Sem esta linha o número
+     morria aqui: ela escolhia o degrau, criava a conta, e o painel abria no
+     padrão — a escolha some entre a vitrine e a compra, que é o defeito
+     clássico de funil (e um parâmetro de URL que ninguém lê é exatamente a
+     promessa morta que este projeto passou a noite removendo).
+
+     `localStorage` e não estado de rota porque entre a escolha e o painel há
+     um cadastro, um e-mail de confirmação e, às vezes, um desvio pelo Google. */
+  useEffect(() => {
+    try {
+      const bruto = new URLSearchParams(window.location.search).get("mensagens");
+      const n = Number(bruto);
+      if (Number.isFinite(n) && n > 0) localStorage.setItem(MENSAGENS_ESCOLHIDAS, String(n));
+    } catch {
+      /* sem storage: o painel abre no padrão, e ela ajusta lá */
     }
   }, []);
 
