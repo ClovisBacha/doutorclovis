@@ -153,7 +153,17 @@ export function MesadaDoMedico({
                 ativa ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-border"
               }`}
             >
-              <p className="text-xl leading-none">{c.emoji}</p>
+              {/* A ilustração no lugar do emoji: as três classes são um
+                  crescendo (broto → buquê → jardim), e é o desenho que faz o
+                  tamanho do presente ser LIDO antes do número. O emoji sozinho
+                  dava três quadradinhos parecidos. `alt=""` porque o nome vem
+                  logo abaixo, em texto. */}
+              <img
+                src={c.imagem}
+                alt=""
+                className="h-14 w-14 rounded-xl object-contain"
+                loading="lazy"
+              />
               <p className="mt-1.5 text-sm font-semibold">
                 {c.nome} · {c.quantidade} 🌱
               </p>

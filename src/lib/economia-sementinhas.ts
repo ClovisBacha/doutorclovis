@@ -176,6 +176,7 @@ export const CLASSES_DE_PRESENTE = [
     emoji: "🌱",
     quantidade: PRESENTE_SUGERIDO,
     efeito: "Um item barato do Cantinho, hoje mesmo",
+    imagem: "/presentes/semente.svg",
   },
   {
     chave: "buque",
@@ -183,6 +184,7 @@ export const CLASSES_DE_PRESENTE = [
     emoji: "💐",
     quantidade: 60,
     efeito: "Um item de faixa média, sem esperar dias",
+    imagem: "/presentes/buque.svg",
   },
   {
     chave: "jardim",
@@ -190,6 +192,7 @@ export const CLASSES_DE_PRESENTE = [
     emoji: "🌷",
     quantidade: 100,
     efeito: "Um item caro do Cantinho, ou quase dois médios",
+    imagem: "/presentes/jardim.svg",
   },
 ] as const;
 

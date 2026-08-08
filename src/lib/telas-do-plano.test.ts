@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   BONUS_VINCULO_MEDICO,
   CLASSES_DE_PRESENTE,
@@ -402,6 +402,23 @@ describe("6. as três classes de presente são calibradas contra a LOJA", () => 
       presenteDeAmiga: PRESENTE_ENTRE_AMIGAS,
     });
     expect(dias).toBeGreaterThanOrEqual(12);
+  });
+
+  test("toda classe tem uma imagem, e o arquivo existe mesmo", () => {
+    /**
+     * O emoji já servia de rótulo; a imagem é o que faz o presente PARECER um
+     * presente na hora de escolher. São SVG (6–28 KB) e não PNG: escalam do
+     * cartãozinho da lista ao cabeçalho da tela de agradecimento sem uma
+     * segunda exportação.
+     *
+     * A asserção que interessa é a do disco. Um caminho digitado errado não
+     * quebra build, não quebra tipo e não quebra teste de unidade: vira um
+     * ícone quebrado na tela da paciente, e só aparece quando alguém olha.
+     */
+    for (const c of CLASSES_DE_PRESENTE) {
+      expect(c.imagem).toBe(`/presentes/${c.chave}.svg`);
+      expect(existsSync(`public${c.imagem}`)).toBe(true);
+    }
   });
 
   test("toda classe tem nome, emoji e efeito declarado", () => {
