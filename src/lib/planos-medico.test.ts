@@ -188,6 +188,18 @@ describe("4. o preço graduado é o mesmo que o Stripe vai calcular", () => {
   });
 });
 
+/**
+ * O preço marginal de uma faixa — `null` na primeira, que é taxa fixa.
+ *
+ * Existe porque `FAIXAS` é uma tupla `as const` cujo primeiro membro tem `fixo`
+ * e os demais têm `centavos`: sem estreitar, o TypeScript recusa `f.centavos`
+ * em cima da união, e um `!` calaria o compilador ao preço de esconder
+ * exatamente o caso que importa (alguém trocar a primeira faixa por unitária).
+ */
+function marginalDe(f: (typeof FAIXAS)[number]): number | null {
+  return "centavos" in f ? f.centavos : null;
+}
+
 describe("4b. o desconto foi para as mensagens DE CIMA", () => {
   /**
    * A queixa que reescreveu a escada: "a partir do momento que a pessoa vai dos
@@ -199,7 +211,7 @@ describe("4b. o desconto foi para as mensagens DE CIMA", () => {
    */
   test("a mensagem 151 quase não é mais barata que a 150", () => {
     const entradaPorMsg = centavosPorMensagem(ENTRADA_MENSAGENS);
-    const primeiraMarginal = FAIXAS[1].centavos!;
+    const primeiraMarginal = marginalDe(FAIXAS[1])!;
     const queda = 1 - primeiraMarginal / entradaPorMsg;
     expect(queda).toBeLessThan(0.1); // era 0,25
   });
@@ -216,7 +228,7 @@ describe("4b. o desconto foi para as mensagens DE CIMA", () => {
   test("o preço marginal NUNCA sobe de uma faixa para a seguinte", () => {
     /* Uma faixa mais cara que a anterior faria comprar MENOS sair mais barato —
        e o slider mostraria o preço caindo enquanto a pessoa arrasta para trás. */
-    const marginais = FAIXAS.slice(1).map((f) => f.centavos!);
+    const marginais = FAIXAS.map(marginalDe).filter((c): c is number => c !== null);
     for (let i = 1; i < marginais.length; i++) {
       expect(marginais[i]).toBeLessThanOrEqual(marginais[i - 1]);
     }
@@ -232,14 +244,15 @@ describe("4b. o desconto foi para as mensagens DE CIMA", () => {
        cima" — palavra do dono. */
     const ultima = FAIXAS[FAIXAS.length - 1];
     const penultima = FAIXAS[FAIXAS.length - 2];
-    expect(ultima.centavos).toBe(PISO_CENTAVOS_POR_MENSAGEM);
+    expect(marginalDe(ultima)).toBe(PISO_CENTAVOS_POR_MENSAGEM);
     expect(penultima.ate).toBe(2_000);
-    expect(penultima.centavos).toBeGreaterThan(PISO_CENTAVOS_POR_MENSAGEM);
+    expect(marginalDe(penultima)!).toBeGreaterThan(PISO_CENTAVOS_POR_MENSAGEM);
   });
 
   test("nenhuma faixa fura o piso", () => {
     for (const f of FAIXAS) {
-      if ("centavos" in f) expect(f.centavos).toBeGreaterThanOrEqual(PISO_CENTAVOS_POR_MENSAGEM);
+      const c = marginalDe(f);
+      if (c !== null) expect(c).toBeGreaterThanOrEqual(PISO_CENTAVOS_POR_MENSAGEM);
     }
   });
 });
