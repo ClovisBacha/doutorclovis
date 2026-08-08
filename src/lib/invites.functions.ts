@@ -273,35 +273,20 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       .eq("id", u.user.id)
       .maybeSingle();
     if (prof && !prof.doctor_id) {
-      /* O TETO DE PACIENTES do plano vale aqui também.
-         
-         Este era o terceiro caminho de vínculo e o único sem a checagem: os
-         outros dois (`respondPatientRequest` e `chooseDoctor`) contam as
-         pacientes antes de ligar mais uma, e este ligava direto. Um médico no
-         Free (5 pacientes) podia passar do teto distribuindo códigos — o
-         limite existia em dois lugares e vazava no terceiro.
-         
-         Passando do teto, o cupom Premium dela continua valendo: ela ganhou o
-         que o código prometia. O que não acontece é o vínculo — e é o médico
-         que precisa resolver isso, fazendo upgrade. */
-      let podeVincular = true;
-      try {
-        const { getEntitlementsByDoctorId } = await import("./entitlements.server");
-        const ent = await getEntitlementsByDoctorId(row.doctor_id as string);
-        if (ent.maxPatients != null) {
-          const { count, error: cntErr } = await (supabaseAdmin as any)
-            .from("patient_profiles")
-            .select("id", { count: "exact", head: true })
-            .eq("doctor_id", row.doctor_id);
-          /* Fail-CLOSED: se a contagem falhar, não vincula. O outro caminho
-             erra para o lado de vincular; aqui, sem interação humana do outro
-             lado, o silêncio tem de ser o lado seguro. */
-          if (cntErr || (count ?? 0) >= ent.maxPatients) podeVincular = false;
-        }
-      } catch {
-        podeVincular = false;
-      }
-      if (podeVincular) {
+      /* ─── O TETO DE PACIENTES SAIU DO PRODUTO ─────────────────────────────
+         Havia aqui uma contagem que recusava o vínculo quando o médico batia no
+         teto do plano — e o comentário contava com orgulho que este era o
+         terceiro caminho, antes o único sem a checagem.
+
+         O eixo "número de pacientes" deixou de existir: `maxPatients` é `null`
+         em todos os planos, inclusive no Free. A medição mostrou que ele nunca
+         protegeu o que se pensava (R$ 0,024 por paciente/mês, menos que UMA
+         mensagem de IA); o que custa é o modelo, e o modelo já está fechado
+         atrás do plano. Ver `docs/custo-de-infraestrutura.md`.
+
+         `semVaga` continua no retorno e continua sendo `true` quando a ESCRITA
+         do vínculo falha — que é o outro motivo, real, de ela sair sem médico. */
+      {
         /* O vínculo é o que o médico comprou ao distribuir o código. Se ele
            não gravar, ela sai "premium sem médico" e ninguém fica sabendo —
            nem ela, que viu "código aplicado", nem ele, que contou com a
@@ -329,12 +314,6 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
           const { bonusDeVinculo } = await import("@/lib/sementinhas.functions");
           await bonusDeVinculo(supabaseAdmin, u.user.id, row.doctor_id as string);
         }
-      } else {
-        /* Não vinculou porque o plano dele está no teto. Ela precisa saber:
-           antes a tela dizia "código aplicado" e ela ficava sem médico sem
-           entender por quê — e ele nunca soube que perdeu uma paciente para o
-           próprio limite. O Premium dela continua valendo. */
-        semVaga = true;
       }
     }
 

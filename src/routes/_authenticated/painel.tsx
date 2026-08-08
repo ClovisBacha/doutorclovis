@@ -10699,11 +10699,11 @@ function PacientesSection({
         data: { accessToken: tk, requestId: req.id, accept },
       });
       if (!res.ok) {
-        toast.error(
-          "reason" in res && res.reason === "limit"
-            ? `Limite do plano ${res.plan} atingido (${res.limit} pacientes). Faça upgrade em Meu Perfil para aceitar mais pacientes.`
-            : "Não foi possível responder à solicitação. Tente novamente.",
-        );
+        /* O ramo `reason === "limit"` saiu junto com o teto de pacientes:
+           `maxPatients` é `null` em todos os planos, o servidor não devolve
+           mais esse motivo, e a frase mandava o médico "fazer upgrade para
+           aceitar mais pacientes" — um upgrade que não existe. */
+        toast.error("Não foi possível responder à solicitação. Tente novamente.");
         return;
       }
       // Remove o card otimisticamente e, ao aceitar, atualiza as pacientes.

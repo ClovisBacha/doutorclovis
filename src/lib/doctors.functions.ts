@@ -1181,17 +1181,17 @@ export const chooseDoctor = createServerFn({ method: "POST" })
     const entDoc = docUser?.user
       ? await getEntitlements(docUser.user)
       : entitlementsFor(planoEfetivo);
-    const limit = entDoc.maxPatients;
-    if (limit != null) {
-      const { count, error: cntErr } = await (supabaseAdmin as any)
-        .from("patient_profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("doctor_id", data.doctorId);
-      // Falha fechada: erro de contagem não vira teto infinito.
-      if (cntErr || (count ?? 0) >= limit) {
-        return { ok: false as const, error: "medico_lotado" };
-      }
-    }
+    /* ─── O TETO DE PACIENTES SAIU DO PRODUTO ──────────────────────────────
+       Havia aqui a quarta e última contagem de `patient_profiles`, que recusava
+       o vínculo com "Este médico já atingiu o limite de pacientes". O eixo
+       deixou de existir: `maxPatients` é `null` em todos os planos.
+
+       A medição fechou o argumento — R$ 0,024 por paciente/mês, menos que UMA
+       mensagem de IA. O que custa é o modelo, e o modelo já está fechado atrás
+       do plano. Ver `docs/custo-de-infraestrutura.md`.
+
+       `entDoc` continua sendo lido acima: ele resolve o plano VIGENTE, que
+       outras decisões desta função usam. */
     // Garante que a paciente tem perfil (linha em patient_profiles): faz o
     // upsert por id (PK = uid), assim o vínculo grava mesmo se a linha ainda
     // não existir, e confirmamos que uma linha foi de fato afetada.

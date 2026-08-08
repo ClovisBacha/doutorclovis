@@ -170,11 +170,11 @@ function EncontrarMedicoPage() {
       toast.success(`${d.display_name} agora é o seu médico 💛`);
       navigate({ to: "/minha-conta" });
     } else {
-      toast.error(
-        res.error === "medico_lotado"
-          ? "Este médico já atingiu o limite de pacientes. Escolha outro."
-          : "Não foi possível escolher este médico agora.",
-      );
+      /* "Este médico já atingiu o limite de pacientes. Escolha outro." saiu
+         com o teto: nenhum plano tem limite de pacientes, o servidor não
+         devolve mais esse erro, e mandar a gestante procurar OUTRO obstetra
+         por um limite que não existe é o pior desfecho possível desta tela. */
+      toast.error("Não foi possível escolher este médico agora.");
     }
   }
 

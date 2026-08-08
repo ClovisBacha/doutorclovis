@@ -8,16 +8,18 @@
  * O card "Pro Equipe" da página de vendas corresponde ao plano `clinica`.
  * Plano desconhecido cai em `free` (o mais restritivo) — nunca libera demais.
  *
- * As capacidades espelham exatamente o que é prometido em /medicos.
- * Escada de LIMITES (pacientes por médico · cérebros por conta):
- *   - Free:    5 pacientes  · 1 médico  · SEM IA (organiza o consultório).
- *   - Starter: 50 pacientes · 1 cérebro · IA no app.
- *   - Pro:     150 pacientes · 1 cérebro · IA também no WhatsApp.
- *   - Elite:   300 pacientes/médico · até 5 cérebros (equipe) + 25 convites.
- *   - Black:   500 pacientes/médico · até 20 cérebros + 250 convites + topo.
- *   - Clínica: personalizado (orçamento por contrato) — vários médicos,
- *              sem tetos rígidos; painel operando cada cérebro individualmente.
- *   - Trial:   experimenta o Pro por tempo limitado.
+ * ─── NÃO HÁ MAIS TETO DE PACIENTES, EM NENHUM PLANO ────────────────────────
+ *
+ * `maxPatients` é `null` em todos. O eixo saiu do produto por decisão do dono, e
+ * a medição confirmou que ele nunca protegeu nada que importasse: uma paciente
+ * ativa custa R$ 0,024 por mês em banco, egresso e funções somados — menos que
+ * UMA mensagem de IA (R$ 0,027). Ver `docs/custo-de-infraestrutura.md`.
+ *
+ * O campo continua existindo porque a tela lê e o contrato de Clínica pode um
+ * dia precisar dele. O que não existe mais é um plano que o use.
+ *
+ * O que separa os planos hoje: a IA. Free não tem; os demais têm, e o quanto
+ * vem da quantidade comprada.
  *
  * ─── O QUE SE VENDE HOJE É `mensagens` ──────────────────────────────────────
  * Os planos nomeados acima são LEGADO: continuam na tabela porque há médicos
@@ -49,10 +51,16 @@ export type Entitlements = {
   aiApp: boolean;
   /** Agente de IA atende e agenda no WhatsApp. */
   aiWhatsapp: boolean;
-  /** Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia). */
-  clinicalToolsAdvanced: boolean;
-  /** Dashboard avançado (FAQ inteligente, risco de abandono). */
-  dashboardAdvanced: boolean;
+  /* ─── `clinicalToolsAdvanced` e `dashboardAdvanced` SAÍRAM ────────────────
+     Eram dois booleanos da tabela de capacidades, e uma varredura no
+     repositório não achou UM consumidor fora deste arquivo. Nenhuma tela lia,
+     nenhum gate checava: o Free "não tinha ferramentas clínicas avançadas" e
+     usava todas elas.
+
+     Uma bandeira que não bloqueia nada é pior que uma ausente — ela faz a
+     tabela mentir sobre o próprio produto, e quem lê para decidir um plano
+     decide errado. Se um dia essas ferramentas virarem diferencial de plano,
+     o campo volta junto com o gate que o aplica, não antes. */
   /** Suporte prioritário. */
   prioritySupport: boolean;
   /** Vários médicos numa conta só (assentos de equipe). */
@@ -81,14 +89,46 @@ export type Entitlements = {
   aiRepliesPerCycle: number | null;
 };
 
+/**
+ * FREE — a plataforma de gestão inteira, sem a IA.
+ *
+ * ─── O QUE MUDOU, E POR QUE ESTAVA ERRADO ANTES ─────────────────────────────
+ *
+ * Ele tinha teto de 5 PACIENTES e duas bandeiras desligadas
+ * (`clinicalToolsAdvanced`, `dashboardAdvanced`). As três saíram, por razões
+ * diferentes:
+ *
+ *  · **O teto de 5 pacientes** existia como limite de negócio numa época em que
+ *    o plano se vendia por número de gestantes. Esse eixo saiu do produto. E o
+ *    que ele passou a fazer, na prática, era outra coisa: era a única coisa que
+ *    limitava o vazamento do chat, que chamava o modelo mesmo sem plano. Esse
+ *    vazamento foi fechado no `chat.ts` — sem plano, sem chamada de modelo — e
+ *    com ele fechado o teto perdeu a função. Cinco pacientes também tornavam o
+ *    Free inútil como plataforma de gestão, que é justamente o que ele precisa
+ *    ser para atrair quem depois assina.
+ *
+ *  · **As duas bandeiras avançadas não bloqueavam nada.** Uma varredura no
+ *    repositório não achou UM consumidor fora deste arquivo: elas eram
+ *    decorativas, e uma tabela de capacidades que mente sobre o próprio produto
+ *    é pior que uma incompleta. Ligadas, dizem a verdade.
+ *
+ * ─── E O CUSTO DISSO? MEDIDO ────────────────────────────────────────────────
+ *
+ * R$ 0,024 por paciente ativa por mês — banco, egresso e funções somados; menos
+ * que UMA mensagem de IA. Um médico no Free com 20 pacientes custa R$ 0,47 por
+ * mês; com 100, R$ 2,36. A conta inteira está em
+ * `docs/custo-de-infraestrutura.md`.
+ *
+ * Free não é o problema de custo. A IA é — e a IA fica atrás do plano.
+ */
 const FREE: Entitlements = {
   label: "Free",
-  maxPatients: 5,
+  /* Sem teto: o eixo "número de pacientes" saiu do produto inteiro. */
+  maxPatients: null,
   maxBrains: 1,
+  /* A ÚNICA coisa que o Free não tem, e a única que custa dinheiro. */
   aiApp: false,
   aiWhatsapp: false,
-  clinicalToolsAdvanced: false,
-  dashboardAdvanced: false,
   prioritySupport: false,
   teamSeats: false,
   premiumInvitesPerMonth: 0,
@@ -150,12 +190,10 @@ const FREE: Entitlements = {
  */
 const ESSENCIAL: Entitlements = {
   label: "Essencial",
-  maxPatients: 15,
+  maxPatients: null,
   maxBrains: 1,
   aiApp: true,
   aiWhatsapp: false,
-  clinicalToolsAdvanced: false,
-  dashboardAdvanced: false,
   prioritySupport: false,
   teamSeats: false,
   premiumInvitesPerMonth: 0,
@@ -167,12 +205,10 @@ const ESSENCIAL: Entitlements = {
 
 const STARTER: Entitlements = {
   label: "Starter",
-  maxPatients: 50,
+  maxPatients: null,
   maxBrains: 1,
   aiApp: true,
   aiWhatsapp: false,
-  clinicalToolsAdvanced: true,
-  dashboardAdvanced: false,
   prioritySupport: false,
   teamSeats: false,
   premiumInvitesPerMonth: 0,
@@ -183,12 +219,10 @@ const STARTER: Entitlements = {
 
 const PRO: Entitlements = {
   label: "Pro",
-  maxPatients: 150,
+  maxPatients: null,
   maxBrains: 1,
   aiApp: true,
   aiWhatsapp: true,
-  clinicalToolsAdvanced: true,
-  dashboardAdvanced: true,
   prioritySupport: true,
   teamSeats: false,
   premiumInvitesPerMonth: 0,
@@ -201,7 +235,7 @@ const PRO: Entitlements = {
 const ELITE: Entitlements = {
   ...PRO,
   label: "Reconhecido",
-  maxPatients: 300,
+  maxPatients: null,
   maxBrains: 5,
   teamSeats: true,
   premiumInvitesPerMonth: 25,
@@ -214,7 +248,7 @@ const ELITE: Entitlements = {
 const BLACK: Entitlements = {
   ...ELITE,
   label: "Black",
-  maxPatients: 500,
+  maxPatients: null,
   maxBrains: 20,
   premiumInvitesPerMonth: 250,
   badge: "Black",
@@ -285,8 +319,6 @@ const MENSAGENS: Entitlements = {
   maxBrains: 1,
   aiApp: true,
   aiWhatsapp: true,
-  clinicalToolsAdvanced: true,
-  dashboardAdvanced: true,
   prioritySupport: true,
   /* Equipe e gerente dedicado são o que separa este plano do contrato de
      Clínica — sem isso, Clínica não teria o que vender. */

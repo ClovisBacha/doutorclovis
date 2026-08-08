@@ -151,32 +151,18 @@ export const requestDoctor = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) return { ok: true as const, status: "pending" as const };
 
-    /* O teto do plano dele é checado AQUI, não só na hora do aceite.
-       
-       Antes, uma paciente pedia, o médico tentava aceitar, batia no limite — e
-       o pedido ficava `pending` para sempre. Ela via "aguardando aceitar" sem
-       fim e sem explicação, e nem podia buscar outro médico (a tela esconde a
-       busca enquanto há pendência). Recusar na hora, com motivo, deixa ela
-       procurar outro obstetra em vez de esperar por nada. */
-    try {
-      const { getEntitlementsByDoctorId } = await import("./entitlements.server");
-      const ent = await getEntitlementsByDoctorId(data.doctorId);
-      if (ent.maxPatients != null) {
-        const { count, error: cntErr } = await (supabaseAdmin as any)
-          .from("patient_profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("doctor_id", data.doctorId);
-        /* Falha FECHADA. Antes era `!cntErr && …`: qualquer falha da contagem
-           (timeout, RLS, tabela indisponível) fazia `count` virar null, o teto
-           desaparecer e o vínculo passar. Um limite que se desliga sozinho no
-           primeiro erro de rede não é um limite. */
-        if (cntErr || (count ?? 0) >= ent.maxPatients) {
-          return { ok: false as const, reason: "lotado" as const };
-        }
-      }
-    } catch {
-      /* não bloqueia por falha na contagem: o aceite ainda checa */
-    }
+    /* ─── O TETO DE PACIENTES SAIU DO PRODUTO ────────────────────────────────
+       Havia aqui uma contagem de `patient_profiles` que barrava o vínculo
+       quando o médico batia no teto do plano. O eixo "número de pacientes"
+       deixou de existir: `maxPatients` é `null` em todos os planos, inclusive
+       no Free.
+
+       E a medição confirmou que ele nunca protegeu o que se pensava — uma
+       paciente ativa custa R$ 0,024 por mês em banco, egresso e funções
+       somados, menos que UMA mensagem de IA. O que custa é o modelo, e o modelo
+       já está fechado atrás do plano (`chat.ts`: sem plano, sem chamada).
+
+       Ver `docs/custo-de-infraestrutura.md`. */
 
     const { error } = await (supabaseAdmin as any).from("patient_link_requests").insert({
       patient_id: user.id,
@@ -411,30 +397,16 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
     };
 
     if (data.accept) {
-      // Escada de planos: cada plano tem um teto de pacientes ativas por
-      // médico (Free 5 → Starter 50 → Pro 150 → Elite 300 → Black/Clínica
-      // 500). Ao atingir o teto, o aceite é bloqueado com o motivo — a
-      // solicitação fica pendente e o médico faz upgrade para aceitar.
-      const { getEntitlements } = await import("./entitlements.server");
-      const ent = await getEntitlements(user);
-      if (ent.maxPatients != null) {
-        const { count, error: cntErr } = await (supabaseAdmin as any)
-          .from("patient_profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("doctor_id", user.id);
-        // Falha fechada, igual ao aceite: erro de contagem não abre o teto.
-        if (cntErr || (count ?? 0) >= ent.maxPatients) {
-          // Teto do plano: a solicitação volta a pendente para ele aceitar
-          // depois do upgrade, em vez de sumir.
-          await desfazer();
-          return {
-            ok: false as const,
-            reason: "limit" as const,
-            limit: ent.maxPatients,
-            plan: ent.label,
-          };
-        }
-      }
+      /* ─── O TETO DE PACIENTES SAIU DO PRODUTO ────────────────────────────────
+         Havia aqui uma contagem de `patient_profiles` que barrava o vínculo
+         quando o médico batia no teto do plano. O eixo "número de pacientes"
+         deixou de existir: `maxPatients` é `null` em todos os planos, inclusive
+         no Free.
+         E a medição confirmou que ele nunca protegeu o que se pensava — uma
+         paciente ativa custa R$ 0,024 por mês em banco, egresso e funções
+         somados, menos que UMA mensagem de IA. O que custa é o modelo, e o modelo
+         já está fechado atrás do plano (`chat.ts`: sem plano, sem chamada).
+         Ver `docs/custo-de-infraestrutura.md`. */
       // Vincula a paciente ao médico (denormalizado em patient_profiles).
       const { error: linkErr } = await (supabaseAdmin as any)
         .from("patient_profiles")

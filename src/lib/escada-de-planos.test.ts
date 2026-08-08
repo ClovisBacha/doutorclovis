@@ -97,8 +97,6 @@ describe("para todo par de planos, o de cima entrega pelo menos o de baixo", () 
         for (const campo of [
           "aiApp",
           "aiWhatsapp",
-          "clinicalToolsAdvanced",
-          "dashboardAdvanced",
           "prioritySupport",
           "teamSeats",
           "dedicatedManager",
@@ -148,13 +146,7 @@ describe("a escada tem os degraus que o produto vende", () => {
       /* A comparação que FAZ sentido: as capacidades. Só `teamSeats` e
          `dedicatedManager` ficam de fora, e de propósito — é o que sobra para o
          contrato de Clínica vender. */
-      for (const campo of [
-        "aiApp",
-        "aiWhatsapp",
-        "clinicalToolsAdvanced",
-        "dashboardAdvanced",
-        "prioritySupport",
-      ] as const) {
+      for (const campo of ["aiApp", "aiWhatsapp", "prioritySupport"] as const) {
         expect(m[campo]).toBe(true);
       }
       expect(m.teamSeats).toBe(false);

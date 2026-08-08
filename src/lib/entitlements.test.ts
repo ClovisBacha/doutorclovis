@@ -114,16 +114,10 @@ describe("o Essencial é o primeiro degrau pago", () => {
     expect(PLAN_ENTITLEMENTS.free.aiApp).toBe(false);
   });
 
-  test("cabe ENTRE o Free e o Starter em pacientes", () => {
-    expect(e.maxPatients).toBeGreaterThan(PLAN_ENTITLEMENTS.free.maxPatients!);
-    expect(e.maxPatients).toBeLessThan(PLAN_ENTITLEMENTS.starter.maxPatients!);
-  });
-
-  test("o Starter continua tendo duas razões de existir", () => {
-    /* Mais pacientes E as ferramentas clínicas avançadas. Sem a segunda, a
-       única diferença seria o número — e aí o Essencial canibaliza. */
-    expect(e.clinicalToolsAdvanced).toBe(false);
-    expect(PLAN_ENTITLEMENTS.starter.clinicalToolsAdvanced).toBe(true);
+  test("não tem mais teto de pacientes — nenhum plano tem", () => {
+    /* Ele nasceu com 15 pacientes, e o eixo saiu do produto inteiro. Um plano
+       PAGO com teto enquanto o Free é ilimitado seria punir quem paga. */
+    for (const p of TODOS) expect(PLAN_ENTITLEMENTS[p].maxPatients).toBeNull();
   });
 
   test("não invade o que é do Pro para cima", () => {

@@ -1048,6 +1048,64 @@ export const Route = createFileRoute("/api/chat")({
           cobertura = brain.hadCoverage;
           similaridade = brain.melhorSimilaridade;
           gravacaoDaLacuna = brain.gravacaoDaLacuna;
+
+          /* ─── O PORTÃO DO FREE: SEM PLANO, SEM CHAMADA DE MODELO ────────────
+           *
+           * "O plano free a gente vai oferecer tudo que aquelas plataformas
+           * oferecem — todas aquelas questões que NÃO TÊM CUSTO." Decisão do
+           * dono, e este era o único lugar onde ela ainda não valia.
+           *
+           * ─── O QUE ACONTECIA ANTES ────────────────────────────────────────
+           *
+           * `semPlano` só trocava o PROMPT: o modelo era chamado do mesmo jeito,
+           * respondia com informação geral, e a plataforma pagava. Um médico no
+           * Free com 50 pacientes custava R$ 20 por mês em modelo — quarenta
+           * vezes o que custa a infraestrutura inteira dele
+           * (`docs/custo-de-infraestrutura.md`: R$ 0,024 por paciente/mês).
+           *
+           * ─── POR QUE ISTO É SEGURO, E ONTEM EU ACHEI QUE NÃO FOSSE ────────
+           *
+           * A trava que me impedia era esta: sem chamar o modelo, ninguém
+           * TRIAGE o texto dela — e calar uma emergência às 3 da manhã para
+           * economizar centavos é a troca errada num app de alto risco.
+           *
+           * O erro do raciocínio foi supor que a mensagem precisa DETECTAR
+           * urgência. Não precisa: ela carrega a orientação de emergência
+           * SEMPRE, em toda resposta, para toda pergunta. Quem está passando
+           * mal lê o caminho do pronto-socorro na primeira linha; quem não
+           * está, ignora. Não há caso em que a instrução falte — que é uma
+           * garantia mais forte do que qualquer triagem por palavra-chave, e
+           * não depende de a régua clínica ser duplicada fora de
+           * `sinais-clinicos.ts`.
+           *
+           * A dúvida dela CONTINUA sendo registrada para o médico (a lacuna já
+           * foi gravada acima, antes deste ponto). O que muda é só que a
+           * plataforma não paga um modelo para responder por um plano que não
+           * inclui modelo. */
+          if (brain.semPlano) {
+            const comoFalar = patient.doctorWhatsapp
+              ? `pelo WhatsApp do consultório (${patient.doctorWhatsapp})`
+              : "pela aba Consultas do app, que chega direto ao consultório";
+            const dele = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
+            const texto = [
+              `Se for algo urgente — sangramento, dor forte, febre, falta de ar, ou a sensação de que algo está muito errado — procure atendimento AGORA: ligue 192 (SAMU) ou vá à maternidade. Isso vale sempre, a qualquer hora.`,
+              ``,
+              `Sobre a sua dúvida: as respostas pela IA não fazem parte do acompanhamento de ${dele} neste momento. **Registrei a sua pergunta para ele ver** — e o caminho mais rápido hoje é falar direto com ele, ${comoFalar}.`,
+              ``,
+              `O resto do app continua todo seu: o diário, os movimentos do bebê, os exames, o álbum e a sua jornada 💛`,
+            ].join("\n");
+
+            const { createUIMessageStream, createUIMessageStreamResponse } = await import("ai");
+            return createUIMessageStreamResponse({
+              stream: createUIMessageStream({
+                execute: async ({ writer }) => {
+                  writer.write({ type: "text-start", id: "sem-plano" });
+                  writer.write({ type: "text-delta", id: "sem-plano", delta: texto });
+                  writer.write({ type: "text-end", id: "sem-plano" });
+                },
+              }),
+            });
+          }
           const memoria = memoryBlock(memorySummary, patient.careMode);
           const base = medicalSystemPrompt(patient.doctorName, patient.careMode);
           const medico = patient.doctorName ? `o(a) ${patient.doctorName}` : "o seu médico";
