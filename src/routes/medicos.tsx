@@ -6,6 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Reveal } from "@/components/reveal";
 import { SpotlightCard } from "@/components/motion-fx";
 import { PricingGlass, type PricingGlassTier } from "@/components/ui/pricing-glass";
+import { EscadaDeMensagens } from "@/components/escada-mensagens";
+import {
+  DEGRAUS_DESTAQUE,
+  descontoVsEntrada,
+  gestantesAtendidas,
+  precoDe,
+} from "@/lib/planos-medico";
 
 export const Route = createFileRoute("/medicos")({
   head: () => ({
@@ -23,18 +30,28 @@ export const Route = createFileRoute("/medicos")({
   component: MedicosPage,
 });
 
-// monthly = preço MENSAL do degrau, em reais. Não há plano anual: a escada tem
-// um Price graduado só, mensal — e mostrar um preço anual sem Price atrás dele
-// seria a tela prometer o que o checkout não cobra.
-//
-// Os três degraus pagos são recortes da MESMA escada (150 / 600 / 1.500
-// mensagens); o checkout do Stripe deixa ajustar para qualquer número até
-// 2.500. Os preços vêm de `precoDe` em `src/lib/planos-medico.ts`, e há teste
-// que trava os dois juntos.
-//
-// Regra de ouro dos planos: cada bullet é algo que o produto FAZ hoje (ou é
-// entregue com implantação assistida, e diz isso). Nada de promessa vaga,
-// número inventado ou recurso de roadmap vendido como pronto.
+// Não há plano ANUAL: a escada tem um Price graduado só, mensal — mostrar um
+// preço anual sem Price atrás dele seria a tela prometer o que o checkout não
+// cobra.
+/**
+ * Os cartões da escada.
+ *
+ * `monthly` NÃO é escrito à mão: sai de `precoDe`, a mesma função que o
+ * checkout usa e que o teste trava contra as camadas do Stripe. Um número
+ * digitado aqui seria a segunda tabela de preços — e é assim que a tela promete
+ * um valor e a fatura cobra outro.
+ *
+ * São três cartões e dez degraus: o resto vive no seletor logo acima deles
+ * (`EscadaDeMensagens`), onde o médico arrasta e vê preço, desconto e gestantes
+ * mudarem ao vivo.
+ *
+ * Regra de ouro dos planos: cada bullet é algo que o produto FAZ hoje (ou é
+ * entregue com implantação assistida, e diz isso). Nada de promessa vaga,
+ * número inventado ou recurso de roadmap vendido como pronto.
+ */
+const [ENTRADA, MEIO, TOPO] = DEGRAUS_DESTAQUE;
+const reais = (centavos: number) => centavos / 100;
+
 const PLANS = [
   {
     key: "free",
@@ -54,53 +71,56 @@ const PLANS = [
     cta: "Criar conta grátis",
   },
   {
-    key: "mensagens_150",
+    key: "mensagens_entrada",
+    mensagens: ENTRADA,
     name: "Consultório",
     tagline: "A sua IA atendendo",
-    monthly: 29.9,
+    monthly: reais(precoDe(ENTRADA)),
     isFrom: false,
     perSuffix: "",
     highlight: false,
     desc: "Uma IA treinada nas SUAS respostas atende suas pacientes no app — você para de repetir as mesmas orientações.",
     features: [
-      "💬 150 mensagens de IA por mês — sai a R$ 0,20 por resposta sua",
+      `💬 ${ENTRADA} mensagens de IA por mês · cerca de ${gestantesAtendidas(ENTRADA)} gestantes`,
       "👩‍🍼 Pacientes ILIMITADAS — o teto é de mensagens, não de gente",
       "IA com as suas respostas, 24h no app",
       "Pré-consulta digital + monitoramento (peso, pressão, chutes)",
     ],
-    cta: "Começar por R$ 29,90",
+    cta: `Começar por R$ ${reais(precoDe(ENTRADA)).toFixed(2).replace(".", ",")}`,
   },
   {
-    key: "mensagens_600",
+    key: "mensagens_meio",
+    mensagens: MEIO,
     name: "Movimento",
     tagline: "Para quem já tem volume",
-    monthly: 97.4,
+    monthly: reais(precoDe(MEIO)),
     isFrom: false,
     perSuffix: "",
     highlight: true,
-    desc: "O mesmo produto inteiro, com quatro vezes mais conversa — e a mensagem 18% mais barata.",
+    desc: "O mesmo produto inteiro, com muito mais conversa — e a mensagem mais barata a cada degrau que você sobe.",
     features: [
-      "💬 600 mensagens de IA por mês — R$ 0,16 por resposta (18% off)",
-      "👩‍🍼 Pacientes ilimitadas · 🧠 o seu cérebro",
+      `💬 ${MEIO.toLocaleString("pt-BR")} mensagens por mês · ${descontoVsEntrada(MEIO)}% mais barata cada uma`,
+      `👩‍🍼 Cerca de ${gestantesAtendidas(MEIO)} gestantes ativas · pacientes ilimitadas`,
       "Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia)",
       "Dashboard do consultório: dúvidas frequentes e engajamento",
     ],
     cta: "Assinar Movimento",
   },
   {
-    key: "mensagens_1500",
+    key: "mensagens_topo",
+    mensagens: TOPO,
     name: "Alto risco",
     tagline: "Conversa o dia inteiro",
-    monthly: 205.4,
+    monthly: reais(precoDe(TOPO)),
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "Para quem acompanha gestação de alto risco: a paciente pergunta quando precisa, e você não paga por isso duas vezes.",
+    desc: "Para quem acompanha gestação de alto risco: a paciente pergunta quando precisa, e a mensagem chega ao preço mais baixo da escada.",
     features: [
-      "💬 1.500 mensagens de IA por mês — R$ 0,14 por resposta (31% off)",
-      "👩‍🍼 Pacientes ilimitadas · triagem de urgência com orientação SAMU/UPA",
+      `💬 ${TOPO.toLocaleString("pt-BR")} mensagens por mês · ${descontoVsEntrada(TOPO)}% mais barata cada uma`,
+      `👩‍🍼 Cerca de ${gestantesAtendidas(TOPO)} gestantes ativas · triagem de urgência com SAMU/UPA`,
       "💬 IA atende e agenda no WhatsApp (implantação assistida)",
-      "🎚️ Precisa de mais? Ajuste até 2.500 (R$ 295,40) no próprio checkout",
+      "🎚️ Qualquer número entre os degraus, no seletor acima",
     ],
     cta: "Assinar Alto risco",
   },
@@ -116,7 +136,7 @@ const PLANS = [
     desc: "A clínica inteira num painel só: vários médicos, cada um com o próprio Segundo Cérebro — operados individualmente. Preço personalizado pelo tamanho da sua equipe.",
     features: [
       "🏥 Painel da clínica: opere o cérebro de cada médico individualmente",
-      "💬 Acima de 2.500 mensagens/mês, o volume é contratado — não tabelado",
+      `💬 Acima de ${TOPO.toLocaleString("pt-BR")} mensagens/mês, o volume é contratado — não tabelado`,
       "📊 Relatório mensal por médico (cobertura e satisfação da IA)",
       "👤 Gerente dedicado + onboarding e migração assistidos",
     ],
@@ -719,6 +739,23 @@ function MedicosPage() {
             )}
           </Reveal>
 
+          {/* ─── O SELETOR, ANTES DOS CARTÕES ──────────────────────────────
+              Os cartões mostram três degraus; a escada tem dez. Sem isto, quem
+              queria 1.250 mensagens não via o preço em lugar nenhum antes de
+              abrir o Stripe — e o meio da escada é exatamente onde ela foi
+              desenhada para levar a pessoa. */}
+          <Reveal>
+            <EscadaDeMensagens
+              className="mt-8"
+              onEscolher={(mensagens) => {
+                /* Carrega a quantidade para o cadastro; de lá ela segue para o
+                   checkout. Sem isto o botão do seletor levaria a pessoa para
+                   um fluxo que esquece o número que ela acabou de escolher. */
+                window.location.href = `/medicos/cadastro?mensagens=${mensagens}`;
+              }}
+            />
+          </Reveal>
+
           {(() => {
             /* ─── SEM ALTERNADOR ANUAL, E ISSO É CORREÇÃO ────────────────────
                A escada de mensagens é MENSAL: existe um Price graduado só, e
@@ -751,14 +788,21 @@ function MedicosPage() {
                 isPopular: plan.highlight,
                 features: plan.features,
                 ctaLabel: plan.cta,
-                ctaHref: plan.key === "enterprise" ? "#contato" : "/medicos/cadastro",
+                /* O cartão leva a quantidade DELE — senão os três botões caem
+                   no mesmo cadastro sem número e o degrau escolhido se perde. */
+                ctaHref:
+                  plan.key === "enterprise"
+                    ? "#contato"
+                    : "mensagens" in plan
+                      ? `/medicos/cadastro?mensagens=${(plan as { mensagens: number }).mensagens}`
+                      : "/medicos/cadastro",
               };
             });
             return (
               <PricingGlass
                 className="mt-8"
                 tiers={glassTiers}
-                toggleNote="🎚️ Precisa de um número no meio? Ajuste as mensagens no próprio checkout — o preço acompanha, de R$ 29,90 a R$ 295,40."
+                toggleNote="🎚️ Qualquer número entre os degraus: use o seletor acima, ou ajuste no próprio checkout."
               />
             );
           })()}

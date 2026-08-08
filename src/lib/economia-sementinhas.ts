@@ -147,6 +147,55 @@ export function mesadaDoMedico(mensagensContratadas: number): number {
 export const PRESENTE_SUGERIDO = 50;
 
 /**
+ * AS TRÊS CLASSES DE PRESENTE.
+ *
+ * ─── POR QUE TRÊS, E NÃO UM CAMPO DE DIGITAR ────────────────────────────────
+ *
+ * Um campo livre obriga o médico a inventar um número, e ele não tem como saber
+ * se 50 é muito ou pouco — o valor só significa alguma coisa contra a LOJA, que
+ * ele nunca viu. Três classes com nome e efeito declarado transformam a escolha
+ * em "o que eu quero que aconteça com ela", que é a decisão que ele sabe tomar.
+ *
+ * ─── OS VALORES SAEM DA LOJA, NÃO DO GOSTO ──────────────────────────────────
+ *
+ * A loja grátis inteira custa `CUSTO_LOJA_GRATIS` (704 🌱) e o item mais caro
+ * dela é o troféu de 200 🌱.
+ *
+ *   · Semente (50)  — um item barato na hora, ou meio dia de ganho típico.
+ *   · Buquê (150)   — o suficiente para um item de faixa média sem esperar.
+ *   · Jardim (300)  — passa do troféu da loja grátis: é o presente que a leva a
+ *                     olhar a prateleira premium, que é o ponto do desenho.
+ *
+ * Nenhum deles chega perto da loja inteira, de propósito: presente do médico
+ * ACELERA a caminhada até a parede dos quinze dias, nunca a substitui.
+ */
+export const CLASSES_DE_PRESENTE = [
+  {
+    chave: "semente",
+    nome: "Semente",
+    emoji: "🌱",
+    quantidade: PRESENTE_SUGERIDO,
+    efeito: "Um item barato do Cantinho, hoje mesmo",
+  },
+  {
+    chave: "buque",
+    nome: "Buquê",
+    emoji: "💐",
+    quantidade: 150,
+    efeito: "Um item de faixa média, sem esperar dias",
+  },
+  {
+    chave: "jardim",
+    nome: "Jardim",
+    emoji: "🌷",
+    quantidade: 300,
+    efeito: "Passa do troféu da loja grátis — ela vai olhar o Premium",
+  },
+] as const;
+
+export type ClasseDePresente = (typeof CLASSES_DE_PRESENTE)[number];
+
+/**
  * Quantos dias até ela ter comprado TODOS os itens grátis.
  *
  * Devolve `Infinity` se o ganho for zero — nunca um número enganosamente

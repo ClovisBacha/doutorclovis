@@ -70,6 +70,8 @@ import {
 } from "@/lib/dinheiro";
 import { pendenciasDoMedico, type Pendencia } from "@/lib/doctor-required";
 import { mensalidadeCentavos } from "@/lib/entitlements";
+import { EscadaDeMensagens } from "@/components/escada-mensagens";
+import { MesadaDoMedico } from "@/components/mesada-do-medico";
 import {
   listMyAddresses,
   saveMyAddress,
@@ -1325,7 +1327,11 @@ function PainelPage() {
                 ter esse plano — ele veria um cartão de "não liberado" em vez da
                 porta. */}
             <SairDaClinicaCard tokenFn={token} />
-            <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
+            <MeuPerfilSection
+              tokenFn={token}
+              onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")}
+              pacientesVinculadas={engagement?.patients ?? []}
+            />
           </>
         )}
         {tab === "Exames" && <ExamesRecebidos tokenFn={token} />}
@@ -8564,7 +8570,6 @@ function DoctorBilling({
   active: boolean;
   exists: boolean;
 }) {
-  const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [busy, setBusy] = useState<string | null>(null);
   // Convite de paciente: +15% em qualquer plano (aplicado no checkout).
   const [inviteDiscount, setInviteDiscount] = useState(false);
@@ -8589,7 +8594,14 @@ function DoctorBilling({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function checkout(planKey: "essencial" | "starter" | "pro" | "elite" | "black") {
+  /**
+   * Abre o checkout da escada.
+   *
+   * Recebe MENSAGENS, não nome de plano: o plano deixou de ser um nome e passou
+   * a ser um número, e é essa quantidade que vira `line_items[0][quantity]` no
+   * Stripe e `doctors.ai_messages_per_cycle` no webhook.
+   */
+  async function checkout(mensagens: number) {
     /* O médico USA o app, mas não ASSINA nele — plano de médico se contrata
        no site. Duas razões, e as duas contam:
        · a loja da Apple/Google cobra comissão sobre assinatura vendida dentro
@@ -8604,7 +8616,7 @@ function DoctorBilling({
       toast(veredito.texto, { duration: 6000 });
       return;
     }
-    setBusy(planKey);
+    setBusy("checkout");
     try {
       const tk = await tokenFn();
       const { createSubscriptionCheckout } = await import("@/lib/billing.functions");
@@ -8612,7 +8624,8 @@ function DoctorBilling({
         data: {
           accessToken: tk,
           product: "doctor_plan",
-          plan: cycle === "annual" ? (`${planKey}_annual` as const) : planKey,
+          plan: "mensagens",
+          mensagens,
           returnPath: "/painel",
         },
       });
@@ -8624,8 +8637,10 @@ function DoctorBilling({
         res.error === "pagamento_indisponivel"
           ? "O pagamento está sendo configurado. Tente em instantes."
           : res.error === "plano_indisponivel"
-            ? "Este ciclo ainda não está disponível — tente o mensal."
-            : "Não foi possível abrir o pagamento.",
+            ? "O plano ainda não está disponível. Avisamos assim que abrir."
+            : res.error === "fora_da_escada"
+              ? "Acima de 2.500 mensagens o plano é de Clínica — fale com a gente."
+              : "Não foi possível abrir o pagamento.",
       );
     } catch {
       toast.error("Não foi possível abrir o pagamento.");
@@ -8684,89 +8699,6 @@ function DoctorBilling({
     );
   }
 
-  const PlanBtn = ({
-    planKey,
-    name,
-    monthly,
-    tagline,
-    highlight,
-    black,
-    perk,
-  }: {
-    planKey: "essencial" | "starter" | "pro" | "elite" | "black";
-    name: string;
-    monthly: number;
-    tagline: string;
-    highlight?: boolean;
-    black?: boolean;
-    perk?: string;
-  }) => (
-    <div
-      className={`rounded-2xl border p-4 ${
-        black
-          ? "border-neutral-700 bg-neutral-900 text-white"
-          : highlight
-            ? "border-amber-400 bg-card ring-1 ring-amber-300"
-            : "border-border bg-card"
-      }`}
-    >
-      <div className="flex items-center gap-2">
-        <p className="font-serif text-base">{name}</p>
-        {black ? (
-          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-neutral-900">
-            MÁXIMO
-          </span>
-        ) : highlight ? (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700">
-            TOP
-          </span>
-        ) : null}
-      </div>
-      <p className={`mt-0.5 text-xs ${black ? "text-white/60" : "text-muted-foreground"}`}>
-        {tagline}
-      </p>
-      <p className="mt-2 text-2xl font-extrabold">
-        {/* `R$ {monthly}` cru imprimia "R$ 49.9" no Essencial — ponto decimal e
-            um dígito só. Os planos inteiros continuam sem centavos. */}
-        R${" "}
-        {monthly.toLocaleString("pt-BR", {
-          minimumFractionDigits: monthly % 1 === 0 ? 0 : 2,
-          maximumFractionDigits: 2,
-        })}
-        <span
-          className={`text-sm font-normal ${black ? "text-white/60" : "text-muted-foreground"}`}
-        >
-          /mês
-        </span>
-      </p>
-      {cycle === "annual" && (
-        <p className={`text-[11px] font-semibold ${black ? "text-amber-300" : "text-emerald-600"}`}>
-          cobrado 1×/ano · 2 meses grátis
-        </p>
-      )}
-      {perk && (
-        <p
-          className={`mt-1.5 text-[11px] font-semibold ${black ? "text-amber-300" : "text-amber-700"}`}
-        >
-          {perk}
-        </p>
-      )}
-      <button
-        onClick={() => checkout(planKey)}
-        disabled={!!busy}
-        className={`press mt-3 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-60 ${
-          black
-            ? "bg-amber-400 text-neutral-900"
-            : highlight
-              ? "bg-amber-500 text-white"
-              : "bg-primary text-primary-foreground"
-        }`}
-      >
-        {busy === planKey ? "Abrindo pagamento…" : `Assinar ${name}`}
-      </button>
-    </div>
-  );
-
   return (
     <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
       <div className="flex items-center justify-between gap-3">
@@ -8779,67 +8711,30 @@ function DoctorBilling({
         </div>
       </div>
 
-      <div className="mt-4 inline-flex rounded-full border border-border bg-card p-1 text-xs font-semibold">
-        <button
-          onClick={() => setCycle("monthly")}
-          className={`rounded-full px-3 py-1.5 ${cycle === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          Mensal
-        </button>
-        <button
-          onClick={() => setCycle("annual")}
-          className={`rounded-full px-3 py-1.5 ${cycle === "annual" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          Anual · 2 meses grátis
-        </button>
-      </div>
+      {/* ─── O ALTERNADOR MENSAL/ANUAL SAIU ────────────────────────────────
+          A escada tem um Price graduado só, MENSAL. O botão "Anual · 2 meses
+          grátis" mandava `plan: "essencial_annual"` e o `priceIdFor` respondia
+          `null`: o médico clicava e nada acontecia, sem erro na tela. Um botão
+          que não faz nada é pior que um botão ausente. */}
 
       {inviteDiscount && (
         <p className="mt-3 rounded-2xl border border-emerald-300/60 bg-emerald-50 p-3 text-center text-sm font-semibold text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300">
-          🎁 Convite de paciente ativo: <strong>+15% de desconto</strong> em qualquer plano, para
-          sempre — aplicado automaticamente no pagamento.
+          🎁 Convite de paciente ativo: <strong>+15% de desconto</strong> para sempre — aplicado
+          automaticamente no pagamento.
         </p>
       )}
 
-      {/* Cinco cards agora: `lg:grid-cols-4` deixaria o Black sozinho na linha
-          de baixo, e o plano mais caro da tabela não pode parecer sobra. */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <PlanBtn
-          planKey="essencial"
-          name="Essencial"
-          monthly={49.9}
-          tagline="Até 15 pacientes · o Segundo Cérebro incluído"
-          perk="de R$ 102 por R$ 49,90"
-        />
-        <PlanBtn
-          planKey="starter"
-          name="Starter"
-          monthly={149}
-          tagline="Até 50 pacientes · 1 cérebro"
-        />
-        <PlanBtn
-          planKey="pro"
-          name="Pro"
-          monthly={297}
-          tagline="Até 150 pacientes · IA no WhatsApp"
-        />
-        <PlanBtn
-          planKey="elite"
-          name="Reconhecido"
-          monthly={597}
-          tagline="Selo + topo da busca · até 5 cérebros"
-          highlight
-          perk="🎟️ 25 convites premium/mês + selo verificado"
-        />
-        <PlanBtn
-          planKey="black"
-          name="Black"
-          monthly={1499}
-          tagline="Até 20 cérebros · 500 pacientes/médico"
-          black
-          perk="🖤 250 convites/mês · gerente dedicado · topo da busca · selo Black"
-        />
-      </div>
+      {/* ─── OS CINCO CARTÕES VIRARAM UM SELETOR ───────────────────────────
+          Eles vendiam Essencial/Starter/Pro/Reconhecido/Black com teto de
+          PACIENTES — dois eixos que saíram do produto — e mandavam nomes de
+          plano que o checkout novo não conhece. É o MESMO componente do site:
+          uma tela só para a mesma compra, e a conta do preço num arquivo só. */}
+      <EscadaDeMensagens
+        className="mt-4"
+        tema="claro"
+        ocupado={busy === "checkout"}
+        onEscolher={checkout}
+      />
 
       {isTeam ? null : (
         <p className="mt-3 text-center text-xs text-muted-foreground">
@@ -8856,127 +8751,16 @@ function DoctorBilling({
 }
 
 /** Card de convites premium (Elite/Black): gera código na hora + cota do mês. */
-function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
-  const [info, setInfo] = useState<{
-    eligible: boolean;
-    limit: number;
-    used: number;
-    remaining: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [code, setCode] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+/* ─── O CARTÃO DE CONVITES PREMIUM SAIU ──────────────────────────────────
+   Ele dava a ASSINATURA INTEIRA da paciente de graça — a receita que a
+   plataforma vive de vender — e não funcionava nos apps, porque desconto de
+   assinatura no iOS e no Android é a loja quem dá, não nós.
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const tk = await tokenFn();
-        const { getMyInviteInfo } = await import("@/lib/invites.functions");
-        const res = await getMyInviteInfo({ data: { accessToken: tk } });
-        if (res.ok) setInfo(res);
-      } finally {
-        setLoading(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (loading || !info || !info.eligible) return null;
-
-  async function generate() {
-    setGenerating(true);
-    setCopied(false);
-    try {
-      const tk = await tokenFn();
-      const { generateInviteCode } = await import("@/lib/invites.functions");
-      const res = await generateInviteCode({ data: { accessToken: tk } });
-      if (res.ok) {
-        setCode(res.code);
-        setInfo((prev) => (prev ? { ...prev, used: res.used, remaining: res.remaining } : prev));
-        // Copia automaticamente para facilitar o envio.
-        try {
-          await navigator.clipboard.writeText(res.code);
-          setCopied(true);
-        } catch {
-          /* sem clipboard: a paciente copia manualmente */
-        }
-      } else {
-        toast.error(
-          res.error === "cota_esgotada"
-            ? "Você já gerou todos os convites deste mês."
-            : "Não foi possível gerar o código. Tente novamente.",
-        );
-      }
-    } catch {
-      toast.error("Não foi possível gerar o código.");
-    }
-    setGenerating(false);
-  }
-
-  const copy = async () => {
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Não foi possível copiar. Código: " + code);
-    }
-  };
-
-  const esgotado = info.remaining <= 0;
-
-  return (
-    <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6 dark:bg-amber-500/10 dark:border-amber-500/30">
-      <p className="font-serif text-lg text-amber-900 dark:text-amber-100">🎟️ Convites premium</p>
-      <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
-        Gere um código na hora e envie para a sua paciente do jeito que quiser (WhatsApp, e-mail…).
-        Cada código vale para <strong>uma paciente</strong> e libera o Obstétrica Premium completo —
-        por sua conta.
-      </p>
-
-      {code && (
-        <button
-          onClick={copy}
-          className="press mt-4 flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-amber-300 bg-white px-4 py-3 font-mono text-xl font-black tracking-[0.3em] text-amber-900"
-        >
-          <span>{code}</span>
-          <span className="font-sans text-xs font-bold text-amber-600">
-            {copied ? "copiado ✓" : "copiar"}
-          </span>
-        </button>
-      )}
-
-      <button
-        onClick={generate}
-        disabled={generating || esgotado}
-        className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-50"
-      >
-        {generating
-          ? "Gerando…"
-          : esgotado
-            ? "Cota do mês esgotada"
-            : code
-              ? "Gerar outro código"
-              : "Gerar código para uma paciente"}
-      </button>
-
-      <div className="mt-3 flex items-center justify-between text-sm">
-        <span className="text-amber-800 dark:text-amber-200">
-          Gerados este mês: <strong>{info.used}</strong> de {info.limit}
-        </span>
-        <span /* O fundo aqui é `bg-amber-200` e NÃO escurece — então o texto também não
-             pode. Eu tinha escurecido só a fonte por padrão, deixando âmbar sobre
-             âmbar: o contador "N restantes" sumia. */
-          className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800"
-        >
-          {info.remaining} restantes
-        </span>
-      </div>
-    </div>
-  );
-}
+   Quem ocupa o lugar é `MesadaDoMedico`: Sementinhas, que não passam por
+   Stripe, Apple nem Google, funcionam igual nas três plataformas e custam
+   ZERO à plataforma — compram conteúdo estático. E aceleram a conversão em
+   vez de adiá-la: quanto mais generoso ele é, mais rápido ela zera a loja
+   grátis e passa a olhar os 57 itens que só o Premium abre. */
 
 /**
  * "Indique um colega": link de indicação (/medicos/cadastro?ref=<meuId>) +
@@ -9645,10 +9429,20 @@ function EnderecosCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 function MeuPerfilSection({
   tokenFn,
   onIrParaPacientes,
+  pacientesVinculadas,
 }: {
   tokenFn: () => Promise<string>;
   /** Trocar de aba mora no painel; esta seção só pede. */
   onIrParaPacientes: () => void;
+  /**
+   * As pacientes dele — para o cartão da mesada saber a quem dar.
+   *
+   * Vem de cima e não de uma busca própria: o painel já carregou esta lista, e
+   * uma segunda leitura poderia mostrar um conjunto diferente do que ele vê na
+   * aba Pacientes. O servidor confere o vínculo de novo em `presentearPaciente`
+   * — esta lista é conveniência de tela, nunca autorização.
+   */
+  pacientesVinculadas: PatientEngagement[];
 }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -9985,7 +9779,7 @@ function MeuPerfilSection({
         <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
       </div>
       <EnderecosCard tokenFn={tokenFn} />
-      <DoctorInviteCard tokenFn={tokenFn} />
+      <MesadaDoMedico tokenFn={tokenFn} pacientes={pacientesVinculadas} />
       <ReferralCard tokenFn={tokenFn} />
       <GoogleCalendarCard tokenFn={tokenFn} />
 

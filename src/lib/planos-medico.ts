@@ -171,6 +171,29 @@ export const DEGRAUS = [150, 300, 500, 750, 1_000, 1_250, 1_500, 1_750, 2_000, 2
 export const DEGRAUS_DESTAQUE = [150, 1_000, 2_500] as const;
 
 /**
+ * Quantas mensagens uma gestante ativa consome por mês, em média.
+ *
+ * ─── POR QUE ESTE NÚMERO PRECISA EXISTIR ────────────────────────────────────
+ *
+ * "1.000 mensagens" não dimensiona nada para um obstetra — ele não conta
+ * mensagens, conta gestantes. Sem a conversão, o slider vende numa unidade que
+ * o comprador não sabe estimar, que é o defeito que a escada de nomes tinha.
+ *
+ * Quinze sai do próprio comentário do teto: 2.500 mensagens ≈ 165 gestantes
+ * ativas. Mora aqui para a tela não inventar a própria régua — foi assim que a
+ * tabela de preços já divergiu quatro vezes nesta base.
+ *
+ * É estimativa, e a tela precisa dizer isso: "cerca de", nunca "até".
+ */
+export const MENSAGENS_POR_GESTANTE_MES = 15;
+
+/** Quantas gestantes ativas um pacote atende, aproximadamente. */
+export function gestantesAtendidas(mensagens: number): number {
+  const n = Math.max(ENTRADA_MENSAGENS, Math.min(mensagens, TETO_AUTOATENDIMENTO));
+  return Math.floor(n / MENSAGENS_POR_GESTANTE_MES);
+}
+
+/**
  * A margem que sobra num pacote, em centavos, num custo por mensagem dado.
  *
  * Inclui a taxa do Stripe no Brasil (3,99% + R$ 0,39) porque margem sem a

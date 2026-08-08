@@ -239,9 +239,22 @@ describe("todo plano vivo existe em todos os lugares que enumeram plano", () => 
 });
 
 describe("o preço com centavos não vaza para a tela", () => {
-  test("o card formata em pt-BR — `R$ {monthly}` cru imprimiria 'R$ 49.9'", () => {
+  test("o seletor formata em pt-BR — cru imprimiria 'R$ 174.4'", () => {
+    /* Este teste cobrava o cartão de plano do painel, que deixou de existir: os
+       cinco cartões viraram o seletor da escada. A regra não mudou de valor,
+       mudou de casa — e um teste que aponta para o lugar errado passa a ser
+       decoração. Agora o preço é formatado num ponto só, e é este. */
+    const codigo = codigoDe("src/components/escada-mensagens.tsx");
+    expect(codigo).toContain('toLocaleString("pt-BR"');
+    expect(codigo).toContain("minimumFractionDigits: 2");
+    /* Centavos SEMPRE, aqui: a escada tem preços como R$ 174,40 e R$ 294,40, e
+       esconder o zero final ("R$ 294,4") é o defeito que este bloco existe para
+       impedir, com outro sinal. */
+    expect(codigo).toContain("maximumFractionDigits: 2");
+  });
+
+  test("e o painel não voltou a imprimir preço cru", () => {
     const codigo = codigoDe("src/routes/_authenticated/painel.tsx");
-    expect(codigo).toContain('monthly.toLocaleString("pt-BR"');
     expect(codigo).not.toMatch(/R\$ \{monthly\}/);
   });
 
