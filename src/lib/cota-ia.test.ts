@@ -675,6 +675,25 @@ function listaDeAbas(painel: string): string {
  * "Empresas" é a única exceção legítima: mora no console do dono (`/admin`),
  * por decisão registrada no comentário de `DOCTOR_TABS`.
  */
+/**
+ * "Órfã" quer dizer INALCANÇÁVEL, não "fora da fita".
+ *
+ * A fita deixou de ser o único caminho: "Meu Perfil" saiu dela e virou a
+ * bolinha do canto superior direito (`PerfilNoTopo`), porque era a décima
+ * quinta aba de uma fita rolável e trocar o cartão exigia rolar até o fim.
+ *
+ * O que este teste protege continua valendo inteiro — quatro telas deste
+ * arquivo já estiveram implementadas e inalcançáveis, inclusive a única de
+ * receituário. Por isso a exceção não é uma lista de nomes liberados: a aba só
+ * passa se o painel de fato ligar o menu do perfil nela. Apagar o
+ * `onAbrirPerfil` volta a reprovar, que é o comportamento certo — sem ele a
+ * tela fica tão órfã quanto estaria fora da fita.
+ */
+function ALCANCAVEL(aba: string, lista: string, codigo: string): boolean {
+  if (lista.includes(`"${aba}"`)) return true;
+  return aba === "Meu Perfil" && codigo.includes(`onAbrirPerfil={() => setTab("${aba}")}`);
+}
+
 describe("nenhuma aba fica órfã", () => {
   const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
 
@@ -685,7 +704,7 @@ describe("nenhuma aba fica órfã", () => {
     const codigo = painel.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
     const comRender = [...codigo.matchAll(/\{tab === "([^"]+)"/g)].map((m) => m[1]);
     const orfas = [...new Set(comRender)].filter(
-      (aba) => aba !== "Empresas" && !lista.includes(`"${aba}"`),
+      (aba) => aba !== "Empresas" && !ALCANCAVEL(aba, lista, codigo),
     );
     expect(orfas).toEqual([]);
   });

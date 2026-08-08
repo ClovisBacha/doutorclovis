@@ -72,6 +72,7 @@ import { pendenciasDoMedico, type Pendencia } from "@/lib/doctor-required";
 import { mensalidadeCentavos } from "@/lib/entitlements";
 import { EscadaDeMensagens } from "@/components/escada-mensagens";
 import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
+import { PerfilNoTopo } from "@/components/perfil-no-topo";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
 import { MesadaDoMedico } from "@/components/mesada-do-medico";
 import {
@@ -268,7 +269,13 @@ const DOCTOR_TABS: readonly PanelTab[] = [
   "Engajamento",
   "Pacientes 👩‍🍼",
   "Clínica 🏥",
-  "Meu Perfil",
+  /* "Meu Perfil" NÃO entra aqui, e continua existindo como aba.
+     Ela virou a bolinha do canto superior direito (`PerfilNoTopo`): é onde as
+     pessoas procuram conta, e onde ela estava — décima quinta de uma fita
+     rolável — trocar o cartão exigia rolar a fita até o fim.
+     Esta lista é a única fonte dos BOTÕES de aba, não das telas: `tab ===
+     "Meu Perfil"` continua renderizando, agora alcançável só pelo menu do
+     perfil e pelos `setTab("Meu Perfil")` que já existiam. */
 ];
 
 /**
@@ -337,6 +344,18 @@ function PainelPage() {
   /** Mensagens de IA por ciclo do plano vigente — define a mensalidade da escada. */
   const [mensagensDoPlano, setMensagensDoPlano] = useState<number | null>(null);
 
+  /**
+   * O que a bolinha do perfil precisa gritar antes de ser clicada.
+   *
+   * Conta inativa é o único estado em que o painel INTEIRO mente: as listas
+   * vêm vazias porque as pacientes não acham o médico na busca, e ele conclui
+   * que o produto quebrou. O aviso já existia — dentro da aba, que é
+   * exatamente onde ele não vai olhar enquanto acha que o problema é outro.
+   */
+  const avisoDaConta = inativo
+    ? "Sua conta está inativa — as pacientes não encontram você na busca."
+    : null;
+
   /* A aba que abre é a do Cérebro. O painel de números diz o que ACONTECEU; o
      cérebro é onde ele MUDA o que vai acontecer. Abrir no primeiro faz o
      produto parecer um relatório; abrir no segundo faz dele uma ferramenta. */
@@ -359,10 +378,11 @@ function PainelPage() {
   /* A fita de abas rola, então a aba ativa pode estar fora da tela.
   
      Isso importa porque várias trocas de aba são PROGRAMÁTICAS, não um toque do
-     médico: um médico com assinatura inativa cai direto em "Meu Perfil" (a
-     ÚLTIMA das 12 abas, ~1100px à direita), e os cartões do Painel levam para
-     "Cérebro" e "Meu Perfil". Ele chegava numa tela cujo indicador de posição
-     estava fora do campo de visão — justamente quando mais precisa se situar. */
+     médico: os cartões do Painel levam para "Cérebro", e ele chegava numa tela
+     cujo indicador de posição estava fora do campo de visão — justamente
+     quando mais precisa se situar.
+     ("Meu Perfil" saiu da fita e virou a bolinha do canto; quem indica a
+     posição dela agora é a própria bolinha, via `ativo`.) */
   const fitaAbas = useRef<HTMLDivElement | null>(null);
   const refsAbas = useRef<Partial<Record<PanelTab, HTMLButtonElement | null>>>({});
 
@@ -1002,10 +1022,36 @@ function PainelPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-5 py-12">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-        Painel do médico
-      </p>
-      <h1 className="mt-2 font-serif text-3xl md:text-4xl">Gestão do consultório</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            Painel do médico
+          </p>
+          <h1 className="mt-2 font-serif text-3xl md:text-4xl">Gestão do consultório</h1>
+        </div>
+        {/* A conta sai da fita de abas e vem para o canto onde as pessoas
+            procuram conta. Ver `perfil-no-topo.tsx`. */}
+        <PerfilNoTopo
+          nome={euMedico?.display_name}
+          fotoUrl={euMedico?.photo_url}
+          rotuloPlano={rotuloPlano}
+          aviso={avisoDaConta}
+          ativo={tab === "Meu Perfil"}
+          onAbrirPerfil={() => setTab("Meu Perfil")}
+          onAbrirCobranca={() => {
+            /* Mesma seção; a cobrança é uma âncora dentro dela. O `setTab` só
+               vale no próximo render, então a rolagem espera um quadro — sem
+               isto, `getElementById` procura um nó que ainda não existe e o
+               clique não faz nada. */
+            setTab("Meu Perfil");
+            requestAnimationFrame(() =>
+              document
+                .getElementById("cobranca")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+            );
+          }}
+        />
+      </div>
 
       {/* Resumo — números já recortados por médico no servidor (equipe vê a
           instalação inteira; assinante vê só os próprios). */}
@@ -1166,7 +1212,7 @@ function PainelPage() {
           </p>
           <p className="mt-1 text-[13px] leading-snug text-amber-900/85 dark:text-amber-200/85">
             Enquanto estiver assim, as pacientes não encontram você na busca e as listas do painel
-            ficam vazias. Ative a assinatura em Meu Perfil, abaixo.
+            ficam vazias. Ative a assinatura no menu do seu perfil, no canto superior direito.
           </p>
         </div>
       )}
