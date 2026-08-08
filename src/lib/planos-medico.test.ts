@@ -50,8 +50,11 @@ describe("1. os dois âncoras que o dono escolheu", () => {
     expect(centavosPorMensagem(150)).toBeCloseTo(19.93, 1);
   });
 
-  test("o topo do autoatendimento é 2.500 mensagens", () => {
-    expect(TETO_AUTOATENDIMENTO).toBe(2_500);
+  test("o topo do autoatendimento é R$ 999,00, e o número de mensagens SAI daí", () => {
+    /* O dono fixou o preço e o custo por mensagem; 11.100 é consequência. */
+    expect(precoDe(TETO_AUTOATENDIMENTO)).toBe(99_900);
+    expect(centavosPorMensagem(TETO_AUTOATENDIMENTO)).toBe(9);
+    expect(TETO_AUTOATENDIMENTO).toBe(11_100);
   });
 });
 
@@ -60,7 +63,7 @@ describe("2. O PISO — a trava que impede o prejuízo futuro", () => {
    * O teste mais importante do arquivo. Tudo o mais é conveniência; este é o
    * que separa uma escada segura de uma que quebra quando o modelo encarecer.
    */
-  test("nenhuma faixa vende abaixo de 9 centavos por mensagem", () => {
+  test("nenhuma faixa vende abaixo de 8 centavos por mensagem", () => {
     for (const faixa of FAIXAS) {
       if ("centavos" in faixa) {
         expect(faixa.centavos).toBeGreaterThanOrEqual(PISO_CENTAVOS_POR_MENSAGEM);
@@ -68,10 +71,29 @@ describe("2. O PISO — a trava que impede o prejuízo futuro", () => {
     }
   });
 
-  test("e o piso é pelo menos 3× o custo de PLANEJAMENTO", () => {
+  test("e o piso é quase 3× o custo de PLANEJAMENTO", () => {
     /* Contra o custo planejado (o pior caso), não contra a média — precificar
-       contra a média é o que produz a surpresa. */
-    expect(PISO_CENTAVOS_POR_MENSAGEM).toBeGreaterThanOrEqual(CUSTO_PLANEJADO_CENTAVOS * 3);
+       contra a média é o que produz a surpresa.
+
+       "Quase" e não "pelo menos": 8 ÷ 2,7 = 2,96. O piso caiu de 9 para 8
+       quando o topo passou a ser R$ 999,00 a nove centavos EFETIVOS, e vale
+       dizer o número certo em vez de arredondar a favor. */
+    expect(PISO_CENTAVOS_POR_MENSAGEM / CUSTO_PLANEJADO_CENTAVOS).toBeGreaterThan(2.9);
+  });
+
+  test("e o que ele realmente garante: margem positiva no ESTRESSE, no topo", () => {
+    /**
+     * A razão contra o custo é um atalho; a garantia de verdade é esta. No
+     * degrau mais fundo, com as mensagens no tamanho máximo E o modelo custando
+     * o dobro do de hoje, a margem depois da taxa do Stripe ainda é confortável.
+     *
+     * É menos folga que os degraus de baixo têm — e isso é o preço de o topo
+     * ser barato. Quem compra volume paga menos por mensagem, e a margem
+     * acompanha.
+     */
+    const preco = precoDe(TETO_AUTOATENDIMENTO);
+    const margem = margemCentavos(TETO_AUTOATENDIMENTO, CUSTO_ESTRESSE);
+    expect(margem / preco).toBeGreaterThan(0.3);
   });
 
   test("o preço por mensagem NUNCA sobe — a escada é monotônica", () => {
@@ -140,54 +162,6 @@ describe("3. lucro em TODOS os degraus, nos TRÊS cenários", () => {
   });
 });
 
-describe("4. o preço graduado é o mesmo que o Stripe vai calcular", () => {
-  /* Se estas contas divergirem, a tela promete um número e a fatura cobra
-     outro — que é a reclamação mais cara que existe. Cada linha aqui é uma
-     linha da configuração do Stripe. */
-  test("150 → só a faixa fixa", () => {
-    expect(precoDe(150)).toBe(2_990);
-  });
-
-  test("300 → fixa + 150 × 19", () => {
-    expect(precoDe(300)).toBe(2_990 + 150 * 19);
-    expect(precoDe(300)).toBe(5_840);
-  });
-
-  test("1.000 → fixa + 150×19 + 200×18 + 250×17 + 250×15", () => {
-    expect(precoDe(1_000)).toBe(2_990 + 150 * 19 + 200 * 18 + 250 * 17 + 250 * 15);
-    expect(precoDe(1_000)).toBe(17_440);
-  });
-
-  test("2.000 → R$ 294,40, o teto que o dono já tinha aprovado", () => {
-    /* O antigo topo (R$ 295,40) valia 2.500 mensagens. Com a escada de dez
-       faixas o mesmo bolso compra 2.000 — e as outras 500 passaram a custar
-       R$ 0,09 cada, que é onde o dono pediu que o desconto morasse. */
-    expect(precoDe(2_000)).toBe(29_440);
-  });
-
-  test("2.500 → R$ 339,40, com as últimas 500 no piso", () => {
-    expect(precoDe(2_500)).toBe(precoDe(2_000) + 500 * 9);
-    expect(precoDe(2_500)).toBe(33_940);
-  });
-
-  test("a soma das dez faixas fecha com o topo", () => {
-    /* A conta inteira, escrita de uma vez — é ela que vai para o painel do
-       Stripe, faixa por faixa. */
-    const soma =
-      2_990 +
-      150 * 19 +
-      200 * 18 +
-      250 * 17 +
-      250 * 15 +
-      250 * 14 +
-      250 * 13 +
-      250 * 11 +
-      250 * 10 +
-      500 * 9;
-    expect(soma).toBe(precoDe(2_500));
-  });
-});
-
 /**
  * O preço marginal de uma faixa — `null` na primeira, que é taxa fixa.
  *
@@ -200,28 +174,121 @@ function marginalDe(f: (typeof FAIXAS)[number]): number | null {
   return "centavos" in f ? f.centavos : null;
 }
 
-describe("4b. o desconto foi para as mensagens DE CIMA", () => {
-  /**
-   * A queixa que reescreveu a escada: "a partir do momento que a pessoa vai dos
-   * cento e cinquenta e uma mensagens, já aumenta muito o desconto".
-   *
-   * A entrada sai a R$ 0,1993/mensagem. A faixa seguinte cobrava R$ 0,15 — ou
-   * seja, comprar UMA mensagem a mais que o pacote mínimo derrubava o preço
-   * marginal em 25% de uma vez, e o resto da escada não motivava mais nada.
-   */
-  test("a mensagem 151 quase não é mais barata que a 150", () => {
-    const entradaPorMsg = centavosPorMensagem(ENTRADA_MENSAGENS);
-    const primeiraMarginal = marginalDe(FAIXAS[1])!;
-    const queda = 1 - primeiraMarginal / entradaPorMsg;
-    expect(queda).toBeLessThan(0.1); // era 0,25
+describe("4. o preço graduado é o mesmo que o Stripe vai calcular", () => {
+  /* Cada linha aqui é uma linha da configuração do Stripe. Se estas contas
+     divergirem, a tela promete um número e a fatura cobra outro — a reclamação
+     mais cara que existe. */
+  test("150 → só a faixa fixa", () => {
+    expect(precoDe(150)).toBe(2_990);
   });
 
-  test("o desconto sobe DE POUCO EM POUCO, degrau a degrau", () => {
-    /* Nenhum salto maior que 6 pontos entre degraus vizinhos — antes o primeiro
-       salto sozinho valia mais que isso. */
-    for (let i = 1; i < DEGRAUS.length; i++) {
-      const salto = descontoVsEntrada(DEGRAUS[i]) - descontoVsEntrada(DEGRAUS[i - 1]);
-      expect(salto).toBeLessThanOrEqual(6);
+  test("250 → fixa + 100 × 16,90", () => {
+    expect(precoDe(250)).toBe(2_990 + 100 * 16.9);
+    expect(precoDe(250)).toBe(4_680);
+  });
+
+  test("1.350 → o degrau do meio, R$ 187,11", () => {
+    expect(precoDe(1_350)).toBe(18_711);
+  });
+
+  test("5.000 → R$ 511,00", () => {
+    expect(precoDe(5_000)).toBe(51_100);
+  });
+
+  test("11.100 → R$ 999,00 exatos", () => {
+    expect(precoDe(TETO_AUTOATENDIMENTO)).toBe(99_900);
+  });
+
+  test("a soma das dez faixas fecha com o topo", () => {
+    /* A conta inteira, faixa a faixa — é ela que vai para o painel do Stripe. */
+    const soma =
+      2_990 +
+      100 * 16.9 +
+      100 * 14.45 +
+      200 * 14.18 +
+      300 * 12.85 +
+      500 * 11.79 +
+      750 * 10.46 +
+      1_100 * 9.14 +
+      1_800 * 8.05 +
+      6_100 * 8.0;
+    expect(Math.round(soma)).toBe(precoDe(TETO_AUTOATENDIMENTO));
+  });
+
+  test("`precoDe` SEMPRE devolve centavo inteiro, em toda a faixa", () => {
+    /**
+     * As camadas cobram centavos com casa decimal, então uma quantidade no meio
+     * de uma camada dá meio centavo (1.000 mensagens caem em 14.584,5). Sem o
+     * `Math.round` do fim, esse número atravessaria a tela, o checkout e o
+     * `toFixed(2)` — e a fatura do Stripe, que arredonda, discordaria por um
+     * centavo em algum lugar que ninguém saberia apontar.
+     */
+    for (let n = ENTRADA_MENSAGENS; n <= TETO_AUTOATENDIMENTO; n += 7) {
+      expect(Number.isInteger(precoDe(n))).toBe(true);
+    }
+    expect(Number.isInteger(precoDe(1_000))).toBe(true);
+  });
+
+  test("e TODOS os dez degraus dão centavos inteiros ANTES do arredondamento", () => {
+    /* As faixas têm casa decimal, então o `Math.round` de `precoDe` existe. Mas
+       os degraus da tabela foram escolhidos para não precisar dele — se um
+       passar a precisar, a tabela do Stripe e a nossa vão divergir por um
+       centavo em algum lugar, e ninguém vai saber onde. */
+    for (const d of DEGRAUS) {
+      let total = 0;
+      let ja = 0;
+      for (const f of FAIXAS) {
+        if (d <= ja) break;
+        const nesta = Math.min(d, f.ate) - ja;
+        if (nesta <= 0) continue;
+        total += "fixo" in f ? f.fixo : nesta * f.centavos;
+        ja = Math.min(d, f.ate);
+      }
+      expect(Math.abs(total - Math.round(total))).toBeLessThan(1e-9);
+    }
+  });
+});
+
+describe("4b. os dois números que o dono fixou, e a curva entre eles", () => {
+  /**
+   * "O plano mais barato tem que ter realmente o nosso custo de vinte centavos.
+   * O plano antes do Clínica tem que ser de novecentos e noventa e nove reais,
+   * com custo de nove centavos por mensagem. Divida em dez partes o desconto
+   * que vai caindo."
+   */
+  test("a entrada custa 20 centavos por mensagem", () => {
+    expect(centavosPorMensagem(ENTRADA_MENSAGENS)).toBeCloseTo(19.93, 2);
+    expect(Math.round(centavosPorMensagem(ENTRADA_MENSAGENS))).toBe(20);
+  });
+
+  test("o topo custa R$ 999,00 a NOVE centavos por mensagem", () => {
+    expect(precoDe(TETO_AUTOATENDIMENTO)).toBe(99_900);
+    expect(centavosPorMensagem(TETO_AUTOATENDIMENTO)).toBe(9);
+  });
+
+  test("e é a conta do dono que define o teto: 999 ÷ 0,09", () => {
+    /* O teto não foi escolhido — ele é consequência dos dois números acima. */
+    expect(TETO_AUTOATENDIMENTO).toBe(Math.round(99_900 / 9));
+  });
+
+  test("são DEZ degraus", () => {
+    expect(FAIXAS).toHaveLength(10);
+    expect(DEGRAUS).toHaveLength(10);
+  });
+
+  test("o desconto sobe SEIS pontos a cada degrau, sempre", () => {
+    /* É isto que "dividir em dez partes" quer dizer: passo constante, não um
+       tombo no começo e migalhas depois — que era o defeito da escada anterior. */
+    const descontos = DEGRAUS.map((d) => descontoVsEntrada(d));
+    expect(descontos).toEqual([0, 6, 12, 18, 24, 30, 36, 42, 48, 54]);
+  });
+
+  test("o preço efetivo cai cerca de 1,2 centavo por degrau", () => {
+    const efetivos = DEGRAUS.map((d) => centavosPorMensagem(d));
+    for (let i = 1; i < efetivos.length; i++) {
+      const passo = efetivos[i - 1] - efetivos[i];
+      expect(passo).toBeGreaterThan(0.9);
+      expect(passo).toBeLessThan(1.5);
     }
   });
 
@@ -234,26 +301,20 @@ describe("4b. o desconto foi para as mensagens DE CIMA", () => {
     }
   });
 
-  test("são dez faixas — o dono pediu de oito a dez", () => {
-    expect(FAIXAS.length).toBeGreaterThanOrEqual(8);
-    expect(FAIXAS.length).toBeLessThanOrEqual(10);
-  });
-
-  test("o piso de R$ 0,09 começa em 2.001, e não antes", () => {
-    /* "Acima de dois mil, a gente coloca o preço de zero vírgula zero nove pra
-       cima" — palavra do dono. */
-    const ultima = FAIXAS[FAIXAS.length - 1];
-    const penultima = FAIXAS[FAIXAS.length - 2];
-    expect(marginalDe(ultima)).toBe(PISO_CENTAVOS_POR_MENSAGEM);
-    expect(penultima.ate).toBe(2_000);
-    expect(marginalDe(penultima)!).toBeGreaterThan(PISO_CENTAVOS_POR_MENSAGEM);
-  });
-
   test("nenhuma faixa fura o piso", () => {
     for (const f of FAIXAS) {
       const c = marginalDe(f);
       if (c !== null) expect(c).toBeGreaterThanOrEqual(PISO_CENTAVOS_POR_MENSAGEM);
     }
+  });
+
+  test("o piso MARGINAL é 8, e o EFETIVO no topo é 9 — não são o mesmo número", () => {
+    /* Em preço graduado o efetivo nunca alcança o marginal do fim. Confundir os
+       dois é o que faria alguém "corrigir" a última faixa para 9 e quebrar o
+       R$ 999,00. */
+    expect(PISO_CENTAVOS_POR_MENSAGEM).toBe(8);
+    expect(centavosPorMensagem(TETO_AUTOATENDIMENTO)).toBe(9);
+    expect(centavosPorMensagem(TETO_AUTOATENDIMENTO)).toBeGreaterThan(PISO_CENTAVOS_POR_MENSAGEM);
   });
 });
 
@@ -266,9 +327,9 @@ describe("5. os limites da escada", () => {
   });
 
   test("acima do teto, a escada NÃO continua — para no topo", () => {
-    /* Acima de 2.500 é Clínica, sob consulta. Deixar a função extrapolar faria
-       a tela vender 10.000 mensagens sozinha, no piso, sem ninguém olhar. */
-    expect(precoDe(10_000)).toBe(precoDe(TETO_AUTOATENDIMENTO));
+    /* Acima de 11.100 é Clínica, sob consulta. Deixar a função extrapolar faria
+       a tela vender 50.000 mensagens sozinha, no piso, sem ninguém olhar. */
+    expect(precoDe(50_000)).toBe(precoDe(TETO_AUTOATENDIMENTO));
   });
 
   test("negativo não quebra nem devolve preço negativo", () => {
@@ -277,22 +338,21 @@ describe("5. os limites da escada", () => {
 
   test("e o PREÇO POR MENSAGEM acima do teto não fura o piso", () => {
     /* O mutante que sobreviveu à primeira bateria. Tirar o `Math.min` deixa
-       `precoDe` igual (a lista de faixas já para em 2.500), mas
-       `centavosPorMensagem(10.000)` passa a dividir R$ 295,40 por dez mil e
-       devolve 2,95 centavos — um terço do piso. A tela mostraria um preço por
+       `precoDe` igual (a lista de faixas já para no topo), mas
+       `centavosPorMensagem(50.000)` passa a dividir R$ 999,00 por cinquenta mil
+       e devolve 2 centavos — um quarto do piso. A tela mostraria um preço por
        mensagem que a plataforma nunca cobra e que daria prejuízo se cobrasse.
        O `precoDe` disfarçava o defeito; o preço unitário o revela. */
-    expect(centavosPorMensagem(10_000)).toBeGreaterThanOrEqual(PISO_CENTAVOS_POR_MENSAGEM);
-    expect(centavosPorMensagem(10_000)).toBe(centavosPorMensagem(TETO_AUTOATENDIMENTO));
+    expect(centavosPorMensagem(50_000)).toBeGreaterThanOrEqual(PISO_CENTAVOS_POR_MENSAGEM);
+    expect(centavosPorMensagem(50_000)).toBe(centavosPorMensagem(TETO_AUTOATENDIMENTO));
   });
 });
 
 describe("6. o desconto anunciado nunca promete mais do que a fatura dá", () => {
-  test("o topo anuncia 31%", () => {
-    /* Caiu de 40% porque o desconto deixou de ser dado de uma vez na faixa 2.
-       O que se perdeu em número de vitrine se ganhou em curva: agora ele sobe
-       a cada degrau, que é o que faz a pessoa querer o degrau seguinte. */
-    expect(descontoVsEntrada(2_500)).toBe(31);
+  test("o topo anuncia 54%", () => {
+    /* De 20 centavos na entrada para 9 no topo: 54,85% de economia real, que
+       `floor` anuncia como 54%. */
+    expect(descontoVsEntrada(TETO_AUTOATENDIMENTO)).toBe(54);
   });
 
   test("a entrada não tem desconto contra ela mesma", () => {

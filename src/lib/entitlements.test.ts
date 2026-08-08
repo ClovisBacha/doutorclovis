@@ -78,8 +78,8 @@ describe("nenhum plano fica pela metade", () => {
     /* Se um dia ele virar preço único, a exclusão acima perde a justificativa e
        este teste é o que avisa. */
     expect(PLAN_PRICE.mensagens).toBe(29.9);
-    expect(mensalidadeCentavos("mensagens", 2_500)).toBe(33_940);
-    expect(mensalidadeCentavos("mensagens", 2_500)).toBeGreaterThan(PLAN_PRICE.mensagens * 100);
+    expect(mensalidadeCentavos("mensagens", 11_100)).toBe(99_900);
+    expect(mensalidadeCentavos("mensagens", 11_100)).toBeGreaterThan(PLAN_PRICE.mensagens * 100);
   });
 
   test("e ele fica acima dos nomeados que aposentou — só não acima dos contratos", () => {

@@ -31,6 +31,7 @@ import {
   diasParaZerarLoja,
 } from "./economia-sementinhas";
 import {
+  DEGRAUS,
   DEGRAUS_DESTAQUE,
   ENTRADA_MENSAGENS,
   TETO_AUTOATENDIMENTO,
@@ -88,7 +89,7 @@ describe("1c. o preço por mensagem NUNCA mostra menos do que a fatura cobra", (
    * É a mesma propaganda enganosa que `descontoVsEntrada` evita com `floor` —
    * aqui o sentido seguro é o oposto, porque o número é PREÇO e não desconto.
    */
-  const mostrado = (centavos: number) => Math.ceil(centavos * 10) / 10;
+  const mostrado = (centavos: number) => Math.ceil(centavos * 100) / 100;
 
   test("nenhuma das 48 posições do slider subestima", () => {
     for (let n = ENTRADA_MENSAGENS; n <= TETO_AUTOATENDIMENTO; n += 50) {
@@ -103,17 +104,27 @@ describe("1c. o preço por mensagem NUNCA mostra menos do que a fatura cobra", (
     }
   });
 
-  test("degraus vizinhos mostram números DIFERENTES", () => {
-    /* Um unitário parado enquanto o total sobe faz o desconto parecer inexistente. */
-    const vistos = new Set<number>();
+  test("os DEZ degraus mostram números diferentes entre si", () => {
+    /* Um unitário parado enquanto o total sobe faz o desconto parecer
+       inexistente. Nos degraus — que é o que a tabela e os cartões mostram —
+       nenhum pode repetir. */
+    const vistos = new Set(DEGRAUS.map((d) => mostrado(centavosPorMensagem(d))));
+    expect(vistos.size).toBe(DEGRAUS.length);
+  });
+
+  test("e o slider quase nunca fica parado ao ser arrastado", () => {
+    /* Com uma casa decimal, as 220 posições colapsavam em 74 valores. Com duas,
+       quase toda posição tem o seu. */
+    const posicoes: number[] = [];
     for (let n = ENTRADA_MENSAGENS; n <= TETO_AUTOATENDIMENTO; n += 50) {
-      vistos.add(mostrado(centavosPorMensagem(n)));
+      posicoes.push(mostrado(centavosPorMensagem(n)));
     }
-    expect(vistos.size).toBe(48);
+    const distintos = new Set(posicoes).size;
+    expect(distintos / posicoes.length).toBeGreaterThan(0.85);
   });
 
   test("a tela usa `ceil`, não `round`", () => {
-    expect(seletor).toContain("Math.ceil(centavos * 10) / 10");
+    expect(seletor).toContain("Math.ceil(centavos * 100) / 100");
     expect(seletor).not.toContain("Math.round(dados.porMensagem");
   });
 });
@@ -210,8 +221,8 @@ describe("4. os cartões da página de vendas saem da escada", () => {
     /* Se um dia alguém digitar um número aqui, é este teste que percebe. */
     const [entrada, meio, topo] = DEGRAUS_DESTAQUE;
     expect(precoDe(entrada)).toBe(2_990);
-    expect(precoDe(meio)).toBe(17_440);
-    expect(precoDe(topo)).toBe(33_940);
+    expect(precoDe(meio)).toBe(18_711);
+    expect(precoDe(topo)).toBe(99_900);
     expect(topo).toBe(TETO_AUTOATENDIMENTO);
   });
 

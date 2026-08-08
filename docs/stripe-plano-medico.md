@@ -33,68 +33,75 @@ Ainda na tela do produto:
 | Tipo de uso     | **Licenciado** (quantidade fixa, não medido) |
 
 > ⚠️ **Progressivo (graduated)**, não "Volume". No progressivo, cada faixa cobra
-> só as unidades que caem dentro dela — é o que faz 2.500 mensagens custarem
-> R$ 339,40. No volume, TODAS as unidades pegariam o preço da última faixa, e o
-> mesmo pedido sairia R$ 225,00. São **34% da sua receita** nessa única escolha,
-> e o erro é invisível: o Stripe aceita as duas configurações sem reclamar.
+> só as unidades que caem dentro dela — é o que faz 11.100 mensagens custarem
+> R$ 999,00. No volume, TODAS as unidades pegariam o preço da última camada, e o
+> mesmo pedido sairia R$ 888,00. São **11% da sua receita no topo** nessa única
+> escolha — e muito mais nos degraus de baixo, onde 1.350 mensagens cairiam de
+> R$ 187,11 para R$ 108,00 — 42%. O erro é invisível: o Stripe aceita as duas
+> configurações sem reclamar.
 
 ### As dez camadas
 
-| Camada | De    | Até   | Por unidade | Taxa fixa da camada |
-| ------ | ----- | ----- | ----------- | ------------------- |
-| 1      | 1     | 150   | R$ 0,00     | **R$ 29,90**        |
-| 2      | 151   | 300   | **R$ 0,19** | R$ 0,00             |
-| 3      | 301   | 500   | **R$ 0,18** | R$ 0,00             |
-| 4      | 501   | 750   | **R$ 0,17** | R$ 0,00             |
-| 5      | 751   | 1.000 | **R$ 0,15** | R$ 0,00             |
-| 6      | 1.001 | 1.250 | **R$ 0,14** | R$ 0,00             |
-| 7      | 1.251 | 1.500 | **R$ 0,13** | R$ 0,00             |
-| 8      | 1.501 | 1.750 | **R$ 0,11** | R$ 0,00             |
-| 9      | 1.751 | 2.000 | **R$ 0,10** | R$ 0,00             |
-| 10     | 2.001 | ∞     | **R$ 0,09** | R$ 0,00             |
+| Camada | De    | Até   | Por unidade   | Taxa fixa da camada |
+| ------ | ----- | ----- | ------------- | ------------------- |
+| 1      | 1     | 150   | R$ 0,0000     | **R$ 29,90**        |
+| 2      | 151   | 250   | **R$ 0,1690** | R$ 0,00             |
+| 3      | 251   | 350   | **R$ 0,1445** | R$ 0,00             |
+| 4      | 351   | 550   | **R$ 0,1418** | R$ 0,00             |
+| 5      | 551   | 850   | **R$ 0,1285** | R$ 0,00             |
+| 6      | 851   | 1.350 | **R$ 0,1179** | R$ 0,00             |
+| 7      | 1.351 | 2.100 | **R$ 0,1046** | R$ 0,00             |
+| 8      | 2.101 | 3.200 | **R$ 0,0914** | R$ 0,00             |
+| 9      | 3.201 | 5.000 | **R$ 0,0805** | R$ 0,00             |
+| 10     | 5.001 | ∞     | **R$ 0,0800** | R$ 0,00             |
 
 A camada 1 é a entrada: quem compra 150 mensagens paga R$ 29,90 e nada por
 unidade. A partir da 151 cada mensagem entra pelo preço da sua faixa.
 
-> **Por que dez camadas, e não quatro.** A escada anterior ia de R$ 0,15 direto,
-> e isso punha quase todo o desconto na mensagem 151: a entrada sai a R$ 0,1993
-> por mensagem, então comprar UMA a mais que o pacote mínimo derrubava o preço
-> marginal em 25% de uma vez. Quem comprava 151 já tinha levado o desconto, e o
-> resto da escada não motivava mais nada. Agora a segunda camada é R$ 0,19 —
-> encosta na entrada — e o desconto é conquistado camada a camada, que é onde
-> ele foi pedido: nas mensagens de cima.
+> **Os preços por unidade têm QUATRO casas, e isso é obrigatório.** As nove
+> faixas por unidade precisam somar exatamente R$ 969,10 em 10.950 mensagens;
+> com valores redondos a soma seria sempre múltipla de 50 centavos, e R$ 969,10
+> não é. O campo do Stripe é `unit_amount_decimal` — ele aceita decimal por
+> unidade justamente para isto. Digite os quatro dígitos.
+
+> **Por que dez camadas.** Os dois números são decisão do dono: a entrada custa
+> 20 centavos por mensagem (R$ 29,90 ÷ 150 = 19,93c) e o último plano de
+> autoatendimento custa **R$ 999,00 a 9 centavos por mensagem** — o que define
+> 11.100 mensagens, porque 999 ÷ 0,09 = 11.100. Tudo entre os dois é
+> consequência, e a escada foi resolvida de trás para a frente para que os dois
+> batessem exatos.
 
 > A última camada fica em ∞ porque o Stripe exige. **O teto real é nosso**: o
-> checkout manda `adjustable_quantity.maximum = 2500` e o servidor recusa acima
-> disso (`fora_da_escada`) — acima de 2.500 é contrato de Clínica.
+> checkout manda `adjustable_quantity.maximum = 11100` e o servidor recusa acima
+> disso (`fora_da_escada`) — acima de 11.100 é contrato de Clínica.
 
 ### Confira antes de salvar
 
-Estes são os números que o site mostra. Se algum não bater, uma camada está
-errada:
+Esta tabela é GERADA a partir de `precoDe`, não digitada — e há teste que a
+confere linha por linha contra o código. Se algum número não bater no painel do
+Stripe, é a camada que está errada, não esta lista.
 
 | Mensagens | Fatura        | Por mensagem | Desconto |
 | --------- | ------------- | ------------ | -------- |
-| 150       | **R$ 29,90**  | R$ 0,1993    | —        |
-| 300       | R$ 58,40      | R$ 0,1947    | 2%       |
-| 500       | R$ 94,40      | R$ 0,1888    | 5%       |
-| 750       | R$ 136,90     | R$ 0,1825    | 8%       |
-| 1.000     | **R$ 174,40** | R$ 0,1744    | 12%      |
-| 1.250     | R$ 209,40     | R$ 0,1675    | 15%      |
-| 1.500     | R$ 241,90     | R$ 0,1613    | 19%      |
-| 1.750     | R$ 269,40     | R$ 0,1539    | 22%      |
-| 2.000     | **R$ 294,40** | R$ 0,1472    | 26%      |
-| 2.500     | **R$ 339,40** | R$ 0,1358    | 31%      |
+| 150       | **R$ 29,90**  | R$ 0,1993    | 0%       |
+| 250       | R$ 46,80      | R$ 0,1872    | 6%       |
+| 350       | R$ 61,25      | R$ 0,1750    | 12%      |
+| 550       | R$ 89,61      | R$ 0,1629    | 18%      |
+| 850       | R$ 128,16     | R$ 0,1508    | 24%      |
+| 1.350     | **R$ 187,11** | R$ 0,1386    | 30%      |
+| 2.100     | R$ 265,56     | R$ 0,1265    | 36%      |
+| 3.200     | R$ 366,10     | R$ 0,1144    | 42%      |
+| 5.000     | R$ 511,00     | R$ 0,1022    | 48%      |
+| 11.100    | **R$ 999,00** | R$ 0,0900    | 54%      |
 
-> **O "R$ 0,09" é o preço MARGINAL da última camada, não a média.** Em preço
-> graduado o efetivo nunca alcança o marginal do fim: quem compra 2.500 paga
-> R$ 0,1358 por mensagem. É a coluna "Por mensagem" que pode ir para a tela —
-> nunca a tabela de camadas.
+> **O "9 centavos" do topo é o preço EFETIVO, não o marginal.** Em preço
+> graduado o efetivo nunca alcança o marginal do fim: a última camada cobra
+> R$ 0,08 por mensagem, e é a mistura com as camadas de cima que faz a média
+> fechar em R$ 0,09. Não "corrija" a camada 10 para 0,0900 — isso quebra o
+> R$ 999,00.
 
-> **Onde foi parar o R$ 295,40.** O topo antigo (quatro camadas) valia 2.500
-> mensagens por R$ 295,40. Com dez camadas, o mesmo bolso compra **2.000
-> mensagens por R$ 294,40** — e as 500 seguintes passaram a custar R$ 0,09 cada,
-> que é exatamente onde o desconto foi pedido.
+> **O desconto sobe seis pontos por degrau**, sempre o mesmo passo: 0 · 6 · 12 ·
+> 18 · 24 · 30 · 36 · 42 · 48 · 54%. É o que "dividir em dez partes" quer dizer.
 
 ## 3. Copiar o ID do Price
 

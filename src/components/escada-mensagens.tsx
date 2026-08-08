@@ -101,16 +101,19 @@ const brl = (centavos: number) =>
  *    o preço total e deixava o unitário parado — que é justamente o número que
  *    deveria mostrar o desconto acontecendo.
  *
- * 2. E `Math.round` mostrava MENOS do que a fatura cobra. Em 2.100 mensagens o
- *    real é 14,4476 centavos e a tela imprimia "R$ 0,14": 2.100 × 0,14 dá
- *    R$ 294,00 contra os R$ 303,40 cobrados. É a mesma propaganda enganosa que
- *    `descontoVsEntrada` evita com `floor` — aqui o sentido seguro é o oposto,
- *    porque o número é um PREÇO e não um desconto.
+ * 2. E `Math.round` mostrava MENOS do que a fatura cobra. É a mesma propaganda
+ *    enganosa que `descontoVsEntrada` evita com `floor` — aqui o sentido seguro
+ *    é o oposto, porque o número é um PREÇO e não um desconto.
+ *
+ * DUAS casas, e não uma: a escada passou a ir de 150 a 11.100 mensagens. Com
+ * uma casa, 220 posições do slider colapsavam em 74 valores e o unitário ficava
+ * parado enquanto o total subia — que é exatamente o defeito que este bloco
+ * existe para impedir. Com duas, são 196.
  */
 const centavosTexto = (centavos: number) =>
-  `${(Math.ceil(centavos * 10) / 10).toLocaleString("pt-BR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
+  `${(Math.ceil(centavos * 100) / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })} centavos`;
 
 /**

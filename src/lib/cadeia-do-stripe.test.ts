@@ -22,6 +22,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
   ENTRADA_MENSAGENS,
+  FAIXAS,
   TETO_AUTOATENDIMENTO,
   centavosPorMensagem,
   precoDe,
@@ -295,32 +296,33 @@ describe("6. o preço que o Stripe vai cobrar é o que a nossa conta diz", () =>
     expect(precoDe(150)).toBe(2_990);
   });
 
-  test("o topo: 2.500 mensagens = R$ 339,40", () => {
-    expect(TETO_AUTOATENDIMENTO).toBe(2_500);
-    expect(precoDe(2_500)).toBe(33_940);
+  test("o topo: 11.100 mensagens = R$ 999,00", () => {
+    expect(TETO_AUTOATENDIMENTO).toBe(11_100);
+    expect(precoDe(11_100)).toBe(99_900);
   });
 
-  test("e o antigo topo (R$ 294,40) agora compra 2.000", () => {
-    /* A escada passou de quatro faixas para dez, com o desconto morando nas
-       mensagens de cima. O mesmo bolso de antes compra 2.000 em vez de 2.500 —
-       e é preciso que o Stripe reproduza os DOIS pontos, não só o topo. */
-    expect(precoDe(2_000)).toBe(29_440);
+  test("e ele custa NOVE centavos por mensagem — é o que define o teto", () => {
+    /* O dono fixou o preço e o custo unitário; 11.100 é 999 ÷ 0,09. Se uma
+       camada do Stripe sair diferente, é este número que não fecha. */
+    expect(precoDe(11_100) / 11_100).toBe(9);
   });
 
   test("e as dez faixas somam exatamente isso", () => {
-    /* A conta que a configuração do Stripe tem de reproduzir, faixa a faixa. */
+    /* A conta que a configuração do Stripe tem de reproduzir, faixa a faixa.
+       Os centavos com casa decimal são de propósito: sem eles a soma não fecha
+       em R$ 999,00 — ver o cabeçalho de `planos-medico.ts`. */
     const soma =
       2_990 +
-      150 * 19 +
-      200 * 18 +
-      250 * 17 +
-      250 * 15 +
-      250 * 14 +
-      250 * 13 +
-      250 * 11 +
-      250 * 10 +
-      500 * 9;
-    expect(soma).toBe(precoDe(2_500));
+      100 * 16.9 +
+      100 * 14.45 +
+      200 * 14.18 +
+      300 * 12.85 +
+      500 * 11.79 +
+      750 * 10.46 +
+      1_100 * 9.14 +
+      1_800 * 8.05 +
+      6_100 * 8.0;
+    expect(Math.round(soma)).toBe(precoDe(11_100));
   });
 });
 
@@ -342,6 +344,8 @@ describe("7. o DOCUMENTO do Stripe é conferido contra a escada, linha por linha
    * aqui não dá erro em lugar nenhum: vira cobrança errada.
    */
   const doc = readFileSync("docs/stripe-plano-medico.md", "utf8");
+  /** Milhar com ponto, como o documento escreve. */
+  const de10 = (n: number) => n.toLocaleString("pt-BR");
 
   /** Uma linha da tabela markdown → números. */
   const linhas = doc
@@ -349,6 +353,38 @@ describe("7. o DOCUMENTO do Stripe é conferido contra a escada, linha por linha
     .filter((l) => /^\| [\d.]+ +\|/.test(l))
     .map((l) => l.split("|").map((c) => c.trim()))
     .filter((c) => (c.length >= 5 && c[2].startsWith("**R$") === false ? true : true));
+
+  test("a tabela de CAMADAS bate com `FAIXAS`, linha por linha", () => {
+    /**
+     * É esta a tabela que vira digitação humana no painel do Stripe — a outra é
+     * só conferência. Uma bateria de mutação mostrou que ela passava despercebida:
+     * trocar R$ 0,0805 por R$ 0,0850 numa camada não matava teste nenhum, e o
+     * médico seria cobrado a mais em todo pedido acima de 3.200 mensagens.
+     */
+    let de = 1;
+    let conferidas = 0;
+    FAIXAS.forEach((f, i) => {
+      const ate = i === FAIXAS.length - 1 ? "∞" : de10(f.ate);
+      const unidade =
+        "centavos" in f ? `**R$ ${(f.centavos / 100).toFixed(4).replace(".", ",")}**` : "R$ 0,0000";
+      const fixa =
+        "fixo" in f ? `**R$ ${(f.fixo / 100).toFixed(2).replace(".", ",")}**` : "R$ 0,00";
+      /* A linha inteira, com os quatro campos — não só o número solto, senão
+         uma camada certa no lugar errado passaria. */
+      const linha = doc
+        .split("\n")
+        .find((l) => l.startsWith(`| ${i + 1} `) || l.startsWith(`| ${i + 1}  `));
+      expect(linha, `camada ${i + 1} não encontrada no documento`).toBeDefined();
+      const campos = linha!.split("|").map((c) => c.trim());
+      expect(campos[2]).toBe(de10(de));
+      expect(campos[3]).toBe(ate);
+      expect(campos[4]).toBe(unidade);
+      expect(campos[5]).toBe(fixa);
+      de = f.ate + 1;
+      conferidas++;
+    });
+    expect(conferidas).toBe(10);
+  });
 
   test("a tabela de conferência existe e tem os dez degraus", () => {
     const comFatura = linhas.filter((c) => /R\$/.test(c[2]));
@@ -360,7 +396,8 @@ describe("7. o DOCUMENTO do Stripe é conferido contra a escada, linha por linha
     let conferidas = 0;
     for (const c of linhas) {
       const mensagens = Number(c[1].replace(/\./g, ""));
-      if (!Number.isFinite(mensagens) || mensagens < 150 || mensagens > 2_500) continue;
+      if (!Number.isFinite(mensagens)) continue;
+      if (mensagens < ENTRADA_MENSAGENS || mensagens > TETO_AUTOATENDIMENTO) continue;
       if (!/R\$/.test(c[2])) continue;
       const fatura = Math.round(num(c[2]) * 100);
       expect(fatura).toBe(precoDe(mensagens));

@@ -18,15 +18,17 @@
  *
  * ─── O PISO EXISTE PARA NÃO HAVER SURPRESA ──────────────────────────────────
  *
- * O preço marginal cai a cada faixa e **para** em R$ 0,09. Não é um número
- * escolhido por estética: é 3,3× o custo de PLANEJAMENTO (R$ 0,027, que já é o
- * pior caso possível, não a média de R$ 0,015). Com ele, o degrau mais fundo da
- * escada ainda dá 51% de margem no cenário em que as mensagens vêm no tamanho
- * máximo E o modelo custa o dobro do de hoje.
+ * O preço marginal cai a cada faixa e **para** em R$ 0,08. Não é estética: é 3×
+ * o custo de PLANEJAMENTO (R$ 0,027, que já é o pior caso possível, não a média
+ * de R$ 0,015).
  *
- * Uma faixa abaixo de R$ 0,09 daria margem NEGATIVA nesse cenário — e é por
- * isso que a escada termina em 2.500 mensagens em vez de seguir descendo. Acima
- * disso é Clínica, sob consulta, onde se olha o uso real antes de dar preço.
+ * No topo — R$ 999,00 por 11.100 mensagens, a 9 centavos efetivos — a margem é
+ * de 66% no custo planejado e de **36% no cenário de estresse**, aquele em que
+ * as mensagens vêm no tamanho máximo E o modelo custa o dobro do de hoje. É
+ * menos folga que os degraus de baixo têm (68% na entrada), e é o preço de o
+ * topo ser barato: quem compra volume paga menos por mensagem, e a margem
+ * acompanha. Acima de 11.100 é Clínica, sob consulta, onde se olha o uso real
+ * antes de dar preço.
  *
  * Este arquivo é só a conta. Sem rede, sem banco, sem React.
  */
@@ -35,47 +37,55 @@
  * As faixas, em centavos por mensagem.
  *
  * `ate` é o teto ACUMULADO da faixa; `centavos` é o preço de cada mensagem
- * DENTRO dela — preço graduado, igual ao do Stripe. A primeira faixa é
- * `fixo`: R$ 29,90 fechados, não por unidade, e isso faz dois trabalhos de uma
- * vez — bate exato no preço de entrada que o dono escolheu e vira tíquete
- * mínimo (ninguém assina por R$ 5).
+ * DENTRO dela — preço graduado, igual ao do Stripe. A primeira faixa é `fixo`:
+ * R$ 29,90 fechados, não por unidade, e isso faz dois trabalhos de uma vez —
+ * bate exato no preço de entrada que o dono escolheu e vira tíquete mínimo
+ * (ninguém assina por R$ 5).
  *
- * ─── POR QUE DEZ FAIXAS, E NÃO QUATRO ───────────────────────────────────────
+ * ─── OS DOIS NÚMEROS QUE O DONO FIXOU ───────────────────────────────────────
  *
- * A escada tinha quatro faixas (15 / 12 / 9) e o dono achou o degrau errado:
- * **na mensagem 151 o desconto despencava de uma vez**. A entrada sai a
- * R$ 0,1993 por mensagem (29,90 ÷ 150); a faixa seguinte cobrava R$ 0,15 — uma
- * queda instantânea de 25% por comprar UMA mensagem a mais que o pacote mínimo.
- * Quem comprasse 151 já levava quase todo o desconto que existia, e o resto da
- * escada não motivava mais nada.
+ *   · a entrada custa **20 centavos por mensagem** (R$ 29,90 ÷ 150 = 19,93c);
+ *   · o último plano de autoatendimento custa **R$ 999,00 a 9 centavos por
+ *     mensagem** — o que define 11.100 mensagens, porque 999 ÷ 0,09 = 11.100.
  *
- * Agora a segunda faixa é R$ 0,19: encosta na entrada (queda de 5%) e o
- * desconto vai sendo conquistado faixa a faixa, um centavo por vez, até o piso.
- * O desconto passa a viver ONDE ELE FOI PEDIDO — nas mensagens de cima.
+ * Tudo entre esses dois pontos é consequência, e a escada foi resolvida DE TRÁS
+ * PARA A FRENTE (do topo para a entrada) para que os dois batessem exatos e os
+ * preços marginais coubessem em duas casas decimais — que é o que se digita no
+ * painel do Stripe.
  *
- * ─── O PISO COMEÇA EM 2.001, E ISSO É DECISÃO DO DONO ───────────────────────
+ * ─── O DESCONTO SOBE SEIS PONTOS POR DEGRAU, E ISSO NÃO É SORTE ─────────────
  *
- * "Acima de dois mil, a gente coloca o preço de R$ 0,09 pra cima, e depois o
- * preço da clínica." É exatamente o que a última faixa faz.
+ * Os dez degraus dão 0 · 6 · 12 · 18 · 24 · 30 · 36 · 42 · 48 · 54% de economia
+ * por mensagem. O preço efetivo cai cerca de 1,21 centavo a cada degrau, sempre
+ * o mesmo passo: era esse o pedido — "vai passar de vinte centavos até nove
+ * centavos, dividido em dez partes".
  *
  * ─── CUIDADO AO LER ESTES NÚMEROS ───────────────────────────────────────────
  *
  * `centavos` é o preço MARGINAL da faixa, não o que o médico paga por mensagem.
- * Em preço graduado o efetivo nunca alcança o marginal do último degrau: quem
- * compra 2.500 paga R$ 0,1358 por mensagem, não R$ 0,09. Quem quiser o número
- * que aparece na tela use `centavosPorMensagem`, nunca esta tabela.
+ * Em preço graduado o efetivo nunca alcança o marginal do último degrau — e é
+ * por isso que o marginal do fim é 8 centavos enquanto o EFETIVO no topo é 9.
+ * Quem quiser o número que aparece na tela use `centavosPorMensagem`, nunca
+ * esta tabela.
+ *
+ * ─── E POR QUE HÁ CASA DECIMAL ──────────────────────────────────────────────
+ *
+ * Porque a conta não fecha sem ela. As nove faixas por unidade precisam somar
+ * exatamente R$ 969,10 em 10.950 mensagens; com limites redondos e marginais
+ * inteiros a soma é sempre múltipla de 50 centavos, e R$ 969,10 não é. O Stripe
+ * cobra decimal por unidade (`unit_amount_decimal`) justamente para isto.
  */
 export const FAIXAS = [
   { ate: 150, fixo: 2_990 },
-  { ate: 300, centavos: 19 },
-  { ate: 500, centavos: 18 },
-  { ate: 750, centavos: 17 },
-  { ate: 1_000, centavos: 15 },
-  { ate: 1_250, centavos: 14 },
-  { ate: 1_500, centavos: 13 },
-  { ate: 1_750, centavos: 11 },
-  { ate: 2_000, centavos: 10 },
-  { ate: 2_500, centavos: 9 },
+  { ate: 250, centavos: 16.9 },
+  { ate: 350, centavos: 14.45 },
+  { ate: 550, centavos: 14.18 },
+  { ate: 850, centavos: 12.85 },
+  { ate: 1_350, centavos: 11.79 },
+  { ate: 2_100, centavos: 10.46 },
+  { ate: 3_200, centavos: 9.14 },
+  { ate: 5_000, centavos: 8.05 },
+  { ate: 11_100, centavos: 8.0 },
 ] as const;
 
 /**
@@ -95,17 +105,24 @@ export const MENSAGENS_ESCOLHIDAS = "obstetrica:mensagens-escolhidas";
 export const ENTRADA_MENSAGENS = 150;
 
 /**
- * O maior pacote que se compra sozinho.
+ * O maior pacote que se compra sozinho: R$ 999,00.
  *
- * Acima disso, Clínica. Não é limitação técnica: 2.500 mensagens ≈ 165
- * gestantes ativas, e quem pede mais que isso quase nunca é UM obstetra — é
- * clínica com vários médicos, e cada médico precisa do próprio cérebro. O
- * pedido em si é a informação, e vale uma conversa antes de um preço.
+ * Acima disso, Clínica. Não é limitação técnica: 11.100 mensagens ≈ 740
+ * gestantes ativas, e quem pede mais que isso não é UM obstetra — é clínica com
+ * vários médicos, e cada médico precisa do próprio cérebro. O pedido em si é a
+ * informação, e vale uma conversa antes de um preço.
  */
-export const TETO_AUTOATENDIMENTO = 2_500;
+export const TETO_AUTOATENDIMENTO = 11_100;
 
-/** O piso do desconto: nenhuma mensagem é vendida abaixo disto. */
-export const PISO_CENTAVOS_POR_MENSAGEM = 9;
+/**
+ * O piso MARGINAL: nenhuma faixa é vendida abaixo disto.
+ *
+ * Oito centavos, e não os nove do efetivo do topo — em preço graduado o efetivo
+ * é sempre maior que o marginal do fim. Continua sendo 3× o custo de
+ * PLANEJAMENTO (2,7c), e no cenário de estresse o topo ainda entrega 36% de
+ * margem depois da taxa do Stripe.
+ */
+export const PISO_CENTAVOS_POR_MENSAGEM = 8;
 
 /**
  * Custo de PLANEJAMENTO por mensagem, em centavos.
@@ -139,7 +156,15 @@ export function precoDe(mensagens: number): number {
     total += "fixo" in faixa ? faixa.fixo : nestaFaixa * faixa.centavos;
     jaCobradas = Math.min(n, faixa.ate);
   }
-  return total;
+  /* ─── ARREDONDA UMA VEZ, NO FIM ────────────────────────────────────────────
+     As faixas cobram centavos com casa decimal, então uma quantidade no meio de
+     uma faixa pode dar meio centavo (1.000 mensagens caem em 14.584,5). O
+     Stripe também arredonda a linha da fatura ao centavo; arredondar aqui e
+     mais nada é o que mantém as duas contas iguais.
+
+     Os dez degraus da tabela foram escolhidos para dar centavos inteiros ANTES
+     do arredondamento — não é o `round` que os salva. */
+  return Math.round(total);
 }
 
 /** O preço de entrada, derivado da escada — nunca escrito à mão. */
@@ -173,15 +198,15 @@ export function descontoVsEntrada(mensagens: number): number {
  * O slider é contínuo, mas ninguém compara oito números de cabeça — os cartões
  * âncora são três (o primeiro, o do meio e o topo) e o resto vive no slider.
  */
-export const DEGRAUS = [150, 300, 500, 750, 1_000, 1_250, 1_500, 1_750, 2_000, 2_500] as const;
+export const DEGRAUS = [150, 250, 350, 550, 850, 1_350, 2_100, 3_200, 5_000, 11_100] as const;
 
 /**
- * Os três que viram cartão.
+ * Os três que viram cartão: a entrada, o meio da escada e o topo.
  *
- * O do meio é 1.000 e não 1.250 de propósito: é o primeiro degrau em que o
- * desconto chega a dois dígitos (12%), que é o número que o cartão mostra.
+ * O do meio é 1.350 — o quinto degrau, com 30% de economia por mensagem. Meio
+ * de verdade: metade dos degraus abaixo, metade acima.
  */
-export const DEGRAUS_DESTAQUE = [150, 1_000, 2_500] as const;
+export const DEGRAUS_DESTAQUE = [150, 1_350, 11_100] as const;
 
 /**
  * Quantas mensagens uma gestante ativa consome por mês, em média.
