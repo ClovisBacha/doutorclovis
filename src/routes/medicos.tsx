@@ -61,12 +61,13 @@ const PLANS = [
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "Saia do caderno e do zap pessoal — de graça, para sempre.",
+    desc: "A plataforma de gestão inteira, de graça e para sempre. Saia do caderno e do zap pessoal.",
     features: [
+      "👩‍🍼 Pacientes ILIMITADAS — sem teto, como nos planos pagos",
       "App de pré-natal completo para as suas pacientes",
-      "Solicitações de consulta organizadas em um só lugar",
-      "Calculadoras e ferramentas clínicas básicas",
-      "Sem a IA respondendo pela sua voz — é o que os planos pagos abrem",
+      "Consultas, pré-consulta digital e prontuário num lugar só",
+      "Ferramentas clínicas: biometria, EPDS, DMG, pré-eclâmpsia",
+      "Só não tem a IA respondendo pela sua voz — é isso que os pagos abrem",
     ],
     cta: "Criar conta grátis",
   },
@@ -101,8 +102,8 @@ const PLANS = [
     features: [
       `💬 ${MEIO.toLocaleString("pt-BR")} mensagens por mês · ${descontoVsEntrada(MEIO)}% mais barata cada uma`,
       `👩‍🍼 Cerca de ${gestantesAtendidas(MEIO)} gestantes ativas · pacientes ilimitadas`,
-      "Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia)",
       "Dashboard do consultório: dúvidas frequentes e engajamento",
+      "🎚️ Qualquer número entre os degraus, no seletor acima",
     ],
     cta: "Assinar Movimento",
   },
@@ -213,11 +214,11 @@ const FAQS = [
   },
   {
     q: "Existe limite de mensagens da IA?",
-    a: "Existe, e é justamente o que você contrata: o plano é medido em mensagens de IA por mês (150, 600, 1.500 — ou qualquer número até 2.500, ajustável no checkout). Quanto mais você contrata, mais barata fica a mensagem: de R$ 0,20 na entrada a R$ 0,12 no topo. Se o mês acabar antes da cota, a paciente não fica sem resposta nem sem saída: ela é avisada de que o limite é DA PLATAFORMA (nunca seu) e recebe o caminho direto até você. E urgência nunca tem cota — sinal de alarme é sempre respondido e sempre encaminhado.",
+    a: "Existe, e é justamente o que você contrata: o plano é medido em mensagens de IA por mês (150, 1.350, 11.100 — ou qualquer número entre eles, no seletor acima). Quanto mais você contrata, mais barata fica a mensagem: de 20 centavos na entrada a 9 centavos no topo, com o desconto subindo seis pontos a cada degrau. Se o mês acabar antes da cota, a paciente não fica sem resposta nem sem saída: ela é avisada de que o limite é DA PLATAFORMA (nunca seu) e recebe o caminho direto até você. E urgência nunca tem cota — sinal de alarme é sempre respondido e sempre encaminhado.",
   },
   {
     q: "Quantas pacientes posso ter?",
-    a: "Quantas você quiser — não há teto de pacientes em nenhum plano pago. Esse limite existia e foi retirado: cobrar por cabeça punia justamente quem traz mais gestantes para a plataforma. O que você dimensiona é o volume de conversa com a IA, que é o que realmente custa. Uma paciente que não usa o chat não custa nada.",
+    a: "Quantas você quiser — não há teto de pacientes em nenhum plano, nem no Free. Esse limite existia e foi retirado: cobrar por cabeça punia justamente quem traz mais gestantes para a plataforma. O que você dimensiona é o volume de conversa com a IA, que é o que realmente custa. Uma paciente que não usa o chat não custa nada.",
   },
 ];
 

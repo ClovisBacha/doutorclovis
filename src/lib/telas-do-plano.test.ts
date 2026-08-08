@@ -279,6 +279,38 @@ describe("4b. a quantidade escolhida no site NÃO se perde no caminho", () => {
   });
 });
 
+describe("4c. a página de vendas conta a verdade sobre o Free", () => {
+  /**
+   * O Free deixou de ser "o teste com 5 pacientes" e virou a plataforma de
+   * gestão inteira. Uma página que ainda o descreve como básico afasta
+   * exatamente quem ele existe para atrair.
+   */
+  test("o cartão do Free diz PACIENTES ILIMITADAS", () => {
+    const i = vendas.indexOf('key: "free"');
+    const cartao = vendas.slice(i, vendas.indexOf("cta:", i));
+    expect(cartao).toContain("ILIMITADAS");
+  });
+
+  test("e não se vende como 'básico'", () => {
+    const i = vendas.indexOf('key: "free"');
+    const cartao = vendas.slice(i, vendas.indexOf("cta:", i));
+    expect(cartao).not.toContain("básica");
+    expect(cartao).not.toContain("Até 5 pacientes");
+  });
+
+  test("nenhum cartão pago vende ferramentas clínicas como diferencial", () => {
+    /* Elas estão no Free também — e um diferencial que todos têm é uma
+       promessa que o comprador confere e descobre falsa. */
+    expect(vendas).not.toContain("Ferramentas clínicas avançadas (biometria");
+  });
+
+  test("o FAQ não cita degraus nem preços que não existem mais", () => {
+    for (const morto of ["até 2.500", "R$ 0,12 no topo", "Free até 5"]) {
+      expect(vendas).not.toContain(morto);
+    }
+  });
+});
+
 describe("5. a mesada tem tela — e a tela conta a mesma história do servidor", () => {
   /**
    * `getMesada` e `presentearPaciente` estavam escritas, testadas e sem NENHUM
