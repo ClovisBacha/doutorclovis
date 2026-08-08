@@ -374,8 +374,11 @@ describe("7. o DOCUMENTO do Stripe é conferido contra a escada, linha por linha
       const linha = doc
         .split("\n")
         .find((l) => l.startsWith(`| ${i + 1} `) || l.startsWith(`| ${i + 1}  `));
-      expect(linha, `camada ${i + 1} não encontrada no documento`).toBeDefined();
-      const campos = linha!.split("|").map((c) => c.trim());
+      /* `expect(x, mensagem)` não existe no runner do Bun, e o segundo
+         argumento era ignorado em silêncio — o teste passava e o TypeScript
+         reclamava. A checagem explícita diz a mesma coisa e compila. */
+      if (!linha) throw new Error(`camada ${i + 1} não encontrada no documento`);
+      const campos = linha.split("|").map((c) => c.trim());
       expect(campos[2]).toBe(de10(de));
       expect(campos[3]).toBe(ate);
       expect(campos[4]).toBe(unidade);
