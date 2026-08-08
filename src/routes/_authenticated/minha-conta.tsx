@@ -130,6 +130,7 @@ import {
   type TestimonialStatus,
 } from "@/lib/testimonials.functions";
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
+import { PresentearAmigas } from "@/components/presentear-amigas";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
    alfabética que só devolvia nome e especialidade — e exigia selo, então
@@ -16772,6 +16773,11 @@ function CantinhoTab({
               <RatingRewardCard onEarned={(n) => setSaldo((s) => s + n)} />
               <TestimonialCard />
               <ReferralCard />
+              {/* O bolso de quem assina: presentear as amigas que ela trouxe.
+                  Vem DEPOIS do cartão de indicação de propósito — primeiro ela
+                  entende como trazer alguém, depois o que pode dar a quem
+                  trouxe. O cartão some sozinho para quem não assina. */}
+              <PresentearAmigas />
             </div>
           )}
         </div>

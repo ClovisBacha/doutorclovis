@@ -196,6 +196,35 @@ export const CLASSES_DE_PRESENTE = [
 export type ClasseDePresente = (typeof CLASSES_DE_PRESENTE)[number];
 
 /**
+ * O BOLSO MENSAL DA PACIENTE QUE ASSINA.
+ *
+ * Quem paga o Premium ganha Sementinhas para dar às amigas que indicou — o
+ * mesmo desenho da mesada do médico, do outro lado do app.
+ *
+ * ─── POR QUE 300, E NÃO MAIS ────────────────────────────────────────────────
+ *
+ * Três presentes de 100 por mês. O número foi escolhido contra duas paredes:
+ *
+ *  · é menos da metade da loja grátis (704), então uma amiga presenteada não
+ *    ganha a prateleira inteira de graça — ela ganha um empurrão e continua
+ *    caminhando até a parede dos quinze dias, que é o que faz a assinatura
+ *    acontecer;
+ *  · e é MENOR que a mesada de entrada do médico (150 × 3 = 450). A hierarquia
+ *    importa: quem paga R$ 19,90 não pode presentear mais que o profissional
+ *    que sustenta a conta dela.
+ */
+export const MESADA_DA_ASSINANTE = 300;
+
+/**
+ * Quanto vai em cada presente entre amigas.
+ *
+ * Cem, e não os 50 do médico: ele presenteia dezenas de pacientes, ela
+ * presenteia duas ou três amigas. Um presente pequeno demais entre pessoas que
+ * se conhecem soa como não ter dado nada.
+ */
+export const PRESENTE_ENTRE_AMIGAS = 100;
+
+/**
  * Quantos dias até ela ter comprado TODOS os itens grátis.
  *
  * Devolve `Infinity` se o ganho for zero — nunca um número enganosamente
