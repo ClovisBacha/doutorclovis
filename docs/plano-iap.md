@@ -43,16 +43,18 @@ lojas, para o servidor não precisar de duas tabelas.
 | id sugerido         | tipo                      | preço         |
 | ------------------- | ------------------------- | ------------- |
 | `premium.mensal`    | assinatura auto-renovável | R$ 19,90/mês  |
-| `premium.anual`     | assinatura auto-renovável | R$ 118,80/ano |
+| `premium.anual`     | assinatura auto-renovável | R$ 109,90/ano |
 | `sementinhas.1000`  | consumível                | R$ 39,90      |
 | `sementinhas.2000`  | consumível                | R$ 69,90      |
 | `sementinhas.5000`  | consumível                | R$ 139,90     |
 | `sementinhas.10000` | consumível                | R$ 249,00     |
 
 **Cuidado com o preço:** na App Store o valor sai de uma **faixa**, não é digitado.
-Os valores acima e o alvo da promoção (R$ 89,90) precisam existir como faixa
-disponível no Brasil — confira antes de prometer o número na tela. Se a faixa
-mais próxima for R$ 89,90, ótimo; se não, o preço da promoção muda e
+Os valores acima precisam existir como faixa disponível no Brasil — confira
+antes de prometer o número na tela. (A oferta de boas-vindas de R$ 89,90 foi
+APOSENTADA: o anual passou a R$ 109,90 cheios, e não há mais promoção de
+primeiro ano a cadastrar. Ver o cabeçalho de `src/lib/promo.ts`.) Se a faixa
+mais próxima do anual não for R$ 109,90, o preço muda e
 `promo.ts` tem de acompanhar (o preço é a constante lá justamente para isso).
 
 ### 2. A promoção, no molde da loja — **decidido: introdutória**
@@ -125,7 +127,7 @@ está no mesmo caminho crítico.
 
 **Não decidido, e precisa de você:**
 
-- Qual faixa de preço usar no Brasil (define se R$ 89,90 sobrevive).
+- Qual faixa de preço usar no Brasil para o anual (R$ 109,90) e o mensal.
 - Introdutória ou promocional — e, se for introdutória, o contador sai.
 - Conta de desenvolvedor Apple (US$ 99/ano) e Google (US$ 25 uma vez).
 

@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BONUS_VINCULO_MEDICO } from "@/lib/economia-sementinhas";
+import {
+  ANUAL_CENTAVOS,
+  ANUAL_MENSAL_EQUIV_CENTAVOS,
+  DESCONTO_ANUAL_PCT,
+  MENSAL_CENTAVOS,
+  REFERENCIA_CENTAVOS,
+  brl,
+} from "@/lib/promo";
 import { X, Lock, Sparkles } from "lucide-react";
 import {
   BabyIllustration,
@@ -196,8 +204,8 @@ export function BabyJourneyModal({
 }
 
 /**
- * Popup do Premium — bonito, tecnológico e direto: ancoragem "de 19,90 por
- * 9,90", os desbloqueios visuais, e o campo de CUPOM no rodapé (o código
+ * Popup do Premium — bonito, tecnológico e direto: a comparação com pagar mês
+ * a mês, os desbloqueios visuais, e o campo do CÓDIGO do médico no rodapé (o
  * que o médico gera libera o Premium na hora; futuramente, cupons de
  * desconto). Reutiliza a identidade tech (brain-tech/grid/scanline).
  */
@@ -358,15 +366,27 @@ export function PremiumUpsellModal({
             </li>
           </ul>
 
-          {/* ancoragem de preço: de X por X */}
+          {/* ─── OS TRÊS NÚMEROS ERAM ESCRITOS À MÃO, E OS TRÊS ESTAVAM ERRADOS
+              "de R$ 19,90 por R$ 9,90/mês, no plano anual (R$ 118,80/ano)".
+
+              O anual passou a R$ 109,90 (equivalente de R$ 9,16), e esta tela
+              ficou com a tabela antiga — cobrando um valor e anunciando outro,
+              que é a reclamação mais cara que existe.
+
+              Agora os três saem de `promo.ts`. E o riscado é o preço REAL de
+              pagar mês a mês por doze meses, com a legenda dizendo o que ele é:
+              riscar um número que ninguém cobra é o "preço de referência" que o
+              CDC proíbe. */}
           <div className="mt-5 rounded-2xl border border-white/15 bg-white/5 p-4 text-center backdrop-blur-sm">
             <p className="text-xs text-white/60">
-              de <span className="font-semibold line-through">R$ 19,90/mês</span> por
+              <span className="font-semibold line-through">{brl(REFERENCIA_CENTAVOS)}</span> pagando
+              mês a mês · por
             </p>
-            <p className="mt-0.5 font-serif text-4xl font-bold">
-              R$ 9,90<span className="text-base font-medium text-white/70">/mês</span>
+            <p className="mt-0.5 font-serif text-4xl font-bold">{brl(ANUAL_CENTAVOS)}</p>
+            <p className="text-[11px] text-white/55">
+              no plano anual · equivale a {brl(ANUAL_MENSAL_EQUIV_CENTAVOS)}/mês ·{" "}
+              {DESCONTO_ANUAL_PCT}% de desconto
             </p>
-            <p className="text-[11px] text-white/55">no plano anual (R$ 118,80/ano)</p>
             <div className="mt-3 grid gap-2">
               <button
                 onClick={() => checkout("annual")}
@@ -380,7 +400,7 @@ export function PremiumUpsellModal({
                 disabled={busy !== null}
                 className="w-full rounded-full border border-white/25 px-5 py-2.5 text-xs font-semibold text-white/85 disabled:opacity-60"
               >
-                {busy === "monthly" ? "Abrindo…" : "Prefiro mensal — R$ 19,90"}
+                {busy === "monthly" ? "Abrindo…" : `Prefiro mensal — ${brl(MENSAL_CENTAVOS)}`}
               </button>
             </div>
           </div>

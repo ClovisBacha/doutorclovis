@@ -3134,19 +3134,12 @@ function LessonSheet({
    já liberada. Pagamento assistido: PIX + comprovante no WhatsApp e o
    consultório ativa o acesso (toggle no painel do médico). */
 
-const QUIZ_PRICE_MONTHLY = 19.9;
-const QUIZ_PRICE_ANNUAL_MONTH = 9.9;
-/**
- * O total do plano anual, cobrado DE UMA VEZ.
- *
- * Este número existia só num comentário. A tela mostrava "R$ 9,90 · por mês ·
- * no anual" e a paciente era debitada em R$ 118,80 na fatura — o preço por
- * mês é verdadeiro, mas não é o que sai do cartão dela. Preço mensal com
- * cobrança anual sem o total à vista é exatamente o que o Código de Defesa do
- * Consumidor chama de informação incompleta, e a primeira coisa que vira
- * estorno.
- */
-const QUIZ_PRICE_ANNUAL_TOTAL = QUIZ_PRICE_ANNUAL_MONTH * 12;
+/* ─── TRÊS CONSTANTES DE PREÇO MORTAS SAÍRAM DAQUI ────────────────────────
+   `QUIZ_PRICE_MONTHLY` (19,9), `QUIZ_PRICE_ANNUAL_MONTH` (9,9) e
+   `QUIZ_PRICE_ANNUAL_TOTAL` (118,80). Nenhuma era referenciada em lugar nenhum
+   do arquivo — a tela já lê os preços do servidor —, e as três guardavam a
+   tabela ANTIGA. Constante de preço morta é a pior espécie de código morto:
+   parece autoridade, e alguém a usa achando que é a fonte. */
 
 function QuizPaywall({
   week,

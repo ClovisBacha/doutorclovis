@@ -20,6 +20,25 @@ import { limitarEntrada, soTexto } from "@/lib/chat-stream";
    e a plataforma NÃO respondia, porque o prompt proibia inventar valores e
    nenhum valor era injetado. Beco sem saída duplo. */
 import { DOCTOR } from "@/lib/doctor.config";
+/* ─── OS PREÇOS DO PROMPT VÊM DA FONTE ÚNICA ──────────────────────────────────
+ *
+ * Estavam escritos à mão dentro do texto, e ficaram para trás: o prompt mandava
+ * a IA informar "primeiro ano com desconto: R$ 89,90 (equivale a R$ 7,49/mês)",
+ * uma oferta de boas-vindas APOSENTADA. Ou seja, a IA — que fala com a marca do
+ * médico — cotava à paciente um preço que a plataforma não cobra mais.
+ *
+ * É a pior versão do defeito que esta base persegue: não é uma tela que alguém
+ * pode reler antes de publicar, é uma frase gerada na hora, dentro de uma
+ * conversa, com a autoridade de quem cuida dela. Agora os quatro números saem
+ * de `promo.ts`, e mudar o preço lá muda o que a IA diz. */
+import {
+  ANUAL_CENTAVOS,
+  ANUAL_MENSAL_EQUIV_CENTAVOS,
+  DESCONTO_ANUAL_PCT,
+  MENSAL_CENTAVOS,
+  REFERENCIA_CENTAVOS,
+  brl,
+} from "@/lib/promo";
 
 // Rate limit simples por IP (janela fixa, em memória). Em ambiente serverless
 // a memória não é compartilhada entre instâncias nem persiste entre cold starts,
@@ -105,8 +124,8 @@ Regras de resposta:
 - Não invente dados (telefone, endereço, valores) além dos listados acima. Se não souber, encaminhe para o suporte pelo e-mail ${DOCTOR.supportEmail}.
 
 Preços do Premium da paciente (pode informar quando perguntarem; nunca invente outros):
-- Mensal: R$ 19,90/mês.
-- Primeiro ano com desconto: R$ 89,90 (equivale a R$ 7,49/mês), contra R$ 238,80 pagando mês a mês.
+- Mensal: ${brl(MENSAL_CENTAVOS)}/mês.
+- Anual: ${brl(ANUAL_CENTAVOS)} cobrados de uma vez — ${DESCONTO_ANUAL_PCT}% mais barato que pagar mês a mês (${brl(REFERENCIA_CENTAVOS)} em doze meses), o que equivale a ${brl(ANUAL_MENSAL_EQUIV_CENTAVOS)}/mês.
 - O acompanhamento básico da gestação é gratuito; o Premium libera a jornada completa.
 - Cancelamento a qualquer momento, pelo próprio app.`;
 
