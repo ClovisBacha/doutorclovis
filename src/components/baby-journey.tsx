@@ -309,7 +309,16 @@ export function PremiumUpsellModal({
            o médico deixou de dar a assinatura; hoje ele vincula e paga o bônus
            de Sementinhas. Anunciar Premium e entregar outra coisa faz a
            paciente ir procurar o que não existe. */
-        toast.success(`Médico vinculado! Você ganhou ${BONUS_VINCULO_MEDICO} Sementinhas 🌱`);
+        /* ─── A FRASE DEPENDE DE QUAL CÓDIGO FOI ─────────────────────────
+           O mesmo campo aceita o cupom da PLATAFORMA (concede Premium) e o
+           código do MÉDICO (vincula e paga Sementinhas). Anunciar um pelo outro
+           manda a paciente procurar o que não existe — e já errou nas duas
+           direções nesta base. Quem sabe qual foi é o servidor: `res.tipo`. */
+        toast.success(
+          res.tipo === "convite"
+            ? `Médico vinculado! Você ganhou ${BONUS_VINCULO_MEDICO} Sementinhas 🌱`
+            : "Premium liberado! 💛",
+        );
         onUnlocked();
         onClose();
         return;

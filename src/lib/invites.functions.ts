@@ -203,7 +203,21 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
         if (subErr) {
           console.error("[cupom] premium concedido sem marca de origem", u.user.id, subErr);
         }
-        return { ok: true as const };
+        /* ─── O `tipo` EXISTE PORQUE UM CAMPO ATENDE DOIS CÓDIGOS ───────────
+           A paciente digita no mesmo lugar o cupom da PLATAFORMA (que concede
+           Premium de verdade, aqui) e o código do MÉDICO (que vincula e paga
+           Sementinhas, abaixo). Os dois devolviam `ok: true` e nada mais, e a
+           tela tinha de adivinhar qual foi.
+
+           Ela adivinhava errado nas duas direções: uma tela anunciava "Premium
+           liberado" para quem só vinculou o médico, e as outras duas passaram a
+           anunciar "Médico vinculado + Sementinhas" para quem resgatou cupom de
+           plataforma. Um verificador adversarial achou as duas metades.
+
+           NÃO inferir pelo `semVaga`: ele é `false` num ramo e `undefined` no
+           outro, e isso é acoplamento acidental — quebra no dia em que o ramo do
+           cupom ganhar a flag. */
+        return { ok: true as const, tipo: "cupom" as const };
       }
     } catch {
       /* tabela ausente → segue para o convite do médico */
@@ -324,25 +338,27 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       }
     }
 
-    /* Registro em subscriptions (origem convite): é o que faz o premium dela
-       sobreviver a um toggle manual. Não trava o resgate — ela já é premium —,
-       mas perder isto em silêncio significa que um dia o premium some sem
-       explicação, e o `catch` que estava aqui nunca disparou: o supabase-js
-       devolve `{ error }`, não lança. */
-    const { error: subErr } = await (supabaseAdmin as any).from("subscriptions").upsert(
-      {
-        user_id: u.user.id,
-        product: "quiz_premium",
-        plan: "invite",
-        source: "doctor_invite",
-        status: "active",
-        stripe_subscription_id: `invite_${row.id}`,
-      },
-      { onConflict: "stripe_subscription_id" },
-    );
-    if (subErr) {
-      console.error("[convite] premium concedido sem marca de origem", u.user.id, subErr);
-    }
+    /* ─── O REGISTRO EM `subscriptions` SAIU DAQUI ──────────────────────────
+     *
+     * Havia um upsert de `{product: "quiz_premium", source: "doctor_invite",
+     * status: "active"}`, e o comentário dele dizia que era "o que faz o premium
+     * dela sobreviver a um toggle manual". Só que este ramo PAROU de conceder
+     * Premium quando o convite do médico virou vínculo + Sementinhas — o bloco
+     * ficou órfão, gravando assinatura ativa para quem não recebeu nada.
+     *
+     * Um verificador adversarial reproduziu os dois estragos:
+     *
+     *  · o médico via a paciente como não-premium (a lista lê
+     *    `patient_profiles.quiz_premium`), ligava o Premium na mão pelo painel,
+     *    e ao tentar DESLIGAR era recusado com "esta paciente tem uma assinatura
+     *    ativa — cancele pelo Stripe". Não existe assinatura no Stripe para
+     *    cancelar: o toggle ficava travado ligado para sempre;
+     *  · e o console da plataforma contava essa linha como premium
+     *    (`ACCESS_STATUS` tem "active"), inflando a KPI de pacientes premium com
+     *    gente que não tem Premium nenhum.
+     *
+     * Sem concessão não há o que marcar. O vínculo já está em
+     * `patient_profiles.doctor_id` e o bônus, no ledger. */
 
-    return { ok: true as const, semVaga };
+    return { ok: true as const, tipo: "convite" as const, semVaga };
   });

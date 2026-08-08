@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { ehNativo } from "@/lib/nativo";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { brl } from "@/lib/promo";
+import { BONUS_VINCULO_MEDICO } from "@/lib/economia-sementinhas";
 import type { PrecosDaPaciente } from "@/lib/promo.functions";
 import { useVoltar } from "@/lib/use-voltar";
 
@@ -205,7 +206,16 @@ export function OfertaPremium({
         data: { accessToken: s.session.access_token, code: codigo.trim() },
       });
       if (res.ok) {
-        toast.success("Premium liberado! 💛");
+        /* ─── A FRASE DEPENDE DE QUAL CÓDIGO FOI ─────────────────────────
+           O mesmo campo aceita o cupom da PLATAFORMA (concede Premium) e o
+           código do MÉDICO (vincula e paga Sementinhas). Anunciar um pelo outro
+           manda a paciente procurar o que não existe — e já errou nas duas
+           direções nesta base. Quem sabe qual foi é o servidor: `res.tipo`. */
+        toast.success(
+          res.tipo === "convite"
+            ? `Médico vinculado! Você ganhou ${BONUS_VINCULO_MEDICO} Sementinhas 🌱`
+            : "Premium liberado! 💛",
+        );
         setTimeout(() => window.location.reload(), 1200);
         return;
       }

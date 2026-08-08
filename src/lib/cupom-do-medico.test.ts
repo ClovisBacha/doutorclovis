@@ -156,36 +156,106 @@ describe("5. e nenhuma TELA promete desconto do médico", () => {
   });
 });
 
-describe("5b. o CÓDIGO do médico anuncia o que realmente entrega", () => {
+describe("5b. o resgate anuncia QUAL dos dois códigos foi usado", () => {
   /**
-   * ─── A PROMESSA QUE SOBREVIVEU A DUAS MUDANÇAS DE PRODUTO ─────────────────
+   * ─── O DEFEITO, E O DEFEITO QUE O CONSERTO CRIOU ──────────────────────────
    *
-   * O toast dizia **"Premium liberado pelo seu médico! 💛"** — em duas telas.
+   * O toast dizia "Premium liberado pelo seu médico! 💛". O resgate parou de
+   * escrever `quiz_premium` quando o médico deixou de dar a assinatura, e parou
+   * de dar desconto quando o cupom saiu. A frase ficou nas duas viradas.
    *
-   * O resgate parou de escrever `quiz_premium` quando o médico deixou de dar a
-   * assinatura; depois parou de dar desconto também. A frase ficou nas duas
-   * viradas. A paciente resgatava o código, lia "Premium liberado", e ia
-   * procurar um Premium que não tinha sido liberado.
+   * Eu troquei a frase em duas telas por "Médico vinculado + Sementinhas" — e
+   * um verificador adversarial mostrou que isso apenas INVERTEU a mentira: o
+   * mesmo campo aceita DOIS códigos. O cupom da PLATAFORMA continua concedendo
+   * Premium de verdade, e passou a ser anunciado como vínculo.
    *
-   * É o mesmo defeito da `/medicos` dizendo "sem cota, sem bloqueio": a tela
-   * guarda a versão do produto que existia quando a frase foi escrita.
+   * E uma TERCEIRA tela (`oferta-premium.tsx`) ficou intocada com a redação
+   * "Premium liberado! 💛" — que o teste anterior não pegava por dois motivos
+   * somados: ela não estava na lista de telas, e a asserção casava a frase
+   * exata "Premium liberado pelo seu médico". Duas frouxidões que se cobriam.
+   *
+   * A régua certa é o servidor dizer qual ramo foi (`res.tipo`), e as TRÊS
+   * telas ramificarem por ele.
    */
-  const telas = [
-    ["a trilha", trilha],
-    ["a jornada do bebê", semComentarios("src/components/baby-journey.tsx")],
-  ] as const;
+  const telas = {
+    "a folha de oferta": "src/components/oferta-premium.tsx",
+    "o paywall da trilha": "src/components/gestacao-path.tsx",
+    "a jornada do bebê": "src/components/baby-journey.tsx",
+  };
 
-  for (const [onde, fonte] of telas) {
-    test(`${onde} não promete mais Premium pelo código`, () => {
-      expect(fonte).not.toContain("Premium liberado pelo seu médico");
+  test("o servidor devolve o discriminador nos DOIS ramos", () => {
+    expect(invites).toContain('tipo: "cupom" as const');
+    expect(invites).toContain('tipo: "convite" as const');
+  });
+
+  test("e ninguém infere o ramo pelo `semVaga`", () => {
+    /* Acoplamento acidental: `semVaga` é `false` num ramo e `undefined` no
+       outro, e isso quebra no dia em que o ramo do cupom ganhar a flag. */
+    for (const caminho of Object.values(telas)) {
+      expect(semComentarios(caminho)).not.toContain("semVaga !== undefined");
+      expect(semComentarios(caminho)).not.toContain("typeof res.semVaga");
+    }
+  });
+
+  for (const [onde, caminho] of Object.entries(telas)) {
+    const fonte = semComentarios(caminho);
+
+    test(`${onde} ramifica pelo tipo`, () => {
+      expect(fonte).toContain('res.tipo === "convite"');
     });
 
-    test(`${onde} anuncia as Sementinhas, e o número vem da fonte única`, () => {
-      /* Escrever "200" à mão aqui seria a mesma divergência dos preços: mudar
-         o bônus e a tela continuar prometendo o valor velho. */
+    test(`${onde} nunca anuncia Premium fora do ramo do cupom`, () => {
+      /* A asserção que descreve o defeito, e ampla o bastante para pegar
+         qualquer redação: "Premium liberado", "Premium liberado! 💛",
+         "Premium liberado pelo seu médico". */
+      const ocorrencias = [...fonte.matchAll(/Premium liberado/g)];
+      for (const m of ocorrencias) {
+        const janela = fonte.slice(Math.max(0, m.index! - 400), m.index!);
+        expect(janela).toContain('res.tipo === "convite"');
+      }
+    });
+
+    test(`${onde} tira o número das Sementinhas da fonte única`, () => {
       expect(fonte).toContain("BONUS_VINCULO_MEDICO");
     });
   }
+});
+
+describe("5c. o resgate do médico NÃO grava assinatura de quem não recebeu nada", () => {
+  /**
+   * O upsert de `{product: "quiz_premium", source: "doctor_invite", status:
+   * "active"}` sobreviveu à remoção da concessão, e o comentário dele dizia ser
+   * "o que faz o premium dela sobreviver a um toggle manual" — de um Premium que
+   * este ramo não concede mais.
+   *
+   * Um verificador adversarial reproduziu os dois estragos:
+   *
+   *  · o médico via a paciente como não-premium (a lista lê
+   *    `patient_profiles.quiz_premium`), ligava na mão pelo painel e não
+   *    conseguia mais DESLIGAR — o toggle recusava com "esta paciente tem uma
+   *    assinatura ativa, cancele pelo Stripe", e não há nada no Stripe para
+   *    cancelar. Travado ligado para sempre;
+   *  · e o console contava a linha como premium (`ACCESS_STATUS` tem "active"),
+   *    inflando a KPI com gente que não tem Premium nenhum.
+   */
+  test("o ramo do convite não escreve em `subscriptions`", () => {
+    const i = invites.indexOf('tipo: "convite" as const');
+    expect(i).toBeGreaterThan(-1);
+    /* Do fim do bloco de vínculo até o return do ramo. */
+    const j = invites.lastIndexOf("bonusDeVinculo", i);
+    expect(j).toBeGreaterThan(-1);
+    expect(invites.slice(j, i)).not.toContain('from("subscriptions")');
+  });
+
+  test("mas o ramo do CUPOM continua marcando — ali há Premium de verdade", () => {
+    const i = invites.indexOf('tipo: "cupom" as const');
+    expect(i).toBeGreaterThan(-1);
+    expect(invites.slice(Math.max(0, i - 1200), i)).toContain('source: "cupom"');
+  });
+
+  test("e `doctor_invite` sumiu do arquivo", () => {
+    expect(invites).not.toContain('source: "doctor_invite"');
+  });
 });
 
 describe("6. o que OCUPA o lugar do cupom existe de verdade", () => {
