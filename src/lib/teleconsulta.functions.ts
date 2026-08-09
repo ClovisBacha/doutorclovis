@@ -276,6 +276,23 @@ export const generateClinicalNote = createServerFn({ method: "POST" })
     const scope = await requireScope(data.accessToken);
     if (!scope) return { ok: false as const, error: "Não autorizado" };
 
+    /* ─── PLANO, ANTES DE GASTAR ─────────────────────────────────────────────
+     *
+     * Havia sessão, e só. Um médico no Free abria Teleconsultas — a aba não é
+     * filtrada por plano, o `podeIA` do painel cobre só a aba Cérebro — e
+     * gerava nota SOAP à vontade, na nossa chave.
+     *
+     * É a mesma régua da transcrição, e pelo mesmo motivo: o que chama modelo é
+     * do produto de IA; o resto da plataforma é da casa. `getEntitlements`
+     * resolve o assento de clínica sozinho, então o médico de uma clínica que
+     * paga passa por aqui pelo plano do dono. */
+    const { getEntitlementsByDoctorId } = await import("./entitlements.server");
+    const ent = await getEntitlementsByDoctorId(scope.doctorId ?? "", scope.isTeam);
+    if (!ent.aiApp) {
+      const { fraseDoGancho } = await import("./gancho-de-upgrade");
+      return { ok: false as const, error: fraseDoGancho("cerebro") };
+    }
+
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key) return { ok: false as const, error: "API key não configurada" };
 

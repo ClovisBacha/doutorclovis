@@ -86,3 +86,36 @@ describe("e o app manda a sessão", () => {
     expect(app.slice(i, i + 260)).toContain("accessToken: sess.session?.access_token");
   });
 });
+
+describe("a nota clínica da teleconsulta também pede plano", () => {
+  /**
+   * Ela EXIGIA sessão — não era porta aberta como a triagem. Mas não olhava
+   * plano: um médico no Free abria Teleconsultas (a aba não é filtrada por
+   * plano; o `podeIA` do painel cobre só a aba Cérebro) e gerava nota SOAP à
+   * vontade, na nossa chave.
+   *
+   * Mesma régua da transcrição, e pelo mesmo motivo: o que chama modelo é do
+   * produto de IA; o resto da plataforma é da casa.
+   */
+  const tele = readFileSync("src/lib/teleconsulta.functions.ts", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  const bloco = tele.slice(tele.indexOf("export const generateClinicalNote"));
+
+  test("o plano é conferido ANTES de tocar na chave", () => {
+    const iPlano = bloco.indexOf("ent.aiApp");
+    const iChave = bloco.indexOf("GOOGLE_GENERATIVE_AI_API_KEY");
+    expect(iPlano).toBeGreaterThan(-1);
+    expect(iPlano).toBeLessThan(iChave);
+  });
+
+  test("e a recusa oferece o plano, em vez de só negar", () => {
+    /* Um "não autorizado" seco faria o médico achar que é defeito. */
+    expect(bloco).toContain('fraseDoGancho("cerebro")');
+  });
+
+  test("a equipe passa, e o resto vem do plano do médico", () => {
+    expect(bloco).toContain('getEntitlementsByDoctorId(scope.doctorId ?? "", scope.isTeam)');
+  });
+});
