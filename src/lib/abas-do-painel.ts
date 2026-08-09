@@ -17,8 +17,12 @@
  *  · Pacientes   — "o que esta pessoa mandou?"  (pré-consulta e exame só
  *                  existem grudados a uma paciente)
  *  · Agenda      — "quem tem hora marcada?"
- *  · Painel      — "como vai o consultório?"
- *  · Ferramentas — o resto que ele usa de vez em quando
+ *  · Painel      — "como vai o consultório?" (e o alcance: Engajamento, Lives)
+ *
+ * "Ferramentas" (receituário e pedido de exame) deixou de ser aba em ago/2026:
+ * ela obrigava o médico a escolher a paciente DE NOVO, no fim do fluxo, depois
+ * de já ter estado na ficha dela. Os modelos moram dentro do cartão da
+ * paciente, onde ele já sabe de quem se trata.
  *
  * "Perguntas" entra em Cérebro porque é o mesmo ciclo: ela pergunta, ele
  * responde, o cérebro aprende. Era a alternativa que eu tinha levantado como
@@ -54,11 +58,8 @@ export const PANEL_TABS = [
   "Painel 📊",
   "Calendário",
   "Agendamentos",
-  "Ferramentas",
   "Perguntas",
   "Cérebro 🧠",
-  "Pré-consultas",
-  "Exames",
   "Teleconsultas",
   "Consultas Pagas",
   "Lives",
@@ -70,7 +71,7 @@ export const PANEL_TABS = [
 
 export type PanelTab = (typeof PANEL_TABS)[number];
 
-export type ChaveDeGrupo = "cerebro" | "pacientes" | "agenda" | "painel" | "ferramentas";
+export type ChaveDeGrupo = "cerebro" | "pacientes" | "agenda" | "painel";
 
 export type GrupoDeAbas = {
   chave: ChaveDeGrupo;
@@ -95,19 +96,26 @@ export const GRUPOS: readonly GrupoDeAbas[] = [
      Pedido do dono: "tira esse painel aí de cima, que aparece em todas as
      telas, e transfere tudo pra esse painel unificado, que pode ser a nossa
      primeira aba". */
-  { chave: "painel", rotulo: "Painel 📊", filhas: ["Painel 📊", "Engajamento"] },
+  /* "Lives" veio para cá quando o grupo Ferramentas acabou. Não é sobra: as
+     três respondem a mesma pergunta — "como vai o consultório e o meu alcance?"
+     — e nenhuma delas é sobre uma paciente específica. */
+  { chave: "painel", rotulo: "Painel 📊", filhas: ["Painel 📊", "Engajamento", "Lives"] },
   { chave: "cerebro", rotulo: "Cérebro 🧠", filhas: ["Cérebro 🧠", "Perguntas"] },
-  {
-    chave: "pacientes",
-    rotulo: "Pacientes 👩‍🍼",
-    filhas: ["Pacientes 👩‍🍼", "Pré-consultas", "Exames"],
-  },
+  /* ─── UMA ABA SÓ DE PACIENTES (ago/2026) ──────────────────────────────────
+     Eram três: Pacientes, Pré-consultas e Exames. As duas últimas listavam
+     coisas que só existem GRUDADAS a uma paciente, e o médico chegava nelas por
+     um caminho que não passava pela paciente — lia uma pré-consulta com 175/115
+     sem ver o prontuário de quem a mandou.
+     Agora é uma tela só: a grade das pacientes, as solicitações, e as duas
+     caixas de entrada como SEÇÕES logo abaixo. Pedido do dono: "você vai
+     eliminar aquela questão de pré-consultas e exames ali em cima, e vai ser
+     somente uma única aba de paciente". */
+  { chave: "pacientes", rotulo: "Pacientes 👩‍🍼", filhas: ["Pacientes 👩‍🍼"] },
   {
     chave: "agenda",
     rotulo: "Agenda 📅",
     filhas: ["Agendamentos", "Calendário", "Teleconsultas", "Consultas Pagas"],
   },
-  { chave: "ferramentas", rotulo: "Ferramentas", filhas: ["Ferramentas", "Lives"] },
 ] as const;
 
 /**

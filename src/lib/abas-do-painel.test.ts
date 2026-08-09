@@ -28,9 +28,14 @@ import {
 } from "./abas-do-painel";
 
 describe("1. o pedido do dono: no máximo cinco", () => {
-  test("são cinco grupos", () => {
+  test("são quatro grupos — abaixo do teto que o dono pediu", () => {
+    /* O pedido era "no máximo cinco". Foram cinco até ago/2026, quando
+       "Ferramentas" deixou de ser aba (os modelos foram para dentro do cartão
+       da paciente) e "Lives" foi para o grupo Painel.
+       O `toBe` exato é de propósito: o teto sozinho deixaria alguém acrescentar
+       um quinto grupo sem ninguém decidir isso. */
     expect(GRUPOS.length).toBeLessThanOrEqual(5);
-    expect(GRUPOS.length).toBe(5);
+    expect(GRUPOS.length).toBe(4);
   });
 
   test("o Painel é o primeiro, e o Cérebro logo em seguida", () => {
@@ -82,7 +87,7 @@ describe("2. nenhuma tela fica sem caminho", () => {
   });
 
   test("todo nome de filha é uma aba que existe de verdade", () => {
-    /* Um typo aqui ("Exame" em vez de "Exames") criaria um grupo apontando
+    /* Um typo aqui ("Pergunta" em vez de "Perguntas") criaria um grupo apontando
        para o nada: o botão existe, o corpo não renderiza, e não há erro. */
     for (const g of GRUPOS) {
       for (const f of g.filhas) expect(PANEL_TABS).toContain(f);
@@ -117,13 +122,22 @@ describe("3. o grupo é DERIVADO da aba — não é um segundo estado", () => {
 
 describe("4. o contador sobe para o grupo", () => {
   test("a soma junta as filhas", () => {
-    /* Pacientes = Pacientes + Pré-consultas + Exames. */
-    expect(somaDoGrupo("pacientes", { "Pacientes 👩‍🍼": 2, "Pré-consultas": 3, Exames: 1 })).toBe(6);
+    /* Painel = Painel + Engajamento + Lives. */
+    expect(somaDoGrupo("painel", { "Painel 📊": 2, Engajamento: 3, Lives: 1 })).toBe(6);
   });
 
   test("aba sem contador conta zero, não estraga a soma", () => {
-    expect(somaDoGrupo("pacientes", { Exames: 4 })).toBe(4);
-    expect(somaDoGrupo("pacientes", {})).toBe(0);
+    expect(somaDoGrupo("painel", { Lives: 4 })).toBe(4);
+    expect(somaDoGrupo("painel", {})).toBe(0);
+  });
+
+  test("o grupo de uma filha só continua somando por ela", () => {
+    /**
+     * "Pacientes" virou grupo de UMA aba quando Pré-consultas e Exames viraram
+     * seções dela. Um grupo de filha única é o caso em que alguém "simplifica"
+     * pulando `somaDoGrupo` — e o número que faz o médico ir até lá some.
+     */
+    expect(somaDoGrupo("pacientes", { "Pacientes 👩‍🍼": 5 })).toBe(5);
   });
 
   test("o contador de Perguntas chega em Cérebro — o caso que motivou tudo", () => {
@@ -138,7 +152,7 @@ describe("4. o contador sobe para o grupo", () => {
   test("e um contador de OUTRO grupo não vaza para este", () => {
     /* Somar tudo indiscriminadamente daria o mesmo número em todos os grupos —
        cinco emblemas iguais não dizem nada. */
-    expect(somaDoGrupo("cerebro", { Exames: 9 })).toBe(0);
+    expect(somaDoGrupo("cerebro", { Lives: 9 })).toBe(0);
   });
 });
 
@@ -162,10 +176,14 @@ describe("5. e o painel de fato ENTREGA os contadores", () => {
     expect(bloco).toContain("onEscolher={setTab}");
   });
 
+  /* `unseenForms` continua na lista, e é o ponto: as pré-consultas deixaram de
+     ser aba e viraram seção de Pacientes. Sem somá-las ao contador de
+     Pacientes, o número que faz o médico ir ler uma pré-consulta sumiria da
+     fita — a fusão de abas escondendo trabalho em vez de revelá-lo, que é
+     exatamente o defeito que este arquivo inteiro existe para impedir. */
   for (const [aba, fonte] of [
     ["Perguntas", "pendingQs"],
-    ["Pacientes 👩‍🍼", "novasPacientes"],
-    ["Pré-consultas", "unseenForms"],
+    ["Pacientes 👩‍🍼", "novasPacientes + unseenForms"],
     ["Teleconsultas", "sala_aberta"],
   ] as const) {
     test(`o contador de «${aba}» chega à fita`, () => {

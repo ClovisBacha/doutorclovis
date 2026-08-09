@@ -780,7 +780,10 @@ function PainelPage() {
   useEffect(() => {
     if (!allowed) return;
     if (tab === "Engajamento" && !engagement) loadEngagement();
-    if (tab === "Pré-consultas") loadPreForms();
+    /* As pré-consultas viraram uma SEÇÃO da aba Pacientes, então é a abertura
+       dela que dispara a leitura. Ficou preso a `tab === "Pré-consultas"` até
+       ago/2026 — uma aba que não existe mais, e a lista nunca carregaria. */
+    if (tab === "Pacientes 👩‍🍼") loadPreForms();
     if (tab === "Teleconsultas") {
       loadTeleconsultas();
       loadPreForms();
@@ -984,7 +987,13 @@ function PainelPage() {
           detalhe: sn && sn.gravidade !== "normal" ? `${sn.nota} · ${sintomas}` : sintomas,
           em: f.submitted_at,
           acao: "Ler",
-          onAcao: () => setTab("Pré-consultas"),
+          /* Leva à PACIENTE, e não a uma lista de pré-consultas: quem lê
+             "175/115" precisa do prontuário de quem mandou, na mesma tela. Era
+             `setTab("Pré-consultas")`, aba que deixou de existir. */
+          onAcao: () => {
+            setAbrirPaciente(f.user_id ?? null);
+            setTab("Pacientes 👩‍🍼");
+          },
         };
       }),
   ];
@@ -1096,9 +1105,12 @@ function PainelPage() {
         aba={tab}
         onEscolher={setTab}
         contadores={{
-          "Pacientes 👩‍🍼": novasPacientes,
+          /* Soma: as pré-consultas por ler viraram seção DENTRO de Pacientes,
+             e sem somar aqui o número simplesmente sumiria da fita — que é
+             exatamente como a fusão de abas esconde trabalho em vez de
+             revelá-lo. */
+          "Pacientes 👩‍🍼": novasPacientes + unseenForms,
           Perguntas: pendingQs,
-          "Pré-consultas": unseenForms,
           Teleconsultas: teleconsultas.filter((s) => s.status === "sala_aberta").length,
         }}
       />
@@ -1327,21 +1339,35 @@ function PainelPage() {
           />
         )}
         {tab === "Pacientes 👩‍🍼" && (
-          <PacientesSection
-            tokenFn={token}
-            onVinculoRespondido={loadPedidosVinculo}
-            abrirPacienteId={abrirPaciente}
-            onAbriu={() => setAbrirPaciente(null)}
-            onDesfechoRegistrado={(fonte, fonteId) =>
-              setEventosClinicos((es) =>
-                es.map((e) =>
-                  e.fonte === fonte && e.fonte_id === fonteId
-                    ? { ...e, tratado_em: new Date().toISOString() }
-                    : e,
-                ),
-              )
-            }
-          />
+          <div className="space-y-10">
+            <PacientesSection
+              tokenFn={token}
+              onVinculoRespondido={loadPedidosVinculo}
+              abrirPacienteId={abrirPaciente}
+              onAbriu={() => setAbrirPaciente(null)}
+              onDesfechoRegistrado={(fonte, fonteId) =>
+                setEventosClinicos((es) =>
+                  es.map((e) =>
+                    e.fonte === fonte && e.fonte_id === fonteId
+                      ? { ...e, tratado_em: new Date().toISOString() }
+                      : e,
+                  ),
+                )
+              }
+            />
+            {/* ─── AS DUAS CAIXAS DE ENTRADA, NA MESMA TELA ────────────────
+                Eram abas próprias — "Pré-consultas" e "Exames" — e as duas
+                listavam coisas que só existem grudadas a uma paciente. O médico
+                chegava nelas por um caminho que não passava pela paciente: lia
+                uma pré-consulta com 175/115 sem o prontuário de quem a mandou.
+
+                Continuam sendo LISTAS, e não só um item dentro do cartão, e
+                isso é deliberado: um laudo que volta e um formulário que chega
+                são trabalho que precisa dele HOJE. Escondidos atrás de duzentos
+                cartões, só seriam vistos por quem já soubesse que estão lá. */}
+            <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
+            <ExamesRecebidos tokenFn={token} />
+          </div>
         )}
         {tab === "Lives" && <LivesSection tokenFn={token} />}
         {tab === "Meu Perfil" && (
@@ -1364,11 +1390,6 @@ function PainelPage() {
             />
           </>
         )}
-        {tab === "Exames" && <ExamesRecebidos tokenFn={token} />}
-        {tab === "Pré-consultas" && (
-          <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
-        )}
-        {tab === "Ferramentas" && <FerramentasSection />}
         {tab === "Teleconsultas" && (
           <TeleconsultasSection
             sessions={teleconsultas}
@@ -4704,181 +4725,16 @@ const EXAM_PANELS = [
   },
 ];
 
-function FerramentasSection() {
-  const [openRx, setOpenRx] = useState<number | null>(null);
-  const [envio, setEnvio] = useState<{
-    tipo: TipoDeEmissao;
-    titulo: string;
-    conteudo: string;
-  } | null>(null);
-  const [openExam, setOpenExam] = useState<number | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+/* A `FerramentasSection` foi removida em ago/2026.
 
-  function copyText(text: string, key: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(key);
-      setTimeout(() => setCopied(null), 2000);
-    });
-  }
+   Ela mostrava os mesmos `PRESCRIPTIONS` e `EXAM_PANELS` que hoje abrem dentro
+   do cartão da paciente — e mostrava com um defeito: para enviar, o médico
+   escolhia a paciente DE NOVO, numa lista de duzentos nomes, no fim do fluxo.
+   Mantê-la ao lado do caminho novo criaria duas telas para a mesma coisa, que é
+   como duas cópias de uma regra divergem nesta base.
 
-  function printText(title: string, text: string) {
-    const w = window.open("", "_blank", "width=600,height=700");
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-      <title>${title}</title>
-      <style>
-        body { font-family: Georgia, serif; padding: 40px; color: #111; }
-        h2 { font-size: 18px; margin-bottom: 24px; }
-        pre { font-family: inherit; font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
-        .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 12px; font-size: 12px; color: #666; }
-      </style></head><body>
-      <h2>${title}</h2><pre>${text}</pre>
-      <div class="footer">Emitido em ${new Date().toLocaleDateString("pt-BR")}</div>
-      <script>window.print();</script></body></html>`);
-  }
-
-  return (
-    <div className="space-y-10">
-      {/* Receituário */}
-      <div>
-        <p className="font-serif text-2xl">Receituário Rápido</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Prescrições comuns de obstetrícia. Clique para expandir, copiar ou imprimir.
-        </p>
-        <div className="mt-5 space-y-2">
-          {PRESCRIPTIONS.map((rx, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
-              <button
-                onClick={() => setOpenRx(openRx === i ? null : i)}
-                className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30"
-              >
-                <span className="flex items-center gap-3 font-medium">
-                  <span className="text-xl">{rx.icon}</span>
-                  {rx.title}
-                </span>
-                <span className="text-muted-foreground text-sm">{openRx === i ? "▲" : "▼"}</span>
-              </button>
-              {openRx === i && (
-                <div className="border-t border-border px-5 py-4 space-y-3">
-                  <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">
-                    {rx.text}
-                  </pre>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => copyText(rx.text, `rx-${i}`)}
-                      className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
-                    >
-                      {copied === `rx-${i}` ? "✅ Copiado!" : "Copiar"}
-                    </button>
-                    <button
-                      onClick={() => printText(rx.title, rx.text)}
-                      className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
-                    >
-                      🖨️ Imprimir
-                    </button>
-                    {/* ENVIAR vira a ação principal, e imprimir desce para
-                        secundária. Enquanto imprimir era o destaque, a receita
-                        existia só no papel que ela levava — e o sistema, que
-                        tem a caixa onde o laudo volta, nunca soube que o exame
-                        tinha sido pedido. */}
-                    <button
-                      onClick={() =>
-                        setEnvio({ tipo: "prescricao", titulo: rx.title, conteudo: rx.text })
-                      }
-                      className="press rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
-                    >
-                      Enviar a uma paciente
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Solicitações de exame */}
-      <div>
-        <p className="font-serif text-2xl">Solicitação de Exames</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Painéis padrão por trimestre. Copie ou imprima em um clique.
-        </p>
-        <div className="mt-5 space-y-2">
-          {EXAM_PANELS.map((panel, i) => {
-            const examText = panel.exams.join("\n");
-            return (
-              <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
-                <button
-                  onClick={() => setOpenExam(openExam === i ? null : i)}
-                  className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30"
-                >
-                  <span className="flex items-center gap-3 font-medium">
-                    <span className="text-xl">{panel.icon}</span>
-                    {panel.title}
-                  </span>
-                  <span className="text-muted-foreground text-sm">
-                    {openExam === i ? "▲" : `${panel.exams.length} exames ▼`}
-                  </span>
-                </button>
-                {openExam === i && (
-                  <div className="border-t border-border px-5 py-4 space-y-3">
-                    <ul className="space-y-1">
-                      {panel.exams.map((e, j) => (
-                        <li key={j} className="flex items-start gap-2 text-sm text-foreground">
-                          <span className="mt-0.5 text-primary shrink-0">•</span>
-                          {e}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => copyText(examText, `exam-${i}`)}
-                        className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
-                      >
-                        {copied === `exam-${i}` ? "✅ Copiado!" : "Copiar lista"}
-                      </button>
-                      <button
-                        onClick={() =>
-                          printText(`Solicitação de Exames — ${panel.title}`, examText)
-                        }
-                        className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
-                      >
-                        🖨️ Imprimir
-                      </button>
-                      <button
-                        onClick={() =>
-                          setEnvio({ tipo: "exame", titulo: panel.title, conteudo: examText })
-                        }
-                        className="press rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
-                      >
-                        Enviar a uma paciente
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <p className="text-xs text-muted-foreground border-t border-border pt-4">
-        ⚕️ Prescrições e painéis baseados nos protocolos FEBRASGO/SBD/SBH 2022–2024. Sempre confirme
-        com o protocolo vigente da sua instituição e ajuste conforme o quadro clínico da paciente.
-      </p>
-
-      {envio && (
-        <EnviarParaPaciente
-          tipo={envio.tipo}
-          titulo={envio.titulo}
-          conteudoInicial={envio.conteudo}
-          tokenFn={token}
-          onFechar={() => setEnvio(null)}
-        />
-      )}
-    </div>
-  );
-}
+   Os modelos ficaram onde estavam (logo acima): quem os usa agora é
+   `AcoesDaPaciente`. */
 
 /* ---------- Agenda (availability config) ---------- */
 

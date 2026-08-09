@@ -746,8 +746,10 @@ describe("nenhuma aba fica órfã", () => {
     const comRender = new Set([...codigo.matchAll(/\{tab === "([^"]+)"/g)].map((m) => m[1]));
     const noMenu = abasNaFita();
     expect(noMenu.filter((aba) => !comRender.has(aba))).toEqual([]);
-    /* E a lista não pode estar vazia, senão o teste acima é decoração. */
-    expect(noMenu.length).toBeGreaterThan(10);
+    /* E a lista não pode estar vazia, senão o teste acima é decoração. O piso
+       é frouxo de propósito: ele existe para pegar `abasNaFita()` devolvendo
+       nada, não para congelar a quantidade de abas — que muda a cada fusão. */
+    expect(noMenu.length).toBeGreaterThanOrEqual(8);
   });
 
   test("o Calendário está ligado — decisão do Clóvis", () => {

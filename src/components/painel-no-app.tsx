@@ -27,6 +27,7 @@
  *    sincronizar alguma coisa?", que é a primeira pergunta de quem usa o mesmo
  *    sistema em dois lugares.
  */
+import type { PanelTab } from "@/lib/abas-do-painel";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 
 export type ResumoDoDia = {
@@ -93,7 +94,15 @@ export function PainelNoApp({
 }: {
   resumo: ResumoDoDia;
   /** Leva para uma aba do painel. */
-  onIr: (aba: string) => void;
+  /**
+   * Para onde ir. Tipado como `PanelTab`, e não como `string`.
+   *
+   * Enquanto era `string`, dois botões deste resumo apontavam para abas que
+   * tinham deixado de existir ("Pré-consultas", "Exames") e o TypeScript não
+   * tinha como saber: tocar neles no celular não fazia nada, sem erro nenhum.
+   * Com o tipo certo, apagar uma aba quebra o build aqui.
+   */
+  onIr: (aba: PanelTab) => void;
   nomeDoMedico?: string | null;
 }) {
   /* A frase vem de `canal-de-venda.ts` — a mesma regra que recusa o checkout
@@ -178,13 +187,14 @@ export function PainelNoApp({
         <Contador
           n={resumo.preConsultasNovas}
           rotulo="pré-consultas novas"
-          onClick={() => onIr("Pré-consultas")}
+          /* Pré-consultas e exames viraram seções da aba Pacientes. */
+          onClick={() => onIr("Pacientes 👩‍🍼")}
         />
         {resumo.examesNovos !== undefined && (
           <Contador
             n={resumo.examesNovos}
             rotulo="exames enviados"
-            onClick={() => onIr("Exames")}
+            onClick={() => onIr("Pacientes 👩‍🍼")}
           />
         )}
       </div>
