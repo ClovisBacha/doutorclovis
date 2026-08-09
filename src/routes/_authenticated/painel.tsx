@@ -3688,7 +3688,20 @@ function TeleconsultasSection({
       data: {
         accessToken: tk,
         patientUserId: form.patientUserId,
-        scheduledFor: form.scheduledFor || null,
+        /* ─── O FUSO, QUE FALTAVA ────────────────────────────────────────────
+         * `datetime-local` entrega "2026-08-10T20:00" — sem fuso nenhum. Essa
+         * string ia crua para uma coluna `timestamptz`, e o Postgres a
+         * interpreta no fuso da sessão, que na Supabase é UTC. O médico marcava
+         * 20:00, o banco guardava 20:00 UTC, e a paciente recebia convite para
+         * 17:00. Três horas de diferença, num compromisso marcado.
+         *
+         * `new Date(string local).toISOString()` resolve porque o NAVEGADOR
+         * conhece o fuso de quem digitou: ele lê a string como hora local e
+         * devolve o instante certo em UTC.
+         *
+         * A tela de Lives, neste mesmo arquivo, já fazia exatamente isto. A
+         * teleconsulta tinha ficado de fora. */
+        scheduledFor: form.scheduledFor ? new Date(form.scheduledFor).toISOString() : null,
         doctorNotes: form.doctorNotes || null,
       },
     });
