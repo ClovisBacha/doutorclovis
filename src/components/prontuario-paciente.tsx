@@ -20,6 +20,7 @@
  * 36+6 contra 37+0 são condutas diferentes.
  */
 
+import type { SecaoDoProntuario } from "@/lib/abas-da-paciente";
 import { ESTILO_SINAL, sinalGlicemia, sinalPressao, type Gravidade } from "@/lib/sinais-clinicos";
 import {
   mudancasDesde,
@@ -159,6 +160,7 @@ export function ProntuarioPaciente({
   registrando,
   consultas = [],
   aoRegistrarConsulta,
+  secoes,
 }: {
   ficha: FichaClinica | null;
   eventos: EventoClinico[];
@@ -172,7 +174,18 @@ export function ProntuarioPaciente({
   /** O formulário de registro. Vem por prop para o prontuário não precisar
       conhecer token nem server function — ele desenha, quem chama age. */
   aoRegistrarConsulta?: React.ReactNode;
+  /**
+   * Quais das cinco seções desenhar. Omitido = TODAS, que é o comportamento de
+   * sempre — nenhuma tela existente muda por causa desta prop.
+   *
+   * Existe porque o cartão da paciente virou três abas e cada uma leva um
+   * pedaço do prontuário. Um `secoes` em vez de três componentes separados
+   * mantém UMA carga de dados: dividir o componente dividiria também as
+   * chamadas ao servidor, e trocar de aba viraria uma espera.
+   */
+  secoes?: SecaoDoProntuario[];
 }) {
+  const mostra = (s: SecaoDoProntuario) => !secoes || secoes.includes(s);
   if (carregando) return <div className="skeleton h-72 rounded-3xl" />;
   if (!ficha) {
     return (
@@ -235,62 +248,64 @@ export function ProntuarioPaciente({
       )}
 
       {/* 1. QUEM É — e o que na história dela muda conduta */}
-      <div className="rounded-3xl border border-border bg-card p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-serif text-2xl text-foreground">{ficha.nome ?? "Paciente"}</h3>
-          <span className="font-serif text-lg tabular-nums text-primary">
-            {idadeGestacional(ficha.gestDias)}
-          </span>
-        </div>
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
-          {ficha.dpp && <span>DPP {new Date(ficha.dpp).toLocaleDateString("pt-BR")}</span>}
-          {ficha.gestacaoNumero != null && <span>{ficha.gestacaoNumero}ª gestação</span>}
-          {ficha.tipoSanguineo && <span>Sangue {ficha.tipoSanguineo}</span>}
-          {ficha.telefone && linkTel(ficha.telefone) && (
-            <a href={linkTel(ficha.telefone)!} className="font-medium text-primary">
-              {formataTelefone(ficha.telefone)}
-            </a>
+      {mostra("quem") && (
+        <div className="rounded-3xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="font-serif text-2xl text-foreground">{ficha.nome ?? "Paciente"}</h3>
+            <span className="font-serif text-lg tabular-nums text-primary">
+              {idadeGestacional(ficha.gestDias)}
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+            {ficha.dpp && <span>DPP {new Date(ficha.dpp).toLocaleDateString("pt-BR")}</span>}
+            {ficha.gestacaoNumero != null && <span>{ficha.gestacaoNumero}ª gestação</span>}
+            {ficha.tipoSanguineo && <span>Sangue {ficha.tipoSanguineo}</span>}
+            {ficha.telefone && linkTel(ficha.telefone) && (
+              <a href={linkTel(ficha.telefone)!} className="font-medium text-primary">
+                {formataTelefone(ficha.telefone)}
+              </a>
+            )}
+          </div>
+
+          {/* Os quatro fatores que antes só a IA lia. */}
+          {ficha.riscos.length > 0 && (
+            <div className="mt-3 rounded-2xl bg-rose-50 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">
+                História que muda conduta
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {ficha.riscos.map((r) => (
+                  <li key={r} className="text-[13px] leading-snug text-rose-900">
+                    • {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {(ficha.alergias || ficha.medicamentos) && (
+            <div className="mt-3 space-y-1 text-[13px] leading-snug">
+              {ficha.alergias && (
+                <p>
+                  <span className="text-muted-foreground">Alergias: </span>
+                  <strong className="text-foreground">{ficha.alergias}</strong>
+                </p>
+              )}
+              {ficha.medicamentos && (
+                <p>
+                  <span className="text-muted-foreground">Em uso: </span>
+                  <strong className="text-foreground">{ficha.medicamentos}</strong>
+                </p>
+              )}
+            </div>
+          )}
+          {ficha.observacoesPrevias && (
+            <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+              {ficha.observacoesPrevias}
+            </p>
           )}
         </div>
-
-        {/* Os quatro fatores que antes só a IA lia. */}
-        {ficha.riscos.length > 0 && (
-          <div className="mt-3 rounded-2xl bg-rose-50 p-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">
-              História que muda conduta
-            </p>
-            <ul className="mt-1 space-y-0.5">
-              {ficha.riscos.map((r) => (
-                <li key={r} className="text-[13px] leading-snug text-rose-900">
-                  • {r}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {(ficha.alergias || ficha.medicamentos) && (
-          <div className="mt-3 space-y-1 text-[13px] leading-snug">
-            {ficha.alergias && (
-              <p>
-                <span className="text-muted-foreground">Alergias: </span>
-                <strong className="text-foreground">{ficha.alergias}</strong>
-              </p>
-            )}
-            {ficha.medicamentos && (
-              <p>
-                <span className="text-muted-foreground">Em uso: </span>
-                <strong className="text-foreground">{ficha.medicamentos}</strong>
-              </p>
-            )}
-          </div>
-        )}
-        {ficha.observacoesPrevias && (
-          <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
-            {ficha.observacoesPrevias}
-          </p>
-        )}
-      </div>
+      )}
 
       {/* 2. O QUE MUDOU DESDE A ÚLTIMA VEZ QUE ELE A VIU.
 
@@ -298,11 +313,15 @@ export function ProntuarioPaciente({
           falta de âncora. Vem ANTES dos números soltos porque um valor isolado
           não decide nada — o que decide é o que ele já sabia contra o que
           apareceu depois. */}
-      <MudancasDesdeAConsulta eventos={eventos} consultas={consultas} incompleto={incompleto} />
-      {aoRegistrarConsulta}
+      {mostra("mudou") && (
+        <>
+          <MudancasDesdeAConsulta eventos={eventos} consultas={consultas} incompleto={incompleto} />
+          {aoRegistrarConsulta}
+        </>
+      )}
 
       {/* 3. O QUE PEDE OLHAR AGORA */}
-      {pendentes.length > 0 && (
+      {mostra("pendentes") && pendentes.length > 0 && (
         <div className="rounded-3xl border border-rose-200 bg-rose-50/60 p-4">
           <p className="text-sm font-bold text-rose-900">
             {pendentes.length === 1
@@ -345,44 +364,45 @@ export function ProntuarioPaciente({
       )}
 
       {/* 4. PARA ONDE OS NÚMEROS ESTÃO INDO */}
-      <div>
-        <h4 className="font-serif text-lg text-foreground">Números dela</h4>
-        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-          Informados por ela no app, não aferidos em consultório. Sem etiqueta significa dentro da
-          faixa de referência ou sem registro — não é diagnóstico.
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Medida
-            rotulo="Última pressão"
-            valor={ultimaPA ? `${ultimaPA.systolic}/${ultimaPA.diastolic}` : "—"}
-            gravidade={sinalPA?.gravidade}
-            nota={sinalPA?.nota}
-          />
-          <Medida
-            rotulo="Última glicemia"
-            valor={gli.ultimo != null ? `${gli.ultimo}` : "—"}
-            gravidade={sinalG?.gravidade}
-            nota={sinalG?.nota}
-          />
-          <Medida
-            rotulo="Peso"
-            valor={peso.ultimo != null ? `${peso.ultimo} kg` : "—"}
-            nota={ganho != null ? `${ganho > 0 ? "+" : ""}${ganho} kg na gestação` : undefined}
-            gravidade={ganho != null ? "normal" : undefined}
-          />
-          <Medida
-            rotulo="Registros"
-            valor={String(eventos.length)}
-            nota={emOrdem.length ? quando(emOrdem[0].ocorrido_em) : undefined}
-          />
-        </div>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Tendencia s={pa} />
-          <Tendencia s={peso} />
-          <Tendencia s={gli} />
-        </div>
+      {mostra("numeros") && (
+        <div>
+          <h4 className="font-serif text-lg text-foreground">Números dela</h4>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            Informados por ela no app, não aferidos em consultório. Sem etiqueta significa dentro da
+            faixa de referência ou sem registro — não é diagnóstico.
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Medida
+              rotulo="Última pressão"
+              valor={ultimaPA ? `${ultimaPA.systolic}/${ultimaPA.diastolic}` : "—"}
+              gravidade={sinalPA?.gravidade}
+              nota={sinalPA?.nota}
+            />
+            <Medida
+              rotulo="Última glicemia"
+              valor={gli.ultimo != null ? `${gli.ultimo}` : "—"}
+              gravidade={sinalG?.gravidade}
+              nota={sinalG?.nota}
+            />
+            <Medida
+              rotulo="Peso"
+              valor={peso.ultimo != null ? `${peso.ultimo} kg` : "—"}
+              nota={ganho != null ? `${ganho > 0 ? "+" : ""}${ganho} kg na gestação` : undefined}
+              gravidade={ganho != null ? "normal" : undefined}
+            />
+            <Medida
+              rotulo="Registros"
+              valor={String(eventos.length)}
+              nota={emOrdem.length ? quando(emOrdem[0].ocorrido_em) : undefined}
+            />
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Tendencia s={pa} />
+            <Tendencia s={peso} />
+            <Tendencia s={gli} />
+          </div>
 
-        {/* ─── E O DESENHO, QUE É OUTRA PERGUNTA ────────────────────────────
+          {/* ─── E O DESENHO, QUE É OUTRA PERGUNTA ────────────────────────────
             Os três cartões acima respondem "como ela está": último valor e
             variação por semana. O gráfico responde "para onde isso está indo",
             que é o que o obstetra pergunta de verdade — peso subindo 200 g por
@@ -395,66 +415,71 @@ export function ProntuarioPaciente({
 
             A gravidade do PONTO vem de `sinais-clinicos`, a mesma régua do app
             da paciente e da fila do painel. */}
-        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <GraficoClinico
-            titulo="Pressão arterial"
-            /* O par sai do MESMO evento — ver `seriesDePressao`. Duas séries
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <GraficoClinico
+              titulo="Pressão arterial"
+              /* O par sai do MESMO evento — ver `seriesDePressao`. Duas séries
                independentes já casaram uma sistólica de hoje com uma diastólica
                de anteontem nesta tela. */
-            series={seriesDePressao(
-              eventos,
-              (sis, dia) => sinalPressao(sis, dia)?.gravidade ?? null,
-            )}
-          />
-          <GraficoClinico titulo="Peso" series={[daSerie(peso)]} />
-          <GraficoClinico
-            titulo="Glicemia"
-            series={[daSerie(gli, (v) => sinalGlicemia(v)?.gravidade ?? null, { de: 70, ate: 99 })]}
-          />
+              series={seriesDePressao(
+                eventos,
+                (sis, dia) => sinalPressao(sis, dia)?.gravidade ?? null,
+              )}
+            />
+            <GraficoClinico titulo="Peso" series={[daSerie(peso)]} />
+            <GraficoClinico
+              titulo="Glicemia"
+              series={[
+                daSerie(gli, (v) => sinalGlicemia(v)?.gravidade ?? null, { de: 70, ate: 99 }),
+              ]}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 5. O QUE ACONTECEU */}
-      <div>
-        <h4 className="font-serif text-lg text-foreground">Linha do tempo</h4>
-        {eventos.length === 0 ? (
-          <p className="mt-2 rounded-2xl border border-border bg-card p-4 text-[13px] text-muted-foreground">
-            Nenhum registro dela no período. Pode ser que ela ainda não use o app — vale combinar
-            isso na próxima consulta.
-          </p>
-        ) : (
-          <ul className="mt-2 space-y-1.5">
-            {eventos.slice(0, 40).map((e) => (
-              <li
-                key={`${e.fonte}-${e.fonte_id}`}
-                className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"
-              >
-                <span
-                  aria-hidden
-                  className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                    e.gravidade === "grave"
-                      ? "bg-rose-500"
-                      : e.gravidade === "atencao"
-                        ? "bg-amber-500"
-                        : "bg-muted-foreground/30"
-                  }`}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                    {ROTULO_ESPECIE[e.especie] ?? e.especie} · {quando(e.ocorrido_em)}
-                  </p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-foreground">{resumo(e)}</p>
-                  {e.texto && (
-                    <p className="mt-0.5 line-clamp-3 text-[12px] leading-snug text-muted-foreground">
-                      {e.texto}
+      {mostra("linha") && (
+        <div>
+          <h4 className="font-serif text-lg text-foreground">Linha do tempo</h4>
+          {eventos.length === 0 ? (
+            <p className="mt-2 rounded-2xl border border-border bg-card p-4 text-[13px] text-muted-foreground">
+              Nenhum registro dela no período. Pode ser que ela ainda não use o app — vale combinar
+              isso na próxima consulta.
+            </p>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {eventos.slice(0, 40).map((e) => (
+                <li
+                  key={`${e.fonte}-${e.fonte_id}`}
+                  className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3"
+                >
+                  <span
+                    aria-hidden
+                    className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                      e.gravidade === "grave"
+                        ? "bg-rose-500"
+                        : e.gravidade === "atencao"
+                          ? "bg-amber-500"
+                          : "bg-muted-foreground/30"
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      {ROTULO_ESPECIE[e.especie] ?? e.especie} · {quando(e.ocorrido_em)}
                     </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                    <p className="mt-0.5 text-[13px] leading-snug text-foreground">{resumo(e)}</p>
+                    {e.texto && (
+                      <p className="mt-0.5 line-clamp-3 text-[12px] leading-snug text-muted-foreground">
+                        {e.texto}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -53,6 +53,13 @@ import {
 } from "@/lib/clinical.functions";
 import { exameSugerido } from "@/lib/exame-sugerido";
 import { filtrarPacientes } from "@/lib/busca-paciente";
+import {
+  ABAS_DA_PACIENTE,
+  ABA_INICIAL_DA_PACIENTE,
+  SECOES_DA_ABA,
+  contadorDaAba,
+  type AbaDaPaciente,
+} from "@/lib/abas-da-paciente";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
 import { GradeDeHorarios } from "@/components/grade-de-horarios";
 import {
@@ -11406,6 +11413,14 @@ function PatientDetailModal({
   const [prontuarioIncompleto, setProntuarioIncompleto] = useState(false);
   const [registrandoDesfecho, setRegistrandoDesfecho] = useState<string | null>(null);
   const [consultasDela, setConsultasDela] = useState<Consulta[]>([]);
+  /* ─── AS TRÊS ABAS DO CARTÃO ────────────────────────────────────────────
+     Abrir uma paciente entregava uma rolagem de ~440 linhas — bebê, ações,
+     prontuário de cinco seções, chips, emergências, ficha e a conversa com a
+     IA — sempre na mesma ordem. Quem abre às 13h50 para decidir uma conduta
+     rolava por cima de meses de história para chegar no que aconteceu esta
+     semana. A régua (o que vai em cada aba, e o contador) mora em
+     `abas-da-paciente`, testada. */
+  const [abaDaFicha, setAbaDaFicha] = useState<AbaDaPaciente>(ABA_INICIAL_DA_PACIENTE);
 
   useEffect(() => {
     (async () => {
@@ -11553,9 +11568,50 @@ function PatientDetailModal({
           <AcoesDaPaciente p={p} tokenFn={tokenFn} />
         </div>
 
+        {/* ─── A FITA DA FICHA ──────────────────────────────────────────
+            O contador SOBE PARA A ABA, e essa é a parte que não pode se
+            perder: empurrar "registros fora de faixa sem desfecho" para dentro
+            de uma aba faria o número que leva o médico até lá sumir da tela — a
+            divisão que era para organizar passaria a esconder trabalho
+            clínico. É a mesma lição da fita principal do painel. */}
+        <div
+          role="tablist"
+          aria-label="Seções da paciente"
+          className="flex shrink-0 gap-1 border-b border-border px-4"
+        >
+          {ABAS_DA_PACIENTE.map((ab) => {
+            const n = contadorDaAba(ab, {
+              pendentes: prontuario.filter((e) => e.gravidade !== "normal" && !e.tratado_em).length,
+              sosAbertos: sosDela.filter((a) => !a.atendido_em).length,
+            });
+            const ativo = ab === abaDaFicha;
+            return (
+              <button
+                key={ab}
+                role="tab"
+                aria-selected={ativo}
+                onClick={() => setAbaDaFicha(ab)}
+                className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                  ativo
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-primary"
+                }`}
+              >
+                {ab}
+                {n > 0 && (
+                  <span className="ml-1.5 rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                    {n}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         {/* O PRONTUÁRIO — primeiro, porque é o que ele veio ver. */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
           <ProntuarioPaciente
+            secoes={SECOES_DA_ABA[abaDaFicha]}
             ficha={fichaClin}
             eventos={prontuario}
             carregando={carregandoProntuario}
@@ -11609,51 +11665,54 @@ function PatientDetailModal({
             }}
           />
 
-          {/* Dados rápidos — o espelho do bebê e os controles ficam DEPOIS do
-              prontuário, dentro da mesma rolagem. */}
-          <div className="flex flex-wrap gap-2 px-4 pt-3">
-            {weeks != null ? (
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {/* Com os dias: conduta em 36s0d não é conduta em 36s6d, e a tela
+          {/* Dados rápidos — semana, DPP, BPM. Ficam em "Agora" porque é o que
+              muda a leitura de qualquer número da tela: 135/88 em 22 semanas e
+              em 38 semanas são duas conversas diferentes. */}
+          {abaDaFicha === "Agora" && (
+            <div className="flex flex-wrap gap-2 px-4 pt-3">
+              {weeks != null ? (
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {/* Com os dias: conduta em 36s0d não é conduta em 36s6d, e a tela
                   dela sempre mostrou os dois. */}
-                {weeks} semanas{p.days != null ? ` e ${p.days}d` : ""}
-              </span>
-            ) : p.birth_date ? (
-              /* Puérpera: antes o painel dizia "Sem data de gestação" para quem
+                  {weeks} semanas{p.days != null ? ` e ${p.days}d` : ""}
+                </span>
+              ) : p.birth_date ? (
+                /* Puérpera: antes o painel dizia "Sem data de gestação" para quem
                já teve o bebê, enquanto a tela dela contava os dias de vida. */
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                🍼{" "}
-                {(() => {
-                  const dias = Math.floor(
-                    (Date.now() - new Date(`${p.birth_date}T00:00:00`).getTime()) / 86400000,
-                  );
-                  if (dias < 0) return "recém-nascido";
-                  if (dias < 14) return `${dias} ${dias === 1 ? "dia" : "dias"} de vida`;
-                  const sem = Math.floor(dias / 7);
-                  return `${sem} ${sem === 1 ? "semana" : "semanas"} de vida`;
-                })()}
-              </span>
-            ) : null}
-            {due && (
-              <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
-                DPP {due}
-              </span>
-            )}
-            {p.fetal_bpm != null && (
-              <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">
-                💓 {p.fetal_bpm} bpm
-              </span>
-            )}
-            {p.quiz_premium && (
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                ⭐ Premium
-              </span>
-            )}
-          </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  🍼{" "}
+                  {(() => {
+                    const dias = Math.floor(
+                      (Date.now() - new Date(`${p.birth_date}T00:00:00`).getTime()) / 86400000,
+                    );
+                    if (dias < 0) return "recém-nascido";
+                    if (dias < 14) return `${dias} ${dias === 1 ? "dia" : "dias"} de vida`;
+                    const sem = Math.floor(dias / 7);
+                    return `${sem} ${sem === 1 ? "semana" : "semanas"} de vida`;
+                  })()}
+                </span>
+              ) : null}
+              {due && (
+                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+                  DPP {due}
+                </span>
+              )}
+              {p.fetal_bpm != null && (
+                <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">
+                  💓 {p.fetal_bpm} bpm
+                </span>
+              )}
+              {p.quiz_premium && (
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                  ⭐ Premium
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Histórico de emergências ANTES dos registros: se ela acionou o SOS,
               é a primeira coisa que o médico precisa ver ao abrir a ficha. */}
-          {sosDela.length > 0 && (
+          {abaDaFicha === "Agora" && sosDela.length > 0 && (
             <div className="px-4 pt-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600 dark:text-rose-300">
                 🆘 Acionamentos de emergência ({sosDela.length})
@@ -11697,118 +11756,127 @@ function PatientDetailModal({
             </div>
           )}
 
-          {/* Ficha clínica — o que ela registrou no app */}
-          {ficha && (
-            <div className="px-4 pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                🩺 Registros dela
-              </p>
-              {/* Sem esta linha, "sem etiqueta" era lido como "está tudo bem" — e
+          {/* Ficha clínica — quem ela é. Vai para a aba "Ficha": é leitura de
+              fundo, não decisão de hoje. */}
+          {abaDaFicha === "Ficha" && (
+            <>
+              {/* Ficha clínica — o que ela registrou no app */}
+              {ficha && (
+                <div className="px-4 pt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    🩺 Registros dela
+                  </p>
+                  {/* Sem esta linha, "sem etiqueta" era lido como "está tudo bem" — e
                 cobre também "não mediu" e "mediu errado". A tela nunca deve
                 deixar o médico concluir nada a partir da AUSÊNCIA de marca. */}
-              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                Medidas informadas por ela no app, não aferidas em consultório. Sem etiqueta
-                significa dentro da faixa de referência ou sem registro — não é diagnóstico.
-              </p>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {medidas.map(({ rot, v }) => (
-                  <div key={rot} className="rounded-2xl border border-border p-2.5 text-center">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {rot}
-                    </p>
-                    <p className="mt-0.5 text-sm font-bold text-foreground">{v ? v.valor : "—"}</p>
-                    {v?.quando && (
-                      <p className="text-[9.5px] text-muted-foreground">
-                        {new Date(`${String(v.quando).slice(0, 10)}T00:00:00`).toLocaleDateString(
-                          "pt-BR",
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                    Medidas informadas por ela no app, não aferidas em consultório. Sem etiqueta
+                    significa dentro da faixa de referência ou sem registro — não é diagnóstico.
+                  </p>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {medidas.map(({ rot, v }) => (
+                      <div key={rot} className="rounded-2xl border border-border p-2.5 text-center">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {rot}
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-foreground">
+                          {v ? v.valor : "—"}
+                        </p>
+                        {v?.quando && (
+                          <p className="text-[9.5px] text-muted-foreground">
+                            {new Date(
+                              `${String(v.quando).slice(0, 10)}T00:00:00`,
+                            ).toLocaleDateString("pt-BR")}
+                          </p>
                         )}
-                      </p>
-                    )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
-                  📓 {(ficha.journals ?? []).length} no diário
-                </span>
-                <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
-                  🦶 {(ficha.kicks ?? []).length} sessões de chutes
-                </span>
-                <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
-                  ❓ {(ficha.pendingQuestions ?? []).length} perguntas
-                </span>
-              </div>
-              {/* Dados clínicos do perfil: o que ela levaria escrito na
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                      📓 {(ficha.journals ?? []).length} no diário
+                    </span>
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                      🦶 {(ficha.kicks ?? []).length} sessões de chutes
+                    </span>
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                      ❓ {(ficha.pendingQuestions ?? []).length} perguntas
+                    </span>
+                  </div>
+                  {/* Dados clínicos do perfil: o que ela levaria escrito na
                 carteirinha. É o que muda a conduta numa emergência. */}
-              {(ficha.profile?.blood_type ||
-                ficha.profile?.allergies ||
-                ficha.profile?.medications) && (
-                <div className="mt-2 rounded-2xl bg-secondary/50 p-2.5 text-[11.5px] leading-snug">
-                  {ficha.profile?.blood_type && (
-                    <p>
-                      <span className="font-semibold">Sangue:</span> {ficha.profile.blood_type}
-                    </p>
-                  )}
-                  {ficha.profile?.allergies && (
-                    <p>
-                      <span className="font-semibold">Alergias:</span> {ficha.profile.allergies}
-                    </p>
-                  )}
-                  {ficha.profile?.medications && (
-                    <p>
-                      <span className="font-semibold">Medicamentos:</span>{" "}
-                      {ficha.profile.medications}
-                    </p>
+                  {(ficha.profile?.blood_type ||
+                    ficha.profile?.allergies ||
+                    ficha.profile?.medications) && (
+                    <div className="mt-2 rounded-2xl bg-secondary/50 p-2.5 text-[11.5px] leading-snug">
+                      {ficha.profile?.blood_type && (
+                        <p>
+                          <span className="font-semibold">Sangue:</span> {ficha.profile.blood_type}
+                        </p>
+                      )}
+                      {ficha.profile?.allergies && (
+                        <p>
+                          <span className="font-semibold">Alergias:</span> {ficha.profile.allergies}
+                        </p>
+                      )}
+                      {ficha.profile?.medications && (
+                        <p>
+                          <span className="font-semibold">Medicamentos:</span>{" "}
+                          {ficha.profile.medications}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Conversa com a IA (somente leitura) */}
-          <div className="py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              💬 Conversa com a IA
-            </p>
-            {messages === null ? (
-              <div className="mt-2 space-y-2">
-                <div className="h-12 animate-pulse rounded-xl bg-secondary" />
-                <div className="h-12 animate-pulse rounded-xl bg-secondary" />
-              </div>
-            ) : messages.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Ela ainda não conversou com a IA (ou o histórico ainda não foi ativado no banco).
-              </p>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {messages.map((m, i) => (
-                  <div
-                    key={i}
-                    className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
-                        m.role === "user"
-                          ? "rounded-br-sm bg-primary/10 text-foreground"
-                          : "rounded-bl-sm bg-secondary"
-                      }`}
-                    >
-                      {m.content}
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        {m.role === "user" ? "Paciente" : "IA"} ·{" "}
-                        {new Date(m.created_at).toLocaleString("pt-BR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
+              {/* Conversa com a IA (somente leitura) */}
+              <div className="py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                  💬 Conversa com a IA
+                </p>
+                {messages === null ? (
+                  <div className="mt-2 space-y-2">
+                    <div className="h-12 animate-pulse rounded-xl bg-secondary" />
+                    <div className="h-12 animate-pulse rounded-xl bg-secondary" />
                   </div>
-                ))}
+                ) : messages.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Ela ainda não conversou com a IA (ou o histórico ainda não foi ativado no
+                    banco).
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {messages.map((m, i) => (
+                      <div
+                        key={i}
+                        className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
+                            m.role === "user"
+                              ? "rounded-br-sm bg-primary/10 text-foreground"
+                              : "rounded-bl-sm bg-secondary"
+                          }`}
+                        >
+                          {m.content}
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            {m.role === "user" ? "Paciente" : "IA"} ·{" "}
+                            {new Date(m.created_at).toLocaleString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>
