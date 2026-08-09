@@ -31,6 +31,7 @@ import {
 } from "@/lib/clinical.functions";
 import { formataTelefone, linkTel } from "@/lib/telefone";
 import { quando } from "@/lib/quando";
+import { GraficoClinico, daSerie, seriesDePressao } from "./grafico-clinico";
 
 function idadeGestacional(dias: number | null): string {
   if (dias == null || dias < 0) return "—";
@@ -193,7 +194,10 @@ export function ProntuarioPaciente({
   const emOrdem = [...eventos].sort((a, b) => b.ocorrido_em.localeCompare(a.ocorrido_em));
 
   const pa = serieDe(eventos, "systolic", "Pressão (sistólica)", "mmHg");
-  const paD = serieDe(eventos, "diastolic", "Diastólica", "mmHg");
+  /* A diastólica NÃO tem série própria: ela só aparece emparelhada com a
+     sistólica, e o par vem do mesmo evento (`seriesDePressao`). Uma `Serie`
+     solta aqui seria o convite para alguém desenhá-la sozinha e reabrir o
+     defeito de compor duas leituras de dias diferentes. */
   const peso = serieDe(eventos, "weight_kg", "Peso", "kg");
   const gli = serieDe(eventos, "glucose_mg_dl", "Glicemia", "mg/dL");
 
@@ -376,6 +380,37 @@ export function ProntuarioPaciente({
           <Tendencia s={pa} />
           <Tendencia s={peso} />
           <Tendencia s={gli} />
+        </div>
+
+        {/* ─── E O DESENHO, QUE É OUTRA PERGUNTA ────────────────────────────
+            Os três cartões acima respondem "como ela está": último valor e
+            variação por semana. O gráfico responde "para onde isso está indo",
+            que é o que o obstetra pergunta de verdade — peso subindo 200 g por
+            semana e 900 g por semana têm o mesmo último peso na tela.
+
+            Um gráfico POR MEDIDA, nunca dois eixos: pressão em mmHg e peso em
+            kg no mesmo desenho exigiria duas escalas, e duas escalas fazem
+            qualquer par de linhas parecer correlacionado. As duas linhas que
+            dividem um gráfico aqui são sistólica e diastólica — mesma unidade.
+
+            A gravidade do PONTO vem de `sinais-clinicos`, a mesma régua do app
+            da paciente e da fila do painel. */}
+        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <GraficoClinico
+            titulo="Pressão arterial"
+            /* O par sai do MESMO evento — ver `seriesDePressao`. Duas séries
+               independentes já casaram uma sistólica de hoje com uma diastólica
+               de anteontem nesta tela. */
+            series={seriesDePressao(
+              eventos,
+              (sis, dia) => sinalPressao(sis, dia)?.gravidade ?? null,
+            )}
+          />
+          <GraficoClinico titulo="Peso" series={[daSerie(peso)]} />
+          <GraficoClinico
+            titulo="Glicemia"
+            series={[daSerie(gli, (v) => sinalGlicemia(v)?.gravidade ?? null, { de: 70, ate: 99 })]}
+          />
         </div>
       </div>
 

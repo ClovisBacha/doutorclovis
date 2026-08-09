@@ -327,6 +327,28 @@ política que deixava qualquer autenticado reescrever a agenda do médico.
 - **Pedido não confirmado NÃO ocupa horário** (é um "quem sabe"). Falha ao ler
   os ocupados devolve erro, e nunca "está tudo livre".
 
+### Gráficos clínicos no prontuário (ago/2026)
+
+`GraficoClinico` (`src/components/grafico-clinico.tsx`) desenha peso, pressão e
+glicemia como série temporal, ao lado dos três cartões de "último valor".
+Os cartões respondem "como ela está"; o gráfico responde "para onde isso vai" —
+peso subindo 200 g/semana e 900 g/semana têm o mesmo último peso na tela.
+
+- **Um gráfico por medida, nunca dois eixos.** Duas escalas fazem qualquer par
+  de linhas parecer correlacionado. As duas linhas que dividem um gráfico são
+  sistólica e diastólica, que são a mesma unidade.
+- **`seriesDePressao` emparelha o PAR do mesmo evento** e calcula a gravidade
+  uma vez, para os dois pontos. Duas séries independentes já casaram uma
+  sistólica de hoje com uma diastólica de anteontem nesta base. **Nunca** chame
+  `sinalPressao(sistolica, 70)` para tirar a gravidade de uma só — 90/70 dispara
+  "diferença implausível" e pinta de laranja uma pressão normal.
+- **Cor de linha = identidade; cor de ponto = gravidade** (de `sinais-clinicos`,
+  nunca uma cópia). A paleta passou nas seis checagens do validador nos dois
+  modos, com passo PRÓPRIO para o escuro (a banda dele é L 0,48–0,67).
+- **Coordenadas em pixels com proporção mantida** (`viewBox` 600×190,
+  `w-full h-auto`): `preserveAspectRatio="none"` esticado deforma os pontos em
+  elipses.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o
