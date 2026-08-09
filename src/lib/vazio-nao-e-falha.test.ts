@@ -253,3 +253,36 @@ describe("6. o botão «Ver relatório» não pode virar «...» para sempre", (
     expect((painel.match(/erroReport\[p\.id\]/g) ?? []).length).toBe(2);
   });
 });
+
+describe("7. a aba Engajamento não morre calada", () => {
+  /**
+   * `token()` devolve string vazia quando a sessão expira e o validador exige
+   * `min(10)` — a chamada é REJEITADA e a promessa estoura. Sem `try`, sem
+   * estado de erro e sem `else`, `engagement` ficava `null` e a aba continuava
+   * mostrando "Clique para carregar o dashboard". O médico clica, nada
+   * acontece, clica de novo.
+   *
+   * O irmão ao lado (`loadEventosClinicos`) já fazia isto certo — mais um caso
+   * de correção aplicada de um lado só.
+   */
+  const i = painel.indexOf("async function loadEngagement");
+  const bloco = painel.slice(i, i + 800);
+
+  test("o carregador trata os dois modos de falha", () => {
+    expect(bloco).toContain("else setFonteFalhou((f) => ({ ...f, engajamento: true }));");
+    expect(bloco).toContain(
+      "} catch {\n      setFonteFalhou((f) => ({ ...f, engajamento: true }));",
+    );
+  });
+
+  test("e limpa o aviso quando dá certo", () => {
+    /* Sem isto a faixa fica acesa para sempre depois da primeira falha. */
+    expect(bloco).toContain("setFonteFalhou((f) => ({ ...f, engajamento: false }));");
+  });
+
+  test("a tela para de convidar a repetir o que acabou de falhar", () => {
+    expect(painel).toContain("falhou={fonteFalhou.engajamento}");
+    expect(painel).toContain("Não consegui carregar o dashboard agora");
+    expect(painel).toContain('{falhou ? "Tentar de novo:" : "Clique para carregar o dashboard."}');
+  });
+});

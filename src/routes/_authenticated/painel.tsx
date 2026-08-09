@@ -384,6 +384,10 @@ function PainelPage() {
     preConsultas: false,
     triagens: false,
     eventos: false,
+    /* O Engajamento não é fonte da FILA — não entra na faixa dela. Mora aqui
+       porque é o mesmo vocabulário, e a aba usa este campo para avisar em vez
+       de ficar oferecendo "Clique para carregar o dashboard" para sempre. */
+    engajamento: false,
   });
 
   /* Vigia de SOS. Roda em paralelo ao resto e nunca derruba o painel: um erro
@@ -654,9 +658,25 @@ function PainelPage() {
   }
 
   async function loadEngagement() {
-    const tk = await token();
-    const res = await getEngagementData({ data: { accessToken: tk } });
-    if (res.ok) setEngagement(res);
+    /* ─── A ABA MORRIA CALADA ────────────────────────────────────────────────
+     *
+     * `token()` devolve string vazia quando a sessão expira e o validador do
+     * servidor exige `min(10)` — a chamada é REJEITADA e a promessa estoura.
+     * Sem `try`, sem estado de erro e sem `else`, `engagement` ficava `null` e
+     * a aba continuava mostrando "Clique para carregar o dashboard". O médico
+     * clica, nada acontece, clica de novo.
+     *
+     * O irmão ao lado (`loadEventosClinicos`) já fazia isto certo. */
+    try {
+      const tk = await token();
+      const res = await getEngagementData({ data: { accessToken: tk } });
+      if (res.ok) {
+        setEngagement(res);
+        setFonteFalhou((f) => ({ ...f, engajamento: false }));
+      } else setFonteFalhou((f) => ({ ...f, engajamento: true }));
+    } catch {
+      setFonteFalhou((f) => ({ ...f, engajamento: true }));
+    }
   }
 
   async function loadEventosClinicos() {
@@ -1291,7 +1311,12 @@ function PainelPage() {
           />
         )}
         {tab === "Engajamento" && (
-          <EngagementSection engagement={engagement} onRefresh={loadEngagement} tokenFn={token} />
+          <EngagementSection
+            engagement={engagement}
+            onRefresh={loadEngagement}
+            tokenFn={token}
+            falhou={fonteFalhou.engajamento}
+          />
         )}
         {tab === "Consultas Pagas" && (
           <ConsultasPagasSection
@@ -3233,6 +3258,7 @@ function EngagementSection({
   engagement,
   onRefresh,
   tokenFn,
+  falhou = false,
 }: {
   engagement: {
     totalPatients: number;
@@ -3245,6 +3271,8 @@ function EngagementSection({
   } | null;
   onRefresh: () => void;
   tokenFn: () => Promise<string>;
+  /** A leitura do dashboard falhou — ver `loadEngagement`. */
+  falhou?: boolean;
 }) {
   const [reportData, setReportData] = useState<Record<string, any>>({});
   const [loadingReport, setLoadingReport] = useState<string | null>(null);
@@ -3286,7 +3314,18 @@ function EngagementSection({
   if (!engagement) {
     return (
       <div className="text-center py-8">
-        <p className="text-sm text-muted-foreground mb-3">Clique para carregar o dashboard.</p>
+        {/* "Clique para carregar" convida a repetir o que acabou de falhar. Se
+            a leitura já foi tentada e não deu, o médico precisa saber disso —
+            senão ele clica, nada acontece, e clica de novo. */}
+        {falhou && (
+          <p className="mx-auto mb-3 max-w-md rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+            📡 Não consegui carregar o dashboard agora. Se insistir e continuar assim, saia e entre
+            de novo — a sua sessão pode ter expirado.
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground mb-3">
+          {falhou ? "Tentar de novo:" : "Clique para carregar o dashboard."}
+        </p>
         <button
           onClick={onRefresh}
           className="rounded-full bg-primary px-6 py-2.5 text-sm text-primary-foreground"
