@@ -469,9 +469,24 @@ describe("10. o script de migração não gira, não exclui e respeita o recorte
      */
     const i = script.indexOf("async function subir");
     const corpo = script.slice(i, script.indexOf("async function limpar"));
-    expect(corpo).toContain("const tentados = new Set();");
-    expect(corpo).toContain("const novas = linhas.filter((l) => !tentados.has(l.id));");
-    expect(corpo).toContain("if (novas.length === 0) break;");
+    /**
+     * CURSOR, e não um conjunto de já-tentados.
+     *
+     * A primeira tentativa guardava os ids tentados e parava quando a página
+     * não trazia nada novo. A revisão adversarial mostrou que isso trocou um
+     * defeito por outro: PDFs nunca são marcados, então voltam sempre — e
+     * bastavam 25 deles (um lote) para a PRIMEIRA página ser toda de PDF. A
+     * segunda repetia os mesmos 25, a conta dava zero, e o script encerrava
+     * ANUNCIANDO QUE TERMINOU sem nunca ter chegado às imagens seguintes.
+     *
+     * Um cursor crescente por `id` avança de verdade: o que foi pulado fica
+     * para trás e não bloqueia o resto.
+     */
+    expect(corpo).toContain('.gt("id", cursor)');
+    expect(corpo).toContain('.order("id", { ascending: true })');
+    expect(corpo).toContain("cursor = linhas[linhas.length - 1].id;");
+    /* E o mecanismo antigo não pode voltar junto. */
+    expect(corpo).not.toContain("const tentados = new Set();");
   });
 
   test("e NÃO marca a linha que não soube converter", () => {
@@ -547,5 +562,92 @@ describe("11. «ela não anexou» e «não consegui servir» pararam de ser a me
        anotação passaria a sugerir falha. */
     expect(visor).toContain("Este registro não tem imagem anexada");
     expect(clinical).toContain(': ("sem_imagem" as const)');
+  });
+});
+
+describe("12. o caminho no balde NÃO carrega o uuid da paciente", () => {
+  /**
+   * ─── O VAZAMENTO QUE A REVISÃO COMPLETA ACHOU ─────────────────────────────
+   *
+   * A primeira versão usava `${uuid de auth.users}/arquivo.jpg`. O caminho entra
+   * na URL ASSINADA, e a URL assinada da foto do álbum vai para a tag `<img>`
+   * de `/album/<token>` — ou seja, para o grupo da família inteiro: no DOM, no
+   * painel de rede, no histórico, em qualquer print.
+   *
+   * Isso desfazia, por outro caminho, uma correção escrita a duas telas dali:
+   * `getAlbumByToken` teve o `select("*")` trocado por colunas nomeadas
+   * exatamente para não entregar `patient_user_id` a quem tem o link, e o tipo
+   * `AlbumPostPublico = Omit<AlbumPost, "patient_user_id">` existe para isso.
+   *
+   * A migração reabriu o buraco pelo campo que ninguém estava olhando.
+   */
+  const mod = semComentarios("src/lib/imagens.server.ts");
+  const script = readFileSync("scripts/migrar-imagens.mjs", "utf8");
+
+  test("a pasta é derivada, não o uuid cru", () => {
+    expect(mod).toContain("export function pastaDoDono(donoId: string): string {");
+    expect(mod).toContain('crypto.createHash("sha256").update(donoId).digest("hex").slice(0, 32)');
+  });
+
+  test("e TODO caminho passa por ela — upload, listagem e exclusão", () => {
+    expect(mod).toContain("`${pastaDoDono(opts.donoId)}/${crypto.randomUUID()}");
+    expect(mod).toContain(".list(pastaDoDono(donoId), { limit: 100 })");
+    expect(mod).toContain("`${pastaDoDono(donoId)}/${a.name}`");
+    /* Nenhum resquício do uuid cru montando caminho. */
+    expect(mod).not.toContain("`${opts.donoId}/");
+    expect(mod).not.toContain("`${donoId}/");
+  });
+
+  test("o backfill deriva IGUAL — senão a varredura da LGPD não acha nada", () => {
+    /**
+     * `apagarPastaDoDono` procura pela pasta derivada. Se o script gravasse com
+     * o uuid cru, os arquivos migrados ficariam fora do alcance da exclusão de
+     * conta — o defeito de LGPD de volta, só que mais difícil de ver.
+     */
+    expect(script).toContain('createHash("sha256").update(String(id)).digest("hex").slice(0, 32)');
+    expect(script).toContain("${pastaDoDono(linha[cfg.dono])}/");
+  });
+});
+
+describe("13. apagar UM exame apaga o arquivo — a terceira ponta", () => {
+  /**
+   * A aba Exames dela apagava a linha direto do navegador. Enquanto o laudo
+   * morava DENTRO da linha isso apagava a imagem junto; com ele no Storage, a
+   * linha some e o arquivo fica — e o navegador não pode limpá-lo, porque os
+   * baldes são privados e sem policy.
+   *
+   * Mesmo defeito já fechado em `deleteAlbumPost` e na exclusão da conta. Esta
+   * ficou aberta porque mora na TELA, não numa função de servidor — não
+   * apareceu em nenhuma busca pelos arquivos que a migração tocou.
+   */
+  const fn = semComentarios("src/lib/exame-do-chat.functions.ts");
+  const app = semComentarios("src/routes/_authenticated/minha-conta.tsx");
+
+  test("existe função de servidor, e ela apaga os dois", () => {
+    expect(fn).toContain("export const apagarMeuExame");
+    expect(fn).toContain("apagarImagem(BALDE_EXAMES, linha.image_path)");
+  });
+
+  test("o caminho é lido ANTES do delete", () => {
+    const i = fn.indexOf("export const apagarMeuExame");
+    const corpo = fn.slice(i);
+    expect(corpo.indexOf("lerComCaminho<{ image_path")).toBeLessThan(corpo.indexOf(".delete()"));
+  });
+
+  test("e só apaga exame DELA", () => {
+    const i = fn.indexOf("export const apagarMeuExame");
+    const corpo = fn.slice(i);
+    expect((corpo.match(/\.eq\("user_id", u\.user\.id\)/g) ?? []).length).toBe(2);
+  });
+
+  test("a tela não apaga mais direto do banco", () => {
+    /* Ancorado na CONFIRMAÇÃO, que é única. Existe outro `remove(id: string)`
+       no arquivo — o do diário — e ele vem antes: cortar da primeira ocorrência
+       media a função errada, e o teste passava por acidente. */
+    const i = app.indexOf('window.confirm("Excluir este exame?")');
+    expect(i).toBeGreaterThan(-1);
+    const bloco = app.slice(i, i + 1200);
+    expect(bloco).toContain("apagarMeuExame");
+    expect(bloco).not.toContain('.from("exam_files").delete()');
   });
 });

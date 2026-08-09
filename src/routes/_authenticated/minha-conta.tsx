@@ -19012,8 +19012,24 @@ function ExamesTab({ gest }: { gest: Gest }) {
 
   async function remove(id: string) {
     if (!window.confirm("Excluir este exame?")) return;
-    const { error } = await (supabase as any).from("exam_files").delete().eq("id", id);
-    if (error) {
+    /* Pelo SERVIDOR, e não mais direto do banco: com o laudo no Storage, apagar
+       a linha deixava o arquivo no balde — e o navegador não pode limpá-lo,
+       porque os baldes são privados e sem policy. Ela mandava apagar, a tela
+       dizia que apagou, e o laudo continuava no nosso disco. */
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const tk = sess.session?.access_token;
+      if (!tk) {
+        toast.error("Sua sessão expirou. Entre de novo para excluir.");
+        return;
+      }
+      const { apagarMeuExame } = await import("@/lib/exame-do-chat.functions");
+      const r = await apagarMeuExame({ data: { accessToken: tk, exameId: id } });
+      if (!r.ok) {
+        toast.error("Não foi possível excluir o exame. Tente novamente.");
+        return;
+      }
+    } catch {
       toast.error("Não foi possível excluir o exame. Tente novamente.");
       return;
     }

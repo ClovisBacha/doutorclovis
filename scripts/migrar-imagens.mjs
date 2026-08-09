@@ -40,6 +40,12 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+
+/** MESMA derivação de `src/lib/imagens.server.ts`. O caminho não pode carregar
+    o uuid de auth.users: ele entra na URL assinada, e a do álbum vai para a
+    tag <img> de quem tem o link do convite. */
+const pastaDoDono = (id) => createHash("sha256").update(String(id)).digest("hex").slice(0, 32);
 
 // ── Ambiente ────────────────────────────────────────────────────────────────
 if (existsSync(".env")) {
@@ -129,24 +135,38 @@ async function subir(sóTabela) {
      * nesta página → terminei", que é o comportamento certo: ele para, informa,
      * e a próxima execução tenta de novo do começo.
      */
-    const tentados = new Set();
+    /**
+     * ─── CURSOR POR `id`, E NÃO UM CONJUNTO DE JÁ-TENTADOS ──────────────────
+     *
+     * A primeira tentativa de consertar o laço infinito guardava os ids já
+     * tentados e parava quando a página não trazia nada novo. Isso trocou um
+     * defeito por outro, e a revisão adversarial pegou: PDFs nunca são
+     * marcados, então voltam sempre. Bastavam 25 deles (um lote) para a
+     * PRIMEIRA página ser toda de PDF — a segunda repetia os mesmos 25, `novas`
+     * dava zero, e o script encerrava anunciando que terminou, sem nunca ter
+     * chegado às imagens que vinham depois.
+     *
+     * Um cursor crescente por `id` avança de verdade: o que foi pulado fica
+     * para trás e não bloqueia o resto.
+     */
+    let cursor = "00000000-0000-0000-0000-000000000000";
     for (;;) {
       const { data: linhas, error } = await sb
         .from(tabela)
         .select(`id, ${cfg.dono}, image_data`)
         .is("image_path", null)
         .not("image_data", "is", null)
+        .gt("id", cursor)
+        .order("id", { ascending: true })
         .limit(LOTE);
       if (error) {
         console.error(`${tabela}: ${error.message}`);
         break;
       }
       if (!linhas || linhas.length === 0) break;
-      const novas = linhas.filter((l) => !tentados.has(l.id));
-      if (novas.length === 0) break;
+      cursor = linhas[linhas.length - 1].id;
 
-      for (const linha of novas) {
-        tentados.add(linha.id);
+      for (const linha of linhas) {
         const img = decodificar(linha.image_data);
         if (!img) {
           /* ─── NÃO MARCA NADA ──────────────────────────────────────────────
@@ -168,7 +188,7 @@ async function subir(sóTabela) {
           pulados++;
           continue;
         }
-        const caminho = `${linha[cfg.dono]}/${crypto.randomUUID()}.${img.extensao}`;
+        const caminho = `${pastaDoDono(linha[cfg.dono])}/${crypto.randomUUID()}.${img.extensao}`;
         const { error: eUp } = await sb.storage
           .from(cfg.balde)
           .upload(caminho, img.bytes, { contentType: img.tipo, upsert: false });

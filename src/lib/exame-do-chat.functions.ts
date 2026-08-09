@@ -222,3 +222,59 @@ export const minhaImagemDeExame = createServerFn({ method: "POST" })
       return { ok: false as const, imagem: null };
     }
   });
+
+/**
+ * Apagar UM exame dela — linha e arquivo.
+ *
+ * ─── A TERCEIRA PONTA DA MESMA MIGRAÇÃO ─────────────────────────────────────
+ *
+ * A aba Exames apagava a linha direto do navegador com a chave anon. Enquanto o
+ * laudo morava DENTRO da linha, isso apagava a imagem junto.
+ *
+ * Com o laudo no Storage, a linha some e o arquivo fica — e o navegador não
+ * pode limpá-lo, porque os baldes são privados e sem policy por decisão
+ * explícita. Ela manda apagar, a tela diz que apagou, e o laudo continua no
+ * nosso disco.
+ *
+ * É o mesmo defeito que já foi fechado em `deleteAlbumPost` e na exclusão da
+ * conta. Esta era a terceira ponta, e ficou aberta porque a exclusão do exame
+ * mora na TELA e não numa função de servidor — não apareceu em nenhuma busca
+ * pelos arquivos que a migração tocou.
+ *
+ * O caminho é lido ANTES do delete: depois a linha não existe e não há como
+ * saber qual arquivo era dela.
+ */
+export const apagarMeuExame = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), exameId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+      if (!u?.user) return { ok: false as const };
+      const sb = supabaseAdmin as any;
+
+      const { lerComCaminho, apagarImagem, BALDE_EXAMES } = await import("@/lib/imagens.server");
+      /* `.eq("user_id")` na própria consulta: um id de outra pessoa não devolve
+         linha nenhuma, em vez de devolver e depender de um `if` para barrar. */
+      const { data: linha } = await lerComCaminho<{ image_path?: string | null }>(
+        "exam_files",
+        "id",
+        (q) => q.eq("id", data.exameId).eq("user_id", u.user.id).maybeSingle(),
+      );
+      if (!linha) return { ok: false as const };
+
+      const { error } = await sb
+        .from("exam_files")
+        .delete()
+        .eq("id", data.exameId)
+        .eq("user_id", u.user.id);
+      if (error) return { ok: false as const };
+
+      if (linha.image_path) await apagarImagem(BALDE_EXAMES, linha.image_path);
+      return { ok: true as const };
+    } catch {
+      return { ok: false as const };
+    }
+  });

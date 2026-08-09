@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 /**
  * IMAGENS FORA DO POSTGRES.
  *
@@ -53,6 +54,37 @@ export const BALDE_EXAMES = "exames";
     expira antes de virar link compartilhável por engano. */
 const VALIDADE_SEGUNDOS = 3600;
 
+/**
+ * A PASTA DE CADA PESSOA — derivada, não o uuid cru.
+ *
+ * ─── O VAZAMENTO QUE ISTO FECHA ─────────────────────────────────────────────
+ *
+ * A primeira versão usava `${uuid de auth.users}/arquivo.jpg`. O caminho entra
+ * na URL ASSINADA, e a URL assinada da foto do álbum vai para a tag `<img>` de
+ * `/album/<token>` — ou seja, para o grupo da família inteiro, no DOM, no painel
+ * de rede, no histórico e em qualquer print.
+ *
+ * Isso desfazia, por outro caminho, uma correção que está escrita a duas telas
+ * daqui: `getAlbumByToken` teve o `select("*")` trocado por colunas nomeadas
+ * exatamente para NÃO entregar `patient_user_id` a quem tem o link. O tipo
+ * `AlbumPostPublico = Omit<AlbumPost, "patient_user_id">` existe para isso. A
+ * migração de imagens reabriu o buraco pelo campo que ninguém estava olhando.
+ *
+ * ─── POR QUE SHA-256 E NÃO UM SEGREDO ───────────────────────────────────────
+ *
+ * O que se quer aqui é uma coisa só: que o caminho não REVELE o uuid. Um hash
+ * determinístico resolve — e por ser determinístico, `apagarPastaDoDono` (a
+ * varredura da LGPD) continua sabendo onde procurar a partir do uid, sem
+ * guardar mapa nenhum e sem depender de mais um segredo em produção.
+ *
+ * Vale para os DOIS baldes, de propósito. O de exames só é servido a quem já
+ * conhece o uuid dela, mas uma regra sem exceção é uma regra que não se erra —
+ * e a exceção teria de ser lembrada por quem criar o terceiro balde.
+ */
+export function pastaDoDono(donoId: string): string {
+  return crypto.createHash("sha256").update(donoId).digest("hex").slice(0, 32);
+}
+
 type Decodificada = { bytes: Uint8Array; tipo: string; extensao: string };
 
 /**
@@ -106,7 +138,7 @@ export async function guardarImagem(opts: {
     /* `crypto.randomUUID` e não o id da linha: a linha ainda não existe na
        hora do upload, e um nome adivinhável somado a um balde mal configurado
        no futuro seria a diferença entre privado e enumerável. */
-    const caminho = `${opts.donoId}/${crypto.randomUUID()}.${img.extensao}`;
+    const caminho = `${pastaDoDono(opts.donoId)}/${crypto.randomUUID()}.${img.extensao}`;
     const { error } = await supabaseAdmin.storage
       .from(opts.balde)
       .upload(caminho, img.bytes, { contentType: img.tipo, upsert: false });
@@ -285,9 +317,9 @@ export async function apagarPastaDoDono(balde: string, donoId: string): Promise<
     for (;;) {
       const { data: arquivos, error } = await supabaseAdmin.storage
         .from(balde)
-        .list(donoId, { limit: 100 });
+        .list(pastaDoDono(donoId), { limit: 100 });
       if (error || !arquivos?.length) return;
-      const caminhos = arquivos.map((a) => `${donoId}/${a.name}`);
+      const caminhos = arquivos.map((a) => `${pastaDoDono(donoId)}/${a.name}`);
       const { error: eDel } = await supabaseAdmin.storage.from(balde).remove(caminhos);
       if (eDel) return;
       if (arquivos.length < 100) return;
