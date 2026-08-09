@@ -19,6 +19,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { salvarConsulta } from "@/lib/clinical.functions";
 import { sinalPressao } from "@/lib/sinais-clinicos";
+import { resumoParaAchados } from "@/lib/resumo-da-consulta";
+import type { EventoClinico } from "@/lib/clinical.functions";
 
 type Campos = {
   ocorridaEm: string;
@@ -117,10 +119,24 @@ export function RegistrarConsulta({
   pacienteId,
   tokenFn,
   onSalvou,
+  eventos = [],
+  desdeAConsulta = null,
 }: {
   pacienteId: string;
   tokenFn: () => Promise<string>;
   onSalvou: () => void;
+  /**
+   * O que ela registrou no app. Vira o rascunho do campo de ACHADOS.
+   *
+   * ─── E NUNCA os campos de medida ────────────────────────────────────────
+   * `consultas.systolic` é o que o MÉDICO aferiu no consultório. Preenchê-lo
+   * com a pressão que ela mediu em casa faria o prontuário afirmar uma
+   * aferição que não aconteceu — e é assim que outro profissional a lê meses
+   * depois. O que entra daqui é texto, editável, e diz de onde veio.
+   */
+  eventos?: EventoClinico[];
+  /** Quando foi a consulta anterior. `null` = primeira. */
+  desdeAConsulta?: string | null;
 }) {
   const [aberto, setAberto] = useState(false);
   const [f, setF] = useState<Campos>(VAZIO);
@@ -132,10 +148,19 @@ export function RegistrarConsulta({
      mais útil que o mesmo número marcado três dias depois na ficha. */
   const sinal = sinalPressao(num(f.systolic), num(f.diastolic));
 
+  /* O rascunho é montado na ABERTURA, e não a cada render: escrito como valor
+     inicial do `useState`, ele congelaria no primeiro render — antes de os
+     eventos chegarem do servidor — e o campo abriria vazio para sempre. */
+  function abrir() {
+    const rascunho = resumoParaAchados(eventos, desdeAConsulta);
+    setF((x) => ({ ...x, achados: x.achados || rascunho }));
+    setAberto(true);
+  }
+
   if (!aberto) {
     return (
       <button
-        onClick={() => setAberto(true)}
+        onClick={abrir}
         className="press w-full rounded-2xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary"
       >
         + Registrar consulta

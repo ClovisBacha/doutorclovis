@@ -11622,6 +11622,12 @@ function PatientDetailModal({
               <RegistrarConsulta
                 pacienteId={p.id}
                 tokenFn={tokenFn}
+                /* O que ela registrou vira o rascunho do campo de achados —
+                   ele acabou de ler tudo isso na tela ao lado e digitaria de
+                   memória. Só o TEXTO: as medidas da consulta são as que ele
+                   afere. */
+                eventos={prontuario}
+                desdeAConsulta={consultasDela[0]?.occurred_at ?? null}
                 onSalvou={async () => {
                   /* Recarrega só as consultas: o resto da ficha não mudou, e
                      recarregar tudo faria a tela piscar inteira depois de uma
