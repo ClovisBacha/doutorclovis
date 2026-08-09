@@ -178,7 +178,6 @@ import {
   listPatientRequests,
   respondPatientRequest,
   listMyPatients,
-  setPatientQuizPremium,
   setPatientFetalBpm,
   type PatientRequest,
   type LinkedPatient,
@@ -5044,7 +5043,32 @@ function CerebroSection({
       </div>
       <ComecePorAqui tokenFn={tokenFn} asDoctor={asId} />
 
-      {/* ─── ① O QUE ESTÁ ESPERANDO ELE ──────────────────────────────────
+      {/* ─── ① COMO ESTÁ O CÉREBRO ─────────────────────────────────────────
+          SUBIU PARA O TOPO — decisão do dono (ago/2026).
+
+          A ordem anterior punha as filas primeiro, com o argumento de que "são
+          trabalho que rende". O argumento continua verdadeiro, e mesmo assim a
+          ordem estava errada: o placar responde "o meu cérebro está bom?", que
+          é a pergunta que o médico traz ao abrir a aba. As filas respondem "o
+          que eu faço agora" — que só importa depois que ele confia no que
+          construiu.
+
+          E o card carrega o aviso da busca por significado, que quando está
+          desligada explica por que a IA parece não saber o que ele já ensinou.
+          Isso enterrado embaixo de três filas é diagnóstico que ninguém lê. */}
+      <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Como está o seu cérebro
+      </h3>
+      <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
+      <BuscaPorSignificadoCard tokenFn={tokenFn} asDoctor={asId} />
+      <ConsumoDaIACard
+        tokenFn={tokenFn}
+        asDoctor={asId}
+        onAbrirPaciente={onAbrirPaciente}
+        onIrParaPlanos={onIrParaPlanos}
+      />
+
+      {/* ─── ② O QUE ESTÁ ESPERANDO ELE ──────────────────────────────────
           O argumento para pôr o Cérebro na PRIMEIRA aba foi "a fila de lacunas
           e a de revisão são trabalho que rende". Dentro da aba, as filas eram o
           4º e o 5º card: ~1.200px de placar e fatura antes do que ele tem para
@@ -5075,19 +5099,6 @@ function CerebroSection({
         onTrained={onTrained}
         asDoctor={asId}
         onContar={(n) => setFila((f) => ({ ...f, perguntas: n }))}
-      />
-
-      {/* ─── ② COMO ESTÁ O CÉREBRO ───────────────────────────────────────── */}
-      <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-        Como está o seu cérebro
-      </h3>
-      <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
-      <BuscaPorSignificadoCard tokenFn={tokenFn} asDoctor={asId} />
-      <ConsumoDaIACard
-        tokenFn={tokenFn}
-        asDoctor={asId}
-        onAbrirPaciente={onAbrirPaciente}
-        onIrParaPlanos={onIrParaPlanos}
       />
 
       {/* ─── ③ FERRAMENTAS ───────────────────────────────────────────────── */}
@@ -10695,7 +10706,6 @@ function PacientesSection({
   }
 
   // Ativa/desativa o premium do quiz (após o PIX, o médico libera aqui)
-  const [premiumBusyId, setPremiumBusyId] = useState<string | null>(null);
   const [encerrandoId, setEncerrandoId] = useState<string | null>(null);
   const [confirmarEncerrar, setConfirmarEncerrar] = useState<string | null>(null);
   const armado = useRef<number | null>(null);
@@ -10748,27 +10758,6 @@ function PacientesSection({
       toast.error("Falha de conexão — tente novamente.");
     } finally {
       setEncerrandoId(null);
-    }
-  }
-  async function togglePremium(p: LinkedPatient) {
-    setPremiumBusyId(p.id);
-    try {
-      const tk = await tokenFn();
-      const res = await setPatientQuizPremium({
-        data: { accessToken: tk, patientId: p.id, premium: !p.quiz_premium },
-      });
-      if (!res.ok) {
-        toast.error(res.error ?? "Não foi possível alterar o premium.");
-        return;
-      }
-      setPatients((ps) =>
-        ps.map((x) => (x.id === p.id ? { ...x, quiz_premium: !p.quiz_premium } : x)),
-      );
-      toast.success(!p.quiz_premium ? "Aulas premium ativadas ⭐" : "Premium desativado.");
-    } catch {
-      toast.error("Falha de conexão — tente novamente.");
-    } finally {
-      setPremiumBusyId(null);
     }
   }
 
@@ -11006,23 +10995,6 @@ function PacientesSection({
                       </div>
                       {/* BPM fetal da consulta → "Sentir o coração" da família */}
                       <FetalBpmChip p={p} tokenFn={tokenFn} onSaved={loadPatients} />
-                      {/* Premium do quiz: liberar após confirmar o PIX da paciente */}
-                      <button
-                        onClick={() => togglePremium(p)}
-                        disabled={premiumBusyId === p.id}
-                        title={
-                          p.quiz_premium
-                            ? "Aulas premium ativas — clique para desativar"
-                            : "Ativar aulas premium (após confirmar o PIX)"
-                        }
-                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
-                          p.quiz_premium
-                            ? "bg-amber-100 text-amber-700"
-                            : "border border-border text-muted-foreground hover:border-amber-400 hover:text-amber-600"
-                        }`}
-                      >
-                        {premiumBusyId === p.id ? "…" : p.quiz_premium ? "⭐ Premium" : "☆ Premium"}
-                      </button>
                       {/* Encerrar acompanhamento. Confirmação em DOIS toques e
                           não um `confirm()` do navegador: o segundo toque é o
                           mesmo botão dizendo o que vai acontecer, o que é mais

@@ -658,105 +658,22 @@ export const listMyPatients = createServerFn({ method: "POST" })
   });
 
 /**
- * Liga/desliga o premium do quiz diário de UMA paciente do médico logado
- * (ativação manual após o PIX — o médico confirma o pagamento e libera).
+ * ─── O MÉDICO NÃO DÁ NEM TIRA O PREMIUM DA PACIENTE ─────────────────────────
+ *
+ * Existia aqui um `setPatientQuizPremium`: o médico ligava/desligava as aulas
+ * pagas dela pelo painel, "após confirmar o PIX".
+ *
+ * Removido por decisão do dono (ago/2026), e a razão é de fronteira, não de
+ * tela: o Premium é a assinatura DELA, com a plataforma. Quem cobra é a
+ * plataforma, quem decide é ela. Um botão no painel do médico misturava as duas
+ * relações — e criava uma cobrança por fora, sem registro, sem prazo e sem
+ * recibo, com o médico no meio de um pagamento que não é dele.
+ *
+ * A capacidade foi tirada do SERVIDOR, não só o botão da tela. Deixar a função
+ * viva seria manter a porta aberta para quem chamasse o endpoint direto — e
+ * "não tem botão" nunca foi controle de acesso.
  */
-export const setPatientQuizPremium = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) =>
-    z
-      .object({
-        accessToken: z.string().min(10),
-        patientId: z.string().uuid(),
-        premium: z.boolean(),
-      })
-      .parse(i),
-  )
-  .handler(async ({ data }) => {
-    const user = await requireDoctor(data.accessToken);
-    if (!user) return { ok: false as const, error: "Sem permissão." };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    /* DONA DA LINHA ANTES DE QUALQUER CONSULTA sobre ela.
-    
-       A checagem de assinatura abaixo rodava primeiro, com o `patientId` cru do
-       pedido. O UPDATE no fim é escopado por `doctor_id`, então nunca houve
-       escrita indevida — mas a resposta diferente ("esta paciente tem assinatura
-       ativa") transformava este endpoint num oráculo: o médico A passava o id de
-       uma paciente do médico B e descobria se ela paga assinatura. É dado de
-       outra pessoa saindo por uma mensagem de erro. */
-    const { data: minha, error: erroDona } = await (supabaseAdmin as any)
-      .from("patient_profiles")
-      .select("id")
-      .eq("id", data.patientId)
-      .eq("doctor_id", user.id)
-      .maybeSingle();
-    /* Falha de leitura ≠ paciente inexistente. Descartar o erro fazia a tela
-       dizer "paciente não encontrada" para um problema de rede — o médico
-       procuraria a paciente, não a conexão. Fecha do mesmo jeito, mas dizendo a
-       verdade sobre o motivo. */
-    if (erroDona) {
-      return { ok: false as const, error: "Não foi possível verificar a paciente agora." };
-    }
-    if (!minha) return { ok: false as const, error: "Paciente não encontrada." };
-
-    // Proteção: o toggle manual NÃO pode revogar quem tem assinatura ativa
-    // (Stripe) ou convite ativo — o acesso pago é gerido pelo webhook, não
-    // pela mão do médico. (Se a tabela subscriptions ainda não existe, ignora.)
-    if (!data.premium) {
-      try {
-        const { data: subs } = await (supabaseAdmin as any)
-          .from("subscriptions")
-          .select("source,status")
-          .eq("user_id", data.patientId)
-          .eq("product", "quiz_premium")
-          .in("status", ["active", "trialing"]);
-        const paga = (subs ?? []).some(
-          // 'convite' = recompensa da paciente que convidou o médico (webhook)
-          (s: any) =>
-            s.source === "stripe" ||
-            s.source === "doctor_invite" ||
-            s.source === "convite" ||
-            s.source === "cupom",
-        );
-        if (paga) {
-          return {
-            ok: false as const,
-            error:
-              "Esta paciente tem uma assinatura ativa — o acesso é gerido pelo pagamento (cancele pelo Stripe).",
-          };
-        }
-      } catch {
-        /* subscriptions ausente: sem estado pago a proteger */
-      }
-    }
-
-    const { data: mexeu, error } = await (supabaseAdmin as any)
-      .from("patient_profiles")
-      .update({ quiz_premium: data.premium })
-      .eq("id", data.patientId)
-      .eq("doctor_id", user.id) // tenancy: só as próprias pacientes
-      .select("id"); // sem isto, zero linhas afetadas voltava como sucesso
-    if (colunaAusente(error)) {
-      return {
-        ok: false as const,
-        error: "Aplique a migração quiz_premium no Supabase (APLICAR_PENDENTES.sql).",
-      };
-    }
-    if (error) return { ok: false as const, error: error.message };
-    // "Salvo ✓" sem ter salvado nada é pior do que um erro.
-    if (!mexeu || mexeu.length === 0) {
-      return { ok: false as const, error: "Nada foi alterado — recarregue a lista." };
-    }
-    return { ok: true as const, error: null };
-  });
-
-/**
- * Registra o BPM fetal medido na consulta ("Sentir o coração" v2, estilo
- * Trellis): o Painel do Papai e o app da paciente vibram no ritmo EXATO do
- * bebê. Fail-closed: o UPDATE só afeta a linha se a paciente pertence ao
- * médico logado (doctor_id no próprio WHERE) — sem checagem separada que
- * poderia abrir corrida. bpm null limpa o registro.
- */
 export const setPatientFetalBpm = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
