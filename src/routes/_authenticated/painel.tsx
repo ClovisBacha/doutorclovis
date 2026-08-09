@@ -50,6 +50,7 @@ import {
   type FichaClinica,
   type TipoDeEmissao,
 } from "@/lib/clinical.functions";
+import { filtrarPacientes } from "@/lib/busca-paciente";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
 import {
   ESTILO_SINAL,
@@ -10628,6 +10629,9 @@ function PacientesSection({
   // Modal "+ adicionar paciente" (convite) e modal de detalhe da paciente
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selected, setSelected] = useState<LinkedPatient | null>(null);
+  /* O que ele digitou na busca. A régua (acento, ordem das palavras, termo
+     vazio) mora em `busca-paciente`, testada — aqui fica só o campo. */
+  const [busca, setBusca] = useState("");
 
   /* A fila mandou abrir uma paciente. Espera a lista carregar — o efeito roda
      de novo quando `patients` chega, então o item clicado durante o
@@ -10782,8 +10786,206 @@ function PacientesSection({
         })
       : null;
 
+  /* A busca filtra a GRADE e a lista de baixo pelo mesmo recorte — duas
+     respostas diferentes para o mesmo termo na mesma tela seria pior que não
+     ter busca. */
+  const visiveis = filtrarPacientes(patients, busca);
+
   return (
     <div className="space-y-8">
+      {/* ─── A GRADE VEM PRIMEIRO ─────────────────────────────────────────
+          As solicitações pendentes abriam a aba. Faz sentido no dia em que
+          existe uma — e nos outros trezentos e sessenta o médico via um quadro
+          de "📭 Nenhuma solicitação pendente" ocupando a primeira dobra antes
+          de chegar nas pacientes dele, que é o motivo de ele abrir esta aba.
+          Elas continuam logo abaixo, com o contador na fita chamando quando há
+          alguma. Pedido do dono: "puxei ele como o primeiro elemento a aparecer
+          na aba das pacientes". */}
+      {/* Minhas pacientes */}
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="font-serif text-xl">Minhas pacientes</h2>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+            {patients.length}
+          </span>
+        </div>
+
+        {/* ─── LEITURA QUE FALHOU NÃO É CONSULTÓRIO VAZIO ────────────────────
+            A cascata de selects de `listMyPatients` saía com `rows = null` num
+            erro real e a tela dizia "Você ainda não tem pacientes vinculadas" —
+            com um botão convidando a adicionar a primeira. Para um médico com
+            duzentas, isso não parece um erro: parece que o produto perdeu tudo. */}
+        {falhouLista && (
+          <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+            📡 Não consegui carregar a sua lista de pacientes agora. Isto <strong>não</strong> quer
+            dizer que ela está vazia — atualize a página antes de concluir qualquer coisa a partir
+            desta tela.
+          </p>
+        )}
+
+        {patients.length === 0 && !falhouLista ? (
+          <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-3xl">👩‍🍼</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Você ainda não tem pacientes vinculadas. Compartilhe seu perfil para que elas
+              encontrem você e enviem uma solicitação.
+            </p>
+            <button
+              onClick={() => setInviteOpen(true)}
+              className="mt-4 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              + Adicionar paciente
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Espelho: cada paciente pelo bebê que ela vê no app. O tamanho
+                do bebê cresce com a semana — identificação visual rápida.
+                2 por linha no celular, 4 no computador. Toque abre o detalhe
+                com a conversa dela com a IA. O último quadro é o "+". */}
+            <p className="mt-3 text-xs text-muted-foreground">
+              Cada quadro é o espelho da tela do bebê da paciente — o bebê cresce com a semana.
+              Toque para ver os detalhes, pedir exame, marcar consulta e receitar.
+            </p>
+
+            {/* ─── A BUSCA ────────────────────────────────────────────────
+                O quadro do bebê é ótimo para RECONHECER e péssimo para
+                PROCURAR: com duzentas pacientes são duzentos quadros do mesmo
+                tamanho, e achar a Fernanda vira rolagem.
+                Só aparece a partir de oito: abaixo disso a lista inteira cabe
+                na tela, e um campo de busca ali é um controle que não serve
+                para nada ocupando a primeira dobra. */}
+            {patients.length >= 8 && (
+              <div className="relative mt-3">
+                <input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar paciente pelo nome…"
+                  aria-label="Buscar paciente pelo nome"
+                  className="w-full rounded-full border border-border bg-background py-2.5 pl-10 pr-9 text-sm outline-none focus:border-primary/60"
+                />
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  🔎
+                </span>
+                {busca && (
+                  <button
+                    onClick={() => setBusca("")}
+                    aria-label="Limpar busca"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground hover:text-primary"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ─── TRÊS POR LINHA, E MAIORES ──────────────────────────────
+                Eram quatro por linha no computador e dois no celular. Pedido do
+                dono: três por linha, com cada quadro maior.
+                No celular ficam DOIS, e isso não é desobediência: três colunas
+                em 390px dão 115px por quadro — menores, e o pedido era
+                justamente que aumentassem. Três é o desenho da tela em que ele
+                estava olhando. */}
+            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {visiveis.map((p) => (
+                <PatientMirrorCard key={p.id} p={p} onOpen={() => setSelected(p)} />
+              ))}
+              {/* "+" — adicionar paciente (convite). Some enquanto ele está
+                  buscando: entre resultados de uma busca, um quadro de
+                  "adicionar" é a única coisa que NÃO é resultado dela. */}
+              <button
+                hidden={busca.trim().length > 0}
+                onClick={() => setInviteOpen(true)}
+                className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:border-primary hover:bg-primary/10"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-3xl font-light leading-none">
+                  +
+                </span>
+                <span className="px-2 text-center text-xs font-semibold">Adicionar paciente</span>
+              </button>
+            </div>
+
+            {/* Nenhum resultado NÃO é "você não tem pacientes". Sem esta
+                frase, buscar por um nome errado devolve a mesma tela vazia do
+                consultório sem ninguém — e o botão de limpar é o caminho de
+                volta. */}
+            {visiveis.length === 0 && busca.trim() && (
+              <div className="mt-4 rounded-2xl border border-border bg-card p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma paciente com “{busca.trim()}” entre as suas {patients.length}.
+                </p>
+                <button
+                  onClick={() => setBusca("")}
+                  className="mt-3 rounded-full border border-border px-4 py-1.5 text-xs font-medium hover:border-primary/50"
+                >
+                  Limpar busca
+                </button>
+              </div>
+            )}
+
+            <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+              <ul className="divide-y divide-border">
+                {visiveis.map((p) => {
+                  const due = fmtDate(p.due_date);
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4"
+                    >
+                      {/* LINHA INTEIRA no celular, e isto não é preferência de
+                          layout. `flex-1` é `flex: 1 1 0%` — base zero —, então
+                          o bloco do nome nunca provoca quebra: ele é esmagado
+                          até sumir e só depois um botão desce. Medido: com três
+                          controles ao lado, o nome ficava com 0 px a 360 e 390.
+                          O médico escolhia qual vínculo encerrar — ação que só
+                          a paciente pode desfazer — olhando para uma inicial e
+                          uma data. */}
+                      <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                          {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {p.display_name ?? "Sem nome"}
+                          </p>
+                          {due && (
+                            <p className="truncate whitespace-nowrap text-xs text-muted-foreground">
+                              DPP {due}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {/* BPM fetal da consulta → "Sentir o coração" da família */}
+                      <FetalBpmChip p={p} tokenFn={tokenFn} onSaved={loadPatients} />
+                      {/* Encerrar acompanhamento. Confirmação em DOIS toques e
+                          não um `confirm()` do navegador: o segundo toque é o
+                          mesmo botão dizendo o que vai acontecer, o que é mais
+                          claro no celular e não pode ser dispensado por engano. */}
+                      <button
+                        onClick={() => encerrar(p)}
+                        disabled={encerrandoId === p.id}
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                          confirmarEncerrar === p.id
+                            ? "bg-rose-600 text-white"
+                            : "border border-border text-muted-foreground hover:border-rose-400 hover:text-rose-600"
+                        }`}
+                        title="Encerrar o acompanhamento desta paciente"
+                      >
+                        {encerrandoId === p.id
+                          ? "…"
+                          : confirmarEncerrar === p.id
+                            ? "Confirmar?"
+                            : "Encerrar"}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Solicitações pendentes */}
       <div>
         <div className="flex items-center gap-2">
@@ -10850,131 +11052,6 @@ function PacientesSection({
               );
             })}
           </div>
-        )}
-      </div>
-
-      {/* Minhas pacientes */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h2 className="font-serif text-xl">Minhas pacientes</h2>
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-            {patients.length}
-          </span>
-        </div>
-
-        {/* ─── LEITURA QUE FALHOU NÃO É CONSULTÓRIO VAZIO ────────────────────
-            A cascata de selects de `listMyPatients` saía com `rows = null` num
-            erro real e a tela dizia "Você ainda não tem pacientes vinculadas" —
-            com um botão convidando a adicionar a primeira. Para um médico com
-            duzentas, isso não parece um erro: parece que o produto perdeu tudo. */}
-        {falhouLista && (
-          <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
-            📡 Não consegui carregar a sua lista de pacientes agora. Isto <strong>não</strong> quer
-            dizer que ela está vazia — atualize a página antes de concluir qualquer coisa a partir
-            desta tela.
-          </p>
-        )}
-
-        {patients.length === 0 && !falhouLista ? (
-          <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
-            <p className="text-3xl">👩‍🍼</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Você ainda não tem pacientes vinculadas. Compartilhe seu perfil para que elas
-              encontrem você e enviem uma solicitação.
-            </p>
-            <button
-              onClick={() => setInviteOpen(true)}
-              className="mt-4 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
-            >
-              + Adicionar paciente
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Espelho: cada paciente pelo bebê que ela vê no app. O tamanho
-                do bebê cresce com a semana — identificação visual rápida.
-                2 por linha no celular, 4 no computador. Toque abre o detalhe
-                com a conversa dela com a IA. O último quadro é o "+". */}
-            <p className="mt-3 text-xs text-muted-foreground">
-              Cada quadro é o espelho da tela do bebê da paciente — o bebê cresce com a semana.
-              Toque para ver os detalhes e a conversa com a IA.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {patients.map((p) => (
-                <PatientMirrorCard key={p.id} p={p} onOpen={() => setSelected(p)} />
-              ))}
-              {/* "+" — adicionar paciente (convite) */}
-              <button
-                onClick={() => setInviteOpen(true)}
-                className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:border-primary hover:bg-primary/10"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-3xl font-light leading-none">
-                  +
-                </span>
-                <span className="px-2 text-center text-xs font-semibold">Adicionar paciente</span>
-              </button>
-            </div>
-
-            <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-              <ul className="divide-y divide-border">
-                {patients.map((p) => {
-                  const due = fmtDate(p.due_date);
-                  return (
-                    <li
-                      key={p.id}
-                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4"
-                    >
-                      {/* LINHA INTEIRA no celular, e isto não é preferência de
-                          layout. `flex-1` é `flex: 1 1 0%` — base zero —, então
-                          o bloco do nome nunca provoca quebra: ele é esmagado
-                          até sumir e só depois um botão desce. Medido: com três
-                          controles ao lado, o nome ficava com 0 px a 360 e 390.
-                          O médico escolhia qual vínculo encerrar — ação que só
-                          a paciente pode desfazer — olhando para uma inicial e
-                          uma data. */}
-                      <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                          {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {p.display_name ?? "Sem nome"}
-                          </p>
-                          {due && (
-                            <p className="truncate whitespace-nowrap text-xs text-muted-foreground">
-                              DPP {due}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {/* BPM fetal da consulta → "Sentir o coração" da família */}
-                      <FetalBpmChip p={p} tokenFn={tokenFn} onSaved={loadPatients} />
-                      {/* Encerrar acompanhamento. Confirmação em DOIS toques e
-                          não um `confirm()` do navegador: o segundo toque é o
-                          mesmo botão dizendo o que vai acontecer, o que é mais
-                          claro no celular e não pode ser dispensado por engano. */}
-                      <button
-                        onClick={() => encerrar(p)}
-                        disabled={encerrandoId === p.id}
-                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
-                          confirmarEncerrar === p.id
-                            ? "bg-rose-600 text-white"
-                            : "border border-border text-muted-foreground hover:border-rose-400 hover:text-rose-600"
-                        }`}
-                        title="Encerrar o acompanhamento desta paciente"
-                      >
-                        {encerrandoId === p.id
-                          ? "…"
-                          : confirmarEncerrar === p.id
-                            ? "Confirmar?"
-                            : "Encerrar"}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </>
         )}
       </div>
 
