@@ -2885,3 +2885,83 @@ COMMENT ON COLUMN public.patient_profiles.home_lat IS
   'Latitude da cidade, resolvida na busca ao salvar. Usada quando não há GPS.';
 COMMENT ON COLUMN public.patient_profiles.home_lon IS
   'Longitude da cidade, resolvida na busca ao salvar. Usada quando não há GPS.';
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  QUEM PERGUNTOU CADA LACUNA  (brain_gap_askers)
+-- ----------------------------------------------------------------------------
+--  Estava FALTANDO neste arquivo, e o CLAUDE.md manda rodar justamente este
+--  para fechar as migrations pendentes. A tabela nasceu em
+--  20260731010000_quem_perguntou.sql e só existia em APLICAR_QUEM_PERGUNTOU.sql,
+--  um arquivo separado que ninguém foi instruído a rodar.
+--
+--  A consequência não é uma tela vazia: é a IA quebrando uma promessa. Quando
+--  ela não sabe responder, diz à paciente "registrei a sua pergunta para ele
+--  ver". Quem liga aquela lacuna àquela paciente é ESTA tabela — `brain_gaps` é
+--  deduplicada por pergunta e não guarda quem perguntou. Sem ela o médico
+--  responde, o painel anuncia "Respondida e aprendida", e a resposta não chega
+--  a ninguém.
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.brain_gap_askers (
+  gap_id     uuid        NOT NULL,
+  user_id    uuid        NOT NULL,
+  -- Quando ELA perguntou. Duas pacientes com a mesma dúvida em semanas
+  -- diferentes é informação clínica, não ruído.
+  created_at timestamptz NOT NULL DEFAULT now(),
+  -- Já foi avisada da resposta? Sem isto, reprocessar a entrega manda o mesmo
+  -- aviso de novo — e um push repetido sobre uma dúvida antiga é o tipo de
+  -- coisa que faz a paciente desligar as notificações.
+  avisada_em timestamptz,
+  PRIMARY KEY (gap_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gap_askers_gap
+    ON public.brain_gap_askers (gap_id)
+    WHERE avisada_em IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_gap_askers_user
+    ON public.brain_gap_askers (user_id, created_at DESC);
+
+-- FKs com CASCADE nos dois lados: lacuna apagada não deixa ligação órfã, e
+-- conta apagada não deixa rastro de quem perguntou o quê.
+DO $fks$
+BEGIN
+  IF to_regclass('public.brain_gaps') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.brain_gap_askers'::regclass
+          AND conname = 'brain_gap_askers_gap_id_fkey'
+     )
+  THEN
+    ALTER TABLE public.brain_gap_askers
+      ADD CONSTRAINT brain_gap_askers_gap_id_fkey
+      FOREIGN KEY (gap_id) REFERENCES public.brain_gaps(id) ON DELETE CASCADE;
+  END IF;
+
+  IF NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.brain_gap_askers'::regclass
+          AND conname = 'brain_gap_askers_user_id_fkey'
+     )
+  THEN
+    ALTER TABLE public.brain_gap_askers
+      ADD CONSTRAINT brain_gap_askers_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+END
+$fks$;
+
+ALTER TABLE public.brain_gap_askers ENABLE ROW LEVEL SECURITY;
+
+-- Só o servidor. A paciente não precisa desta tabela (ela vê a resposta na aba
+-- Perguntas dela), e o médico a alcança pelas server functions do painel.
+DROP POLICY IF EXISTS "servico gerencia quem perguntou" ON public.brain_gap_askers;
+CREATE POLICY "servico gerencia quem perguntou" ON public.brain_gap_askers
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+REVOKE ALL ON public.brain_gap_askers FROM anon, authenticated;
+GRANT ALL ON public.brain_gap_askers TO service_role;
+
+COMMENT ON TABLE public.brain_gap_askers IS
+  'Quem perguntou cada lacuna. Existe para a IA poder cumprir o que promete a paciente ("registrei aqui para ele ver") — brain_gaps e deduplicada por pergunta e nao guarda quem perguntou.';
