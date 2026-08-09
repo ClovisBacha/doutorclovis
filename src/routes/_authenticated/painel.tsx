@@ -53,6 +53,7 @@ import {
 } from "@/lib/clinical.functions";
 import { exameSugerido } from "@/lib/exame-sugerido";
 import { filtrarPacientes } from "@/lib/busca-paciente";
+import { quemEstaQuieta, textoDaQuietude } from "@/lib/silencio";
 import {
   ABAS_DA_PACIENTE,
   ABA_INICIAL_DA_PACIENTE,
@@ -789,6 +790,11 @@ function PainelPage() {
   useEffect(() => {
     if (!allowed) return;
     if (tab === "Engajamento" && !engagement) loadEngagement();
+    /* A FILA precisa do engajamento, e a fila vive na aba de entrada.
+       Enquanto isto só carregava ao abrir "Engajamento", os itens de "sem
+       registro há X dias" eram vazios POR CONSTRUÇÃO na única tela onde a fila
+       aparece — a régua estaria certa e a lista, sempre vazia. */
+    if (tab === abaDeEntrada && !engagement) loadEngagement();
     /* As pré-consultas viraram uma SEÇÃO da aba Pacientes, então quem dispara a
        releitura é a abertura dela — era `tab === "Pré-consultas"`, aba que
        deixou de existir.
@@ -984,6 +990,41 @@ function PainelPage() {
        todos, abaixo de "Fulana pediu consulta" e sem nenhuma marca. O
        formulário desenhado para ser lido antes da consulta ficava no fim da
        fila justamente quando trazia o número que não podia esperar. */
+    /* ─── DE QUEM ELE DEVERIA TER NOTÍCIA E NÃO TEM ───────────────────────
+       O engajamento já sabia quem está inativa, mas vivia numa aba de métrica
+       que ninguém abre no meio do dia, e não cruzava com idade gestacional.
+       Uma gestante de 37 semanas sem notícia há dez dias é uma ligação.
+
+       Nível "leitura", o mais baixo: silêncio NÃO é sinal clínico — ela pode
+       estar ótima e sem paciência para o app. `sinais-clinicos` declara isso no
+       cabeçalho, e pôr este item acima de uma pressão alta desfaria a decisão.
+       Só os seis primeiros: a lista é ordenada por quem estourou mais o próprio
+       prazo, e vinte itens de recado afogariam o resto da fila. */
+    ...quemEstaQuieta(
+      (engagement?.patients ?? []).map((x) => ({
+        id: x.id,
+        nome: x.display_name,
+        semanas: x.reference_weeks ?? null,
+        ultimoEm: x.lastActivityAt ?? null,
+        criadaEm: x.createdAt ?? null,
+      })),
+    )
+      .slice(0, 6)
+      .map((q) => {
+        const t = textoDaQuietude(q);
+        return {
+          id: `quieta-${q.paciente.id}`,
+          nivel: "leitura" as const,
+          titulo: t.titulo,
+          detalhe: t.detalhe,
+          em: q.paciente.ultimoEm,
+          acao: "Abrir",
+          onAcao: () => {
+            setAbrirPaciente(q.paciente.id);
+            setTab("Pacientes 👩‍🍼");
+          },
+        };
+      }),
     ...preForms
       .filter((f) => !f.seen_by_doctor)
       .map((f) => {
