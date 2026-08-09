@@ -123,22 +123,15 @@ async function subir(sóTabela) {
     let falhas = 0;
     let pulados = 0;
     /**
-     * ─── POR QUE UM CONJUNTO DE JÁ-TENTADOS ─────────────────────────────────
+     * ─── CURSOR POR `id` ────────────────────────────────────────────────────
      *
-     * O laço relê SEMPRE o mesmo filtro (`image_path is null`). Uma linha que
-     * não foi atualizada volta na página seguinte — e se a falha for sistêmica
-     * (balde ainda não criado, que é justamente o cenário que todo o desenho de
-     * recuo existe para cobrir; chave sem permissão de Storage; quota), o script
-     * gira para sempre nas mesmas 25 linhas, imprimindo erro sem avançar.
+     * O laço relê SEMPRE o mesmo filtro (`image_path is null`), então uma linha
+     * que não foi atualizada volta na página seguinte. Sem cursor, uma falha
+     * sistêmica — balde ainda não criado, que é justamente o cenário que todo o
+     * desenho de recuo existe para cobrir — fazia o script girar para sempre nas
+     * mesmas 25 linhas, imprimindo erro sem avançar.
      *
-     * Guardar os ids já tentados nesta rodada transforma isso em "nada novo
-     * nesta página → terminei", que é o comportamento certo: ele para, informa,
-     * e a próxima execução tenta de novo do começo.
-     */
-    /**
-     * ─── CURSOR POR `id`, E NÃO UM CONJUNTO DE JÁ-TENTADOS ──────────────────
-     *
-     * A primeira tentativa de consertar o laço infinito guardava os ids já
+     * A primeira tentativa de consertar isso guardava os ids já
      * tentados e parava quando a página não trazia nada novo. Isso trocou um
      * defeito por outro, e a revisão adversarial pegou: PDFs nunca são
      * marcados, então voltam sempre. Bastavam 25 deles (um lote) para a
