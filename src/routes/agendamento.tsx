@@ -6,6 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { CalendarPlus, Check, Loader2 } from "lucide-react";
 import { submitAppointmentRequest } from "@/lib/appointments.functions";
 import { DOCTOR } from "@/lib/doctor.config";
+import { EscolherHorario } from "@/components/escolher-horario";
+import { getMyDoctorLink } from "@/lib/patientlink.functions";
+import type { HorarioLivre } from "@/lib/disponibilidade";
 import { Reveal } from "@/components/reveal";
 
 type Booked = { name: string; date: string; time: string; reason: string };
@@ -99,6 +102,27 @@ function AgendamentoPage() {
       })
       .catch(() => {});
   }, []);
+  /* Quem é o médico dela, para poder mostrar a agenda DELE. `null` para
+     visitante do site — e aí o formulário continua sendo um pedido livre. */
+  const [meuMedicoId, setMeuMedicoId] = useState<string | null>(null);
+  const [sessao, setSessao] = useState<string | null>(null);
+  const [escolhido, setEscolhido] = useState<HorarioLivre | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const tk = sess.session?.access_token;
+        if (!tk) return;
+        setSessao(tk);
+        const r = await getMyDoctorLink({ data: { accessToken: tk } });
+        if (r.ok && r.link.doctor?.id) setMeuMedicoId(r.link.doctor.id);
+      } catch {
+        /* Sem vínculo resolvido, cai no formulário livre — que é o caminho de
+           sempre e continua funcionando. */
+      }
+    })();
+  }, []);
+
   const [booked, setBooked] = useState<Booked | null>(null);
   const [error, setError] = useState<string | null>(null);
   const today = ymdLocal();
@@ -249,27 +273,55 @@ function AgendamentoPage() {
                   placeholder="(00) 00000-0000"
                 />
               </div>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Data preferida" type="date" name="date" min={today} required />
+              {/* ─── HORÁRIOS DE VERDADE, QUANDO DÁ PARA SABER DE QUEM ────────
+                  Logada e vinculada a um médico, ela escolhe entre as vagas que
+                  ele ABRIU e que ainda estão livres — em vez de chutar uma data
+                  e uma de oito horas fixas, iguais para todo médico e todo dia
+                  da semana. Metade desses chutes caía em dia que ele não atende
+                  ou horário já ocupado, e cada um virava uma recusa, uma
+                  contraproposta e mais um dia de espera.
+
+                  Visitante do site continua com os campos livres, e isso é
+                  honesto: sem saber o médico não existe agenda para consultar —
+                  o que ela manda ali é um PEDIDO, e sempre foi. */}
+              {meuMedicoId && sessao ? (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium">Horário preferido</label>
-                  <select
-                    name="time"
-                    required
-                    defaultValue=""
-                    className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-                  >
-                    <option value="" disabled>
-                      Selecione…
-                    </option>
-                    {horarios.map((h) => (
-                      <option key={h} value={h}>
-                        {h}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="text-sm font-medium">Escolha o horário</label>
+                  <EscolherHorario
+                    doctorId={meuMedicoId}
+                    accessToken={sessao}
+                    valor={escolhido}
+                    aoEscolher={setEscolhido}
+                  />
+                  {/* Os mesmos nomes de campo de antes: o `onSubmit` lê o
+                      formulário e não precisa saber por qual dos dois caminhos
+                      a paciente passou. */}
+                  <input type="hidden" name="date" value={escolhido?.dia ?? ""} />
+                  <input type="hidden" name="time" value={escolhido?.hora ?? ""} />
                 </div>
-              </div>
+              ) : (
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field label="Data preferida" type="date" name="date" min={today} required />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">Horário preferido</label>
+                    <select
+                      name="time"
+                      required
+                      defaultValue=""
+                      className="rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                    >
+                      <option value="" disabled>
+                        Selecione…
+                      </option>
+                      {horarios.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
               <Field
                 label="Motivo da consulta"
                 name="reason"
