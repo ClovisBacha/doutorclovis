@@ -64,11 +64,11 @@ O médico abre a aba Calendário e vê a grade da semana toda vazia mais "Nenhum
 `/home/user/doutorclovis/supabase/APLICAR_AGENDA.sql:17`  
 O CLAUDE.md manda rodar supabase/APLICAR_AGENDA.sql para ligar contraproposta + fila. O arquivo só adiciona proposed_date/proposed_time; na linha 17 cria um índice sobre confirmed_date/confirmed_time, que ele NÃO cria e que vêm de APLICAR_PENDENTES. Num banco onde as pendentes não foram aplicadas, o SQL Editor para nesse statement com 42703 e tudo que vem depois — inclusive o CREATE TABLE public.appointment_waitlist da linha 24, os índices e os GRANTs — nunca roda. O dono lê "erro na linha 17", acha que foi só o índice, e fica com a fila de espera inexistente enquanto o painel jura que ela está vazia.
 
-**Engajamento: a aba inteira morre calada quando a sessão expira**  
+**✅ Engajamento: a aba inteira morre calada quando a sessão expira**  
 `src/routes/_authenticated/painel.tsx:731`  
 `token()` devolve string vazia quando não há sessão (painel.tsx:304-307), e o validador do servidor exige `z.string().min(10)` — a chamada REJEITA. `loadEngagement` não tem try/catch, não tem estado de erro e só trata `res.ok === true`. O efeito da linha 821 (`if (tab === "Engajamento" && !engagement) loadEngagement()`) dispara uma promessa rejeitada sem catch, `engagement` fica `null` e a aba mostra "Clique para carregar o dashboard" com o botão "Carregar dados" — que chama a MESMA função e também falha calado. O médico clica quantas vezes quiser e a tela não muda nem diz por quê. Com dados já em tela, o "↺ Atualizar" tem o mesmo destino: falha sem mensagem logo abaixo da faixa âmbar que manda "Atualize antes de ligar para alguém".
 
-**Engajamento: "Ver relatório" trava em "..." para sempre, ou não abre nada**  
+**✅ Engajamento: "Ver relatório" trava em "..." para sempre, ou não abre nada**  
 `src/routes/_authenticated/painel.tsx:3353`  
 Dois caminhos, os dois sem uma palavra ao médico. (1) Se `getPatientReport` LANÇA (rede, sessão expirada — `token()` vazio é recusado pelo zod), não há try/catch nem finally: `setLoadingReport(null)` nunca roda, e o botão daquela paciente fica `disabled` mostrando "..." até o médico dar F5. (2) Se devolve `{ok:false}` — que é o que acontece quando `assertOwnsRow` nega, por exemplo numa paciente já desvinculada —, `reportData[userId]` não é preenchido mas `setExpandedId(userId)` roda mesmo assim; o JSX é guardado por `expandedId === p.id && reportData[p.id]`, então o clique não produz absolutamente nada na tela e nenhum toast explica.
 
@@ -81,6 +81,7 @@ A paciente pergunta, depois troca de medico (patientlink.functions.ts:487 grava 
 O CLAUDE.md manda rodar supabase/APLICAR_PENDENTES.sql para fechar as migrations pendentes. Esse arquivo cria brain_gaps e brain_feedback, mas NAO cria brain_gap_askers (a tabela nasceu na migration 20260731010000, pendente, e no arquivo separado APLICAR_QUEM_PERGUNTOU.sql). Sem ela, com o painel parecendo perfeito: (a) entregarRespostaDaLacuna cai no catch e devolve 0 — nenhuma paciente recebe a resposta que a IA prometeu ("registrei aqui para ele ver"), e nao ha nada na tela dizendo isso; (b) listBrainGaps deixa `pacientes` undefined, entao o aviso "So uma paciente perguntou isto — talvez seja do caso dela" nunca aparece; (c) marcar "Responder so para ela" cai no `if (cntErr)` e devolve varias_pacientes/quantas:null, mostrando "Nao consegui confirmar quem esta esperando. Tente de novo." — um botao que nunca funciona, com uma mensagem que convida a repetir.
 
 **Pergunta generalizada com 1 a 7 caracteres derruba a RESPOSTA CLINICA inteira**  
+> ❎ FALSO POSITIVO — conferido. Os DOIS chamadores (`answerAndTrain` e `resolveBrainGap`) omitem o campo quando o texto tem menos de 8 caracteres (`edited.length >= 8 ? {...} : {}`), então o `.min(8)` do zod nunca chega a rejeitar a chamada.  
 `src/routes/_authenticated/painel.tsx:2901`  
 O medico escreve a resposta, marca 'Ensinar isto a minha IA' e digita algo curto no campo da pergunta generalizada (ex.: 'febre', 5 letras). O cliente manda perguntaGeneralizada='febre'; o zod do servidor exige min(8), o inputValidator LANCA, a server function nunca roda e o catch da tela mostra 'Nao consegui enviar. Tente de novo.'. Clicar de novo repete o mesmo erro para sempre e a paciente nao recebe resposta nenhuma. O aviso na tela afirma o contrario, textualmente: 'Muito curta — sem isso a IA nao aprende (a resposta chega a ela de qualquer jeito)' (painel.tsx:2998). Nao chega. O botao continua habilitado e nada indica que a culpa e do campo opcional de treino.
 
@@ -92,7 +93,7 @@ O dono de clínica SEM linha em `doctors` (gestor não-médico) entra no painel 
 `src/lib/clinical.functions.ts:1150`  
 O commit HEAD anterior ("Imagens saem do Postgres e vão para o Storage") passou a ler e escrever exam_files.image_path. Essa coluna NÃO nasce em nenhuma migration de supabase/migrations/, nem em APLICAR_PENDENTES.sql, nem em BANCO_COMPLETO.sql — ela só existe em supabase/APLICAR_IMAGENS_NO_STORAGE.sql, arquivo que o CLAUDE.md não cita em lugar nenhum (o CLAUDE.md só manda rodar PENDENTES, EVENTOS_CLINICOS e AGENDA). Como o banco de produção está atrás do repo, o efeito é duplo e imediato: (1) o médico abre QUALQUER exame na aba Exames -> o select devolve 42703 -> imagemDoExame cai no if (error) e responde motivo:"falha" -> a tela mostra a tarja âmbar "Não consegui carregar a imagem" para todos os laudos, sempre; (2) a paciente anexa laudo no chat -> o insert nomeia image_path -> PostgREST devolve PGRST204 antes de chegar ao banco -> enviarExameDoChat devolve {ok:false} -> ela lê "Não consegui enviar o arquivo agora" e o exame nunca é gravado, mesmo com o Storage fora do caminho. A lista de exames continua funcionando (não seleciona image_path), então o médico vê nomes de laudos que nunca abrem.
 
-**Abrir um exame na aba Exames da paciente estoura a tela: preview.image_data é undefined no primeiro render**  
+**✅ Abrir um exame na aba Exames da paciente estoura a tela: preview.image_data é undefined no primeiro render**  
 `src/routes/_authenticated/minha-conta.tsx:19151`  
 A paciente abre Minha Conta -> Exames e clica no botão 'Abrir' de qualquer exame. `abrirExame` faz `setPreview(exam)` SÍNCRONO e só depois vai buscar a imagem. Mas `exam` veio de `load()`, cujo select foi propositalmente enxugado e NÃO traz image_data — então `exam.image_data` é `undefined`. O React renderiza o lightbox nesse estado e executa `preview.image_data!.startsWith("data:application/pdf")` sobre undefined: TypeError em tempo de render, que sobe para o error boundary do __root e mata a tela. Acontece em 100% dos cliques. E mesmo depois de aplicado o Storage o bug persiste por outro caminho: o exame vindo do chat grava image_data NULL e image_path preenchido, e `abrirExame` só busca `select("image_data")` — nunca image_path —, então o fetch traz null e o crash continua.
 
@@ -112,7 +113,7 @@ Quem reconstruir o banco pelas migrations (supabase db push) para em 20260719030
 `src/routes/_authenticated/painel.tsx:3690`  
 O médico marca a teleconsulta para 20:00 no campo datetime-local. O painel manda a string crua '2026-08-10T20:00' (sem fuso) e o servidor a insere direto na coluna scheduled_for timestamptz; o Postgres da Supabase lê como UTC. O cartão volta na tela mostrando 17:00 — e o convite do Google Agenda é criado às 17:00, com o e-mail do Google avisando a paciente desse horário. A LivesSection, no MESMO arquivo, faz a conversão certa (new Date(when).toISOString(), linha 10347); a de teleconsulta não. Esta base já registrou dois defeitos exatamente desta família em src/lib/fuso.test.ts (o cartão do batimento e a fila de espera) e criou instanteBrasilia/ymdBrasilia para isso — a teleconsulta ficou de fora.
 
-**generateClinicalNote chama o Gemini sem verificar plano nenhum — médico do Free gera nota SOAP ilimitada**  
+**✅ generateClinicalNote chama o Gemini sem verificar plano nenhum — médico do Free gera nota SOAP ilimitada**  
 `src/lib/teleconsulta.functions.ts:251`  
 Um médico no plano Free (aiApp: false) abre Teleconsultas — a aba não é filtrada por plano, e o gate podeIA do painel só cobre a aba Cérebro. Numa sessão com status sala_aberta/encerrada aparece o botão '✨ Gerar nota SOAP'. Ele clica, e funciona: o servidor só checa requireScope (médico ativo) e chama generateText no Gemini. Sem teto: a cota do médico conta apenas os canais 'app' e 'nutricao', e esta chamada grava canal 'teleconsulta'. Chamada paga, ilimitada, para quem não paga IA — enquanto /api/transcribe e o Segundo Cérebro barram no mesmo entitlement.
 
@@ -135,11 +136,11 @@ O médico abre Meu Perfil, preenche/corrige qualquer campo e clica "Salvar perfi
 
 ### 🟡 SILENCIOSO
 
-**getDoctorWaitlist ignora o campo error: falha de leitura vira "fila vazia"**  
+**✅ getDoctorWaitlist ignora o campo error: falha de leitura vira "fila vazia"**  
 `/home/user/doutorclovis/src/lib/admin.functions.ts:585`  
 Tabela appointment_waitlist ausente (42P01/PGRST205), grant revogado ou qualquer erro de PostgREST devolvem data: null com error preenchido. O destructuring só pega data, então a função retorna { ok: true, entries: [] } — sucesso. O painel imprime "Ninguém na fila de espera no momento" e o contador mostra 0. O médico conclui que ninguém está esperando vaga e não oferta o horário cancelado a ninguém. Note o contraste com getMyWaitlist, sweepWaitlist e leaveWaitlist, que na mesma feature já foram corrigidas para logar/propagar erro.
 
-**WaitlistSection transforma qualquer falha em lista vazia, sem faixa de aviso**  
+**✅ WaitlistSection transforma qualquer falha em lista vazia, sem faixa de aviso**  
 `/home/user/doutorclovis/src/routes/_authenticated/painel.tsx:2327`  
 Sessão expirada, rede caída ou ok:false do servidor caem no mesmo lugar que "a fila está mesmo vazia": setEntries([]). A tela então renderiza o texto tranquilizador "Ninguém na fila de espera no momento". O resto do painel tem o mecanismo certo para isso (setFonteFalhou, usado por SOS, vínculos, triagens, eventos e pré-consultas) — a fila é a única fonte da aba Agendamentos que não participa dele.
 
@@ -211,15 +212,15 @@ A aba Perguntas esta em DOCTOR_TABS para todos os planos (painel.tsx:250) e o ch
 `src/lib/admin.functions.ts:213`  
 A contagem exata de pendentes usa so scopedBy (carimbo doctor_id na linha); a LISTA usa scopedBy MAIS o filtro de vinculo atual (nameById). Depois de encerrar o acompanhamento de uma paciente com 3 perguntas em aberto, o badge da aba Perguntas e o Stat 'Perguntas a responder' continuam dizendo 3 enquanto a aba mostra 'Nenhuma pergunta ainda.'. Nenhuma acao do painel faz esse numero baixar — as linhas nao sao mais alcancaveis por nenhuma tela. E o mesmo defeito de 'dois numeros para a mesma coisa' que o comentario ao lado do codigo diz ter consertado.
 
-**listPatientRequests nunca olha o campo error — solicitação de vínculo some em silêncio**  
+**✅ listPatientRequests nunca olha o campo error — solicitação de vínculo some em silêncio**  
 `src/lib/patientlink.functions.ts:309`  
 A paciente busca o médico, envia a solicitação e passa a ver "aguardando o médico aceitar". No painel, a leitura de patient_link_requests falha (tabela ausente em produção → 42P01/PGRST205, ou timeout/RLS) e o destructuring só pega `data`. `rows` vem undefined, a função devolve `{ ok: true, requests: [] }` — sucesso. A aba Pacientes desenha o cartão "📭 Nenhuma solicitação pendente" e a fila de trabalho do Painel executa `if (pr.ok) … setFonteFalhou({vinculos:false})`, ou seja, apaga o próprio aviso de falha. O médico nunca fica sabendo que alguém pediu para ser acompanhada, e não existe tela nenhuma onde isso apareça. `patient_link_requests` só existe na migration 20260709000000 / APLICAR_PENDENTES.sql — é exatamente o lote pendente descrito no CLAUDE.md.
 
-**listMyPatients devolve ok:true com lista vazia em QUALQUER erro — inclusive coluna doctor_id ausente**  
+**✅ listMyPatients devolve ok:true com lista vazia em QUALQUER erro — inclusive coluna doctor_id ausente**  
 `src/lib/patientlink.functions.ts:564`  
 A cascata de selects degrada as COLUNAS opcionais, mas `.eq("doctor_id", user.id)` está nas seis tentativas. Se `patient_profiles.doctor_id` não existir no banco (coluna adicionada em 20260709000000 / APLICAR_PENDENTES.sql:1175), o PostgREST devolve 42703 para todas as seis, o laço termina com `rows = null` e a função retorna `{ ok: true, patients: [] }`. O mesmo acontece com qualquer erro que não seja 42703 (permissão, statement_timeout, 42P01): o `break` sai com `rows = null` e o retorno continua sendo `ok: true`. Na tela, `patients.length === 0` cai no estado vazio de onboarding: "👩‍🍼 Você ainda não tem pacientes vinculadas. Compartilhe seu perfil para que elas encontrem você…". Um médico com 40 pacientes lê que não tem nenhuma, com um convite para divulgar o perfil. Não há `missingTable` nem faixa de erro — ao contrário de `listLivesAdmin`, que no mesmo arquivo do painel devolve `missingTable`.
 
-**pacientesAtuais engole o erro e a fila clínica responde "nada esperando por você"**  
+**✅ pacientesAtuais engole o erro e a fila clínica responde "nada esperando por você"**  
 `src/lib/clinical.functions.ts:191`  
 `pacientesAtuais` é o recorte de TODAS as funções clínicas e lê patient_profiles sem checar `error`. Falhando (42703 se doctor_id não existe, timeout, rede), devolve Map vazio. Em `eventosQuePedemOlhar` isso cai no atalho `if (ids.length === 0) return vazio;` — e `vazio` tem `incompleto: false`. O painel faz `if (r.ok) { setEventosClinicos(r.eventos); setFonteFalhou({eventos: r.incompleto}) }`, então a faixa de leitura incompleta é DESLIGADA e a fila de trabalho fica vazia: uma paciente com 178/112 registrada hoje não aparece em lugar nenhum e a tela afirma completude. O próprio cabeçalho do arquivo diz que isso não pode acontecer ("devolvê-lo aqui transformava uma falha de leitura em 'nada esperando por você'") — o `catch` foi corrigido, mas o caminho `ids.length === 0` não. `examesRecebidos` (linha 1057) tem o mesmo atalho e vira "Nenhuma paciente enviou exame".
 
@@ -227,7 +228,7 @@ A cascata de selects degrada as COLUNAS opcionais, mas `.eq("doctor_id", user.id
 `src/lib/acionamentos.functions.ts:99`  
 `acionamentosDaPaciente` usa a sua própria cópia de `pacientesAtuais`, também sem checar `error`. Numa falha de leitura o array volta vazio, `!atuais.includes(pacienteId)` é verdadeiro e a função devolve `{ ok: true, acionamentos: [] }`. No PatientDetailModal o bloco "🆘 Acionamentos de emergência" só renderiza com `sosDela.length > 0` — ou seja, ele simplesmente não existe na tela. Uma paciente que apertou o SOS três vezes abre como uma ficha sem nenhuma emergência, sem qualquer marca de que a leitura falhou. É o mesmo padrão do achado anterior, com a agravante de ser o dado que o comentário do modal chama de "a primeira coisa que o médico precisa ver ao abrir a ficha".
 
-**Aceitar/recusar solicitação: try/finally sem catch — botão sem reação e sem mensagem**  
+**✅ Aceitar/recusar solicitação: try/finally sem catch — botão sem reação e sem mensagem**  
 `src/routes/_authenticated/painel.tsx:10765`  
 `respond()` embrulha a chamada num `try { … } finally { setRespondingId(null) }` sem `catch`. Se `respondPatientRequest` rejeitar (queda de rede, 500, sessão expirada — `tokenFn()` devolvendo string vazia faz o `inputValidator` lançar), a promessa vira unhandled rejection: nenhum toast, o card continua na lista e o botão volta a ficar clicável. O médico toca em "Aceitar", vê um "…" piscar e conclui que aceitou. Enquanto isso a paciente segue vendo "aguardando o médico aceitar". As duas ações irmãs da mesma seção — `encerrar()` e `togglePremium()` — têm `catch { toast.error("Falha de conexão — tente novamente.") }`; só a mais importante das três não tem.
 
@@ -235,7 +236,7 @@ A cascata de selects degrada as COLUNAS opcionais, mas `.eq("doctor_id", user.id
 `src/routes/_authenticated/painel.tsx:10748`  
 O efeito de carga inicial é `try { … } finally { setLoading(false) }`, sem catch, e cada resultado é aplicado só sob `if (res.ok)`. Existem três caminhos que produzem `ok:false` sem nenhum aviso na tela: assinatura vencida (`requireDoctor` recusa quando `doctors.active === false`), token expirado, e falha de rede (que rejeita e nem chega no `if`). Nos três, `loading` vira false e a aba pinta "📭 Nenhuma solicitação pendente" + "Você ainda não tem pacientes vinculadas". Não há botão de recarregar nem faixa de erro dentro da seção — o médico não tem como distinguir "não há ninguém" de "não consegui ler", que é justamente a distinção que o resto do painel (`fonteFalhou`, `incompleto`) foi construído para preservar.
 
-**O vínculo é gravado sem conferir se alguma linha foi afetada — a solicitação já foi consumida**  
+**✅ O vínculo é gravado sem conferir se alguma linha foi afetada — a solicitação já foi consumida**  
 `src/lib/patientlink.functions.ts:411`  
 `respondPatientRequest` primeiro RECLAMA a solicitação (status vira "accepted") e só depois grava `patient_profiles.doctor_id`. Esse UPDATE checa apenas `linkErr` — não faz `.select("id")` nem confere linhas afetadas. Um UPDATE que casa zero linhas (perfil da paciente inexistente ou apagado por LGPD com a conta auth ainda viva, ou o gatilho `trg_protect_doctor_id` reescrevendo `NEW.doctor_id := OLD.doctor_id` se a conexão não estiver com `current_user = 'service_role'`) não devolve erro: `desfazer()` não roda, a função retorna ok, o painel mostra "Paciente vinculada ✓", dispara o push "aceitou te acompanhar" para ela — e ela não aparece em `listMyPatients` porque nunca foi vinculada. A solicitação já não está mais "pending", então o item também some da fila. O padrão correto está a 280 linhas de distância no mesmo arquivo, com o comentário "sem isto, zero linhas afetadas voltava como sucesso".
 
