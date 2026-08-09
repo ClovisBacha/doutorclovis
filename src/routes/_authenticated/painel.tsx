@@ -54,6 +54,7 @@ import {
 import { exameSugerido } from "@/lib/exame-sugerido";
 import { filtrarPacientes } from "@/lib/busca-paciente";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
+import { GradeDeHorarios } from "@/components/grade-de-horarios";
 import {
   ESTILO_SINAL,
   PESO_SINAL,
@@ -1255,6 +1256,15 @@ function PainelPage() {
         )}
         {tab === "Calendário" && (
           <div className="space-y-10">
+            {/* A conexão com o Google fica NA AGENDA, e não em Meu Perfil.
+                É ela que decide se a teleconsulta vira um evento no Google
+                Agenda com sala do Meet e convite para as duas — a diferença
+                entre o link chegar sozinho e o médico ter de mandá-lo. */}
+            <GoogleCalendarCard tokenFn={token} />
+            {/* A grade de horários fica na AGENDA, e logo abaixo da conexão do
+                Google: as duas respondem "quando eu atendo" — uma para o meu
+                calendário, outra para o app da paciente. */}
+            <GradeDeHorarios tokenFn={token} />
             /* ─── UM CALENDÁRIO SÓ, COM AS TRÊS FONTES ──────────────────────── Era uma faixa de
             SETE dias que só conhecia `appointments`. O médico via a consulta presencial aqui e a
             teleconsulta do mesmo dia noutra aba — e nenhuma das duas respondia "como está o meu
@@ -9801,7 +9811,10 @@ function MeuPerfilSection({
       <EnderecosCard tokenFn={tokenFn} />
       <MesadaDoMedico tokenFn={tokenFn} pacientes={pacientesVinculadas} />
       <ReferralCard tokenFn={tokenFn} />
-      <GoogleCalendarCard tokenFn={tokenFn} />
+      {/* O cartão do Google Agenda saiu daqui e foi para a aba Calendário
+          (ago/2026). Ele decide como as teleconsultas viram evento com sala do
+          Meet — é assunto de agenda, e enterrado entre cobrança e endereços
+          ninguém o achava. */}
 
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-start justify-between gap-3">
