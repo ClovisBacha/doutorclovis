@@ -161,6 +161,30 @@ export const excluirMinhaConta = createServerFn({ method: "POST" })
       }
     }
 
+    /* ─── OS ARQUIVOS, ANTES DAS LINHAS ──────────────────────────────────────
+     *
+     * O CASCADE derruba as linhas de `exam_files` e `family_album_posts` — e,
+     * enquanto o laudo morava DENTRO da linha, derrubar a linha era derrubar a
+     * imagem. Ao mover os bytes para o Storage, essa equivalência se quebrou em
+     * silêncio: a linha some, o arquivo fica.
+     *
+     * Ela pede a exclusão da conta, o produto responde que apagou, e o laudo
+     * dela continua no nosso disco. Isso torna a LGPD inexequível pelo caminho
+     * que a própria migração de imagens criou.
+     *
+     * ANTES do `deleteUser`, e não depois: com a linha já apagada não há mais
+     * como saber quais arquivos eram dela — o caminho tem o uuid, mas quem
+     * relaciona uuid a pessoa é a linha que acabou de sumir.
+     *
+     * Best-effort: se o Storage não responder, a exclusão da CONTA segue. Negar
+     * a exclusão por causa de um órfão seria um problema de LGPD maior que o
+     * órfão. */
+    {
+      const { apagarPastaDoDono, BALDE_EXAMES, BALDE_ALBUM } = await import("@/lib/imagens.server");
+      await apagarPastaDoDono(BALDE_EXAMES, uid);
+      await apagarPastaDoDono(BALDE_ALBUM, uid);
+    }
+
     /* `deleteUser` derruba `auth.users`, e o restante sai pelos `ON DELETE
        CASCADE` que `APLICAR_EVENTOS_CLINICOS.sql` e `APLICAR_ESQUECIMENTO.sql`
        acrescentaram. Sem eles, isto FALHA com violação de chave estrangeira — e

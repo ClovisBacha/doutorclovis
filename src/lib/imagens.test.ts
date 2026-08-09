@@ -395,3 +395,60 @@ describe("8. a paciente continua vendo o PRÓPRIO exame", () => {
     expect(app).toContain("Carregando o exame…");
   });
 });
+
+describe("9. excluir a conta apaga os ARQUIVOS, não só as linhas", () => {
+  /**
+   * ─── A SEGUNDA PONTA SOLTA DA MIGRAÇÃO, ACHADA POR REVISÃO ────────────────
+   *
+   * `excluirMinhaConta` apaga as tabelas da IA à mão e deixa o resto sair pelos
+   * `ON DELETE CASCADE` do `deleteUser` — o que derruba as LINHAS de
+   * `exam_files` e `family_album_posts`.
+   *
+   * Enquanto o laudo morava DENTRO da linha, derrubar a linha era derrubar a
+   * imagem. Ao mover os bytes para o Storage, essa equivalência se quebrou em
+   * silêncio: a linha some, o arquivo fica.
+   *
+   * Ela pede a exclusão, o produto responde que apagou, e o laudo dela continua
+   * no nosso disco — a LGPD deixa de ser exequível pelo caminho que a própria
+   * migração criou. É a segunda ponta assim; a primeira foi a paciente perder o
+   * acesso ao próprio exame.
+   */
+  const conta = semComentarios("src/lib/conta.functions.ts");
+  /* `mod` mora no escopo do describe 2 — aqui precisa do seu próprio. */
+  const mod = semComentarios("src/lib/imagens.server.ts");
+
+  test("os dois baldes são varridos", () => {
+    expect(conta).toContain("apagarPastaDoDono(BALDE_EXAMES, uid)");
+    expect(conta).toContain("apagarPastaDoDono(BALDE_ALBUM, uid)");
+  });
+
+  test("e ANTES do deleteUser, não depois", () => {
+    /**
+     * Com a linha já apagada não há mais como saber quais arquivos eram dela: o
+     * caminho carrega o uuid, mas quem relaciona uuid a pessoa é a linha que
+     * acabou de sumir.
+     */
+    const iArquivos = conta.indexOf("apagarPastaDoDono(BALDE_EXAMES, uid)");
+    const iDelete = conta.indexOf("auth.admin.deleteUser(uid)");
+    expect(iArquivos).toBeGreaterThan(-1);
+    expect(iDelete).toBeGreaterThan(iArquivos);
+  });
+
+  test("a varredura não pode DERRUBAR a exclusão da conta", () => {
+    /* Negar a exclusão por causa de um órfão seria um problema de LGPD maior
+       que o órfão. */
+    const i = mod.indexOf("export async function apagarPastaDoDono");
+    const corpo = mod.slice(i);
+    expect(corpo).toContain("try {");
+    expect(corpo).toContain("catch {");
+  });
+
+  test("e pagina, para não parar no meio de quem tem muitos arquivos", () => {
+    /* O Storage lista com teto. Sem o laço, quem tem mais de 100 arquivos ficava
+       com o resto no balde — o mesmo defeito, só que mais difícil de ver. */
+    const i = mod.indexOf("export async function apagarPastaDoDono");
+    const corpo = mod.slice(i);
+    expect(corpo).toContain("for (;;)");
+    expect(corpo).toContain("if (arquivos.length < 100) return;");
+  });
+});

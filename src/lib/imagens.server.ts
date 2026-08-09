@@ -251,3 +251,48 @@ export async function apagarImagem(balde: string, caminho: string | null | undef
     /* silêncio proposital — ver comentário acima */
   }
 }
+
+/**
+ * Apaga TUDO o que é de uma pessoa dentro de um balde.
+ *
+ * ─── POR QUE ISTO PRECISOU EXISTIR ──────────────────────────────────────────
+ *
+ * `excluirMinhaConta` apaga as tabelas da IA à mão e deixa o resto sair pelos
+ * `ON DELETE CASCADE` do `deleteUser`. Isso derrubava as LINHAS de `exam_files`
+ * e `family_album_posts` — e, enquanto o laudo morava DENTRO da linha, derrubar
+ * a linha era derrubar a imagem.
+ *
+ * Ao mover os bytes para o Storage, essa equivalência se quebrou em silêncio: a
+ * linha some, o arquivo fica. A paciente pede a exclusão da conta, o produto
+ * responde que apagou, e o laudo dela continua no nosso disco — o que torna a
+ * LGPD inexequível pelo caminho que a própria migração criou.
+ *
+ * Achado por revisão adversarial do diff, e é a segunda vez que a migração de
+ * imagens deixa uma ponta assim: a primeira foi a paciente perder o acesso ao
+ * próprio exame.
+ *
+ * Best-effort de propósito: se o Storage não responder, a exclusão da CONTA não
+ * pode parar por causa disso — negar a exclusão seria um problema de LGPD
+ * maior que o órfão. O que fica é registro, para dar para varrer depois.
+ */
+export async function apagarPastaDoDono(balde: string, donoId: string): Promise<void> {
+  if (!donoId?.trim()) return;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    /* O Storage não apaga pasta: só objeto. Lista e remove em lote. O `limit`
+       alto cobre com folga o que uma pessoa acumula — e o laço continua
+       enquanto vier página cheia, para não parar no meio de quem tem muitos. */
+    for (;;) {
+      const { data: arquivos, error } = await supabaseAdmin.storage
+        .from(balde)
+        .list(donoId, { limit: 100 });
+      if (error || !arquivos?.length) return;
+      const caminhos = arquivos.map((a) => `${donoId}/${a.name}`);
+      const { error: eDel } = await supabaseAdmin.storage.from(balde).remove(caminhos);
+      if (eDel) return;
+      if (arquivos.length < 100) return;
+    }
+  } catch {
+    /* ver o comentário acima */
+  }
+}
