@@ -83,7 +83,11 @@ export const GRUPOS: readonly GrupoDeAbas[] = [
   /* Cérebro primeiro, e é decisão de produto: o painel de números diz o que
      ACONTECEU; o cérebro é onde ele MUDA o que vai acontecer. */
   { chave: "cerebro", rotulo: "Cérebro 🧠", filhas: ["Cérebro 🧠", "Perguntas"] },
-  { chave: "pacientes", rotulo: "Pacientes 👩‍🍼", filhas: ["Pacientes 👩‍🍼", "Pré-consultas", "Exames"] },
+  {
+    chave: "pacientes",
+    rotulo: "Pacientes 👩‍🍼",
+    filhas: ["Pacientes 👩‍🍼", "Pré-consultas", "Exames"],
+  },
   {
     chave: "agenda",
     rotulo: "Agenda 📅",

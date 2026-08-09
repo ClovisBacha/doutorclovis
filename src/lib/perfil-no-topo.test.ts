@@ -28,6 +28,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { FORA_DA_FITA, abasNaFita } from "./abas-do-painel";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -40,13 +41,17 @@ const menu = semComentarios("src/components/perfil-no-topo.tsx");
 
 describe("1. a aba saiu da fita, a tela ficou", () => {
   test("«Meu Perfil» não é mais um botão da fita", () => {
-    /* A lista `DOCTOR_TABS` é a única fonte dos botões. */
-    const i = painel.indexOf("const DOCTOR_TABS");
-    const lista = painel.slice(i, painel.indexOf("];", i));
-    expect(lista).not.toContain('"Meu Perfil"');
-    /* E a fita continua sendo montada a partir dela — se alguém trocar por uma
+    /**
+     * A fonte dos botões mudou de lugar: era `DOCTOR_TABS`, dentro de
+     * `painel.tsx`; agora é `GRUPOS`, em `abas-do-painel.ts`, com as quinze
+     * abas agrupadas em cinco. A garantia é a mesma, então a asserção
+     * pergunta à fonte nova em vez de raspar o arquivo.
+     */
+    expect(abasNaFita()).not.toContain("Meu Perfil");
+    expect(FORA_DA_FITA).toContain("Meu Perfil");
+    /* E a fita continua sendo montada a partir dela — se alguém desenhar uma
        lista literal no JSX, esta asserção deixa de significar algo. */
-    expect(painel).toContain("DOCTOR_TABS.map");
+    expect(painel).toContain("<AbasDoPainel");
   });
 
   test("mas a TELA continua renderizando", () => {

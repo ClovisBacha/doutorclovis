@@ -16,6 +16,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   FORA_DA_FITA,
   GRUPOS,
@@ -124,4 +125,36 @@ describe("4. o contador sobe para o grupo", () => {
        cinco emblemas iguais não dizem nada. */
     expect(somaDoGrupo("cerebro", { Exames: 9 })).toBe(0);
   });
+});
+
+describe("5. e o painel de fato ENTREGA os contadores", () => {
+  /**
+   * `somaDoGrupo` estar certa não serve de nada se ninguém lhe passar números.
+   *
+   * Esta era a lacuna que um mutante encontrou: apagar `Perguntas: pendingQs`
+   * do painel deixava tudo verde — a função somava corretamente um objeto
+   * vazio. O emblema sumia da fita, que é exatamente o defeito que a fusão
+   * podia introduzir e que estes testes existem para impedir.
+   */
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+  const bloco = painel.slice(
+    painel.indexOf("<AbasDoPainel"),
+    painel.indexOf("<AbasDoPainel") + 900,
+  );
+
+  test("a fita é montada com o estado da aba atual", () => {
+    expect(bloco).toContain("aba={tab}");
+    expect(bloco).toContain("onEscolher={setTab}");
+  });
+
+  for (const [aba, fonte] of [
+    ["Perguntas", "pendingQs"],
+    ["Pacientes 👩‍🍼", "novasPacientes"],
+    ["Pré-consultas", "unseenForms"],
+    ["Teleconsultas", "sala_aberta"],
+  ] as const) {
+    test(`o contador de «${aba}» chega à fita`, () => {
+      expect(bloco).toContain(fonte);
+    });
+  }
 });

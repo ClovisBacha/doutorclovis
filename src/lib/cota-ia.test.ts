@@ -13,6 +13,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { AVISO_EM, inicioDoCiclo, situacaoDaCota } from "./cota-ia.server";
+import { FORA_DA_FITA, abasNaFita } from "./abas-do-painel";
 
 function codigoDe(caminho: string): string {
   return readFileSync(caminho, "utf8")
@@ -558,9 +559,20 @@ describe("o consumo aparece antes de virar problema", () => {
   test("a fita de abas é uma tablist de verdade", () => {
     /* Quinze botões numa fita rolável sem semântica: o leitor de tela os lê
        como quinze botões soltos e não anuncia qual está ativo. */
-    expect(painel).toContain('role="tablist"');
-    expect(painel).toContain('role="tab"');
-    expect(painel).toContain("aria-selected={tab === t}");
+    /* A fita virou `AbasDoPainel` (duas fitas: grupos em cima, telas do grupo
+       embaixo), então a semântica é cobrada lá — o painel só a monta. */
+    const fita = readFileSync("src/components/abas-do-painel.tsx", "utf8");
+    /* AS DUAS fitas — a dos grupos e a das telas do grupo. Cobrar uma
+       ocorrência só era satisfeito pela segunda, e apagar a semântica da
+       primeira (a que o médico usa o tempo todo) passava batido. */
+    expect((fita.match(/role="tablist"/g) ?? []).length).toBe(2);
+    expect((fita.match(/role="tab"/g) ?? []).length).toBe(2);
+    expect(fita).toContain("aria-selected={ativo}");
+    /* E cada fita se anuncia com um nome próprio: duas tablists sem rótulo
+       fazem o leitor de tela dizer "lista de abas" duas vezes. */
+    expect(fita).toContain('aria-label="Áreas do painel"');
+    expect(fita).toContain('aria-label="Telas desta área"');
+    expect(painel).toContain("<AbasDoPainel");
   });
 
   test("a barra muda de cor conforme a régua", () => {
@@ -655,12 +667,23 @@ describe("quem mais conversou", () => {
  * É a quarta vez nesta base que um teste mede o texto que descreve o código em
  * vez do código. Por isso a limpeza mora no helper, e não em cada chamada.
  */
-function listaDeAbas(painel: string): string {
-  const ini = painel.indexOf("const DOCTOR_TABS");
-  return painel
-    .slice(ini, painel.indexOf("\n];", ini))
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*/g, "");
+/**
+ * A lista de abas saiu de `painel.tsx` e mora em `src/lib/abas-do-painel.ts`.
+ *
+ * O arquivo tinha 11 mil linhas e a lista era lida daqui por regex. Com o
+ * agrupamento em cinco grupos, ela virou dado testável de verdade — e estas
+ * funções passam a perguntar ao módulo em vez de raspar texto.
+ *
+ * A GARANTIA não mudou: toda aba com bloco de renderização precisa ter um
+ * caminho até ela. Já falhou quatro vezes neste arquivo — Ferramentas (a única
+ * tela de receituário do produto), Exames e o Calendário, órfão até ago/2026.
+ */
+function listaDeAbas(_painel?: string): string {
+  /* Assinatura preservada para os chamadores; o texto agora é gerado da fonte
+     real, então um teste que procure `"Calendário"` continua valendo. */
+  return abasNaFita()
+    .map((t) => `"${t}"`)
+    .join(",\n");
 }
 
 /**
@@ -691,7 +714,13 @@ function listaDeAbas(painel: string): string {
  */
 function ALCANCAVEL(aba: string, lista: string, codigo: string): boolean {
   if (lista.includes(`"${aba}"`)) return true;
-  return aba === "Meu Perfil" && codigo.includes(`onAbrirPerfil={() => setTab("${aba}")}`);
+  /* Fora da fita só passa quem o menu do perfil de fato alcança. A exceção não
+     é uma lista de nomes liberados: se alguém apagar a entrada do menu, a aba
+     volta a reprovar aqui — que é o comportamento certo, porque sem ela a tela
+     fica tão órfã quanto estaria fora da fita. */
+  if (aba === "Meu Perfil") return codigo.includes('onAbrirPerfil={() => setTab("Meu Perfil")}');
+  if (aba === "Clínica 🏥") return codigo.includes('setTab("Clínica 🏥")');
+  return false;
 }
 
 describe("nenhuma aba fica órfã", () => {
@@ -715,7 +744,7 @@ describe("nenhuma aba fica órfã", () => {
        toca no botão e não acontece nada, sem erro nenhum. */
     const codigo = painel.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
     const comRender = new Set([...codigo.matchAll(/\{tab === "([^"]+)"/g)].map((m) => m[1]));
-    const noMenu = [...listaDeAbas(painel).matchAll(/"([^"]+)",/g)].map((m) => m[1]);
+    const noMenu = abasNaFita();
     expect(noMenu.filter((aba) => !comRender.has(aba))).toEqual([]);
     /* E a lista não pode estar vazia, senão o teste acima é decoração. */
     expect(noMenu.length).toBeGreaterThan(10);
@@ -736,11 +765,9 @@ describe("o Cérebro é a primeira coisa que ele vê", () => {
     /* Era a 11ª de 14 numa fita rolável de uma linha — uns oitocentos pixels à
        direita num celular. O médico precisava ROLAR para chegar na única parte
        do painel que fica melhor quanto mais ele a usa. */
-    const lista = listaDeAbas(painel);
-    const posCerebro = lista.indexOf('"Cérebro 🧠"');
-    const posPainel = lista.indexOf('"Painel 📊"');
-    expect(posCerebro).toBeGreaterThan(0);
-    expect(posCerebro).toBeLessThan(posPainel);
+    const ordem = abasNaFita();
+    expect(ordem.indexOf("Cérebro 🧠")).toBe(0);
+    expect(ordem.indexOf("Cérebro 🧠")).toBeLessThan(ordem.indexOf("Painel 📊"));
   });
 
   test("e é a aba que abre", () => {
@@ -756,8 +783,8 @@ describe("o Cérebro é a primeira coisa que ele vê", () => {
 
   test("aparece uma vez só na lista", () => {
     /* Duplicar renderizaria dois botões da mesma aba. */
-    const lista = listaDeAbas(painel);
-    expect((lista.match(/"Cérebro 🧠"/g) ?? []).length).toBe(1);
+    const ordem = abasNaFita();
+    expect(ordem.filter((t) => t === "Cérebro 🧠").length).toBe(1);
   });
 });
 

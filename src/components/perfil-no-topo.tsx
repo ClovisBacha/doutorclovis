@@ -49,6 +49,15 @@ export function PerfilNoTopo({
   ativo = false,
   onAbrirPerfil,
   onAbrirCobranca,
+  /**
+   * "Minha clínica", quando o plano tem equipe.
+   *
+   * Ela também saiu da fita das cinco abas — só existe num plano, e não merece
+   * um quinto do espaço de todo mundo. Mas sair da fita sem ganhar entrada
+   * AQUI a deixaria implementada e inalcançável, que é o defeito que este
+   * produto já teve quatro vezes.
+   */
+  onAbrirClinica,
   onSair,
 }: {
   nome?: string | null;
@@ -58,6 +67,7 @@ export function PerfilNoTopo({
   ativo?: boolean;
   onAbrirPerfil: () => void;
   onAbrirCobranca: () => void;
+  onAbrirClinica?: () => void;
   onSair?: () => void;
 }) {
   /* Iniciais quando não há foto. Duas letras no máximo: "Clóvis Bacha" → "CB",
@@ -133,6 +143,12 @@ export function PerfilNoTopo({
           Plano, limite e cobrança
           <span className="ml-auto text-[11px] text-muted-foreground">cartão</span>
         </DropdownMenuItem>
+        {onAbrirClinica && (
+          <DropdownMenuItem onClick={onAbrirClinica}>
+            Minha clínica
+            <span className="ml-auto text-[11px] text-muted-foreground">equipe</span>
+          </DropdownMenuItem>
+        )}
         {onSair && (
           <>
             <DropdownMenuSeparator />

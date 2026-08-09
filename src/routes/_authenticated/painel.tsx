@@ -73,6 +73,8 @@ import { mensalidadeCentavos } from "@/lib/entitlements";
 import { EscadaDeMensagens } from "@/components/escada-mensagens";
 import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
 import { PerfilNoTopo } from "@/components/perfil-no-topo";
+import { AbasDoPainel } from "@/components/abas-do-painel";
+import type { PanelTab } from "@/lib/abas-do-painel";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
 import { MesadaDoMedico } from "@/components/mesada-do-medico";
 import {
@@ -205,78 +207,14 @@ const STATUS_STYLE: Record<string, string> = {
   declined: "bg-rose-100 text-rose-700",
 };
 
-const PANEL_TABS = [
-  "Painel 📊",
-  "Calendário",
-  "Agendamentos",
-  "Ferramentas",
-  "Perguntas",
-  "Cérebro 🧠",
-  "Pré-consultas",
-  "Exames",
-  "Teleconsultas",
-  "Consultas Pagas",
-  "Lives",
-  "Engajamento",
-  "Pacientes 👩‍🍼",
-  "Clínica 🏥",
-  "Meu Perfil",
-] as const;
-type PanelTab = (typeof PANEL_TABS)[number];
-
-// Cada médico (inclusive o Dr. Clóvis) é um inquilino: vê só as abas escopadas
-// por doctor_id no servidor — painel, agendamentos, perguntas, pré-consultas,
-// teleconsultas, engajamento, cérebro, pacientes, consultas pagas, lives e
-// perfil, todas recortadas ao PRÓPRIO médico. O financeiro da plataforma
-// inteira e as Empresas ficam no console do dono (/admin), não aqui.
-const DOCTOR_TABS: readonly PanelTab[] = [
-  /* CÉREBRO PRIMEIRO, e isso é uma decisão de produto, não de layout.
-     Ele era a 11ª de 14 numa fita rolável de uma linha só — ou seja, uns
-     oitocentos pixels à direita num celular. O médico precisava ROLAR para
-     chegar na única parte do painel que fica melhor quanto mais ele a usa.
-     A fila de lacunas e a de revisão são trabalho que rende: cada resposta
-     dele economiza as próximas. Escondê-las atrás de uma rolagem horizontal é
-     o mesmo que pedir que ele lembre de procurar. */
-  "Cérebro 🧠",
-  "Painel 📊",
-  "Agendamentos",
-  /* CALENDÁRIO ligado — decisão do Clóvis, out/ago 2026.
-     Ele estava implementado (`CalendárioSection`, com a grade do mês e o
-     salto para o dia) e fora desta lista, que é a ÚNICA fonte dos botões de
-     aba. Nenhum `setTab("Calendário")` existia em lugar nenhum: a tela era
-     inalcançável por qualquer caminho, e `if (tab === "Empresas")` mais abaixo
-     era código morto pelo mesmo motivo.
-     Vem logo depois de Agendamentos de propósito: são a mesma pergunta em duas
-     formas — a lista responde "o que pediram", o calendário responde "como
-     está a minha semana". Separá-las na fita obrigaria a rolar entre uma e
-     outra justamente quando ele está comparando as duas. */
-  "Calendário",
-  "Perguntas",
-  /* FERRAMENTAS ligada. Ela já existia — receituário e painéis de exame, ~1.150
-     linhas escritas — e nunca foi listada aqui, então nenhum botão a montava.
-     Era a única tela de receituário do produto, inalcançável. */
-  "Ferramentas",
-  "Pré-consultas",
-  /* A caixa de entrada dos exames. Fica ao lado de Pré-consultas porque é onde
-     ele já procura o que a paciente mandou — e porque quatro abas deste arquivo
-     estão implementadas e INALCANÇÁVEIS por não terem sido listadas aqui,
-     inclusive a única tela de receituário do produto. Uma tela que existe e não
-     é renderizada é pior que uma que não existe: ninguém a procura. */
-  "Exames",
-  "Teleconsultas",
-  "Consultas Pagas",
-  "Lives",
-  "Engajamento",
-  "Pacientes 👩‍🍼",
-  "Clínica 🏥",
-  /* "Meu Perfil" NÃO entra aqui, e continua existindo como aba.
-     Ela virou a bolinha do canto superior direito (`PerfilNoTopo`): é onde as
-     pessoas procuram conta, e onde ela estava — décima quinta de uma fita
-     rolável — trocar o cartão exigia rolar a fita até o fim.
-     Esta lista é a única fonte dos BOTÕES de aba, não das telas: `tab ===
-     "Meu Perfil"` continua renderizando, agora alcançável só pelo menu do
-     perfil e pelos `setTab("Meu Perfil")` que já existiam. */
-];
+/**
+ * A lista de abas e o agrupamento saíram deste arquivo.
+ *
+ * Moram em `src/lib/abas-do-painel.ts`, sem JSX, para o agrupamento poder ser
+ * testado sem montar uma tela de 11 mil linhas — e para a lista não virar
+ * duas, que é como quatro telas deste produto já ficaram implementadas e
+ * inalcançáveis, inclusive a única de receituário.
+ */
 
 /**
  * A aba em que o médico ATERRISSA — declarada, não deduzida.
@@ -375,27 +313,13 @@ function PainelPage() {
     : podeIA
       ? ABA_DE_ENTRADA
       : ABA_DE_ENTRADA_SEM_IA;
-  /* A fita de abas rola, então a aba ativa pode estar fora da tela.
-  
-     Isso importa porque várias trocas de aba são PROGRAMÁTICAS, não um toque do
-     médico: os cartões do Painel levam para "Cérebro", e ele chegava numa tela
-     cujo indicador de posição estava fora do campo de visão — justamente
-     quando mais precisa se situar.
+  /* A rolagem até a aba ativa saiu daqui e mora em `AbasDoPainel`, junto da
+     fita que ela rola. Ela continua importando pelo mesmo motivo de antes:
+     várias trocas de aba são PROGRAMÁTICAS — um cartão do Painel manda para
+     Exames —, e sem isso ele aterrissava numa tela cujo indicador de posição
+     estava fora do campo de visão, justamente quando mais precisa se situar.
      ("Meu Perfil" saiu da fita e virou a bolinha do canto; quem indica a
-     posição dela agora é a própria bolinha, via `ativo`.) */
-  const fitaAbas = useRef<HTMLDivElement | null>(null);
-  const refsAbas = useRef<Partial<Record<PanelTab, HTMLButtonElement | null>>>({});
-
-  useEffect(() => {
-    const el = refsAbas.current[tab];
-    if (!el || !fitaAbas.current) return;
-    /* `inline: "nearest"` traz a aba para dentro da fita. `block: "nearest"`
-       PODE rolar a página na vertical — ele percorre todos os ancestrais
-       roláveis, e aqui o documento é o mais próximo. Como as trocas
-       programáticas vêm de cartões abaixo da fita, o efeito colateral é levar a
-       página de volta para o topo da aba, que é para onde ele quer olhar. */
-    el.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
-  }, [tab]);
+     posição dela é a própria bolinha, via `ativo`.) */
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   // null = o próprio cérebro (comportamento de sempre).
   const [brainAsDoctor, setBrainAsDoctor] = useState<{ id: string; name: string } | null>(null);
@@ -1038,6 +962,10 @@ function PainelPage() {
           aviso={avisoDaConta}
           ativo={tab === "Meu Perfil"}
           onAbrirPerfil={() => setTab("Meu Perfil")}
+          /* Só quem tem equipe. Sem plano de clínica a entrada não aparece —
+             e o bloco `tab === "Clínica 🏥" && !podeEquipe` continua existindo
+             para quem chegar lá por outro caminho. */
+          onAbrirClinica={podeEquipe ? () => setTab("Clínica 🏥") : undefined}
           onAbrirCobranca={() => {
             /* Mesma seção; a cobrança é uma âncora dentro dela. O `setTab` só
                vale no próximo render, então a rolagem espera um quadro — sem
@@ -1135,73 +1063,30 @@ function PainelPage() {
         ]}
       />
 
-      {/* Tabs — todo médico é inquilino, recortado por doctor_id.
+      {/* ─── AS DUAS FITAS ────────────────────────────────────────────────
+          Eram QUINZE abas numa fita rolável de uma linha só. Num monitor a nona
+          já aparecia cortada; num celular a última ficava mil pixels à direita.
+          O médico não descobria o que existe — precisava lembrar de rolar.
 
-          Rola na horizontal em vez de quebrar linha. Com `flex-wrap`, as 12 abas
-          num celular de 360px viravam ~5 linhas: perto de 200px de tela só para
-          navegar, empurrando o conteúdo para baixo do dobra. E pior, a
-          `border-b` do container só encosta na ÚLTIMA linha, então o sublinhado
-          de aba ativa (`-mb-px` + `border-b-2`) flutuava no meio do bloco quando
-          a aba selecionada caía numa linha de cima — o indicador apontava para o
-          nada. Uma fita rolável resolve as duas coisas: uma linha só, com o
-          sublinhado sempre em cima da borda. `snap` para a aba parar alinhada. */}
-      <div
-        ref={fitaAbas}
-        /* Sem `-mb-px` nos filhos. `overflow-x: auto` faz o `overflow-y`
-           computar para `auto` também (regra do CSS: `visible` ao lado de um
-           valor não-`visible` vira `auto`), então a caixa recorta no padding box
-           e comia 1px da `border-b-2` da aba ativa. Tirar a margem negativa
-           basta — o `pb-px` que eu tinha posto junto só abria uma folga de 1px
-           entre o sublinhado e a linha cinza, sem cobrir nada. */
-        /* `role="tablist"`: são quinze botões numa fita rolável, e sem
-           semântica de aba o leitor de tela os lê como quinze botões soltos,
-           sem anunciar qual está ativo — a informação mais importante da fita. */
-        role="tablist"
-        aria-label="Seções do painel"
-        className="mt-8 flex snap-x gap-2 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {DOCTOR_TABS.map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            ref={(el) => {
-              refsAbas.current[t] = el;
-            }}
-            onClick={() => setTab(t)}
-            className={`shrink-0 snap-start whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-primary"
-            }`}
-          >
-            {t}
-            {/* Mesmo contador da aba Perguntas: numa fita de 12 abas, o número
-                é o que faz a aba certa se anunciar sem ele precisar rolar. */}
-            {t === "Pacientes 👩‍🍼" && novasPacientes > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white">
-                {novasPacientes}
-              </span>
-            )}
-            {t === "Perguntas" && pendingQs > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white">
-                {pendingQs}
-              </span>
-            )}
-            {t === "Pré-consultas" && unseenForms > 0 && (
-              <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-xs font-bold text-white">
-                {unseenForms}
-              </span>
-            )}
-            {t === "Teleconsultas" &&
-              teleconsultas.filter((s) => s.status === "sala_aberta").length > 0 && (
-                <span className="ml-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-xs font-bold text-white">
-                  {teleconsultas.filter((s) => s.status === "sala_aberta").length}
-                </span>
-              )}
-          </button>
-        ))}
-      </div>
+          Agora são cinco grupos em cima e as telas do grupo embaixo. O desenho
+          e o agrupamento moram em `abas-do-painel`; aqui fica só o que este
+          arquivo sabe: QUANTO trabalho espera em cada tela.
+
+          Os contadores sobem para o grupo. É a parte que quase se perdeu: o
+          número em "Perguntas" é o que faz o médico ir até lá, e empurrada para
+          dentro de Cérebro ela sumiria da fita — a fusão que era para revelar
+          as telas passaria a esconder o trabalho. */}
+      <AbasDoPainel
+        className="mt-8"
+        aba={tab}
+        onEscolher={setTab}
+        contadores={{
+          "Pacientes 👩‍🍼": novasPacientes,
+          Perguntas: pendingQs,
+          "Pré-consultas": unseenForms,
+          Teleconsultas: teleconsultas.filter((s) => s.status === "sala_aberta").length,
+        }}
+      />
 
       {/* Conta inativa: ele entra, mas precisa saber por que as listas estão
           vazias — senão conclui que o painel está quebrado. */}
