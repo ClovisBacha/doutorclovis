@@ -4971,7 +4971,7 @@ function CerebroSection({
         Ferramentas
       </h3>
       <BrainConversationsCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainConsultaCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainConsultaCard tokenFn={tokenFn} asDoctor={asId} onIrParaPlanos={onIrParaPlanos} />
       <BrainEvalCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainKnowledgeCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainPlaygroundCard tokenFn={tokenFn} asDoctor={asId} />
@@ -5318,10 +5318,13 @@ function BrainConversationsCard({
 function BrainConsultaCard({
   tokenFn,
   asDoctor,
+  onIrParaPlanos,
 }: {
   tokenFn: () => Promise<string>;
   // Plano Clínica: operar o cérebro de um médico da clínica (admin).
   asDoctor?: string;
+  /** Para onde o gancho do 402 leva. Ver o comentário no `onClick` do toast. */
+  onIrParaPlanos?: () => void;
 }) {
   const [transcript, setTranscript] = useState("");
   const [transcribing, setTranscribing] = useState(false);
@@ -5354,10 +5357,14 @@ function BrainConsultaCard({
             duration: 9000,
             action: {
               label: "Ver planos",
-              onClick: () =>
-                document
-                  .getElementById("cobranca")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+              /* `getElementById("cobranca")` NÃO SERVE aqui, e é um defeito que
+                 uma auditoria pegou: a âncora mora na tela de perfil, que só é
+                 renderizada quando `tab === "Meu Perfil"`. O médico está na aba
+                 Cérebro quando transcreve, então o nó não existe, o `?.` engole
+                 tudo e o botão não faz absolutamente nada. Um gancho que não
+                 leva a lugar nenhum é pior que nenhum gancho: ele confirma ao
+                 médico que o produto está quebrado. */
+              onClick: () => onIrParaPlanos?.(),
             },
           });
           return;

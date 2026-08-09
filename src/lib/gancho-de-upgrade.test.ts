@@ -139,6 +139,28 @@ describe("3. as telas transformam o 402 em gancho, não em erro", () => {
     const bloco = painel.slice(i, painel.indexOf("return;", i));
     expect(bloco).toContain('fraseDoGancho("transcricao")');
     expect(bloco).toContain("Ver planos");
+    /**
+     * E o botão LEVA a algum lugar.
+     *
+     * Ele rolava até `getElementById("cobranca")` — uma âncora que mora na tela
+     * de perfil e só existe quando `tab === "Meu Perfil"`. O médico está na aba
+     * Cérebro quando transcreve, então o nó não existia, o `?.` engolia tudo e
+     * o botão não fazia absolutamente nada. Um gancho que não leva a lugar
+     * nenhum é pior que nenhum gancho: confirma ao médico que o produto está
+     * quebrado, no exato momento em que a gente pede dinheiro a ele.
+     */
+    expect(bloco).toContain("onIrParaPlanos");
+    expect(bloco).not.toContain('getElementById("cobranca")');
+    /**
+     * E ALGUÉM passa a prop.
+     *
+     * Sem esta linha o teste provava o componente e não o CHAMADOR — pela sexta
+     * vez nesta base. `onIrParaPlanos?.()` com a prop ausente é exatamente o
+     * botão morto de novo, só que agora com um `?.` para engolir o silêncio.
+     */
+    expect(painel).toContain("<BrainConsultaCard");
+    const iCard = painel.indexOf("<BrainConsultaCard");
+    expect(painel.slice(iCard, iCard + 200)).toContain("onIrParaPlanos={onIrParaPlanos}");
     /* E o gancho não pode virar `toast.error`: erro vermelho para quem só
        precisa assinar é a mesma mentira do "tente novamente". */
     expect(bloco).not.toContain("toast.error");
