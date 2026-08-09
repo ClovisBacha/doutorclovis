@@ -119,3 +119,47 @@ describe("a nota clínica da teleconsulta também pede plano", () => {
     expect(bloco).toContain('getEntitlementsByDoctorId(scope.doctorId ?? "", scope.isTeam)');
   });
 });
+
+describe("o gate da nota SOAP chega ao médico, em vez de morrer no caminho", () => {
+  /**
+   * ─── UM GATE SEM GANCHO É PIOR QUE NENHUM GATE ────────────────────────────
+   *
+   * O servidor passou a barrar por plano e devolve
+   * `{ ok:false, error: fraseDoGancho("cerebro") }`. O painel só olhava
+   * `res.ok`: o botão voltava do "..." e não acontecia nada.
+   *
+   * A aba Teleconsultas não é filtrada por plano — o `podeIA` cobre só a aba
+   * Cérebro —, então o médico no Free vê o botão, digita a consulta inteira em
+   * tópicos, clica, e o produto fica mudo. Ele conclui que está quebrado, não
+   * que existe um plano. Gasta a paciência dele e não vende nada.
+   *
+   * Achado por revisão adversarial do diff.
+   */
+  const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+  /* Até a função SEGUINTE, não uma janela de caracteres: o objeto da paciente
+     ocupa doze linhas e uma janela curta parava antes do `catch`/`finally` —
+     o teste falhava no estado BOM, e os mutantes "morriam" por já estar
+     vermelho. Um teste que falha sempre não mede nada. */
+  const i = painel.indexOf("async function doGenerateNote");
+  const bloco = painel.slice(i, painel.indexOf("async function doSaveNote", i));
+
+  test("a recusa do servidor vira mensagem na tela", () => {
+    expect(bloco).toContain("else toast.error(res.error");
+  });
+
+  test("e o botão sempre sai do «...»", () => {
+    /* `tokenFn()` devolve string vazia com a sessão expirada e a promessa
+       estoura; sem `finally`, o botão fica desabilitado até o F5. */
+    expect(bloco).toContain("} finally {");
+    const iFinally = bloco.indexOf("} finally {");
+    expect(bloco.indexOf("setGeneratingNote(null)", iFinally)).toBeGreaterThan(iFinally);
+  });
+
+  test("e a exceção também fala", () => {
+    /* A frase do CATCH, que é diferente da do `else` — cobrar o trecho comum
+       era satisfeito pelo ramo vizinho e deixava o catch emudecer. */
+    expect(bloco).toContain(
+      '} catch {\n      toast.error("Não foi possível gerar a nota agora. Tente de novo.");',
+    );
+  });
+});

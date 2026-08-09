@@ -3799,26 +3799,47 @@ function TeleconsultasSection({
     const bullets = noteBullets[s.id] ?? "";
     if (!bullets.trim()) return;
     setGeneratingNote(s.id);
-    const tk = await tokenFn();
-    const res = await generateClinicalNote({
-      data: {
-        accessToken: tk,
-        bullets,
-        patient: {
-          name: s.patient_name ?? "Paciente",
-          weeksAtSubmission: pre?.weeks_at_submission ?? null,
-          weight: pre?.current_weight ?? null,
-          systolic: pre?.systolic ?? null,
-          diastolic: pre?.diastolic ?? null,
-          symptoms: pre?.symptoms ?? [],
-          medications: pre?.medications ?? null,
-          questions: pre?.questions ?? null,
-          emotionalState: pre?.emotional_state ?? null,
+    /* ─── O GANCHO DO PLANO CHEGAVA E ERA JOGADO FORA ───────────────────────
+     *
+     * O servidor passou a barrar a nota SOAP por plano e devolve
+     * `{ ok:false, error: fraseDoGancho("cerebro") }`. Aqui só `res.ok` era
+     * olhado: o botão voltava do "..." e não acontecia nada.
+     *
+     * A aba Teleconsultas não é filtrada por plano — o `podeIA` do painel cobre
+     * só a aba Cérebro —, então o médico no Free vê o botão, digita a consulta
+     * inteira em tópicos, clica, e o produto fica mudo. Ele conclui que está
+     * quebrado, e não que existe um plano. Um gate sem gancho é pior que sem
+     * gate: gasta a paciência dele e não vende nada.
+     *
+     * E o `try/catch` porque `tokenFn()` devolve string vazia com a sessão
+     * expirada: sem ele, `setGeneratingNote(null)` nunca roda e o botão fica em
+     * "..." até o F5. */
+    try {
+      const tk = await tokenFn();
+      const res = await generateClinicalNote({
+        data: {
+          accessToken: tk,
+          bullets,
+          patient: {
+            name: s.patient_name ?? "Paciente",
+            weeksAtSubmission: pre?.weeks_at_submission ?? null,
+            weight: pre?.current_weight ?? null,
+            systolic: pre?.systolic ?? null,
+            diastolic: pre?.diastolic ?? null,
+            symptoms: pre?.symptoms ?? [],
+            medications: pre?.medications ?? null,
+            questions: pre?.questions ?? null,
+            emotionalState: pre?.emotional_state ?? null,
+          },
         },
-      },
-    });
-    setGeneratingNote(null);
-    if (res.ok) setGeneratedNote((p) => ({ ...p, [s.id]: res.note }));
+      });
+      if (res.ok) setGeneratedNote((p) => ({ ...p, [s.id]: res.note }));
+      else toast.error(res.error || "Não foi possível gerar a nota agora.");
+    } catch {
+      toast.error("Não foi possível gerar a nota agora. Tente de novo.");
+    } finally {
+      setGeneratingNote(null);
+    }
   }
 
   async function doSaveNote(id: string) {
