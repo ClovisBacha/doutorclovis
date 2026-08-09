@@ -337,3 +337,107 @@ export function validaRegistro(campos: Partial<Record<CampoClinico, string>>): s
   }
   return null;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   A PACIENTE COMPARADA COM ELA MESMA
+
+   As faixas acima são absolutas: 140/90 é 140/90 para qualquer gestante. Elas
+   respondem "este número é alto?" e não respondem "este número é alto PARA
+   ELA?".
+
+   Quem sempre teve 100/60 e chega a 132/86 está dentro de toda faixa de
+   referência — e subiu 32 na sistólica. Numa gestação de alto risco isso é
+   exatamente o tipo de coisa que se quer ver antes de virar 160/110.
+
+   ─── O QUE ISTO É, E O QUE NÃO É ──────────────────────────────────────────
+
+   Não é diagnóstico, e não substitui a régua absoluta: a gravidade final é
+   sempre a MAIOR das duas. Um delta pequeno nunca rebaixa um 165/105.
+
+   O corte de +30 sistólica / +15 diastólica sobre a média dela é o critério de
+   "hipertensão relativa" clássico da obstetrícia. Ele saiu da definição formal
+   de pré-eclâmpsia (ACOG, anos 2000) e continua largamente usado como sinal de
+   VIGILÂNCIA — que é exatamente o papel dele aqui. Nunca sobe além de
+   "atenção", e a nota descreve o que aconteceu ("subiu 32 sobre a média dela"),
+   sem nomear doença.
+
+   ⚠️ Clóvis: estes dois números são o padrão que escolhi e estão num lugar só.
+   Se você quiser outro corte, é esta constante que muda.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export const DELTA_PRESSAO = { sistolica: 30, diastolica: 15 } as const;
+
+/** Quantas medidas fazem uma linha de base. Menos que isso é ruído. */
+export const MINIMO_PARA_BASE = 3;
+
+export type BasePessoal = { sistolica: number; diastolica: number; medidas: number };
+
+/**
+ * A linha de base dela: a média das PRIMEIRAS medidas do acompanhamento.
+ *
+ * As primeiras, e não as últimas: se a média fosse móvel, uma subida lenta
+ * arrastaria a própria referência junto e o delta nunca dispararia — o defeito
+ * que faz um alarme de tendência ser inútil justamente na tendência lenta.
+ *
+ * `null` com menos de três pares: duas medidas não são uma linha de base, e
+ * fingir que são faria o alerta disparar pela variação normal do dia.
+ */
+export function baseDePressao(
+  pares: { sistolica: number; diastolica: number }[],
+): BasePessoal | null {
+  const validos = pares.filter(
+    (p) =>
+      Number.isFinite(p.sistolica) &&
+      Number.isFinite(p.diastolica) &&
+      /* Descarta implausíveis com a MESMA régua absoluta — um 0/0 na base
+         puxaria a média para baixo e faria tudo parecer subida. */
+      sinalPressao(p.sistolica, p.diastolica)?.nota !== "Valor de pressão implausível",
+  );
+  if (validos.length < MINIMO_PARA_BASE) return null;
+  const usados = validos.slice(0, 6);
+  const soma = usados.reduce((a, p) => ({ s: a.s + p.sistolica, d: a.d + p.diastolica }), {
+    s: 0,
+    d: 0,
+  });
+  return {
+    sistolica: Math.round(soma.s / usados.length),
+    diastolica: Math.round(soma.d / usados.length),
+    medidas: usados.length,
+  };
+}
+
+/**
+ * A pressão dela contra a régua absoluta E contra ela mesma.
+ *
+ * A gravidade devolvida é a MAIOR das duas. Sem isso, um delta "normal"
+ * rebaixaria um 165/105 — que é o erro que transforma um alerta em ruído no
+ * caso exato em que ele precisa funcionar.
+ */
+export function sinalPressaoComBase(
+  sistolica?: number | null,
+  diastolica?: number | null,
+  base?: BasePessoal | null,
+): Sinal | null {
+  const absoluto = sinalPressao(sistolica, diastolica);
+  if (!absoluto || !base || sistolica == null || diastolica == null) return absoluto;
+  /* Já grave pela régua absoluta: o delta não acrescenta nada e a nota dele
+     competiria com "pressão em faixa grave", que é a que importa ler. */
+  if (absoluto.gravidade === "grave") return absoluto;
+
+  const ds = sistolica - base.sistolica;
+  const dd = diastolica - base.diastolica;
+  const subiu = ds >= DELTA_PRESSAO.sistolica || dd >= DELTA_PRESSAO.diastolica;
+  if (!subiu) return absoluto;
+
+  const qual =
+    ds >= DELTA_PRESSAO.sistolica && dd >= DELTA_PRESSAO.diastolica
+      ? `+${ds} e +${dd}`
+      : ds >= DELTA_PRESSAO.sistolica
+        ? `+${ds} na sistólica`
+        : `+${dd} na diastólica`;
+  return {
+    /* Nunca passa de "atenção". Descreve o que aconteceu; não nomeia doença. */
+    gravidade: "atencao",
+    nota: `${qual} sobre a média dela (${base.sistolica}/${base.diastolica})`,
+  };
+}

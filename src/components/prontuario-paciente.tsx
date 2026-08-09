@@ -21,7 +21,14 @@
  */
 
 import type { SecaoDoProntuario } from "@/lib/abas-da-paciente";
-import { ESTILO_SINAL, sinalGlicemia, sinalPressao, type Gravidade } from "@/lib/sinais-clinicos";
+import {
+  ESTILO_SINAL,
+  baseDePressao,
+  sinalGlicemia,
+  sinalPressao,
+  sinalPressaoComBase,
+  type Gravidade,
+} from "@/lib/sinais-clinicos";
 import {
   mudancasDesde,
   serieDe,
@@ -221,7 +228,22 @@ export function ProntuarioPaciente({
   const ultimaPA = emOrdem.find(
     (e) => e.dados.systolic != null && e.dados.diastolic != null,
   )?.dados;
-  const sinalPA = sinalPressao(ultimaPA?.systolic, ultimaPA?.diastolic);
+  /* ─── A BASE DELA ────────────────────────────────────────────────────────
+     As PRIMEIRAS medidas do acompanhamento, em ordem cronológica. `emOrdem`
+     está do mais recente para o mais antigo (a linha do tempo lê assim), então
+     inverter aqui é obrigatório — com a ordem trocada, a "base" seria a média
+     das medidas MAIS RECENTES e a subida lenta arrastaria a própria referência.
+     É a mesma armadilha que já transformou +4,1 kg em +1,6 kg nesta tela. */
+  const base = baseDePressao(
+    [...emOrdem]
+      .reverse()
+      .filter((e) => e.dados.systolic != null && e.dados.diastolic != null)
+      .map((e) => ({
+        sistolica: Number(e.dados.systolic),
+        diastolica: Number(e.dados.diastolic),
+      })),
+  );
+  const sinalPA = sinalPressaoComBase(ultimaPA?.systolic, ultimaPA?.diastolic, base);
   const sinalG = sinalGlicemia(gli.ultimo);
 
   const pendentes = eventos.filter((e) => e.gravidade !== "normal" && !e.tratado_em);
