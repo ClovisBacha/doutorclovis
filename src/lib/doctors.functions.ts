@@ -394,7 +394,13 @@ export const registerDoctor = createServerFn({ method: "POST" })
     };
 
     let { data: row, error } = await doUpsert(slug, true);
-    if (error && error.code === "42703") {
+    /* `colunaAusente`, e não `42703` cru. O upsert tem `.select()` encadeado,
+       então 42703 PODE vir (do select de retorno) — mas o payload com coluna
+       fora do schema cache volta PGRST204, e esse caso não era coberto. O
+       mesmo defeito estava em `updateMyDoctor`, onde não havia select nenhum e
+       o recuo portanto nunca rodava. */
+    const { colunaAusente } = await import("./postgrest");
+    if (colunaAusente(error)) {
       // Colunas do perfil rico ainda não migradas: salva o básico mesmo assim.
       ({ data: row, error } = await doUpsert(slug, false));
     }
@@ -403,7 +409,7 @@ export const registerDoctor = createServerFn({ method: "POST" })
         `${slug}-${Math.random().toString(36).slice(2, 6)}`,
         true,
       ));
-      if (error && error.code === "42703") {
+      if (colunaAusente(error)) {
         ({ data: row, error } = await doUpsert(
           `${slug}-${Math.random().toString(36).slice(2, 6)}`,
           false,
@@ -510,20 +516,16 @@ export const updateMyDoctor = createServerFn({ method: "POST" })
        inteiro falhava e o médico perdia tudo o que digitou sem entender por
        quê. Se o Postgres reclamar de coluna inexistente (42703), grava o
        básico — o trabalho dele não se perde. */
-    const RICH_UPDATE_KEYS = [
-      "instagram",
-      "rqe",
-      "education",
-      "hospitals",
-      "insurances",
-      "languages",
-      "approach",
-      "consultation_price_brl",
-      "offers_telehealth",
-      "personal_phone",
-      "accepts_insurance",
-      "accepts_private",
-    ] as const;
+    /* ─── A MESMA LISTA DA LEITURA, E NÃO UMA CÓPIA ──────────────────────────
+     *
+     * Esta lista era escrita à mão e já tinha divergido de `RICH_COLS`: faltavam
+     * QUATRO colunas — `consultation_currency`, `consultation_price_cents`,
+     * `focos` e `photo_url`. Num banco sem elas, o recuo removia doze campos,
+     * o UPDATE tentava de novo com os outros quatro, e falhava igual.
+     *
+     * Derivar de `RICH_COLS` é o que impede a próxima coluna nova de nascer só
+     * de um lado — que é como esta chegou aqui. */
+    const RICH_UPDATE_KEYS = RICH_COLS.split(",");
     const doUpdate = (richOk: boolean) => {
       const profile = stripUndefined(data.profile) as Record<string, unknown>;
       if (!richOk) for (const k of RICH_UPDATE_KEYS) delete profile[k];
@@ -533,7 +535,20 @@ export const updateMyDoctor = createServerFn({ method: "POST" })
         .eq("id", user.id);
     };
     let { error } = await doUpdate(true);
-    if (error && error.code === "42703") ({ error } = await doUpdate(false));
+    /* ─── O RECUO NUNCA RODAVA ───────────────────────────────────────────────
+     *
+     * `error.code === "42703"` num caminho de ESCRITA. O `postgrest.ts` desta
+     * base documenta exatamente isto: um UPDATE cujo payload tem coluna fora do
+     * schema cache volta PGRST204, do PostgREST — nunca 42703, que vem do
+     * Postgres num SELECT.
+     *
+     * Ou seja, o escudo existia, tinha um comentário explicando por que era
+     * necessário, e não rodava uma única vez. Num banco sem as colunas do
+     * perfil rico, "Salvar perfil" falhava SEMPRE, e o médico perdia tudo o que
+     * digitou sem entender por quê — o desfecho exato que o comentário ao lado
+     * dizia estar impedindo. */
+    const { colunaAusente } = await import("./postgrest");
+    if (colunaAusente(error)) ({ error } = await doUpdate(false));
     return { ok: !error };
   });
 
