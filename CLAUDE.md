@@ -223,6 +223,45 @@ não sabia dizer quando acontece. **Uma coluna com fuso, não duas de texto:**
 (`z.string().datetime({ offset: true })`). Mandar o valor cru para `timestamptz`
 é o erro de três horas que a teleconsulta já teve aqui.
 
+### Painel do médico: quatro grupos de abas (ago/2026)
+
+Eram quinze abas numa fita rolável de uma linha. Hoje são **quatro grupos**
+(`src/lib/abas-do-painel.ts` — sem JSX, testado; fita em
+`src/components/abas-do-painel.tsx`):
+
+| Grupo            | Telas                                                    |
+| ---------------- | -------------------------------------------------------- |
+| **Painel 📊**    | Painel, Engajamento, Lives                               |
+| **Cérebro 🧠**   | Cérebro, Perguntas                                       |
+| **Pacientes 👩‍🍼** | (uma só — pré-consultas e exames são seções dela)        |
+| **Agenda 📅**    | Agendamentos, Calendário, Teleconsultas, Consultas Pagas |
+
+"Meu Perfil" e "Clínica 🏥" saem da fita e vivem no menu da bolinha
+(`FORA_DA_FITA`).
+
+**O Painel é a aba de entrada** (`ABA_DE_ENTRADA`), e isso inverteu a decisão
+anterior (Cérebro primeiro). O que mudou não foi gosto: a **fila de trabalho**
+saiu do cabeçalho que se repetia em todas as telas e passou a morar dentro do
+Painel — com ela dentro, o Painel deixou de ser "o que aconteceu" e virou "o que
+ainda precisa dele". O Cérebro é o segundo grupo.
+
+Três regras que os testes cobram (`abas-do-painel.test.ts`, `cota-ia.test.ts`):
+
+1. **O contador sobe para o grupo** (`somaDoGrupo`). O emblema de Pacientes soma
+   `novasPacientes + unseenForms` — sem isso o número que faz o médico ir ler
+   uma pré-consulta sumiria da fita, e a fusão passaria a esconder trabalho.
+2. **A fila de trabalho fica FORA** da `div` que o app nativo esconde para
+   mostrar `PainelNoApp`. Lá dentro, ela não existiria no celular.
+3. **Toda aba da fita tem bloco de renderização**, e `onIr` do resumo do celular
+   é tipado como `PanelTab` — apagar uma aba quebra o build em vez de deixar um
+   botão que não faz nada.
+
+Receituário e pedido de exame **não são mais uma aba**: abrem dentro do cartão
+da paciente (`AcoesDaPaciente`), com a paciente já escolhida. A dica do painel de
+exames vem de `exame-sugerido.ts`, que lê a faixa de semanas **do próprio título
+do painel** em vez de duplicá-la; entre as faixas (14–17, 29–31) não há sugestão,
+de propósito.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

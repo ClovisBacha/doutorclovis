@@ -1365,7 +1365,25 @@ function PainelPage() {
                 isso é deliberado: um laudo que volta e um formulário que chega
                 são trabalho que precisa dele HOJE. Escondidos atrás de duzentos
                 cartões, só seriam vistos por quem já soubesse que estão lá. */}
-            <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
+            <div>
+              {/* O TÍTULO precisou nascer aqui. Enquanto era aba, o nome da aba
+                  era o título — virada seção, a lista aparecia sem nada dizendo
+                  o que ela é, logo acima de outra lista. */}
+              <div className="flex items-center gap-2">
+                <h2 className="font-serif text-xl">Pré-consultas</h2>
+                {unseenForms > 0 && (
+                  <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+                    {unseenForms}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                O que elas responderam antes da consulta — pressão, peso, sintomas e dúvidas.
+              </p>
+              <div className="mt-4">
+                <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
+              </div>
+            </div>
             <ExamesRecebidos tokenFn={token} />
           </div>
         )}
