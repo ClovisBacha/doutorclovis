@@ -10686,6 +10686,16 @@ function PacientesSection({
         ]);
         if (reqRes.ok) setRequests(reqRes.requests);
         if (patRes.ok) setPatients(patRes.patients);
+        /* As duas listas compartilham a faixa: as duas vêm da mesma tela e o
+           médico precisa saber que o que ele está vendo pode estar incompleto,
+           venha a falha de qual das duas vier. */
+        setFalhouLista(!reqRes.ok || !patRes.ok);
+      } catch {
+        /* Havia `try/finally` SEM `catch`: `token()` devolve string vazia com a
+           sessão expirada, o validador exige `min(10)`, a chamada é rejeitada —
+           e a rejeição subia sem ninguém tratar. A tela saía do "carregando"
+           por causa do `finally` e ficava vazia, calada, para sempre. */
+        setFalhouLista(true);
       } finally {
         setLoading(false);
       }

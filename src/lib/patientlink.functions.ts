@@ -306,13 +306,24 @@ export const listPatientRequests = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, requests: [] as PatientRequest[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: rows } = await (supabaseAdmin as any)
+    const { data: rows, error } = await (supabaseAdmin as any)
       .from("patient_link_requests")
       .select("id,patient_id,message,created_at")
       .eq("doctor_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(100);
+    /* ─── UMA SOLICITAÇÃO QUE SOME É UMA PACIENTE QUE DESISTE ────────────────
+     *
+     * O `error` era descartado, então tabela ausente, RLS ou timeout viravam
+     * "nenhuma solicitação pendente". Do outro lado há uma gestante que pediu
+     * para ser acompanhada e está esperando o aceite — ela não tem como saber
+     * que o pedido nunca apareceu para ninguém, e depois de alguns dias procura
+     * outro obstetra.
+     *
+     * É o único item desta fila em que o custo do silêncio é um paciente
+     * perdido, não um número errado. */
+    if (error) return { ok: false as const, requests: [] as PatientRequest[] };
 
     const reqs = (rows ?? []) as Omit<PatientRequest, "patient_name">[];
     // Nomes das pacientes numa segunda query (sem FK para embed do PostgREST).

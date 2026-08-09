@@ -137,3 +137,42 @@ describe("3. a lista de pacientes não afirma consultório vazio", () => {
     expect(bloco).not.toContain("setPatients([])");
   });
 });
+
+describe("4. uma solicitação de vínculo que some é uma paciente perdida", () => {
+  const link = semComentarios("src/lib/patientlink.functions.ts");
+
+  test("a leitura das solicitações olha o `error`", () => {
+    /**
+     * É o único item desta fila em que o custo do silêncio é uma PESSOA, não um
+     * número errado: do outro lado há uma gestante que pediu para ser
+     * acompanhada e está esperando o aceite. Ela não tem como saber que o
+     * pedido nunca apareceu para ninguém — e depois de alguns dias procura
+     * outro obstetra.
+     */
+    const i = link.indexOf("export const listPatientRequests");
+    const corpo = link.slice(i, i + 1600);
+    expect(corpo).toContain("const { data: rows, error }");
+    expect(corpo).toContain("if (error) return { ok: false as const, requests:");
+  });
+
+  test("o carregamento da tela tem `catch`, não só `finally`", () => {
+    /**
+     * Era `try/finally` SEM `catch`. `token()` devolve string vazia com a sessão
+     * expirada, o validador exige `min(10)`, a chamada é rejeitada — e a
+     * rejeição subia sem ninguém tratar. A tela saía do "carregando" por causa
+     * do `finally` e ficava vazia, calada, para sempre.
+     */
+    /* Ancorado no `Promise.all` das duas listas: `listPatientRequests(...)`
+       aparece antes, noutro carregador (`loadPedidosVinculo`, que já tratava
+       certo), e cortar da primeira ocorrência media o bloco errado. */
+    const i = painel.indexOf("const [reqRes, patRes] = await Promise.all(");
+    expect(i).toBeGreaterThan(-1);
+    const bloco = painel.slice(i, i + 900);
+    expect(bloco).toContain("} catch {");
+    expect(bloco).toContain("setFalhouLista(true)");
+  });
+
+  test("e a faixa acende se QUALQUER uma das duas listas falhar", () => {
+    expect(painel).toContain("setFalhouLista(!reqRes.ok || !patRes.ok)");
+  });
+});
