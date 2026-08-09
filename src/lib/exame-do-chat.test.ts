@@ -35,7 +35,16 @@ describe("o anexo vai para o médico", () => {
     /* Reusar `exam_files` é o que dá de graça o visualizador, a devolutiva e o
        registro de desfecho — tudo já construído e funcionando. */
     expect(fn).toContain('.from("exam_files").insert(');
-    expect(fn).toContain("image_data: data.imagem");
+    /**
+     * A imagem continua chegando — mudou ONDE ela fica.
+     *
+     * Era `image_data: data.imagem` (base64 dentro da linha). Agora o laudo vai
+     * para o Storage e a linha guarda o caminho; o base64 só entra quando o
+     * Storage não responde, que é o recuo que impede uma migração de
+     * armazenamento de perder o exame da paciente.
+     */
+    expect(fn).toContain("image_data: caminho ? null : data.imagem");
+    expect(fn).toContain("image_path: caminho");
   });
 
   test("o chat NÃO manda mais a imagem para a IA", () => {

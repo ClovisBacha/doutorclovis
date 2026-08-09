@@ -8,7 +8,16 @@ export type AlbumPost = {
   patient_user_id: string;
   author_name: string;
   caption: string | null;
-  image_data: string | null;
+  /**
+   * O que a tag `<img>` deve usar — URL assinada quando a foto está no
+   * Storage, a data URL antiga enquanto a linha não migrou.
+   *
+   * Chamava-se `image_data` e carregava base64 cru. O nome mudou de propósito
+   * em vez de o campo passar a carregar uma URL calado: assim o compilador
+   * aponta cada tela que lê isto, e nenhuma fica servindo a coluna velha
+   * depois que a linha migrou.
+   */
+  image_url: string | null;
   emoji: string | null;
   created_at: string;
 };
@@ -38,15 +47,52 @@ export const createAlbumPost = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
-    const { error } = await supabaseAdmin.from("family_album_posts").insert({
-      patient_user_id: u.user.id,
-      author_name: data.authorName,
-      caption: data.caption,
-      image_data: data.imageData,
-      emoji: data.emoji,
-    });
+    const { error } = await supabaseAdmin
+      .from("family_album_posts")
+      .insert(await linhaComImagem(u.user.id, data));
     return { ok: !error, error: error?.message };
   });
+
+/**
+ * A parte da linha que carrega a foto — no Storage quando dá, em base64 quando
+ * não dá.
+ *
+ * As duas inserções do álbum (a dela e a do acompanhante com link) precisam da
+ * MESMA decisão. Escrevê-la duas vezes é como as duas telas do álbum acabaram
+ * com `select("*")` numa e colunas nomeadas na outra: a correção foi feita num
+ * lado só e o uuid dela continuou vazando pelo outro por meses.
+ *
+ * O `null` de `guardarImagem` não é erro a tratar: é a instrução para gravar
+ * como sempre se gravou. Se o balde ainda não existe em produção — e o banco
+ * de lá está atrás do repositório há meses —, a foto entra em base64 e ninguém
+ * percebe. Quando o balde aparece, a economia começa sozinha, sem novo deploy.
+ */
+async function linhaComImagem(
+  donoId: string,
+  data: {
+    authorName: string;
+    caption: string | null;
+    imageData: string | null;
+    emoji: string | null;
+  },
+) {
+  const { guardarImagem, BALDE_ALBUM } = await import("@/lib/imagens.server");
+  const caminho = await guardarImagem({
+    balde: BALDE_ALBUM,
+    donoId,
+    dataUrl: data.imageData,
+  });
+  return {
+    patient_user_id: donoId,
+    author_name: data.authorName,
+    caption: data.caption,
+    /* Uma coisa OU outra, nunca as duas: gravar o base64 junto do caminho
+       manteria exatamente o peso que esta mudança existe para tirar. */
+    image_data: caminho ? null : data.imageData,
+    image_path: caminho,
+    emoji: data.emoji,
+  };
+}
 
 export const getAlbumByToken = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ token: z.string() }).parse(i))
@@ -72,14 +118,33 @@ export const getAlbumByToken = createServerFn({ method: "POST" })
        tinha sido propagada para o irmão. */
     const { data: posts } = await supabaseAdmin
       .from("family_album_posts")
-      .select("id, created_at, author_name, caption, image_data, emoji")
+      .select("id, created_at, author_name, caption, image_data, image_path, emoji")
       .eq("patient_user_id", invite.user_id)
       .order("created_at", { ascending: false });
     return {
       ok: true as const,
-      posts: (posts ?? []) as AlbumPostPublico[],
+      posts: (await comUrlDeImagem(posts ?? [])) as AlbumPostPublico[],
     };
   });
+
+/**
+ * Troca (image_path, image_data) por uma `image_url` só, para a tela.
+ *
+ * As assinaturas saem em paralelo. Em série, um álbum de trinta fotos faria
+ * trinta idas ao Storage uma depois da outra — o tipo de espera que aparece
+ * como "o álbum demora a abrir" e ninguém liga à causa.
+ */
+async function comUrlDeImagem<T extends { image_data?: string | null; image_path?: string | null }>(
+  linhas: T[],
+): Promise<Array<Omit<T, "image_data" | "image_path"> & { image_url: string | null }>> {
+  const { imagemDaLinha, BALDE_ALBUM } = await import("@/lib/imagens.server");
+  return Promise.all(
+    linhas.map(async (l) => {
+      const { image_data: _d, image_path: _p, ...resto } = l;
+      return { ...resto, image_url: await imagemDaLinha(BALDE_ALBUM, l) };
+    }),
+  );
+}
 
 export const addAlbumPostPublic = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -105,13 +170,12 @@ export const addAlbumPostPublic = createServerFn({ method: "POST" })
     if (!invite) return { ok: false as const, error: "Token inválido." };
     if (invite.expires_at && new Date(invite.expires_at) < new Date())
       return { ok: false as const, error: "Convite expirado." };
-    const { error } = await supabaseAdmin.from("family_album_posts").insert({
-      patient_user_id: invite.user_id,
-      author_name: data.authorName,
-      caption: data.caption,
-      image_data: data.imageData,
-      emoji: data.emoji,
-    });
+    /* A pasta é a DELA, não de quem postou: o acompanhante não tem conta, e o
+       arquivo pertence ao álbum dela — inclusive para a hora de apagar tudo a
+       pedido dela, que a LGPD exige que seja possível. */
+    const { error } = await supabaseAdmin
+      .from("family_album_posts")
+      .insert(await linhaComImagem(String(invite.user_id), data));
     return { ok: !error, error: error?.message };
   });
 
@@ -123,11 +187,25 @@ export const deleteAlbumPost = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const };
+    /* O caminho ANTES do delete — depois a linha não existe mais e o arquivo
+       ficaria no balde para sempre, pago e invisível. `.eq(patient_user_id)`
+       nas duas consultas: sem isso, um id de outra pessoa devolveria o caminho
+       da foto dela e o arquivo seria apagado por quem não podia. */
+    const { data: linha } = await supabaseAdmin
+      .from("family_album_posts")
+      .select("image_path")
+      .eq("id", data.id)
+      .eq("patient_user_id", u.user.id)
+      .maybeSingle();
     const { error } = await supabaseAdmin
       .from("family_album_posts")
       .delete()
       .eq("id", data.id)
       .eq("patient_user_id", u.user.id);
+    if (!error && linha?.image_path) {
+      const { apagarImagem, BALDE_ALBUM } = await import("@/lib/imagens.server");
+      await apagarImagem(BALDE_ALBUM, linha.image_path as string);
+    }
     return { ok: !error };
   });
 
@@ -142,7 +220,7 @@ export const getMyAlbumPosts = createServerFn({ method: "POST" })
       .select("*")
       .eq("patient_user_id", u.user.id)
       .order("created_at", { ascending: false });
-    return { ok: true as const, posts: (posts ?? []) as AlbumPost[] };
+    return { ok: true as const, posts: (await comUrlDeImagem(posts ?? [])) as AlbumPost[] };
   });
 
 // ─── Baby Name Voting ─────────────────────────────────────────────────────────

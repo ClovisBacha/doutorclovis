@@ -1147,7 +1147,7 @@ export const imagemDoExame = createServerFn({ method: "POST" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: row, error } = await (supabaseAdmin as any)
         .from("exam_files")
-        .select("user_id,image_data")
+        .select("user_id,image_data,image_path")
         .eq("id", data.exameId)
         .maybeSingle();
       if (error) return { ok: false as const, imagem: null, motivo: "falha" as const };
@@ -1163,7 +1163,12 @@ export const imagemDoExame = createServerFn({ method: "POST" })
         return { ok: false as const, imagem: null, motivo: "nao_encontrado" as const };
       }
       await trilha(user, "exame.imagem", String(row.user_id));
-      const img = (row.image_data as string) ?? null;
+      /* A URL assinada é gerada DEPOIS da checagem de vínculo e da trilha, e
+         só para quem passou. Assinar antes criaria um link válido por uma hora
+         para um laudo que o médico não tinha direito de ver — e o link
+         sobrevive ao "não" que a função devolve. */
+      const { imagemDaLinha, BALDE_EXAMES } = await import("@/lib/imagens.server");
+      const img = await imagemDaLinha(BALDE_EXAMES, row);
       return {
         ok: true as const,
         imagem: img,

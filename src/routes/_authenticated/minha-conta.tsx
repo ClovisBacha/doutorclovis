@@ -13664,9 +13664,9 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
                 key={post.id}
                 className="group relative rounded-2xl border border-border bg-card overflow-hidden"
               >
-                {post.image_data && (
+                {post.image_url && (
                   <img
-                    src={post.image_data}
+                    src={post.image_url}
                     alt={post.caption ?? "Foto do álbum"}
                     className="w-full object-cover"
                     style={{ maxHeight: 220 }}

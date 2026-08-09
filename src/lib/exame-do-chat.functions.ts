@@ -107,6 +107,15 @@ export const enviarExameDoChat = createServerFn({ method: "POST" })
       const doctorId = (prof?.doctor_id as string | null) ?? null;
       const nomeDela = ((prof?.display_name as string | null) ?? "").trim() || "Uma paciente";
 
+      /* O laudo vai para o Storage; `null` devolvido significa que o balde não
+         respondeu, e aí grava base64 como sempre gravou. O exame da paciente
+         nunca pode se perder por causa de uma migração de armazenamento. */
+      const { guardarImagem, BALDE_EXAMES } = await import("@/lib/imagens.server");
+      const caminho = await guardarImagem({
+        balde: BALDE_EXAMES,
+        donoId: u.user.id,
+        dataUrl: data.imagem,
+      });
       const { error } = await sb.from("exam_files").insert({
         user_id: u.user.id,
         /* Nome com a data porque é o que a lista do médico mostra, e "Exame"
@@ -114,7 +123,10 @@ export const enviarExameDoChat = createServerFn({ method: "POST" })
         name: `Enviado no chat — ${ymdBrasilia()}`,
         category: "outros",
         notes: data.nota?.slice(0, 500) || null,
-        image_data: data.imagem,
+        /* Uma coisa OU outra — gravar as duas manteria o peso que a mudança
+           existe para tirar. */
+        image_data: caminho ? null : data.imagem,
+        image_path: caminho,
       });
       /* Erro aqui é o único que a paciente PRECISA ver: se o exame não foi
          gravado, ela tem que saber para mandar de novo. Todo o resto desta
