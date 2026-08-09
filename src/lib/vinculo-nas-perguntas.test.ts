@@ -88,3 +88,45 @@ describe("o contador não pode teimar num resto inalcançável", () => {
     expect(blocoContagem.slice(0, 260)).not.toContain("head: true");
   });
 });
+
+describe("as AÇÕES de teleconsulta autorizam pelo vínculo, não só pelo carimbo", () => {
+  /**
+   * ─── A ASSIMETRIA, QUE É O QUE TORNAVA ISTO PIOR ──────────────────────────
+   *
+   * A LISTA já tinha sido corrigida para o vínculo atual. As AÇÕES não. Então a
+   * sessão da ex-paciente sumia da tela do médico anterior — e ele continuava
+   * podendo abrir a sala dela e gravar nota clínica nela, bastando o id, que
+   * ele teve na mão enquanto ela era paciente.
+   *
+   * Autorização assimétrica em relação à leitura é a pior forma disto: some da
+   * tela, e por isso ninguém percebe que continua permitido.
+   */
+  const tele = readFileSync("src/lib/teleconsulta.functions.ts", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  const owns = tele.slice(
+    tele.indexOf("async function ownsTele"),
+    tele.indexOf("export type TeleconsultaSession"),
+  );
+
+  test("o carimbo continua sendo exigido", () => {
+    expect(owns).toContain("data.doctor_id !== scope.doctorId");
+  });
+
+  test("e o vínculo de HOJE também", () => {
+    expect(owns).toContain("vinculadasAgora(sb,");
+    expect(owns).toContain("atuais.has(String(data.patient_user_id))");
+  });
+
+  test("equipe passa; assinante sem médico resolvido NÃO", () => {
+    /* `vinculadasAgora` devolve conjunto VAZIO (não `null`) quando não há
+       médico — falha fechando, que é o que se quer numa autorização. */
+    expect(owns).toContain("if (scope.isTeam) return true;");
+    expect(owns).toContain("if (atuais === null) return true;");
+  });
+
+  test("as duas ações passam por ele", () => {
+    expect((tele.match(/await ownsTele\(/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+});

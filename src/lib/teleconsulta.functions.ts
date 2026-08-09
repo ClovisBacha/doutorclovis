@@ -39,15 +39,39 @@ function scopedBy(qb: any, scope: TeleScope) {
   return scope.isTeam ? qb : qb.eq("doctor_id", scope.doctorId);
 }
 
-/** Fail-closed: a linha `id` pertence ao chamador? Equipe sempre; assinante só se doctor_id bate. */
+/**
+ * Fail-closed: a linha `id` é dele HOJE?
+ *
+ * ─── POR QUE NÃO BASTA O CARIMBO ────────────────────────────────────────────
+ *
+ * `teleconsulta_sessions.doctor_id` é gravado quando a sessão é criada.
+ * `encerrarAcompanhamento` zera `patient_profiles.doctor_id` e não toca em
+ * carimbo nenhum — é uma tabela só.
+ *
+ * A LISTA já tinha sido corrigida para o vínculo atual, e é isso que tornava
+ * esta função pior do que parecia: a sessão da ex-paciente sumia da tela do
+ * médico anterior, mas as AÇÕES continuavam autorizando por id. Ele não vê mais
+ * a linha, e ainda assim pode abrir a sala dela e gravar nota clínica nela — só
+ * precisa do id, que ele já teve na mão enquanto ela era paciente.
+ *
+ * Autorização assimétrica em relação à leitura é a pior forma disto: some da
+ * tela, e por isso ninguém percebe que continua permitido.
+ */
 async function ownsTele(sb: any, id: string, scope: TeleScope): Promise<boolean> {
   if (scope.isTeam) return true;
   const { data } = await sb
     .from("teleconsulta_sessions")
-    .select("doctor_id")
+    .select("doctor_id,patient_user_id")
     .eq("id", id)
     .maybeSingle();
-  return !!data && data.doctor_id === scope.doctorId;
+  if (!data || data.doctor_id !== scope.doctorId) return false;
+  /* O carimbo bate. Falta a pergunta que a lista já faz: ela ainda é paciente
+     dele? `vinculadasAgora` devolve conjunto VAZIO quando não há médico
+     resolvido — falha fechando, que é o que se quer numa autorização. */
+  const { vinculadasAgora } = await import("./vinculo.server");
+  const atuais = await vinculadasAgora(sb, { isTeam: false, doctorId: scope.doctorId });
+  if (atuais === null) return true;
+  return atuais.has(String(data.patient_user_id));
 }
 
 export type TeleconsultaSession = {
