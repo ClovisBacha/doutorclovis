@@ -56,7 +56,7 @@ A paciente encerra o acompanhamento e passa para outro médico (patient_profiles
 
 ### 🟠 QUEBRA
 
-**Calendário e Fila dependem de colunas/tabela que podem não existir em produção**  
+**✅ Calendário e Fila dependem de colunas/tabela que podem não existir em produção**  
 `/home/user/doutorclovis/src/routes/_authenticated/painel.tsx:4770`  
 O médico abre a aba Calendário e vê a grade da semana toda vazia mais "Nenhuma consulta confirmada com data definida", tendo dez consultas confirmadas. Abre Agendamentos e a Fila de espera diz "Ninguém na fila de espera no momento". Nada de erro aparece. Causa: confirmed_date/confirmed_time/price_brl/payment_status/internal_notes nascem em supabase/migrations/20260610010000_doctor_scheduling.sql, proposed_date/proposed_time em 20260723010000 e a tabela appointment_waitlist inteira em 20260723020000 — todas posteriores a 20260608120000, a fronteira do que o CLAUDE.md declara pendente em produção. Como o painel lê com select("*"), coluna ausente não dá erro: vira undefined, o filtro descarta tudo e a tela mente. Só o botão Confirmar falha em voz alta (PGRST204 no toast).
 
@@ -96,7 +96,7 @@ O commit HEAD anterior ("Imagens saem do Postgres e vão para o Storage") passou
 `src/routes/_authenticated/minha-conta.tsx:19151`  
 A paciente abre Minha Conta -> Exames e clica no botão 'Abrir' de qualquer exame. `abrirExame` faz `setPreview(exam)` SÍNCRONO e só depois vai buscar a imagem. Mas `exam` veio de `load()`, cujo select foi propositalmente enxugado e NÃO traz image_data — então `exam.image_data` é `undefined`. O React renderiza o lightbox nesse estado e executa `preview.image_data!.startsWith("data:application/pdf")` sobre undefined: TypeError em tempo de render, que sobe para o error boundary do __root e mata a tela. Acontece em 100% dos cliques. E mesmo depois de aplicado o Storage o bug persiste por outro caminho: o exame vindo do chat grava image_data NULL e image_path preenchido, e `abrirExame` só busca `select("image_data")` — nunca image_path —, então o fetch traz null e o crash continua.
 
-**assessSymptoms chama o Gemini sem token de sessão, sem limite de taxa e sem nenhum gate de plano**  
+**✅ assessSymptoms chama o Gemini sem token de sessão, sem limite de taxa e sem nenhum gate de plano**  
 `src/lib/triage.functions.ts:18`  
 O inputValidator de `assessSymptoms` não pede accessToken — só sintomas, pressão, nota e semanas. O handler não chama `supabaseAdmin.auth.getUser`, não consulta entitlements e não passa por `makeRateLimiter` (que este repo já tem e usa em exame-do-chat.functions.ts:53). Server functions do TanStack Start são endpoints HTTP POST públicos; o `attachSupabaseAuth` em src/start.ts é middleware de CLIENTE (só põe o header) e nada no servidor o confere. Qualquer pessoa com a URL do serverFn dispara `generateText` com o Gemini em laço, sem login. Pior para a fatura: o uso é registrado com `doctorId: null, patientId: null, canal: "triagem"`, e 'triagem' está fora de CANAIS_DA_COTA — o custo cai como despesa não atribuída da plataforma, sem cota que trave e sem médico que pague.
 
@@ -108,7 +108,7 @@ O médico abre a aba Teleconsultas: a lista vem vazia ("Nenhuma teleconsulta cad
 `supabase/migrations/20260719030000_lives_consultas_doctor.sql:9`  
 Quem reconstruir o banco pelas migrations (supabase db push) para em 20260719030000: 'ALTER TABLE public.lives' aborta com 42P01 porque nenhuma migration cria essa tabela. E o mesmo arquivo, três linhas abaixo, é o ÚNICO lugar das migrations que adiciona private_consultations.doctor_id — o recorte da aba Consultas Pagas. Ou seja: uma tabela que não existe mata a coluna de outra aba. O médico fica com Lives mostrando o aviso amarelo (esse caminho está tratado) e Consultas Pagas mostrando lista vazia sem aviso nenhum.
 
-**O horário da teleconsulta é gravado 3 horas errado — a paciente recebe convite para a hora errada**  
+**✅ O horário da teleconsulta é gravado 3 horas errado — a paciente recebe convite para a hora errada**  
 `src/routes/_authenticated/painel.tsx:3690`  
 O médico marca a teleconsulta para 20:00 no campo datetime-local. O painel manda a string crua '2026-08-10T20:00' (sem fuso) e o servidor a insere direto na coluna scheduled_for timestamptz; o Postgres da Supabase lê como UTC. O cartão volta na tela mostrando 17:00 — e o convite do Google Agenda é criado às 17:00, com o e-mail do Google avisando a paciente desse horário. A LivesSection, no MESMO arquivo, faz a conversão certa (new Date(when).toISOString(), linha 10347); a de teleconsulta não. Esta base já registrou dois defeitos exatamente desta família em src/lib/fuso.test.ts (o cartão do batimento e a fila de espera) e criou instanteBrasilia/ymdBrasilia para isso — a teleconsulta ficou de fora.
 
