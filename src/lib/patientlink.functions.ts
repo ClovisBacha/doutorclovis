@@ -562,6 +562,20 @@ export const listMyPatients = createServerFn({ method: "POST" })
       "id,display_name,due_date,created_at",
     ];
     let rows: any[] | null = null;
+    /**
+     * SE A CASCATA TERMINOU SEM LER NADA, ISSO NÃO É "ele não tem paciente".
+     *
+     * O laço sai por três portas: achou (rows preenchido), erro real (break), ou
+     * esgotou os selects. Nas duas últimas `rows` fica `null`, e o `(rows ?? [])`
+     * logo abaixo transformava isso em lista vazia com `ok: true` — o médico
+     * abria a aba Pacientes e lia que não tem nenhuma.
+     *
+     * Em produção esse caminho não é hipotético: a última tentativa da cascata
+     * ainda cita `doctor_id` no filtro, e se ESSA coluna faltar todas as seis
+     * falham com 42703 em sequência. A tela então afirma, com todas as letras,
+     * que o consultório está vazio.
+     */
+    let leu = false;
     for (const sel of selects) {
       const res = await (supabaseAdmin as any)
         .from("patient_profiles")
@@ -571,10 +585,12 @@ export const listMyPatients = createServerFn({ method: "POST" })
         .limit(500);
       if (!res.error) {
         rows = res.data;
+        leu = true;
         break;
       }
       if (res.error.code !== "42703") break; // erro real, não coluna ausente
     }
+    if (!leu) return { ok: false as const, patients: [] as LinkedPatient[] };
 
     // Semana gestacional por paciente (mesma função pura do app).
     const { computeGestation } = await import("./gestacao");

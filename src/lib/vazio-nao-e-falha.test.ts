@@ -98,3 +98,42 @@ describe("2. a fila de espera não afirma vazio quando não leu", () => {
     expect(painel).toContain("não</strong> quer dizer que ela");
   });
 });
+
+describe("3. a lista de pacientes não afirma consultório vazio", () => {
+  const link = semComentarios("src/lib/patientlink.functions.ts");
+
+  test("a cascata de selects diz se chegou a LER", () => {
+    /**
+     * O laço sai por três portas: achou, erro real (break), ou esgotou os
+     * selects. Nas duas últimas `rows` ficava `null` e o `(rows ?? [])`
+     * transformava isso em lista vazia com `ok: true`.
+     *
+     * Em produção não é hipotético: a última tentativa da cascata ainda cita
+     * `doctor_id` no filtro, e se ESSA coluna faltar as seis falham em
+     * sequência com 42703 — a tela então afirma que o consultório está vazio.
+     */
+    const i = link.indexOf("export const listMyPatients");
+    const corpo = link.slice(i, i + 2600);
+    expect(corpo).toContain("let leu = false;");
+    expect(corpo).toContain("leu = true;");
+    expect(corpo).toContain("if (!leu) return { ok: false as const");
+  });
+
+  test("a tela avisa em vez de convidar a adicionar a primeira paciente", () => {
+    /* O vazio antigo trazia um botão "+ Adicionar paciente". Para um médico com
+       duzentas, isso não parece erro: parece que o produto perdeu tudo. */
+    expect(painel).toContain("{patients.length === 0 && !falhouLista ? (");
+    expect(painel).toContain("Não consegui carregar a sua lista de pacientes agora");
+  });
+
+  test("e a falha NÃO apaga a lista que já estava na tela", () => {
+    /**
+     * `setPatients([])` no ramo de erro seria a mesma mentira, só que
+     * destruindo dado bom que já tinha sido lido com sucesso.
+     */
+    const i = painel.indexOf("async function loadPatients");
+    const bloco = painel.slice(i, i + 500);
+    expect(bloco).toContain("setFalhouLista(true)");
+    expect(bloco).not.toContain("setPatients([])");
+  });
+});

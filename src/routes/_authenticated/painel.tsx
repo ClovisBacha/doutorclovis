@@ -10581,10 +10581,21 @@ function PacientesSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abrirPacienteId, patients]);
 
+  /* "Não consegui ler" não pode ter a cara de "você não tem paciente". */
+  const [falhouLista, setFalhouLista] = useState(false);
+
   async function loadPatients() {
     const tk = await tokenFn();
     const res = await listMyPatients({ data: { accessToken: tk } });
-    if (res.ok) setPatients(res.patients);
+    if (res.ok) {
+      setPatients(res.patients);
+      setFalhouLista(false);
+    } else {
+      /* NÃO chama `setPatients([])`: apagar a lista que já está na tela por
+         causa de uma leitura que falhou é a mesma mentira, só que destruindo
+         dado bom. Mantém o que havia e avisa. */
+      setFalhouLista(true);
+    }
   }
 
   // Ativa/desativa o premium do quiz (após o PIX, o médico libera aqui)
@@ -10802,7 +10813,20 @@ function PacientesSection({
           </span>
         </div>
 
-        {patients.length === 0 ? (
+        {/* ─── LEITURA QUE FALHOU NÃO É CONSULTÓRIO VAZIO ────────────────────
+            A cascata de selects de `listMyPatients` saía com `rows = null` num
+            erro real e a tela dizia "Você ainda não tem pacientes vinculadas" —
+            com um botão convidando a adicionar a primeira. Para um médico com
+            duzentas, isso não parece um erro: parece que o produto perdeu tudo. */}
+        {falhouLista && (
+          <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+            📡 Não consegui carregar a sua lista de pacientes agora. Isto <strong>não</strong> quer
+            dizer que ela está vazia — atualize a página antes de concluir qualquer coisa a partir
+            desta tela.
+          </p>
+        )}
+
+        {patients.length === 0 && !falhouLista ? (
           <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
             <p className="text-3xl">👩‍🍼</p>
             <p className="mt-2 text-sm text-muted-foreground">
