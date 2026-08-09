@@ -399,6 +399,23 @@ sempre a MAIOR entre absoluta e delta — o delta nunca rebaixa um 165/105.
 **Folha para levar** (`folha-da-paciente.tsx`): impressão do navegador, sem
 biblioteca de PDF. Carimba data, hora e a origem dos números.
 
+**Modo consulta** (`modo-consulta.tsx` + régua em `src/lib/modo-consulta.ts`):
+tela cheia para os quinze minutos com a paciente na frente — idade gestacional
+em DIAS no corpo grande, alergias/medicações/risco/sangue, o que mudou desde a
+última consulta, e o formulário. Sem gráfico, sem linha do tempo, sem IA.
+
+- **Alergia e medicação aparecem SEMPRE**, mesmo vazias: espaço em branco onde
+  deveria estar "alergias" é lido como "não tem alergia".
+- **"Nada relatado" ≠ "desconhecido".** Com `ficha.degradada` (ou ficha nula) o
+  valor é DESCONHECIDO, em âmbar e com ⚠️ — a diferença entre os dois é uma
+  prescrição.
+- **`idadeGestacional` mora aqui**, e não mais duplicada no prontuário: uma
+  régua que arredonda num dos dois lugares faz a mesma paciente aparecer como
+  36s numa tela e 36s6d noutra.
+- O formulário é o MESMO `RegistrarConsulta`, e o "o que mudou" é o MESMO texto
+  que entra no campo de achados — duas versões divergiriam, e ele leria uma e
+  assinaria a outra.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

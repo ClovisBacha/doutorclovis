@@ -55,6 +55,7 @@ import { exameSugerido } from "@/lib/exame-sugerido";
 import { filtrarPacientes } from "@/lib/busca-paciente";
 import { quemEstaQuieta, textoDaQuietude } from "@/lib/silencio";
 import { FolhaDaPaciente } from "@/components/folha-da-paciente";
+import { ModoConsulta } from "@/components/modo-consulta";
 import {
   ABAS_DA_PACIENTE,
   ABA_INICIAL_DA_PACIENTE,
@@ -11466,6 +11467,8 @@ function PatientDetailModal({
   /* A folha para levar — encaminhamento, segunda opinião, internação de
      madrugada. Nesses momentos o sistema não está com ele: está o papel. */
   const [folhaAberta, setFolhaAberta] = useState(false);
+  /* Modo consulta: a tela dos quinze minutos com ela na frente. */
+  const [emConsulta, setEmConsulta] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -11616,6 +11619,13 @@ function PatientDetailModal({
             className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
           >
             📄 Folha para levar
+          </button>
+          {/* Em destaque: é a ação do momento em que ele mais usa esta tela. */}
+          <button
+            onClick={() => setEmConsulta(true)}
+            className="press rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground"
+          >
+            🩺 Modo consulta
           </button>
         </div>
 
@@ -11941,6 +11951,42 @@ function PatientDetailModal({
           é uma PÁGINA, e o `print:` dela precisa de um contêiner que não seja
           filho de um `overflow-y-auto` — senão o navegador imprime só a parte
           visível. */}
+      {/* ─── MODO CONSULTA ────────────────────────────────────────────────
+          Fora da rolagem do cartão: é uma TELA, não uma seção. O formulário é
+          o MESMO `RegistrarConsulta` — um segundo formulário de consulta seria
+          o segundo lugar onde a validação e o rascunho divergem. */}
+      {emConsulta && (
+        <ModoConsulta
+          nome={p.display_name ?? "Paciente"}
+          ficha={fichaClin}
+          eventos={prontuario}
+          consultas={consultasDela}
+          onFechar={() => setEmConsulta(false)}
+          formulario={
+            <RegistrarConsulta
+              pacienteId={p.id}
+              tokenFn={tokenFn}
+              eventos={prontuario}
+              desdeAConsulta={consultasDela[0]?.occurred_at ?? null}
+              onSalvou={async () => {
+                try {
+                  const cs = await consultasDaPaciente({
+                    data: { accessToken: await tokenFn(), pacienteId: p.id },
+                  });
+                  if (cs.ok) setConsultasDela(cs.consultas);
+                } catch {
+                  /* o registro já foi salvo; a lista atualiza no próximo abrir */
+                }
+                /* Sai do modo consulta ao salvar: a consulta acabou, e deixar a
+                   tela aberta faria o próximo registro nascer em cima do
+                   rascunho desta. */
+                setEmConsulta(false);
+              }}
+            />
+          }
+        />
+      )}
+
       {folhaAberta && (
         <FolhaDaPaciente
           nome={p.display_name ?? "Paciente"}

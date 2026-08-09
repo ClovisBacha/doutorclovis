@@ -21,6 +21,7 @@
  */
 
 import type { SecaoDoProntuario } from "@/lib/abas-da-paciente";
+import { idadeGestacional } from "@/lib/modo-consulta";
 import {
   ESTILO_SINAL,
   baseDePressao,
@@ -41,10 +42,9 @@ import { formataTelefone, linkTel } from "@/lib/telefone";
 import { quando } from "@/lib/quando";
 import { GraficoClinico, daSerie, seriesDePressao } from "./grafico-clinico";
 
-function idadeGestacional(dias: number | null): string {
-  if (dias == null || dias < 0) return "—";
-  return `${Math.floor(dias / 7)}s${dias % 7}d`;
-}
+/* `idadeGestacional` mora em `modo-consulta.ts`. Estava duplicada aqui, e uma
+   régua que arredonda em UM dos dois lugares faz a mesma paciente aparecer como
+   36s numa tela e 36s6d noutra — e em obstetrícia os dias decidem conduta. */
 
 const ROTULO_ESPECIE: Record<string, string> = {
   medida: "Medida",
