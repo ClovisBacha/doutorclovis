@@ -452,3 +452,56 @@ describe("9. excluir a conta apaga os ARQUIVOS, não só as linhas", () => {
     expect(corpo).toContain("if (arquivos.length < 100) return;");
   });
 });
+
+describe("10. o script de migração não gira, não exclui e respeita o recorte", () => {
+  /**
+   * Três defeitos achados por revisão adversarial, todos no comando que o DONO
+   * vai rodar à mão contra o banco de produção.
+   */
+  const script = readFileSync("scripts/migrar-imagens.mjs", "utf8");
+
+  test("`subir` para quando uma página não traz nada NOVO", () => {
+    /**
+     * O laço relê sempre o mesmo filtro. Uma linha não atualizada volta na
+     * página seguinte — e com falha sistêmica (balde ainda não criado, que é
+     * justamente o cenário que o desenho de recuo existe para cobrir) o script
+     * girava para sempre nas mesmas 25 linhas, imprimindo erro sem avançar.
+     */
+    const i = script.indexOf("async function subir");
+    const corpo = script.slice(i, script.indexOf("async function limpar"));
+    expect(corpo).toContain("const tentados = new Set();");
+    expect(corpo).toContain("const novas = linhas.filter((l) => !tentados.has(l.id));");
+    expect(corpo).toContain("if (novas.length === 0) break;");
+  });
+
+  test("e NÃO marca a linha que não soube converter", () => {
+    /**
+     * A versão anterior gravava `image_path: ""` para tirar a linha do filtro —
+     * o que a excluía da migração para SEMPRE. O caso mais comum é o laudo em
+     * PDF: aceito de propósito pelo produto, entregue assim por todo
+     * laboratório, e o arquivo mais pesado da tabela (~4 MB). Ou seja,
+     * justamente o alvo principal da economia de disco era o que ficava de
+     * fora, permanentemente.
+     */
+    /* Sem comentários: a explicação do conserto CITA `image_path: ""` para
+       dizer o que era feito antes, e a asserção casava com o próprio texto. */
+    const semCom = script.replace(/\/\*[\s\S]*?\*\//g, "");
+    const i = semCom.indexOf("async function subir");
+    const corpo = semCom.slice(i, semCom.indexOf("async function limpar"));
+    expect(corpo).not.toContain('image_path: ""');
+    expect(corpo).toContain("pulados++");
+  });
+
+  test("`limpar` respeita `--tabela`", () => {
+    /**
+     * A flag era aceita e VALIDADA na entrada, respeitada por `subir`, e
+     * ignorada no ÚNICO comando que apaga. Quem migrou só `exam_files` e
+     * rodasse `limpar --tabela=exam_files --confirmar` acreditando estar
+     * restrito disparava também a limpeza do álbum.
+     */
+    expect(script).toContain("async function limpar(confirmar, sóTabela)");
+    expect(script).toContain("await limpar(confirmar, sóTabela)");
+    const i = script.indexOf("async function limpar");
+    expect(script.slice(i, i + 700)).toContain("if (sóTabela && tabela !== sóTabela) continue;");
+  });
+});

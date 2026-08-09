@@ -115,6 +115,21 @@ async function subir(sóTabela) {
     if (sóTabela && tabela !== sóTabela) continue;
     let feitas = 0;
     let falhas = 0;
+    let pulados = 0;
+    /**
+     * ─── POR QUE UM CONJUNTO DE JÁ-TENTADOS ─────────────────────────────────
+     *
+     * O laço relê SEMPRE o mesmo filtro (`image_path is null`). Uma linha que
+     * não foi atualizada volta na página seguinte — e se a falha for sistêmica
+     * (balde ainda não criado, que é justamente o cenário que todo o desenho de
+     * recuo existe para cobrir; chave sem permissão de Storage; quota), o script
+     * gira para sempre nas mesmas 25 linhas, imprimindo erro sem avançar.
+     *
+     * Guardar os ids já tentados nesta rodada transforma isso em "nada novo
+     * nesta página → terminei", que é o comportamento certo: ele para, informa,
+     * e a próxima execução tenta de novo do começo.
+     */
+    const tentados = new Set();
     for (;;) {
       const { data: linhas, error } = await sb
         .from(tabela)
@@ -127,20 +142,30 @@ async function subir(sóTabela) {
         break;
       }
       if (!linhas || linhas.length === 0) break;
+      const novas = linhas.filter((l) => !tentados.has(l.id));
+      if (novas.length === 0) break;
 
-      for (const linha of linhas) {
+      for (const linha of novas) {
+        tentados.add(linha.id);
         const img = decodificar(linha.image_data);
         if (!img) {
-          /* Não é data URL — provavelmente já é uma URL, ou lixo. Marcar com
-             caminho vazio faria a leitura quebrar; deixo como está e conto,
-             para o número aparecer no fim em vez de o laço girar para sempre
-             na mesma linha. */
-          falhas++;
-          const { error: eMarca } = await sb
-            .from(tabela)
-            .update({ image_path: "" })
-            .eq("id", linha.id);
-          if (eMarca) console.error(`  ${linha.id}: não é data URL e não consegui marcar`);
+          /* ─── NÃO MARCA NADA ──────────────────────────────────────────────
+           *
+           * A versão anterior gravava `image_path: ""` para tirar a linha do
+           * filtro. Isso EXCLUÍA o registro da migração para sempre — e o caso
+           * mais comum aqui é o laudo em PDF, que o produto aceita de
+           * propósito, que todo laboratório entrega, e que é o arquivo MAIS
+           * PESADO da tabela (~4 MB): exatamente o alvo principal da economia.
+           *
+           * PDF continua em base64 hoje por uma razão de TELA, não de
+           * armazenamento: os visualizadores decidem entre `<object>` e `<img>`
+           * pelo prefixo `data:application/pdf`, e uma URL assinada não carrega
+           * essa informação. Migrá-lo sem mexer na exibição quebraria a leitura
+           * do laudo — e essa é a única coisa pior que gastar disco.
+           *
+           * Então: pula, conta, e deixa a linha intacta para o dia em que a
+           * tela souber lidar com isso. */
+          pulados++;
           continue;
         }
         const caminho = `${linha[cfg.dono]}/${crypto.randomUUID()}.${img.extensao}`;
@@ -167,14 +192,21 @@ async function subir(sóTabela) {
         }
         feitas++;
       }
-      process.stdout.write(`\r${tabela}: ${feitas} subidas, ${falhas} falhas…`);
+      process.stdout.write(`\r${tabela}: ${feitas} subidas, ${falhas} falhas, ${pulados} pulados…`);
     }
-    console.log(`\r${tabela}: ${feitas} subidas, ${falhas} falhas.        `);
+    console.log(
+      `\r${tabela}: ${feitas} subidas, ${falhas} falhas, ${pulados} pulados (PDF e afins).        `,
+    );
   }
 }
 
-async function limpar(confirmar) {
+async function limpar(confirmar, sóTabela) {
   for (const [tabela, cfg] of Object.entries(TABELAS)) {
+    /* `--tabela` era ACEITO e VALIDADO na entrada, respeitado por `subir` e
+       ignorado aqui — no único comando que APAGA. Quem migrou só exam_files e
+       rodava `limpar --tabela=exam_files --confirmar` acreditando estar
+       restrito disparava também a limpeza do álbum. */
+    if (sóTabela && tabela !== sóTabela) continue;
     let limpas = 0;
     let recusadas = 0;
     for (;;) {
@@ -260,7 +292,7 @@ if (sóTabela && !TABELAS[sóTabela]) {
 
 if (comando === "status") await status();
 else if (comando === "subir") await subir(sóTabela);
-else if (comando === "limpar") await limpar(confirmar);
+else if (comando === "limpar") await limpar(confirmar, sóTabela);
 else {
   console.error("Comandos: status | subir | limpar --confirmar");
   process.exit(1);
