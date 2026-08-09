@@ -38,9 +38,10 @@
  * O estado continua sendo a aba FOLHA (`tab`), exatamente como era. O grupo é
  * DERIVADO dela por `grupoDe`.
  *
- * Isso não é elegância: é o que faz os ~20 `setTab("Exames")` espalhados pelo
- * arquivo — em cartões, em callbacks, no resumo do app — continuarem
- * funcionando sem serem tocados, cada um selecionando o grupo certo sozinho.
+ * Isso não é elegância: é o que faz as dezenas de `setTab("Teleconsultas")`
+ * espalhadas pelo painel — em cartões, em callbacks, no resumo do app —
+ * continuarem funcionando sem serem tocadas, cada uma selecionando o grupo
+ * certo sozinha.
  * Um segundo estado "grupo atual" precisaria ser sincronizado em cada um
  * desses pontos, e o primeiro esquecido deixaria a fita mostrando um grupo e o
  * corpo mostrando outro.

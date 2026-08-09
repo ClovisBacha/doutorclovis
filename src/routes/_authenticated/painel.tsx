@@ -780,9 +780,14 @@ function PainelPage() {
   useEffect(() => {
     if (!allowed) return;
     if (tab === "Engajamento" && !engagement) loadEngagement();
-    /* As pré-consultas viraram uma SEÇÃO da aba Pacientes, então é a abertura
-       dela que dispara a leitura. Ficou preso a `tab === "Pré-consultas"` até
-       ago/2026 — uma aba que não existe mais, e a lista nunca carregaria. */
+    /* As pré-consultas viraram uma SEÇÃO da aba Pacientes, então quem dispara a
+       releitura é a abertura dela — era `tab === "Pré-consultas"`, aba que
+       deixou de existir.
+       Isto é ATUALIZAÇÃO, não a primeira carga: `loadPreForms` já roda na
+       montagem (ver o efeito de `load`), porque a fila de trabalho da tela
+       inicial lê `preForms` e ficaria vazia por construção. Trocar aqui por
+       engano não esvaziaria a tela — deixaria a lista velha, que é pior de
+       perceber. */
     if (tab === "Pacientes 👩‍🍼") loadPreForms();
     if (tab === "Teleconsultas") {
       loadTeleconsultas();
