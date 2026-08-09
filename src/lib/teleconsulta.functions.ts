@@ -518,7 +518,19 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
     if (!sess) return { ok: false as const, error: "Sessão não encontrada" };
-    if (!scope.isTeam && sess.doctor_id !== scope.doctorId)
+    /* ─── ABRIR A SALA TAMBÉM PASSA PELO VÍNCULO ─────────────────────────────
+     *
+     * Esta linha checava só o CARIMBO, e ficou de fora quando `ownsTele` ganhou
+     * o vínculo atual. O commit que fez aquilo afirmou, no texto, ter fechado
+     * "abrir a sala dela" — e fechou só `updateTeleconsultaStatus` e
+     * `saveDoctorClinicalNote`. Abrir a sala, que é a ação de que a frase
+     * falava, continuou autorizando por id.
+     *
+     * É a pior forma do defeito: a sala é uma chamada de vídeo COM a paciente,
+     * e o convite sai por e-mail e push para ela. O médico anterior podia
+     * convocar para uma consulta por vídeo alguém que já é de outro
+     * consultório. */
+    if (!(await ownsTele(supabaseAdmin as any, data.id, scope)))
       return { ok: false as const, error: "Não autorizado" };
     const patientUserId = sess.patient_user_id as string;
     const scheduledFor = (sess.scheduled_for as string | null) ?? null;

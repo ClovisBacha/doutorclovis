@@ -130,3 +130,38 @@ describe("as AÇÕES de teleconsulta autorizam pelo vínculo, não só pelo cari
     expect((tele.match(/await ownsTele\(/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("ABRIR A SALA passa pelo vínculo — a ação que o commit anterior dizia ter fechado", () => {
+  /**
+   * ─── UM ERRO MEU, ACHADO POR REVISÃO ADVERSARIAL ──────────────────────────
+   *
+   * Quando `ownsTele` ganhou o vínculo atual, eu escrevi no commit que aquilo
+   * fechava "abrir a sala dela e gravar nota clínica nela". Fechou só as duas
+   * ações que chamavam `ownsTele` — `updateTeleconsultaStatus` e
+   * `saveDoctorClinicalNote`. `openTeleconsultaRoom`, que é literalmente abrir
+   * a sala, autorizava por conta própria, só pelo carimbo.
+   *
+   * Dois revisores independentes apontaram a mesma coisa, citando o meu próprio
+   * texto de commit como evidência de que a correção não cobria o que dizia.
+   *
+   * É a pior forma do defeito: a sala é uma chamada de vídeo COM a paciente, e
+   * o convite sai por e-mail e push para ela. O médico anterior podia convocar
+   * para uma consulta por vídeo alguém que já é de outro consultório.
+   */
+  const tele = readFileSync("src/lib/teleconsulta.functions.ts", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+
+  test("as TRÊS ações passam por `ownsTele` — não duas", () => {
+    expect((tele.match(/await ownsTele\(/g) ?? []).length).toBe(3);
+  });
+
+  test("e abrir a sala não autoriza mais por conta própria", () => {
+    const i = tele.indexOf("export const openTeleconsultaRoom");
+    const corpo = tele.slice(i, i + 1800);
+    expect(corpo).toContain("await ownsTele(supabaseAdmin as any, data.id, scope)");
+    /* A comparação solta de carimbo era a autorização inteira. */
+    expect(corpo).not.toContain("sess.doctor_id !== scope.doctorId");
+  });
+});
