@@ -77,3 +77,41 @@ describe("os lotes existem porque `.in()` vai na URL", () => {
     expect(codigo).toContain("if (profiles.length === 0) return new Map<string, number>();");
   });
 });
+
+describe("o cartão de consumo nomeia só quem é paciente dele HOJE", () => {
+  /**
+   * ─── O VAZAMENTO ──────────────────────────────────────────────────────────
+   *
+   * "Quem mais conversou" sai de `ai_usage.doctor_id` — o CARIMBO do momento da
+   * conversa. Ele responde "quem falou com o meu cérebro naquele mês", e não
+   * "quem é minha paciente": as duas perguntas se separam no dia em que ela
+   * troca de consultório.
+   *
+   * E a busca de nomes não tinha filtro NENHUM — bastava o id para o nome atual
+   * sair. O médico anterior continuava lendo o nome de uma paciente que já é de
+   * outro consultório, num cartão que ele abre todo mês.
+   *
+   * É a regra do CLAUDE.md: o recorte é sempre pelo vínculo ATUAL, nunca pelo
+   * carimbo da linha de origem.
+   */
+  const cota = readFileSync("src/lib/cota-ia.server.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  test("a busca de nomes filtra por doctor_id", () => {
+    const i = cota.indexOf('.from("patient_profiles")');
+    expect(i).toBeGreaterThan(-1);
+    const consulta = cota.slice(i, cota.indexOf(");", cota.indexOf('.in(\n        "id"', i)));
+    expect(consulta).toContain('.eq("doctor_id", doctorId)');
+  });
+
+  test("e quem não está mais vinculada SOME da lista", () => {
+    /* Mostrar "Paciente" com o volume de conversas dela entregaria o mesmo dado
+       sem o nome — o médico sabe quem estava conversando naquele mês. */
+    expect(cota).toContain("topo\n        .filter(([id]) => nomes.has(id))");
+  });
+
+  test("mas o TOTAL não muda", () => {
+    /* Aquelas respostas foram geradas, custaram, e saíram da cota que ele
+       pagou. O que sai da tela é a identidade, não a conta. */
+    expect(cota).toContain("const total = data.length;");
+  });
+});

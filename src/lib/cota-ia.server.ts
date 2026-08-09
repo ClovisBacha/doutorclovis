@@ -273,9 +273,29 @@ export async function consumoPorPaciente(
     if (!porPaciente.size) return { total, pacientes: [] };
 
     const topo = [...porPaciente.entries()].sort((a, b) => b[1] - a[1]).slice(0, limite);
+    /* ─── O NOME SÓ SAI PARA QUEM É PACIENTE DELE HOJE ──────────────────────
+     *
+     * Os ids vêm de `ai_usage.doctor_id`, que é o CARIMBO do momento da
+     * conversa. Ele responde "quem falou com o meu cérebro naquele mês", e não
+     * "quem é minha paciente" — e as duas perguntas se separam no dia em que
+     * ela troca de consultório.
+     *
+     * Sem `.eq("doctor_id", doctorId)` aqui, a busca de nomes não tinha filtro
+     * NENHUM: bastava o id para o nome atual sair. O médico anterior continuava
+     * lendo o nome de uma paciente que já é de outro consultório, num cartão
+     * que ele abre todo mês.
+     *
+     * É a regra do CLAUDE.md, e ela vale aqui como vale no resto: o recorte é
+     * sempre pelo vínculo ATUAL (`patient_profiles.doctor_id`), nunca pelo
+     * carimbo da linha de origem.
+     *
+     * O `total` NÃO muda: aquelas respostas foram geradas, custaram, e saíram
+     * da cota que ele pagou. O que sai da tela é a IDENTIDADE de quem já não é
+     * paciente dele. */
     const { data: perfis } = await sb
       .from("patient_profiles")
       .select("id,display_name")
+      .eq("doctor_id", doctorId)
       .in(
         "id",
         topo.map(([id]) => id),
@@ -289,12 +309,16 @@ export async function consumoPorPaciente(
 
     return {
       total,
-      pacientes: topo.map(([id, respostas]) => ({
-        patientId: id,
-        nome: nomes.get(id)?.trim() || "Paciente",
-        respostas,
-        fatia: total > 0 ? respostas / total : 0,
-      })),
+      /* Quem não está mais vinculada some da lista — mostrar "Paciente" com o
+         volume de conversas dela seria entregar o mesmo dado sem o nome. */
+      pacientes: topo
+        .filter(([id]) => nomes.has(id))
+        .map(([id, respostas]) => ({
+          patientId: id,
+          nome: nomes.get(id)?.trim() || "Paciente",
+          respostas,
+          fatia: total > 0 ? respostas / total : 0,
+        })),
     };
   } catch {
     return { total: 0, pacientes: [] };
