@@ -74,6 +74,7 @@ import { EscadaDeMensagens } from "@/components/escada-mensagens";
 import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
 import { PerfilNoTopo } from "@/components/perfil-no-topo";
 import { AbasDoPainel } from "@/components/abas-do-painel";
+import { rolarAte } from "@/lib/rolar-ate";
 import type { PanelTab } from "@/lib/abas-do-painel";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
 import { MesadaDoMedico } from "@/components/mesada-do-medico";
@@ -967,16 +968,16 @@ function PainelPage() {
              para quem chegar lá por outro caminho. */
           onAbrirClinica={podeEquipe ? () => setTab("Clínica 🏥") : undefined}
           onAbrirCobranca={() => {
-            /* Mesma seção; a cobrança é uma âncora dentro dela. O `setTab` só
-               vale no próximo render, então a rolagem espera um quadro — sem
-               isto, `getElementById` procura um nó que ainda não existe e o
-               clique não faz nada. */
+            /* Mesma seção; a cobrança é uma âncora dentro dela.
+               Um quadro só NÃO bastava, e isso custou um achado de auditoria: a
+               troca de aba vale no render seguinte, mas a seção de perfil
+               renderiza um esqueleto enquanto busca os dados do médico, e
+               `#cobranca` só entra na árvore quando a busca termina. Na
+               PRIMEIRA abertura o nó não existia, o `?.` engolia tudo, e o item
+               de menu não fazia nada — funcionando para quem já tinha aberto o
+               perfil antes, que é quem costuma testar. */
             setTab("Meu Perfil");
-            requestAnimationFrame(() =>
-              document
-                .getElementById("cobranca")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-            );
+            rolarAte("cobranca");
           }}
         />
       </div>

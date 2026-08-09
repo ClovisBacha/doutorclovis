@@ -90,17 +90,32 @@ describe("2. a bolinha é o indicador de posição da tela que saiu da fita", ()
 });
 
 describe("3. o caminho da cobrança sobrevive à troca de aba", () => {
-  test("a rolagem até a âncora espera o próximo quadro", () => {
+  test("a rolagem ESPERA a âncora existir, não só o próximo quadro", () => {
     /**
-     * `setTab` só vale no render seguinte. Chamar `getElementById("cobranca")`
-     * na mesma volta procura um nó que ainda não existe: o clique não faz
-     * nada, e nada falha alto — o pior tipo de defeito de tela.
+     * `setTab` só vale no render seguinte — por isso a primeira versão esperava
+     * um quadro. Mas isso resolvia metade: a seção de perfil renderiza um
+     * esqueleto enquanto busca os dados do médico, e `#cobranca` só entra na
+     * árvore quando a busca termina. Na PRIMEIRA abertura o nó não existia, o
+     * `?.` engolia tudo, e o item de menu não fazia nada.
+     *
+     * O sintoma é o pior tipo: funciona para quem já abriu o perfil antes
+     * (dados em memória) e falha para quem clica pela primeira vez — ou seja,
+     * quem testa uma vez vê funcionar.
      */
     const i = painel.indexOf("onAbrirCobranca");
     expect(i).toBeGreaterThan(-1);
-    const bloco = painel.slice(i, i + 500);
-    expect(bloco).toContain("requestAnimationFrame");
-    expect(bloco).toContain('getElementById("cobranca")');
+    const bloco = painel.slice(i, i + 700);
+    expect(bloco).toContain('rolarAte("cobranca")');
+    /* E não voltou ao `getElementById` de um quadro só. */
+    expect(bloco).not.toContain("getElementById");
+  });
+
+  test("e a espera tem teto — não vira laço eterno", () => {
+    /* Se a âncora nunca chegar (erro no carregamento, âncora renomeada), o
+       laço rodaria para sempre numa tela que o médico já abandonou. */
+    const util = readFileSync("src/lib/rolar-ate.ts", "utf8");
+    expect(util).toContain("const LIMITE_MS = 4000;");
+    expect(util).toContain("if (performance.now() - inicio >= limite) return;");
   });
 
   test("e a âncora existe do outro lado", () => {
