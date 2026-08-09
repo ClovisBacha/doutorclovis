@@ -66,7 +66,7 @@ async function handle(request: Request): Promise<Response> {
     const hojeYmd = paredeDaClinica(agora.toISOString())?.dia ?? "";
     const ateYmd = paredeDaClinica(ate.toISOString())?.dia ?? "";
 
-    const [consultas, teles, enviados] = await Promise.all([
+    const [consultas, teles, enviados, pre] = await Promise.all([
       (supabaseAdmin as any)
         .from("appointment_requests")
         .select("id, patient_name, patient_email, confirmed_date, confirmed_time")
@@ -84,6 +84,14 @@ async function handle(request: Request): Promise<Response> {
         .from("appointment_reminders")
         .select("fonte, fonte_id, especie")
         .gte("enviado_em", new Date(agora.getTime() - 72 * 3600_000).toISOString()),
+      /* Quem já mandou a pré-consulta nos últimos 20 dias. A janela é generosa
+         de propósito: pedir de novo o que ela respondeu semana passada é a
+         forma mais rápida de ensinar que os avisos deste app não valem
+         leitura — e é o mesmo canal por onde chega a emergência. */
+      (supabaseAdmin as any)
+        .from("pre_consultation_forms")
+        .select("user_id")
+        .gte("submitted_at", new Date(agora.getTime() - 20 * 86400_000).toISOString()),
     ]);
 
     /* Sem a tabela de registro, NÃO manda nada. Enviar sem poder registrar é
@@ -106,6 +114,13 @@ async function handle(request: Request): Promise<Response> {
         chaveDoLembrete({ fonte: r.fonte, id: r.fonte_id }, r.especie),
       ),
     );
+
+    /* Falha ao ler as pré-consultas vira "ninguém respondeu"? NÃO: isso pediria
+       de novo a todo mundo. Conjunto vazio só quando a leitura deu certo. */
+    const jaResponderam = new Set<string>(
+      pre.error ? [] : ((pre.data ?? []) as any[]).map((r) => String(r.user_id)),
+    );
+    const preIndisponivel = !!pre.error;
 
     const compromissos: Compromisso[] = [];
 
@@ -131,13 +146,17 @@ async function handle(request: Request): Promise<Response> {
     }
 
     for (const t of (teles.data ?? []) as any[]) {
+      const uid = t.patient_user_id ?? null;
       compromissos.push({
         id: t.id,
         fonte: "teleconsulta",
         quando: String(t.scheduled_for),
         email: null,
-        userId: t.patient_user_id ?? null,
+        userId: uid,
         nome: null,
+        /* Sem conseguir ler as respostas, trata como PRONTA: calar o pedido é
+           errar para o lado de não incomodar. */
+        preConsultaPronta: preIndisponivel || (uid ? jaResponderam.has(String(uid)) : false),
       });
     }
 

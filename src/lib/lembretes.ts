@@ -38,9 +38,24 @@ export type Compromisso = {
   /** Conta no app, quando existe — o push vai por aqui. */
   userId: string | null;
   nome: string | null;
+  /**
+   * Ela já mandou a pré-consulta desta vez?
+   *
+   * `true` cala o pedido de 48 h — pedir de novo o que ela já respondeu é a
+   * forma mais rápida de ensinar que os avisos deste app não valem leitura.
+   */
+  preConsultaPronta?: boolean;
 };
 
-export type Especie = "24h" | "4h";
+/**
+ * As três espécies, da mais distante para a mais próxima.
+ *
+ * `48h_pre` não é um lembrete de consulta: é o pedido da PRÉ-CONSULTA. Fica
+ * aqui, e não numa máquina própria, porque o problema difícil é o mesmo — não
+ * repetir a cada hora — e ele já está resolvido, com registro e índice único.
+ * Uma segunda máquina significaria uma segunda chance de mandar em dobro.
+ */
+export type Especie = "48h_pre" | "24h" | "4h";
 
 export type LembreteAEnviar = {
   compromisso: Compromisso;
@@ -49,7 +64,7 @@ export type LembreteAEnviar = {
   faltamMinutos: number;
 };
 
-export const HORAS_DA_ESPECIE: Record<Especie, number> = { "24h": 24, "4h": 4 };
+export const HORAS_DA_ESPECIE: Record<Especie, number> = { "48h_pre": 48, "24h": 24, "4h": 4 };
 
 /** A chave que o registro de enviados guarda. Uma por (compromisso, espécie). */
 export function chaveDoLembrete(c: Pick<Compromisso, "fonte" | "id">, e: Especie): string {
@@ -94,13 +109,25 @@ export function lembretesVencidos(
        cadastrar o e-mail. */
     if (!c.email && !c.userId) continue;
 
+    /* ─── A ESCADA, DA MAIS PRÓXIMA PARA A MAIS DISTANTE ────────────────────
+       Cada faixa exclui as de cima. Faltando 3 h, "faltam 48 h ou menos"
+       também é verdade — avaliadas soltas, as três espécies disparariam juntas
+       numa consulta marcada de véspera, e a paciente receberia três avisos no
+       mesmo minuto. */
     const especie: Especie | null =
       faltamMin <= HORAS_DA_ESPECIE["4h"] * 60
         ? "4h"
         : faltamMin <= HORAS_DA_ESPECIE["24h"] * 60
           ? "24h"
-          : null;
+          : faltamMin <= HORAS_DA_ESPECIE["48h_pre"] * 60
+            ? "48h_pre"
+            : null;
     if (!especie) continue;
+
+    /* O pedido de pré-consulta só faz sentido para quem tem o app — é lá que o
+       formulário existe. Para quem não tem, ele seria um e-mail pedindo que
+       ela abrisse uma tela que não pode abrir. */
+    if (especie === "48h_pre" && (!c.userId || c.preConsultaPronta)) continue;
 
     if (jaEnviados.has(chaveDoLembrete(c, especie))) continue;
     saida.push({ compromisso: c, especie, faltamMinutos: faltamMin });
@@ -137,6 +164,12 @@ export function textoDoLembrete(
   const primeiro = (l.compromisso.nome ?? "").trim().split(/\s+/)[0] || "Tudo certo";
   const onde = l.compromisso.fonte === "teleconsulta" ? "sua teleconsulta" : "sua consulta";
   const quando = comoDizerQuando(l.faltamMinutos, horaLocal);
+  if (l.especie === "48h_pre") {
+    return {
+      titulo: "Sua consulta é depois de amanhã 📝",
+      corpo: `${primeiro}, responda a pré-consulta no app — pressão, peso e como você tem se sentido. É o que ele lê antes de te ver.`,
+    };
+  }
   return l.especie === "24h"
     ? {
         titulo: "Consulta amanhã 📅",

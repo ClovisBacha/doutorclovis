@@ -301,7 +301,21 @@ o buraco e quem estava na fila não foi chamada.
   gravação numa corrida entre dois crons. O registro é gravado ANTES do envio:
   um push perdido é melhor que um push de hora em hora — é o mesmo canal por
   onde chega o aviso de emergência.
-- **Aplicar:** `supabase/APLICAR_LEMBRETES.sql`. **Agendar:** cron de hora em
+- **A pré-consulta usa a MESMA máquina** (espécie `48h_pre`): dois dias antes,
+  push pedindo que ela responda. Só para quem tem conta (o formulário vive no
+  app) e só se ela ainda não respondeu — pedir o que ela acabou de mandar ensina
+  que os avisos deste app não valem leitura. Falha ao ler as respostas trata
+  como "já respondeu": errar para o lado de não incomodar.
+- **A consulta aponta para a paciente** (`appointment_requests.patient_user_id`,
+  `supabase/APLICAR_CONSULTA_DA_PACIENTE.sql`). A tabela nasceu identificando
+  por e-mail DIGITADO, e sem esse elo nada downstream funciona — saber se a
+  pré-consulta chegou, juntar o que ela registrou entre consultas, pôr a
+  consulta na linha do tempo clínica. `NULL` continua válido: consulta de quem
+  não tem conta é caso legítimo. O INSERT **repete sem a coluna** (PGRST204) se
+  o banco ainda não a tem, para não derrubar o que funcionava antes.
+- **Aplicar:** `supabase/APLICAR_LEMBRETES.sql` (rode de novo se você já o
+  tinha rodado — o CHECK antigo recusa `48h_pre`) e
+  `supabase/APLICAR_CONSULTA_DA_PACIENTE.sql`. **Agendar:** cron de hora em
   hora apontando para `/api/lembretes-tick` com
   `Authorization: Bearer <CRON_SECRET>`. Não está no `vercel.json` de propósito
   — intervalo menor que diário exige plano Pro, e o `waitlist-tick` já segue

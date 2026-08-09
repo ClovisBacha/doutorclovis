@@ -38,8 +38,44 @@ describe("1. quando o lembrete vence", () => {
     expect(r[0].especie).toBe("24h");
   });
 
-  test("faltando 30 h, ainda não sai nada", () => {
-    expect(lembretesVencidos([consulta({ quando: daquiA(30) })], AGORA, nada)).toEqual([]);
+  test("faltando 30 h, sai o PEDIDO DE PRÉ-CONSULTA", () => {
+    /* Era "não sai nada" até a pré-consulta entrar na mesma escada. Dois dias
+       antes é quando responder ainda muda a consulta: ele lê antes de ela
+       chegar. */
+    const r = lembretesVencidos([consulta({ quando: daquiA(30) })], AGORA, nada);
+    expect(r).toHaveLength(1);
+    expect(r[0].especie).toBe("48h_pre");
+  });
+
+  test("faltando 60 h, ainda não sai nada", () => {
+    expect(lembretesVencidos([consulta({ quando: daquiA(60) })], AGORA, nada)).toEqual([]);
+  });
+
+  test("a pré-consulta JÁ RESPONDIDA não é pedida de novo", () => {
+    /**
+     * Pedir o que ela acabou de mandar é a forma mais rápida de ensinar que os
+     * avisos deste app não valem leitura — e é o mesmo canal por onde chega a
+     * emergência.
+     */
+    expect(
+      lembretesVencidos([consulta({ quando: daquiA(30), preConsultaPronta: true })], AGORA, nada),
+    ).toEqual([]);
+  });
+
+  test("sem conta no app, a pré-consulta não é pedida — nem por e-mail", () => {
+    /* O formulário existe DENTRO do app. Um e-mail pedindo que ela abra uma
+       tela que não pode abrir é pior que silêncio. */
+    expect(
+      lembretesVencidos([consulta({ quando: daquiA(30), userId: null })], AGORA, nada),
+    ).toEqual([]);
+  });
+
+  test("mas o lembrete de 24 h ainda vai por e-mail para quem não tem app", () => {
+    /* A escada não pode calar as outras espécies junto: quem não tem conta
+       continua sendo lembrada da consulta. */
+    const r = lembretesVencidos([consulta({ quando: daquiA(20), userId: null })], AGORA, nada);
+    expect(r).toHaveLength(1);
+    expect(r[0].especie).toBe("24h");
   });
 
   test("faltando 3 h, sai o de 4 h — e só ele", () => {
@@ -111,6 +147,19 @@ describe("3. não repetir — o ponto do arquivo", () => {
     expect(r[0].especie).toBe("4h");
   });
 
+  test("as três espécies são independentes na escada", () => {
+    /**
+     * A pré-consulta já pedida não impede o lembrete de 24 h: são avisos
+     * diferentes, com propósitos diferentes. Um `jaEnviados` que casasse por
+     * compromisso, e não por (compromisso, espécie), calaria os dois seguintes.
+     */
+    const c = consulta({ quando: daquiA(20) });
+    const enviados = new Set([chaveDoLembrete(c, "48h_pre")]);
+    const r = lembretesVencidos([c], AGORA, enviados);
+    expect(r).toHaveLength(1);
+    expect(r[0].especie).toBe("24h");
+  });
+
   test("a chave separa fonte, linha e espécie", () => {
     /**
      * Sem a fonte na chave, a consulta `abc` e a teleconsulta `abc` — ids de
@@ -150,6 +199,15 @@ describe("5. o texto", () => {
 
     const quatro = lembretesVencidos([consulta({ quando: daquiA(3) })], AGORA, nada)[0];
     expect(textoDoLembrete(quatro, "14:30").corpo).not.toContain("Confirme");
+  });
+
+  test("o pedido de pré-consulta diz o que responder, e onde", () => {
+    /* "Preencha a pré-consulta" não diz nada a quem nunca viu a tela. Pressão,
+       peso e como ela tem se sentido é o que de fato muda a consulta. */
+    const l = lembretesVencidos([consulta({ quando: daquiA(30) })], AGORA, nada)[0];
+    const t = textoDoLembrete(l, "14:30");
+    expect(t.corpo).toContain("no app");
+    expect(t.corpo).toContain("pressão");
   });
 
   test("teleconsulta diz que o link abre no app", () => {

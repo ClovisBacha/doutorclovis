@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS public.appointment_reminders (
   -- 'consulta' | 'teleconsulta'
   fonte text NOT NULL,
   fonte_id uuid NOT NULL,
-  -- '24h' | '4h'
-  especie text NOT NULL CHECK (especie IN ('24h','4h')),
+  -- '48h_pre' (pedido da pré-consulta) | '24h' | '4h'
+  especie text NOT NULL CHECK (especie IN ('48h_pre','24h','4h')),
   enviado_em timestamptz NOT NULL DEFAULT now(),
   -- Para diagnóstico: chegou por push, por e-mail, ou por nenhum dos dois.
   canais text
@@ -47,3 +47,18 @@ ALTER TABLE public.appointment_reminders ENABLE ROW LEVEL SECURITY;
 -- Sem política nenhuma: só o service role escreve e lê. Ninguém mais tem o que
 -- fazer aqui, e uma política a mais seria superfície a mais.
 GRANT ALL ON public.appointment_reminders TO service_role;
+
+-- ── Rodar de novo depois de o app ganhar a espécie '48h_pre' ────────────────
+-- `CREATE TABLE IF NOT EXISTS` não altera uma tabela que já existe, então quem
+-- rodou este arquivo antes de ago/2026 tem o CHECK antigo — e cada pedido de
+-- pré-consulta falharia silenciosamente no INSERT, sem lembrete e sem erro
+-- visível. Este bloco conserta, e é inofensivo em banco novo.
+DO $$
+BEGIN
+  ALTER TABLE public.appointment_reminders DROP CONSTRAINT IF EXISTS appointment_reminders_especie_check;
+  ALTER TABLE public.appointment_reminders
+    ADD CONSTRAINT appointment_reminders_especie_check
+    CHECK (especie IN ('48h_pre','24h','4h'));
+EXCEPTION WHEN undefined_table THEN
+  NULL; -- a tabela nasce logo acima com o CHECK certo
+END $$;

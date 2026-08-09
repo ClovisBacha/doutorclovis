@@ -547,26 +547,53 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
       };
     }
 
-    const { data: nova, error } = await (supabaseAdmin as any)
-      .from("appointment_requests")
-      .insert({
-        patient_name: nome,
-        patient_email: email,
-        /* `NOT NULL` sem default desde a primeira migration. Marcar por
-           telefone sem ter o telefone é comum; a string vazia mantém a coluna
-           honesta em vez de inventar um número. */
-        patient_phone: data.telefone,
-        reason: data.motivo || "Consulta",
-        preferred_date: data.dia,
-        preferred_time: data.hora,
-        confirmed_date: data.dia,
-        confirmed_time: data.hora,
-        status: "confirmed",
-        price_brl: data.precoBrl,
-        doctor_id: scope.isTeam ? null : scope.doctorId,
-      })
-      .select("id")
-      .single();
+    const linha: Record<string, unknown> = {
+      patient_name: nome,
+      patient_email: email,
+      /* ─── O ELO COM A CONTA DELA ───────────────────────────────────────
+           `appointment_requests` sempre identificou por e-mail DIGITADO, e por
+           isso a consulta nunca soube de qual paciente do app ela é. Sem este
+           campo não dá para dizer se a pré-consulta dela chegou, nem juntar o
+           que ela registrou entre duas consultas, nem pôr a consulta na linha
+           do tempo clínica — tudo dependia de casar e-mails, e um caractere
+           diferente quebra o casamento em silêncio.
+           `null` continua válido: consulta de quem não tem conta é caso
+           legítimo, e é o que o consultório intermedia. */
+      patient_user_id: data.pacienteId,
+      /* `NOT NULL` sem default desde a primeira migration. Marcar por telefone
+         sem ter o telefone é comum; a string vazia mantém a coluna honesta em
+         vez de inventar um número. */
+      patient_phone: data.telefone,
+      reason: data.motivo || "Consulta",
+      preferred_date: data.dia,
+      preferred_time: data.hora,
+      confirmed_date: data.dia,
+      confirmed_time: data.hora,
+      status: "confirmed",
+      price_brl: data.precoBrl,
+      doctor_id: scope.isTeam ? null : scope.doctorId,
+    };
+
+    const gravar = () =>
+      (supabaseAdmin as any).from("appointment_requests").insert(linha).select("id").single();
+
+    let { data: nova, error } = await gravar();
+
+    /* ─── A COLUNA NOVA NÃO PODE DERRUBAR O QUE JÁ FUNCIONAVA ────────────────
+       `patient_user_id` chegou depois. Num banco que ainda não rodou o SQL, o
+       PostgREST recusa o INSERT INTEIRO com PGRST204 ("coluna desconhecida no
+       payload") — e marcar consulta, que funcionava ontem, pararia de funcionar
+       hoje por causa de um campo opcional.
+       Repete sem ele: a consulta é marcada, só não fica ligada à conta dela.
+       É `PGRST204` e não `42703`: aquele é erro do Postgres em SELECT, e
+       escrito aqui seria um fallback que nunca roda. */
+    if (error) {
+      const { colunaAusente } = await import("./postgrest");
+      if (colunaAusente(error)) {
+        delete linha.patient_user_id;
+        ({ data: nova, error } = await gravar());
+      }
+    }
 
     if (error) {
       const code = (error as { code?: string }).code;
@@ -575,6 +602,8 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
       if (code === "23505")
         return { ok: false as const, error: "Já existe consulta confirmada nesse horário." };
       const { colunaAusente: falta } = await import("./postgrest");
+      /* Se AINDA falta coluna depois de tirar `patient_user_id`, o que falta é
+         a leva antiga de colunas da agenda — outro SQL, outra instrução. */
       if (falta(error))
         return {
           ok: false as const,
