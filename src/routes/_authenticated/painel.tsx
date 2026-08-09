@@ -74,6 +74,8 @@ import { EscadaDeMensagens } from "@/components/escada-mensagens";
 import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
 import { PerfilNoTopo } from "@/components/perfil-no-topo";
 import { AbasDoPainel } from "@/components/abas-do-painel";
+import { CalendarioDoMes } from "@/components/calendario-do-mes";
+import { montarAgenda } from "@/lib/agenda-unificada";
 import { rolarAte } from "@/lib/rolar-ate";
 import type { PanelTab } from "@/lib/abas-do-painel";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
@@ -777,6 +779,14 @@ function PainelPage() {
       if (!engagement) loadEngagement();
     }
     if (tab === "Consultas Pagas") loadPrivateConsults();
+    /* O calendário junta pedidos, teleconsultas e consultas particulares. Sem
+       carregar as duas últimas ao abrir a aba, a grade mostraria só o
+       presencial — e "não tem nada marcado" é justamente a mentira que este
+       trabalho todo está tentando tirar do painel. */
+    if (tab === "Calendário") {
+      loadTeleconsultas();
+      loadPrivateConsults();
+    }
   }, [tab, allowed]);
 
   /* AS TRÊS MUTAÇÕES OTIMISTAS pintam a tela antes do servidor responder — e
@@ -1185,7 +1195,22 @@ function PainelPage() {
           />
         )}
         {tab === "Calendário" && (
-          <CalendárioSection appointments={appointments} onNavigate={setTab} />
+          /* ─── UM CALENDÁRIO SÓ, COM AS TRÊS FONTES ────────────────────────
+             Era uma faixa de SETE dias que só conhecia `appointments`. O médico
+             via a consulta presencial aqui e a teleconsulta do mesmo dia noutra
+             aba — e nenhuma das duas respondia "como está o meu mês".
+
+             O merge e a régua de "que dia é isto" moram em `agenda-unificada`,
+             sem JSX: é lá que estão as decisões difíceis (data confirmada ganha
+             da preferida; particular não tem data marcada e entra como
+             preferência), e é lá que elas são testadas. */
+          <CalendarioDoMes
+            eventos={montarAgenda({
+              pedidos: appointments as never[],
+              teleconsultas: teleconsultas as never[],
+              particulares: privateConsults as never[],
+            })}
+          />
         )}
         {tab === "Agendamentos" && (
           <div className="space-y-6">
@@ -4729,197 +4754,6 @@ function FerramentasSection() {
           onFechar={() => setEnvio(null)}
         />
       )}
-    </div>
-  );
-}
-
-/* ---------- Calendário (week view) ---------- */
-const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
-function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
-  return d;
-}
-
-function CalendárioSection({
-  appointments,
-  onNavigate,
-}: {
-  appointments: AdminAppointment[];
-  onNavigate: (tab: PanelTab) => void;
-}) {
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
-
-  function prevWeek() {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() - 7);
-    setWeekStart(d);
-  }
-
-  function nextWeek() {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + 7);
-    setWeekStart(d);
-  }
-
-  function goToday() {
-    setWeekStart(getWeekStart(new Date()));
-  }
-
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-
-  const confirmedAppts = appointments.filter(
-    (a) => a.status === "confirmed" && (a as any).confirmed_date,
-  );
-
-  function getAppts(day: Date) {
-    const iso = ymdLocal(day);
-    return confirmedAppts
-      .filter((a) => (a as any).confirmed_date === iso)
-      .sort((a, b) =>
-        ((a as any).confirmed_time ?? "").localeCompare((b as any).confirmed_time ?? ""),
-      );
-  }
-
-  const today = ymdLocal();
-
-  const weekLabel = `${weekDays[0].toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} — ${weekDays[6].toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}`;
-
-  return (
-    <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={prevWeek}
-            className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
-          >
-            ← Anterior
-          </button>
-          <button
-            onClick={goToday}
-            className="rounded-full border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary"
-          >
-            Hoje
-          </button>
-          <button
-            onClick={nextWeek}
-            className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
-          >
-            Próxima →
-          </button>
-        </div>
-        <p className="text-sm font-medium">{weekLabel}</p>
-        <button
-          onClick={() => onNavigate("Agendamentos")}
-          className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground"
-        >
-          Ver todos
-        </button>
-      </div>
-
-      {/* Week grid */}
-      <div className="grid grid-cols-7 gap-1.5">
-        {weekDays.map((day, i) => {
-          const iso = ymdLocal(day);
-          const isToday = iso === today;
-          const dayAppts = getAppts(day);
-          return (
-            <div
-              key={i}
-              className={`rounded-2xl border p-2 min-h-[120px] flex flex-col gap-1.5 ${isToday ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}
-            >
-              <div className="text-center">
-                <p
-                  className={`text-[10px] font-semibold uppercase tracking-wide ${isToday ? "text-primary" : "text-muted-foreground"}`}
-                >
-                  {DOW_LABELS[i]}
-                </p>
-                <p className={`text-sm font-bold ${isToday ? "text-primary" : ""}`}>
-                  {day.getDate()}
-                </p>
-              </div>
-              {dayAppts.map((a) => (
-                <div
-                  key={a.id}
-                  title={`${a.patient_name} — ${(a as any).confirmed_time}`}
-                  className="rounded-lg bg-primary/10 px-1.5 py-1 text-[10px] leading-tight text-primary truncate"
-                >
-                  <span className="font-medium">{(a as any).confirmed_time}</span>{" "}
-                  {a.patient_name.split(" ")[0]}
-                </div>
-              ))}
-              {dayAppts.length === 0 && (
-                <p className="text-[10px] text-muted-foreground/50 text-center mt-1">—</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Upcoming confirmed list */}
-      <div className="mt-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground mb-3">
-          Próximas confirmadas
-        </p>
-        {confirmedAppts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma consulta confirmada com data definida.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {confirmedAppts
-              .filter((a) => (a as any).confirmed_date >= today)
-              .sort((a, b) => {
-                const da = `${(a as any).confirmed_date}T${(a as any).confirmed_time ?? "00:00"}`;
-                const db = `${(b as any).confirmed_date}T${(b as any).confirmed_time ?? "00:00"}`;
-                return da.localeCompare(db);
-              })
-              .slice(0, 10)
-              .map((a) => {
-                const ext = a as any;
-                return (
-                  <div
-                    key={a.id}
-                    className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-2.5"
-                  >
-                    <div className="text-center min-w-[48px]">
-                      <p className="text-sm font-bold text-primary">
-                        {new Date(ext.confirmed_date + "T00:00:00").getDate()}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground uppercase">
-                        {new Date(ext.confirmed_date + "T00:00:00").toLocaleDateString("pt-BR", {
-                          month: "short",
-                        })}
-                      </p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{a.patient_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {ext.confirmed_time} · {a.reason}
-                      </p>
-                    </div>
-                    {ext.price_brl && (
-                      <p
-                        className={`text-xs font-medium shrink-0 ${ext.payment_status === "pago" ? "text-emerald-600" : "text-amber-600"}`}
-                      >
-                        {ext.payment_status === "pago" ? "✓ " : ""}R${" "}
-                        {(ext.price_brl / 100).toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
