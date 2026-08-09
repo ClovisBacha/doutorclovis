@@ -231,16 +231,21 @@ const STATUS_STYLE: Record<string, string> = {
  *
  * Amarrar as duas a ESTA constante faz a próxima reordenação de abas levá-las
  * junto, em vez de deixá-las para trás sem ninguém perceber.
- */
-const ABA_DE_ENTRADA: PanelTab = "Cérebro 🧠";
-/**
- * E onde ele aterrissa quando o Cérebro está trancado pelo plano.
  *
- * Sem isto, o médico do Free abria o painel direto num paywall — a primeira
- * coisa que ele via ao entrar no produto que já paga (ou que ainda está
- * decidindo pagar) era uma porta fechada, e não o próprio consultório.
+ * ─── POR QUE VOLTOU A SER O PAINEL (ago/2026) ───────────────────────────────
+ *
+ * Era o Cérebro, por uma regra verdadeira: números dizem o que ACONTECEU, o
+ * cérebro é onde ele MUDA o que vai acontecer. O que virou a regra do avesso
+ * foi a FILA DE TRABALHO mudar de lugar. Ela vivia num cabeçalho repetido em
+ * todas as telas e agora mora dentro do Painel; com ela dentro, o Painel deixou
+ * de ser o que aconteceu e passou a ser o que ainda precisa dele.
+ *
+ * De quebra, some o segundo caminho: havia uma `ABA_DE_ENTRADA_SEM_IA` só
+ * porque o Cérebro é paywall no Free e o médico abria o painel dentro de uma
+ * porta fechada. O Painel não é paywall de ninguém — a entrada passou a ser
+ * uma só, para todos os planos e também no app nativo.
  */
-const ABA_DE_ENTRADA_SEM_IA: PanelTab = "Painel 📊";
+const ABA_DE_ENTRADA: PanelTab = "Painel 📊";
 
 async function token() {
   const { data } = await supabase.auth.getSession();
@@ -266,10 +271,11 @@ function PainelPage() {
       const { ehNativo } = await import("@/lib/nativo");
       const nativo = ehNativo();
       setNoApp(nativo);
-      /* `ehNativo` só resolve depois da montagem (olha um global do Capacitor,
-         que não existe no SSR), então o `tab` inicial já nasceu no Cérebro.
-         Corrigir aqui é o que faz o médico abrir o app no resumo. */
-      if (nativo) setTab(ABA_DE_ENTRADA_SEM_IA);
+      /* Entrada única (ago/2026): o `tab` inicial já nasce onde o app precisa
+         que ele esteja, então não há mais nada a corrigir aqui. Enquanto eram
+         duas constantes, era este `setTab` que fazia o resumo do celular
+         aparecer — se `abaDeEntrada` voltar a divergir de `ABA_DE_ENTRADA`,
+         este desvio precisa voltar junto. */
     })();
   }, []);
   /** Perfil de médico existe mas está inativo: entra, com aviso, em Meu Perfil. */
@@ -297,25 +303,21 @@ function PainelPage() {
     ? "Sua conta está inativa — as pacientes não encontram você na busca."
     : null;
 
-  /* A aba que abre é a do Cérebro. O painel de números diz o que ACONTECEU; o
-     cérebro é onde ele MUDA o que vai acontecer. Abrir no primeiro faz o
-     produto parecer um relatório; abrir no segundo faz dele uma ferramenta. */
+  /* A aba que abre é o Painel — que agora é a FILA DE TRABALHO, e não o
+     relatório de números que ela era. Ver o comentário de `ABA_DE_ENTRADA`. */
   const [tab, setTab] = useState<PanelTab>(ABA_DE_ENTRADA);
-  /* Onde ele aterrissou de fato — é o que decide onde o interruptor de SOS e o
-     resumo do app aparecem. No Free o Cérebro é paywall, então a entrada é
-     outra, e as duas peças têm que ir junto. */
-  /* NO APP NATIVO, A ENTRADA É O PAINEL — e isto não é preferência, é a única
-     forma de o resumo funcionar.
-     `PainelNoApp` substitui o conteúdo da aba de entrada no celular. Se a
-     entrada fosse o Cérebro, tocar em "Cérebro" não mostraria nada: a aba
-     ativa seria a de entrada e o conteúdo continuaria escondido atrás do
-     resumo. Aterrissando no Painel, o resumo é a tela de abrir e TODAS as abas
-     — inclusive o Cérebro — ficam a um toque, inteiras. */
-  const abaDeEntrada = noApp
-    ? ABA_DE_ENTRADA_SEM_IA
-    : podeIA
-      ? ABA_DE_ENTRADA
-      : ABA_DE_ENTRADA_SEM_IA;
+  /**
+   * Onde ele aterrissou de fato. É o que decide onde aparecem o interruptor de
+   * push do SOS e, no celular, o resumo do dia.
+   *
+   * Hoje é sempre `ABA_DE_ENTRADA` — o Painel não é paywall de ninguém e serve
+   * ao app nativo tão bem quanto ao computador, então os dois desvios que
+   * existiam (Free e nativo) deixaram de ter para onde desviar. Continua com
+   * nome próprio de propósito: as três peças abaixo se penduram em "onde ele
+   * aterrissa", e escritas como `tab === "Painel 📊"` elas já sumiram da tela
+   * uma vez, quando o Cérebro passou para a frente.
+   */
+  const abaDeEntrada = ABA_DE_ENTRADA;
   /* A rolagem até a aba ativa saiu daqui e mora em `AbasDoPainel`, junto da
      fita que ela rola. Ela continua importando pelo mesmo motivo de antes:
      várias trocas de aba são PROGRAMÁTICAS — um cartão do Painel manda para
@@ -504,9 +506,9 @@ function PainelPage() {
    * Estava escrito duas vezes, nos dois ramos do `load` (caminho feliz e
    * fallback), e só a cópia do fallback ganhou o desvio do Free. Como o médico
    * Free ATIVO entra sempre pelo caminho feliz, o desvio nunca rodava para
-   * ele: abria o painel dentro do paywall do Cérebro — a porta fechada que o
-   * comentário de `ABA_DE_ENTRADA_SEM_IA` existe para impedir — e, de quebra,
-   * ficava sem o interruptor de push do SOS, que só aparece na aba de entrada.
+   * ele: abria o painel dentro do paywall do Cérebro — uma porta fechada como
+   * primeira tela — e, de quebra, ficava sem o interruptor de push do SOS, que
+   * só aparece na aba de entrada.
    *
    * Duas cópias de uma regra divergem. Foi assim com os dois filtros de
    * lacuna, e foi assim aqui.
@@ -528,8 +530,12 @@ function PainelPage() {
        novo na tela criaria a segunda fonte que esta base já viu divergir. */
     setMensagensDoPlano(typeof ent?.aiRepliesPerCycle === "number" ? ent.aiRepliesPerCycle : null);
     /* Só na entrada: arrancar o médico da aba em que ele está, a cada
-       atualização de três minutos, seria pior que o problema que isto resolve. */
-    if (ent?.aiApp === false && !ehRefresh) setTab(ABA_DE_ENTRADA_SEM_IA);
+       atualização de três minutos, seria pior que o problema que isto resolve.
+       Hoje ele já nasce no Painel, então isto é rede — mas rede que precisa
+       continuar existindo: quem decide o `tab` inicial é o `useState`, e um dia
+       em que a entrada volte a ser uma aba de plano, este é o desvio que
+       impede o Free de abrir o produto num paywall. */
+    if (ent?.aiApp === false && !ehRefresh) setTab(ABA_DE_ENTRADA);
   }
 
   async function load(ehRefresh = false) {
@@ -982,14 +988,19 @@ function PainelPage() {
   ];
 
   return (
-    <section className="mx-auto max-w-5xl px-5 py-12">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Painel do médico
-          </p>
-          <h1 className="mt-2 font-serif text-3xl md:text-4xl">Gestão do consultório</h1>
-        </div>
+    <section className="mx-auto max-w-5xl px-5 pb-12 pt-6">
+      {/* ─── SEM TÍTULO, DE PROPÓSITO ─────────────────────────────────────
+          O título e a linha de apoio ocupavam a primeira dobra de TODAS as
+          telas para dizer ao médico onde ele já sabia que estava — ele chegou
+          aqui clicando em "painel". O que a primeira dobra tem de mostrar é
+          trabalho, e o trabalho agora começa na fita de abas, logo abaixo da
+          bolinha do perfil. Pedido do dono: "tira esse painel aí de cima, pois
+          ele já tem ali em um ponto".
+
+          (A frase antiga não está citada aqui de propósito: o teste que guarda
+          esta decisão procura o texto no arquivo inteiro, e prosa que cita o
+          código já quebrou asserção nesta base cinco vezes.) */}
+      <div className="flex items-start justify-end gap-4">
         {/* A conta sai da fita de abas e vem para o canto onde as pessoas
             procuram conta. Ver `perfil-no-topo.tsx`. */}
         <PerfilNoTopo
@@ -1065,41 +1076,6 @@ function PainelPage() {
         />
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {/* Primeiro da fila de propósito: uma paciente esperando aceite é o
-            item mais urgente do painel — ela está do outro lado vendo
-            "aguardando o médico aceitar". */}
-        {/* Emergência é o primeiro número porque é o único que não pode
-            esperar. Antes o resumo começava por "pedidos de consulta". */}
-        <Stat
-          label="Emergências sem desfecho"
-          value={sosNaoAtendidos}
-          highlight={sosNaoAtendidos > 0}
-          /* Vermelho, e não a cor da marca. Promover este número a "o único que
-             não pode esperar" e pintá-lo igual a "pedidos de consulta" é
-             desfazer a promoção no mesmo gesto. */
-          tom={sosNaoAtendidos > 0 ? "urgente" : undefined}
-        />
-        <Stat label="Pacientes esperando" value={novasPacientes} highlight={novasPacientes > 0} />
-        <Stat label="Pedidos de consulta" value={pendingAppts} highlight={pendingAppts > 0} />
-        <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
-      </div>
-
-      {/* A fila ABSORVEU as faixas soltas de SOS e de paciente esperando: elas
-          existiam porque não havia lista, e duas chamadas para a mesma coisa é
-          ruído. O modal de emergência continua, esse é outro assunto. */}
-      <FilaDeTrabalho
-        itens={fila}
-        fontesComFalha={[
-          ...(fonteFalhou.sos ? ["emergências"] : []),
-          ...(fonteFalhou.vinculos ? ["solicitações de pacientes"] : []),
-          ...(fonteFalhou.consultasEPerguntas ? ["consultas e perguntas"] : []),
-          ...(fonteFalhou.preConsultas ? ["pré-consultas"] : []),
-          ...(fonteFalhou.triagens ? ["alertas de sintomas"] : []),
-          ...(fonteFalhou.eventos ? ["registros clínicos"] : []),
-        ]}
-      />
-
       {/* ─── AS DUAS FITAS ────────────────────────────────────────────────
           Eram QUINZE abas numa fita rolável de uma linha só. Num monitor a nona
           já aparecia cortada; num celular a última ficava mil pixels à direita.
@@ -1114,7 +1090,7 @@ function PainelPage() {
           dentro de Cérebro ela sumiria da fita — a fusão que era para revelar
           as telas passaria a esconder o trabalho. */}
       <AbasDoPainel
-        className="mt-8"
+        className="mt-5"
         aba={tab}
         onEscolher={setTab}
         contadores={{
@@ -1136,6 +1112,65 @@ function PainelPage() {
             Enquanto estiver assim, as pacientes não encontram você na busca e as listas do painel
             ficam vazias. Ative a assinatura no menu do seu perfil, no canto superior direito.
           </p>
+        </div>
+      )}
+
+      {/* ─── O QUE ERA CABEÇALHO DE TODAS AS TELAS MORA AQUI ──────────────
+          Os quatro números e a fila de trabalho apareciam ACIMA da fita, em
+          TODAS as telas do painel. Repetir a mesma coisa em quinze lugares não
+          é reforço: é a primeira dobra inteira gasta antes de o médico chegar
+          na tela que ele pediu, e no celular era a fila mais as duas fitas
+          empurrando o conteúdo para fora do campo de visão.
+
+          Trazê-los para a aba de entrada é o que faz o Painel deixar de ser o
+          relatório do que aconteceu e virar o que AINDA PRECISA DELE — e é por
+          isso que ele passou a ser a primeira aba.
+
+          ─── POR QUE AQUI FORA, E NÃO DENTRO DO `tab === "Painel 📊"` ────────
+          Aquele bloco vive dentro da `div` que o celular ESCONDE para mostrar
+          `PainelNoApp` no lugar. Posta lá dentro, a fila de trabalho — que
+          lista emergências sem desfecho — simplesmente não existiria no
+          telefone, que é onde ele lê o painel de madrugada. */}
+      {tab === abaDeEntrada && (
+        <div className="mt-6 space-y-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Primeiro da fila de propósito: uma paciente esperando aceite é o
+              item mais urgente do painel — ela está do outro lado vendo
+              "aguardando o médico aceitar". */}
+            {/* Emergência é o primeiro número porque é o único que não pode
+              esperar. Antes o resumo começava por "pedidos de consulta". */}
+            <Stat
+              label="Emergências sem desfecho"
+              value={sosNaoAtendidos}
+              highlight={sosNaoAtendidos > 0}
+              /* Vermelho, e não a cor da marca. Promover este número a "o único que
+               não pode esperar" e pintá-lo igual a "pedidos de consulta" é
+               desfazer a promoção no mesmo gesto. */
+              tom={sosNaoAtendidos > 0 ? "urgente" : undefined}
+            />
+            <Stat
+              label="Pacientes esperando"
+              value={novasPacientes}
+              highlight={novasPacientes > 0}
+            />
+            <Stat label="Pedidos de consulta" value={pendingAppts} highlight={pendingAppts > 0} />
+            <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
+          </div>
+
+          {/* A fila ABSORVEU as faixas soltas de SOS e de paciente esperando: elas
+            existiam porque não havia lista, e duas chamadas para a mesma coisa é
+            ruído. O modal de emergência continua, esse é outro assunto. */}
+          <FilaDeTrabalho
+            itens={fila}
+            fontesComFalha={[
+              ...(fonteFalhou.sos ? ["emergências"] : []),
+              ...(fonteFalhou.vinculos ? ["solicitações de pacientes"] : []),
+              ...(fonteFalhou.consultasEPerguntas ? ["consultas e perguntas"] : []),
+              ...(fonteFalhou.preConsultas ? ["pré-consultas"] : []),
+              ...(fonteFalhou.triagens ? ["alertas de sintomas"] : []),
+              ...(fonteFalhou.eventos ? ["registros clínicos"] : []),
+            ]}
+          />
         </div>
       )}
 

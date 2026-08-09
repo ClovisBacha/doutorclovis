@@ -13,7 +13,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { AVISO_EM, inicioDoCiclo, situacaoDaCota } from "./cota-ia.server";
-import { FORA_DA_FITA, abasNaFita } from "./abas-do-painel";
+import { FORA_DA_FITA, GRUPOS, abasNaFita } from "./abas-do-painel";
 
 function codigoDe(caminho: string): string {
   return readFileSync(caminho, "utf8")
@@ -758,27 +758,62 @@ describe("nenhuma aba fica órfã", () => {
   });
 });
 
-describe("o Cérebro é a primeira coisa que ele vê", () => {
+describe("o Cérebro está à mão, e o Painel é a porta", () => {
   const painel = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
 
-  test("é a primeira aba da fita", () => {
+  test("o Cérebro é o segundo grupo da fita — visível sem rolar", () => {
     /* Era a 11ª de 14 numa fita rolável de uma linha — uns oitocentos pixels à
        direita num celular. O médico precisava ROLAR para chegar na única parte
-       do painel que fica melhor quanto mais ele a usa. */
+       do painel que fica melhor quanto mais ele a usa.
+       Ele saiu do primeiro lugar quando a fila de trabalho passou a morar
+       dentro do Painel; o que este teste protege é o que importava desde o
+       começo — que ele esteja VISÍVEL, e não escondido no fim da fita. */
     const ordem = abasNaFita();
-    expect(ordem.indexOf("Cérebro 🧠")).toBe(0);
-    expect(ordem.indexOf("Cérebro 🧠")).toBeLessThan(ordem.indexOf("Painel 📊"));
+    const grupos = GRUPOS.map((g) => g.chave);
+    expect(grupos.indexOf("cerebro")).toBe(1);
+    expect(ordem.indexOf("Cérebro 🧠")).toBeLessThan(ordem.indexOf("Agendamentos"));
   });
 
-  test("e é a aba que abre", () => {
-    /* O painel de números diz o que ACONTECEU; o cérebro é onde ele MUDA o que
-       vai acontecer. */
+  test("a aba que abre é o Painel — porque é onde mora a fila de trabalho", () => {
+    /* A fila (emergências sem desfecho, pacientes esperando, pré-consultas por
+       ler) vivia num cabeçalho repetido em TODAS as telas. Ao trazê-la para
+       dentro do Painel, o Painel deixou de ser o relatório do que aconteceu e
+       virou o que ainda precisa dele — e aterrissar numa fila de trabalho ganha
+       de aterrissar em qualquer outra coisa. */
     /* Pela CONSTANTE, não pelo literal: o interruptor de push do SOS e o
        resumo do app se penduram na "aba de entrada", e escritos como
        `tab === "Painel 📊"` eles saíram silenciosamente da tela quando o
        Cérebro passou para a frente. */
-    expect(painel).toContain('const ABA_DE_ENTRADA: PanelTab = "Cérebro 🧠";');
+    expect(painel).toContain('const ABA_DE_ENTRADA: PanelTab = "Painel 📊";');
     expect(painel).toContain("useState<PanelTab>(ABA_DE_ENTRADA)");
+  });
+
+  test("o cabeçalho que aparecia em todas as telas não existe mais", () => {
+    /**
+     * "PAINEL DO MÉDICO / Gestão do consultório" gastava a primeira dobra de
+     * QUINZE telas para dizer ao médico onde ele já sabia que estava — ele
+     * chegou aqui clicando em "painel". Sai o título, entra a fita de abas logo
+     * abaixo da bolinha do perfil, e a primeira dobra passa a mostrar trabalho.
+     */
+    expect(painel).not.toContain("Gestão do consultório");
+    /* O `<h1>` inteiro, e não só a frase: trocar o texto e manter o cabeçalho
+       devolveria o mesmo espaço perdido com outra palavra dentro. */
+    expect(painel).not.toMatch(/<h1[^>]*>\s*Gestão/);
+  });
+
+  test("a fila de trabalho fica FORA do bloco que o celular esconde", () => {
+    /**
+     * O risco desta mudança inteira, num assert.
+     *
+     * O conteúdo da aba mora numa `div` que o app nativo esconde para mostrar
+     * `PainelNoApp` no lugar. Se a fila fosse parar lá dentro, ela existiria só
+     * no computador — e some justamente do telefone, que é onde ele abre o
+     * painel de madrugada para ver se alguém apertou o botão de emergência.
+     */
+    const corte = painel.indexOf('<div className={noApp && tab === abaDeEntrada ? "hidden"');
+    expect(corte).toBeGreaterThan(-1);
+    expect(painel.slice(0, corte)).toContain("<FilaDeTrabalho");
+    expect(painel.slice(corte)).not.toContain("<FilaDeTrabalho");
   });
 
   test("aparece uma vez só na lista", () => {
@@ -872,13 +907,13 @@ describe("as decisões do dono, escritas em teste", () => {
        Aterrissar no Painel (e não no Cérebro) é o que mantém TODAS as abas
        alcançáveis: se a entrada fosse o Cérebro, tocar em "Cérebro" não
        mostraria nada — a aba ativa seria a de entrada. */
-    /* Sem espaços: o prettier quebra o ternário em quatro linhas conforme o
-       tamanho dos nomes muda, e uma asserção presa à formatação quebra por
-       motivo errado. */
-    expect(painel.replace(/\s+/g, " ")).toContain(
-      "const abaDeEntrada = noApp ? ABA_DE_ENTRADA_SEM_IA",
-    );
-    expect(painel).toContain("if (nativo) setTab(ABA_DE_ENTRADA_SEM_IA);");
+    /* A ENTRADA VIROU UMA SÓ (ago/2026). Havia dois desvios — um para o Free,
+       cujo Cérebro é paywall, e outro para o app nativo — e os dois existiam
+       porque a entrada era o Cérebro. Com o Painel na porta, não há para onde
+       desviar: ele não é paywall de ninguém e é exatamente a tela que o resumo
+       do celular quer mostrar. */
+    expect(painel).toContain("const abaDeEntrada = ABA_DE_ENTRADA;");
+    expect(painel).not.toContain("ABA_DE_ENTRADA_SEM_IA:");
     expect(painel).toContain('noApp && tab === abaDeEntrada ? "hidden" : "mt-8"');
   });
 

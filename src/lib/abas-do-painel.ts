@@ -80,8 +80,22 @@ export type GrupoDeAbas = {
 };
 
 export const GRUPOS: readonly GrupoDeAbas[] = [
-  /* Cérebro primeiro, e é decisão de produto: o painel de números diz o que
-     ACONTECEU; o cérebro é onde ele MUDA o que vai acontecer. */
+  /* ─── PAINEL PRIMEIRO, E A RAZÃO MUDOU ────────────────────────────────────
+     O Cérebro vinha na frente por uma regra que era verdadeira: "o painel de
+     números diz o que ACONTECEU; o cérebro é onde ele MUDA o que vai
+     acontecer". Abrir num relatório fazia o produto parecer um relatório.
+
+     O que virou a regra do avesso não foi gosto: foi a FILA DE TRABALHO mudar
+     de lugar (ago/2026). Ela vivia num cabeçalho repetido em todas as telas —
+     emergências, pacientes esperando, pré-consultas por ler — e agora mora
+     dentro do Painel. Com ela dentro, o Painel deixou de ser o que aconteceu e
+     passou a ser o que AINDA PRECISA DELE. Aterrissar numa fila de trabalho é
+     melhor que aterrissar em qualquer outra coisa.
+
+     Pedido do dono: "tira esse painel aí de cima, que aparece em todas as
+     telas, e transfere tudo pra esse painel unificado, que pode ser a nossa
+     primeira aba". */
+  { chave: "painel", rotulo: "Painel 📊", filhas: ["Painel 📊", "Engajamento"] },
   { chave: "cerebro", rotulo: "Cérebro 🧠", filhas: ["Cérebro 🧠", "Perguntas"] },
   {
     chave: "pacientes",
@@ -93,7 +107,6 @@ export const GRUPOS: readonly GrupoDeAbas[] = [
     rotulo: "Agenda 📅",
     filhas: ["Agendamentos", "Calendário", "Teleconsultas", "Consultas Pagas"],
   },
-  { chave: "painel", rotulo: "Painel 📊", filhas: ["Painel 📊", "Engajamento"] },
   { chave: "ferramentas", rotulo: "Ferramentas", filhas: ["Ferramentas", "Lives"] },
 ] as const;
 

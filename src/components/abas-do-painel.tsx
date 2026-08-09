@@ -55,7 +55,14 @@ export function AbasDoPainel({
       <div
         role="tablist"
         aria-label="Áreas do painel"
-        className="flex snap-x gap-1 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        /* ─── O ESPAÇO ENTRE OS GRUPOS É PARTE DA FITA ────────────────────
+           `gap-1` com `px-4` em cada botão empilhava cinco rótulos quase
+           encostados: o que separava um do outro era a palavra, não o espaço, e
+           lida de relance a fita parecia uma frase. O ar foi para o GAP e saiu
+           do padding, então a fita não ficou mais larga — só ficou legível.
+           Pedido do dono: "aumenta o espaçamento entre o cérebro, o pacientes,
+           agenda, painel, ferramentas". */
+        className="flex snap-x gap-5 overflow-x-auto border-b border-border sm:gap-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {GRUPOS.map((g) => {
           const total = somaDoGrupo(g.chave, contadores);
@@ -66,7 +73,7 @@ export function AbasDoPainel({
               role="tab"
               aria-selected={ativo}
               onClick={() => onEscolher(abaDeEntradaDoGrupo(g.chave))}
-              className={`shrink-0 snap-start whitespace-nowrap border-b-2 px-3.5 py-2 text-sm font-medium transition-colors sm:px-4 ${
+              className={`shrink-0 snap-start whitespace-nowrap border-b-2 px-0.5 py-2.5 text-[15px] font-medium transition-colors ${
                 ativo
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-primary"

@@ -33,10 +33,25 @@ describe("1. o pedido do dono: no máximo cinco", () => {
     expect(GRUPOS.length).toBe(5);
   });
 
-  test("e o Cérebro é o primeiro", () => {
-    /* Decisão de produto, não de layout: o painel de números diz o que
-       ACONTECEU; o cérebro é onde ele MUDA o que vai acontecer. */
-    expect(GRUPOS[0].chave).toBe("cerebro");
+  test("o Painel é o primeiro, e o Cérebro logo em seguida", () => {
+    /**
+     * Aqui houve uma INVERSÃO, e ela está escrita para não ser desfeita por
+     * engano.
+     *
+     * O Cérebro vinha primeiro por uma regra verdadeira: o painel de números
+     * diz o que ACONTECEU; o cérebro é onde ele MUDA o que vai acontecer.
+     *
+     * O que virou a regra do avesso foi a FILA DE TRABALHO mudar de lugar
+     * (ago/2026). Ela vivia num cabeçalho repetido em todas as telas e passou a
+     * morar dentro do Painel — com ela dentro, o Painel deixou de ser números
+     * do passado e virou o que AINDA PRECISA DELE. Aterrissar numa fila de
+     * trabalho ganha de aterrissar em qualquer outra coisa.
+     *
+     * O Cérebro em segundo, e não em quinto: continua sendo a parte que fica
+     * melhor quanto mais ele a usa, e era a 11ª de 14 antes de tudo isso.
+     */
+    expect(GRUPOS[0].chave).toBe("painel");
+    expect(GRUPOS[1].chave).toBe("cerebro");
   });
 });
 
