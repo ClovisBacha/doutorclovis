@@ -80,3 +80,85 @@ describe("a lista de colunas do recuo não pode divergir da leitura", () => {
     expect(fn.slice(i, i + 260)).toContain("display_name");
   });
 });
+
+describe("A CLASSE: nenhum caminho de ESCRITA confere `42703` cru", () => {
+  /**
+   * ─── POR QUE ISTO É UM TESTE DE VARREDURA, E NÃO DE CASO ──────────────────
+   *
+   * `postgrest.ts` já documentava a regra por extenso: um INSERT/UPDATE cujo
+   * payload cita coluna fora do schema cache volta PGRST204, do PostgREST;
+   * 42703 vem do Postgres, num SELECT. Quem escreve `42703` num caminho de
+   * escrita escreveu um recuo que nunca roda.
+   *
+   * A regra estava escrita, e mesmo assim eu encontrei SEIS violações nesta
+   * madrugada — três em `doctors.functions.ts`, uma em `lives`, uma no agente
+   * de WhatsApp. E as consequências não eram cosméticas: "Salvar perfil"
+   * falhava sempre, e o pedido de consulta feito pelo WhatsApp simplesmente
+   * sumia, sem chegar a painel nenhum e sem deixar rastro.
+   *
+   * Um comentário não impede a sétima. Este teste impede.
+   */
+  const ESCRITAS = [".insert(", ".update(", ".upsert(", ".delete("];
+
+  function violacoes(): string[] {
+    const { execSync } = require("node:child_process");
+    const saida = execSync(
+      "grep -rn 'code === \"42703\"' --include=*.ts --include=*.tsx src || true",
+      { encoding: "utf8" },
+    );
+    const achados: string[] = [];
+    for (const linha of saida.split("\n")) {
+      if (!linha.trim()) continue;
+      const [arq, n] = linha.split(":");
+      if (arq.endsWith(".test.ts") || arq.endsWith("postgrest.ts")) continue;
+      const fonte = readFileSync(arq, "utf8").split("\n");
+      const i = Number(n);
+      /* Janela curta de propósito: olhar longe demais alcança a função
+         anterior, e um SELECT vira falso positivo — foi o que aconteceu com
+         `consultaparticular.functions.ts` na primeira varredura. */
+      /**
+       * QUAL OPERAÇÃO PRODUZIU ESTE `error` — pela mais PRÓXIMA acima, não por
+       * uma janela de N linhas.
+       *
+       * A janela fixa errou nos dois sentidos: curta demais, um comentário de
+       * catorze linhas empurrava o `.insert(` para fora e a violação passava
+       * (foi o que aconteceu com o agente de WhatsApp); longa demais, alcançava
+       * a função anterior e um SELECT virava falso positivo.
+       *
+       * Comparar a distância até a escrita e até o `.select(` responde a
+       * pergunta certa: de quem é este erro.
+       */
+      const acima = fonte.slice(0, i).join("\n");
+      const ultimaEscrita = Math.max(...ESCRITAS.map((op) => acima.lastIndexOf(op)));
+      const ultimaLeitura = acima.lastIndexOf(".select(");
+      const janela = ultimaEscrita > ultimaLeitura ? ".insert(" : "";
+      const linha0 = fonte[i - 1].trim();
+      /* Comentário não é código. Os próprios comentários que EXPLICAM este
+         defeito citam `code === "42703"` para dizer o que era feito antes — e
+         a primeira versão desta varredura acusava a explicação como se fosse a
+         violação. */
+      const ehComentario =
+        linha0.startsWith("*") || linha0.startsWith("//") || linha0.startsWith("/*");
+      const ehEscrita = ESCRITAS.some((op) => janela.includes(op));
+      const jaCobre = linha0.includes("PGRST204");
+      if (ehEscrita && !jaCobre && !ehComentario) achados.push(`${arq}:${n}`);
+    }
+    return achados;
+  }
+
+  test("a varredura não encontra nenhum", () => {
+    expect(violacoes()).toEqual([]);
+  });
+
+  test("e a varredura de fato enxerga o código (não passa por vacuidade)", () => {
+    /* Sem isto, um `grep` quebrado devolveria zero violações para sempre e o
+       teste viraria decoração — que é o mesmo formato do defeito que ele
+       persegue. */
+    const { execSync } = require("node:child_process");
+    const saida = execSync(
+      "grep -rn 'code === \"42703\"' --include=*.ts --include=*.tsx src || true",
+      { encoding: "utf8" },
+    );
+    expect(saida.split("\n").filter(Boolean).length).toBeGreaterThan(5);
+  });
+});

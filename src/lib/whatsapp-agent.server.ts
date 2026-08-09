@@ -368,9 +368,27 @@ async function createAppointmentRequest(
   const { error } = await (sb as any)
     .from("appointment_requests")
     .insert(targetDoctor ? { ...row, doctor_id: targetDoctor } : row);
-  if (error?.code === "42703" && targetDoctor) {
+  /* ─── `colunaAusente`, E NÃO `42703` CRU ──────────────────────────────────
+   *
+   * Isto é um INSERT: um payload com coluna fora do schema cache volta
+   * PGRST204, do PostgREST — nunca 42703, que é do Postgres num SELECT. O recuo
+   * portanto NUNCA rodava, e a consequência não é cosmética: num banco sem
+   * `doctor_id` em `appointment_requests`, o insert falhava, o recuo não
+   * acontecia, e nada era devolvido nem registrado. A paciente pedia consulta
+   * pelo WhatsApp, o agente respondia que estava agendado, e o pedido não
+   * chegava a painel nenhum.
+   *
+   * Sexta ocorrência desta mesma classe nesta madrugada — o `postgrest.ts`
+   * existe justamente para ela. */
+  const { colunaAusente } = await import("./postgrest");
+  if (colunaAusente(error) && targetDoctor) {
     // Coluna doctor_id ainda não migrada: registra sem atribuição.
-    await (sb as any).from("appointment_requests").insert(row);
+    const { error: e2 } = await (sb as any).from("appointment_requests").insert(row);
+    if (e2) console.error("[whatsapp] pedido de consulta não gravou", e2);
+  } else if (error) {
+    /* O silêncio aqui era total: sem log, um pedido perdido não deixava rastro
+       em lugar nenhum. */
+    console.error("[whatsapp] pedido de consulta não gravou", error);
   }
 }
 
