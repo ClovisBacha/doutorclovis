@@ -566,9 +566,28 @@ export const listUnansweredQuestions = createServerFn({ method: "POST" })
     if (!target) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    /* ─── O CARIMBO NÃO BASTA ────────────────────────────────────────────────
+     *
+     * `doctor_questions.doctor_id` é gravado no instante em que a paciente
+     * pergunta. `encerrarAcompanhamento` zera `patient_profiles.doctor_id` e
+     * não toca em carimbo nenhum — é uma tabela só. Então a paciente troca de
+     * consultório e a pergunta dela continua caindo na fila do médico
+     * ANTERIOR, que a lê, responde, e ensina o cérebro dele com uma dúvida
+     * clínica de quem não é mais paciente dele.
+     *
+     * É a mesma falha que `vinculo.server.ts` foi criado para fechar nas outras
+     * três listas do painel. `doctor_questions` ficou de fora.
+     *
+     * `user_id` entra no `select` só para o cruzamento — ele NÃO vai para a
+     * tela, e continua fora do retorno. */
+    const { vinculadasAgora } = await import("./vinculo.server");
+    const atuais = await vinculadasAgora(supabaseAdmin as any, {
+      isTeam: false,
+      doctorId: target.doctorId,
+    });
     let query = (supabaseAdmin as any)
       .from("doctor_questions")
-      .select("id,question,created_at")
+      .select("id,question,created_at,user_id")
       .eq("answered", false)
       .order("created_at", { ascending: true })
       .limit(50);
@@ -593,20 +612,40 @@ export const listUnansweredQuestions = createServerFn({ method: "POST" })
         total: 0,
       };
     }
+    /* O cruzamento com o vínculo ATUAL, e o `user_id` some no caminho. */
+    const daFila = (
+      (rows ?? []) as { id: string; question: string; created_at: string; user_id: string }[]
+    )
+      .filter((r) => atuais === null || atuais.has(r.user_id))
+      .map(({ user_id: _u, ...resto }) => resto);
+
     /* A CONTAGEM EXATA, além das 50 que a tela mostra.
        O badge da fita contava não-respondidas entre as 200 mais RECENTES; este
        card lista as 50 mais ANTIGAS. Com 73 na fila, a fita dizia 73 e o card
        mostrava 50, um do lado do outro — dois números para a mesma coisa, e
-       nenhum dos dois exato. `head: true` traz só o número. */
-    const { count } = await (supabaseAdmin as any)
+       nenhum dos dois exato.
+
+       A contagem também passa pelo vínculo: contar pelo carimbo e listar pelo
+       vínculo daria um badge que nunca zera — o médico responde tudo o que
+       aparece e o número teima num resto que ele não tem como alcançar. */
+    const { data: todas } = await (supabaseAdmin as any)
       .from("doctor_questions")
-      .select("id", { count: "exact", head: true })
+      .select("user_id")
       .eq("answered", false)
       .eq("doctor_id", target.doctorId);
+    /* `head: true` traria só um número — e um número contado pelo CARIMBO, que
+       é justamente o que não serve aqui. Vem só a coluna `user_id`, que é
+       barata, e a contagem sai depois do mesmo recorte da lista. */
+    const totalReal =
+      todas == null
+        ? daFila.length
+        : ((todas ?? []) as { user_id: string }[]).filter(
+            (r) => atuais === null || atuais.has(r.user_id),
+          ).length;
     return {
       ok: true as const,
-      total: typeof count === "number" ? count : ((rows ?? []) as unknown[]).length,
-      questions: (rows ?? []) as { id: string; question: string; created_at: string }[],
+      total: totalReal,
+      questions: daFila,
     };
   });
 
