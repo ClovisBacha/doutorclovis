@@ -473,3 +473,30 @@ botões "Ver relatório", os dois carregadores de aba, e os três recuos de colu
 ausente em `doctors.functions.ts`.
 
 Ao consertar qualquer coisa neste repositório, vale procurar o irmão.
+
+---
+
+## Lacuna de modelagem encontrada ao unificar a agenda (9/ago, tarde)
+
+**`private_consultations` não guarda data marcada.** A tabela tem
+`preferred_dates` — as datas que a PACIENTE preferiria — e nenhum campo para o
+horário que ficou combinado. Não há `confirmed_at`, `scheduled_for` nem
+equivalente.
+
+Consequência prática: a consulta particular é a única das três fontes da agenda
+que não sabe dizer quando acontece. O calendário a coloca na primeira
+preferência e a marca como "sem hora combinada" (tracejada), porque as duas
+alternativas são piores — esconder some justamente com a consulta pela qual o
+médico já recebeu, e pintar como compromisso faz ele contar com uma hora que
+ninguém combinou.
+
+**A decisão é do dono**, e são duas:
+
+1. A consulta particular passa a ter data/hora combinada no banco (uma coluna
+   nova + o lugar na tela onde ele marca)? É o que faz ela virar compromisso de
+   verdade no calendário.
+2. Quem marca — ele, ao confirmar o pagamento, ou ela, escolhendo entre horários
+   que ele abriu?
+
+Enquanto não houver decisão, o comportamento atual é o mais honesto possível com
+o dado que existe.
