@@ -363,6 +363,42 @@ peso subindo 200 g/semana e 900 g/semana têm o mesmo último peso na tela.
   `w-full h-auto`): `preserveAspectRatio="none"` esticado deforma os pontos em
   elipses.
 
+### O cartão da paciente (ago/2026)
+
+Abrir uma paciente entregava uma rolagem de ~440 linhas. Hoje são **três abas**
+(`src/lib/abas-da-paciente.ts`, testado):
+
+| Aba          | Pergunta                      | Conteúdo                                   |
+| ------------ | ----------------------------- | ------------------------------------------ |
+| **Agora**    | "o que eu faço com ela hoje?" | quem é, o que pede olhar, o que mudou, SOS |
+| **História** | "como ela chegou aqui?"       | gráficos e linha do tempo                  |
+| **Ficha**    | "quem ela é?"                 | perfil clínico e a conversa com a IA       |
+
+- **O contador sobe para a aba** (`contadorDaAba`): pendentes + SOS sem
+  desfecho, em "Agora". Sem isso a divisão esconderia trabalho clínico.
+- "Quem é ela" fica em **Agora**, não em Ficha: 135/88 em 22 e em 38 semanas são
+  conversas diferentes.
+- `ProntuarioPaciente` ganhou a prop `secoes` em vez de virar três componentes —
+  dividir o componente dividiria as chamadas ao servidor.
+
+**A consulta abre pré-preenchida** (`resumo-da-consulta.ts`) com o que ela
+registrou desde a última — **só no campo de ACHADOS**. Nunca nos campos de
+medida: `consultas.systolic` é o que o médico aferiu, e preenchê-lo com a
+pressão que ela mediu em casa faria o prontuário afirmar uma aferição que não
+aconteceu.
+
+**A paciente comparada com ela mesma** (`sinalPressaoComBase` em
+`sinais-clinicos.ts`): +30/+15 sobre a média das PRIMEIRAS medidas dela. Base
+móvel faria a subida lenta arrastar a referência junto. A gravidade final é
+sempre a MAIOR entre absoluta e delta — o delta nunca rebaixa um 165/105.
+
+**Quem parou de registrar** entra na fila (`silencio.ts`), no nível mais baixo:
+`sinais-clinicos` declara que silêncio NÃO é sinal clínico. Prazo por fase
+(7 d ≥36s, 12 d ≥28s, 21 d antes). Recém-cadastrada sem registro não entra.
+
+**Folha para levar** (`folha-da-paciente.tsx`): impressão do navegador, sem
+biblioteca de PDF. Carimba data, hora e a origem dos números.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

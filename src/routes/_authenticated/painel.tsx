@@ -54,6 +54,7 @@ import {
 import { exameSugerido } from "@/lib/exame-sugerido";
 import { filtrarPacientes } from "@/lib/busca-paciente";
 import { quemEstaQuieta, textoDaQuietude } from "@/lib/silencio";
+import { FolhaDaPaciente } from "@/components/folha-da-paciente";
 import {
   ABAS_DA_PACIENTE,
   ABA_INICIAL_DA_PACIENTE,
@@ -11462,6 +11463,9 @@ function PatientDetailModal({
      semana. A régua (o que vai em cada aba, e o contador) mora em
      `abas-da-paciente`, testada. */
   const [abaDaFicha, setAbaDaFicha] = useState<AbaDaPaciente>(ABA_INICIAL_DA_PACIENTE);
+  /* A folha para levar — encaminhamento, segunda opinião, internação de
+     madrugada. Nesses momentos o sistema não está com ele: está o papel. */
+  const [folhaAberta, setFolhaAberta] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -11605,8 +11609,14 @@ function PatientDetailModal({
             consulta. Estavam numa aba separada que obrigava a escolher a
             paciente de novo, no fim do fluxo, depois de já ter estado na ficha
             dela. */}
-        <div className="shrink-0 border-b border-border px-4 py-2.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
           <AcoesDaPaciente p={p} tokenFn={tokenFn} />
+          <button
+            onClick={() => setFolhaAberta(true)}
+            className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
+          >
+            📄 Folha para levar
+          </button>
         </div>
 
         {/* ─── A FITA DA FICHA ──────────────────────────────────────────
@@ -11926,6 +11936,23 @@ function PatientDetailModal({
           )}
         </div>
       </div>
+
+      {/* A folha, por cima de tudo. Fora da rolagem do cartão de propósito: ela
+          é uma PÁGINA, e o `print:` dela precisa de um contêiner que não seja
+          filho de um `overflow-y-auto` — senão o navegador imprime só a parte
+          visível. */}
+      {folhaAberta && (
+        <FolhaDaPaciente
+          nome={p.display_name ?? "Paciente"}
+          ficha={fichaClin}
+          eventos={prontuario}
+          consultas={consultasDela}
+          semanas={p.weeks ?? null}
+          dpp={p.due_date ?? null}
+          medico={null}
+          onFechar={() => setFolhaAberta(false)}
+        />
+      )}
     </div>
   );
 }
