@@ -129,7 +129,7 @@ O medico com plano Pro Equipe abre o menu do perfil e clica em 'Minha clinica'. 
 `src/lib/clinical.functions.ts:1348`  
 O medico abre Ferramentas, expande 'Suplementacao pre-natal padrao', clica 'Enviar a uma paciente', escolhe a paciente e confirma. O INSERT em `doctor_orders` volta 42P01, `emitirParaPaciente` devolve `{ok:false}`, o modal lanca e mostra 'Nao consegui enviar. Tente de novo.' — mensagem que convida a repetir um ato que nunca vai funcionar. A tabela so existe em `20260731030000_prescricoes_e_pedidos.sql` e em `supabase/APLICAR_RECEITAS.sql`; nao esta no APLICAR_PENDENTES.sql (o unico arquivo que o CLAUDE.md manda aplicar) nem no BANCO_COMPLETO.sql. O erro tambem nao distingue 42P01 de falha de rede, entao ninguem descobre que falta rodar um SQL.
 
-**"Salvar perfil" falha SEMPRE num banco sem APLICAR_MEDICO.sql — a rede de 42703 esqueceu 4 colunas**  
+**✅ "Salvar perfil" falha SEMPRE num banco sem APLICAR_MEDICO.sql — a rede de 42703 esqueceu 4 colunas**  
 `src/lib/doctors.functions.ts:513`  
 O médico abre Meu Perfil, preenche/corrige qualquer campo e clica "Salvar perfil". O painel monta `perfil` sempre com consultation_currency, consultation_price_cents, focos e photo_url (painel.tsx:9596 — nunca undefined: moeda cai em "BRL", cents em 0, focos em [] e photo_url em ""). Num banco onde só o APLICAR_PENDENTES.sql foi rodado essas 4 colunas NÃO existem: o 1º update devolve 42703, a retentativa apaga só as 12 chaves de RICH_UPDATE_KEYS, manda as 4 de novo, toma 42703 outra vez e volta ok:false. A tela diz apenas "Não foi possível salvar o perfil." — sem citar SQL nenhum. Nada do perfil é salvo, nunca, por nenhum caminho: registerDoctor tem a MESMA lista incompleta, então o médico novo também não consegue se cadastrar.
 
@@ -200,7 +200,7 @@ Toda montagem do BrainGapsCard dispara `void curarLacunasDoMedico(...)`, que cha
 `src/lib/admin.functions.ts:168`  
 Num banco onde APLICAR_PENDENTES.sql nao foi rodado (o cenario declarado no CLAUDE.md), a coluna doctor_id nao existe em doctor_questions. Toda consulta da aba passa por scopedBy → `.eq("doctor_id", ...)` → PostgREST 42703. Como o erro e descartado (achado seguinte), a aba mostra 'Nenhuma pergunta ainda.' e a faixa 'nao consegui conferir tudo' fica APAGADA (res.ok=true zera fonteFalhou.consultasEPerguntas, painel.tsx:632). Responder tambem morre: responderPergunta busca a linha com `.eq("doctor_id", user.id)` (clinical.functions.ts:1477), a consulta erra, `pergunta` vem null e a funcao devolve {ok:false} generico — o toast diz 'Nao consegui enviar. Tente de novo.' para sempre, sem cair no aviso 'banco_desatualizado', que so cobre o payload do UPDATE.
 
-**getAdminData descarta o campo error das duas consultas — lista vazia com cara de 'nao tem nada'**  
+**✅ getAdminData descarta o campo error das duas consultas — lista vazia com cara de 'nao tem nada'**  
 `src/lib/admin.functions.ts:188`  
 Qualquer falha (coluna ausente, timeout, RLS) na consulta de doctor_questions OU na de patient_profiles devolve {data:null,error} — supabase-js nao lanca. O codigo faz `(questions.data ?? [])` e `(profiles.data ?? [])`, monta nameById vazio e o filtro por vinculo derruba TODAS as perguntas. O handler devolve ok:true, o painel zera fonteFalhou.consultasEPerguntas e a aba renderiza 'Nenhuma pergunta ainda.' (painel.tsx:2846). Detalhe cruel: basta a consulta de patient_profiles falhar — nada a ver com perguntas — para a aba ficar vazia e silenciosa. O irmao no Cerebro faz o certo (listUnansweredQuestions devolve ok:false e a tela mostra a faixa ambar 'isto nao quer dizer que nao ha nenhuma').
 
@@ -411,7 +411,7 @@ diagnosticoDaBusca devolve o mesmo `ok:false` em três situações distintas: mi
 `src/routes/_authenticated/painel.tsx:362`  
 `loadTriagens()` roda no mount, no tique de 3 minutos e ao voltar para a aba, gastando uma ida ao servidor por vez. O resultado entra em `setTriagens(r.triagens)` e o array MORRE ali: `grep -n triagens painel.tsx` devolve só a declaração do useState, o flag de falha e a escrita — nenhuma leitura em JSX, nenhum .map, nenhum .length. A decisão de não pôr triagem na fila é deliberada e está documentada (painel.tsx:874-878: ela chega pelo fluxo de eventos clínicos, `ev-triage_logs-`), mas a carga ficou para trás. Consequência prática: três chamadas por ciclo sem consumidor, e a entrada 'alertas de sintomas' em fontesComFalha avisa o médico sobre uma fonte que ele não veria de qualquer jeito por esse caminho.
 
-**Link de live sem https vira 'Falha de conexão' — o médico culpa a internet**  
+**✅ Link de live sem https vira 'Falha de conexão' — o médico culpa a internet**  
 `src/routes/_authenticated/painel.tsx:10361`  
 O médico cola 'www.instagram.com/drfulano/live' no campo Link e clica em Cadastrar. z.string().url() reprova no inputValidator, a server function rejeita antes de chegar ao handler, e o único catch da função escreve 'Falha de conexão — tente novamente.' Ele tenta de novo com a mesma URL, troca de rede, e nunca descobre que faltava o https://. O caminho que existe para explicar erro (toast.error(res.error)) só é alcançado quando o handler roda.
 
@@ -446,3 +446,30 @@ A função de servidor que lê as assinaturas do usuário (product, plan, status
 **"Foto atualizada ✓" antes de a foto entrar no perfil**  
 `src/components/campo-foto.tsx:88`  
 O médico escolhe a foto, ela sobe para o bucket e o toast diz "Foto atualizada ✓". Mas o `onChange` só mexe no estado do formulário: a coluna doctors.photo_url só é escrita quando ele clica "Salvar perfil" depois. Se ele trocar de aba, fechar o painel ou o save falhar (ver o achado do 42703, em que photo_url é justamente uma das colunas que derrubam o update), o arquivo fica órfão no Storage e a paciente continua vendo o círculo com a inicial — depois de a tela ter confirmado a troca.
+
+---
+
+## Estado em 9/ago/2026, fim do dia
+
+Além dos itens marcados acima, esta lista ganhou uma trava de CLASSE que não
+estava nela:
+
+**O `42703` em caminho de escrita.** `postgrest.ts` já documentava que um
+INSERT/UPDATE com coluna fora do schema cache volta `PGRST204`, e que 42703 vem
+do Postgres num SELECT — ou seja, quem escreve `42703` numa escrita escreveu um
+recuo que nunca roda. Havia **seis** violações. As consequências não eram
+cosméticas: "Salvar perfil" falhava sempre, e o pedido de consulta feito pelo
+WhatsApp sumia sem chegar a painel nenhum.
+
+Um comentário não impediu a sexta. Agora há um teste que VARRE a base
+(`src/lib/salvar-perfil-do-medico.test.ts`) e reprova a sétima.
+
+### O padrão mais recorrente desta auditoria
+
+Seis vezes o mesmo formato: **a correção existe num lugar e não no irmão ao
+lado.** O fuso da teleconsulta (a tela de Lives já convertia), o `select("*")`
+do álbum, a autorização de teleconsulta (lista corrigida, ações não), os dois
+botões "Ver relatório", os dois carregadores de aba, e os três recuos de coluna
+ausente em `doctors.functions.ts`.
+
+Ao consertar qualquer coisa neste repositório, vale procurar o irmão.
