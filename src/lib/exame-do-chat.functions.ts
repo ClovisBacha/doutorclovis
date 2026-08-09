@@ -107,26 +107,25 @@ export const enviarExameDoChat = createServerFn({ method: "POST" })
       const doctorId = (prof?.doctor_id as string | null) ?? null;
       const nomeDela = ((prof?.display_name as string | null) ?? "").trim() || "Uma paciente";
 
-      /* O laudo vai para o Storage; `null` devolvido significa que o balde não
-         respondeu, e aí grava base64 como sempre gravou. O exame da paciente
-         nunca pode se perder por causa de uma migração de armazenamento. */
-      const { guardarImagem, BALDE_EXAMES } = await import("@/lib/imagens.server");
-      const caminho = await guardarImagem({
+      /* O laudo vai para o Storage, com DOIS recuos — o balde pode não existir
+         e a coluna também não. Os dois voltam a gravar base64, como sempre foi.
+         O exame da paciente nunca pode se perder por causa de uma migração de
+         armazenamento: ela fotografa o laudo às onze da noite e não tem como
+         saber que a culpa é de uma coluna. */
+      const { gravarLinhaComImagem, BALDE_EXAMES } = await import("@/lib/imagens.server");
+      const { error } = await gravarLinhaComImagem({
+        tabela: "exam_files",
         balde: BALDE_EXAMES,
         donoId: u.user.id,
         dataUrl: data.imagem,
-      });
-      const { error } = await sb.from("exam_files").insert({
-        user_id: u.user.id,
-        /* Nome com a data porque é o que a lista do médico mostra, e "Exame"
-           repetido dez vezes não distingue nada. */
-        name: `Enviado no chat — ${ymdBrasilia()}`,
-        category: "outros",
-        notes: data.nota?.slice(0, 500) || null,
-        /* Uma coisa OU outra — gravar as duas manteria o peso que a mudança
-           existe para tirar. */
-        image_data: caminho ? null : data.imagem,
-        image_path: caminho,
+        resto: {
+          user_id: u.user.id,
+          /* Nome com a data porque é o que a lista do médico mostra, e "Exame"
+             repetido dez vezes não distingue nada. */
+          name: `Enviado no chat — ${ymdBrasilia()}`,
+          category: "outros",
+          notes: data.nota?.slice(0, 500) || null,
+        },
       });
       /* Erro aqui é o único que a paciente PRECISA ver: se o exame não foi
          gravado, ela tem que saber para mandar de novo. Todo o resto desta

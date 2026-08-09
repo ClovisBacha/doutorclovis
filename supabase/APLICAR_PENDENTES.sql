@@ -2965,3 +2965,32 @@ GRANT ALL ON public.brain_gap_askers TO service_role;
 
 COMMENT ON TABLE public.brain_gap_askers IS
   'Quem perguntou cada lacuna. Existe para a IA poder cumprir o que promete a paciente ("registrei aqui para ele ver") — brain_gaps e deduplicada por pergunta e nao guarda quem perguntou.';
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  IMAGENS NO STORAGE  (exam_files.image_path / family_album_posts.image_path)
+-- ----------------------------------------------------------------------------
+--  Repetido aqui de propósito. O arquivo completo é
+--  supabase/APLICAR_IMAGENS_NO_STORAGE.sql (com os baldes e os índices do
+--  backfill), mas o CLAUDE.md manda rodar ESTE — e depender de alguém lembrar
+--  de um segundo arquivo é como `brain_gap_askers` ficou de fora por semanas.
+--
+--  Sem a coluna, o código NÃO perde só a economia de disco: o PostgREST recusa
+--  o INSERT inteiro com PGRST204 e o SELECT com 42703. Há recuo no código para
+--  os dois casos (ver src/lib/imagens.server.ts), então nada quebra — mas o
+--  laudo continua indo para dentro da linha, que é o que se quer evitar.
+-- ════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE IF EXISTS public.exam_files
+  ADD COLUMN IF NOT EXISTS image_path text;
+
+ALTER TABLE IF EXISTS public.family_album_posts
+  ADD COLUMN IF NOT EXISTS image_path text;
+
+insert into storage.buckets (id, name, public)
+values ('album', 'album', false)
+on conflict (id) do update set public = false;
+
+insert into storage.buckets (id, name, public)
+values ('exames', 'exames', false)
+on conflict (id) do update set public = false;

@@ -117,6 +117,84 @@ export async function guardarImagem(opts: {
   }
 }
 
+/**
+ * Grava a linha com a imagem — e sobrevive ao banco que ainda não tem a coluna.
+ *
+ * ─── O DEFEITO QUE ISTO EVITA, E QUE JÁ ESTEVE NO AR ────────────────────────
+ *
+ * `guardarImagem` já recuava quando o BALDE não existia. Faltava o outro lado:
+ * a COLUNA. E aí o desenho "seguro" tinha um buraco no meio.
+ *
+ * O PostgREST não ignora uma coluna desconhecida no payload — ele recusa o
+ * INSERT inteiro com PGRST204. Como `image_path` nasce num APLICAR que o banco
+ * de produção ainda não viu, mandar a coluna junto não deixava de economizar
+ * disco: **não gravava o exame da paciente**. Ela fotografa o laudo às onze da
+ * noite, a tela diz que falhou, e não há nada em lugar nenhum.
+ *
+ * O mesmo vale para a leitura (42703), tratada em `lerComCaminho`.
+ *
+ * O recuo devolve o base64 para `image_data` — senão a linha entraria sem
+ * imagem alguma — e apaga o arquivo que subiu, que sem referência seria órfão
+ * puro, pago e invisível.
+ */
+export async function gravarLinhaComImagem(opts: {
+  tabela: string;
+  balde: string;
+  donoId: string;
+  dataUrl: string | null | undefined;
+  /** Os outros campos da linha, sem nada de imagem. */
+  resto: Record<string, unknown>;
+}): Promise<{ error: { message?: string } | null }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const sb = supabaseAdmin as any;
+  const caminho = await guardarImagem({
+    balde: opts.balde,
+    donoId: opts.donoId,
+    dataUrl: opts.dataUrl,
+  });
+
+  const { error } = await sb.from(opts.tabela).insert({
+    ...opts.resto,
+    /* Uma coisa OU outra: gravar as duas manteria o peso que esta mudança
+       existe para tirar. */
+    image_data: caminho ? null : (opts.dataUrl ?? null),
+    image_path: caminho,
+  });
+  if (!error) return { error: null };
+
+  const { colunaAusente } = await import("./postgrest");
+  if (!colunaAusente(error)) return { error };
+
+  /* Banco sem a coluna: volta ao formato antigo, com a imagem inteira. */
+  await apagarImagem(opts.balde, caminho);
+  const { error: erro2 } = await sb
+    .from(opts.tabela)
+    .insert({ ...opts.resto, image_data: opts.dataUrl ?? null });
+  return { error: erro2 };
+}
+
+/**
+ * Lê uma linha pedindo `image_path`; se a coluna não existir, lê sem ela.
+ *
+ * Um `select` que cita coluna ausente volta 42703 e derruba a consulta INTEIRA
+ * — o médico não veria laudo nenhum, nem os que estão em base64 e sempre
+ * funcionaram. `colunas` deve trazer os campos SEM `image_path`; ele é
+ * acrescentado aqui e removido no recuo.
+ */
+export async function lerComCaminho<T = any>(
+  tabela: string,
+  colunas: string,
+  aplicarFiltros: (q: any) => any,
+): Promise<{ data: T | null; error: { message?: string } | null }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const sb = supabaseAdmin as any;
+  const primeira = await aplicarFiltros(sb.from(tabela).select(`${colunas},image_path`));
+  if (!primeira.error) return primeira;
+  const { colunaAusente } = await import("./postgrest");
+  if (!colunaAusente(primeira.error)) return primeira;
+  return await aplicarFiltros(sb.from(tabela).select(colunas));
+}
+
 /** URL assinada de vida curta. `null` se o objeto não existe ou o balde não. */
 export async function urlAssinada(
   balde: string,

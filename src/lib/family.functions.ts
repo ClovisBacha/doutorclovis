@@ -47,9 +47,7 @@ export const createAlbumPost = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
-    const { error } = await supabaseAdmin
-      .from("family_album_posts")
-      .insert(await linhaComImagem(u.user.id, data));
+    const { error } = await gravarPost(u.user.id, data);
     return { ok: !error, error: error?.message };
   });
 
@@ -67,7 +65,7 @@ export const createAlbumPost = createServerFn({ method: "POST" })
  * de lá está atrás do repositório há meses —, a foto entra em base64 e ninguém
  * percebe. Quando o balde aparece, a economia começa sozinha, sem novo deploy.
  */
-async function linhaComImagem(
+async function gravarPost(
   donoId: string,
   data: {
     authorName: string;
@@ -76,22 +74,19 @@ async function linhaComImagem(
     emoji: string | null;
   },
 ) {
-  const { guardarImagem, BALDE_ALBUM } = await import("@/lib/imagens.server");
-  const caminho = await guardarImagem({
+  const { gravarLinhaComImagem, BALDE_ALBUM } = await import("@/lib/imagens.server");
+  return await gravarLinhaComImagem({
+    tabela: "family_album_posts",
     balde: BALDE_ALBUM,
     donoId,
     dataUrl: data.imageData,
+    resto: {
+      patient_user_id: donoId,
+      author_name: data.authorName,
+      caption: data.caption,
+      emoji: data.emoji,
+    },
   });
-  return {
-    patient_user_id: donoId,
-    author_name: data.authorName,
-    caption: data.caption,
-    /* Uma coisa OU outra, nunca as duas: gravar o base64 junto do caminho
-       manteria exatamente o peso que esta mudança existe para tirar. */
-    image_data: caminho ? null : data.imageData,
-    image_path: caminho,
-    emoji: data.emoji,
-  };
 }
 
 export const getAlbumByToken = createServerFn({ method: "POST" })
@@ -116,11 +111,12 @@ export const getAlbumByToken = createServerFn({ method: "POST" })
        É exatamente o que foi removido de `getPublicNameSession`, com o
        comentário certo, 190 linhas abaixo neste mesmo arquivo. A correção não
        tinha sido propagada para o irmão. */
-    const { data: posts } = await supabaseAdmin
-      .from("family_album_posts")
-      .select("id, created_at, author_name, caption, image_data, image_path, emoji")
-      .eq("patient_user_id", invite.user_id)
-      .order("created_at", { ascending: false });
+    const { lerComCaminho } = await import("@/lib/imagens.server");
+    const { data: posts } = await lerComCaminho<any[]>(
+      "family_album_posts",
+      "id, created_at, author_name, caption, image_data, emoji",
+      (q) => q.eq("patient_user_id", invite.user_id).order("created_at", { ascending: false }),
+    );
     return {
       ok: true as const,
       posts: (await comUrlDeImagem(posts ?? [])) as AlbumPostPublico[],
@@ -173,9 +169,7 @@ export const addAlbumPostPublic = createServerFn({ method: "POST" })
     /* A pasta é a DELA, não de quem postou: o acompanhante não tem conta, e o
        arquivo pertence ao álbum dela — inclusive para a hora de apagar tudo a
        pedido dela, que a LGPD exige que seja possível. */
-    const { error } = await supabaseAdmin
-      .from("family_album_posts")
-      .insert(await linhaComImagem(String(invite.user_id), data));
+    const { error } = await gravarPost(String(invite.user_id), data);
     return { ok: !error, error: error?.message };
   });
 
@@ -191,12 +185,12 @@ export const deleteAlbumPost = createServerFn({ method: "POST" })
        ficaria no balde para sempre, pago e invisível. `.eq(patient_user_id)`
        nas duas consultas: sem isso, um id de outra pessoa devolveria o caminho
        da foto dela e o arquivo seria apagado por quem não podia. */
-    const { data: linha } = await supabaseAdmin
-      .from("family_album_posts")
-      .select("image_path")
-      .eq("id", data.id)
-      .eq("patient_user_id", u.user.id)
-      .maybeSingle();
+    const { lerComCaminho } = await import("@/lib/imagens.server");
+    const { data: linha } = await lerComCaminho<{ image_path?: string | null }>(
+      "family_album_posts",
+      "id",
+      (q) => q.eq("id", data.id).eq("patient_user_id", u.user.id).maybeSingle(),
+    );
     const { error } = await supabaseAdmin
       .from("family_album_posts")
       .delete()

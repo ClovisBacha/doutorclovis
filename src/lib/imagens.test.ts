@@ -94,12 +94,59 @@ describe("2. o upload nunca derruba a gravação", () => {
     expect(corpo).toContain("return null");
   });
 
-  test("as duas escritas gravam UMA coisa ou OUTRA, nunca as duas", () => {
-    /* Gravar o base64 junto do caminho manteria exatamente o peso que esta
-       mudança existe para tirar — a migração ficaria só no nome. */
+  test("grava UMA coisa ou OUTRA, nunca as duas", () => {
+    /**
+     * Gravar o base64 junto do caminho manteria exatamente o peso que esta
+     * mudança existe para tirar — a migração ficaria só no nome.
+     *
+     * A decisão mora num lugar só (`gravarLinhaComImagem`), e é por isso que a
+     * asserção mudou de endereço: as duas escritas do álbum e a do exame
+     * passaram a chamar a mesma função, em vez de repetirem o ternário três
+     * vezes e divergirem na primeira correção.
+     */
+    expect(mod).toContain("image_data: caminho ? null : (opts.dataUrl ?? null)");
+    expect(mod).toContain("image_path: caminho");
+    /* A CHAMADA, não o import: trocar só a linha do `import` deixava o teste
+       verde enquanto a escrita voltava a mandar a coluna crua. */
     for (const arq of ["src/lib/family.functions.ts", "src/lib/exame-do-chat.functions.ts"]) {
-      expect(semComentarios(arq)).toContain("image_data: caminho ? null : data.imag");
+      expect(semComentarios(arq)).toContain("await gravarLinhaComImagem({");
     }
+    /* E a leitura do laudo, do outro lado. */
+    expect(semComentarios("src/lib/clinical.functions.ts")).toContain("await lerComCaminho<{");
+  });
+
+  test("coluna ausente NÃO impede a gravação — recua para base64", () => {
+    /**
+     * O buraco no meio do desenho "seguro", achado por auditoria depois de já
+     * estar no ar. `guardarImagem` recuava quando o BALDE não existia; faltava
+     * a COLUNA.
+     *
+     * O PostgREST não ignora coluna desconhecida no payload — recusa o INSERT
+     * inteiro com PGRST204. Como `image_path` nasce num APLICAR que produção
+     * ainda não viu, mandar a coluna junto não deixava de economizar disco:
+     * NÃO GRAVAVA o exame. Ela fotografa o laudo às onze da noite, a tela diz
+     * que falhou, e não há nada em lugar nenhum.
+     */
+    const i = mod.indexOf("export async function gravarLinhaComImagem");
+    const corpo = mod.slice(i, mod.indexOf("export async function lerComCaminho"));
+    /* A LINHA que governa o recuo, não a menção ao nome: um mutante que
+       devolvia o erro antes dela sobreviveu cobrando só `toContain`. */
+    expect(corpo).toContain("if (!colunaAusente(error)) return { error };");
+    /* O recuo devolve a imagem para `image_data` — senão a linha entraria sem
+       imagem nenhuma, que é o mesmo desastre com outro nome. */
+    expect(corpo).toContain("image_data: opts.dataUrl ?? null");
+    /* E apaga o arquivo que subiu: sem referência, é órfão puro. */
+    expect(corpo).toContain("apagarImagem(opts.balde, caminho)");
+  });
+
+  test("e a LEITURA também recua — 42703 derruba a consulta inteira", () => {
+    /* Um `select` citando coluna ausente não devolve a linha sem o campo: volta
+       42703 e derruba tudo. O médico não veria laudo nenhum — nem os que estão
+       em base64 e sempre funcionaram. */
+    const i = mod.indexOf("export async function lerComCaminho");
+    const corpo = mod.slice(i, i + 900);
+    expect(corpo).toContain("if (!colunaAusente(primeira.error)) return primeira;");
+    expect(corpo).toContain("aplicarFiltros(sb.from(tabela).select(colunas))");
   });
 
   test("o exame ainda é gravado quando o Storage não responde", () => {
@@ -182,7 +229,7 @@ describe("5. apagar a linha apaga o arquivo", () => {
   test("o caminho é lido ANTES do delete", () => {
     /* Depois do delete a linha não existe, e o arquivo ficaria no balde para
        sempre — pago e invisível. */
-    const iSelect = family.indexOf('.select("image_path")');
+    const iSelect = family.indexOf("lerComCaminho<{ image_path");
     const iDelete = family.indexOf(".delete()", iSelect);
     expect(iSelect).toBeGreaterThan(-1);
     expect(iDelete).toBeGreaterThan(iSelect);
@@ -190,15 +237,15 @@ describe("5. apagar a linha apaga o arquivo", () => {
 
   test("e a leitura do caminho é recortada pela dona", () => {
     /**
-     * Sem `.eq(patient_user_id)` no SELECT, um id de outra pessoa devolveria o
-     * caminho da foto dela — e o arquivo seria apagado por quem não podia. O
-     * DELETE tem o filtro; o SELECT ao lado precisa do mesmo.
+     * Sem `.eq(patient_user_id)`, um id de outra pessoa devolveria o caminho da
+     * foto dela — e o arquivo seria apagado por quem não podia. O DELETE tem o
+     * filtro; a leitura ao lado precisa do mesmo.
+     *
+     * Recortado à PRÓPRIA leitura — até o `.maybeSingle()` que a fecha. Uma
+     * janela de caracteres alcançava o DELETE logo abaixo, que tem o filtro:
+     * apagar o `.eq` da leitura deixava o teste verde na conta do vizinho.
      */
-    /* Recortado ao PRÓPRIO select — até o `.maybeSingle()` que o fecha. Uma
-       janela de caracteres alcançava o DELETE logo abaixo, que tem o filtro:
-       apagar o `.eq` do select deixava o teste verde na conta do filtro do
-       vizinho. */
-    const i = family.indexOf('.select("image_path")');
+    const i = family.indexOf("lerComCaminho<{ image_path");
     const consulta = family.slice(i, family.indexOf(".maybeSingle()", i));
     expect(consulta).toContain('.eq("patient_user_id"');
   });

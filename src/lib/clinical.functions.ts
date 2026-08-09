@@ -1145,11 +1145,16 @@ export const imagemDoExame = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, imagem: null, motivo: "sessao" as const };
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: row, error } = await (supabaseAdmin as any)
-        .from("exam_files")
-        .select("user_id,image_data,image_path")
-        .eq("id", data.exameId)
-        .maybeSingle();
+      /* `select` citando coluna ausente volta 42703 e derruba a consulta
+         INTEIRA — o médico não veria laudo nenhum, nem os que estão em base64 e
+         sempre funcionaram. `lerComCaminho` tenta com `image_path` e relê sem
+         ela quando o banco ainda não a tem. */
+      const { lerComCaminho } = await import("@/lib/imagens.server");
+      const { data: row, error } = await lerComCaminho<{
+        user_id: string;
+        image_data?: string | null;
+        image_path?: string | null;
+      }>("exam_files", "user_id,image_data", (q) => q.eq("id", data.exameId).maybeSingle());
       if (error) return { ok: false as const, imagem: null, motivo: "falha" as const };
       /* "não existe" e "não é sua paciente" respondem IGUAL — as outras doze
          funções já faziam assim. Distinguir permitia a um médico confirmar, com
