@@ -214,8 +214,9 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     // janela aqui — precisamos da última atividade "de sempre" para o risco de
     // abandono (>10 dias sem registro).
     const activityMap = await safe<Map<string, number>>(async () => {
-      // O mapa é consultado por p.id; como `profiles` já vem recortado por
-      // doctor_id no caminho do assinante, só as pacientes DELE são reveladas.
+      /* `profiles` já vem recortado por doctor_id no caminho do assinante, e
+         agora esse recorte também vale para a LEITURA — ver o bloco de lotes
+         logo abaixo. Antes ele valia só para a consulta ao mapa. */
       if (profiles.length === 0) return new Map<string, number>();
       const map = new Map<string, number>();
       const record = (uid: string, ts: string | null) => {
@@ -224,22 +225,50 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
         const prev = map.get(uid);
         if (prev == null || ms > prev) map.set(uid, ms);
       };
+      /* ─── RECORTADO PELAS PACIENTES DELE, EM LOTES ────────────────────────
+       *
+       * Isto lia as 5000 linhas mais recentes de CADA tabela na plataforma
+       * INTEIRA e depois consultava o mapa pelos ids dele. Nenhum dado de
+       * outro consultório chegava à tela — mas a conta ficava errada, e cada
+       * vez mais errada: bastava a plataforma ter 5000 registros mais novos
+       * que a última atividade de uma paciente dele para ela sumir do mapa. E
+       * sumir do mapa não a marca como sumida: `lastMs == null` a exclui do
+       * risco de abandono, então ela some do cartão "Oportunidade de
+       * reengajar" — que é onde ele iria procurá-la.
+       *
+       * Com o recorte, o volume passa a ser o do consultório dele, e a conta
+       * para de depender de quantos OUTROS médicos usam o produto.
+       *
+       * ─── POR QUE EM LOTES DE 100 ──────────────────────────────────────────
+       *
+       * `.in()` vai na query string, e cada uuid custa 39 caracteres depois do
+       * percent-encoding. Acima de ~206 pacientes a request line passa dos 8 KB
+       * do proxy e volta 414 — com `data` nula e um `error` que ninguém lê. É o
+       * mesmo raciocínio (e o mesmo número) de `getEngagementData` em
+       * `admin.functions.ts`, onde o modo de falha está documentado por
+       * extenso.
+       *
+       * O limite por lote continua existindo, mas agora cobre 100 pacientes em
+       * vez da plataforma: são ~30 registros por paciente antes de apertar. */
+      const LOTE = 100;
+      const ids = profiles.map((p: { id: string }) => p.id);
+      const porLotes = async (tabela: string, coluna: string) => {
+        const partes: any[] = [];
+        for (let i = 0; i < ids.length; i += LOTE) {
+          const { data } = await sb
+            .from(tabela)
+            .select(`user_id,${coluna}`)
+            .in("user_id", ids.slice(i, i + LOTE))
+            .order(coluna, { ascending: false })
+            .limit(3000);
+          partes.push(...(data ?? []));
+        }
+        return { data: partes };
+      };
       const [health, journals, kicks] = await Promise.all([
-        sb
-          .from("health_logs")
-          .select("user_id,created_at")
-          .order("created_at", { ascending: false })
-          .limit(5000),
-        sb
-          .from("journal_entries")
-          .select("user_id,created_at")
-          .order("created_at", { ascending: false })
-          .limit(5000),
-        sb
-          .from("kick_sessions")
-          .select("user_id,started_at")
-          .order("started_at", { ascending: false })
-          .limit(5000),
+        porLotes("health_logs", "created_at"),
+        porLotes("journal_entries", "created_at"),
+        porLotes("kick_sessions", "started_at"),
       ]);
       (health.data ?? []).forEach((r: any) => record(r.user_id, r.created_at));
       (journals.data ?? []).forEach((r: any) => record(r.user_id, r.created_at));
