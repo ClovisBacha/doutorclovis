@@ -50,6 +50,7 @@ import {
   type FichaClinica,
   type TipoDeEmissao,
 } from "@/lib/clinical.functions";
+import { exameSugerido } from "@/lib/exame-sugerido";
 import { filtrarPacientes } from "@/lib/busca-paciente";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
 import {
@@ -11223,6 +11224,179 @@ function InvitePatientModal({
  * CONVERSA dela com a IA (somente leitura) — o mesmo acesso individual da aba
  * Cérebro, agora a um toque do quadro dela.
  */
+/**
+ * O QUE O MÉDICO FAZ COM ESTA PACIENTE — dentro da ficha dela.
+ *
+ * ─── O QUE ISTO SUBSTITUI ───────────────────────────────────────────────────
+ *
+ * Receituário e solicitação de exame moravam numa aba "Ferramentas", separada
+ * das pacientes. O caminho era: abrir Ferramentas, escolher o modelo, e então
+ * procurar a paciente numa lista de duzentos nomes — depois de já ter estado na
+ * ficha dela. Escolher a paciente DUAS vezes, no fim do fluxo, é onde se erra a
+ * paciente; e o erro aqui é uma receita no celular de quem não devia recebê-la.
+ *
+ * Pedido do dono (ago/2026): "quando clicar na paciente vai abrir a solicitação
+ * de exame, a solicitação de consulta e o receituário rápido, com as opções que
+ * a plataforma já dá de dica, e ele edita da maneira que quiser".
+ *
+ * ─── AS DUAS COISAS QUE NÃO PODEM SUMIR ─────────────────────────────────────
+ *
+ * **O texto continua editável.** O modelo é ponto de partida, não prescrição
+ * pronta: dose, via e duração mudam com a paciente. Campo travado faria ele
+ * copiar para outro lugar, editar lá, e o registro voltaria a não existir — que
+ * é o defeito que `EnviarParaPaciente` nasceu para consertar.
+ *
+ * **A confirmação continua.** Os modelos são escritos para o médico ("Opção 1 /
+ * Opção 2", faixas de dose); lidos por uma gestante como instrução de casa,
+ * isso é auto-medicação. A tela de conferência é a mesma de antes.
+ */
+function AcoesDaPaciente({ p, tokenFn }: { p: LinkedPatient; tokenFn: () => Promise<string> }) {
+  const [escolhendo, setEscolhendo] = useState<"exame" | "prescricao" | null>(null);
+  const [envio, setEnvio] = useState<{
+    tipo: TipoDeEmissao;
+    titulo: string;
+    conteudo: string;
+  } | null>(null);
+
+  /* A DICA. O painel do trimestre em que ela está aparece marcado; nas semanas
+     entre as faixas não há sugestão nenhuma, de propósito — ver
+     `exame-sugerido`. */
+  const sugerido = exameSugerido(EXAM_PANELS, p.weeks);
+
+  const primeiroNome = (p.display_name ?? "").trim().split(/\s+/)[0] || "";
+
+  function pedirConsulta() {
+    setEnvio({
+      tipo: "orientacao",
+      titulo: "Pedido de consulta",
+      /* Editável como todo o resto. Sai do jeito que ele mandaria no WhatsApp,
+         com o nome dela e a semana já preenchidos — o que ele teria de digitar
+         de novo em cada uma das duzentas. */
+      conteudo:
+        `${primeiroNome ? `${primeiroNome}, ` : ""}gostaria de te ver em consulta` +
+        `${p.weeks != null ? ` — você está com ${p.weeks} semanas` : ""}.\n\n` +
+        `Abra o aplicativo em Agendamento e escolha o horário que funcionar para você. ` +
+        `Se preferir, me responda por aqui com os dias em que consegue vir.`,
+    });
+  }
+
+  const MODELOS =
+    escolhendo === "prescricao"
+      ? PRESCRIPTIONS.map((rx, i) => ({ i, titulo: rx.title, icone: rx.icon, texto: rx.text }))
+      : EXAM_PANELS.map((ex, i) => ({
+          i,
+          titulo: ex.title,
+          icone: ex.icon,
+          texto: ex.exams.join("\n"),
+        }));
+
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setEscolhendo("exame")}
+          className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
+        >
+          🔬 Pedir exame
+        </button>
+        <button
+          onClick={() => setEscolhendo("prescricao")}
+          className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
+        >
+          💊 Receituário
+        </button>
+        <button
+          onClick={pedirConsulta}
+          className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
+        >
+          📅 Pedir consulta
+        </button>
+      </div>
+
+      {/* ── Escolher o modelo ── */}
+      {escolhendo && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+          onClick={() => setEscolhendo(null)}
+        >
+          <div
+            className="flex max-h-[80svh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-card shadow-xl sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  {escolhendo === "prescricao" ? "Receituário rápido" : "Solicitação de exames"}
+                </p>
+                <p className="truncate font-serif text-lg">
+                  {p.display_name?.trim() || "Paciente"}
+                </p>
+              </div>
+              <button
+                onClick={() => setEscolhendo(null)}
+                className="shrink-0 text-sm text-muted-foreground"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {MODELOS.map((m) => {
+                const ehSugerido = escolhendo === "exame" && m.i === sugerido;
+                return (
+                  <button
+                    key={m.i}
+                    onClick={() => {
+                      setEnvio({
+                        tipo: escolhendo === "prescricao" ? "prescricao" : "exame",
+                        titulo: m.titulo,
+                        conteudo: m.texto,
+                      });
+                      setEscolhendo(null);
+                    }}
+                    className={`mb-2 flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+                      ehSugerido
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="text-xl">{m.icone}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">{m.titulo}</span>
+                      {ehSugerido && (
+                        <span className="text-[11px] font-semibold text-primary">
+                          Sugerido para {p.weeks} semanas
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">›</span>
+                  </button>
+                );
+              })}
+              <p className="px-1 pb-1 pt-2 text-[11px] leading-snug text-muted-foreground">
+                ⚕️ Modelos baseados nos protocolos FEBRASGO/SBD/SBH 2022–2024. O texto abre editável
+                — ajuste ao quadro dela antes de enviar.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Editar e enviar. A paciente já vai escolhida: ele está na ficha
+             dela, e escolher de novo numa lista é onde se erra a pessoa. ── */}
+      {envio && (
+        <EnviarParaPaciente
+          tipo={envio.tipo}
+          titulo={envio.titulo}
+          conteudoInicial={envio.conteudo}
+          tokenFn={tokenFn}
+          paciente={p}
+          onFechar={() => setEnvio(null)}
+        />
+      )}
+    </>
+  );
+}
+
 function PatientDetailModal({
   p,
   tokenFn,
@@ -11389,6 +11563,15 @@ function PatientDetailModal({
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-4 py-2.5">
             <p className="truncate font-serif text-lg text-white">{p.display_name ?? "Paciente"}</p>
           </div>
+        </div>
+
+        {/* ─── O QUE ELE FAZ COM ELA ─────────────────────────────────────
+            Uma linha só, acima do prontuário: exame, receita e pedido de
+            consulta. Estavam numa aba separada que obrigava a escolher a
+            paciente de novo, no fim do fluxo, depois de já ter estado na ficha
+            dela. */}
+        <div className="shrink-0 border-b border-border px-4 py-2.5">
+          <AcoesDaPaciente p={p} tokenFn={tokenFn} />
         </div>
 
         {/* O PRONTUÁRIO — primeiro, porque é o que ele veio ver. */}

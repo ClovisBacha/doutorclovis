@@ -23,23 +23,39 @@ const ROTULO: Record<TipoDeEmissao, string> = {
   orientacao: "Orientação",
 };
 
+/* `z-[70]`: esta tela agora nasce DENTRO da ficha da paciente, que já é um
+   modal em `z-50`. Empatada com o pai, ela ficava atrás do conteúdo da ficha —
+   o médico clicava em "receituário" e nada parecia acontecer. Fica acima de
+   qualquer modal do painel, que é o certo para a última tela antes de mandar
+   uma receita. */
 export function EnviarParaPaciente({
   tipo,
   titulo,
   conteudoInicial,
   tokenFn,
   onFechar,
+  paciente,
 }: {
   tipo: TipoDeEmissao;
   titulo: string;
   conteudoInicial: string;
   tokenFn: () => Promise<string>;
   onFechar: () => void;
+  /**
+   * A paciente já escolhida — quando isto vem, não há seletor.
+   *
+   * É o caminho que nasce DENTRO da ficha dela: o médico abriu a paciente,
+   * leu o prontuário e pediu o exame ali mesmo. Fazê-lo escolher de novo, numa
+   * lista de duzentos nomes, no meio de um fluxo que já sabe de quem se trata,
+   * é onde se erra a paciente — e o erro aqui é uma receita no celular de quem
+   * não devia recebê-la.
+   */
+  paciente?: LinkedPatient;
 }) {
   const [pacientes, setPacientes] = useState<LinkedPatient[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
-  const [alvo, setAlvo] = useState<string | null>(null);
+  const [alvo, setAlvo] = useState<string | null>(paciente?.id ?? null);
   const [confirmando, setConfirmando] = useState(false);
   const [falhouLista, setFalhouLista] = useState(false);
   const [conteudo, setConteudo] = useState(conteudoInicial);
@@ -48,6 +64,13 @@ export function EnviarParaPaciente({
 
   useEffect(() => {
     (async () => {
+      /* Com a paciente já escolhida não há lista para carregar — e buscá-la
+         assim mesmo faria a ficha de UMA paciente puxar as duzentas só para
+         não usar nenhuma. */
+      if (paciente) {
+        setCarregando(false);
+        return;
+      }
       try {
         const r = await listMyPatients({ data: { accessToken: await tokenFn() } });
         if (r.ok) setPacientes(r.patients);
@@ -76,7 +99,7 @@ export function EnviarParaPaciente({
           !(p.display_name ?? "").trim(),
       )
     : pacientes;
-  const escolhida = pacientes.find((p) => p.id === alvo) ?? null;
+  const escolhida = paciente ?? pacientes.find((p) => p.id === alvo) ?? null;
 
   function pedirConfirmacao() {
     if (!alvo) {
@@ -120,7 +143,7 @@ export function EnviarParaPaciente({
 
   if (confirmando && escolhida) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
         <div className="flex max-h-[92svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-xl">
           <div className="shrink-0 border-b border-border px-5 py-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-700">
@@ -182,7 +205,7 @@ export function EnviarParaPaciente({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
       {/* SEM fechar no clique de fundo: ele reescreve a posologia, mira o campo
           de recado, erra dez pixels — e some tudo. Fecha pelo ✕. */}
       <div className="flex max-h-[92svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-xl">
@@ -203,7 +226,21 @@ export function EnviarParaPaciente({
             <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Para quem
             </span>
-            {carregando ? (
+            {paciente ? (
+              /* Fixo, e ainda assim MOSTRADO: ele precisa ver para quem está
+                 prescrevendo antes de confirmar, mesmo quando não escolheu
+                 aqui. Semana e DPP junto, pelo mesmo motivo do seletor — duas
+                 pacientes de mesmo nome eram linhas idênticas. */
+              <p className="mt-1 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary">
+                {paciente.display_name?.trim() || "Paciente sem nome"}
+                <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                  {paciente.weeks != null ? `${paciente.weeks}s` : ""}
+                  {paciente.due_date
+                    ? ` · DPP ${new Date(`${paciente.due_date}T00:00:00`).toLocaleDateString("pt-BR")}`
+                    : ""}
+                </span>
+              </p>
+            ) : carregando ? (
               <div className="skeleton mt-1 h-9 rounded-xl" />
             ) : falhouLista ? (
               <p className="mt-1 rounded-xl border border-amber-300 bg-amber-50/70 p-3 text-[13px] leading-snug text-amber-900">
