@@ -59,6 +59,7 @@ import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhoo
 import { Route as ApiPushWeeklyTickRouteImport } from './routes/api/push-weekly-tick'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
+import { Route as ApiLembretesTickRouteImport } from './routes/api/lembretes-tick'
 import { Route as ApiInstagramWebhookRouteImport } from './routes/api/instagram-webhook'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
@@ -319,6 +320,11 @@ const ApiMpWebhookRoute = ApiMpWebhookRouteImport.update({
   path: '/api/mp-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLembretesTickRoute = ApiLembretesTickRouteImport.update({
+  id: '/api/lembretes-tick',
+  path: '/api/lembretes-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiInstagramWebhookRoute = ApiInstagramWebhookRouteImport.update({
   id: '/api/instagram-webhook',
   path: '/api/instagram-webhook',
@@ -418,6 +424,7 @@ export interface FileRoutesByFullPath {
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
+  '/api/lembretes-tick': typeof ApiLembretesTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
@@ -479,6 +486,7 @@ export interface FileRoutesByTo {
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
+  '/api/lembretes-tick': typeof ApiLembretesTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
@@ -542,6 +550,7 @@ export interface FileRoutesById {
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
+  '/api/lembretes-tick': typeof ApiLembretesTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
@@ -605,6 +614,7 @@ export interface FileRouteTypes {
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/instagram-webhook'
+    | '/api/lembretes-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/push-weekly-tick'
@@ -666,6 +676,7 @@ export interface FileRouteTypes {
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/instagram-webhook'
+    | '/api/lembretes-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/push-weekly-tick'
@@ -728,6 +739,7 @@ export interface FileRouteTypes {
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/instagram-webhook'
+    | '/api/lembretes-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/push-weekly-tick'
@@ -788,6 +800,7 @@ export interface RootRouteChildren {
   ApiCartaSemanalRoute: typeof ApiCartaSemanalRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiInstagramWebhookRoute: typeof ApiInstagramWebhookRoute
+  ApiLembretesTickRoute: typeof ApiLembretesTickRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiPushWeeklyTickRoute: typeof ApiPushWeeklyTickRoute
@@ -1154,6 +1167,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMpWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/lembretes-tick': {
+      id: '/api/lembretes-tick'
+      path: '/api/lembretes-tick'
+      fullPath: '/api/lembretes-tick'
+      preLoaderRoute: typeof ApiLembretesTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/instagram-webhook': {
       id: '/api/instagram-webhook'
       path: '/api/instagram-webhook'
@@ -1288,6 +1308,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCartaSemanalRoute: ApiCartaSemanalRoute,
   ApiChatRoute: ApiChatRoute,
   ApiInstagramWebhookRoute: ApiInstagramWebhookRoute,
+  ApiLembretesTickRoute: ApiLembretesTickRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
   ApiPushWeeklyTickRoute: ApiPushWeeklyTickRoute,

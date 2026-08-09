@@ -285,6 +285,48 @@ Calendário é a tela, e as três listas viraram seções abaixo dele, inteiras.
 - **Cores:** 🟢 presencial, 🟠 teleconsulta, 🟣 particular (`CORES_DO_TIPO`).
   O que não tem hora combinada aparece tracejado.
 
+### Lembretes de consulta (24 h e 4 h) — ago/2026
+
+Falta em consultório de alto risco é vaga perdida duas vezes: o médico fica com
+o buraco e quem estava na fila não foi chamada.
+
+- **A régua é pura e testada**: `src/lib/lembretes.ts`. A janela é ABERTA
+  ("faltam 24 h ou menos e ainda não mandei"), e não uma faixa estreita — cron
+  atrasado manda tarde em vez de não mandar, e a ausência de um lembrete não
+  deixa rastro nenhum.
+- **A de 24 h só vale enquanto faltam mais de 4 h.** Sem isso, uma consulta
+  marcada de véspera dispararia as duas no mesmo minuto.
+- **O que impede o spam são DUAS coisas**: a régua não repete o que está em
+  `appointment_reminders`, e o índice único dessa tabela recusa a segunda
+  gravação numa corrida entre dois crons. O registro é gravado ANTES do envio:
+  um push perdido é melhor que um push de hora em hora — é o mesmo canal por
+  onde chega o aviso de emergência.
+- **Aplicar:** `supabase/APLICAR_LEMBRETES.sql`. **Agendar:** cron de hora em
+  hora apontando para `/api/lembretes-tick` com
+  `Authorization: Bearer <CRON_SECRET>`. Não está no `vercel.json` de propósito
+  — intervalo menor que diário exige plano Pro, e o `waitlist-tick` já segue
+  esse mesmo caminho (serviço externo grátis).
+
+### Horários disponíveis e bloqueios (ago/2026)
+
+`doctor_slots` (grade semanal) e `doctor_blocks` (férias, congresso, uma tarde),
+em `supabase/APLICAR_DISPONIBILIDADE.sql`. Nascem com `doctor_id NOT NULL` e RLS
+própria — as tabelas anteriores foram revogadas por nascerem sem dono e com
+política que deixava qualquer autenticado reescrever a agenda do médico.
+
+- Régua em `src/lib/disponibilidade.ts` (pura, sem banco): expandir a grade,
+  subtrair bloqueios (**início inclusivo, fim exclusivo**), subtrair o que já
+  está marcado, subtrair o passado. Cada borda vale um encaixe por dia.
+- **A paciente NÃO calcula os livres no navegador**: saber o que está livre
+  exige subtrair consultas de outras pacientes. `horariosLivresDoMedico`
+  (service role) devolve só `{dia, hora}`.
+- Tela do médico: `GradeDeHorarios`, na aba Calendário. Tela da paciente:
+  `EscolherHorario`, em `/agendamento` — só para quem está logada e vinculada;
+  visitante continua com os campos livres, porque sem saber o médico não há
+  agenda para consultar.
+- **Pedido não confirmado NÃO ocupa horário** (é um "quem sabe"). Falha ao ler
+  os ocupados devolve erro, e nunca "está tudo livre".
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o
