@@ -176,3 +176,38 @@ describe("4. uma solicitação de vínculo que some é uma paciente perdida", ()
     expect(painel).toContain("setFalhouLista(!reqRes.ok || !patRes.ok)");
   });
 });
+
+describe("5. aceitar uma paciente que não vinculou não pode passar por aceite", () => {
+  const link = semComentarios("src/lib/patientlink.functions.ts");
+  const bloco = link.slice(link.indexOf("export const respondPatientRequest"));
+
+  test("o vínculo confere QUANTAS linhas mudaram, não só o erro", () => {
+    /**
+     * Um UPDATE que não encontra a linha NÃO é erro no Postgres: afeta zero
+     * linhas e volta limpo. Como a solicitação já foi RECLAMADA como "accepted"
+     * uma linha acima, o resultado era o pior estado possível.
+     *
+     * A paciente fica em limbo: o cartão dela sai de "aguardando o médico" e
+     * ela acredita que foi aceita, enquanto `doctor_id` continua nulo. Não
+     * aparece na lista dele, o cérebro dele não a atende, e o SOS dela não
+     * chega a ninguém — sem uma linha de erro em lugar nenhum.
+     */
+    expect(bloco).toContain('.eq("id", req.patient_id)\n        .select("id")');
+    expect(bloco).toContain("if (linkErr || !vinculada?.length)");
+  });
+
+  test("e zero linhas DESFAZ a decisão, em vez de seguir", () => {
+    /* O rollback já existia para o caso de erro; faltava chegar até aqui. */
+    const i = bloco.indexOf("if (linkErr || !vinculada?.length)");
+    const trecho = bloco.slice(i, i + 420);
+    expect(trecho).toContain("await desfazer();");
+    expect(trecho).toContain("return { ok: false as const };");
+  });
+
+  test("o caso silencioso fica REGISTRADO — ele não tem erro para logar", () => {
+    /* Sem erro do banco não há nada em log nenhum: se não registrarmos, esse
+       estado é literalmente invisível depois do fato. */
+    const i = bloco.indexOf("if (linkErr || !vinculada?.length)");
+    expect(bloco.slice(i, i + 420)).toContain("aceite não encontrou o perfil da paciente");
+  });
+});

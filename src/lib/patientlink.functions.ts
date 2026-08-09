@@ -418,12 +418,30 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
          somados, menos que UMA mensagem de IA. O que custa é o modelo, e o modelo
          já está fechado atrás do plano (`chat.ts`: sem plano, sem chamada).
          Ver `docs/custo-de-infraestrutura.md`. */
-      // Vincula a paciente ao médico (denormalizado em patient_profiles).
-      const { error: linkErr } = await (supabaseAdmin as any)
+      /* ─── QUANTAS LINHAS MUDARAM, E NÃO SÓ "DEU ERRO" ─────────────────────
+       *
+       * Um UPDATE que não encontra a linha NÃO é erro no Postgres: afeta zero
+       * linhas e volta limpo. Aqui isso significava o pior estado possível — a
+       * solicitação já tinha sido RECLAMADA como "accepted" logo acima, e o
+       * vínculo não acontecia.
+       *
+       * A paciente fica em limbo: o cartão dela sai de "aguardando o médico" e
+       * ela acredita que foi aceita, enquanto `doctor_id` continua nulo. Ela
+       * não aparece na lista dele, o cérebro dele não a atende, e o SOS dela
+       * não chega a ninguém — sem uma linha de erro em lugar nenhum.
+       *
+       * Acontece quando o perfil dela não existe (conta apagada entre o pedido
+       * e o aceite, perfil nunca criado). O `.select("id")` faz o PostgREST
+       * devolver o que mudou, e aí zero linhas volta a ser tratável. */
+      const { data: vinculada, error: linkErr } = await (supabaseAdmin as any)
         .from("patient_profiles")
         .update({ doctor_id: user.id, updated_at: now })
-        .eq("id", req.patient_id);
-      if (linkErr) {
+        .eq("id", req.patient_id)
+        .select("id");
+      if (linkErr || !vinculada?.length) {
+        if (!linkErr) {
+          console.error("[vínculo] aceite não encontrou o perfil da paciente", req.patient_id);
+        }
         await desfazer();
         return { ok: false as const };
       }
