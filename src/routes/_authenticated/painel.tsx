@@ -3249,6 +3249,9 @@ function EngagementSection({
   const [reportData, setReportData] = useState<Record<string, any>>({});
   const [loadingReport, setLoadingReport] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  /* Por paciente: duas linhas podem falhar de forma diferente, e um erro global
+     mostraria o aviso na linha errada. */
+  const [erroReport, setErroReport] = useState<Record<string, boolean>>({});
 
   async function loadPatientReport(userId: string) {
     if (reportData[userId]) {
@@ -3256,11 +3259,28 @@ function EngagementSection({
       return;
     }
     setLoadingReport(userId);
-    const tk = await tokenFn();
-    const res = await getPatientReport({ data: { accessToken: tk, userId } });
-    if (res.ok) setReportData((d) => ({ ...d, [userId]: res }));
-    setLoadingReport(null);
-    setExpandedId(userId);
+    setErroReport((e) => ({ ...e, [userId]: false }));
+    /* ─── SEM `try`, O BOTÃO FICAVA EM "..." PARA SEMPRE ────────────────────
+     *
+     * `tokenFn()` devolve string vazia quando a sessão expira e o validador do
+     * servidor exige `min(10)` — a chamada é REJEITADA, e a promessa estoura.
+     * Sem `catch`/`finally`, `setLoadingReport(null)` nunca rodava: o botão
+     * "Ver relatório" virava "..." e ficava assim, desabilitado, até o médico
+     * recarregar a página. Ele fica clicando num botão morto.
+     *
+     * E com `res.ok` falso a linha expandia sem nada dentro — silêncio no lugar
+     * de "não consegui". */
+    try {
+      const tk = await tokenFn();
+      const res = await getPatientReport({ data: { accessToken: tk, userId } });
+      if (res.ok) setReportData((d) => ({ ...d, [userId]: res }));
+      else setErroReport((e) => ({ ...e, [userId]: true }));
+    } catch {
+      setErroReport((e) => ({ ...e, [userId]: true }));
+    } finally {
+      setLoadingReport(null);
+      setExpandedId(userId);
+    }
   }
 
   if (!engagement) {
@@ -3424,6 +3444,11 @@ function EngagementSection({
                       {loadingReport === p.id ? "..." : "Ver relatório"}
                     </button>
                   </div>
+                  {expandedId === p.id && erroReport[p.id] && (
+                    <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+                      📡 Não consegui carregar o relatório dela agora. Tente de novo em instantes.
+                    </p>
+                  )}
                   {expandedId === p.id && reportData[p.id] && (
                     <div className="mt-4 border-t border-amber-200 pt-4">
                       <EngagementReportSnippet data={reportData[p.id]} />
@@ -3480,6 +3505,11 @@ function EngagementSection({
                       {loadingReport === p.id ? "..." : "Ver relatório"}
                     </button>
                   </div>
+                  {expandedId === p.id && erroReport[p.id] && (
+                    <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+                      📡 Não consegui carregar o relatório dela agora. Tente de novo em instantes.
+                    </p>
+                  )}
                   {expandedId === p.id && reportData[p.id] && (
                     <div className="mt-4 border-t border-emerald-200 pt-4">
                       <EngagementReportSnippet data={reportData[p.id]} />

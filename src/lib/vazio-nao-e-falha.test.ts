@@ -211,3 +211,45 @@ describe("5. aceitar uma paciente que não vinculou não pode passar por aceite"
     expect(bloco.slice(i, i + 420)).toContain("aceite não encontrou o perfil da paciente");
   });
 });
+
+describe("6. o botão «Ver relatório» não pode virar «...» para sempre", () => {
+  /**
+   * `tokenFn()` devolve string vazia quando a sessão expira, e o validador do
+   * servidor exige `min(10)` — a chamada é REJEITADA e a promessa estoura.
+   *
+   * Sem `catch`/`finally`, `setLoadingReport(null)` nunca rodava: o botão
+   * virava "..." e ficava assim, desabilitado, até o médico recarregar a
+   * página. Ele fica clicando num botão morto, sem uma palavra do que houve.
+   *
+   * E com `res.ok` falso a linha expandia sem nada dentro — silêncio no lugar
+   * de "não consegui".
+   */
+  const i = painel.indexOf("async function loadPatientReport");
+  const bloco = painel.slice(i, i + 1100);
+
+  test("o carregamento sempre termina", () => {
+    expect(bloco).toContain("} finally {");
+    expect(bloco).toContain("setLoadingReport(null);");
+    /* O `finally` é o que garante isso mesmo quando a promessa estoura. */
+    const iFinally = bloco.indexOf("} finally {");
+    expect(bloco.indexOf("setLoadingReport(null);")).toBeGreaterThan(iFinally);
+  });
+
+  test("e a falha aparece na linha DAQUELA paciente", () => {
+    /* Um erro global mostraria o aviso na linha errada quando duas falham. */
+    /* Os DOIS ramos: `ok:false` (o servidor respondeu que não deu) e a exceção
+       (a promessa estourou). Cobrar a expressão solta era satisfeito pelo
+       `catch` enquanto o `else` sumia — e `ok:false` é o caso mais comum dos
+       dois, porque não depende de a sessão ter expirado. */
+    expect(bloco).toContain("else setErroReport((e) => ({ ...e, [userId]: true }));");
+    expect(bloco).toContain("} catch {\n      setErroReport((e) => ({ ...e, [userId]: true }));");
+    expect(painel).toContain("{expandedId === p.id && erroReport[p.id] && (");
+    expect(painel).toContain("Não consegui carregar o relatório dela agora");
+  });
+
+  test("os DOIS botões «Ver relatório» têm a faixa", () => {
+    /* A tela repete o cartão em duas listas; corrigir um só deixaria o defeito
+       vivo na outra — é o padrão desta base. */
+    expect((painel.match(/erroReport\[p\.id\]/g) ?? []).length).toBe(2);
+  });
+});
