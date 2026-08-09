@@ -39,6 +39,15 @@ export type PrivateConsultation = {
   pix_qr_code: string | null;
   pix_qr_code_base64: string | null;
   amount_cents: number | null;
+  /**
+   * Quando a consulta FOI COMBINADA. `null` = ainda sem horário.
+   *
+   * `preferred_dates` é o que ELA preferiria; isto é o que ficou marcado. Sem
+   * este campo, a consulta particular era a única fonte da agenda que não sabia
+   * dizer quando acontece — e o calendário do mês tinha de mostrá-la como
+   * preferência, tracejada.
+   */
+  scheduled_for?: string | null;
   created_at: string;
 };
 
@@ -277,4 +286,56 @@ export const confirmPaymentForDoctor = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("doctor_id", user.id);
     return { ok: !error };
+  });
+
+/**
+ * MARCA a data e a hora de uma consulta particular.
+ *
+ * ─── POR QUE ISTO PRECISOU EXISTIR ──────────────────────────────────────────
+ *
+ * `private_consultations` guardava `preferred_dates` — o que ELA preferiria — e
+ * nada sobre o que ficou combinado. Era a única das três fontes da agenda que
+ * não sabia dizer quando acontece, e o calendário do mês tinha de mostrá-la
+ * como preferência, tracejada.
+ *
+ * ─── O QUE CHEGA AQUI ───────────────────────────────────────────────────────
+ *
+ * Um instante ISO com fuso, montado no NAVEGADOR a partir do que ele digitou —
+ * `datetime-local` entrega string sem fuso, e mandá-la crua para uma coluna
+ * `timestamptz` foi exatamente o defeito de três horas que a teleconsulta já
+ * teve nesta base. Aqui o validador exige o `Z`/offset, então a string crua nem
+ * passa.
+ *
+ * `null` desmarca — o médico combinou e depois desmarcou, e a consulta volta a
+ * aparecer na agenda como preferência em vez de sumir.
+ */
+export const marcarHoraDaConsulta = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        id: z.string().uuid(),
+        /* `datetime()` do zod exige fuso. É a trava que impede a string crua do
+           `datetime-local` de entrar. */
+        scheduledFor: z.string().datetime({ offset: true }).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireDoctor(data.accessToken);
+    if (!user) return { ok: false as const, motivo: "sem_permissao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("private_consultations")
+      .update({ scheduled_for: data.scheduledFor })
+      .eq("id", data.id)
+      .eq("doctor_id", user.id);
+    if (!error) return { ok: true as const };
+    /* Coluna ainda não migrada: diz O QUE FAZER, em vez de "não foi possível
+       salvar". É o mesmo recuo que o resto da base usa — e `colunaAusente`
+       cobre PGRST204, que é o código que um UPDATE devolve (42703 é de
+       SELECT). */
+    const { colunaAusente } = await import("./postgrest");
+    if (colunaAusente(error)) return { ok: false as const, motivo: "sem_coluna" as const };
+    return { ok: false as const, motivo: "falhou" as const };
   });

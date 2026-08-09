@@ -75,7 +75,7 @@ import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
 import { PerfilNoTopo } from "@/components/perfil-no-topo";
 import { AbasDoPainel } from "@/components/abas-do-painel";
 import { CalendarioDoMes } from "@/components/calendario-do-mes";
-import { montarAgenda } from "@/lib/agenda-unificada";
+import { deCampoLocal, montarAgenda, paraCampoLocal } from "@/lib/agenda-unificada";
 import { rolarAte } from "@/lib/rolar-ate";
 import type { PanelTab } from "@/lib/abas-do-painel";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
@@ -102,6 +102,7 @@ import {
 import {
   getPrivateConsultationsForDoctor,
   confirmPaymentForDoctor,
+  marcarHoraDaConsulta,
   CONSULT_TYPES as PRIVATE_CONSULT_TYPES,
   type PrivateConsultation,
 } from "@/lib/consultaparticular.functions";
@@ -1201,9 +1202,9 @@ function PainelPage() {
              aba — e nenhuma das duas respondia "como está o meu mês".
 
              O merge e a régua de "que dia é isto" moram em `agenda-unificada`,
-             sem JSX: é lá que estão as decisões difíceis (data confirmada ganha
-             da preferida; particular não tem data marcada e entra como
-             preferência), e é lá que elas são testadas. */
+             sem JSX: é lá que estão as decisões difíceis (a data combinada ganha
+             da preferida, nas três fontes; particular ainda sem horário entra
+             como preferência), e é lá que elas são testadas. */
           <CalendarioDoMes
             eventos={montarAgenda({
               pedidos: appointments as never[],
@@ -4257,6 +4258,7 @@ function ConsultasPagasSection({
                 {c.message && (
                   <p className="text-xs mt-0.5 italic text-muted-foreground">"{c.message}"</p>
                 )}
+                <MarcarHorario consulta={c} onRefresh={onRefresh} tokenFn={tokenFn} />
               </div>
               {c.status === "pagamento_enviado" && (
                 <div className="flex flex-col gap-1.5 shrink-0">
@@ -4289,6 +4291,89 @@ function ConsultasPagasSection({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * MARCAR O HORÁRIO DA CONSULTA PARTICULAR.
+ *
+ * Era a única das três fontes da agenda sem hora combinada: o banco guardava as
+ * datas que a PACIENTE preferia e mais nada, então o calendário do mês tinha de
+ * mostrá-la tracejada, como preferência — justamente a consulta pela qual ele já
+ * recebeu.
+ *
+ * O `datetime-local` devolve "hora de parede", sem fuso. Mandá-la crua para a
+ * coluna `timestamptz` seria erro de três horas no Brasil; por isso o valor
+ * passa por `deCampoLocal` antes de sair daqui, e o servidor recusa qualquer
+ * string sem fuso.
+ */
+function MarcarHorario({
+  consulta,
+  onRefresh,
+  tokenFn,
+}: {
+  consulta: any;
+  onRefresh: () => void;
+  tokenFn: () => Promise<string>;
+}) {
+  const [valor, setValor] = useState(() => paraCampoLocal(consulta.scheduled_for));
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar(quando: string | null) {
+    setSalvando(true);
+    try {
+      const res = await marcarHoraDaConsulta({
+        data: { accessToken: await tokenFn(), id: consulta.id, scheduledFor: quando },
+      });
+      if (res.ok) {
+        toast.success(quando ? "Horário marcado." : "Horário desmarcado.");
+        onRefresh();
+      } else if (res.motivo === "sem_coluna") {
+        /* Diz O QUE FAZER. "Não foi possível salvar" mandaria ele tentar de
+           novo para sempre — a coluna não vai aparecer sozinha. */
+        toast.error("Rode o APLICAR_HORA_DA_CONSULTA.sql no Supabase para marcar horários.");
+      } else {
+        toast.error("Não foi possível marcar o horário.");
+      }
+    } catch {
+      toast.error("Não foi possível marcar o horário.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <label className="text-xs text-muted-foreground" htmlFor={`quando-${consulta.id}`}>
+        Horário combinado
+      </label>
+      <input
+        id={`quando-${consulta.id}`}
+        type="datetime-local"
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        className="rounded-full border border-border bg-background px-3 py-1 text-xs"
+      />
+      <button
+        onClick={() => salvar(deCampoLocal(valor))}
+        disabled={salvando || !valor.trim()}
+        className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
+      >
+        Marcar
+      </button>
+      {consulta.scheduled_for && (
+        <button
+          onClick={() => {
+            setValor("");
+            salvar(null);
+          }}
+          disabled={salvando}
+          className="rounded-full border border-border px-3 py-1 text-xs disabled:opacity-40"
+        >
+          Desmarcar
+        </button>
+      )}
     </div>
   );
 }

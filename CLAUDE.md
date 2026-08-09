@@ -204,6 +204,25 @@ Estas eram pendências de backlog; já estão em produção. Precisam do
   (`sweepWaitlist`). Cascata roda preguiçosa (ao abrir Consultas/Fila) e por cron
   seguro `/api/waitlist-tick` (`CRON_SECRET`). Ver `src/lib/waitlist.functions.ts`.
 
+### Calendário único do mês (ago/2026)
+
+Uma tela só, do mês, juntando as **três** fontes que viviam em abas separadas:
+pedidos (`appointment_requests`), teleconsultas e consultas particulares. Régua
+em `src/lib/agenda-unificada.ts` (funções puras, sem JSX); grade em
+`src/components/calendario-do-mes.tsx`. Legenda por **tipo** — azul presencial,
+laranja teleconsulta, roxo particular —, porque o tipo é o que muda o dia dele;
+status vira texto ao abrir o dia. O que **não** tem hora combinada aparece
+tracejado, nunca como compromisso.
+
+A consulta particular ganhou `scheduled_for timestamptz`
+(`supabase/APLICAR_HORA_DA_CONSULTA.sql`, idempotente) — era a única fonte que
+não sabia dizer quando acontece. **Uma coluna com fuso, não duas de texto:**
+`confirmed_time` aceitar "manhã" já quebrou ordenação. O médico marca no campo
+`datetime-local`, que devolve hora sem fuso — a conversão passa por
+`deCampoLocal`/`paraCampoLocal` e o servidor recusa string sem fuso
+(`z.string().datetime({ offset: true })`). Mandar o valor cru para `timestamptz`
+é o erro de três horas que a teleconsulta já teve aqui.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

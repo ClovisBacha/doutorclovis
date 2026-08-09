@@ -76,6 +76,43 @@ export function horaLocal(iso: string): string | null {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+/**
+ * Instante ISO → valor de um `<input type="datetime-local">`.
+ *
+ * O campo não tem fuso: ele mostra e devolve "hora de parede". Então o que entra
+ * nele tem de ser a hora LOCAL do instante — `iso.slice(0, 16)` mostraria a hora
+ * UTC, e o médico veria 17:30 onde combinou 14:30.
+ */
+export function paraCampoLocal(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${diaLocal(d)}T${hh}:${mi}`;
+}
+
+/**
+ * Valor de um `<input type="datetime-local">` → instante ISO com fuso.
+ *
+ * ─── ESTE É O DEFEITO DE TRÊS HORAS, EVITADO ────────────────────────────────
+ *
+ * Mandar "2026-08-20T14:30" cru para uma coluna `timestamptz` faz o Postgres
+ * lê-lo como UTC — no Brasil, três horas de erro em toda consulta marcada. Já
+ * aconteceu nesta base, na criação da teleconsulta.
+ *
+ * `new Date` de uma data-e-hora SEM fuso é interpretada como local (a regra do
+ * ECMAScript; só a forma "só data" é UTC). O `toISOString()` depois carimba o
+ * `Z`, que é o que o servidor exige.
+ */
+export function deCampoLocal(valor: string): string | null {
+  const v = valor.trim();
+  if (!v) return null;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
 type PedidoBruto = {
   id: string;
   patient_name?: string | null;
@@ -99,6 +136,8 @@ type ParticularBruta = {
   id: string;
   consult_type?: string | null;
   preferred_dates?: string[] | null;
+  /** O horário COMBINADO. `null` enquanto ninguém marcou. */
+  scheduled_for?: string | null;
   status?: string | null;
   amount_cents?: number | null;
 };
@@ -169,20 +208,43 @@ export function daTeleconsulta(t: TeleBruta): EventoDaAgenda | null {
 }
 
 /**
- * Uma consulta particular vira evento — e aqui há uma limitação a declarar.
+ * Uma consulta particular vira evento.
  *
- * `private_consultations` NÃO guarda data marcada: guarda `preferred_dates`, as
- * preferências que ela mandou. Então o calendário a coloca na primeira
- * preferência e marca `firme: false`. Sem isso, ela sumiria do mês — e é
- * justamente a consulta que ele já recebeu dinheiro para dar.
- *
- * A saída definitiva é o banco ganhar uma data combinada; enquanto não ganha,
- * mostrar a preferência marcada como preferência é mais honesto que esconder.
+ * `scheduled_for` (ago/2026) é o horário COMBINADO; `preferred_dates` são as
+ * preferências que ela mandou. Com o horário marcado a consulta vira compromisso
+ * de verdade; sem ele, cai na primeira preferência com `firme: false` — porque
+ * sumir seria pior: é justamente a consulta que ele já recebeu para dar.
  */
 export function daParticular(c: ParticularBruta): EventoDaAgenda | null {
+  const pago = c.status === "confirmado" || c.status === "realizado";
+  const marcada = c.scheduled_for?.trim();
+
+  /* ─── COMBINADA GANHA DA PREFERIDA ────────────────────────────────────────
+     Mesma régua do pedido de consulta: o que ficou combinado manda sobre o que
+     ela pediu. Com `scheduled_for`, a consulta particular vira compromisso de
+     verdade — hora, ordenação e tudo. */
+  if (marcada) {
+    const d = new Date(marcada);
+    if (!Number.isNaN(d.getTime())) {
+      return {
+        id: `part:${c.id}`,
+        tipo: "particular",
+        dia: diaLocal(d),
+        hora: horaLocal(marcada),
+        titulo: c.consult_type?.trim() || "Consulta particular",
+        situacao: pago ? "Paga" : "Marcada · a pagar",
+        firme: true,
+        pago,
+      };
+    }
+  }
+
+  /* Sem horário combinado, cai na primeira preferência — marcada COMO
+     preferência. Esconder sumiria justamente com a consulta pela qual ele já
+     recebeu; pintar como compromisso o faria contar com uma hora que ninguém
+     combinou. */
   const dia = (c.preferred_dates ?? []).map((d) => String(d).trim()).filter(Boolean)[0];
   if (!dia) return null;
-  const pago = c.status === "confirmado" || c.status === "realizado";
   return {
     id: `part:${c.id}`,
     tipo: "particular",
@@ -190,7 +252,7 @@ export function daParticular(c: ParticularBruta): EventoDaAgenda | null {
     hora: null,
     titulo: c.consult_type?.trim() || "Consulta particular",
     situacao: pago
-      ? "Paga"
+      ? "Paga · marcar horário"
       : c.status === "pagamento_enviado"
         ? "Conferir pagamento"
         : "Aguardando pagamento",
