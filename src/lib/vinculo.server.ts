@@ -35,19 +35,56 @@
  * com regra própria e trilha própria, é outra tela, que ainda não existe.
  */
 
-/** Ids das pacientes vinculadas AGORA ao médico. `null` = sem recorte (equipe). */
-export async function vinculadasAgora(
+/**
+ * Ids das pacientes vinculadas AGORA — E SE A LEITURA DEU CERTO.
+ *
+ * ─── POR QUE A FALHA PRECISA SUBIR ──────────────────────────────────────────
+ *
+ * `supabase-js` não lança: devolve `{ data, error }`. O `error` era descartado,
+ * e aí um conjunto vazio passou a significar duas coisas opostas: "este médico
+ * não tem paciente" e "não consegui ler quais são".
+ *
+ * Para AUTORIZAR, as duas dão no mesmo e está certo — quem não sabe de quem é a
+ * paciente não deixa ninguém passar. Falha fechando.
+ *
+ * Para LISTAR, não. Uma fila que se esvazia por um timeout e diz "Tudo
+ * respondido 🎉" é a mesma mentira que este projeto já corrigiu em meia dúzia
+ * de telas. Pior: `listUnansweredQuestions` tem um comentário longo explicando
+ * exatamente isso na SUA leitura — e ganhou uma segunda leitura, esta, sem a
+ * mesma proteção.
+ */
+export async function vinculadasAgoraComEstado(
   sb: { from: (t: string) => any },
   scope: { isTeam: boolean; doctorId: string | null },
-): Promise<Set<string> | null> {
-  if (scope.isTeam) return null;
+): Promise<{ ids: Set<string> | null; falhou: boolean }> {
+  if (scope.isTeam) return { ids: null, falhou: false };
   /* Sem médico resolvido e sem ser equipe: conjunto VAZIO, não `null`. Os dois
      valores são opostos aqui — `null` significa "não recorte nada", e devolvê-lo
      por engano num caso de borda abriria exatamente a porta que esta função
      existe para fechar. Falha fechando. */
-  if (!scope.doctorId) return new Set<string>();
-  const { data } = await sb.from("patient_profiles").select("id").eq("doctor_id", scope.doctorId);
-  return new Set(((data ?? []) as { id: string }[]).map((p) => p.id));
+  if (!scope.doctorId) return { ids: new Set<string>(), falhou: false };
+  const { data, error } = await sb
+    .from("patient_profiles")
+    .select("id")
+    .eq("doctor_id", scope.doctorId);
+  return {
+    ids: new Set(((data ?? []) as { id: string }[]).map((p) => p.id)),
+    falhou: !!error,
+  };
+}
+
+/**
+ * O recorte sem o estado — para quem só precisa do conjunto.
+ *
+ * Continua devolvendo conjunto vazio quando a leitura falha, que é o
+ * comportamento seguro para autorização. Quem PRECISA distinguir vazio de falha
+ * — as listas — usa `vinculadasAgoraComEstado`.
+ */
+export async function vinculadasAgora(
+  sb: { from: (t: string) => any },
+  scope: { isTeam: boolean; doctorId: string | null },
+): Promise<Set<string> | null> {
+  return (await vinculadasAgoraComEstado(sb, scope)).ids;
 }
 
 /**

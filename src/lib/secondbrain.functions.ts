@@ -580,11 +580,31 @@ export const listUnansweredQuestions = createServerFn({ method: "POST" })
      *
      * `user_id` entra no `select` só para o cruzamento — ele NÃO vai para a
      * tela, e continua fora do retorno. */
-    const { vinculadasAgora } = await import("./vinculo.server");
-    const atuais = await vinculadasAgora(supabaseAdmin as any, {
-      isTeam: false,
-      doctorId: target.doctorId,
-    });
+    const { vinculadasAgoraComEstado } = await import("./vinculo.server");
+    const { ids: atuais, falhou: vinculoFalhou } = await vinculadasAgoraComEstado(
+      supabaseAdmin as any,
+      { isTeam: false, doctorId: target.doctorId },
+    );
+    /* ─── A SEGUNDA LEITURA PRECISA DA MESMA PROTEÇÃO DA PRIMEIRA ────────────
+     *
+     * Esta função já tinha um comentário longo dizendo que "não consegui olhar"
+     * e "não há nada" precisam de telas diferentes — e devolvia `ok:false`
+     * quando a leitura das perguntas falhava.
+     *
+     * Ao acrescentar o cruzamento com o vínculo, eu criei uma SEGUNDA leitura
+     * sem essa proteção: um timeout em `patient_profiles` devolvia conjunto
+     * vazio, o filtro cortava tudo, e a tela voltava a dizer "Tudo respondido
+     * 🎉" — exatamente o invariante que o comentário ao lado defende.
+     *
+     * Achado por revisão adversarial do diff. */
+    if (vinculoFalhou) {
+      console.error(`[cerebro] vínculo não carregou; fila de perguntas não é confiável`);
+      return {
+        ok: false as const,
+        questions: [] as { id: string; question: string; created_at: string }[],
+        total: 0,
+      };
+    }
     let query = (supabaseAdmin as any)
       .from("doctor_questions")
       .select("id,question,created_at,user_id")

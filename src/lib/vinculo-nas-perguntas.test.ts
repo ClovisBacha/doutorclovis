@@ -41,11 +41,28 @@ const blocoLista = bloco.slice(0, bloco.indexOf("const { data: todas }"));
 const blocoContagem = bloco.slice(bloco.indexOf("const { data: todas }"));
 
 describe("a lista cruza o carimbo com o vínculo de hoje", () => {
-  test("pergunta ao `vinculadasAgora` e GUARDA a resposta", () => {
+  test("pergunta ao vínculo e GUARDA a resposta", () => {
     /* A ATRIBUIÇÃO, não a chamada: chamar o helper e jogar fora o resultado é
        o mesmo defeito com uma etapa a mais. */
-    expect(blocoLista).toContain("const atuais = await vinculadasAgora(supabaseAdmin as any");
+    expect(blocoLista).toContain("await vinculadasAgoraComEstado(");
+    expect(blocoLista).toContain("const { ids: atuais, falhou: vinculoFalhou }");
     expect(blocoLista).toContain("doctorId: target.doctorId");
+  });
+
+  test("e uma falha ao LER o vínculo não vira «Tudo respondido 🎉»", () => {
+    /**
+     * Achado por revisão adversarial do próprio diff. Esta função já tinha um
+     * comentário longo dizendo que "não consegui olhar" e "não há nada"
+     * precisam de telas diferentes, e devolvia `ok:false` quando a leitura das
+     * PERGUNTAS falhava.
+     *
+     * O cruzamento com o vínculo acrescentou uma SEGUNDA leitura sem essa
+     * proteção: um timeout em `patient_profiles` devolvia conjunto vazio, o
+     * filtro cortava tudo, e a tela voltava a afirmar que não há trabalho.
+     */
+    expect(blocoLista).toContain("if (vinculoFalhou) {");
+    const i = blocoLista.indexOf("if (vinculoFalhou) {");
+    expect(blocoLista.slice(i, i + 400)).toContain("ok: false as const");
   });
 
   test("e FILTRA de verdade, não só consulta", () => {
@@ -163,5 +180,47 @@ describe("ABRIR A SALA passa pelo vínculo — a ação que o commit anterior di
     expect(corpo).toContain("await ownsTele(supabaseAdmin as any, data.id, scope)");
     /* A comparação solta de carimbo era a autorização inteira. */
     expect(corpo).not.toContain("sess.doctor_id !== scope.doctorId");
+  });
+});
+
+describe("o recorte em si: `null` e conjunto vazio são OPOSTOS", () => {
+  /**
+   * ─── A PROPRIEDADE MAIS PERIGOSA DESTE MÓDULO ─────────────────────────────
+   *
+   * `null` quer dizer "não recorte nada" — é o caminho da EQUIPE, que enxerga a
+   * instalação inteira de propósito. Conjunto vazio quer dizer "ninguém passa".
+   *
+   * Trocar um pelo outro num caso de borda não deixa a tela vazia: faz TODA
+   * lista do painel mostrar as pacientes de TODOS os médicos. É exatamente a
+   * porta que este módulo existe para fechar.
+   *
+   * A bateria de mutação encontrou isto: nada testava o helper, e um mutante
+   * que devolvia `null` quando a leitura falhava sobreviveu — ou seja, o pior
+   * vazamento possível não tinha nenhuma trava.
+   */
+  const vinc = readFileSync("src/lib/vinculo.server.ts", "utf8");
+
+  test("a leitura olha o `error`", () => {
+    expect(vinc).toContain("const { data, error }");
+    expect(vinc).toContain("falhou: !!error,");
+  });
+
+  test("e o invólucro NUNCA devolve `null` por causa de falha", () => {
+    /* `null` é reservado à equipe. Devolvê-lo numa falha de leitura abriria o
+       painel inteiro de todos os médicos. */
+    const i = vinc.indexOf("export async function vinculadasAgora(");
+    const corpo = vinc.slice(i);
+    expect(corpo).toContain("return (await vinculadasAgoraComEstado(sb, scope)).ids;");
+    expect(corpo).not.toContain("falhou ? null");
+  });
+
+  test("só a equipe recebe `null`", () => {
+    const i = vinc.indexOf("export async function vinculadasAgoraComEstado");
+    const corpo = vinc.slice(i, vinc.indexOf("export async function vinculadasAgora("));
+    expect(corpo).toContain("if (scope.isTeam) return { ids: null, falhou: false };");
+    /* Sem médico resolvido: conjunto VAZIO, não null. */
+    expect(corpo).toContain(
+      "if (!scope.doctorId) return { ids: new Set<string>(), falhou: false };",
+    );
   });
 });
