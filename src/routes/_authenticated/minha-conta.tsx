@@ -6190,8 +6190,13 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
     setLoading(true);
     setResult(null);
     try {
+      /* A sessão vai junto: sem ela a orientação continua saindo (a régua é de
+         regra, não de IA), mas escrita à mão em vez de gerada. Ver o cabeçalho
+         de `assessSymptoms`. */
+      const { data: sess } = await supabase.auth.getSession();
       const res = await assessSymptoms({
         data: {
+          accessToken: sess.session?.access_token,
           symptoms: [...selected],
           systolic: sys ? Number(sys) : null,
           diastolic: dia ? Number(dia) : null,
