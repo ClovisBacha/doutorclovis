@@ -505,3 +505,47 @@ describe("10. o script de migração não gira, não exclui e respeita o recorte
     expect(script.slice(i, i + 700)).toContain("if (sóTabela && tabela !== sóTabela) continue;");
   });
 });
+
+describe("11. «ela não anexou» e «não consegui servir» pararam de ser a mesma frase", () => {
+  /**
+   * ─── UMA REGRESSÃO CLÍNICA QUE A MIGRAÇÃO TROUXE DE VOLTA ─────────────────
+   *
+   * Antes de mover o laudo para o Storage, `null` no visor só podia significar
+   * uma coisa: a linha não tem imagem. Depois, passou a significar também "o
+   * arquivo existe e eu não consegui assinar a URL" — Storage instável, balde
+   * ainda não criado, chave rotacionada.
+   *
+   * A tela traduzia as duas como "Este registro não tem imagem anexada — só a
+   * anotação dela". Ela fotografou o laudo; ele lê que não há laudo, marca como
+   * visto e segue.
+   *
+   * O comentário no topo de `imagemDoExame` descreve esse MESMO desfecho como
+   * já tendo acontecido uma vez, por outro motivo. A minha migração o trouxe de
+   * volta por um caminho novo — e foi a revisão adversarial que viu.
+   */
+  const clinical = semComentarios("src/lib/clinical.functions.ts");
+  const visor = semComentarios("src/components/exames-recebidos.tsx");
+
+  test("o servidor distingue pelos DADOS, não por palpite", () => {
+    /* `image_path` preenchido é a prova de que existe arquivo. */
+    expect(clinical).toContain(
+      "const tinhaArquivo = !!(row as { image_path?: string | null }).image_path?.trim();",
+    );
+    expect(clinical).toContain('? ("falha_no_arquivo" as const)');
+  });
+
+  test("e a tela diz o que NÃO concluir", () => {
+    /* "Não tem imagem" faria ele marcar como visto. O texto precisa impedir
+       essa conclusão, que é o dano real. */
+    expect(visor).toContain('motivo === "falha_no_arquivo"');
+    expect(visor).toContain("Ela anexou um arquivo e eu não consegui carregá-lo agora");
+    expect(visor).toContain("antes de dar como visto");
+  });
+
+  test("o «sem imagem» de verdade continua existindo", () => {
+    /* Trocar um pelo outro só moveria a mentira: registro que é mesmo só
+       anotação passaria a sugerir falha. */
+    expect(visor).toContain("Este registro não tem imagem anexada");
+    expect(clinical).toContain(': ("sem_imagem" as const)');
+  });
+});

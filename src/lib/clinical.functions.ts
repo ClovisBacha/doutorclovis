@@ -1208,10 +1208,29 @@ export const imagemDoExame = createServerFn({ method: "POST" })
          sobrevive ao "não" que a função devolve. */
       const { imagemDaLinha, BALDE_EXAMES } = await import("@/lib/imagens.server");
       const img = await imagemDaLinha(BALDE_EXAMES, row);
+      /* ─── "NÃO ANEXOU" E "NÃO CONSEGUI SERVIR" SE SEPARARAM ─────────────────
+       *
+       * Antes da migração, `null` aqui só podia significar uma coisa: a linha
+       * não tem imagem. Depois dela passou a significar também "o arquivo
+       * existe, e eu não consegui assinar a URL" — Storage instável, balde
+       * ainda não criado, chave rotacionada.
+       *
+       * A tela traduzia as duas como "Este registro não tem imagem anexada —
+       * só a anotação dela". Ela fotografou o laudo; ele lê que não há laudo,
+       * marca como visto e segue. É o mesmo defeito que o comentário no topo
+       * desta função descreve como já tendo acontecido uma vez, por outro
+       * motivo — e a minha migração o trouxe de volta por um caminho novo.
+       *
+       * `image_path` preenchido é a prova de que existe arquivo. */
+      const tinhaArquivo = !!(row as { image_path?: string | null }).image_path?.trim();
       return {
         ok: true as const,
         imagem: img,
-        motivo: img ? ("ok" as const) : ("sem_imagem" as const),
+        motivo: img
+          ? ("ok" as const)
+          : tinhaArquivo
+            ? ("falha_no_arquivo" as const)
+            : ("sem_imagem" as const),
       };
     } catch {
       return { ok: false as const, imagem: null, motivo: "falha" as const };

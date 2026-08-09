@@ -177,9 +177,9 @@ function VisorDoExame({
      leitura", "não é sua paciente" e "a linha não tem imagem" colapsavam num
      `null` só. O cliente fazia `r.ok ? r.imagem : null` e recolapsava tudo: uma
      falha de rede continuava aparecendo como "ela não anexou laudo". */
-  const [motivo, setMotivo] = useState<"ok" | "sem_imagem" | "nao_encontrado" | "falha" | "sessao">(
-    "ok",
-  );
+  const [motivo, setMotivo] = useState<
+    "ok" | "sem_imagem" | "falha_no_arquivo" | "nao_encontrado" | "falha" | "sessao"
+  >("ok");
   const [carregando, setCarregando] = useState(true);
   const [recado, setRecado] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -281,6 +281,16 @@ function VisorDoExame({
                 className="w-full rounded-2xl border border-border"
               />
             )
+          ) : motivo === "falha_no_arquivo" ? (
+            /* ─── ELA ANEXOU, E EU NÃO CONSEGUI SERVIR ────────────────────────
+               Depois que o laudo saiu da linha para o Storage, `null` deixou de
+               significar só "não anexou". Dizer "não tem imagem" aqui faria ele
+               marcar como visto e seguir — sobre um exame que existe. */
+            <p className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4 text-center text-sm leading-snug text-amber-900">
+              <strong>Ela anexou um arquivo e eu não consegui carregá-lo agora.</strong> Isto{" "}
+              <strong>não</strong> quer dizer que o exame está sem imagem — tente de novo em
+              instantes antes de dar como visto.
+            </p>
           ) : motivo === "sem_imagem" ? (
             <p className="rounded-2xl border border-border bg-background p-4 text-center text-sm text-muted-foreground">
               Este registro não tem imagem anexada — só a anotação dela.
