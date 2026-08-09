@@ -437,6 +437,194 @@ export const confirmAppointment = createServerFn({ method: "POST" })
     return { ok: true as const, error: null };
   });
 
+const MarcarNoDiaSchema = z.object({
+  accessToken: z.string().min(10),
+  dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  hora: z.string().regex(/^\d{2}:\d{2}$/),
+  nome: z.string().trim().min(2).max(120),
+  /**
+   * Vazio quando `pacienteId` vem preenchido — nesse caso quem resolve o
+   * e-mail é o SERVIDOR.
+   *
+   * O e-mail da paciente mora em `auth.users`, e nem `patient_profiles` nem
+   * `listMyPatients` o carregam. A tela não teria como preencher o campo ao
+   * escolher uma paciente da lista: o nome entraria, o e-mail ficaria em
+   * branco, e o médico digitaria de cabeça o e-mail de quem já está cadastrada
+   * — errando um caractere e mandando a confirmação para o vazio.
+   */
+  email: z.union([z.string().trim().email().max(200), z.literal("")]),
+  /** Paciente vinculada, quando é uma. `null` para quem só tem e-mail. */
+  pacienteId: z.string().uuid().nullable(),
+  telefone: z.string().trim().max(40),
+  motivo: z.string().trim().max(300),
+  precoBrl: z.number().int().nonnegative().nullable(),
+});
+
+/**
+ * O MÉDICO MARCA A CONSULTA, no dia, do calendário.
+ *
+ * ─── O QUE FALTAVA ─────────────────────────────────────────────────────────
+ *
+ * Toda linha de `appointment_requests` nascia da PACIENTE: ela pedia, ele
+ * confirmava. Não havia caminho para o contrário — o médico combinar no
+ * telefone e lançar na agenda. Ele via o mês e não podia escrever nele.
+ *
+ * ─── NASCE CONFIRMADA, E ISSO É O PONTO ────────────────────────────────────
+ *
+ * `status: "confirmed"` com `confirmed_date/time` preenchidos. Nascer
+ * `pending` faria a própria consulta que ele acabou de marcar aparecer na fila
+ * de trabalho pedindo que ele a confirmasse — trabalho inventado, e uma agenda
+ * em que o compromisso dele aparece tracejado.
+ *
+ * `preferred_date/time` recebem o mesmo valor porque são `NOT NULL` desde a
+ * primeira migration: são "o que a paciente pediu", e aqui quem pediu foi ele.
+ *
+ * ─── E-MAIL, NÃO CADASTRO ──────────────────────────────────────────────────
+ *
+ * `patient_email` é o que a tabela sempre exigiu, e é o que permite marcar para
+ * quem NÃO tem conta no app: a intermediação é do consultório. Se ela for
+ * paciente vinculada, a tela manda o e-mail dela e o efeito é o mesmo — com a
+ * diferença de que aí o aviso também chega por push.
+ */
+export const marcarConsultaNoDia = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => MarcarNoDiaSchema.parse(i))
+  .handler(async ({ data }) => {
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, error: "Sem permissão." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    /* ─── QUEM É ELA, RESOLVIDO NO SERVIDOR ─────────────────────────────────
+       Duas coisas acontecem aqui, e a segunda é a que importa:
+
+       1. O e-mail vem de `auth.users`, que só o service role enxerga.
+       2. O VÍNCULO é conferido. Sem isto, um `pacienteId` qualquer no corpo do
+          pedido faria este endpoint devolver o e-mail de qualquer paciente da
+          plataforma para qualquer médico assinante — recorte pelo vínculo
+          ATUAL (`patient_profiles.doctor_id`), como no resto do produto. */
+    let nome = data.nome;
+    let email = data.email;
+    if (data.pacienteId) {
+      const { data: prof } = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("id, display_name, doctor_id")
+        .eq("id", data.pacienteId)
+        .maybeSingle();
+      if (!prof) return { ok: false as const, error: "Paciente não encontrada." };
+      if (!scope.isTeam && prof.doctor_id !== scope.doctorId)
+        return { ok: false as const, error: "Paciente não é sua." };
+      const { data: u } = await supabaseAdmin.auth.admin.getUserById(data.pacienteId);
+      const doCadastro = u?.user?.email ?? "";
+      /* O que o médico digitou GANHA do cadastro: ele pode estar marcando para
+         o e-mail que ela usa de verdade, e não o do login. Só cai no cadastro
+         quando ele deixou em branco. */
+      email = data.email || doCadastro;
+      nome = data.nome || (prof.display_name as string | null) || "Paciente";
+    }
+    if (!email) {
+      return {
+        ok: false as const,
+        error: "Sem e-mail para avisar — preencha, ou escolha uma paciente do app.",
+      };
+    }
+
+    /* Mesma checagem de choque do `confirmAppointment`, e pelo mesmo motivo:
+       duas pacientes no mesmo horário é o erro que a agenda existe para
+       impedir. O índice único parcial continua sendo o backstop de verdade —
+       esta consulta é só para dar a mensagem com o NOME de quem já está lá. */
+    const { data: clash } = await scopedBy(
+      (supabaseAdmin as any)
+        .from("appointment_requests")
+        .select("id, patient_name")
+        .eq("status", "confirmed")
+        .eq("confirmed_date", data.dia)
+        .eq("confirmed_time", data.hora),
+      scope,
+    ).limit(1);
+    if (clash?.length) {
+      return {
+        ok: false as const,
+        error: `Já existe consulta confirmada nesse horário (${clash[0].patient_name ?? "outra paciente"}).`,
+      };
+    }
+
+    const { data: nova, error } = await (supabaseAdmin as any)
+      .from("appointment_requests")
+      .insert({
+        patient_name: nome,
+        patient_email: email,
+        /* `NOT NULL` sem default desde a primeira migration. Marcar por
+           telefone sem ter o telefone é comum; a string vazia mantém a coluna
+           honesta em vez de inventar um número. */
+        patient_phone: data.telefone,
+        reason: data.motivo || "Consulta",
+        preferred_date: data.dia,
+        preferred_time: data.hora,
+        confirmed_date: data.dia,
+        confirmed_time: data.hora,
+        status: "confirmed",
+        price_brl: data.precoBrl,
+        doctor_id: scope.isTeam ? null : scope.doctorId,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      const code = (error as { code?: string }).code;
+      /* 23505 = índice único do slot. Outra confirmação entrou na fração de
+         segundo entre a checagem acima e este INSERT. */
+      if (code === "23505")
+        return { ok: false as const, error: "Já existe consulta confirmada nesse horário." };
+      const { colunaAusente: falta } = await import("./postgrest");
+      if (falta(error))
+        return {
+          ok: false as const,
+          error: "Faltam colunas de agenda no banco. Rode o APLICAR_PENDENTES.sql no Supabase.",
+        };
+      return { ok: false as const, error: error.message };
+    }
+
+    /* O aviso fecha o ciclo, e a falha dele NÃO desfaz a consulta: ela já está
+       na agenda dele, que é o que ele pediu. */
+    let avisou = false;
+    try {
+      const { sendEmail, emailLayout } = await import("@/lib/email.server");
+      const { destinoMedico } = await import("@/lib/doctor-mail.server");
+      const med = await destinoMedico(scope.isTeam ? null : scope.doctorId);
+      const dataBr = new Date(data.dia + "T00:00:00").toLocaleDateString("pt-BR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+      });
+      await sendEmail({
+        to: email,
+        replyTo: med.email || undefined,
+        subject: "Sua consulta foi marcada ✅",
+        html: emailLayout(
+          `Olá, ${esc(nome.split(" ")[0]) || "tudo bem"}!`,
+          `<p style="margin:0 0 14px">Sua consulta foi <strong>marcada</strong>:</p>
+           <p style="margin:0 0 6px"><strong>Data:</strong> ${dataBr}</p>
+           <p style="margin:0 0 6px"><strong>Horário:</strong> ${esc(data.hora)}</p>
+           <p style="margin:14px 0 0;font-size:13px;color:#9b8178">Precisa remarcar? Responda este e-mail.</p>`,
+          med.marca,
+        ),
+      });
+      avisou = true;
+      const { sendPushToEmail } = await import("@/lib/push.server");
+      await sendPushToEmail(email, {
+        title: "Consulta marcada ✅",
+        body: `${nome.split(" ")[0]}: ${dataBr} às ${data.hora}.`,
+        url: "/minha-conta",
+      });
+    } catch (e) {
+      console.error("aviso de consulta marcada falhou", e);
+    }
+
+    /* `avisou` sobe para a tela porque "marcada ✓" e "marcada, mas ela não foi
+       avisada" são dois desfechos diferentes — e o segundo é o que faz ele
+       pegar o telefone. Sem `RESEND_API_KEY` o envio é no-op silencioso. */
+    return { ok: true as const, id: nova.id as string, avisou, error: null };
+  });
+
 const ProposeSchema = z.object({
   accessToken: z.string().min(10),
   id: z.string().uuid(),

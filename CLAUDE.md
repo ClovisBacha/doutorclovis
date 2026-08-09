@@ -229,12 +229,12 @@ Eram quinze abas numa fita rolável de uma linha. Hoje são **quatro grupos**
 (`src/lib/abas-do-painel.ts` — sem JSX, testado; fita em
 `src/components/abas-do-painel.tsx`):
 
-| Grupo            | Telas                                                    |
-| ---------------- | -------------------------------------------------------- |
-| **Painel 📊**    | Painel, Engajamento, Lives                               |
-| **Cérebro 🧠**   | Cérebro, Perguntas                                       |
-| **Pacientes 👩‍🍼** | (uma só — pré-consultas e exames são seções dela)        |
-| **Agenda 📅**    | Agendamentos, Calendário, Teleconsultas, Consultas Pagas |
+| Grupo            | Telas                                                   |
+| ---------------- | ------------------------------------------------------- |
+| **Painel 📊**    | Painel, Engajamento, Lives                              |
+| **Cérebro 🧠**   | Cérebro, Perguntas                                      |
+| **Pacientes 👩‍🍼** | (uma só — pré-consultas e exames são seções dela)       |
+| **Agenda 📅**    | (uma só — o Calendário, com pedidos/teles/pagas dentro) |
 
 "Meu Perfil" e "Clínica 🏥" saem da fita e vivem no menu da bolinha
 (`FORA_DA_FITA`).
@@ -261,6 +261,29 @@ da paciente (`AcoesDaPaciente`), com a paciente já escolhida. A dica do painel 
 exames vem de `exame-sugerido.ts`, que lê a faixa de semanas **do próprio título
 do painel** em vez de duplicá-la; entre as faixas (14–17, 29–31) não há sugestão,
 de propósito.
+
+### O calendário é a agenda inteira (ago/2026)
+
+`Agendamentos`, `Teleconsultas` e `Consultas Pagas` deixaram de ser abas: o
+Calendário é a tela, e as três listas viraram seções abaixo dele, inteiras.
+
+- **Clicar num dia abre `DiaDaAgenda`** (`src/components/dia-da-agenda.tsx`):
+  tela grande com tudo do dia, botão de **marcar consulta** e, nas
+  teleconsultas, **abrir a sala e mandar o link**.
+- **Marcar funciona para quem NÃO tem conta no app.** `marcarConsultaNoDia`
+  (`admin.functions.ts`) insere em `appointment_requests` já `confirmed` —
+  nascer `pending` faria a consulta que ele acabou de marcar aparecer na fila
+  pedindo que ele a confirmasse.
+- **Teleconsulta é a exceção, e ela é dita**: a sala pendura na conta da
+  paciente, então exige paciente vinculada. Régua em `validarNovaConsulta`
+  (`agenda-unificada.ts`), testada em `marcar-no-dia.test.ts`.
+- **O e-mail da paciente vinculada é resolvido no SERVIDOR** — ele mora em
+  `auth.users` e nenhuma lista do painel o carrega. A tela manda o `pacienteId`;
+  o servidor confere o vínculo (`patient_profiles.doctor_id`) antes de ler o
+  e-mail. Sem essa conferência, qualquer `pacienteId` no corpo do pedido
+  devolveria o e-mail de qualquer paciente da plataforma.
+- **Cores:** 🟢 presencial, 🟠 teleconsulta, 🟣 particular (`CORES_DO_TIPO`).
+  O que não tem hora combinada aparece tracejado.
 
 ### Ciclo menstrual + cérebro do paciente
 

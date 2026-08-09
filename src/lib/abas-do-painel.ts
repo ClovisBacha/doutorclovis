@@ -58,11 +58,8 @@
 export const PANEL_TABS = [
   "Painel 📊",
   "Calendário",
-  "Agendamentos",
   "Perguntas",
   "Cérebro 🧠",
-  "Teleconsultas",
-  "Consultas Pagas",
   "Lives",
   "Engajamento",
   "Pacientes 👩‍🍼",
@@ -112,11 +109,15 @@ export const GRUPOS: readonly GrupoDeAbas[] = [
      eliminar aquela questão de pré-consultas e exames ali em cima, e vai ser
      somente uma única aba de paciente". */
   { chave: "pacientes", rotulo: "Pacientes 👩‍🍼", filhas: ["Pacientes 👩‍🍼"] },
-  {
-    chave: "agenda",
-    rotulo: "Agenda 📅",
-    filhas: ["Agendamentos", "Calendário", "Teleconsultas", "Consultas Pagas"],
-  },
+  /* ─── UMA AGENDA SÓ, QUE É O CALENDÁRIO (ago/2026) ────────────────────────
+     Eram quatro: Agendamentos, Calendário, Teleconsultas e Consultas Pagas. O
+     médico via a consulta presencial numa aba e a teleconsulta do mesmo dia
+     noutra, e nenhuma respondia "como está o meu dia".
+     Agora o calendário é a tela, e as três listas são seções abaixo dele — cada
+     uma continua inteira, com os botões que sempre teve. Pedido do dono: "não
+     vai existir mais essa questão de agendamentos e teleconsultas em cima, vai
+     ser tudo focado no calendário". */
+  { chave: "agenda", rotulo: "Agenda 📅", filhas: ["Calendário"] },
 ] as const;
 
 /**

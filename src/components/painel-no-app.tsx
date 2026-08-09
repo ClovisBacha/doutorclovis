@@ -156,7 +156,7 @@ export function PainelNoApp({
       {/* Sala aberta em seguida: é a única outra coisa com hora marcada. */}
       {resumo.salasAbertas > 0 && (
         <button
-          onClick={() => onIr("Teleconsultas")}
+          onClick={() => onIr("Calendário")}
           className="press flex w-full items-center gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-left dark:bg-emerald-500/10"
         >
           <span className="text-2xl">🎥</span>
@@ -182,7 +182,7 @@ export function PainelNoApp({
         <Contador
           n={resumo.agendamentosPendentes}
           rotulo="horários a confirmar"
-          onClick={() => onIr("Agendamentos")}
+          onClick={() => onIr("Calendário")}
         />
         <Contador
           n={resumo.preConsultasNovas}

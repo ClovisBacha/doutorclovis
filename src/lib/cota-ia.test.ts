@@ -746,10 +746,12 @@ describe("nenhuma aba fica órfã", () => {
     const comRender = new Set([...codigo.matchAll(/\{tab === "([^"]+)"/g)].map((m) => m[1]));
     const noMenu = abasNaFita();
     expect(noMenu.filter((aba) => !comRender.has(aba))).toEqual([]);
-    /* E a lista não pode estar vazia, senão o teste acima é decoração. O piso
-       é frouxo de propósito: ele existe para pegar `abasNaFita()` devolvendo
-       nada, não para congelar a quantidade de abas — que muda a cada fusão. */
-    expect(noMenu.length).toBeGreaterThanOrEqual(8);
+    /* E a lista tem de ser a fita INTEIRA, senão o teste acima é decoração:
+       `abasNaFita()` devolvendo vazio faria `filter` não achar nada e passar.
+       Comparado com a soma dos grupos, e não com um número — o número encolhe a
+       cada fusão de abas e um piso fixo quebraria por motivo errado. */
+    expect(noMenu.length).toBe(GRUPOS.reduce((n, g) => n + g.filhas.length, 0));
+    expect(noMenu.length).toBeGreaterThan(0);
   });
 
   test("o Calendário está ligado — decisão do Clóvis", () => {
@@ -773,7 +775,7 @@ describe("o Cérebro está à mão, e o Painel é a porta", () => {
     const ordem = abasNaFita();
     const grupos = GRUPOS.map((g) => g.chave);
     expect(grupos.indexOf("cerebro")).toBe(1);
-    expect(ordem.indexOf("Cérebro 🧠")).toBeLessThan(ordem.indexOf("Agendamentos"));
+    expect(ordem.indexOf("Cérebro 🧠")).toBeLessThan(ordem.indexOf("Calendário"));
   });
 
   test("a aba que abre é o Painel — porque é onde mora a fila de trabalho", () => {

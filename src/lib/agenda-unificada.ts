@@ -49,9 +49,12 @@ export type EventoDaAgenda = {
 
 /** As cores da legenda. Uma fonte só — a legenda e as bolinhas leem daqui. */
 export const CORES_DO_TIPO: Record<TipoDeEvento, { ponto: string; rotulo: string }> = {
-  /* Azul para o que acontece no consultório, laranja para o que acontece por
-     vídeo: a distinção que muda o que ele faz no dia (sair de casa ou não). */
-  presencial: { ponto: "bg-sky-500", rotulo: "Presencial" },
+  /* VERDE para o que acontece no consultório, LARANJA para o que acontece por
+     vídeo: a distinção que muda o que ele faz no dia (sair de casa ou não).
+     Era azul e laranja; virou verde e laranja a pedido do dono (ago/2026), e a
+     troca vale a pena por um motivo além do gosto — azul e roxo, lado a lado
+     numa bolinha de 6px, são a mesma cor para muita gente. */
+  presencial: { ponto: "bg-emerald-500", rotulo: "Presencial" },
   teleconsulta: { ponto: "bg-amber-500", rotulo: "Teleconsulta" },
   particular: { ponto: "bg-violet-500", rotulo: "Consulta particular" },
 };
@@ -314,4 +317,90 @@ export function celasDoMes(ano: number, mes: number): { data: Date; doMes: boole
     if (i === 34 && new Date(inicio.getTime() + 35 * 86400000).getMonth() !== mes) break;
   }
   return celas;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   MARCAR NO DIA — a régua do formulário, longe do JSX.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export type NovaConsulta = {
+  /**
+   * `YYYY-MM-DD`. Vem DENTRO do objeto, e não de um estado que a tela de cima
+   * guarda em paralelo: o dia e o resto do formulário são a mesma decisão, e
+   * separá-los cria o par que se desencontra — o médico abre o dia 12, o pai
+   * ainda tem o 10 no estado, e a consulta nasce no dia errado.
+   */
+  dia: string;
+  tipo: "presencial" | "teleconsulta";
+  nome: string;
+  email: string;
+  /** `HH:MM`. */
+  hora: string;
+  /** Quando é paciente vinculada; `null` para quem só tem e-mail. */
+  pacienteId: string | null;
+};
+
+/**
+ * O que impede esta consulta de ser marcada — ou `null` se pode.
+ *
+ * ─── POR QUE VALIDAR AQUI E TAMBÉM NO SERVIDOR ──────────────────────────────
+ *
+ * O servidor é quem manda: ele tem o índice único do slot e é o único que não
+ * dá para enganar. Isto aqui não substitui aquilo — existe para o médico
+ * descobrir o choque de horário ANTES de mandar, com o nome de quem já está
+ * naquele horário na frente dele. A ida ao servidor devolveria a mesma recusa
+ * meio segundo depois, e sem o nome.
+ *
+ * A ordem das checagens é a ordem em que ele preenche: tipo, quem, quando.
+ */
+export function validarNovaConsulta(v: NovaConsulta, doDia: EventoDaAgenda[]): string | null {
+  if (v.tipo === "teleconsulta" && !v.pacienteId) {
+    /* A sala de vídeo pendura na conta dela: é a conta que recebe o aviso, abre
+       a sala e guarda a gravação. Marcar teleconsulta para um e-mail avulso
+       criaria uma sala sem dono do outro lado. */
+    return "Teleconsulta só para paciente do app — escolha uma da lista ou marque como presencial.";
+  }
+  if (v.nome.trim().length < 2) return "Escreva o nome de quem vai ser atendida.";
+  /* ─── E-MAIL EM BRANCO SÓ PASSA PARA PACIENTE DO APP ──────────────────────
+     O e-mail dela mora em `auth.users`, que a tela não enxerga — quem resolve é
+     o servidor. Exigir aqui obrigaria o médico a digitar de cabeça o e-mail de
+     quem já está cadastrada, que é como se erra um caractere e se manda a
+     confirmação para o vazio.
+     Para quem NÃO tem conta, o e-mail é a única forma de avisar: aí é exigido.
+     Régua propositalmente frouxa quando ele digita algo — o servidor tem o
+     validador estrito, e barrar aqui um endereço válido de formato incomum
+     seria impedir a consulta por causa de uma regex. */
+  const emailEscrito = v.email.trim();
+  if (!emailEscrito && !v.pacienteId) {
+    return "Sem e-mail não dá para avisar — preencha, ou escolha uma paciente do app.";
+  }
+  if (emailEscrito && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailEscrito)) {
+    return "Confira o e-mail — é por ele que o aviso vai.";
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v.hora.trim())) return "Escolha um horário válido.";
+
+  const ocupado = doDia.find((e) => e.firme && e.hora === v.hora.trim());
+  if (ocupado) return `Já tem ${ocupado.titulo} às ${ocupado.hora} nesse dia.`;
+  return null;
+}
+
+/**
+ * O resumo do dia em uma frase — o que ele lê antes de abrir qualquer coisa.
+ *
+ * Conta só o que é COMPROMISSO (`firme`). Somar as preferências faria "4
+ * consultas" para um dia com uma marcada e três "quem sabe" — e a frase existe
+ * justamente para ele saber se o dia está cheio.
+ */
+export function resumoDoDia(doDia: EventoDaAgenda[]): string {
+  const firmes = doDia.filter((e) => e.firme);
+  if (firmes.length === 0)
+    return doDia.length ? "Nada marcado — só pedidos sem hora." : "Dia livre";
+  const presenciais = firmes.filter((e) => e.tipo === "presencial").length;
+  const telas = firmes.filter((e) => e.tipo === "teleconsulta").length;
+  const particulares = firmes.filter((e) => e.tipo === "particular").length;
+  const partes: string[] = [];
+  if (presenciais) partes.push(`${presenciais} no consultório`);
+  if (telas) partes.push(`${telas} por vídeo`);
+  if (particulares) partes.push(`${particulares} particular${particulares > 1 ? "es" : ""}`);
+  return partes.join(" · ");
 }

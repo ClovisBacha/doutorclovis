@@ -4,9 +4,12 @@ import {
   celasDoMes,
   diaLocal,
   porDia,
+  resumoDoDia,
   type EventoDaAgenda,
+  type NovaConsulta,
   type TipoDeEvento,
 } from "@/lib/agenda-unificada";
+import { DiaDaAgenda, type PacienteDoSelect } from "./dia-da-agenda";
 
 /**
  * O CALENDÁRIO DO MÊS — um só, com tudo dentro.
@@ -33,14 +36,27 @@ import {
  */
 export function CalendarioDoMes({
   eventos,
+  pacientes = [],
+  aoMarcar,
+  aoEnviarLink,
   className = "",
 }: {
   eventos: EventoDaAgenda[];
+  /** Para o atalho "é paciente do app" dentro do dia. */
+  pacientes?: PacienteDoSelect[];
+  /** Quando existe, clicar num dia abre a tela grande com o formulário. */
+  aoMarcar?: (v: NovaConsulta) => Promise<{ ok: boolean; erro?: string; avisou?: boolean }>;
+  aoEnviarLink?: (evento: EventoDaAgenda) => Promise<{ ok: boolean; erro?: string }>;
   className?: string;
 }) {
   const hoje = new Date();
   const [mes, setMes] = useState(() => new Date(hoje.getFullYear(), hoje.getMonth(), 1));
   const [diaAberto, setDiaAberto] = useState<string | null>(() => diaLocal(hoje));
+  /* O dia em TELA GRANDE. Separado de `diaAberto` de propósito: a faixa de
+     leitura embaixo da grade continua acompanhando o dia selecionado, e o modal
+     só abre quando ele clica de verdade. Fundidos, o calendário abriria um
+     modal sozinho ao carregar, em cima do dia de hoje. */
+  const [diaEmTela, setDiaEmTela] = useState<string | null>(null);
 
   const celas = useMemo(() => celasDoMes(mes.getFullYear(), mes.getMonth()), [mes]);
   const mapa = useMemo(() => porDia(eventos), [eventos]);
@@ -128,7 +144,13 @@ export function CalendarioDoMes({
           return (
             <button
               key={chave}
-              onClick={() => setDiaAberto(chave)}
+              onClick={() => {
+                setDiaAberto(chave);
+                /* Um clique, duas coisas: seleciona (a faixa de baixo segue) e
+                   abre a tela do dia. Sem `aoMarcar` não há o que abrir — o
+                   calendário continua servindo como só-leitura. */
+                if (aoMarcar) setDiaEmTela(chave);
+              }}
               aria-label={`${data.getDate()} — ${eventosDoDia.length} compromisso(s)`}
               aria-pressed={aberto}
               className={`flex min-h-[62px] flex-col items-center gap-1 rounded-xl border p-1.5 text-sm transition-colors ${
@@ -166,15 +188,22 @@ export function CalendarioDoMes({
 
       {/* ── O dia aberto ── */}
       <div className="mt-4 border-t border-border pt-3">
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-          {diaAberto
-            ? new Date(`${diaAberto}T12:00:00`).toLocaleDateString("pt-BR", {
-                weekday: "long",
-                day: "2-digit",
-                month: "long",
-              })
-            : "Escolha um dia"}
-        </p>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            {diaAberto
+              ? new Date(`${diaAberto}T12:00:00`).toLocaleDateString("pt-BR", {
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "long",
+                })
+              : "Escolha um dia"}
+          </p>
+          {/* Como o dia está, em uma frase. Conta só COMPROMISSO — somar as
+              preferências daria "4 consultas" num dia com uma marcada e três
+              "quem sabe", e é justamente para saber se o dia está cheio que
+              esta linha existe. */}
+          {diaAberto && <p className="text-[11px] text-muted-foreground">{resumoDoDia(doDia)}</p>}
+        </div>
         {doDia.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">Nada marcado neste dia.</p>
         ) : (
@@ -207,6 +236,21 @@ export function CalendarioDoMes({
           </ul>
         )}
       </div>
+
+      {/* ─── O DIA EM TELA GRANDE ────────────────────────────────────────
+          Onde ele lê o dia inteiro e MARCA. A faixa acima continua existindo
+          como resumo de leitura rápida: fechada a tela, ele ainda vê o que
+          escolheu sem precisar abrir de novo. */}
+      {diaEmTela && aoMarcar && (
+        <DiaDaAgenda
+          dia={diaEmTela}
+          eventos={mapa.get(diaEmTela) ?? []}
+          pacientes={pacientes}
+          aoMarcar={aoMarcar}
+          aoEnviarLink={aoEnviarLink}
+          onFechar={() => setDiaEmTela(null)}
+        />
+      )}
     </div>
   );
 }

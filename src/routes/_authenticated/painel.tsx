@@ -8,6 +8,7 @@ import {
   getPreConsultaForms,
   getPatientReport,
   markPreConsultaSeen,
+  marcarConsultaNoDia,
   setQuestionAnswered,
   updateAppointmentStatus,
   confirmAppointment,
@@ -789,20 +790,21 @@ function PainelPage() {
        engano não esvaziaria a tela — deixaria a lista velha, que é pior de
        perceber. */
     if (tab === "Pacientes 👩‍🍼") loadPreForms();
-    if (tab === "Teleconsultas") {
-      loadTeleconsultas();
-      loadPreForms();
-      // O select de pacientes da nova teleconsulta vem do engagement
-      if (!engagement) loadEngagement();
-    }
-    if (tab === "Consultas Pagas") loadPrivateConsults();
+
     /* O calendário junta pedidos, teleconsultas e consultas particulares. Sem
        carregar as duas últimas ao abrir a aba, a grade mostraria só o
        presencial — e "não tem nada marcado" é justamente a mentira que este
        trabalho todo está tentando tirar do painel. */
+    /* O CALENDÁRIO É A AGENDA INTEIRA agora — pedidos, teleconsultas e
+       particulares moram nele, como seções. Então ele carrega tudo que as três
+       abas antigas carregavam; deixar de fora o que era da aba de teleconsulta
+       faria a seção dela abrir vazia dentro do calendário. */
     if (tab === "Calendário") {
       loadTeleconsultas();
       loadPrivateConsults();
+      loadPreForms();
+      // O select de pacientes da nova teleconsulta vem do engagement
+      if (!engagement) loadEngagement();
     }
   }, [tab, allowed]);
 
@@ -966,7 +968,7 @@ function PainelPage() {
         }${a.reason ? ` · ${a.reason}` : ""}`,
         em: a.created_at,
         acao: "Confirmar",
-        onAcao: () => setTab("Agendamentos"),
+        onAcao: () => setTab("Calendário"),
       })),
     /* A pressão da pré-consulta agora ganha etiqueta clínica na aba — mas a aba
        deixou de ser a porta de entrada. Sem promover o nível aqui, uma
@@ -1116,7 +1118,9 @@ function PainelPage() {
              revelá-lo. */
           "Pacientes 👩‍🍼": novasPacientes + unseenForms,
           Perguntas: pendingQs,
-          Teleconsultas: teleconsultas.filter((s) => s.status === "sala_aberta").length,
+          /* Salas abertas contam para a AGENDA: "Teleconsultas" deixou de
+             ser aba e virou seção do calendário. */
+          Calendário: teleconsultas.filter((s) => s.status === "sala_aberta").length,
         }}
       />
 
@@ -1250,33 +1254,132 @@ function PainelPage() {
           />
         )}
         {tab === "Calendário" && (
-          /* ─── UM CALENDÁRIO SÓ, COM AS TRÊS FONTES ────────────────────────
-             Era uma faixa de SETE dias que só conhecia `appointments`. O médico
-             via a consulta presencial aqui e a teleconsulta do mesmo dia noutra
-             aba — e nenhuma das duas respondia "como está o meu mês".
-
-             O merge e a régua de "que dia é isto" moram em `agenda-unificada`,
-             sem JSX: é lá que estão as decisões difíceis (a data combinada ganha
-             da preferida, nas três fontes; particular ainda sem horário entra
-             como preferência), e é lá que elas são testadas. */
-          <CalendarioDoMes
-            eventos={montarAgenda({
-              pedidos: appointments as never[],
-              teleconsultas: teleconsultas as never[],
-              particulares: privateConsults as never[],
-            })}
-          />
-        )}
-        {tab === "Agendamentos" && (
-          <div className="space-y-6">
-            <AppointmentsSection
-              appointments={appointments}
-              onChangeStatus={changeStatus}
-              onRefresh={load}
-              medico={euMedico}
+          <div className="space-y-10">
+            /* ─── UM CALENDÁRIO SÓ, COM AS TRÊS FONTES ──────────────────────── Era uma faixa de
+            SETE dias que só conhecia `appointments`. O médico via a consulta presencial aqui e a
+            teleconsulta do mesmo dia noutra aba — e nenhuma das duas respondia "como está o meu
+            mês". O merge e a régua de "que dia é isto" moram em `agenda-unificada`, sem JSX: é lá
+            que estão as decisões difíceis (a data combinada ganha da preferida, nas três fontes;
+            particular ainda sem horário entra como preferência), e é lá que elas são testadas. */
+            <CalendarioDoMes
+              eventos={montarAgenda({
+                pedidos: appointments as never[],
+                teleconsultas: teleconsultas as never[],
+                particulares: privateConsults as never[],
+              })}
+              /* O atalho "é paciente do app": preenche nome e e-mail. A lista
+                 vem do engajamento, que é a mesma fonte dos outros seletores de
+                 paciente do painel — duas listas de pacientes divergiriam. */
+              /* Sem e-mail de propósito: ele mora em `auth.users` e nenhuma
+                 lista do painel o carrega. Escolher a paciente manda o `id`, e
+                 o servidor resolve o e-mail do cadastro — o campo da tela fica
+                 em branco e é opcional nesse caso. Preenchê-lo com "" fingindo
+                 que veio do banco faria o médico achar que ela não tem e-mail. */
+              pacientes={(engagement?.patients ?? []).map((p) => ({
+                id: p.id,
+                nome: p.display_name ?? "Paciente",
+                email: null,
+              }))}
+              aoMarcar={async (v) => {
+                const tk = await token();
+                if (v.tipo === "teleconsulta") {
+                  /* Teleconsulta é OUTRA tabela, com sala e conta do outro lado —
+                     por isso o formulário exige paciente do app, e por isso a
+                     validação disso mora em `validarNovaConsulta`, testada.
+                     `pacienteId` não é nulo aqui: a régua já barrou. */
+                  const r = await createTeleconsulta({
+                    data: {
+                      accessToken: tk,
+                      patientUserId: v.pacienteId!,
+                      /* `deCampoLocal` porque `scheduled_for` é `timestamptz`:
+                         mandar "2026-08-20T14:30" cru são três horas de erro. */
+                      scheduledFor: deCampoLocal(`${v.dia}T${v.hora}`),
+                      doctorNotes: null,
+                    },
+                  });
+                  await loadTeleconsultas();
+                  return { ok: r.ok, erro: r.ok ? undefined : r.error };
+                }
+                const r = await marcarConsultaNoDia({
+                  data: {
+                    accessToken: tk,
+                    dia: v.dia,
+                    hora: v.hora,
+                    nome: v.nome.trim(),
+                    email: v.email.trim(),
+                    /* Quem é ela — o servidor usa isto para pegar o e-mail do
+                       cadastro (que só ele enxerga) e para conferir o vínculo. */
+                    pacienteId: v.pacienteId,
+                    telefone: "",
+                    motivo: "",
+                    precoBrl: null,
+                  },
+                });
+                await load(true);
+                return {
+                  ok: r.ok,
+                  erro: r.ok ? undefined : (r.error ?? undefined),
+                  avisou: r.ok ? r.avisou : undefined,
+                };
+              }}
+              aoEnviarLink={async (ev) => {
+                /* O id do evento vem prefixado (`tele:<uuid>`) porque a agenda
+                   junta três fontes num espaço de ids só. Sem tirar o prefixo, o
+                   servidor recebe um uuid inválido. */
+                const id = ev.id.replace(/^tele:/, "");
+                const sessao = teleconsultas.find((t) => t.id === id);
+                if (!sessao) return { ok: false, erro: "Sessão não encontrada." };
+                const r = await openTeleconsultaRoom({
+                  data: {
+                    accessToken: await token(),
+                    id: sessao.id,
+                    patientUserId: sessao.patient_user_id,
+                    scheduledFor: sessao.scheduled_for,
+                  },
+                });
+                await loadTeleconsultas();
+                return { ok: r.ok, erro: r.ok ? undefined : r.error };
+              }}
             />
-            <WaitlistSection />
-            <BroadcastSection />
+            <section>
+              <h2 className="font-serif text-xl">Pedidos de consulta</h2>
+              <p className="mb-4 mt-1 text-sm text-muted-foreground">
+                O que as pacientes pediram e ainda espera por você — confirmar, sugerir outro
+                horário ou recusar.
+              </p>
+              <AppointmentsSection
+                appointments={appointments}
+                onChangeStatus={changeStatus}
+                onRefresh={load}
+                medico={euMedico}
+              />
+              <WaitlistSection />
+              <BroadcastSection />
+            </section>
+            <section>
+              <h2 className="font-serif text-xl">Teleconsultas</h2>
+              <p className="mb-4 mt-1 text-sm text-muted-foreground">
+                As salas de vídeo. Abrir a sala manda o convite com o link para ela e para você.
+              </p>
+              <TeleconsultasSection
+                sessions={teleconsultas}
+                preForms={preForms}
+                onRefresh={loadTeleconsultas}
+                tokenFn={token}
+                patients={engagement?.patients ?? []}
+              />
+            </section>
+            <section>
+              <h2 className="font-serif text-xl">Consultas particulares</h2>
+              <p className="mb-4 mt-1 text-sm text-muted-foreground">
+                O que foi pago e o que ainda falta pagar — e o horário combinado de cada uma.
+              </p>
+              <ConsultasPagasSection
+                consultations={privateConsults}
+                onRefresh={loadPrivateConsults}
+                tokenFn={token}
+              />
+            </section>
           </div>
         )}
         {tab === "Perguntas" && (
@@ -1413,28 +1516,12 @@ function PainelPage() {
             />
           </>
         )}
-        {tab === "Teleconsultas" && (
-          <TeleconsultasSection
-            sessions={teleconsultas}
-            preForms={preForms}
-            onRefresh={loadTeleconsultas}
-            tokenFn={token}
-            patients={engagement?.patients ?? []}
-          />
-        )}
         {tab === "Engajamento" && (
           <EngagementSection
             engagement={engagement}
             onRefresh={loadEngagement}
             tokenFn={token}
             falhou={fonteFalhou.engajamento}
-          />
-        )}
-        {tab === "Consultas Pagas" && (
-          <ConsultasPagasSection
-            consultations={privateConsults}
-            onRefresh={loadPrivateConsults}
-            tokenFn={token}
           />
         )}
       </div>
@@ -2237,7 +2324,7 @@ function NextAppointmentCard({
         </div>
         {appointments.pending > 0 && (
           <button
-            onClick={() => onNavigate("Agendamentos")}
+            onClick={() => onNavigate("Calendário")}
             className="shrink-0 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground"
           >
             Ver pedidos →
