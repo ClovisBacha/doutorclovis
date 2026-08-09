@@ -18912,6 +18912,10 @@ function ExamesTab({ gest }: { gest: Gest }) {
   const [imageData, setImageData] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState<ExamFile | null>(null);
+  /* A imagem chega DEPOIS do modal abrir. Sem um estado de falha, "ainda não
+     chegou" e "não vai chegar" ficam iguais — e a tela precisa dizer coisas
+     diferentes para cada um. */
+  const [erroPreview, setErroPreview] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -18930,15 +18934,30 @@ function ExamesTab({ gest }: { gest: Gest }) {
     setExams(data ?? []);
   }
 
-  /** A imagem de UM exame, sob demanda — é o que a lista não carrega. */
+  /**
+   * A imagem de UM exame, sob demanda — é o que a lista não carrega.
+   *
+   * Passou a vir pelo SERVIDOR. Com o laudo no Storage, `image_data` fica NULL
+   * e o navegador não pode ler o balde (privado, sem policy) — ela deixaria de
+   * ver o próprio exame, calada, à medida que os novos fossem migrando.
+   */
   async function abrirExame(exam: ExamFile) {
     setPreview(exam);
-    const { data } = await (supabase as any)
-      .from("exam_files")
-      .select("image_data")
-      .eq("id", exam.id)
-      .maybeSingle();
-    if (data?.image_data) setPreview({ ...exam, image_data: data.image_data });
+    setErroPreview(false);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const tk = sess.session?.access_token;
+      if (!tk) {
+        setErroPreview(true);
+        return;
+      }
+      const { minhaImagemDeExame } = await import("@/lib/exame-do-chat.functions");
+      const r = await minhaImagemDeExame({ data: { accessToken: tk, exameId: exam.id } });
+      if (r.ok && r.imagem) setPreview({ ...exam, image_data: r.imagem });
+      else setErroPreview(true);
+    } catch {
+      setErroPreview(true);
+    }
   }
   useEffect(() => {
     load();
@@ -19153,9 +19172,21 @@ function ExamesTab({ gest }: { gest: Gest }) {
           onClick={() => setPreview(null)}
         >
           <div className="relative max-h-[90vh] max-w-2xl overflow-auto rounded-2xl bg-white p-2">
-            {preview.image_data!.startsWith("data:application/pdf") ? (
+            {/* ─── A IMAGEM PODE NÃO TER CHEGADO AINDA ──────────────────────
+                `setPreview(exam)` é síncrono e `exam` vem da lista, que NÃO
+                traz `image_data`. No primeiro render ele é `undefined`, e o
+                `!` seguido de `.startsWith` estourava a tela inteira — a
+                paciente clicava em "Abrir" e via uma página branca.
+                Três estados, e cada um diz o seu: carregando, falhou, pronto. */}
+            {!preview.image_data ? (
+              <p className="p-8 text-center text-sm text-muted-foreground">
+                {erroPreview
+                  ? "Não consegui carregar este exame agora. Tente de novo em instantes."
+                  : "Carregando o exame…"}
+              </p>
+            ) : preview.image_data.startsWith("data:application/pdf") ? (
               <object
-                data={preview.image_data!}
+                data={preview.image_data}
                 type="application/pdf"
                 className="h-[75vh] w-[85vw] max-w-2xl rounded-xl"
                 aria-label={preview.name}
@@ -19171,7 +19202,7 @@ function ExamesTab({ gest }: { gest: Gest }) {
                 </button>
               </object>
             ) : (
-              <img src={preview.image_data!} alt={preview.name} className="max-w-full rounded-xl" />
+              <img src={preview.image_data} alt={preview.name} className="max-w-full rounded-xl" />
             )}
             <p className="mt-2 text-center text-sm font-medium text-foreground">{preview.name}</p>
           </div>

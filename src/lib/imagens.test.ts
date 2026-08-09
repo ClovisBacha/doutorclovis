@@ -336,3 +336,62 @@ describe("7. o backfill é seguro por construção", () => {
     expect(script.slice(i, i + 300)).toContain(".remove([caminho])");
   });
 });
+
+describe("8. a paciente continua vendo o PRÓPRIO exame", () => {
+  /**
+   * ─── A METADE QUE FALTAVA DA MIGRAÇÃO ─────────────────────────────────────
+   *
+   * A aba Exames dela lia `image_data` direto do banco com a chave anon. Isso
+   * funcionava enquanto o laudo morava DENTRO da linha.
+   *
+   * Com o laudo no Storage, `image_data` fica NULL — e o navegador não pode ler
+   * o balde: eles são privados e sem policy nenhuma, por decisão explícita.
+   * A economia de disco teria custado à paciente o acesso ao laudo dela,
+   * caladamente, à medida que os exames novos fossem migrando.
+   *
+   * E a tela ainda estourava: `setPreview(exam)` é síncrono, `exam` vem da
+   * lista (que não traz a imagem), e `preview.image_data!.startsWith(...)` sobre
+   * `undefined` derrubava a página. Ela clicava em "Abrir" e via branco.
+   */
+  const fn = semComentarios("src/lib/exame-do-chat.functions.ts");
+  const app = semComentarios("src/routes/_authenticated/minha-conta.tsx");
+
+  test("existe uma função de servidor para a imagem dela", () => {
+    expect(fn).toContain("export const minhaImagemDeExame");
+    expect(fn).toContain("imagemDaLinha(BALDE_EXAMES, linha)");
+  });
+
+  test("e ela só devolve exame DA PRÓPRIA paciente", () => {
+    /* O filtro vai na CONSULTA, não num `if` depois: assim um id de outra
+       pessoa não devolve linha nenhuma, em vez de devolver e depender de uma
+       comparação para barrar. A leitura é com a chave de serviço, que ignora
+       RLS — o filtro é obrigatório. */
+    const i = fn.indexOf("export const minhaImagemDeExame");
+    expect(fn.slice(i)).toContain('.eq("user_id", u.user.id)');
+  });
+
+  test("a tela pede ao servidor, não ao banco", () => {
+    const i = app.indexOf("async function abrirExame");
+    const bloco = app.slice(i, i + 900);
+    expect(bloco).toContain("minhaImagemDeExame");
+    expect(bloco).not.toContain('.select("image_data")');
+  });
+
+  test("e NUNCA estoura quando a imagem ainda não chegou", () => {
+    /* Era `preview.image_data!.startsWith(...)` — `!` sobre `undefined`. */
+    expect(app).not.toContain("preview.image_data!.startsWith");
+    expect(app).toContain("{!preview.image_data ? (");
+  });
+
+  test("«ainda não chegou» e «não vai chegar» dizem coisas diferentes", () => {
+    /* Sem o estado de falha, um erro de rede ficaria em "Carregando o exame…"
+       para sempre — e ela esperaria por algo que não vem. */
+    /* O RAMO que marca a falha, não a menção ao nome: `setErroPreview` aparece
+       três vezes (limpar, catch, else), e cobrar o identificador solto deixava
+       apagar justamente o `else` — o caso "o servidor respondeu que não tem". */
+    expect(app).toContain("else setErroPreview(true);");
+    expect(app).toContain("} catch {\n      setErroPreview(true);");
+    expect(app).toContain("Não consegui carregar este exame agora");
+    expect(app).toContain("Carregando o exame…");
+  });
+});

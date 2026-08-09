@@ -171,3 +171,54 @@ async function avisarDoExame(doctorId: string, nomeDela: string): Promise<void> 
     /* o exame está salvo; o aviso é enriquecimento */
   }
 }
+
+/**
+ * A IMAGEM DE UM EXAME DELA — pelo servidor, e não mais pelo navegador.
+ *
+ * ─── POR QUE ISTO PRECISOU EXISTIR ──────────────────────────────────────────
+ *
+ * A aba Exames dela lia `image_data` direto do banco com a chave anon. Isso
+ * funcionava enquanto o laudo morava DENTRO da linha.
+ *
+ * Com o laudo no Storage, `image_data` fica NULL — e o navegador não pode ler o
+ * balde: eles são privados e sem policy nenhuma, por decisão explícita (ver
+ * `imagens.server.ts`). O resultado seria a paciente deixando de ver o PRÓPRIO
+ * exame, calada, à medida que os novos fossem migrando.
+ *
+ * Ou seja: não é uma função nova de produto, é a metade que faltava da migração
+ * de armazenamento. Sem ela, a economia de disco teria custado à paciente o
+ * acesso ao laudo dela.
+ *
+ * ─── O RECORTE ──────────────────────────────────────────────────────────────
+ *
+ * `.eq("user_id", u.user.id)` na própria consulta, e não uma checagem depois:
+ * assim um id de exame de outra pessoa não devolve linha nenhuma, em vez de
+ * devolver a linha e depender de um `if` para barrar. A RLS já protegia o
+ * caminho antigo; aqui a leitura é com a chave de serviço, que a ignora — então
+ * o filtro é obrigatório.
+ */
+export const minhaImagemDeExame = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), exameId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+      if (!u?.user) return { ok: false as const, imagem: null };
+
+      const { lerComCaminho, imagemDaLinha, BALDE_EXAMES } = await import("@/lib/imagens.server");
+      const { data: linha } = await lerComCaminho<{
+        image_data?: string | null;
+        image_path?: string | null;
+      }>("exam_files", "image_data", (q) =>
+        q.eq("id", data.exameId).eq("user_id", u.user.id).maybeSingle(),
+      );
+      if (!linha) return { ok: false as const, imagem: null };
+      return { ok: true as const, imagem: await imagemDaLinha(BALDE_EXAMES, linha) };
+    } catch {
+      /* Falhar aqui devolve `imagem: null`, e a tela mostra "não consegui
+         carregar" — nunca um estouro. Ver o comentário do modal. */
+      return { ok: false as const, imagem: null };
+    }
+  });
