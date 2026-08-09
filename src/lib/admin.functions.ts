@@ -582,7 +582,7 @@ export const getDoctorWaitlist = createServerFn({ method: "POST" })
     const scope = await requireScope(data.accessToken);
     if (!scope) return { ok: false as const, entries: [] as AdminWaitlistEntry[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows } = await scopedBy(
+    const { data: rows, error } = await scopedBy(
       (supabaseAdmin as any)
         .from("appointment_waitlist")
         .select(
@@ -594,6 +594,17 @@ export const getDoctorWaitlist = createServerFn({ method: "POST" })
       .order("week_start", { ascending: true })
       .order("created_at", { ascending: true })
       .limit(200);
+    /* ─── "VAZIA" E "NÃO CONSEGUI LER" NÃO PODEM TER A MESMA CARA ────────────
+     *
+     * `supabase-js` não lança: devolve `{ data, error }`. O `error` era
+     * descartado, então tabela ausente (a `appointment_waitlist` nasce numa
+     * migration pendente), grant revogado ou timeout viravam `ok: true` com
+     * lista vazia — e a tela dizia, tranquila, "Ninguém na fila de espera no
+     * momento".
+     *
+     * O médico lê isso e para de oferecer vaga. Do outro lado há gestantes
+     * esperando por um horário que ele acha que ninguém quer. */
+    if (error) return { ok: false as const, entries: [] as AdminWaitlistEntry[] };
     return { ok: true as const, entries: (rows ?? []) as AdminWaitlistEntry[] };
   });
 

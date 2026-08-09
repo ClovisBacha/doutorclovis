@@ -2205,14 +2205,22 @@ function BroadcastSection() {
 /* ---------- Fila de espera (visão do médico) ---------- */
 function WaitlistSection() {
   const [entries, setEntries] = useState<AdminWaitlistEntry[] | null>(null);
+  /* Sessão expirada, rede caída e `ok:false` do servidor caíam todos no mesmo
+     lugar que "a fila está mesmo vazia" — e a tela então afirmava, tranquila,
+     "Ninguém na fila de espera no momento". O médico lê isso e para de oferecer
+     vaga; do outro lado há gestantes esperando um horário que ele acha que
+     ninguém quer. */
+  const [falhou, setFalhou] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await getDoctorWaitlist({ data: { accessToken: await token() } });
         setEntries(res.ok ? res.entries : []);
+        setFalhou(!res.ok);
       } catch {
         setEntries([]);
+        setFalhou(true);
       }
     })();
   }, []);
@@ -2239,9 +2247,15 @@ function WaitlistSection() {
           </p>
         </div>
         <span className="rounded-full bg-secondary px-3 py-1 text-xs font-bold">
-          {entries.length}
+          {falhou ? "—" : entries.length}
         </span>
       </div>
+      {falhou && (
+        <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+          📡 Não consegui ler a fila de espera agora. Isto <strong>não</strong> quer dizer que ela
+          está vazia — atualize a página antes de dar uma vaga como não procurada.
+        </p>
+      )}
 
       {entries.length === 0 ? (
         <p className="mt-4 rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground">

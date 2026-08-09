@@ -186,18 +186,49 @@ async function trilha(
 }
 
 /** Pacientes que são dele AGORA. O recorte de tudo neste arquivo. */
-async function pacientesAtuais(doctorId: string): Promise<Map<string, string>> {
+/**
+ * O recorte, e SE ELE DEU CERTO.
+ *
+ * ─── POR QUE a falha precisa subir ──────────────────────────────────────────
+ *
+ * `supabase-js` não lança: devolve `{ data, error }`. Esta leitura ignorava o
+ * `error`, e um Map vazio significa duas coisas opostas — "este médico não tem
+ * paciente" e "não consegui ler quais são".
+ *
+ * Do ponto de vista de SEGURANÇA as duas dão no mesmo, e isso está certo: sem
+ * saber quem é dele, ninguém passa. Falha fechando.
+ *
+ * Do ponto de vista do MÉDICO são opostas. Ele lê "Nada esperando por você" e
+ * fecha o painel — quando o que houve foi um timeout, e pode haver uma pressão
+ * alterada esperando do outro lado. Numa fila clínica, "não consegui olhar"
+ * não pode ter a mesma cara que "olhei e não há nada".
+ */
+async function pacientesAtuaisComEstado(
+  doctorId: string,
+): Promise<{ mapa: Map<string, string>; falhou: boolean }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await (supabaseAdmin as any)
+  const { data, error } = await (supabaseAdmin as any)
     .from("patient_profiles")
     .select("id,display_name")
     .eq("doctor_id", doctorId);
-  return new Map(
+  const mapa = new Map(
     ((data ?? []) as { id: string; display_name: string | null }[]).map((p) => [
       p.id,
       p.display_name ?? "",
     ]),
   );
+  return { mapa, falhou: !!error };
+}
+
+/**
+ * O recorte, sem o estado — para os chamadores que só precisam do conjunto.
+ *
+ * Continua devolvendo Map vazio quando a leitura falha, que é o comportamento
+ * seguro: quem não sabe de quem é a paciente não mostra nada de ninguém. Quem
+ * PRECISA distinguir vazio de falha usa `pacientesAtuaisComEstado`.
+ */
+async function pacientesAtuais(doctorId: string): Promise<Map<string, string>> {
+  return (await pacientesAtuaisComEstado(doctorId)).mapa;
 }
 
 /**
@@ -314,9 +345,12 @@ export const eventosQuePedemOlhar = createServerFn({ method: "POST" })
     const user = await medicoDaSessao(data.accessToken);
     if (!user) return { ...vazio, ok: false as const };
     try {
-      const pacientes = await pacientesAtuais(user.id);
+      const { mapa: pacientes, falhou } = await pacientesAtuaisComEstado(user.id);
       const ids = [...pacientes.keys()];
-      if (ids.length === 0) return vazio;
+      /* Sem pacientes E sem falha: a fila está mesmo vazia.
+         Sem pacientes POR CAUSA de falha: `incompleto`, e a tela avisa em vez
+         de afirmar tranquilamente que não há nada. */
+      if (ids.length === 0) return falhou ? { ...vazio, incompleto: true } : vazio;
 
       const desde = new Date(Date.now() - data.dias * 86400000).toISOString();
       const { linhas, incompleto } = await lerEventos(
