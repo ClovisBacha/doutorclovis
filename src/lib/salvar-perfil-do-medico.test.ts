@@ -24,6 +24,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 
 const fn = readFileSync("src/lib/doctors.functions.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 
@@ -101,7 +102,6 @@ describe("A CLASSE: nenhum caminho de ESCRITA confere `42703` cru", () => {
   const ESCRITAS = [".insert(", ".update(", ".upsert(", ".delete("];
 
   function violacoes(): string[] {
-    const { execSync } = require("node:child_process");
     const saida = execSync(
       "grep -rn 'code === \"42703\"' --include=*.ts --include=*.tsx src || true",
       { encoding: "utf8" },
@@ -154,7 +154,6 @@ describe("A CLASSE: nenhum caminho de ESCRITA confere `42703` cru", () => {
     /* Sem isto, um `grep` quebrado devolveria zero violações para sempre e o
        teste viraria decoração — que é o mesmo formato do defeito que ele
        persegue. */
-    const { execSync } = require("node:child_process");
     const saida = execSync(
       "grep -rn 'code === \"42703\"' --include=*.ts --include=*.tsx src || true",
       { encoding: "utf8" },
