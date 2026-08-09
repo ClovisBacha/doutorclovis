@@ -539,6 +539,12 @@ function PainelPage() {
         return;
       }
       if (res.ok) {
+        /* `incompleto` é o caso do meio: a chamada respondeu, mas uma das três
+           leituras do servidor falhou. Sem isto, o médico via listas parciais
+           com cara de completas — e a pior delas é a de perguntas, que esvazia
+           inteira quando a leitura dos PERFIS falha, porque o nome alimenta o
+           filtro. */
+        setFonteFalhou((f) => ({ ...f, consultasEPerguntas: !!res.incompleto }));
         // Conta da plataforma (ADMIN_EMAILS) NÃO é médico: seu lugar é o
         // console /admin. Só redireciona quem SERÁ admitido lá (o super-admin
         // dono); um e-mail admin secundário sem conta de médico vê o bloqueio

@@ -286,3 +286,46 @@ describe("7. a aba Engajamento não morre calada", () => {
     expect(painel).toContain('{falhou ? "Tentar de novo:" : "Clique para carregar o dashboard."}');
   });
 });
+
+describe("8. a fila de perguntas não esvazia por causa da leitura dos PERFIS", () => {
+  /**
+   * ─── O ELO QUE NÃO É ÓBVIO ────────────────────────────────────────────────
+   *
+   * `getAdminData` faz três leituras em paralelo e descartava os três `error`.
+   *
+   * A de `patient_profiles` é a pior, e não parece: o mapa de nomes que ela
+   * produz alimenta o FILTRO das perguntas (`nameById.has(q.user_id)`). Se essa
+   * leitura falha, o mapa fica vazio e o filtro derruba TODAS as perguntas — a
+   * fila do médico esvazia inteira por causa de uma consulta que nem é a das
+   * perguntas, e a tela diz que não há nada a responder.
+   *
+   * É o mesmo formato do defeito de `vinculadasAgora`: uma segunda leitura,
+   * acrescentada por um bom motivo, sem a proteção que a primeira já tinha.
+   */
+  const adminFn = semComentarios("src/lib/admin.functions.ts");
+
+  test("as três leituras são conferidas", () => {
+    expect(adminFn).toContain(
+      "const leituraFalhou = !!(appts.error || questions.error || profiles.error);",
+    );
+  });
+
+  test("mas o dado bom NÃO é jogado fora", () => {
+    /**
+     * `ok:false` aqui apagaria os agendamentos que podem ter vindo bem. Trocar
+     * uma mentira por um apagão não é conserto — a tela precisa mostrar o que
+     * tem E avisar que pode faltar.
+     */
+    const i = adminFn.indexOf("const leituraFalhou");
+    const bloco = adminFn.slice(i, i + 2600);
+    expect(bloco).toContain("incompleto: leituraFalhou,");
+    expect(bloco).not.toContain("if (leituraFalhou) return { ok: false");
+  });
+
+  test("e o painel acende a faixa com isso", () => {
+    /* Sem o chamador, o servidor diria a verdade e a tela continuaria calada. */
+    expect(painel).toContain(
+      "setFonteFalhou((f) => ({ ...f, consultasEPerguntas: !!res.incompleto }));",
+    );
+  });
+});

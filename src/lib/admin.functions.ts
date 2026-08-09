@@ -176,6 +176,23 @@ export const getAdminData = createServerFn({ method: "POST" })
       scopedBy(sb.from("patient_profiles").select("id,display_name,doctor_id"), scope),
     ]);
 
+    /* ─── AS TRÊS LEITURAS PODEM FALHAR, E DUAS DELAS MENTEM CALADAS ─────────
+     *
+     * `supabase-js` não lança: devolve `{ data, error }`. Os três `error` eram
+     * descartados.
+     *
+     * O de `profiles` é o pior, e não é óbvio: `nameById` alimenta o FILTRO das
+     * perguntas logo abaixo (`nameById.has(q.user_id)`). Se essa leitura falha,
+     * o mapa fica vazio e o filtro derruba TODAS as perguntas — a fila do
+     * médico esvazia inteira por causa de uma consulta que nem é a das
+     * perguntas, e a tela diz que não há nada a responder.
+     *
+     * Não devolvo `ok:false`: os agendamentos podem ter vindo bem, e jogar fora
+     * dado bom por causa de outra consulta seria trocar uma mentira por um
+     * apagão. O painel já tem a faixa de fonte falhada — ela passa a acender
+     * também por aqui. */
+    const leituraFalhou = !!(appts.error || questions.error || profiles.error);
+
     const nameById = new Map(
       (profiles.data ?? []).map((p: { id: string; display_name: string | null }) => [
         p.id,
@@ -220,6 +237,8 @@ export const getAdminData = createServerFn({ method: "POST" })
 
     return {
       ok: true as const,
+      /** Alguma das três leituras falhou — o que está aqui pode estar incompleto. */
+      incompleto: leituraFalhou,
       isTeam: scope.isTeam,
       appointments: (appts.data ?? []) as AdminAppointment[],
       questions: questionsWithName,
