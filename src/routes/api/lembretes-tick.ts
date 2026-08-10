@@ -87,9 +87,15 @@ async function handle(request: Request): Promise<Response> {
       /* Quem já mandou a pré-consulta nos últimos 20 dias. A janela é generosa
          de propósito: pedir de novo o que ela respondeu semana passada é a
          forma mais rápida de ensinar que os avisos deste app não valem
-         leitura — e é o mesmo canal por onde chega a emergência. */
+         leitura — e é o mesmo canal por onde chega a emergência.
+
+         `preconsulta_forms`, e não `pre_consultation_forms`: escrevi o nome
+         errado na primeira versão e o efeito era invisível — a leitura falhava,
+         `preIndisponivel` virava true, e o pedido de pré-consulta NUNCA saía.
+         Nenhum erro na tela, nenhum log, nenhum push. O teste ao lado deste
+         arquivo agora confere cada `.from()` contra o schema. */
       (supabaseAdmin as any)
-        .from("pre_consultation_forms")
+        .from("preconsulta_forms")
         .select("user_id")
         .gte("submitted_at", new Date(agora.getTime() - 20 * 86400_000).toISOString()),
     ]);

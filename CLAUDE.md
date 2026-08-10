@@ -49,13 +49,19 @@ cp .env.example .env
 
 O `.env` está no `.gitignore` — nunca commite chaves reais.
 
-> **Atenção:** o banco de produção só tem as 8 tabelas originais — todas as
-> migrations a partir de `20260608120000` estão pendentes (28 tabelas faltando,
-> verificado em 2026-06-12). Aplique `supabase/APLICAR_PENDENTES.sql` no
-> SQL Editor do Supabase (arquivo consolidado e idempotente; pode rodar mais
-> de uma vez). Sem isso, Contrações, Pré-consulta, Exames, Linha do Tempo,
-> Ciclo Menstrual, Plano de Parto, Teleconsulta, Álbum, Pós-parto, Escola,
-> Conquistas e outras abas não persistem dados.
+> **Banco em dia (ago/2026).** O dono aplicou todos os `APLICAR_*.sql`.
+> Conferido por sondagem ao PostgREST: `doctor_slots`, `doctor_blocks`,
+> `appointment_reminders` e `private_consultations` respondem 200, e
+> `clinical_acks` responde 401 (existe, e a RLS barra o anon — o esperado).
+>
+> Os `APLICAR_*.sql` continuam idempotentes: rodar de novo é seguro, e é o que
+> se faz depois de acrescentar uma migration.
+>
+> ⚠️ **O nome da tabela é `preconsulta_forms`**, não `pre_consultation_forms`.
+> Escrever o segundo custou um pedido de pré-consulta que nunca era enviado, sem
+> erro nem log — o chamador tratava a falha de leitura como "todas já
+> responderam". `src/lib/tabelas-que-existem.test.ts` confere cada `.from()`
+> contra o schema e contra os `APLICAR_*.sql`.
 
 ## Deploy (Vercel)
 
