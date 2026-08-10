@@ -69,6 +69,24 @@ import preocupada from "@/assets/bolha/preocupada.webp";
 
 export type Humor = "feliz" | "comemorando" | "dormindo" | "preocupada";
 
+/**
+ * ─── AS QUATRO ARTES, E UMA TROCA PELA METADE (ago/2026) ────────────────────
+ *
+ * `feliz` é a arte NOVA do Bebê Bolha (pedido do dono: "o personagem agora é o
+ * bebê bolha"). As outras três continuam com a personagem anterior, em aquarela
+ * — e a diferença de traço aparece assim que o humor muda.
+ *
+ * Não dá para usar a arte nova nas quatro: ela SORRI. Pôr um sorriso onde o
+ * app quer dizer "preocupada" ou "dormindo" é pior que a inconsistência de
+ * estilo, porque aí a cara passa a contradizer o que a tela está dizendo.
+ *
+ * Falta, então, a mesma personagem em três expressões: comemorando, dormindo e
+ * preocupada. Enquanto elas não chegam, o enquadramento é o que segura a
+ * emenda: a arte nova foi recortada para a ESFERA cair no mesmo tamanho e na
+ * mesma altura da antiga (222px de diâmetro, centro em 153×131 na caixa de
+ * 320). Casar pela caixa da imagem, e não pela esfera, faria o personagem
+ * mudar de tamanho ao trocar de humor — na mesma tela, na mesma bolha.
+ */
 const ARTE: Record<Humor, string> = { feliz, comemorando, dormindo, preocupada };
 
 /**
