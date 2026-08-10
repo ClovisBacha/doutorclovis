@@ -87,6 +87,54 @@ function StarMeter({ halves, size = "text-xl" }: { halves: number; size?: string
   );
 }
 
+/**
+ * UMA ESTRELA DO PLACAR DO DIA — acesa ou apagada.
+ *
+ * SVG e não o emoji ⭐. O emoji não tem versão VAZIA: para apagá-lo só resta
+ * `grayscale` + `opacity`, e o que sai é uma estrela cinza suja em vez do
+ * contorno leve que o desenho pede. Com SVG as duas versões partem da MESMA
+ * geometria — a apagada é a acesa sem recheio —, então elas se alinham
+ * perfeitamente na fileira, que é justamente o que se nota quando não está.
+ */
+function EstrelaDoDia({ acesa, tamanho = 34 }: { acesa: boolean; tamanho?: number }) {
+  /* Ponta para cima e cinco braços iguais, calculados em vez de escritos à
+     mão: um `path` decorado a olho fica com um braço mais curto, e numa
+     fileira de seis o defeito se repete seis vezes. */
+  const pontos = Array.from({ length: 10 }, (_, i) => {
+    const r = i % 2 === 0 ? 48 : 19.5;
+    const a = (Math.PI / 5) * i - Math.PI / 2;
+    return `${(50 + r * Math.cos(a)).toFixed(2)},${(50 + r * Math.sin(a)).toFixed(2)}`;
+  }).join(" ");
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      width={tamanho}
+      height={tamanho}
+      aria-hidden
+      className="shrink-0"
+      style={acesa ? { filter: "drop-shadow(0 2px 4px rgba(214,158,46,0.45))" } : undefined}
+    >
+      <polygon
+        points={pontos}
+        fill={acesa ? "url(#dc-estrela-ouro)" : "rgba(255,255,255,0.5)"}
+        stroke={acesa ? "#e0a92b" : "rgba(120,90,120,0.28)"}
+        strokeWidth={acesa ? 3 : 3.5}
+        strokeLinejoin="round"
+      />
+      {acesa && (
+        <defs>
+          {/* Claro em cima e âmbar embaixo: estrela chapada lê como adesivo. */}
+          <linearGradient id="dc-estrela-ouro" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffe08a" />
+            <stop offset="52%" stopColor="#fdc32f" />
+            <stop offset="100%" stopColor="#f0a51c" />
+          </linearGradient>
+        </defs>
+      )}
+    </svg>
+  );
+}
+
 /** Hash estável de string → número (posiciona decorações de forma determinística). */
 function hashStr(s: string): number {
   let h = 0;
@@ -247,7 +295,6 @@ import { Bolha, humorDaJornada } from "@/components/bolha";
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
    cenário fixo da tela de atividades. */
 import jogoBolha from "@/assets/jogo/bolha.webp";
-import jogoPresente from "@/assets/jogo/presente.webp";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { ehNativo, tocarPadrao } from "@/lib/nativo";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
@@ -6176,79 +6223,12 @@ const POS_ENFEITE = [
    `app-mobile-shell.tsx`, onde a saudação acontece uma vez só. Esta tela usa a
    linha para dizer onde ela está: "Hoje com {bebê}". */
 
-/**
- * O anel do dia: quantos dos 6 momentos já foram feitos.
- *
- * É SVG e não uma barra porque o número mora no meio dele — e a estrela na
- * ponta do arco só existe se houver arco: em 0/6 ela ficaria pousada no topo
- * sem nada atrás, parecendo enfeite solto.
- */
-function AnelDoDia({
-  feitos,
-  total,
-  escuro = false,
-}: {
-  feitos: number;
-  total: number;
-  escuro?: boolean;
-}) {
-  const R = 39;
-  const C = 2 * Math.PI * R;
-  const frac = Math.max(0, Math.min(1, total > 0 ? feitos / total : 0));
-  /* Começa no topo e anda no sentido do relógio: o -90° do grupo. */
-  const ang = -90 + frac * 360;
-  const rad = (ang * Math.PI) / 180;
-  return (
-    <span className="relative flex h-[92px] w-[92px] shrink-0 items-center justify-center">
-      <span
-        className={`absolute inset-0 rounded-full backdrop-blur-xl ${escuro ? "bg-white/12" : "bg-white/38"}`}
-        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)" }}
-      />
-      <svg viewBox="0 0 92 92" className="absolute inset-0 h-full w-full -rotate-90">
-        <circle cx="46" cy="46" r={R} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={5} />
-        {frac > 0 && (
-          <circle
-            cx="52"
-            cy="52"
-            r={R}
-            fill="none"
-            stroke="#a78bfa"
-            strokeWidth={7}
-            strokeLinecap="round"
-            strokeDasharray={`${C * frac} ${C}`}
-          />
-        )}
-      </svg>
-      {frac > 0 && (
-        <span
-          aria-hidden
-          className="absolute text-[15px] leading-none"
-          style={{
-            left: `${46 + R * Math.cos(rad)}px`,
-            top: `${46 + R * Math.sin(rad)}px`,
-            transform: "translate(-50%,-50%)",
-          }}
-        >
-          ⭐
-        </span>
-      )}
-      <span className="relative text-center leading-tight">
-        <span
-          className="block text-[19px] font-semibold"
-          style={{ color: escuro ? "#f6f2ff" : "#33264a" }}
-        >
-          {feitos}/{total}
-        </span>
-        <span
-          className="block text-[10.5px]"
-          style={{ color: escuro ? "rgba(255,255,255,0.7)" : "rgba(100,116,139,1)" }}
-        >
-          concluídos
-        </span>
-      </span>
-    </span>
-  );
-}
+/* ─── O ANEL DO DIA SAIU (ago/2026) ──────────────────────────────────────
+   Era um anel de 92px com "0/6 concluídos" no canto superior direito da folha
+   do dia. Saiu no redesenho: placar no ALTO da tela é a primeira coisa que ela
+   lê toda manhã, e de manhã ele está sempre zerado. A mesma contagem virou o
+   painel de estrelas do PÉ — depois do trabalho, que é onde saldo se lê sem
+   soar cobrança. O `AtividadeIcone` do tile das atividades continua abaixo. */
 
 /**
  * Os desenhinhos das atividades.
@@ -6445,6 +6425,21 @@ function WellnessScreen({
      exigiria rastrear pergunta a pergunta fora dele. */
   const pctAula = aulaFeita ? 100 : Math.round((halves / 6) * 100);
 
+  /* ─── O QUE O MASCOTE DIZ ────────────────────────────────────────────────
+     O texto do meio é o da referência, palavra por palavra. Os outros dois
+     existem porque o da referência ficaria ERRADO nos dois extremos:
+
+     · Modo Cuidado — "um abraço no seu bebê e no futuro que vocês estão
+       criando" é exatamente a frase que não se diz a quem perdeu a gestação.
+       Aqui o recado não pede nada e não fala do bebê.
+     · Dia completo — um convite a começar, lido depois de ela ter feito tudo,
+       ensina que o app não repara no que ela fez. */
+  const recadoDoDia = careMode
+    ? "💗 Que bom te ver por aqui. Hoje, cuidar de você já basta — no seu tempo, do seu jeito."
+    : halves >= 6
+      ? "🌟 Dia completo! Você cuidou de vocês dois hoje, e isso fica. Descanse — amanhã tem mais. 💜"
+      : "💗 Que bom te ver por aqui! Cada escolha de cuidado hoje é um abraço no seu bebê e no futuro que vocês estão criando. 💜";
+
   // Os 6 cards: aula primeiro (o conteúdo do dia), depois os 5 de bem-estar.
   const cards: { key: string; emoji: string; done: boolean }[] = [
     { key: "aula", emoji: lessonEmoji || "📚", done: lesson.alreadyDone },
@@ -6626,41 +6621,70 @@ function WellnessScreen({
                   NESTA tela. Um número por canto. */}
             </div>
 
-            {/* ── Saudação + anel de progresso ──────────────────────── */}
-            <div className="mt-3.5 flex items-start gap-3">
-              {/* O mascote mora AQUI, e não na trilha.
-                  O Caminho é a tela que a paciente personaliza — o céu segue a
-                  hora dela, a decoração é a que ela comprou, e a bolinha do dia
-                  é a única coisa que pede o toque. Um personagem espalhado por
-                  lá seria o único elemento que ela não escolheu e não pode
-                  tirar. Aqui, no lugar onde ela vem trabalhar, ele faz o
-                  oposto: dá companhia a uma tela que antes só cobrava tarefa.
-                  A cara vem do progresso do próprio dia. */}
-              <span className="mt-0.5 shrink-0">
-                <Bolha
-                  tamanho={44}
-                  humor={humorDaJornada({
-                    comemorando: halves >= 6,
-                    diaFeito: halves >= 6,
-                    careMode,
-                  })}
+            {/* ── O MASCOTE GRANDE E O QUE ELE DIZ ────────────────────
+                Antes eram três coisas numa linha: mascote de 44px, título com
+                subtítulo, e o anel de progresso. Viraram duas, empilhadas e
+                centradas — mascote grande e um balão de fala.
+
+                O QUE MUDOU DE FUNDO, e não é só tamanho: a tela abria
+                COBRANDO. "0/6 concluídos" no canto superior direito é um
+                placar, e placar zerado é a primeira coisa que ela lia toda
+                manhã. Agora abre com alguém falando com ela; o placar foi para
+                o PÉ da tela, depois do trabalho feito, que é onde saldo se lê
+                sem soar cobrança.
+
+                O mascote mora AQUI, e não na trilha. O Caminho é a tela que a
+                paciente personaliza — o céu segue a hora dela, a decoração é a
+                que ela comprou. Um personagem espalhado por lá seria o único
+                elemento que ela não escolheu e não pode tirar. Aqui, no lugar
+                onde ela vem trabalhar, ele faz o oposto: dá companhia a uma
+                tela que antes só cobrava tarefa. A cara vem do progresso do
+                próprio dia. */}
+            <div className="mt-1 flex flex-col items-center">
+              {/* `careMode` VAI para o componente, não só para o texto: a arte
+                  de "comemorando" tem confete pintado dentro dela, e o portão
+                  do luto mora lá justamente para o chamador não esquecer. */}
+              <Bolha
+                tamanho={188}
+                humor={humorDaJornada({
+                  comemorando: halves >= 6,
+                  diaFeito: halves >= 6,
+                  careMode,
+                })}
+                careMode={careMode}
+              />
+
+              {/* O BALÃO. O rabinho aponta para CIMA, para o mascote — é o que
+                  faz o texto ser fala dele em vez de mais um cartão da tela.
+                  Ele é um quadrado girado 45° com as duas bordas de baixo
+                  escondidas atrás do balão: triângulo em `border` não aceita
+                  o mesmo fundo translúcido do balão e apareceria como uma
+                  cunha opaca mais escura que ele. */}
+              <div className="relative -mt-1 w-full">
+                <span
+                  aria-hidden
+                  className="absolute left-1/2 top-0 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[3px]"
+                  style={{
+                    background: vidro,
+                    borderTop: `1px solid ${vidroBorda}`,
+                    borderLeft: `1px solid ${vidroBorda}`,
+                  }}
                 />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2
-                  className="font-serif text-[21px] leading-tight"
-                  style={{ fontWeight: 500, color: tinta }}
+                <div
+                  className="relative rounded-[26px] px-6 py-5"
+                  style={{
+                    background: vidro,
+                    backdropFilter: "blur(22px) saturate(175%)",
+                    WebkitBackdropFilter: "blur(22px) saturate(175%)",
+                    border: `1px solid ${vidroBorda}`,
+                    boxShadow: `inset 0 1px 0 ${vidroLuz}, 0 18px 40px -22px rgba(60,40,70,0.5)`,
+                  }}
                 >
-                  {babyName ? `Hoje com ${babyName}` : "O seu dia"} 💜
-                </h2>
-                <p
-                  className="mt-1.5 max-w-[220px] text-[12px] leading-snug"
-                  style={{ color: tintaSec }}
-                >
-                  {careMode ? "No seu tempo." : "6 momentos especiais esperando por vocês."}
-                </p>
+                  <p className="text-[15px] leading-[1.5]" style={{ color: tinta }}>
+                    {recadoDoDia}
+                  </p>
+                </div>
               </div>
-              <AnelDoDia feitos={halves} total={6} escuro={ceuEscuro} />
             </div>
 
             {/* ── A aula em destaque ─────────────────────────────────── */}
@@ -6793,7 +6817,10 @@ function WellnessScreen({
                   que os controles desta tela podem não fazer nada. */}
             </div>
 
-            <div className="mt-2.5 flex flex-col gap-1">
+            {/* `gap-2` e não `gap-1`: na referência os cartões respiram, e é
+                essa folga que faz cinco deles lerem como lista em vez de
+                bloco único. */}
+            <div className="mt-2.5 flex flex-col gap-2">
               {WELLNESS_TYPES.map((a) => {
                 const meta = WELLNESS_META[a.key];
                 const isDone = !careMode && done.has(a.key);
@@ -6801,7 +6828,12 @@ function WellnessScreen({
                   <button
                     key={a.key}
                     onClick={() => setOpenKey(a.key)}
-                    className="press flex w-full items-center gap-2.5 rounded-[18px] px-3 py-1.5 text-left"
+                    /* `px-3` e não `px-3.5`, `gap-2.5` e não `gap-3`: cada 2px
+                       aqui é largura na coluna de texto, e é ela que decide se
+                       "Momento com o bebê" cabe numa linha como na referência
+                       ou quebra em duas. Medido: com 14px de folga lateral a
+                       coluna dava 181px e o título pedia 185. */
+                    className="press flex w-full items-center gap-2.5 rounded-[22px] px-3 py-3 text-left"
                     style={{
                       background: vidro,
                       backdropFilter: "blur(18px) saturate(170%)",
@@ -6816,7 +6848,7 @@ function WellnessScreen({
                         arroz: os cinco tiles viravam o elemento mais forte da
                         página, acima até do bebê. */}
                     <span
-                      className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[13px]"
+                      className="flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-[16px]"
                       style={{
                         background: `linear-gradient(150deg, ${meta.tile ?? meta.a} 0%, ${meta.tileB ?? meta.b} 100%)`,
                         color: meta.ink ?? meta.b,
@@ -6827,7 +6859,7 @@ function WellnessScreen({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span
-                        className="block text-[13px] leading-tight"
+                        className="block text-[14.5px] leading-tight"
                         style={{
                           color: ceuEscuro
                             ? (meta.inkDark ?? meta.ink ?? meta.b)
@@ -6838,7 +6870,7 @@ function WellnessScreen({
                         {meta.title}
                       </span>
                       <span
-                        className="mt-px block text-[10.5px] leading-[1.35]"
+                        className="mt-0.5 block text-[12.5px] leading-[1.35]"
                         style={{ color: tintaSec }}
                       >
                         {meta.desc}
@@ -6847,7 +6879,7 @@ function WellnessScreen({
                     {!careMode && (
                       <span className="flex shrink-0 items-center gap-1.5">
                         <span
-                          className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
+                          className={`flex h-[26px] w-[26px] items-center justify-center rounded-full text-[12px] ${
                             isDone ? "bg-emerald-400 text-white" : ""
                           }`}
                           style={
@@ -6860,7 +6892,7 @@ function WellnessScreen({
                         >
                           {isDone ? "✓" : ""}
                         </span>
-                        <span className="tabular-nums text-[12.5px]" style={{ color: tintaSec }}>
+                        <span className="tabular-nums text-[13.5px]" style={{ color: tintaSec }}>
                           {isDone ? "1/1" : "0/1"}
                         </span>
                         {/* A seta mora num botão de vidro, como no desenho —
@@ -6904,10 +6936,26 @@ function WellnessScreen({
               </p>
             )}
 
-            {/* ── Recompensa do dia ──────────────────────────────────── */}
+            {/* ── ESTRELAS DE HOJE ────────────────────────────────────
+                Substitui o cartão "Recompensa do dia", e absorve o que ele
+                dizia. O antigo mostrava um 🎁 e a PROMESSA ("complete tudo e
+                ganhe 3 estrelas"); este mostra o ESTADO — seis estrelas, uma
+                por momento do dia, acesas conforme ela anda. A promessa
+                continua, virou a última linha.
+
+                ─── SEIS ESTRELAS, E POR QUE O TEXTO NÃO DIZ "ESTRELAS" ─────
+                O desenho traz seis estrelas e a legenda "2/6 estrelas
+                conquistadas". Nesta base os dois números são coisas
+                diferentes: `halves` conta os SEIS momentos do dia (5 de
+                bem-estar + a aula), e a recompensa por fechar o dia são TRÊS
+                estrelas — a moeda que ela gasta na Loja. Escrever "6 estrelas"
+                prometeria o dobro do que o app paga, e ela descobriria isso no
+                fim do dia.
+                Então: seis estrelas no desenho, uma por momento (que é o que a
+                referência mostra), e a legenda fala de MOMENTOS. */}
             {!careMode && (
               <div
-                className="mt-2 flex items-center gap-2.5 rounded-[18px] px-3 py-2"
+                className="mt-3 rounded-[22px] px-4 py-4"
                 style={{
                   background: vidro,
                   backdropFilter: "blur(18px) saturate(170%)",
@@ -6916,50 +6964,53 @@ function WellnessScreen({
                   boxShadow: `inset 0 1px 0 ${vidroLuz}, 0 12px 28px -18px rgba(60,40,70,0.45)`,
                 }}
               >
-                {/* O 🎁 do sistema é vermelho e amarelo — as duas cores que
-                    esta tela não tem. Esta arte nasceu na paleta dela. */}
-                <img src={jogoPresente} alt="" aria-hidden className="h-[62px] w-[62px] shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span
-                    className="block font-serif text-[15px]"
-                    style={{ fontWeight: 600, color: tinta }}
-                  >
-                    Recompensa do dia
-                  </span>
-                  <span
-                    className="mt-0.5 block text-[11.5px] leading-snug"
-                    style={{ color: tintaSec }}
-                  >
-                    {halves >= 6 ? (
-                      "Dia completo! As 3 estrelas são suas 🌟"
-                    ) : (
-                      <>
-                        Complete todas as atividades e ganhe{" "}
-                        <span
-                          className="font-semibold"
-                          style={{ color: ceuEscuro ? "#c9b0ff" : "#7c3aed" }}
-                        >
-                          3 estrelas
-                        </span>{" "}
-                        ✨
-                      </>
-                    )}
-                  </span>
-                </span>
-                <span
-                  className={`flex shrink-0 flex-col items-center rounded-[18px] px-5 py-2.5 ${ceuEscuro ? "bg-white/14" : "bg-white/65"}`}
-                  style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)" }}
+                <p
+                  className="text-center font-serif text-[14.5px]"
+                  style={{ fontWeight: 600, color: tinta }}
                 >
-                  <span className="flex items-center gap-1.5">
-                    <span className="text-[17px] leading-none">⭐</span>
-                    <span className="text-[19px] font-bold leading-none" style={{ color: tinta }}>
-                      3
-                    </span>
-                  </span>
-                  <span className="mt-0.5 text-[11px]" style={{ color: tintaSec }}>
-                    estrelas
-                  </span>
-                </span>
+                  ⭐ Estrelas de hoje
+                </p>
+
+                {/* A fileira ocupa quase a largura do cartão, como no desenho:
+                    seis estrelas pequenas e apertadas no meio leem como
+                    enfeite; grandes e espalhadas leem como placar. */}
+                <div
+                  className="mt-3 flex items-center justify-center gap-3.5"
+                  role="img"
+                  aria-label={`${halves} de 6 momentos concluídos`}
+                >
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <EstrelaDoDia key={i} acesa={i < halves} tamanho={38} />
+                  ))}
+                </div>
+
+                <p className="mt-3 text-center text-[13px]" style={{ color: tintaSec }}>
+                  <span className="text-[16px] font-bold tabular-nums" style={{ color: tinta }}>
+                    {halves}/6
+                  </span>{" "}
+                  momentos concluídos
+                </p>
+                <p className="mt-1 text-center text-[12px]" style={{ color: tintaSec }}>
+                  {halves >= 6 ? (
+                    "Dia completo! As 3 estrelas são suas 🌟"
+                  ) : halves > 0 ? (
+                    <>
+                      Continue assim! Feche os 6 e ganhe{" "}
+                      <span className="font-semibold" style={{ color: "#7c3aed" }}>
+                        3 estrelas
+                      </span>{" "}
+                      💗
+                    </>
+                  ) : (
+                    <>
+                      Comece por onde quiser — feche os 6 e ganhe{" "}
+                      <span className="font-semibold" style={{ color: "#7c3aed" }}>
+                        3 estrelas
+                      </span>{" "}
+                      ✨
+                    </>
+                  )}
+                </p>
               </div>
             )}
           </>
