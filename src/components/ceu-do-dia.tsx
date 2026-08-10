@@ -1,43 +1,50 @@
 /**
  * OS QUATRO CÉUS DA HOME — amanhecer, dia, pôr do sol e anoitecer.
  *
- * ─── O QUE ISTO SUBSTITUI ───────────────────────────────────────────────────
+ * ─── DE DEZ ARTES PARA QUATRO ───────────────────────────────────────────────
  *
- * Dez artes em `.webp` (700 KB) repartidas em dez faixas de hora. Pedido do
- * dono (ago/2026): "a gente vai remover o que está atualmente, que são várias
+ * Eram dez `.webp` (700 KB) repartidos em dez faixas de hora. Pedido do dono
+ * (ago/2026): "a gente vai remover o que está atualmente, que são várias
  * versões ali, porém que no final não ficou bom o suficiente... vai ficar
  * muito mais simples".
  *
- * ─── POR QUE SVG E NÃO IMAGEM ───────────────────────────────────────────────
+ * ─── POR QUE VOLTOU A SER IMAGEM ────────────────────────────────────────────
  *
- * As quatro cenas são malhas de gradiente com três elementos (astro, dunas,
- * estrelas). Em SVG isso custa ~2 KB por céu em vez de ~70 KB, escala sem
- * borrar em qualquer densidade de tela, e — o que imagem nenhuma faz — deixa
- * a estrela cintilar e o astro respirar sem um segundo arquivo.
+ * A primeira tentativa redesenhou as quatro cenas em SVG, porque não havia
+ * como trazer os arquivos para cá: imagem anexada no chat não tem caminho em
+ * disco. O SVG chegou perto da referência, mas perto não era o pedido — e
+ * assim que os PNGs chegaram por link, eles entraram no lugar.
  *
- * `preserveAspectRatio="xMidYMid slice"` é o `background-size: cover` do SVG:
- * a cena é desenhada para retrato (430×956, a proporção do iPhone) e sobra
- * cortada nas bordas em qualquer outra. O que é cortado é sempre céu liso —
- * o astro e as dunas ficam dentro da faixa segura vertical.
+ * Os originais somavam 5,5 MB. Convertidos para WebP (qualidade 0,86), somam
+ * **112 KB** — menos que um sexto do conjunto antigo, porque são degradês
+ * suaves e é justamente neles que o WebP ganha. A conversão foi feita pelo
+ * canvas do próprio navegador; não há `cwebp` neste ambiente.
  *
  * ─── A REGRA QUE NÃO PODE SE PERDER ─────────────────────────────────────────
  *
- * `dark` acompanha a ARTE, não o relógio. É esse campo que decide se o texto
- * do hero é branco ou escuro, e se a barra de status do iOS vai clara ou
- * escura. O amanhecer é claro apesar de cedo; o anoitecer é escuro apesar de
- * ainda não ser noite fechada.
+ * `dark` e `topoEscuro` NÃO são gosto: saíram da luminância MEDIDA de cada
+ * arte, faixa de cima e faixa de baixo separadas. Duas cenas invertem o brilho
+ * entre as duas pontas, e é por isso que são dois campos e não um. Trocar uma
+ * arte obriga a medir de novo — o texto do hero e a barra de status do iOS
+ * dependem só disso.
  */
 
-import type { ReactElement } from "react";
+import amanhecerSrc from "@/assets/ceu/amanhecer.webp";
+import diaSrc from "@/assets/ceu/dia.webp";
+import porDoSolSrc from "@/assets/ceu/por-do-sol.webp";
+import anoitecerSrc from "@/assets/ceu/anoitecer.webp";
 
 /** As quatro cenas, na ordem do dia. */
 export type NomeDoCeu = "amanhecer" | "dia" | "por-do-sol" | "anoitecer";
 
 export type Ceu = {
   nome: NomeDoCeu;
+  /** A arte. 853×1844 (proporção 0,463 — quase a do iPhone, então `cover`
+      recorta pouco). */
+  src: string;
   /**
    * O PÉ da cena é escuro? Manda no número da semana, no rótulo "semanas" e
-   * nos cartões da segunda dobra. Segue a ARTE, nunca o relógio.
+   * nos cartões da segunda dobra.
    */
   dark: boolean;
   /**
@@ -46,41 +53,38 @@ export type Ceu = {
    *
    * ─── POR QUE DOIS BOOLEANOS E NÃO UM ────────────────────────────────────
    *
-   * Duas das quatro cenas INVERTEM o brilho entre a faixa de cima e a de
-   * baixo. O pôr do sol abre em violeta escuro (#6f66bc) e termina em pêssego
-   * claro; o anoitecer abre em azul-marinho e termina em lavanda média.
+   * Porque duas artes invertem o brilho entre as pontas. Medido (luminância
+   * média das faixas 0–12% e 74–100%):
+   *
+   *   amanhecer   topo 0,534   base 0,673   → claro nas duas
+   *   dia         topo 0,637   base 0,738   → claro nas duas
+   *   pôr do sol  topo 0,345   base 0,278   → ESCURO nas duas
+   *   anoitecer   topo 0,087   base 0,189   → escuro nas duas
    *
    * Com um booleano só, o nome do bebê no pôr do sol saía em texto escuro
-   * sobre violeta escuro: 3,43:1 medido, contra o mínimo de 4,5 que este app
-   * cobra. Não era escolha de cor — era a régua perguntando ao pedaço errado
-   * do céu.
+   * sobre violeta escuro: 3,43:1 contra o mínimo de 4,5 que este app cobra.
    */
   topoEscuro: boolean;
   /**
-   * Que astro está no céu desta cena — é ele que a pílula do clima mostra.
+   * Que astro está na arte — é ele que a pílula do clima mostra.
    *
-   * Segue a CENA e não o relógio: no amanhecer a lua ainda está lá em cima,
-   * e é a lua que a referência traz no badge. Um sol ali contradiria o
-   * desenho que está atrás dele.
+   * Segue a ARTE e não o relógio: no amanhecer a lua ainda está no céu, e um
+   * sol no badge contradiria o desenho logo atrás dele.
    */
   astro: "lua" | "sol";
   /**
-   * A cor CHAPADA do topo da cena.
+   * A cor CHAPADA do primeiro pixel da arte.
    *
    * O iOS em modo standalone não pinta o conteúdo da página fora da área
-   * segura — pinta o fundo do DOCUMENTO. Sem esta cor sobrava uma faixa creme
-   * atrás do relógio do sistema. Tem que casar com o primeiro `stop` do
-   * gradiente, ou a emenda aparece.
+   * segura — pinta o fundo do DOCUMENTO. Sem esta cor sobra uma faixa creme
+   * atrás do relógio do sistema. Amostrada da imagem, não estimada.
    */
   corDeTopo: string;
   /**
-   * A cor CHAPADA do pé da cena — o último `stop` do gradiente.
+   * A cor CHAPADA do último pixel da arte.
    *
-   * A cena é desenhada para UMA TELA, e o hero é mais alto que uma tela: ele
-   * continua atrás da segunda dobra (progresso, saudação, médico). Esta cor é
-   * o que continua dali para baixo. Sem ela o SVG teria de esticar para
-   * cobrir o hero inteiro — e esticar em `slice` amplia a cena até a lua sair
-   * pela borda direita, que foi exatamente o defeito medido.
+   * A arte cobre a PRIMEIRA DOBRA; o hero continua atrás da segunda (progresso,
+   * saudação, médico), e é esta cor que segue dali para baixo.
    */
   corDeBaixo: string;
 };
@@ -88,37 +92,40 @@ export type Ceu = {
 const CEUS: Ceu[] = [
   {
     nome: "amanhecer",
+    src: amanhecerSrc,
     dark: false,
     topoEscuro: false,
     astro: "lua",
-    corDeTopo: "#9b97dd",
-    corDeBaixo: "#d6c8ec",
+    corDeTopo: "#6f7dd1",
+    corDeBaixo: "#a39adb",
   },
   {
     nome: "dia",
+    src: diaSrc,
     dark: false,
     topoEscuro: false,
     astro: "sol",
-    corDeTopo: "#2f96e8",
-    corDeBaixo: "#6bcdc0",
+    corDeTopo: "#3ba6ef",
+    corDeBaixo: "#30a5bd",
   },
   {
     nome: "por-do-sol",
-    // O pé é pêssego claro, mas o topo é violeta escuro — daí os dois
-    // diferirem. Medido: texto escuro no topo dava 3,43:1; branco dá 4,98:1.
-    dark: false,
+    src: porDoSolSrc,
+    // A faixa laranja do meio engana: as duas PONTAS são violeta escuro.
+    dark: true,
     topoEscuro: true,
     astro: "sol",
-    corDeTopo: "#6f66bc",
-    corDeBaixo: "#9a88c6",
+    corDeTopo: "#5c448e",
+    corDeBaixo: "#423076",
   },
   {
     nome: "anoitecer",
+    src: anoitecerSrc,
     dark: true,
     topoEscuro: true,
     astro: "lua",
-    corDeTopo: "#16215f",
-    corDeBaixo: "#4436a8",
+    corDeTopo: "#081157",
+    corDeBaixo: "#101b74",
   },
 ];
 
@@ -176,717 +183,35 @@ export function ceuPeloSol(agora: Date, sunrise: Date | null, sunset: Date | nul
   return PORNOME.get("anoitecer")!;
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
-   AS CENAS
-   ──────────────────────────────────────────────────────────────────────────── */
-
-/* A cena é desenhada nesta caixa e recortada para caber em qualquer tela. */
-const W = 430;
-const H = 956;
-
 /**
- * Estrelas em posições DETERMINÍSTICAS.
- *
- * `Math.random()` aqui daria mismatch de hidratação: o servidor sorteia um
- * céu e o cliente sorteia outro, e o React reclama (ou repinta) na primeira
- * pintura. A sequência abaixo é um gerador congruente escrito à mão — mesma
- * entrada, mesmo céu, servidor e navegador.
- */
-function estrelas(qtd: number, semente: number, alturaMax: number) {
-  const out: { x: number; y: number; r: number; o: number; d: number }[] = [];
-  let s = semente;
-  const proximo = () => {
-    s = (s * 1103515245 + 12345) % 2147483648;
-    return s / 2147483648;
-  };
-  for (let i = 0; i < qtd; i++) {
-    const a = proximo();
-    const b = proximo();
-    const c = proximo();
-    out.push({
-      x: a * W,
-      y: b * alturaMax,
-      r: 0.7 + c * 1.15,
-      o: 0.42 + c * 0.55,
-      d: (i % 9) * 0.45,
-    });
-  }
-  return out;
-}
-
-/** A lua em quarto crescente: um disco cheio com outro mordendo a borda. */
-function LuaCrescente({
-  cx,
-  cy,
-  r,
-  id,
-  cor = "#fdf4fb",
-  brilho = 0.34,
-}: {
-  cx: number;
-  cy: number;
-  r: number;
-  id: string;
-  cor?: string;
-  brilho?: number;
-}) {
-  return (
-    <g>
-      {/* O halo primeiro, atrás: pintado depois cobriria a lua de leitoso. */}
-      <circle cx={cx} cy={cy} r={r * 2.9} fill={`url(#halo-${id})`} opacity={brilho} />
-      <mask id={`lua-${id}`}>
-        <circle cx={cx} cy={cy} r={r} fill="#fff" />
-        {/* A mordida vem de cima à esquerda — é a fase que a referência traz.
-            Deslocada em 0,52r: menos que isso vira meia-lua, mais vira fio. */}
-        <circle cx={cx - r * 0.52} cy={cy - r * 0.3} r={r * 0.94} fill="#000" />
-      </mask>
-      <circle cx={cx} cy={cy} r={r} fill={cor} mask={`url(#lua-${id})`} />
-    </g>
-  );
-}
-
-/** O sol: disco quente com halo largo. `halo` controla o alcance do brilho. */
-function Sol({
-  cx,
-  cy,
-  r,
-  id,
-  nucleo,
-  borda,
-  halo = 3.4,
-  opacidade = 0.5,
-}: {
-  cx: number;
-  cy: number;
-  r: number;
-  id: string;
-  nucleo: string;
-  borda: string;
-  halo?: number;
-  opacidade?: number;
-}) {
-  return (
-    <g>
-      <circle cx={cx} cy={cy} r={r * halo} fill={`url(#halo-${id})`} opacity={opacidade} />
-      <circle cx={cx} cy={cy} r={r} fill={`url(#disco-${id})`} />
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke={borda} strokeOpacity={0.35} />
-      <circle cx={cx} cy={cy} r={r * 0.55} fill={nucleo} opacity={0.9} />
-    </g>
-  );
-}
-
-/* ── 1. AMANHECER ──────────────────────────────────────────────────────────
-   Lavanda em cima, pêssego no horizonte, dunas de neve lilás. A lua ainda
-   está no céu — é o que diz que o dia acabou de começar. */
-function Amanhecer() {
-  const st = estrelas(11, 7717, H * 0.36);
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="xMidYMid slice"
-      className="h-full w-full"
-      aria-hidden
-    >
-      <defs>
-        {/* O céu fica ROXO por muito tempo e só abre em pêssego perto do
-            horizonte — é a proporção da referência. Trocar a ordem (rosa
-            cedo, roxo tarde) é o que fazia a cena parecer desbotada. */}
-        <linearGradient id="am-ceu" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#9b97dd" />
-          <stop offset="0.12" stopColor="#a49ede" />
-          <stop offset="0.24" stopColor="#ada4de" />
-          <stop offset="0.36" stopColor="#b7a9dd" />
-          <stop offset="0.46" stopColor="#c3addd" />
-          <stop offset="0.53" stopColor="#d2b2d9" />
-          <stop offset="0.58" stopColor="#e2bcc7" />
-          <stop offset="0.61" stopColor="#efc5b1" />
-          <stop offset="0.635" stopColor="#f8d2a2" />
-          <stop offset="0.655" stopColor="#fbdda6" />
-          <stop offset="0.675" stopColor="#f2d5bc" />
-          <stop offset="0.72" stopColor="#e4d2e2" />
-          <stop offset="0.82" stopColor="#ddd0ee" />
-          <stop offset="1" stopColor="#d6c8ec" />
-        </linearGradient>
-        {/* O clarão nasce no VALE entre os dois morros, à esquerda do centro,
-            e é largo e baixo — não um halo redondo atrás da esfera. */}
-        <radialGradient id="am-glow" cx="0.38" cy="0.655" r="0.62">
-          <stop offset="0" stopColor="#fde6a8" stopOpacity="0.92" />
-          <stop offset="0.28" stopColor="#fbd3a2" stopOpacity="0.55" />
-          <stop offset="0.58" stopColor="#f3c9b4" stopOpacity="0.22" />
-          <stop offset="1" stopColor="#e6c4d8" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="halo-am">
-          <stop offset="0" stopColor="#fff8f2" stopOpacity="0.7" />
-          <stop offset="0.3" stopColor="#fff8f2" stopOpacity="0.34" />
-          <stop offset="0.6" stopColor="#fff8f2" stopOpacity="0.11" />
-          <stop offset="1" stopColor="#fff8f2" stopOpacity="0" />
-        </radialGradient>
-        {/* Os morros são MAIS ESCUROS que a planície: é o contraste entre os
-            dois que desenha o vale. */}
-        <linearGradient id="am-morro" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#b2a2da" />
-          <stop offset="1" stopColor="#c9bbe6" />
-        </linearGradient>
-        <linearGradient id="am-morro-longe" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#c9b6e2" />
-          <stop offset="1" stopColor="#dccdee" />
-        </linearGradient>
-        {/* A planície é quase lisa, e é isso que faz a cena respirar: ela
-            ocupa o terço de baixo inteiro sem nenhuma onda atravessando. */}
-        <linearGradient id="am-plano" x1="0.3" y1="0" x2="0.7" y2="1">
-          <stop offset="0" stopColor="#efe2f4" />
-          <stop offset="0.35" stopColor="#e6d8f0" />
-          <stop offset="1" stopColor="#d8c9ec" />
-        </linearGradient>
-        <linearGradient id="am-duna-azul" x1="0.1" y1="0" x2="0.9" y2="1">
-          <stop offset="0" stopColor="#e8ecfa" />
-          <stop offset="0.45" stopColor="#c9d0ee" />
-          <stop offset="1" stopColor="#d9d6f0" />
-        </linearGradient>
-        <linearGradient id="am-duna-rosa" x1="0.2" y1="0" x2="0.8" y2="1">
-          <stop offset="0" stopColor="#fbe4e2" />
-          <stop offset="0.5" stopColor="#ecd8f0" />
-          <stop offset="1" stopColor="#dccbec" />
-        </linearGradient>
-        <filter id="am-mole" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="4" />
-        </filter>
-      </defs>
-
-      <rect width={W} height={H} fill="url(#am-ceu)" />
-      <rect width={W} height={H} fill="url(#am-glow)" />
-
-      {st.map((s, i) => (
-        <circle
-          key={i}
-          cx={s.x}
-          cy={s.y}
-          r={s.r * 0.7}
-          fill="#fff"
-          /* `fill-opacity` e não `opacity`: a classe `.dc-estrela` anima
-             `opacity`, e as duas se MULTIPLICAM. Escritas na mesma
-             propriedade, o CSS venceria o atributo e todas as estrelas
-             cintilariam com o mesmo brilho. */
-          fillOpacity={s.o * 0.5}
-          className="dc-estrela"
-          style={{ animationDelay: `${s.d}s` }}
-        />
-      ))}
-
-      <LuaCrescente cx={372} cy={288} r={21} id="am" cor="#fffdff" brilho={0.48} />
-
-      {/* ── O VALE ──────────────────────────────────────────────────────
-          Dois morros emoldurando, o clarão no meio, e uma planície lisa na
-          frente. A versão anterior tinha faixas onduladas atravessando a
-          largura toda: lia como listras, não como paisagem, e sem o vale o
-          clarão do amanhecer não tinha de onde vir. */}
-      {/* Morro da esquerda */}
-      <path
-        d={`M-20 ${H * 0.638} C 10 ${H * 0.567}, 62 ${H * 0.547}, 118 ${H * 0.575}
-            C 172 ${H * 0.602}, 214 ${H * 0.636}, 268 ${H * 0.648}
-            L ${W + 20} ${H * 0.648} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#am-morro)"
-      />
-      {/* O fio de luz da crista entra AQUI, e não no fim: desenhado depois da
-          planície, ele descia por cima dela e os dois fios se cruzavam num X
-          no meio do vale. */}
-      <path
-        d={`M-20 ${H * 0.638} C 10 ${H * 0.567}, 62 ${H * 0.547}, 118 ${H * 0.575}
-            C 160 ${H * 0.598}, 186 ${H * 0.617}, 208 ${H * 0.628}`}
-        fill="none"
-        stroke="#fbe0c4"
-        strokeOpacity="0.32"
-        strokeWidth="1.2"
-      />
-      {/* Morro da direita, um pouco mais alto — a assimetria é da referência */}
-      <path
-        d={`M${W + 20} ${H * 0.632} C ${W - 14} ${H * 0.558}, ${W - 68} ${H * 0.541}, ${W - 128} ${H * 0.572}
-            C ${W - 186} ${H * 0.601}, ${W - 232} ${H * 0.638}, ${W - 288} ${H * 0.65}
-            L -20 ${H * 0.65} L -20 ${H} L ${W + 20} ${H} Z`}
-        fill="url(#am-morro)"
-      />
-      <path
-        d={`M${W + 20} ${H * 0.632} C ${W - 14} ${H * 0.558}, ${W - 68} ${H * 0.541}, ${W - 128} ${H * 0.572}
-            C ${W - 176} ${H * 0.597}, ${W - 200} ${H * 0.616}, ${W - 222} ${H * 0.628}`}
-        fill="none"
-        stroke="#fbe0c4"
-        strokeOpacity="0.32"
-        strokeWidth="1.2"
-      />
-      {/* CRISTA DISTANTE, desenhada DEPOIS dos dois morros.
-          Atrás deles ela ficava escondida, e o encontro das duas encostas
-          virava um "V" de ponta afiada — na referência o vale tem fundo
-          arredondado. Vindo à frente, e mais clara (é o que a distância faz
-          com a cor), ela preenche o entalhe e fecha o vale.
-          O topo dela passa ACIMA do vértice em que as duas encostas se
-          cruzam (0,611H contra 0,63H) — embaixo dele o "V" continuava
-          aparecendo por cima. Nas bordas ela desce para 0,672H e some atrás
-          dos morros, que é o que faz ler como crista distante e não como uma
-          quarta camada. */}
-      <path
-        d={`M-20 ${H * 0.672} C 74 ${H * 0.662}, 152 ${H * 0.612}, 215 ${H * 0.611}
-            S 350 ${H * 0.662}, ${W + 20} ${H * 0.672} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#am-morro-longe)"
-      />
-      {/* A planície — o terço de baixo, liso */}
-      <path
-        d={`M-20 ${H * 0.672} C 110 ${H * 0.662}, 300 ${H * 0.662}, ${W + 20} ${H * 0.672}
-            L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#am-plano)"
-      />
-      {/* A duna azulada da esquerda, e a rosada da direita: as duas únicas
-          formas da planície, e cada uma encosta numa borda. */}
-      <g filter="url(#am-mole)">
-        <path
-          d={`M-20 ${H * 0.688} C 40 ${H * 0.684}, 96 ${H * 0.706}, 132 ${H * 0.734}
-              C 96 ${H * 0.75}, 30 ${H * 0.756}, -20 ${H * 0.752} Z`}
-          fill="url(#am-duna-azul)"
-          opacity="0.9"
-        />
-        <path
-          d={`M${W + 20} ${H * 0.678} C ${W - 40} ${H * 0.682}, ${W - 108} ${H * 0.706}, ${W - 132} ${H * 0.74}
-              C ${W - 90} ${H * 0.762}, ${W - 20} ${H * 0.766}, ${W + 20} ${H * 0.756} Z`}
-          fill="url(#am-duna-rosa)"
-          opacity="0.92"
-        />
-      </g>
-    </svg>
-  );
-}
-
-/* ── 2. DIA ────────────────────────────────────────────────────────────────
-   Azul forte no alto que abre em creme e verde-água embaixo. Sol alto à
-   direita, com halo largo e nenhuma nuvem: é o céu limpo do meio do dia. */
-function Dia() {
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="xMidYMid slice"
-      className="h-full w-full"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="di-ceu" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#2f96e8" />
-          <stop offset="0.18" stopColor="#4ea7ea" />
-          <stop offset="0.36" stopColor="#79c2ea" />
-          <stop offset="0.54" stopColor="#a5d9e9" />
-          <stop offset="0.68" stopColor="#cfe9e0" />
-          <stop offset="0.78" stopColor="#eaf4d9" />
-          <stop offset="0.86" stopColor="#cfead6" />
-          <stop offset="0.94" stopColor="#8ed8c8" />
-          <stop offset="1" stopColor="#6bcdc0" />
-        </linearGradient>
-        {/* Ver a nota do amanhecer: a queda precisa de paradas intermediárias
-            para o halo não virar um disco de borda dura. */}
-        <radialGradient id="halo-di">
-          <stop offset="0" stopColor="#fffdf0" stopOpacity="0.9" />
-          <stop offset="0.22" stopColor="#fff8dd" stopOpacity="0.5" />
-          <stop offset="0.45" stopColor="#fff4cc" stopOpacity="0.22" />
-          <stop offset="0.72" stopColor="#fff2c0" stopOpacity="0.07" />
-          <stop offset="1" stopColor="#fff2c0" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="disco-di">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.6" stopColor="#fff8d8" />
-          <stop offset="1" stopColor="#ffeda6" />
-        </radialGradient>
-        <linearGradient id="di-onda-a" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f4f8dd" stopOpacity="0.95" />
-          <stop offset="1" stopColor="#dcefdc" stopOpacity="0.9" />
-        </linearGradient>
-        <linearGradient id="di-onda-b" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#d8eede" stopOpacity="0.95" />
-          <stop offset="1" stopColor="#9fdccb" stopOpacity="0.95" />
-        </linearGradient>
-        <linearGradient id="di-onda-c" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#96dcc9" />
-          <stop offset="1" stopColor="#63cabd" />
-        </linearGradient>
-        <filter id="di-mole" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="4" />
-        </filter>
-      </defs>
-
-      <rect width={W} height={H} fill="url(#di-ceu)" />
-
-      <Sol cx={340} cy={190} r={32} id="di" nucleo="#ffffff" borda="#fff3bd" halo={3.6} />
-
-      {/* Ondas suaves — o mesmo desenho das dunas, mas em creme e verde-água:
-          aqui elas leem como colina distante sob luz forte. */}
-      <g filter="url(#di-mole)">
-        <path
-          d={`M-20 ${H * 0.742} C 70 ${H * 0.706}, 168 ${H * 0.756}, 262 ${H * 0.738}
-              S ${W + 20} ${H * 0.705}, ${W + 20} ${H * 0.73} L ${W + 20} ${H} L -20 ${H} Z`}
-          fill="url(#di-onda-a)"
-        />
-      </g>
-      <path
-        d={`M-20 ${H * 0.806} C 96 ${H * 0.784}, 190 ${H * 0.828}, 300 ${H * 0.806}
-            S ${W + 20} ${H * 0.778}, ${W + 20} ${H * 0.8} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#di-onda-b)"
-      />
-      <path
-        d={`M-20 ${H * 0.876} C 110 ${H * 0.852}, 214 ${H * 0.9}, 330 ${H * 0.874}
-            S ${W + 20} ${H * 0.856}, ${W + 20} ${H * 0.87} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#di-onda-c)"
-      />
-      <path
-        d={`M-20 ${H * 0.806} C 96 ${H * 0.784}, 190 ${H * 0.828}, 300 ${H * 0.806}
-            S ${W + 20} ${H * 0.778}, ${W + 20} ${H * 0.8}`}
-        fill="none"
-        stroke="#ffffff"
-        strokeOpacity="0.55"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-/* ── 3. PÔR DO SOL ─────────────────────────────────────────────────────────
-   Violeta no alto, coral no meio, ouro no horizonte. O sol encosta na crista
-   da direita — é ele que acende as bordas das dunas. */
-function PorDoSol() {
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="xMidYMid slice"
-      className="h-full w-full"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="ps-ceu" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#6f66bc" />
-          <stop offset="0.12" stopColor="#8069b6" />
-          <stop offset="0.24" stopColor="#a870a2" />
-          <stop offset="0.34" stopColor="#d47b7a" />
-          <stop offset="0.44" stopColor="#ea8a62" />
-          <stop offset="0.54" stopColor="#f59a52" />
-          <stop offset="0.63" stopColor="#fbb44c" />
-          <stop offset="0.7" stopColor="#fdc94e" />
-          <stop offset="0.78" stopColor="#f7a86c" />
-          <stop offset="0.87" stopColor="#cf8a95" />
-          <stop offset="0.95" stopColor="#a288c4" />
-          <stop offset="1" stopColor="#9a88c6" />
-        </linearGradient>
-        <radialGradient id="halo-ps">
-          <stop offset="0" stopColor="#fff6c4" stopOpacity="0.88" />
-          <stop offset="0.22" stopColor="#ffe698" stopOpacity="0.48" />
-          <stop offset="0.46" stopColor="#ffd873" stopOpacity="0.22" />
-          <stop offset="0.74" stopColor="#ffc25e" stopOpacity="0.07" />
-          <stop offset="1" stopColor="#ffc25e" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="disco-ps">
-          <stop offset="0" stopColor="#fffbe0" />
-          <stop offset="0.65" stopColor="#ffef9e" />
-          <stop offset="1" stopColor="#ffd964" />
-        </radialGradient>
-        <linearGradient id="ps-duna-a" x1="0.2" y1="0" x2="0.8" y2="1">
-          <stop offset="0" stopColor="#f0a069" stopOpacity="0.92" />
-          <stop offset="1" stopColor="#e08a72" stopOpacity="0.92" />
-        </linearGradient>
-        <linearGradient id="ps-duna-b" x1="0.1" y1="0" x2="0.9" y2="1">
-          <stop offset="0" stopColor="#ef9a6f" />
-          <stop offset="0.55" stopColor="#e28a80" />
-          <stop offset="1" stopColor="#d4849a" />
-        </linearGradient>
-        <linearGradient id="ps-duna-c" x1="0" y1="0" x2="0.9" y2="1">
-          <stop offset="0" stopColor="#c98a9e" />
-          <stop offset="1" stopColor="#a98ac0" />
-        </linearGradient>
-        <linearGradient id="ps-duna-d" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#a889c4" />
-          <stop offset="1" stopColor="#9787c8" />
-        </linearGradient>
-        <filter id="ps-mole" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="5" />
-        </filter>
-      </defs>
-
-      <rect width={W} height={H} fill="url(#ps-ceu)" />
-
-      {/* O sol encostado na crista: metade dele já sumiu atrás da duna, e é o
-          que faz o horizonte acender de dentro para fora. */}
-      <Sol
-        cx={346}
-        cy={527}
-        r={30}
-        id="ps"
-        nucleo="#fffce8"
-        borda="#ffe89a"
-        halo={4.2}
-        opacidade={0.62}
-      />
-
-      <g filter="url(#ps-mole)">
-        <path
-          d={`M-20 ${H * 0.585} C 52 ${H * 0.538}, 130 ${H * 0.566}, 208 ${H * 0.6}
-              S 330 ${H * 0.618}, ${W + 20} ${H * 0.566} L ${W + 20} ${H} L -20 ${H} Z`}
-          fill="url(#ps-duna-a)"
-        />
-      </g>
-      <path
-        d={`M-20 ${H * 0.652} C 78 ${H * 0.61}, 168 ${H * 0.666}, 258 ${H * 0.658}
-            S 386 ${H * 0.624}, ${W + 20} ${H * 0.654} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#ps-duna-b)"
-        opacity="0.96"
-      />
-      <path
-        d={`M-20 ${H * 0.724} C 96 ${H * 0.69}, 200 ${H * 0.746}, 312 ${H * 0.722}
-            S ${W + 20} ${H * 0.702}, ${W + 20} ${H * 0.718} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#ps-duna-c)"
-        opacity="0.94"
-      />
-      <path
-        d={`M-20 ${H * 0.806} C 110 ${H * 0.784}, 220 ${H * 0.834}, 336 ${H * 0.804}
-            S ${W + 20} ${H * 0.79}, ${W + 20} ${H * 0.802} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#ps-duna-d)"
-      />
-      {/* As duas cristas acesas pelo sol rasante. */}
-      <path
-        d={`M-20 ${H * 0.652} C 78 ${H * 0.61}, 168 ${H * 0.666}, 258 ${H * 0.658}
-            S 386 ${H * 0.624}, ${W + 20} ${H * 0.654}`}
-        fill="none"
-        stroke="#ffe2ad"
-        strokeOpacity="0.55"
-        strokeWidth="1.6"
-      />
-      <path
-        d={`M-20 ${H * 0.724} C 96 ${H * 0.69}, 200 ${H * 0.746}, 312 ${H * 0.722}
-            S ${W + 20} ${H * 0.702}, ${W + 20} ${H * 0.718}`}
-        fill="none"
-        stroke="#ffd9b0"
-        strokeOpacity="0.4"
-        strokeWidth="1.4"
-      />
-    </svg>
-  );
-}
-
-/* ── 4. ANOITECER ──────────────────────────────────────────────────────────
-   Azul-marinho profundo, estrelas, lua crescente e as ondas de luz. É a cena
-   da referência do rebranding — a que o resto da tela foi desenhado para. */
-function Anoitecer() {
-  const st = estrelas(56, 20260810, H * 0.62);
-  /* As luzinhas da base: hastes finas com um bulbo aceso, como flores de luz.
-     Posições fixas — o mesmo motivo das estrelas. */
-  const flores = [
-    { x: 40, y: 0.895, h: 26, r: 3.4 },
-    { x: 58, y: 0.878, h: 34, r: 2.8 },
-    { x: 132, y: 0.905, h: 22, r: 2.6 },
-    { x: 300, y: 0.9, h: 28, r: 3 },
-    { x: 356, y: 0.884, h: 32, r: 3.6 },
-    { x: 378, y: 0.902, h: 24, r: 2.8 },
-    { x: 396, y: 0.892, h: 30, r: 3.2 },
-  ];
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="xMidYMid slice"
-      className="h-full w-full"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="an-ceu" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#16215f" />
-          <stop offset="0.14" stopColor="#1d2a72" />
-          <stop offset="0.3" stopColor="#2b3090" />
-          <stop offset="0.44" stopColor="#3f38a8" />
-          <stop offset="0.54" stopColor="#5544b6" />
-          <stop offset="0.61" stopColor="#7c5cc4" />
-          <stop offset="0.66" stopColor="#b487d6" />
-          <stop offset="0.7" stopColor="#c9a0dd" />
-          <stop offset="0.76" stopColor="#7a68d0" />
-          <stop offset="0.86" stopColor="#5a4cc0" />
-          <stop offset="1" stopColor="#4436a8" />
-        </linearGradient>
-        {/* O clarão baixo: o resto do dia que ainda não foi embora. */}
-        <radialGradient id="an-glow" cx="0.45" cy="0.69" r="0.52">
-          <stop offset="0" stopColor="#e0b8f0" stopOpacity="0.62" />
-          <stop offset="0.5" stopColor="#9a7ad8" stopOpacity="0.24" />
-          <stop offset="1" stopColor="#6a52c0" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="halo-an">
-          <stop offset="0" stopColor="#f6e4ff" stopOpacity="0.6" />
-          <stop offset="0.26" stopColor="#eed6ff" stopOpacity="0.3" />
-          <stop offset="0.55" stopColor="#e4c8f6" stopOpacity="0.11" />
-          <stop offset="1" stopColor="#e0c0f0" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="an-onda-a" x1="0" y1="0" x2="1" y2="0.4">
-          <stop offset="0" stopColor="#4f6fd8" />
-          <stop offset="0.45" stopColor="#7a6ade" />
-          <stop offset="1" stopColor="#4a63d4" />
-        </linearGradient>
-        <linearGradient id="an-onda-b" x1="0" y1="0" x2="1" y2="0.35">
-          <stop offset="0" stopColor="#6a5cd0" />
-          <stop offset="0.5" stopColor="#9a72dc" />
-          <stop offset="1" stopColor="#5f52c8" />
-        </linearGradient>
-        <linearGradient id="an-onda-c" x1="0" y1="0" x2="1" y2="0.3">
-          <stop offset="0" stopColor="#5b4ac0" />
-          <stop offset="0.5" stopColor="#8158cc" />
-          <stop offset="1" stopColor="#4e3fb4" />
-        </linearGradient>
-        <linearGradient id="an-fio" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#cfe0ff" stopOpacity="0.15" />
-          <stop offset="0.35" stopColor="#f0e6ff" stopOpacity="0.9" />
-          <stop offset="0.75" stopColor="#e6d4ff" stopOpacity="0.7" />
-          <stop offset="1" stopColor="#cfc0ff" stopOpacity="0.1" />
-        </linearGradient>
-        <filter id="an-mole" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="6" />
-        </filter>
-        <filter id="an-brilho" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" />
-        </filter>
-      </defs>
-
-      <rect width={W} height={H} fill="url(#an-ceu)" />
-      <rect width={W} height={H} fill="url(#an-glow)" />
-
-      {st.map((s, i) => (
-        <circle
-          key={i}
-          cx={s.x}
-          cy={s.y}
-          r={s.r}
-          fill="#fff"
-          /* Ver a nota do amanhecer: `fill-opacity` multiplica com o
-             `opacity` animado, `opacity` seria sobrescrito por ele. */
-          fillOpacity={s.o}
-          className="dc-estrela"
-          style={{ animationDelay: `${s.d}s` }}
-        />
-      ))}
-
-      <LuaCrescente cx={356} cy={188} r={27} id="an" cor="#f7e7fb" brilho={0.5} />
-
-      {/* AS ONDAS DE LUZ. Cada uma é uma faixa preenchida com um fio aceso na
-          crista — é o fio que faz a onda parecer luz em vez de morro. */}
-      <g filter="url(#an-mole)">
-        <path
-          d={`M-20 ${H * 0.585} C 70 ${H * 0.542}, 150 ${H * 0.6}, 240 ${H * 0.594}
-              S 372 ${H * 0.542}, ${W + 20} ${H * 0.566} L ${W + 20} ${H} L -20 ${H} Z`}
-          fill="url(#an-onda-a)"
-          opacity="0.86"
-        />
-      </g>
-      <path
-        d={`M-20 ${H * 0.585} C 70 ${H * 0.542}, 150 ${H * 0.6}, 240 ${H * 0.594}
-            S 372 ${H * 0.542}, ${W + 20} ${H * 0.566}`}
-        fill="none"
-        stroke="url(#an-fio)"
-        strokeWidth="2"
-        filter="url(#an-brilho)"
-      />
-      <path
-        d={`M-20 ${H * 0.585} C 70 ${H * 0.542}, 150 ${H * 0.6}, 240 ${H * 0.594}
-            S 372 ${H * 0.542}, ${W + 20} ${H * 0.566}`}
-        fill="none"
-        stroke="url(#an-fio)"
-        strokeWidth="1.1"
-      />
-
-      <path
-        d={`M-20 ${H * 0.664} C 84 ${H * 0.62}, 176 ${H * 0.686}, 272 ${H * 0.668}
-            S ${W + 20} ${H * 0.616}, ${W + 20} ${H * 0.646} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#an-onda-b)"
-        opacity="0.92"
-      />
-      <path
-        d={`M-20 ${H * 0.664} C 84 ${H * 0.62}, 176 ${H * 0.686}, 272 ${H * 0.668}
-            S ${W + 20} ${H * 0.616}, ${W + 20} ${H * 0.646}`}
-        fill="none"
-        stroke="url(#an-fio)"
-        strokeWidth="2.2"
-        filter="url(#an-brilho)"
-      />
-      <path
-        d={`M-20 ${H * 0.664} C 84 ${H * 0.62}, 176 ${H * 0.686}, 272 ${H * 0.668}
-            S ${W + 20} ${H * 0.616}, ${W + 20} ${H * 0.646}`}
-        fill="none"
-        stroke="url(#an-fio)"
-        strokeWidth="1.2"
-      />
-
-      <path
-        d={`M-20 ${H * 0.752} C 100 ${H * 0.714}, 206 ${H * 0.776}, 318 ${H * 0.75}
-            S ${W + 20} ${H * 0.712}, ${W + 20} ${H * 0.738} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#an-onda-c)"
-      />
-      <path
-        d={`M-20 ${H * 0.752} C 100 ${H * 0.714}, 206 ${H * 0.776}, 318 ${H * 0.75}
-            S ${W + 20} ${H * 0.712}, ${W + 20} ${H * 0.738}`}
-        fill="none"
-        stroke="url(#an-fio)"
-        strokeWidth="1.8"
-        filter="url(#an-brilho)"
-      />
-      <path
-        d={`M-20 ${H * 0.752} C 100 ${H * 0.714}, 206 ${H * 0.776}, 318 ${H * 0.75}
-            S ${W + 20} ${H * 0.712}, ${W + 20} ${H * 0.738}`}
-        fill="none"
-        stroke="url(#an-fio)"
-        strokeWidth="1"
-        strokeOpacity="0.8"
-      />
-
-      {/* Colina da frente, apagada: é ela que dá o chão da cena. */}
-      <path
-        d={`M-20 ${H * 0.86} C 90 ${H * 0.836}, 200 ${H * 0.882}, 320 ${H * 0.858}
-            S ${W + 20} ${H * 0.844}, ${W + 20} ${H * 0.856} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="#4232a2"
-        opacity="0.75"
-      />
-
-      {flores.map((f, i) => (
-        <g key={i} opacity="0.9">
-          <line
-            x1={f.x}
-            y1={H * f.y + f.h}
-            x2={f.x}
-            y2={H * f.y}
-            stroke="#c9a6ee"
-            strokeOpacity="0.5"
-            strokeWidth="1"
-          />
-          <circle cx={f.x} cy={H * f.y} r={f.r * 2.6} fill="#e8c0ff" opacity="0.18" />
-          <circle cx={f.x} cy={H * f.y} r={f.r} fill="#f0d8ff" />
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-const CENAS: Record<NomeDoCeu, () => ReactElement> = {
-  amanhecer: Amanhecer,
-  dia: Dia,
-  "por-do-sol": PorDoSol,
-  anoitecer: Anoitecer,
-};
-
-/**
- * O céu do momento, pronto para ser o fundo absoluto de um container
+ * A arte do momento, pronta para ser o fundo absoluto de um container
  * `relative overflow-hidden`.
  *
  * ─── POR QUE A ALTURA É A DA PRIMEIRA DOBRA, E NÃO `inset-0` ────────────────
  *
- * A cena tem a proporção de UMA TELA (430×956). O hero é mais alto que uma
- * tela — ele segue atrás da segunda dobra. Com `inset-0` o `slice` ampliava a
- * cena até cobrir os 1104px do hero: escala de 1,155, e a lua saía pela borda
- * direita cortada ao meio. Medido, não suposto.
+ * A arte tem a proporção de UMA TELA. O hero é mais alto — ele segue atrás da
+ * segunda dobra. Com `inset-0` o `cover` ampliava a arte para cobrir os
+ * ~1100px do hero: a lua saía cortada pela borda direita. Medido, não suposto.
  *
- * Presa à altura da primeira dobra, a cena fica na proporção para que foi
- * desenhada e o `corDeBaixo` do container continua dali para baixo.
+ * Presa à altura da primeira dobra, a arte fica no enquadramento para que foi
+ * desenhada, e o `corDeBaixo` do container continua dali para baixo.
  */
 export function CeuDoDia({ nome, className = "" }: { nome: NomeDoCeu; className?: string }) {
-  const Cena = CENAS[nome] ?? Dia;
+  const ceu = PORNOME.get(nome) ?? PORNOME.get("dia")!;
   return (
     <div
       className={`pointer-events-none absolute inset-x-0 top-0 h-[calc(100svh+0.5rem+var(--safe-top))] ${className}`}
       aria-hidden
     >
-      <Cena />
+      {/* `fetchPriority="high"`: é o primeiro pixel que a paciente vê, e sem
+          isso ele disputa a fila com o resto da página. */}
+      <img
+        src={ceu.src}
+        alt=""
+        fetchPriority="high"
+        decoding="async"
+        className="h-full w-full object-cover"
+      />
     </div>
   );
 }

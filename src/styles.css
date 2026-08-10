@@ -1257,23 +1257,9 @@ button:active > .duo3d {
   will-change: transform;
 }
 
-/* A estrela dos céus novos (`ceu-do-dia.tsx`).
-   Cintila pela OPACIDADE e não pelo tamanho: estrela que incha e murcha lê
-   como bolha pulsando. O `opacity` do elemento já vem do SVG (cada estrela
-   tem o seu), então a animação mexe só na multiplicação — por isso os valores
-   são relativos e o pico é 1. */
-@keyframes dcEstrela {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-.dc-estrela {
-  animation: dcEstrela 4.2s ease-in-out infinite;
-}
+/* `.dc-estrela` saiu junto com as cenas em SVG (ago/2026). As estrelas
+   voltaram a ser pintadas DENTRO da arte, e pixel pintado não cintila — o
+   preço de usar a imagem que o dono aprovou em vez de um desenho meu. */
 
 @media (prefers-reduced-motion: reduce) {
   .dc-sky-breathe {
@@ -1281,9 +1267,6 @@ button:active > .duo3d {
     transform: scale(1.04);
   }
   .dc-orb {
-    animation: none;
-  }
-  .dc-estrela {
     animation: none;
   }
 }
@@ -1294,8 +1277,7 @@ button:active > .duo3d {
    dez faixas. Saíram com as dez artes e com `sky-ambience.tsx`, no
    rebranding que trocou os céus por quatro cenas em SVG.
    A vida do céu novo mora DENTRO da cena (`ceu-do-dia.tsx`): as estrelas
-   cintilam por `.dc-estrela`, logo acima, e o céu inteiro respira por
-   `.dc-sky-breathe`. Uma fonte só, versionada com o desenho que ela anima. */
+   respira por `.dc-sky-breathe`, logo acima. */
 /* ─── O TEXTO DE VIDRO SAIU (ago/2026) ───────────────────────────────
    `.dc-glass-text` era o material do relógio da tela bloqueada do iOS:
    preenchimento translúcido com o céu atravessando a letra. O próprio bloco
