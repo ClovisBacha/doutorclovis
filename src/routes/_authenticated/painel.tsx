@@ -1542,36 +1542,27 @@ function PainelPage() {
                   ),
                 )
               }
+              preForms={preForms}
+              onMarkSeenPreConsulta={markSeen}
+              onIrParaAgenda={() => setTab("Calendário")}
             />
-            {/* ─── AS DUAS CAIXAS DE ENTRADA, NA MESMA TELA ────────────────
-                Eram abas próprias — "Pré-consultas" e "Exames" — e as duas
-                listavam coisas que só existem grudadas a uma paciente. O médico
-                chegava nelas por um caminho que não passava pela paciente: lia
-                uma pré-consulta com 175/115 sem o prontuário de quem a mandou.
-
-                Continuam sendo LISTAS, e não só um item dentro do cartão, e
-                isso é deliberado: um laudo que volta e um formulário que chega
-                são trabalho que precisa dele HOJE. Escondidos atrás de duzentos
-                cartões, só seriam vistos por quem já soubesse que estão lá. */}
-            <div>
-              {/* O TÍTULO precisou nascer aqui. Enquanto era aba, o nome da aba
-                  era o título — virada seção, a lista aparecia sem nada dizendo
-                  o que ela é, logo acima de outra lista. */}
-              <div className="flex items-center gap-2">
-                <h2 className="font-serif text-xl">Pré-consultas</h2>
-                {unseenForms > 0 && (
-                  <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
-                    {unseenForms}
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                O que elas responderam antes da consulta — pressão, peso, sintomas e dúvidas.
-              </p>
-              <div className="mt-4">
-                <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
-              </div>
-            </div>
+            {/* ─── A MESADA MOROU EM "MEU PERFIL", E NÃO FAZIA SENTIDO LÁ ───
+                Presentear é uma ação sobre uma paciente, não sobre o cadastro
+                do médico — e é aqui, na aba Pacientes, que ele já está olhando
+                para a lista delas. Pedido do dono: "vai ser lá que o médico
+                dará os presentinhos". */}
+            <MesadaDoMedico tokenFn={token} pacientes={engagement?.patients ?? []} />
+            {/* ─── A LISTA DE PRÉ-CONSULTAS SAIU DAQUI (ago/2026) ────────────
+                Era uma seção própria, com o título "Pré-consultas" escrito na
+                aba — pedido do dono: "não tem que estar escrito ali". O selo
+                "Pré-consulta nova" no quadro da paciente (`PatientMirrorCard`)
+                e o relatório completo dentro da ficha dela (`PatientDetailModal`,
+                aba Agora) são a mesma pré-consulta, só lida por PACIENTE em vez
+                de uma lista solta de todas — "quem clica numa paciente quer a
+                paciente inteira", a mesma razão que já tinha tirado peso e
+                pressão de aparecer só ali. O contador do grupo na fita
+                (`unseenForms`) continua somando sozinho, sem depender desta
+                seção existir. */}
             <ExamesRecebidos tokenFn={token} />
           </div>
         )}
@@ -1589,11 +1580,7 @@ function PainelPage() {
                 ter esse plano — ele veria um cartão de "não liberado" em vez da
                 porta. */}
             <SairDaClinicaCard tokenFn={token} />
-            <MeuPerfilSection
-              tokenFn={token}
-              onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")}
-              pacientesVinculadas={engagement?.patients ?? []}
-            />
+            <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
           </>
         )}
         {tab === "Engajamento" && (
@@ -3308,166 +3295,111 @@ function CartaoDePergunta({
   );
 }
 
-/* ---------- Pré-consultas (Feature 11 + 47) ---------- */
-function PreConsultasSection({
-  forms,
+/**
+ * A pré-consulta dela, DENTRO da própria ficha (ago/2026).
+ *
+ * Era uma seção solta na aba Pacientes, listando as de TODAS as pacientes
+ * juntas com o título "Pré-consultas" escrito ali — pedido do dono: "não tem
+ * que estar escrito ali na aba de pacientes". O relatório completo
+ * (`PatientReportView`) reaproveita o `ficha` que `PatientDetailModal` já
+ * carregou — MESMA chamada que a seção antiga fazia por trás (`getPatientReport`),
+ * sem pedir de novo e sem o risco que a versão antiga documentava (relatório
+ * de uma paciente vazando para o card de outra): aqui só existe UMA paciente,
+ * a que está com a ficha aberta.
+ */
+function PreConsultaCard({
+  form,
+  ficha,
   onMarkSeen,
-  tokenFn,
 }: {
-  forms: AdminPreConsulta[];
+  form: AdminPreConsulta;
+  ficha: any;
   onMarkSeen: (id: string) => void;
-  tokenFn: () => Promise<string>;
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [reportData, setReportData] = useState<any>(null);
-  /* DE QUEM é o relatório que está em `reportData`.
-  
-     Sem isto havia vazamento de dado clínico entre pacientes: `reportData` é um
-     estado só, e `loadReport` só escrevia nele em caso de SUCESSO. Abrir a
-     paciente B, depois abrir a paciente A cujo relatório falha, deixava o card
-     da A renderizando o relatório da B — peso, pressão, perguntas pendentes,
-     com o nome da B dentro do card da A. E a falha é alcançável: a lista de
-     pré-consultas é escopada por `preconsulta_forms.doctor_id` (gravado no
-     envio), enquanto o relatório é autorizado por `patient_profiles.doctor_id`;
-     uma paciente que trocou de médico continua listada e o relatório é negado.
-  
-     Agora o relatório só é exibido quando pertence à paciente aberta. */
-  const [reportOwner, setReportOwner] = useState<string | null>(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportErro, setReportErro] = useState(false);
-
-  async function loadReport(userId: string) {
-    setReportLoading(true);
-    setReportErro(false);
-    // Limpa antes de buscar: nada de mostrar o anterior enquanto carrega.
-    setReportData(null);
-    setReportOwner(null);
-    try {
-      const tk = await tokenFn();
-      const res = await getPatientReport({ data: { accessToken: tk, userId } });
-      if (res.ok) {
-        setReportData(res);
-        setReportOwner(userId);
-      } else {
-        setReportErro(true);
-      }
-    } catch {
-      setReportErro(true);
-    } finally {
-      setReportLoading(false);
-    }
-  }
-
-  function printReport() {
-    window.print();
-  }
-
-  if (forms.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Nenhuma pré-consulta recebida ainda. As pacientes podem preenchê-la em{" "}
-        <strong>Minha Conta → Pré-consulta</strong>.
-      </p>
-    );
-  }
-
+  const [aberto, setAberto] = useState(false);
   return (
-    <div className="space-y-4">
-      {forms.map((f) => (
-        <div
-          key={f.id}
-          className={`rounded-2xl border bg-card p-5 shadow-[var(--shadow-card)] ${!f.seen_by_doctor ? "border-primary/40" : "border-border"}`}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="font-medium">{f.patient_name}</p>
-                {!f.seen_by_doctor && (
-                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
-                    Nova
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Semana {f.weeks_at_submission ?? "—"} ·{" "}
-                {new Date(f.submitted_at).toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setExpandedId((id) => (id === f.id ? null : f.id));
-                  if (!f.seen_by_doctor) onMarkSeen(f.id);
-                  if (expandedId !== f.id) loadReport(f.user_id);
-                }}
-                className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
-              >
-                {expandedId === f.id ? "Fechar" : "Ver relatório"}
-              </button>
-            </div>
-          </div>
-
-          {/* Quick summary chips */}
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {f.symptoms.map((s) => (
-              <span key={s} className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
-                {s}
-              </span>
-            ))}
-            {f.current_weight && (
-              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-                ⚖️ {f.current_weight} kg
+    <div
+      className={`rounded-2xl border bg-card p-4 shadow-[var(--shadow-card)] ${!form.seen_by_doctor ? "border-primary/40" : "border-border"}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold">Ela respondeu antes da consulta</p>
+            {!form.seen_by_doctor && (
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+                Nova
               </span>
             )}
-            {f.systolic != null &&
-              f.diastolic != null &&
-              /* `!= null` e não truthy: com `&&`, um "0/80" sumia da tela por
-                 inteiro em vez de aparecer marcado como implausível. */
-              (() => {
-                const sn = sinalPressao(f.systolic, f.diastolic);
-                return (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      sn && sn.gravidade !== "normal"
-                        ? ESTILO_SINAL[sn.gravidade]
-                        : "bg-secondary text-muted-foreground"
-                    }`}
-                    title={sn?.nota || undefined}
-                  >
-                    💓 {f.systolic}/{f.diastolic}
-                    {sn && sn.gravidade !== "normal" ? ` · ${sn.nota}` : ""}
-                  </span>
-                );
-              })()}
           </div>
+          <p className="text-xs text-muted-foreground">
+            Semana {form.weeks_at_submission ?? "—"} ·{" "}
+            {new Date(form.submitted_at).toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setAberto((a) => !a);
+            if (!form.seen_by_doctor) onMarkSeen(form.id);
+          }}
+          className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
+        >
+          {aberto ? "Fechar" : "Ver relatório"}
+        </button>
+      </div>
 
-          {f.questions && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              <strong>Perguntas:</strong> {f.questions}
-            </p>
-          )}
+      {/* Resumo rápido */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {form.symptoms.map((s) => (
+          <span key={s} className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
+            {s}
+          </span>
+        ))}
+        {form.current_weight && (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+            ⚖️ {form.current_weight} kg
+          </span>
+        )}
+        {form.systolic != null &&
+          form.diastolic != null &&
+          /* `!= null` e não truthy: com `&&`, um "0/80" sumia da tela por
+             inteiro em vez de aparecer marcado como implausível. */
+          (() => {
+            const sn = sinalPressao(form.systolic, form.diastolic);
+            return (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  sn && sn.gravidade !== "normal"
+                    ? ESTILO_SINAL[sn.gravidade]
+                    : "bg-secondary text-muted-foreground"
+                }`}
+                title={sn?.nota || undefined}
+              >
+                💓 {form.systolic}/{form.diastolic}
+                {sn && sn.gravidade !== "normal" ? ` · ${sn.nota}` : ""}
+              </span>
+            );
+          })()}
+      </div>
 
-          {/* Expanded report */}
-          {expandedId === f.id && (
-            <div className="mt-5 border-t border-border pt-5">
-              {reportLoading ? (
-                <p className="text-sm text-muted-foreground">Carregando relatório...</p>
-              ) : reportErro ? (
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  Não foi possível carregar o histórico desta paciente. Ela pode ter trocado de
-                  médico — os dados dela deixam de ser seus quando isso acontece.
-                </p>
-              ) : reportData && reportOwner === f.user_id ? (
-                <PatientReportView data={reportData} formData={f} onPrint={printReport} />
-              ) : null}
-            </div>
+      {form.questions && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          <strong>Perguntas:</strong> {form.questions}
+        </p>
+      )}
+
+      {aberto && (
+        <div className="mt-5 border-t border-border pt-5">
+          {ficha ? (
+            <PatientReportView data={ficha} formData={form} onPrint={() => window.print()} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Carregando relatório...</p>
           )}
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -9617,20 +9549,10 @@ function EnderecosCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
 function MeuPerfilSection({
   tokenFn,
   onIrParaPacientes,
-  pacientesVinculadas,
 }: {
   tokenFn: () => Promise<string>;
   /** Trocar de aba mora no painel; esta seção só pede. */
   onIrParaPacientes: () => void;
-  /**
-   * As pacientes dele — para o cartão da mesada saber a quem dar.
-   *
-   * Vem de cima e não de uma busca própria: o painel já carregou esta lista, e
-   * uma segunda leitura poderia mostrar um conjunto diferente do que ele vê na
-   * aba Pacientes. O servidor confere o vínculo de novo em `presentearPaciente`
-   * — esta lista é conveniência de tela, nunca autorização.
-   */
-  pacientesVinculadas: PatientEngagement[];
 }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -9967,7 +9889,6 @@ function MeuPerfilSection({
         <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
       </div>
       <EnderecosCard tokenFn={tokenFn} />
-      <MesadaDoMedico tokenFn={tokenFn} pacientes={pacientesVinculadas} />
       <ReferralCard tokenFn={tokenFn} />
       {/* O cartão do Google Agenda saiu daqui e foi para a aba Calendário
           (ago/2026). Ele decide como as teleconsultas viram evento com sala do
@@ -10730,6 +10651,9 @@ function PacientesSection({
   abrirPacienteId,
   onAbriu,
   onDesfechoRegistrado,
+  preForms = [],
+  onMarkSeenPreConsulta,
+  onIrParaAgenda,
 }: {
   tokenFn: () => Promise<string>;
   /**
@@ -10758,6 +10682,17 @@ function PacientesSection({
    * parar de olhar para ela.
    */
   onDesfechoRegistrado?: (fonte: string, fonteId: string) => void;
+  /**
+   * As pré-consultas de TODAS as pacientes dele — não mais uma seção própria
+   * nesta aba (ago/2026). O selo "Pré-consulta nova" no quadro dela e o
+   * relatório completo dentro da ficha dela são a MESMA lista, só que lida
+   * por paciente em vez de uma lista solta: pedido do dono, "não tem que
+   * estar escrito ali na aba de pacientes".
+   */
+  preForms?: AdminPreConsulta[];
+  onMarkSeenPreConsulta?: (id: string) => void;
+  /** Ver `AcoesDaPaciente`. */
+  onIrParaAgenda?: () => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<PatientRequest[]>([]);
@@ -10928,6 +10863,9 @@ function PacientesSection({
      respostas diferentes para o mesmo termo na mesma tela seria pior que não
      ter busca. */
   const visiveis = filtrarPacientes(patients, busca);
+  const preFormsPendentes = new Set(
+    preForms.filter((f) => !f.seen_by_doctor).map((f) => f.user_id),
+  );
 
   return (
     <div className="space-y-8">
@@ -11026,7 +10964,12 @@ function PacientesSection({
                 estava olhando. */}
             <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
               {visiveis.map((p) => (
-                <PatientMirrorCard key={p.id} p={p} onOpen={() => setSelected(p)} />
+                <PatientMirrorCard
+                  key={p.id}
+                  p={p}
+                  onOpen={() => setSelected(p)}
+                  temPreConsultaNova={preFormsPendentes?.has(p.id) ?? false}
+                />
               ))}
               {/* "+" — adicionar paciente (convite). Some enquanto ele está
                   buscando: entre resultados de uma busca, um quadro de
@@ -11034,7 +10977,7 @@ function PacientesSection({
               <button
                 hidden={busca.trim().length > 0}
                 onClick={() => setInviteOpen(true)}
-                className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:border-primary hover:bg-primary/10"
+                className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:border-primary hover:bg-primary/10"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-3xl font-light leading-none">
                   +
@@ -11201,6 +11144,9 @@ function PacientesSection({
           tokenFn={tokenFn}
           onClose={() => setSelected(null)}
           onDesfechoRegistrado={onDesfechoRegistrado}
+          onIrParaAgenda={onIrParaAgenda}
+          preForms={preForms}
+          onMarkSeenPreConsulta={onMarkSeenPreConsulta}
         />
       )}
     </div>
@@ -11208,22 +11154,43 @@ function PacientesSection({
 }
 
 /**
- * Espelho da tela do bebê da paciente (mini). Mesmo céu dia/noite do app e o
- * bebê no tamanho da semana dela — o médico reconhece a paciente pelo bebê.
+ * Espelho da tela do bebê da paciente. Mesmo céu dia/noite do app e o bebê no
+ * tamanho da semana dela — o médico reconhece a paciente pelo bebê.
+ *
+ * ─── O RODAPÉ SAIU DE CIMA DO CÉU (ago/2026) ────────────────────────────────
+ * Nome branco sobre o gradiente é bonito e ilegível em metade dos céus — e era
+ * a ÚNICA informação nítida do quadro, com o resto reduzido a um selinho de
+ * semanas. Agora nome da paciente e nome do bebê vivem fora da imagem, em
+ * texto normal do cartão: legíveis em qualquer hora do dia, sem depender de
+ * contraste contra um fundo que muda.
  */
-function PatientMirrorCard({ p, onOpen }: { p: LinkedPatient; onOpen?: () => void }) {
+function PatientMirrorCard({
+  p,
+  onOpen,
+  temPreConsultaNova = false,
+}: {
+  p: LinkedPatient;
+  onOpen?: () => void;
+  temPreConsultaNova?: boolean;
+}) {
   const period = periodFor(new Date().getHours());
   const dark = period === "madrugada" || period === "noite";
   const weeks = p.weeks ?? null;
+  const idade = weeks != null ? `${weeks}s${p.days ?? 0}d` : null;
   return (
     <button
       onClick={onOpen}
-      className="overflow-hidden rounded-2xl border border-border text-left shadow-[var(--shadow-card)] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+      className="group overflow-hidden rounded-2xl border border-border bg-card text-left shadow-[var(--shadow-card)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
     >
       <div
-        className="relative flex aspect-square items-center justify-center"
+        className="relative flex aspect-[4/3] items-center justify-center"
         style={{ background: gradientFor(period, 1) }}
       >
+        {temPreConsultaNova && (
+          <span className="absolute right-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow-sm">
+            Pré-consulta nova
+          </span>
+        )}
         {weeks ? (
           <>
             <BabyIllustration
@@ -11231,14 +11198,14 @@ function PatientMirrorCard({ p, onOpen }: { p: LinkedPatient; onOpen?: () => voi
               tone={p.baby_skin_tone ?? 0}
               showSac={false}
               showInfo={false}
-              className="h-[70%] w-[70%] drop-shadow-[0_8px_20px_rgba(0,0,0,0.18)]"
+              className="h-[74%] w-[74%] drop-shadow-[0_8px_20px_rgba(0,0,0,0.18)] transition-transform duration-300 group-hover:scale-105"
             />
             <span
-              className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                dark ? "bg-white/15 text-white/90" : "bg-white/70 text-foreground"
+              className={`absolute left-2 top-2 rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums backdrop-blur-sm ${
+                dark ? "bg-white/15 text-white/90" : "bg-white/75 text-foreground"
               }`}
             >
-              {weeks} sem
+              {idade}
             </span>
           </>
         ) : (
@@ -11248,12 +11215,12 @@ function PatientMirrorCard({ p, onOpen }: { p: LinkedPatient; onOpen?: () => voi
             Sem data de gestação
           </span>
         )}
-        {/* Nome sobre um véu escuro na base — legível em qualquer céu */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-2.5 py-2">
-          <p className="truncate text-[11px] font-semibold text-white">
-            {p.display_name ?? "Paciente"}
-          </p>
-        </div>
+      </div>
+      <div className="space-y-0.5 px-3 py-2.5">
+        <p className="truncate text-sm font-semibold text-foreground">
+          {p.display_name ?? "Paciente"}
+        </p>
+        {p.baby_name && <p className="truncate text-xs text-muted-foreground">{p.baby_name}</p>}
       </div>
     </button>
   );
@@ -11387,7 +11354,22 @@ function InvitePatientModal({
  * Opção 2", faixas de dose); lidos por uma gestante como instrução de casa,
  * isso é auto-medicação. A tela de conferência é a mesma de antes.
  */
-function AcoesDaPaciente({ p, tokenFn }: { p: LinkedPatient; tokenFn: () => Promise<string> }) {
+function AcoesDaPaciente({
+  p,
+  tokenFn,
+  onIrParaAgenda,
+}: {
+  p: LinkedPatient;
+  tokenFn: () => Promise<string>;
+  /**
+   * O atalho para o Calendário. "Pedir consulta" manda um convite — quem
+   * escolhe o horário continua sendo SÓ a paciente, no Agendamento dela; o
+   * médico não marca por aqui. O atalho é só para ele ACOMPANHAR: pular
+   * direto para onde o pedido dela vai aparecer quando ela responder, em vez
+   * de sair da ficha e procurar a aba Calendário sozinho.
+   */
+  onIrParaAgenda?: () => void;
+}) {
   const [escolhendo, setEscolhendo] = useState<"exame" | "prescricao" | null>(null);
   const [envio, setEnvio] = useState<{
     tipo: TipoDeEmissao;
@@ -11448,6 +11430,15 @@ function AcoesDaPaciente({ p, tokenFn }: { p: LinkedPatient; tokenFn: () => Prom
         >
           📅 Pedir consulta
         </button>
+        {onIrParaAgenda && (
+          <button
+            onClick={onIrParaAgenda}
+            className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-muted-foreground hover:border-primary/50 hover:text-primary"
+            title="Ir para o Calendário — é lá que o pedido dela aparece quando ela escolher o horário"
+          >
+            🗓️ Ver na Agenda
+          </button>
+        )}
       </div>
 
       {/* ── Escolher o modelo ── */}
@@ -11539,12 +11530,20 @@ function PatientDetailModal({
   tokenFn,
   onClose,
   onDesfechoRegistrado,
+  onIrParaAgenda,
+  preForms = [],
+  onMarkSeenPreConsulta,
 }: {
   p: LinkedPatient;
   tokenFn: () => Promise<string>;
   onClose: () => void;
   /** Sobe o desfecho para a fila de trabalho do painel. Ver PacientesSection. */
   onDesfechoRegistrado?: (fonte: string, fonteId: string) => void;
+  /** Ver `AcoesDaPaciente`. Fecha a ficha antes de trocar de aba. */
+  onIrParaAgenda?: () => void;
+  /** Todas as pré-consultas do médico — aqui só a dela é usada. Ver `PreConsultaCard`. */
+  preForms?: AdminPreConsulta[];
+  onMarkSeenPreConsulta?: (id: string) => void;
 }) {
   const [messages, setMessages] = useState<BrainChatMessage[] | null>(null);
   /* A ficha clínica dela. O espelho do bebê já estava aqui, mas a aba
@@ -11676,14 +11675,23 @@ function PatientDetailModal({
         month: "long",
       })
     : null;
+  /* A pré-consulta DELA, se houver — ver `PreConsultaCard`. */
+  const preConsulta = preForms.find((f) => f.user_id === p.id) ?? null;
 
+  /* ─── QUASE A TELA INTEIRA (ago/2026) ───────────────────────────────────
+     Era um modal de 3xl centralizado — quem abre uma paciente para decidir
+     conduta via um quadradinho no meio da tela, com o resto do painel escuro
+     ao redor. Pedido do dono: "eu quero uma tela que ocupe basicamente a tela
+     inteira do computador". No celular já não havia margem a devolver: some
+     o padding e o cantinho arredondado, e ela ocupa o viewport igual a uma
+     página própria — só a "✕" no canto para voltar. */
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[92svh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-card shadow-xl"
+        className="flex h-[100dvh] w-full flex-col overflow-hidden bg-card shadow-xl sm:h-[95svh] sm:w-[95vw] sm:max-w-6xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabeçalho: espelho do céu + bebê da semana.
@@ -11721,7 +11729,18 @@ function PatientDetailModal({
             paciente de novo, no fim do fluxo, depois de já ter estado na ficha
             dela. */}
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
-          <AcoesDaPaciente p={p} tokenFn={tokenFn} />
+          <AcoesDaPaciente
+            p={p}
+            tokenFn={tokenFn}
+            onIrParaAgenda={
+              onIrParaAgenda
+                ? () => {
+                    onClose();
+                    onIrParaAgenda();
+                  }
+                : undefined
+            }
+          />
           <button
             onClick={() => setFolhaAberta(true)}
             className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
@@ -11752,6 +11771,7 @@ function PatientDetailModal({
             const n = contadorDaAba(ab, {
               pendentes: prontuario.filter((e) => e.gravidade !== "normal" && !e.tratado_em).length,
               sosAbertos: sosDela.filter((a) => !a.atendido_em).length,
+              preConsultaNova: !!preConsulta && !preConsulta.seen_by_doctor,
             });
             const ativo = ab === abaDaFicha;
             return (
@@ -11779,6 +11799,19 @@ function PatientDetailModal({
 
         {/* O PRONTUÁRIO — primeiro, porque é o que ele veio ver. */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
+          {/* A pré-consulta dela vive em "Agora": é trabalho que precisa dele
+              HOJE, não histórico. Sai antes do prontuário — mesma lógica de
+              "o que pede olhar" — porque é frequentemente o motivo de ele ter
+              aberto esta ficha. */}
+          {abaDaFicha === "Agora" && preConsulta && (
+            <div className="mb-4">
+              <PreConsultaCard
+                form={preConsulta}
+                ficha={ficha}
+                onMarkSeen={onMarkSeenPreConsulta ?? (() => {})}
+              />
+            </div>
+          )}
           <ProntuarioPaciente
             secoes={SECOES_DA_ABA[abaDaFicha]}
             ficha={fichaClin}

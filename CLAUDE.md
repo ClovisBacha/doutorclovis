@@ -470,6 +470,37 @@ em DIAS no corpo grande, alergias/medicações/risco/sangue, o que mudou desde a
   que entra no campo de achados — duas versões divergiriam, e ele leria uma e
   assinaria a outra.
 
+### A aba Pacientes mais tecnológica, e a pré-consulta mudou de casa (ago/2026)
+
+- **O quadro da paciente (`PatientMirrorCard`) ganhou rodapé.** Nome branco
+  sobre o céu do bebê era bonito e ilegível em metade dos horários, e era a
+  ÚNICA informação nítida do quadro. Agora nome da mãe e nome do bebê vivem
+  fora da imagem, em texto normal do cartão — legíveis em qualquer hora do
+  dia — e o selo de idade gestacional mostra semana **e dia** (`22s3d`), não
+  só semana.
+- **A pré-consulta saiu da lista solta na aba Pacientes** — pedido do dono:
+  "não tem que estar escrito ali". Ela não sumiu: virou um selo "Pré-consulta
+  nova" no quadro da paciente e o relatório completo (`PreConsultaCard`,
+  reaproveitando o `ficha` que `PatientDetailModal` já carrega — mesma
+  chamada que a seção antiga fazia por trás, sem pedir de novo) dentro da
+  própria ficha dela, na aba **Agora**. `ContagensDaPaciente` ganhou
+  `preConsultaNova` para o contador da aba somar 1 sem depender da seção
+  antiga existir — é a mesma regra de "o contador sobe para a aba" aplicada
+  de novo, e o teste (`abas-da-paciente.test.ts`) cobra que o valor venha de
+  `preConsulta.seen_by_doctor`, não de `false` fixo.
+- **A ficha da paciente é quase a tela inteira.** Era um modal de `max-w-3xl`
+  centralizado; agora ocupa o viewport quase por completo
+  (`h-[100dvh]`/`h-[95svh]` conforme o tamanho de tela) — pedido do dono: "eu
+  quero uma tela que ocupe basicamente a tela inteira do computador".
+- **"Pedir consulta" ganhou um atalho para o Calendário**, não um jeito novo
+  de marcar. Quem escolhe o horário continua sendo SÓ a paciente, no
+  Agendamento dela — o botão "🗓️ Ver na Agenda" só fecha a ficha e troca de
+  aba, para o médico acompanhar onde o pedido dela vai aparecer quando ela
+  responder.
+- **A mesada de Sementinhas (`MesadaDoMedico`) mudou de "Meu Perfil" para
+  Pacientes** — presentear é uma ação sobre uma paciente, e é ali que ele já
+  está olhando a lista delas.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

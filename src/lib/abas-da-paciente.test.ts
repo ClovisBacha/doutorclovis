@@ -43,6 +43,18 @@ describe("1. o contador sobe para a aba", () => {
        registro grave sem desfecho ficaria sem emblema. */
     expect(contadorDaAba("Agora", { pendentes: -3, sosAbertos: 2 })).toBe(2);
   });
+
+  test("pré-consulta nova soma 1 em «Agora» — ela saiu da lista solta, o número não pode sumir junto", () => {
+    expect(contadorDaAba("Agora", { pendentes: 0, sosAbertos: 0, preConsultaNova: true })).toBe(1);
+  });
+
+  test("pré-consulta já vista não soma nada", () => {
+    expect(contadorDaAba("Agora", { pendentes: 0, sosAbertos: 0, preConsultaNova: false })).toBe(0);
+  });
+
+  test("omitir `preConsultaNova` é o mesmo que não ter — chamador antigo continua correto", () => {
+    expect(contadorDaAba("Agora", { pendentes: 1, sosAbertos: 0 })).toBe(1);
+  });
 });
 
 describe("2. nenhuma seção do prontuário fica sem casa", () => {
@@ -126,5 +138,16 @@ describe("4. e a tela de fato USA a régua", () => {
     expect(semEspacos).toContain(
       'pendentes: prontuario.filter((e) => e.gravidade !== "normal" && !e.tratado_em).length',
     );
+  });
+
+  test("e a pré-consulta nova vem de uma busca de verdade, não de `false` fixo", () => {
+    /**
+     * A pré-consulta saiu da lista solta na aba Pacientes e passou a viver
+     * dentro do cartão (ago/2026). Sem este teste, `preConsultaNova: false`
+     * fixo passaria despercebido: o emblema de "Agora" pareceria certo em todo
+     * teste de unidade e nunca acenderia na tela de verdade.
+     */
+    const semEspacos = painel.replace(/\s+/g, " ");
+    expect(semEspacos).toContain("preConsultaNova: !!preConsulta && !preConsulta.seen_by_doctor");
   });
 });

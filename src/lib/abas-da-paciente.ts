@@ -56,20 +56,30 @@ export type ContagensDaPaciente = {
   pendentes: number;
   /** Acionamentos de emergência sem desfecho. */
   sosAbertos: number;
+  /**
+   * Ela mandou uma pré-consulta e ninguém viu ainda.
+   *
+   * A pré-consulta morava numa lista própria fora do cartão (ago/2026: saiu de
+   * lá — "não tem que estar escrito ali na aba de pacientes"). Mudar ONDE ela
+   * aparece sem trazer o número junto repetiria o defeito que este módulo
+   * existe para prevenir: o emblema que leva o médico até o trabalho pendente
+   * sumiria da aba.
+   */
+  preConsultaNova?: boolean;
 };
 
 /**
  * O número que a aba mostra.
  *
- * Soma pendentes e SOS em aba nenhuma além de "Agora": os dois são trabalho de
- * hoje, e é exatamente por isso que estão os dois na mesma aba. História e
- * Ficha não têm trabalho pendente — têm leitura.
+ * Soma pendentes, SOS e pré-consulta nova em aba nenhuma além de "Agora": os
+ * três são trabalho de hoje, e é exatamente por isso que estão na mesma aba.
+ * História e Ficha não têm trabalho pendente — têm leitura.
  */
 export function contadorDaAba(aba: AbaDaPaciente, c: ContagensDaPaciente): number {
   if (aba !== "Agora") return 0;
   /* Números negativos viriam de um `length` impossível ou de uma subtração
      errada lá em cima; somá-los esconderia trabalho de verdade. */
-  return Math.max(0, c.pendentes) + Math.max(0, c.sosAbertos);
+  return Math.max(0, c.pendentes) + Math.max(0, c.sosAbertos) + (c.preConsultaNova ? 1 : 0);
 }
 
 /**
