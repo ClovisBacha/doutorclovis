@@ -27,7 +27,14 @@ const CICLO = [
   { fase: "out" as const, dur: 6000 },
 ];
 
-const HUMORES: Humor[] = ["feliz", "comemorando", "dormindo", "preocupada"];
+const HUMORES: Humor[] = [
+  "feliz",
+  "comemorando",
+  "dormindo",
+  "preocupada",
+  "orgulhosa",
+  "surpresa",
+];
 
 function Preview() {
   const [i, setI] = useState(0);

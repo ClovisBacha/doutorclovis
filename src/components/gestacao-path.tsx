@@ -6675,13 +6675,18 @@ function WellnessScreen({
                   `careMode` VAI para o componente, não só para o texto: a arte
                   de "comemorando" tem confete pintado dentro dela, e o portão
                   do luto mora lá justamente para o chamador não esquecer. */}
+              {/* `diaFeito` e NÃO `comemorando`, embora os dois saiam do mesmo
+                  `halves >= 6`. A arte de comemorar tem chapéu de festa e
+                  confete — é arte de INSTANTE, e esta tela não sabe distinguir
+                  "acabei de fechar o dia" de "abri de novo às 22h". Mostrada
+                  nas duas, a festa vira papel de parede e perde o efeito
+                  justamente onde ele importa.
+                  A festa continua onde existe o instante: ao terminar uma
+                  atividade e ao gabaritar o quiz. Aqui fica a piscadinha, que
+                  é o "eu vi o que você fez" sem estourar confete de novo. */}
               <Bolha
                 tamanho={298}
-                humor={humorDaJornada({
-                  comemorando: halves >= 6,
-                  diaFeito: halves >= 6,
-                  careMode,
-                })}
+                humor={humorDaJornada({ diaFeito: halves >= 6, careMode })}
                 careMode={careMode}
               />
 
@@ -6878,16 +6883,21 @@ function WellnessScreen({
                 por momento do dia, acesas conforme ela anda. A promessa
                 continua, virou a última linha.
 
-                ─── SEIS ESTRELAS, E POR QUE O TEXTO NÃO DIZ "ESTRELAS" ─────
-                O desenho traz seis estrelas e a legenda "2/6 estrelas
-                conquistadas". Nesta base os dois números são coisas
-                diferentes: `halves` conta os SEIS momentos do dia (5 de
-                bem-estar + a aula), e a recompensa por fechar o dia são TRÊS
-                estrelas — a moeda que ela gasta na Loja. Escrever "6 estrelas"
-                prometeria o dobro do que o app paga, e ela descobriria isso no
-                fim do dia.
-                Então: seis estrelas no desenho, uma por momento (que é o que a
-                referência mostra), e a legenda fala de MOMENTOS. */}
+                ─── "ESTRELAS", E A CONTRADIÇÃO QUE ISSO CRIOU ──────────────
+                A legenda diz "N/6 estrelas conquistadas", como no desenho e
+                como o dono pediu. Mas a linha de baixo prometia "feche os 6 e
+                ganhe 3 estrelas" — dois números para a mesma moeda, no MESMO
+                cartão. Quem lesse os dois só podia concluir que o app não sabe
+                quantas estrelas está pagando.
+                Quem cedeu foi a promessa, porque ela era imprecisa de qualquer
+                jeito: o que o app credita ao fechar o dia é SEMENTINHAS 🌱
+                (`grantSementinhas`, com "3 estrelas do dia" apenas como nome
+                da conquista). Agora a última linha diz o que de fato cai na
+                carteira dela.
+                Fica de fora deste commit, e vale registrar: o medidor da
+                trilha e o aviso de fim de dia continuam falando em TRÊS
+                estrelas (seis meias). É a mesma jornada contada em duas
+                denominações, e uma hora precisa ser unificada. */}
             {!careMode && (
               <div
                 className="mt-3 rounded-[22px] px-4 py-4"
@@ -6912,7 +6922,7 @@ function WellnessScreen({
                 <div
                   className="mt-3 flex items-center justify-center gap-3.5"
                   role="img"
-                  aria-label={`${halves} de 6 momentos concluídos`}
+                  aria-label={`${halves} de 6 estrelas conquistadas`}
                 >
                   {[0, 1, 2, 3, 4, 5].map((i) => (
                     <EstrelaDoDia key={i} acesa={i < halves} tamanho={38} />
@@ -6923,26 +6933,26 @@ function WellnessScreen({
                   <span className="text-[16px] font-bold tabular-nums" style={{ color: tinta }}>
                     {halves}/6
                   </span>{" "}
-                  momentos concluídos
+                  estrelas conquistadas
                 </p>
                 <p className="mt-1 text-center text-[12px]" style={{ color: tintaSec }}>
                   {halves >= 6 ? (
-                    "Dia completo! As 3 estrelas são suas 🌟"
+                    "Dia completo! Você acendeu as seis 🌟"
                   ) : halves > 0 ? (
                     <>
-                      Continue assim! Feche os 6 e ganhe{" "}
+                      Continue assim! Acenda as 6 e ganhe{" "}
                       <span className="font-semibold" style={{ color: "#7c3aed" }}>
-                        3 estrelas
+                        Sementinhas
                       </span>{" "}
-                      💗
+                      🌱
                     </>
                   ) : (
                     <>
-                      Comece por onde quiser — feche os 6 e ganhe{" "}
+                      Comece por onde quiser — acenda as 6 e ganhe{" "}
                       <span className="font-semibold" style={{ color: "#7c3aed" }}>
-                        3 estrelas
+                        Sementinhas
                       </span>{" "}
-                      ✨
+                      🌱
                     </>
                   )}
                 </p>
@@ -7241,10 +7251,15 @@ function DailyQuizBlock({
                     exatamente o peso que se pediu para tirar. Ela só está
                     junto. */}
                 <span className="dc-result-in">
+                  {/* Três caras para três resultados, e não duas para dois: a
+                      festa (chapéu e confete) é para quem GABARITOU, e usá-la
+                      também no "acertou 2 de 5" gasta a comemoração — depois
+                      dela, acertar tudo não tem mais o que ganhar. No meio
+                      entra a piscadinha, que é elogio sem festa. */}
                   <Bolha
                     tamanho={84}
-                    humor={score > 0 ? "comemorando" : "feliz"}
-                    entrada={score > 0 ? "pulo" : undefined}
+                    humor={score === total ? "comemorando" : score > 0 ? "orgulhosa" : "feliz"}
+                    entrada={score === total ? "pulo" : undefined}
                     careMode={careMode}
                   />
                 </span>

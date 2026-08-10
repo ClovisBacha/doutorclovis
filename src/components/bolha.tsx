@@ -66,28 +66,47 @@ import feliz from "@/assets/bolha/feliz.webp";
 import comemorando from "@/assets/bolha/comemorando.webp";
 import dormindo from "@/assets/bolha/dormindo.webp";
 import preocupada from "@/assets/bolha/preocupada.webp";
+import orgulhosa from "@/assets/bolha/orgulhosa.webp";
+import surpresa from "@/assets/bolha/surpresa.webp";
 
-export type Humor = "feliz" | "comemorando" | "dormindo" | "preocupada";
+export type Humor = "feliz" | "comemorando" | "dormindo" | "preocupada" | "orgulhosa" | "surpresa";
 
 /**
- * ─── AS QUATRO ARTES, E UMA TROCA PELA METADE (ago/2026) ────────────────────
+ * ─── AS ARTES DO BEBÊ BOLHA (ago/2026) ──────────────────────────────────────
  *
- * `feliz` é a arte NOVA do Bebê Bolha (pedido do dono: "o personagem agora é o
- * bebê bolha"). As outras três continuam com a personagem anterior, em aquarela
- * — e a diferença de traço aparece assim que o humor muda.
+ * Cinco das seis já são a personagem nova. `preocupada` é a única que ainda
+ * está na personagem anterior, em aquarela — a expressão não foi desenhada, e
+ * NÃO dá para emprestar outra: `surpresa` num "a sequência acabou" lê como
+ * animação, e `feliz` apagaria o sinal. Uma cara que contradiz o que a tela
+ * diz é pior que uma diferença de traço.
  *
- * Não dá para usar a arte nova nas quatro: ela SORRI. Pôr um sorriso onde o
- * app quer dizer "preocupada" ou "dormindo" é pior que a inconsistência de
- * estilo, porque aí a cara passa a contradizer o que a tela está dizendo.
+ * ─── TODAS PARTEM DA MESMA ESFERA ───────────────────────────────────────────
  *
- * Falta, então, a mesma personagem em três expressões: comemorando, dormindo e
- * preocupada. Enquanto elas não chegam, o enquadramento é o que segura a
- * emenda: a arte nova foi recortada para a ESFERA cair no mesmo tamanho e na
- * mesma altura da antiga (222px de diâmetro, centro em 153×131 na caixa de
- * 320). Casar pela caixa da imagem, e não pela esfera, faria o personagem
- * mudar de tamanho ao trocar de humor — na mesma tela, na mesma bolha.
+ * `Bolha` desenha a arte num quadrado de `tamanho` e põe a sombra do chão POR
+ * FORA da imagem, então o enquadramento é o que impede o personagem de mudar
+ * de tamanho e de altura ao trocar de humor — na mesma tela, na mesma bolha.
+ * As cinco novas foram recortadas casando a ESFERA da arte `feliz` (221px de
+ * diâmetro, centro em 153×132 na caixa de 320), e não a caixa da imagem: a
+ * caixa inclui faíscas, confete e o ZZZ, que estão em lugares diferentes em
+ * cada arte, e casar por ela encolheria a esfera para caber os extras.
+ *
+ * Onde os extras não cabiam nesse tamanho — o chapéu de festa do
+ * `comemorando`, o ZZZ do `dormindo` —, a escala cedeu o mínimo. Bolha um tico
+ * menor num humor é melhor que chapéu cortado ao meio.
+ *
+ * As artes de `comemorando` e `surpresa` chegaram SEM canal alfa e com o
+ * quadriculado de transparência PINTADO dentro (artefato do gerador). Ele saiu
+ * por preenchimento a partir das bordas, e não por "todo pixel claro vira
+ * transparente" — este último furaria os reflexos brancos dentro da bolha.
  */
-const ARTE: Record<Humor, string> = { feliz, comemorando, dormindo, preocupada };
+const ARTE: Record<Humor, string> = {
+  feliz,
+  comemorando,
+  dormindo,
+  preocupada,
+  orgulhosa,
+  surpresa,
+};
 
 /**
  * Que cara ela faz, a partir do estado da jornada.
@@ -119,6 +138,12 @@ export function humorDaJornada(o: {
   if (o.comemorando) return "comemorando";
   if (o.sequenciaPerdida) return "preocupada";
   if (o.noite && o.diaFeito) return "dormindo";
+  /* ORGULHOSA — a piscadinha. Fica entre a festa e o repouso: o dia está
+     fechado, mas não é o instante da comemoração nem a hora de dormir. É o que
+     ela encontra quando VOLTA à tela depois de ter feito tudo. Antes caía em
+     `feliz`, a mesma cara de quem ainda não começou — e a bolha deixava de
+     reparar no dia dela. */
+  if (o.diaFeito) return "orgulhosa";
   return "feliz";
 }
 
