@@ -32,7 +32,15 @@ const HORA = {
   "por-do-sol": "2026-08-10T17:20:00-03:00",
   anoitecer: "2026-08-10T21:00:00-03:00",
 };
-const MIN = { nome: 4.5, numero: 3, semanas: 4.5, graus: 4.5 };
+/* Os pisos são os da WCAG 2.1 AA: 4,5:1 para texto normal e 3:1 para texto
+   grande (o número da semana passa dos 24px em negrito por larga margem).
+   A pílula do clima ("graus") saiu da barra em ago/2026 e saiu daqui junto —
+   alvo que não existe mais na tela vira linha que nunca reprova. */
+const MIN = { nome: 4.5, numero: 3, semanas: 4.5 };
+/* Alvos que a tela pode legitimamente não ter (o nome só existe se a paciente
+   deu nome ao bebê). Some da lista sem reprovar; o que NÃO pode é um alvo
+   obrigatório sumir em silêncio, e é isso que a conferência abaixo cobra. */
+const OPCIONAIS = new Set(["nome"]);
 
 const n = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 let falhas = 0;
@@ -71,13 +79,16 @@ for (const [ceu, t] of Object.entries(HORA)) {
         parseFloat(getComputedStyle(e).fontSize) > 40,
     );
     const lab = ps.find((e) => e.children.length === 0 && /^semanas?$/.test(e.textContent.trim()));
-    const grau = ps.find((e) => e.children.length === 0 && /^\d+°$/.test(e.textContent.trim()));
+    /* O nome do bebê carrega um 💜 num <span>, então ele NÃO tem
+       `children.length === 0` como os outros. A regra aqui é "só o <p> mais
+       raso que começa com o nome" — sem isso o alvo nunca era encontrado e o
+       texto mais exposto da tela (branco ou índigo direto sobre a arte, sem
+       cartão atrás) passava a vida sem ser medido. */
     const nome = ps.find(
-      (e) => e.children.length === 0 && e.textContent.trim().startsWith("Clovis"),
+      (e) => e.tagName === "P" && /^Clovis\b/.test(e.textContent.trim()) && e.children.length <= 1,
     );
     num && num.setAttribute("data-alvo", "numero");
     lab && lab.setAttribute("data-alvo", "semanas");
-    grau && grau.setAttribute("data-alvo", "graus");
     nome && nome.setAttribute("data-alvo", "nome");
   });
 
@@ -187,6 +198,17 @@ for (const [ceu, t] of Object.entries(HORA)) {
       String(min).padStart(4),
       ok ? "PASSA" : "FALHA",
     );
+  }
+
+  /* ALVO SUMIDO REPROVA. Sem isto, renomear um elemento fazia o `find` voltar
+     vazio, o céu inteiro sair da tabela e o script imprimir "TODOS PASSAM" —
+     um verde que quer dizer "não conferi nada". */
+  const achados = new Set(caixas.map((c) => c.alvo));
+  for (const alvo of Object.keys(MIN)) {
+    if (!achados.has(alvo) && !OPCIONAIS.has(alvo)) {
+      falhas++;
+      console.log(ceu.padEnd(11), alvo.padEnd(8), "NÃO ENCONTRADO na tela");
+    }
   }
   await c.close();
 }

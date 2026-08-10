@@ -14,8 +14,6 @@ import {
   LifeBuoy,
   Heart,
   Menu,
-  Moon,
-  Sun,
   MessageCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -1205,63 +1203,38 @@ export function AppHomeScreen({
 
               {/* O NOME DO BEBÊ, no eixo da tela. `pointer-events-none` porque
                   ele atravessa a faixa inteira: sem isso a metade invisível do
-                  bloco cobriria o botão do menu e a pílula do clima. */}
+                  bloco cobriria o botão do menu. */}
               {babyName && (
                 <p
-                  /* O teto é o que SOBRA depois dos dois cantos, não uma
-                     fração da linha. `52%` era metade da faixa — mas a faixa
-                     tem um botão de 40px de um lado e a pílula do clima de
-                     ~76px do outro, e em 320px de largura um nome comprido
-                     ("Ana Beatriz…") entrava 8px por baixo da pílula. Medido.
-                     11rem reserva os dois cantos mais o respiro; em telas
-                     largas o nome fica até MAIS folgado que antes. */
-                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-11rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] font-semibold leading-none ${textoDoTopo}`}
+                  /* O teto é o que SOBRA depois dos cantos, não uma fração da
+                     linha. `52%` era metade da faixa — mas a faixa tem um
+                     botão de 40px de um lado, e em 320px de largura um nome
+                     comprido ("Ana Beatriz…") passava por baixo dele. Medido.
+                     Eram 11rem enquanto a pílula do clima ocupava o canto
+                     direito; com ela fora, sobra só o botão a reservar, e o
+                     nome ganhou 4rem de folga — que é justamente o que faz o
+                     canto vazio valer a pena. O reserva continua SIMÉTRICO
+                     porque o bloco é centrado: encolher só a esquerda tiraria
+                     o nome do eixo. */
+                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-7rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] font-semibold leading-none ${textoDoTopo}`}
                   style={{ ...overArtTopo, color: corDoTopo }}
                 >
                   {babyName} <span className="align-middle text-[0.72em]">💜</span>
                 </p>
               )}
 
-              {/* A pílula do clima: ícone do céu + graus. O ícone segue a CENA
-                  e não o relógio — lua no anoitecer, sol no resto —, que é a
-                  mesma régua do texto claro/escuro. Sem ele a pílula seria só
-                  um número solto e ninguém saberia do que ele fala. */}
-              {weather && (
-                <div
-                  className="relative z-10 flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3"
-                  style={glassLeve}
-                  aria-label={`${weather.temp} graus, ${weather.condition}`}
-                >
-                  {slot.astro === "lua" ? (
-                    <Moon
-                      className="h-[15px] w-[15px] shrink-0"
-                      strokeWidth={2.2}
-                      style={tracoDeVidro}
-                    />
-                  ) : (
-                    <Sun
-                      className="h-[15px] w-[15px] shrink-0"
-                      strokeWidth={2.2}
-                      style={tracoDeVidro}
-                    />
-                  )}
-                  {/* `textoDoTopo` e não `cardText`: a pílula mora no topo, e
-                      no pôr do sol o topo é violeta escuro enquanto a base é
-                      pêssego claro. Com a régua da base, o número de graus
-                      sairia escuro sobre o vidro escuro. */}
-                  {/* O halo vale aqui também, e pelo mesmo motivo dos outros
-                      textos sobre a cena: o vidro é fino (20% de opacidade),
-                      então quem está atrás do número é o CÉU, não o vidro. No
-                      pôr do sol o topo é violeta médio e o branco chegava a
-                      3,85:1 no pior pixel — com o halo vai a 8,4. */}
-                  <span
-                    className={`text-[15px] font-medium leading-none ${textoDoTopo}`}
-                    style={{ ...overArtTopo, color: corDoTopo }}
-                  >
-                    {weather.temp}°
-                  </span>
-                </div>
-              )}
+              {/* ─── A PÍLULA DO CLIMA SAIU (ago/2026) ────────────────────
+                  Ficava aqui, à direita: ícone do céu + graus. Saiu por
+                  decisão do dono, e a razão está registrada porque ela vale
+                  para o que quiser ocupar este canto depois — "17°" com um
+                  ícone é a informação MENOS útil da tela ocupando o segundo
+                  lugar mais visível dela. Numa tela cujo assunto é o bebê, o
+                  canto tinha de dizer algo sobre ele, ou não dizer nada.
+                  Ficou não dizendo nada, e o céu voltou a ocupar o espaço.
+
+                  O CLIMA em si NÃO saiu do produto: `useWeather` continua de
+                  pé porque a chuva do céu (`SkyRain`) e o cartão de saudação
+                  da segunda dobra leem dele. O que saiu foi só o mostrador. */}
             </div>
 
             {isMadrugada && (
