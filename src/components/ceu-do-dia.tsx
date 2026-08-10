@@ -91,8 +91,8 @@ const CEUS: Ceu[] = [
     dark: false,
     topoEscuro: false,
     astro: "lua",
-    corDeTopo: "#a49dea",
-    corDeBaixo: "#cabde8",
+    corDeTopo: "#9b97dd",
+    corDeBaixo: "#d6c8ec",
   },
   {
     nome: "dia",
@@ -279,7 +279,7 @@ function Sol({
    Lavanda em cima, pêssego no horizonte, dunas de neve lilás. A lua ainda
    está no céu — é o que diz que o dia acabou de começar. */
 function Amanhecer() {
-  const st = estrelas(14, 7717, H * 0.4);
+  const st = estrelas(11, 7717, H * 0.36);
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
@@ -288,62 +288,68 @@ function Amanhecer() {
       aria-hidden
     >
       <defs>
-        {/* Mais quente e mais saturado que a primeira versão: o dono comparou
-            com a referência e o veredito foi "o fundo está muito desbotado".
-            O que faz a cena ler como amanhecer é a faixa de pêssego/ouro
-            chegando ATRÁS da esfera, não um lilás uniforme de cima a baixo. */}
+        {/* O céu fica ROXO por muito tempo e só abre em pêssego perto do
+            horizonte — é a proporção da referência. Trocar a ordem (rosa
+            cedo, roxo tarde) é o que fazia a cena parecer desbotada. */}
         <linearGradient id="am-ceu" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#a49dea" />
-          <stop offset="0.14" stopColor="#aca4ec" />
-          <stop offset="0.3" stopColor="#bba9e6" />
-          <stop offset="0.44" stopColor="#cdb2dd" />
-          <stop offset="0.55" stopColor="#e0bccd" />
-          <stop offset="0.63" stopColor="#f2c8b2" />
-          <stop offset="0.7" stopColor="#fbd9a8" />
-          <stop offset="0.75" stopColor="#fee4b4" />
-          <stop offset="0.8" stopColor="#f2d6c6" />
-          <stop offset="0.88" stopColor="#dcc8ea" />
-          <stop offset="1" stopColor="#cabde8" />
+          <stop offset="0" stopColor="#9b97dd" />
+          <stop offset="0.12" stopColor="#a49ede" />
+          <stop offset="0.24" stopColor="#ada4de" />
+          <stop offset="0.36" stopColor="#b7a9dd" />
+          <stop offset="0.46" stopColor="#c3addd" />
+          <stop offset="0.53" stopColor="#d2b2d9" />
+          <stop offset="0.58" stopColor="#e2bcc7" />
+          <stop offset="0.61" stopColor="#efc5b1" />
+          <stop offset="0.635" stopColor="#f8d2a2" />
+          <stop offset="0.655" stopColor="#fbdda6" />
+          <stop offset="0.675" stopColor="#f2d5bc" />
+          <stop offset="0.72" stopColor="#e4d2e2" />
+          <stop offset="0.82" stopColor="#ddd0ee" />
+          <stop offset="1" stopColor="#d6c8ec" />
         </linearGradient>
-        {/* O clarão do sol que ainda não nasceu, no centro do horizonte. */}
-        {/* `r` grande e o centro baixo: o clarão tem de ler como uma FAIXA
-            atravessando o horizonte, não como um bolo de luz concentrado num
-            ponto. Com raio curto ele virava uma mancha redonda atrás da
-            esfera — o oposto de um amanhecer. */}
-        <radialGradient id="am-glow" cx="0.47" cy="0.72" r="0.78">
-          <stop offset="0" stopColor="#fff0c8" stopOpacity="0.9" />
-          <stop offset="0.22" stopColor="#ffdfa6" stopOpacity="0.6" />
-          <stop offset="0.45" stopColor="#f9c9ae" stopOpacity="0.3" />
-          <stop offset="0.72" stopColor="#e9c3cc" stopOpacity="0.1" />
-          <stop offset="1" stopColor="#dcc4e4" stopOpacity="0" />
+        {/* O clarão nasce no VALE entre os dois morros, à esquerda do centro,
+            e é largo e baixo — não um halo redondo atrás da esfera. */}
+        <radialGradient id="am-glow" cx="0.38" cy="0.655" r="0.62">
+          <stop offset="0" stopColor="#fde6a8" stopOpacity="0.92" />
+          <stop offset="0.28" stopColor="#fbd3a2" stopOpacity="0.55" />
+          <stop offset="0.58" stopColor="#f3c9b4" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#e6c4d8" stopOpacity="0" />
         </radialGradient>
-        {/* Quatro `stop` e não dois: a queda linear de um gradiente de duas
-            paradas deixa uma BORDA DE DISCO visível em volta do astro — o
-            halo lê como círculo desenhado em vez de luz. Os valores abaixo
-            aproximam uma queda quadrática, que é como luz se espalha. */}
         <radialGradient id="halo-am">
           <stop offset="0" stopColor="#fff8f2" stopOpacity="0.7" />
           <stop offset="0.3" stopColor="#fff8f2" stopOpacity="0.34" />
           <stop offset="0.6" stopColor="#fff8f2" stopOpacity="0.11" />
           <stop offset="1" stopColor="#fff8f2" stopOpacity="0" />
         </radialGradient>
-        {/* Cada camada abre CLARA na crista e fecha mais densa embaixo: é
-            essa sombra própria que separa uma duna da outra. Antes as três
-            eram quase a mesma cor e a paisagem lia como uma mancha só. */}
-        <linearGradient id="am-duna-a" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#c9bce8" />
-          <stop offset="1" stopColor="#bcaee2" />
+        {/* Os morros são MAIS ESCUROS que a planície: é o contraste entre os
+            dois que desenha o vale. */}
+        <linearGradient id="am-morro" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#b2a2da" />
+          <stop offset="1" stopColor="#c9bbe6" />
         </linearGradient>
-        <linearGradient id="am-duna-b" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#dccfee" />
-          <stop offset="1" stopColor="#c6b8e6" />
+        <linearGradient id="am-morro-longe" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#c9b6e2" />
+          <stop offset="1" stopColor="#dccdee" />
         </linearGradient>
-        <linearGradient id="am-duna-c" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#e8dcf4" />
-          <stop offset="1" stopColor="#d2c4ec" />
+        {/* A planície é quase lisa, e é isso que faz a cena respirar: ela
+            ocupa o terço de baixo inteiro sem nenhuma onda atravessando. */}
+        <linearGradient id="am-plano" x1="0.3" y1="0" x2="0.7" y2="1">
+          <stop offset="0" stopColor="#efe2f4" />
+          <stop offset="0.35" stopColor="#e6d8f0" />
+          <stop offset="1" stopColor="#d8c9ec" />
+        </linearGradient>
+        <linearGradient id="am-duna-azul" x1="0.1" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor="#e8ecfa" />
+          <stop offset="0.45" stopColor="#c9d0ee" />
+          <stop offset="1" stopColor="#d9d6f0" />
+        </linearGradient>
+        <linearGradient id="am-duna-rosa" x1="0.2" y1="0" x2="0.8" y2="1">
+          <stop offset="0" stopColor="#fbe4e2" />
+          <stop offset="0.5" stopColor="#ecd8f0" />
+          <stop offset="1" stopColor="#dccbec" />
         </linearGradient>
         <filter id="am-mole" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="5" />
+          <feGaussianBlur stdDeviation="4" />
         </filter>
       </defs>
 
@@ -355,82 +361,95 @@ function Amanhecer() {
           key={i}
           cx={s.x}
           cy={s.y}
-          r={s.r * 0.72}
+          r={s.r * 0.7}
           fill="#fff"
           /* `fill-opacity` e não `opacity`: a classe `.dc-estrela` anima
              `opacity`, e as duas se MULTIPLICAM. Escritas na mesma
              propriedade, o CSS venceria o atributo e todas as estrelas
-             cintilariam com o mesmo brilho — some a variação que faz o céu
-             parecer céu. */
+             cintilariam com o mesmo brilho. */
           fillOpacity={s.o * 0.5}
           className="dc-estrela"
           style={{ animationDelay: `${s.d}s` }}
         />
       ))}
 
-      {/* A lua mora à DIREITA, na altura da esfera — não colada no topo.
-          Pedido do dono: "mova a lua para a área central/direita da tela,
-          levemente acima da linha do horizonte". Em cx=362 ela passa ao lado
-          da bolha (que termina em x≈344 na tela mais larga) sem encostar. */}
-      <LuaCrescente cx={366} cy={312} r={20} id="am" cor="#fffdff" brilho={0.5} />
+      <LuaCrescente cx={372} cy={288} r={21} id="am" cor="#fffdff" brilho={0.48} />
 
-      {/* Dunas: três cristas com a névoa do amanhecer entre elas. A de trás é
-          mais azulada e mais borrada — é a distância que faz isso. */}
+      {/* ── O VALE ──────────────────────────────────────────────────────
+          Dois morros emoldurando, o clarão no meio, e uma planície lisa na
+          frente. A versão anterior tinha faixas onduladas atravessando a
+          largura toda: lia como listras, não como paisagem, e sem o vale o
+          clarão do amanhecer não tinha de onde vir. */}
+      {/* Morro da esquerda */}
+      <path
+        d={`M-20 ${H * 0.638} C 10 ${H * 0.567}, 62 ${H * 0.547}, 118 ${H * 0.575}
+            C 172 ${H * 0.602}, 214 ${H * 0.636}, 268 ${H * 0.648}
+            L ${W + 20} ${H * 0.648} L ${W + 20} ${H} L -20 ${H} Z`}
+        fill="url(#am-morro)"
+      />
+      {/* O fio de luz da crista entra AQUI, e não no fim: desenhado depois da
+          planície, ele descia por cima dela e os dois fios se cruzavam num X
+          no meio do vale. */}
+      <path
+        d={`M-20 ${H * 0.638} C 10 ${H * 0.567}, 62 ${H * 0.547}, 118 ${H * 0.575}
+            C 160 ${H * 0.598}, 186 ${H * 0.617}, 208 ${H * 0.628}`}
+        fill="none"
+        stroke="#fbe0c4"
+        strokeOpacity="0.32"
+        strokeWidth="1.2"
+      />
+      {/* Morro da direita, um pouco mais alto — a assimetria é da referência */}
+      <path
+        d={`M${W + 20} ${H * 0.632} C ${W - 14} ${H * 0.558}, ${W - 68} ${H * 0.541}, ${W - 128} ${H * 0.572}
+            C ${W - 186} ${H * 0.601}, ${W - 232} ${H * 0.638}, ${W - 288} ${H * 0.65}
+            L -20 ${H * 0.65} L -20 ${H} L ${W + 20} ${H} Z`}
+        fill="url(#am-morro)"
+      />
+      <path
+        d={`M${W + 20} ${H * 0.632} C ${W - 14} ${H * 0.558}, ${W - 68} ${H * 0.541}, ${W - 128} ${H * 0.572}
+            C ${W - 176} ${H * 0.597}, ${W - 200} ${H * 0.616}, ${W - 222} ${H * 0.628}`}
+        fill="none"
+        stroke="#fbe0c4"
+        strokeOpacity="0.32"
+        strokeWidth="1.2"
+      />
+      {/* CRISTA DISTANTE, desenhada DEPOIS dos dois morros.
+          Atrás deles ela ficava escondida, e o encontro das duas encostas
+          virava um "V" de ponta afiada — na referência o vale tem fundo
+          arredondado. Vindo à frente, e mais clara (é o que a distância faz
+          com a cor), ela preenche o entalhe e fecha o vale.
+          O topo dela passa ACIMA do vértice em que as duas encostas se
+          cruzam (0,611H contra 0,63H) — embaixo dele o "V" continuava
+          aparecendo por cima. Nas bordas ela desce para 0,672H e some atrás
+          dos morros, que é o que faz ler como crista distante e não como uma
+          quarta camada. */}
+      <path
+        d={`M-20 ${H * 0.672} C 74 ${H * 0.662}, 152 ${H * 0.612}, 215 ${H * 0.611}
+            S 350 ${H * 0.662}, ${W + 20} ${H * 0.672} L ${W + 20} ${H} L -20 ${H} Z`}
+        fill="url(#am-morro-longe)"
+      />
+      {/* A planície — o terço de baixo, liso */}
+      <path
+        d={`M-20 ${H * 0.672} C 110 ${H * 0.662}, 300 ${H * 0.662}, ${W + 20} ${H * 0.672}
+            L ${W + 20} ${H} L -20 ${H} Z`}
+        fill="url(#am-plano)"
+      />
+      {/* A duna azulada da esquerda, e a rosada da direita: as duas únicas
+          formas da planície, e cada uma encosta numa borda. */}
       <g filter="url(#am-mole)">
         <path
-          d={`M-20 ${H * 0.578} C 40 ${H * 0.523}, 118 ${H * 0.514}, 176 ${H * 0.567}
-              S 300 ${H * 0.604}, 356 ${H * 0.548} S 430 ${H * 0.53}, ${W + 20} ${H * 0.552}
-              L ${W + 20} ${H} L -20 ${H} Z`}
-          fill="url(#am-duna-a)"
+          d={`M-20 ${H * 0.688} C 40 ${H * 0.684}, 96 ${H * 0.706}, 132 ${H * 0.734}
+              C 96 ${H * 0.75}, 30 ${H * 0.756}, -20 ${H * 0.752} Z`}
+          fill="url(#am-duna-azul)"
+          opacity="0.9"
+        />
+        <path
+          d={`M${W + 20} ${H * 0.678} C ${W - 40} ${H * 0.682}, ${W - 108} ${H * 0.706}, ${W - 132} ${H * 0.74}
+              C ${W - 90} ${H * 0.762}, ${W - 20} ${H * 0.766}, ${W + 20} ${H * 0.756} Z`}
+          fill="url(#am-duna-rosa)"
           opacity="0.92"
         />
       </g>
-      <path
-        d={`M-20 ${H * 0.63} C 62 ${H * 0.596}, 152 ${H * 0.65}, 232 ${H * 0.639}
-            S 372 ${H * 0.607}, ${W + 20} ${H * 0.633} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#am-duna-b)"
-        opacity="0.95"
-      />
-      <path
-        d={`M-20 ${H * 0.702} C 90 ${H * 0.676}, 190 ${H * 0.72}, 300 ${H * 0.703}
-            S ${W + 20} ${H * 0.688}, ${W + 20} ${H * 0.7} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="url(#am-duna-c)"
-      />
-      {/* CADA crista ganha o fio de luz, não só a da frente: é o par
-          "fio aceso em cima + massa mais densa embaixo" que faz três camadas
-          lerem como três, e não como uma mancha lilás só. */}
-      <path
-        d={`M-20 ${H * 0.63} C 62 ${H * 0.596}, 152 ${H * 0.65}, 232 ${H * 0.639}
-            S 372 ${H * 0.607}, ${W + 20} ${H * 0.633}`}
-        fill="none"
-        stroke="#ffeede"
-        strokeOpacity="0.42"
-        strokeWidth="1.4"
-      />
-      <path
-        d={`M-20 ${H * 0.702} C 90 ${H * 0.676}, 190 ${H * 0.72}, 300 ${H * 0.703}
-            S ${W + 20} ${H * 0.688}, ${W + 20} ${H * 0.7}`}
-        fill="none"
-        stroke="#fff3e4"
-        strokeOpacity="0.62"
-        strokeWidth="1.7"
-      />
-      {/* Uma quarta camada, bem à frente e mais densa: é ela que dá o "chão"
-          e impede que a base da tela vire um degradê chapado. */}
-      <path
-        d={`M-20 ${H * 0.79} C 108 ${H * 0.766}, 214 ${H * 0.812}, 330 ${H * 0.788}
-            S ${W + 20} ${H * 0.774}, ${W + 20} ${H * 0.786} L ${W + 20} ${H} L -20 ${H} Z`}
-        fill="#c3b4e6"
-        opacity="0.55"
-      />
-      <path
-        d={`M-20 ${H * 0.79} C 108 ${H * 0.766}, 214 ${H * 0.812}, 330 ${H * 0.788}
-            S ${W + 20} ${H * 0.774}, ${W + 20} ${H * 0.786}`}
-        fill="none"
-        stroke="#f6ecff"
-        strokeOpacity="0.4"
-        strokeWidth="1.3"
-      />
     </svg>
   );
 }
