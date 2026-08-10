@@ -15,10 +15,26 @@
  * disco. O SVG chegou perto da referência, mas perto não era o pedido — e
  * assim que os PNGs chegaram por link, eles entraram no lugar.
  *
- * Os originais somavam 5,5 MB. Convertidos para WebP (qualidade 0,86), somam
- * **112 KB** — menos que um sexto do conjunto antigo, porque são degradês
- * suaves e é justamente neles que o WebP ganha. A conversão foi feita pelo
- * canvas do próprio navegador; não há `cwebp` neste ambiente.
+ * ─── E POR QUE ELAS PASSARAM POR UM UPSCALE (ago/2026) ─────────────────────
+ *
+ * Os PNGs do Drive têm 853×1844. Um iPhone 15 Pro Max pede 1290×2790 (430 CSS
+ * × densidade 3): a arte era AMPLIADA 1,62× pelo navegador, e o resultado era
+ * o borrão que o dono viu.
+ *
+ * A conversão não era a culpada, e isso foi medido antes de mexer: o WebP
+ * batia com o PNG a 44–47 dB de PSNR, ou seja, imperceptível. O arquivo é que
+ * era menor que a tela.
+ *
+ * Então as quatro passaram pelo upscale do Higgsfield (4K → 1900×4096) e saem
+ * daqui por REDUÇÃO para 1440 de largura. Ganho real medido no anoitecer, que
+ * é o que tem detalhe fino: os fios de luz saíam borrados e agora saem
+ * inteiros. No `dia`, que é degradê puro, não há diferença visível — e não
+ * havia como haver: upscale não inventa detalhe onde não existe.
+ *
+ * O peso subiu de 112 KB para 400 KB somando as quatro, e só uma carrega por
+ * vez. A proporção de saída é a do ORIGINAL (1844/853) e não a do upscale
+ * (4096/1900): 0,3% de diferença bastaria para deslocar o enquadramento já
+ * calibrado — foi assim que a lua saiu cortada da primeira vez.
  *
  * ─── A REGRA QUE NÃO PODE SE PERDER ─────────────────────────────────────────
  *
@@ -53,13 +69,19 @@ export type Ceu = {
    *
    * ─── POR QUE DOIS BOOLEANOS E NÃO UM ────────────────────────────────────
    *
-   * Porque duas artes invertem o brilho entre as pontas. Medido (luminância
-   * média das faixas 0–12% e 74–100%):
+   * Porque duas artes invertem o brilho entre as pontas. Medido de novo depois
+   * do upscale (luminância RELATIVA da WCAG, faixas 0–12% e 74–100%):
    *
-   *   amanhecer   topo 0,534   base 0,673   → claro nas duas
-   *   dia         topo 0,637   base 0,738   → claro nas duas
-   *   pôr do sol  topo 0,345   base 0,278   → ESCURO nas duas
-   *   anoitecer   topo 0,087   base 0,189   → escuro nas duas
+   *   amanhecer   topo 0,255   base 0,412   → claro nas duas
+   *   dia         topo 0,399   base 0,523   → claro nas duas
+   *   pôr do sol  topo 0,106   base 0,069   → ESCURO nas duas
+   *   anoitecer   topo 0,013   base 0,041   → escuro nas duas
+   *
+   * Os números são MENORES que os da versão anterior deste comentário porque
+   * mudou a régua, não a arte: aquela era média simples dos canais, esta é a
+   * luminância relativa da WCAG, que é corrigida por gama. A ordem — que é o
+   * que decide claro/escuro — não mudou, e `scripts/contraste-hero.mjs` passa
+   * nos quatro céus.
    *
    * Com um booleano só, o nome do bebê no pôr do sol saía em texto escuro
    * sobre violeta escuro: 3,43:1 contra o mínimo de 4,5 que este app cobra.
@@ -96,8 +118,8 @@ const CEUS: Ceu[] = [
     dark: false,
     topoEscuro: false,
     astro: "lua",
-    corDeTopo: "#6f7dd1",
-    corDeBaixo: "#a39adb",
+    corDeTopo: "#7983dd",
+    corDeBaixo: "#a99fdd",
   },
   {
     nome: "dia",
@@ -105,8 +127,8 @@ const CEUS: Ceu[] = [
     dark: false,
     topoEscuro: false,
     astro: "sol",
-    corDeTopo: "#3ba6ef",
-    corDeBaixo: "#30a5bd",
+    corDeTopo: "#3fabf9",
+    corDeBaixo: "#2ea9c2",
   },
   {
     nome: "por-do-sol",
@@ -115,8 +137,8 @@ const CEUS: Ceu[] = [
     dark: true,
     topoEscuro: true,
     astro: "sol",
-    corDeTopo: "#5c448e",
-    corDeBaixo: "#423076",
+    corDeTopo: "#5e4697",
+    corDeBaixo: "#403077",
   },
   {
     nome: "anoitecer",
@@ -124,8 +146,8 @@ const CEUS: Ceu[] = [
     dark: true,
     topoEscuro: true,
     astro: "lua",
-    corDeTopo: "#081157",
-    corDeBaixo: "#101b74",
+    corDeTopo: "#081159",
+    corDeBaixo: "#0f1872",
   },
 ];
 
