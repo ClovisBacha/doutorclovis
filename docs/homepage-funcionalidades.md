@@ -61,7 +61,7 @@ sozinha. Vende para a paciente **e** para o médico.
 A prova de cuidado com o detalhe em três segundos de vídeo. Não precisa de
 explicação, só de demonstração.
 
-`src/components/sky-ambience.tsx`
+`src/components/ceu-do-dia.tsx`
 
 ## 8 · Gravar a consulta e receber o resumo escrito
 

@@ -573,6 +573,64 @@ de entrada:
   mensal na aba Ciclo Menstrual). Ver `CicloHero`/`CicloCalendario` em
   `minha-conta.tsx`.
 
+## A tela principal do bebê — quatro céus e a composição nova (ago/2026)
+
+Rebranding pedido pelo dono: "vai ficar muito mais simples". Dez artes em
+`.webp` (700 KB, dez faixas de hora) e o ambiente animado por faixa saíram;
+entraram **quatro cenas em SVG** (`src/components/ceu-do-dia.tsx`).
+
+| Cena           | Quando (pelo sol)                      | `dark` |
+| -------------- | -------------------------------------- | ------ |
+| **Amanhecer**  | 50 min antes → 70 min depois do nascer | não    |
+| **Dia**        | entre o nascer e o pôr                 | não    |
+| **Pôr do sol** | 80 min antes → 30 min depois do pôr    | não    |
+| **Anoitecer**  | o resto                                | sim    |
+
+- **SVG e não imagem.** As cenas são malhas de gradiente com três elementos
+  (astro, dunas, estrelas): ~2 KB cada em vez de ~70 KB, escalam sem borrar em
+  qualquer densidade, e deixam a estrela cintilar (`.dc-estrela`) e o céu
+  respirar (`.dc-sky-breathe`) sem um segundo arquivo.
+- **A cena cobre a PRIMEIRA DOBRA, não o hero inteiro.** Com `inset-0` o
+  `slice` ampliava tudo 1,155× para cobrir os 1104px do hero e a lua saía
+  cortada pela borda direita — medido, não suposto. Daí `corDeBaixo`: a cor
+  chapada que continua atrás da segunda dobra.
+- **`dark` acompanha a ARTE, nunca o relógio** — é ele que decide texto claro
+  ou escuro, o vidro dos cartões e a barra de status do iOS.
+- **As estrelas têm posição DETERMINÍSTICA** (gerador congruente com semente).
+  `Math.random()` daria mismatch de hidratação. E o brilho de cada uma vai em
+  `fill-opacity`, porque `.dc-estrela` anima `opacity` e as duas se
+  multiplicam — escritas na mesma propriedade, o CSS venceria o atributo e
+  todas cintilariam igual.
+- **O halo do astro tem quatro `stop`.** Dois caem linear e deixam uma borda
+  de disco visível: o halo lê como círculo desenhado em vez de luz.
+
+**A composição seguiu a referência aprovada:**
+
+- Barra de topo: menu à esquerda, **nome do bebê no centro óptico da tela**,
+  pílula do clima (ícone do céu + graus) à direita. O nome é posicionado em
+  `absolute` com `-translate-x-1/2` e não no fluxo: o botão mede 40px e a
+  pílula ~72px, então num `justify-between` ele nasceria fora do eixo — e
+  andaria pela tela conforme a pílula do clima carregasse.
+- **O cartão de vidro com as três medidas saiu.** Comprimento, peso e fruta
+  continuam na aba do Bebê, que é onde ela vai quando quer o detalhe; aqui
+  ficou o número da semana apoiado direto na cena.
+- **A folga vertical é repartida por três espaçadores com pesos** (1.15 /
+  0.72 / 0.85, e uma escala menor em `short:`), tirados das proporções da
+  referência — bolha a ~39% da altura, número a ~68%. Antes o botão da bolha
+  era `flex-1` e engolia toda a folga, empurrando o número para 90% da altura,
+  a 21px da barra de baixo.
+- **A barra de navegação inferior não mudou** — estava fora do escopo por
+  pedido explícito.
+
+**Bancada:** `/preview-home?w=20` renderiza a tela real sem login (`?clima=1`
+liga o clima). O céu vem do relógio do navegador, então o Playwright o escolhe
+com `page.clock.setFixedTime` — sempre com offset explícito (`-03:00`), senão
+o fuso do contêiner (UTC) muda a cena.
+
+**O Céu Clássico (`sky_theme = "v1"`) continua de pé.** É item pago da Loja
+(150 🌱); as dez artes eram o tema padrão, este é a alternativa que alguém
+comprou. Apagá-la seria tirar da paciente uma coisa que ela pagou.
+
 ## Experiência "app de milhões" (IMPLEMENTADO — jul/2026)
 
 - **Movimento**: primitivas `Reveal`/`Stagger`/`StaggerItem` em

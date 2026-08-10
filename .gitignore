@@ -50,3 +50,6 @@ src/assets/social/*.png
 
 # Rascunho dos agentes de auditoria — some quando eles terminam.
 .tmp-audit/
+
+# Pastas de trabalho dos agentes verificadores (screenshots, scripts de medição)
+.verif*/
