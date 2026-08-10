@@ -16,7 +16,6 @@ import {
   Menu,
   Moon,
   Sun,
-  UserRound,
   MessageCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -646,17 +645,11 @@ const DREAM_VEIL =
   "linear-gradient(180deg, rgba(183,158,255,0.66) 0%, rgba(247,176,213,0.62) 38%," +
   " rgba(255,193,158,0.74) 72%, rgba(255,224,199,0.82) 100%)";
 
-/**
- * As artes são SÓ CÉU — a bolha é desenhada aqui (`BabyOrb`), e é por isso que
- * ela fica sempre exatamente centrada no bebê, em qualquer tela, e pode
- * respirar. Na primeira leva a esfera vinha pintada dentro de cada imagem, em
- * posição e tamanho diferentes: o bebê não caía dentro dela em nenhuma, e
- * desenhar outra por cima dava duas esferas cruzadas.
- *
- * Se algum dia entrar uma arte COM esfera pintada, volte para `true` — senão a
- * bolha desenhada aparece por cima da pintada e o defeito volta.
- */
-const ART_HAS_ORB = false;
+/* O interruptor `ART_HAS_ORB` saiu (ago/2026). Ele existia porque a primeira
+   leva de artes `.webp` trazia a esfera PINTADA dentro da imagem, em posição e
+   tamanho diferentes em cada uma — e desenhar outra por cima dava duas esferas
+   cruzadas. Aquelas artes não existem mais: as cenas de `ceu-do-dia.tsx` são
+   só céu, por construção, e a bolha é sempre desenhada aqui. */
 
 /** A bolha desenhada pelo app: sempre centrada no bebê, com aro e respiração. */
 function BabyOrb() {
@@ -773,13 +766,6 @@ export function AppHomeScreen({
   const baby = gest ? babyForWeek(gest.weeks) : null;
   const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
   const daysLeft = gest ? Math.max(0, 280 - gest.totalDays) : null;
-  const trimestre = gest
-    ? gest.weeks < 14
-      ? "1º trimestre"
-      : gest.weeks < 28
-        ? "2º trimestre"
-        : "3º trimestre"
-    : null;
   /* A home lê o céu pelo MESMO hook que a tela do jogo. Antes ela tinha a
      conta própria aqui dentro; agora existe uma só, e as duas telas não têm
      como divergir. */
@@ -900,12 +886,11 @@ export function AppHomeScreen({
         " drop-shadow(1.2px 2.4px 3px rgba(96,66,110,0.22))",
   };
   const cardText = darkSky ? "text-white" : "text-foreground";
-  /* UMA classe de vidro para toda a tela, grande e pequeno. Ela não troca de
-     cor conforme o céu: vidro é sempre a mesma parede translúcida, e quem
-     garante a leitura nos dois casos é o bisel — ver `.dc-glass-text` no
-     styles.css. */
-  const glassText = "dc-glass-text";
-  const glassSmall = glassText;
+  /* O vidro sobrou para UM texto: o número de graus na pílula do clima. O
+     nome do bebê e o número da semana passaram a ser cor sólida no rebranding
+     — a referência os traz nítidos, e vidro precisa de corpo grande para o
+     olho reconstruir a letra. Ver `.dc-glass-text` no styles.css. */
+  const glassSmall = "dc-glass-text";
   /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
      nasce de baixo contraste por ser secundário, e agora o céu passa por trás
      dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
@@ -1159,7 +1144,7 @@ export function AppHomeScreen({
                       curta cai para 48vw — é o que faz o número continuar
                       dentro da primeira dobra num aparelho de 780px. */}
                   <div className="relative aspect-square w-[min(60vw,19.5rem)] short:w-[min(48vw,15rem)]">
-                    {ART_HAS_ORB ? null : <BabyOrb />}
+                    <BabyOrb />
                     {/* `scale` porque o SVG tem margem interna larga: a tinta do
                       bebê é ~55% da caixa, e 1.43 leva ela a ~80% da bolha — a
                       proporção que a referência tem. Medido na tela, não

@@ -30,13 +30,11 @@
 
 import type { ReactElement } from "react";
 
-/** As quatro cenas. A ordem é a do dia, e é ela que a Loja mostra. */
+/** As quatro cenas, na ordem do dia. */
 export type NomeDoCeu = "amanhecer" | "dia" | "por-do-sol" | "anoitecer";
 
 export type Ceu = {
   nome: NomeDoCeu;
-  /** Como a paciente chama — aparece na Loja e no rótulo de acessibilidade. */
-  rotulo: string;
   /** Céu escuro pede texto claro. Segue a ARTE, nunca o relógio. */
   dark: boolean;
   /**
@@ -60,25 +58,22 @@ export type Ceu = {
   corDeBaixo: string;
 };
 
-export const CEUS: Ceu[] = [
+const CEUS: Ceu[] = [
   {
     nome: "amanhecer",
-    rotulo: "Amanhecer",
     dark: false,
     corDeTopo: "#9b98e0",
     corDeBaixo: "#ddd3ee",
   },
-  { nome: "dia", rotulo: "Dia", dark: false, corDeTopo: "#2f96e8", corDeBaixo: "#6bcdc0" },
+  { nome: "dia", dark: false, corDeTopo: "#2f96e8", corDeBaixo: "#6bcdc0" },
   {
     nome: "por-do-sol",
-    rotulo: "Pôr do sol",
     dark: false,
     corDeTopo: "#6f66bc",
     corDeBaixo: "#9a88c6",
   },
   {
     nome: "anoitecer",
-    rotulo: "Anoitecer",
     dark: true,
     corDeTopo: "#16215f",
     corDeBaixo: "#4436a8",
@@ -86,11 +81,6 @@ export const CEUS: Ceu[] = [
 ];
 
 const PORNOME = new Map(CEUS.map((c) => [c.nome, c]));
-
-/** A cena de um nome. Nome desconhecido cai no dia — nunca devolve `undefined`. */
-export function ceuPorNome(nome: string): Ceu {
-  return PORNOME.get(nome as NomeDoCeu) ?? PORNOME.get("dia")!;
-}
 
 /**
  * QUE CÉU MOSTRAR, pelo relógio.

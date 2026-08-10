@@ -15,8 +15,6 @@
     "imagens:status": "node scripts/migrar-imagens.mjs status",
     "imagens:subir": "node scripts/migrar-imagens.mjs subir",
     "imagens:limpar": "node scripts/migrar-imagens.mjs limpar",
-    "sky:check": "node scripts/sky-ambience-check.mjs",
-    "sky:geo": "node scripts/sky-geo.mjs",
     "social": "node scripts/social/gerar.mjs",
     "prepare": "husky",
     "test": "bun test src/",

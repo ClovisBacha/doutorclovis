@@ -1360,16 +1360,6 @@ button:active > .duo3d {
          para lavar o glifo, perto o bastante para descolá-lo do cenário. */
         0 9px 20px rgba(16, 28, 60, 0.3);
   }
-
-  /* O recorte vale para TODO glifo, inclusive emoji — e emoji recortado perde
-     a cor: o 💜 saía cinza. Isto devolve a pintura normal a quem não é letra. */
-  .dc-glass-text .dc-sem-vidro {
-    -webkit-background-clip: border-box;
-    background-clip: border-box;
-    background-image: none;
-    color: initial;
-    text-shadow: none;
-  }
 }
 
 /* ══════════════ Chuva na home ══════════════════════════════════════
