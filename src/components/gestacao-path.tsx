@@ -2758,18 +2758,6 @@ export function GestacaoPath({
                   bancada?.enfeites ??
                   trayItems.map((id) => CANTINHO_BY_ID[id]?.emoji).filter((e): e is string => !!e)
                 }
-                avisoAmanha={
-                  isT
-                    ? {
-                        emoji: quizForDay(D + 1)
-                          ? quizEmojiForDay(D + 1)
-                          : challengeForDay(D + 1).emoji,
-                        texto: `Amanhã tem ${quizForDay(D + 1) ? "aula nova" : "desafio novo"} — volte para manter a chama 🔥${
-                          streak > 0 ? ` (${streak} ${streak === 1 ? "dia" : "dias"})` : ""
-                        }`,
-                      }
-                    : null
-                }
                 lesson={
                   q
                     ? {
@@ -6301,7 +6289,6 @@ function WellnessScreen({
   lesson,
   babyName,
   homeCity,
-  avisoAmanha,
   enfeites = [],
   onEarn,
   onEarnLesson,
@@ -6326,8 +6313,6 @@ function WellnessScreen({
   babyName?: string | null;
   /** Cidade do cadastro — o degrau entre o GPS e o IP, igual ao da home. */
   homeCity?: { nome: string; lat: number; lon: number } | null;
-  /** O gancho de amanhã, que morava na folha removida. Null fora de hoje. */
-  avisoAmanha?: { emoji: string; texto: string } | null;
   /** Emojis dos itens comprados na loja — boiam atrás do conteúdo. */
   enfeites?: string[];
   onEarn: (key: string) => void;
@@ -6593,12 +6578,20 @@ function WellnessScreen({
           </div>
         ) : (
           <>
-            {/* ── Topo: voltar + carteira ───────────────────────────── */}
-            <div className="flex items-center justify-between">
+            {/* ── Topo: voltar ──────────────────────────────────────────
+                FLUTUANDO, não numa linha própria. Na arte de referência a
+                bolha começa 17px abaixo da área segura; com o botão ocupando
+                uma faixa de 40px no fluxo, ela só podia começar 57px mais
+                embaixo. O botão não pode sair (é a única saída da folha),
+                então quem sai é a FAIXA dele: `absolute` no canto, e o
+                mascote sobe para o lugar que o desenho lhe dá. Como a bolha é
+                centrada e o botão fica na ponta esquerda, os dois dividem a
+                mesma altura sem se tocar. */}
+            <div className="pointer-events-none absolute left-8 right-8 top-[calc(0.75rem+var(--safe-top))] z-10 flex items-center justify-between">
               <button
                 onClick={onClose}
                 aria-label="Voltar ao Caminho"
-                className={`press flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-xl ${ceuEscuro ? "bg-white/16 text-white/80" : "bg-white/70 text-slate-500"}`}
+                className={`press pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-xl ${ceuEscuro ? "bg-white/16 text-white/80" : "bg-white/70 text-slate-500"}`}
                 style={{
                   boxShadow:
                     "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 0 0 1px rgba(255,255,255,0.55), 0 8px 20px -10px rgba(90,60,80,0.4)",
@@ -6640,12 +6633,38 @@ function WellnessScreen({
                 onde ela vem trabalhar, ele faz o oposto: dá companhia a uma
                 tela que antes só cobrava tarefa. A cara vem do progresso do
                 próprio dia. */}
-            <div className="mt-1 flex flex-col items-center">
-              {/* `careMode` VAI para o componente, não só para o texto: a arte
+            {/* ─── AS MEDIDAS SAÍRAM DA ARTE, NÃO DO OLHO ──────────────
+                A referência é um PNG de 853×1844 representando uma tela de
+                430px, então a escala é 430/853 = 0,5041 e toda distância dela
+                sai de uma conta, não de um chute. Medido no arquivo
+                (`.medir-ref.mjs`, descartado depois):
+
+                  cartão de atividade   367,0px de largura → o conteúdo da
+                                        página já mede 366 (430 − 2×32) ✔
+                  balão                 257,1 × 190,6, topo a 262,6 do alto
+                  bolha do mascote      ~199 de diâmetro, topo a 64 do alto
+
+                É por isso que o balão NÃO é da largura do cartão: na arte ele
+                mede 70% dela. Cheio, o balão vira mais um cartão da pilha e
+                deixa de ler como fala. */}
+            <div className="mt-2 flex flex-col items-center">
+              {/* O mascote divide a faixa com o botão de voltar. Na arte não
+                  há botão nenhum e a bolha começa logo abaixo da barra de
+                  status; aqui o botão existe e não pode sair (é a única saída
+                  da folha). Como ele é pequeno e fica na ponta esquerda, e a
+                  bolha é centrada, os dois convivem sem se tocar.
+
+                  298 e não 258: `tamanho` é a caixa da ARTE, e a bolha
+                  desenhada dentro dela é menor que a caixa. Com 258 a bolha
+                  saía com 172px de diâmetro contra os 199 medidos na
+                  referência — o número que interessa é o da bolha, então ele é
+                  que foi calibrado, não o da caixa.
+
+                  `careMode` VAI para o componente, não só para o texto: a arte
                   de "comemorando" tem confete pintado dentro dela, e o portão
                   do luto mora lá justamente para o chamador não esquecer. */}
               <Bolha
-                tamanho={188}
+                tamanho={298}
                 humor={humorDaJornada({
                   comemorando: halves >= 6,
                   diaFeito: halves >= 6,
@@ -6660,7 +6679,12 @@ function WellnessScreen({
                   escondidas atrás do balão: triângulo em `border` não aceita
                   o mesmo fundo translúcido do balão e apareceria como uma
                   cunha opaca mais escura que ele. */}
-              <div className="relative -mt-1 w-full">
+              {/* `-mt-[74px]`: a caixa da arte do mascote continua ~80px
+                  abaixo da bolha (é onde mora a sombra no chão). Sem puxar, o
+                  balão nascia 77px longe da bolha e o rabinho apontava para o
+                  vazio. Na arte de referência o balão encosta na sombra —
+                  balão topo a 262,6 e sombra a ~270. */}
+              <div className="relative -mt-[74px] w-[257px] max-w-full">
                 <span
                   aria-hidden
                   className="absolute left-1/2 top-0 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[3px]"
@@ -6671,7 +6695,7 @@ function WellnessScreen({
                   }}
                 />
                 <div
-                  className="relative rounded-[26px] px-6 py-5"
+                  className="relative rounded-[26px] px-5 py-5"
                   style={{
                     background: vidro,
                     backdropFilter: "blur(22px) saturate(175%)",
@@ -6687,121 +6711,24 @@ function WellnessScreen({
               </div>
             </div>
 
-            {/* ── A aula em destaque ─────────────────────────────────── */}
-            <button
-              onClick={() => setOpenKey("aula")}
-              className="press relative mt-3.5 block w-full overflow-hidden rounded-[24px] px-5 py-4 text-left"
-              style={{
-                background: vidro,
-                backdropFilter: "blur(22px) saturate(175%)",
-                WebkitBackdropFilter: "blur(22px) saturate(175%)",
-                border: `1px solid ${vidroBorda}`,
-                boxShadow: `inset 0 1px 0 ${vidroLuz}, 0 18px 40px -22px rgba(60,40,70,0.5)`,
-              }}
-            >
-              <div className="relative">
-                <div className="relative z-10" style={{ maxWidth: "56%" }}>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-[3px] text-[9.5px] font-medium ${ceuEscuro ? "bg-violet-400/25 text-violet-100" : "bg-violet-100/85 text-violet-700"}`}
-                  >
-                    <span className="text-[10px] leading-none">⭐</span> Recomendada
-                  </span>
-                  <p
-                    className="mt-2 line-clamp-2 font-serif text-[17px] leading-[1.18]"
-                    style={{ fontWeight: 600, color: tinta }}
-                  >
-                    {tituloAula}
-                  </p>
-                  <p className="mt-1.5 text-[11.5px]" style={{ color: tintaSec }}>
-                    Aula da semana + quiz
-                  </p>
-                  <p
-                    className="mt-2 flex items-center gap-1.5 text-[11.5px]"
-                    style={{ color: tintaSec }}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.7}
-                      className="h-3.5 w-3.5"
-                    >
-                      <circle cx="12" cy="12" r="9" />
-                      <path d="M12 7v5l3 2" strokeLinecap="round" />
-                    </svg>
-                    {minutosAula} min
-                    <span className="text-slate-300">|</span>
-                    <span>⭐ ½</span>
-                  </p>
-                </div>
-                {/* O bebê da semana, o mesmo desenho da home. */}
-                {/* A bolha sangra para fora do cartão à direita e embaixo, como
-                    no desenho: é o que a faz parecer um objeto POUSADO no
-                    cartão em vez de uma figurinha colada dentro dele. */}
-                <span
-                  className="pointer-events-none absolute -right-6 top-1/2 h-[188px] w-[188px] -translate-y-1/2"
-                  style={{
-                    /* O cartão tem `overflow-hidden` (precisa, pelos cantos), e
-                       a bolha é mais alta que ele: nos céus escuros as bordas
-                       cortadas viravam duas linhas retas dentro do cartão. A
-                       máscara apaga a bolha antes de ela chegar no corte. */
-                    maskImage:
-                      "radial-gradient(circle at 50% 50%, #000 62%, rgba(0,0,0,0.35) 78%, transparent 92%)",
-                    WebkitMaskImage:
-                      "radial-gradient(circle at 50% 50%, #000 62%, rgba(0,0,0,0.35) 78%, transparent 92%)",
-                  }}
-                >
-                  {/* A bolha é ARTE, não CSS. Gradiente e sombra dão volume,
-                      mas não dão iridescência nem as faíscas em volta — e era
-                      justamente isso que faltava para a tela bater com o
-                      desenho. O miolo do arquivo é transparente, então o bebê
-                      aparece por dentro dela. */}
-                  <img
-                    src={jogoBolha}
-                    alt=""
-                    aria-hidden
-                    className="absolute inset-0 h-full w-full"
-                  />
-                  <BabyIllustration
-                    week={Math.max(1, Math.min(42, Math.floor(day / 7)))}
-                    tone={0}
-                    showSac={false}
-                    showInfo={false}
-                    className="absolute inset-0 h-full w-full origin-center scale-[1.26]"
-                  />
-                </span>
-              </div>
+            {/* ─── O CARTÃO DA AULA SAIU DAQUI (ago/2026) ──────────────
+                Era o bloco em destaque entre o balão e a lista: selo
+                "Recomendada", título da aula da semana, duração, o bebê da
+                semana e o botão "Continuar aula". Saiu porque a arte de
+                referência não o traz, e o pedido foi tela 100% igual a ela.
 
-              <span
-                className="press relative z-10 mt-3 flex w-fit items-center gap-1.5 rounded-full px-5 py-2.5 text-[13px] font-semibold text-white"
-                style={{
-                  background: "linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)",
-                  boxShadow: "0 10px 24px -10px rgba(139,92,246,0.75)",
-                }}
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="h-[15px] w-[15px]">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                {aulaFeita ? "Rever aula" : "Continuar aula"}
-              </span>
+                ⚠️ ELE ERA A ÚNICA PORTA DA AULA. `setOpenKey("aula")` não é
+                chamado de nenhum outro lugar do app, então enquanto não
+                existir outra entrada:
+                  · a aula da semana e o quiz ficam inalcançáveis;
+                  · `halves` nunca chega a 6 (a aula vale 1 dos 6), então
+                    "Dia completo" e as 3 estrelas do dia ficam fora de
+                    alcance mesmo fazendo tudo o que a tela mostra.
 
-              <div className="relative z-10 mt-3 flex items-center gap-2.5">
-                <span
-                  className={`h-1.5 flex-1 overflow-hidden rounded-full ${ceuEscuro ? "bg-white/20" : "bg-white/60"}`}
-                >
-                  <span
-                    className="block h-full rounded-full"
-                    style={{
-                      width: `${pctAula}%`,
-                      background: "linear-gradient(90deg, #8b5cf6, #a78bfa)",
-                    }}
-                  />
-                </span>
-                <span className="shrink-0 text-[11.5px]" style={{ color: tintaSec }}>
-                  {pctAula}% concluído
-                </span>
-              </div>
-            </button>
+                O ramo `openKey === "aula"` continua inteiro e funcionando
+                logo acima — falta só quem o acione. Três saídas possíveis: um
+                sexto cartão na lista, o cartão de volta abaixo das estrelas,
+                ou um botão na trilha. É decisão do dono. */}
 
             {/* ── Atividades de hoje ─────────────────────────────────── */}
             <div className="mt-3.5 flex items-center justify-between gap-3">
@@ -6925,16 +6852,12 @@ function WellnessScreen({
               })}
             </div>
 
-            {/* ── O gancho de amanhã ─────────────────────────────────
-                Vinha da folha que foi removida. Fica no PÉ e não no topo: no
-                topo ele competia com o que ela veio fazer hoje; aqui é a
-                última coisa que ela lê, que é quando um "volte amanhã"
-                funciona. */}
-            {avisoAmanha && !careMode && (
-              <p className="mt-4 text-center text-[11.5px]" style={{ color: tintaSec }}>
-                {avisoAmanha.emoji} {avisoAmanha.texto}
-              </p>
-            )}
+            {/* ─── O GANCHO DE AMANHÃ SAIU (ago/2026) ──────────────────
+                Era uma linha entre os cartões e o placar: "🍼 Amanhã tem aula
+                nova — volte para manter a chama 🔥". Saiu porque a arte de
+                referência não a traz, e o pedido foi tela 100% igual a ela.
+                Além disso ela ficou mentindo no mesmo commit: aponta para a
+                aula, e a aula perdeu a porta junto com o cartão em destaque. */}
 
             {/* ── ESTRELAS DE HOJE ────────────────────────────────────
                 Substitui o cartão "Recompensa do dia", e absorve o que ele
