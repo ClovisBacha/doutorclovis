@@ -251,11 +251,13 @@ export function daTeleconsulta(t: TeleBruta): EventoDaAgenda | null {
     hora: horaLocal(iso),
     titulo: t.patient_name?.trim() || "Paciente",
     situacao:
-      t.status === "sala_aberta"
-        ? "Sala aberta"
-        : t.status === "encerrada"
-          ? "Encerrada"
-          : "Agendada",
+      t.status === "cancelada"
+        ? "Cancelada"
+        : t.status === "sala_aberta"
+          ? "Sala aberta"
+          : t.status === "encerrada"
+            ? "Encerrada"
+            : "Agendada",
     /* Teleconsulta nasce com data e hora marcadas — é o único dos três que
        sempre tem compromisso de verdade. */
     firme: true,
@@ -277,6 +279,7 @@ export function daTeleconsulta(t: TeleBruta): EventoDaAgenda | null {
  */
 export function daParticular(c: ParticularBruta): EventoDaAgenda | null {
   const pago = c.status === "confirmado" || c.status === "realizado";
+  const cancelada = c.status === "cancelado";
   const marcada = c.scheduled_for?.trim();
 
   /* ─── COMBINADA GANHA DA PREFERIDA ────────────────────────────────────────
@@ -292,7 +295,7 @@ export function daParticular(c: ParticularBruta): EventoDaAgenda | null {
         dia: diaLocal(d),
         hora: horaLocal(marcada),
         titulo: c.consult_type?.trim() || "Consulta particular",
-        situacao: pago ? "Paga" : "Marcada · a pagar",
+        situacao: cancelada ? "Cancelada" : pago ? "Paga" : "Marcada · a pagar",
         firme: true,
         pago,
         duracaoMinutos: DURACAO_PADRAO_MINUTOS,
@@ -312,11 +315,13 @@ export function daParticular(c: ParticularBruta): EventoDaAgenda | null {
     dia: dia.slice(0, 10),
     hora: null,
     titulo: c.consult_type?.trim() || "Consulta particular",
-    situacao: pago
-      ? "Paga · marcar horário"
-      : c.status === "pagamento_enviado"
-        ? "Conferir pagamento"
-        : "Aguardando pagamento",
+    situacao: cancelada
+      ? "Cancelada"
+      : pago
+        ? "Paga · marcar horário"
+        : c.status === "pagamento_enviado"
+          ? "Conferir pagamento"
+          : "Aguardando pagamento",
     firme: false,
     pago,
     duracaoMinutos: DURACAO_PADRAO_MINUTOS,
@@ -502,4 +507,19 @@ export function resumoDoDia(doDia: EventoDaAgenda[]): string {
   if (telas) partes.push(`${telas} por vídeo`);
   if (particulares) partes.push(`${particulares} particular${particulares > 1 ? "es" : ""}`);
   return partes.join(" · ");
+}
+
+/**
+ * Situações que já são um FIM — cancelar de novo não é uma ação, é confusão.
+ *
+ * As três fontes traduzem status diferentes para as mesmas quatro palavras
+ * finais (`SITUACAO_PEDIDO`, `daTeleconsulta`, `daParticular`): cancelar uma
+ * consulta "Realizada" ou já "Cancelada" não desfaz nada — só oferece um
+ * botão que parece fazer algo e não faz.
+ */
+const SITUACOES_TERMINAIS = new Set(["Cancelada", "Recusada", "Realizada", "Encerrada"]);
+
+/** Se este evento ainda pode ser cancelado pelo médico. */
+export function podeCancelar(e: Pick<EventoDaAgenda, "situacao">): boolean {
+  return !SITUACOES_TERMINAIS.has(e.situacao);
 }

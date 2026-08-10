@@ -1410,6 +1410,40 @@ function PainelPage() {
                 await loadTeleconsultas();
                 return { ok: r.ok, erro: r.ok ? undefined : r.error };
               }}
+              aoCancelar={async (ev) => {
+                /* Mesmo prefixo de `aoEnviarLink`: a agenda junta as três
+                   fontes num espaço de ids só (`ped:`, `tele:`, `part:`), e
+                   cada uma cancela numa tabela diferente. `changeStatus` não
+                   entra aqui de propósito — ele já mostra o próprio toast, e
+                   este botão mostra o dele; os dois juntos duplicariam o
+                   aviso na tela. */
+                const tk = await token();
+                if (ev.id.startsWith("ped:")) {
+                  const id = ev.id.replace(/^ped:/, "");
+                  const r = await updateAppointmentStatus({
+                    data: { accessToken: tk, id, status: "cancelled" as never },
+                  });
+                  await load(true);
+                  return { ok: !!r?.ok };
+                }
+                if (ev.id.startsWith("tele:")) {
+                  const id = ev.id.replace(/^tele:/, "");
+                  const r = await updateTeleconsultaStatus({
+                    data: { accessToken: tk, id, status: "cancelada" },
+                  });
+                  await loadTeleconsultas();
+                  return { ok: r.ok };
+                }
+                if (ev.id.startsWith("part:")) {
+                  const id = ev.id.replace(/^part:/, "");
+                  const r = await confirmPaymentForDoctor({
+                    data: { accessToken: tk, id, status: "cancelado" },
+                  });
+                  await loadPrivateConsults();
+                  return { ok: !!r.ok };
+                }
+                return { ok: false, erro: "Tipo de evento desconhecido." };
+              }}
             />
             {/* A conexão com o Google fica NA AGENDA, e não em Meu Perfil.
                 É ela que decide se a teleconsulta vira um evento no Google

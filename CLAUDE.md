@@ -501,6 +501,33 @@ em DIAS no corpo grande, alergias/medicações/risco/sangue, o que mudou desde a
   Pacientes** — presentear é uma ação sobre uma paciente, e é ali que ele já
   está olhando a lista delas.
 
+### Cancelar consulta, direto no dia da agenda (ago/2026)
+
+O ✕ mora ao lado de cada compromisso — na faixa de leitura do
+`CalendarioDoMes` e na tela grande do dia (`DiaDaAgenda`) — e abre uma
+**mensagem** de confirmação ("Cancelar esta consulta com Fulana?" · Sim/Não),
+não o mesmo botão virando "tem certeza?": pedido do dono foi por uma
+confirmação separada, explicitamente.
+
+- **As três fontes cancelam em três lugares diferentes**, e o prefixo do id
+  (`ped:`/`tele:`/`part:`, o mesmo que já distinguia `aoEnviarLink`) decide
+  qual: `updateAppointmentStatus` (`appointment_requests`, já existia),
+  `updateTeleconsultaStatus` (`teleconsulta_sessions`, ganhou o status
+  `cancelada`) e `confirmPaymentForDoctor` (`private_consultations`, já
+  aceitava `cancelado`). Nenhuma função nova — só a teleconsulta precisou de
+  um status a mais, porque era a única das três sem "cancelada" no enum E no
+  CHECK do banco.
+- **`podeCancelar`** (`agenda-unificada.ts`, pura, testada) recusa o X em
+  situações que já são fim de linha (Cancelada, Recusada, Realizada,
+  Encerrada) — um X numa consulta já cancelada seria um botão que promete
+  uma ação e não faz nada.
+- **`daTeleconsulta`/`daParticular` aprenderam a mostrar "Cancelada"**: sem
+  isso, uma teleconsulta cancelada continuava caindo no `else` e aparecendo
+  como "Agendada" — a mesma consulta que ele acabou de cancelar, com cara de
+  ainda ia acontecer.
+- **Aplicar no Supabase:** `supabase/APLICAR_CANCELAR_CONSULTA.sql` (só a
+  teleconsulta precisa — as outras duas tabelas já aceitavam o valor).
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

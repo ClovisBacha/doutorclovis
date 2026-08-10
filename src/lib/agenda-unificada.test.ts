@@ -18,6 +18,7 @@ import {
   horaDosMinutos,
   minutosDesdeMeiaNoite,
   montarAgenda,
+  podeCancelar,
   porDia,
 } from "./agenda-unificada";
 
@@ -210,5 +211,51 @@ describe("6. minutos e faixa horária", () => {
 
   test("sem hora, não há faixa — não inventa uma a partir só da duração", () => {
     expect(faixaHoraria({ hora: null, duracaoMinutos: 30 })).toBeNull();
+  });
+});
+
+describe("7. cancelar consulta", () => {
+  test("teleconsulta cancelada mostra «Cancelada», não o padrão «Agendada»", () => {
+    /* `status` fora dos três valores originais ("agendada"/"sala_aberta"/
+       "encerrada") caía no `else` final e virava "Agendada" — uma
+       teleconsulta cancelada aparecendo como se ainda fosse acontecer. */
+    const e = daTeleconsulta({
+      id: "t3",
+      scheduled_for: new Date(2026, 7, 10, 9, 0).toISOString(),
+      status: "cancelada",
+    })!;
+    expect(e.situacao).toBe("Cancelada");
+  });
+
+  test("particular cancelada mostra «Cancelada», com ou sem horário marcado", () => {
+    /* As duas formas da fonte — COM `scheduled_for` (compromisso de verdade) e
+       só com preferência — precisam concordar sobre uma cancelada, ou o
+       médico vê "Marcada · a pagar"/"Aguardando pagamento" numa consulta que
+       ele mesmo cancelou. */
+    const comHorario = daParticular({
+      id: "p3",
+      scheduled_for: new Date(2026, 7, 12, 10, 0).toISOString(),
+      status: "cancelado",
+    })!;
+    expect(comHorario.situacao).toBe("Cancelada");
+
+    const semHorario = daParticular({
+      id: "p4",
+      preferred_dates: ["2026-08-12"],
+      status: "cancelado",
+    })!;
+    expect(semHorario.situacao).toBe("Cancelada");
+  });
+
+  test("podeCancelar recusa o que já é fim de linha", () => {
+    for (const situacao of ["Cancelada", "Recusada", "Realizada", "Encerrada"]) {
+      expect(podeCancelar({ situacao })).toBe(false);
+    }
+  });
+
+  test("podeCancelar aceita o que ainda está em aberto", () => {
+    for (const situacao of ["Aguardando você", "Confirmada", "Horário sugerido", "Agendada"]) {
+      expect(podeCancelar({ situacao })).toBe(true);
+    }
   });
 });

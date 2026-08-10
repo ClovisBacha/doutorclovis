@@ -1,9 +1,9 @@
 /**
- * O SERVIDOR É O BACKSTOP — e três invariantes dele não podem se perder.
+ * O SERVIDOR É O BACKSTOP — e quatro invariantes dele não podem se perder.
  *
  * O painel roda contra um banco que fica atrás do repo (migrations pendentes),
- * e este arquivo cobra três coisas que só quebram em produção, meses depois,
- * sem teste de unidade que as pegue de outro jeito:
+ * e este arquivo cobra coisas que só quebram em produção, meses depois, sem
+ * teste de unidade que as pegue de outro jeito:
  *
  *   1. O choque de horário em `marcarConsultaNoDia` compara FAIXA, não minuto
  *      exato — senão 10:00–10:30 e 10:15 passam como "livre".
@@ -12,6 +12,9 @@
  *      para de funcionar no banco que só rodou metade dos SQLs.
  *   3. O aviso em massa (`sendDoctorBroadcast`) nunca manda para paciente de
  *      OUTRO médico, mesmo com um id forjado no corpo do pedido.
+ *   4. O X de cancelar, no dia da agenda, manda cada tipo de evento para a
+ *      tabela certa — um `ped:` cancelado como `part:` erraria a linha
+ *      inteira, e o UPDATE recusaria em silêncio (a busca por id não bate).
  */
 
 import { describe, expect, test } from "bun:test";
@@ -105,5 +108,59 @@ describe("3. sendDoctorBroadcast — o filtro nunca escapa do escopo do médico"
 
   test("sem `patientIds`, continua mandando para todas — o comportamento de sempre", () => {
     expect(fn).toContain("if (data.patientIds && data.patientIds.length > 0)");
+  });
+});
+
+describe("4. cancelar no dia da agenda — cada prefixo vai para a fonte certa", () => {
+  const painel = semComentarios("src/routes/_authenticated/painel.tsx");
+  const fn = trecho(
+    painel,
+    "aoCancelar={async (ev) => {",
+    "<GoogleCalendarCard tokenFn={token} />",
+  );
+
+  test("`ped:` cancela em appointment_requests, via `updateAppointmentStatus`", () => {
+    const iPrefixo = fn.indexOf('ev.id.startsWith("ped:")');
+    const iChamada = fn.indexOf("updateAppointmentStatus({");
+    const iStatus = fn.indexOf('status: "cancelled"');
+    expect(iPrefixo).toBeGreaterThan(-1);
+    expect(iChamada).toBeGreaterThan(iPrefixo);
+    expect(iStatus).toBeGreaterThan(iChamada);
+  });
+
+  test("`tele:` cancela em teleconsulta_sessions, via `updateTeleconsultaStatus`", () => {
+    const iPrefixo = fn.indexOf('ev.id.startsWith("tele:")');
+    const iChamada = fn.indexOf("updateTeleconsultaStatus({");
+    const iStatus = fn.indexOf('status: "cancelada"');
+    expect(iPrefixo).toBeGreaterThan(-1);
+    expect(iChamada).toBeGreaterThan(iPrefixo);
+    expect(iStatus).toBeGreaterThan(iChamada);
+  });
+
+  test("`part:` cancela em private_consultations, via `confirmPaymentForDoctor`", () => {
+    const iPrefixo = fn.indexOf('ev.id.startsWith("part:")');
+    const iChamada = fn.indexOf("confirmPaymentForDoctor({");
+    const iStatus = fn.indexOf('status: "cancelado"');
+    expect(iPrefixo).toBeGreaterThan(-1);
+    expect(iChamada).toBeGreaterThan(iPrefixo);
+    expect(iStatus).toBeGreaterThan(iChamada);
+  });
+
+  test("um prefixo desconhecido recusa, em vez de cair num dos três ramos por acaso", () => {
+    expect(fn).toContain('return { ok: false, erro: "Tipo de evento desconhecido." }');
+  });
+});
+
+describe("5. teleconsulta_sessions aceita «cancelada»", () => {
+  const tele = semComentarios("src/lib/teleconsulta.functions.ts");
+
+  test("o validador de updateTeleconsultaStatus inclui «cancelada» no enum", () => {
+    /**
+     * O CHECK do banco (`teleconsulta_sessions_status_check`) nasceu fechado
+     * em três palavras — sem esta linha, o zod aceitaria "cancelada" e o
+     * Postgres recusaria o UPDATE com violação de CHECK, uma camada abaixo de
+     * onde dá para testar sem banco de verdade.
+     */
+    expect(tele).toContain('status: z.enum(["agendada", "sala_aberta", "encerrada", "cancelada"])');
   });
 });

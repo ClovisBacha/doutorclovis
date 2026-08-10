@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   CORES_DO_TIPO,
   celasDoMes,
   diaLocal,
   faixaHoraria,
+  podeCancelar,
   porDia,
   resumoDoDia,
   type EventoDaAgenda,
@@ -41,6 +43,7 @@ export function CalendarioDoMes({
   aoMarcar,
   aoEnviarLink,
   aoBuscarContato,
+  aoCancelar,
   className = "",
 }: {
   eventos: EventoDaAgenda[];
@@ -51,6 +54,8 @@ export function CalendarioDoMes({
   aoEnviarLink?: (evento: EventoDaAgenda) => Promise<{ ok: boolean; erro?: string }>;
   /** Busca e-mail e telefone do cadastro da paciente escolhida no formulário. */
   aoBuscarContato?: (pacienteId: string) => Promise<ContatoDaPaciente>;
+  /** Cancela a consulta — pedido, teleconsulta ou particular, pelo prefixo do id. */
+  aoCancelar?: (evento: EventoDaAgenda) => Promise<{ ok: boolean; erro?: string }>;
   className?: string;
 }) {
   const hoje = new Date();
@@ -61,6 +66,10 @@ export function CalendarioDoMes({
      só abre quando ele clica de verdade. Fundidos, o calendário abriria um
      modal sozinho ao carregar, em cima do dia de hoje. */
   const [diaEmTela, setDiaEmTela] = useState<string | null>(null);
+  /* Cancelamento na faixa de leitura — mesmo desenho da tela grande
+     (`DiaDaAgenda`): um id em confirmação por vez, nunca dois ao mesmo tempo. */
+  const [cancelando, setCancelando] = useState<string | null>(null);
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState<string | null>(null);
 
   const celas = useMemo(() => celasDoMes(mes.getFullYear(), mes.getMonth()), [mes]);
   const mapa = useMemo(() => porDia(eventos), [eventos]);
@@ -215,25 +224,74 @@ export function CalendarioDoMes({
             {doDia.map((e) => (
               <li
                 key={e.id}
-                className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+                className="rounded-2xl border border-border bg-background px-3 py-2 text-sm"
               >
-                <span className={`h-2 w-2 shrink-0 rounded-full ${CORES_DO_TIPO[e.tipo].ponto}`} />
-                <span className="font-medium tabular-nums">
-                  {faixaHoraria(e) ?? (e.firme ? "—" : "a combinar")}
-                </span>
-                <span className="font-medium">{e.titulo}</span>
-                <span className="text-xs text-muted-foreground">{e.situacao}</span>
-                {/* O pagamento, que é o que ele quer ver ao abrir a consulta.
-                    `null` NÃO vira "não pago": não há o que pagar, e um selo
-                    vermelho ali seria cobrança inventada. */}
-                {e.pago !== null && (
+                <div className="flex flex-wrap items-center gap-2">
                   <span
-                    className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      e.pago ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {e.pago ? "Pago" : "A pagar"}
+                    className={`h-2 w-2 shrink-0 rounded-full ${CORES_DO_TIPO[e.tipo].ponto}`}
+                  />
+                  <span className="font-medium tabular-nums">
+                    {faixaHoraria(e) ?? (e.firme ? "—" : "a combinar")}
                   </span>
+                  <span className="font-medium">{e.titulo}</span>
+                  <span className="text-xs text-muted-foreground">{e.situacao}</span>
+                  <span className="ml-auto flex items-center gap-1.5">
+                    {/* O pagamento, que é o que ele quer ver ao abrir a consulta.
+                        `null` NÃO vira "não pago": não há o que pagar, e um selo
+                        vermelho ali seria cobrança inventada. */}
+                    {e.pago !== null && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          e.pago ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {e.pago ? "Pago" : "A pagar"}
+                      </span>
+                    )}
+                    {aoCancelar && podeCancelar(e) && (
+                      <button
+                        onClick={() => setConfirmandoCancelamento(e.id)}
+                        disabled={cancelando === e.id}
+                        aria-label="Cancelar esta consulta"
+                        title="Cancelar esta consulta"
+                        className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:border-rose-400 hover:text-rose-600 disabled:opacity-50"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </span>
+                </div>
+                {confirmandoCancelamento === e.id && (
+                  <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2.5 dark:border-rose-500/30 dark:bg-rose-500/10">
+                    <p className="text-[13px] leading-snug text-rose-900 dark:text-rose-100">
+                      Cancelar esta consulta com {e.titulo}?
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={async () => {
+                          setConfirmandoCancelamento(null);
+                          setCancelando(e.id);
+                          try {
+                            const r = await aoCancelar!(e);
+                            toast[r.ok ? "success" : "error"](
+                              r.ok ? "Consulta cancelada." : r.erro || "Não consegui cancelar.",
+                            );
+                          } finally {
+                            setCancelando(null);
+                          }
+                        }}
+                        className="press rounded-full bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white"
+                      >
+                        Sim, cancelar
+                      </button>
+                      <button
+                        onClick={() => setConfirmandoCancelamento(null)}
+                        className="rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-muted-foreground"
+                      >
+                        Não
+                      </button>
+                    </div>
+                  </div>
                 )}
               </li>
             ))}
@@ -253,6 +311,7 @@ export function CalendarioDoMes({
           aoMarcar={aoMarcar}
           aoEnviarLink={aoEnviarLink}
           aoBuscarContato={aoBuscarContato}
+          aoCancelar={aoCancelar}
           onFechar={() => setDiaEmTela(null)}
         />
       )}

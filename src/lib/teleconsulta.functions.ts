@@ -186,7 +186,7 @@ export const updateTeleconsultaStatus = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         id: z.string().uuid(),
-        status: z.enum(["agendada", "sala_aberta", "encerrada"]),
+        status: z.enum(["agendada", "sala_aberta", "encerrada", "cancelada"]),
       })
       .parse(i),
   )

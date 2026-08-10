@@ -6,6 +6,7 @@ import {
   faixaHoraria,
   horaDosMinutos,
   minutosDesdeMeiaNoite,
+  podeCancelar,
   resumoDoDia,
   validarNovaConsulta,
   type EventoDaAgenda,
@@ -77,6 +78,7 @@ export function DiaDaAgenda({
   aoMarcar,
   aoEnviarLink,
   aoBuscarContato,
+  aoCancelar,
   onFechar,
 }: {
   /** `YYYY-MM-DD`. */
@@ -90,6 +92,8 @@ export function DiaDaAgenda({
   /** Busca e-mail e telefone do cadastro dela. Sem isto, os dois campos ficam
       em branco e editáveis, como sempre foram. */
   aoBuscarContato?: (pacienteId: string) => Promise<ContatoDaPaciente>;
+  /** Cancela a consulta — pedido, teleconsulta ou particular, pelo prefixo do id. */
+  aoCancelar?: (evento: EventoDaAgenda) => Promise<{ ok: boolean; erro?: string }>;
   onFechar: () => void;
 }) {
   /* "Agora" é lido uma vez, na abertura — não a cada render. Um relógio que
@@ -110,6 +114,11 @@ export function DiaDaAgenda({
   const [salvando, setSalvando] = useState(false);
   const [enviandoLink, setEnviandoLink] = useState<string | null>(null);
   const [buscandoContato, setBuscandoContato] = useState(false);
+  /* O id do evento em confirmação de cancelamento — nunca dois ao mesmo tempo,
+     então basta UM id, não um Set. Fechar sem responder (clicar fora, marcar
+     outro) volta ao normal sozinho: não há "sim" nem "não" implícito. */
+  const [cancelando, setCancelando] = useState<string | null>(null);
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState<string | null>(null);
 
   const titulo = useMemo(
     () =>
@@ -240,16 +249,71 @@ export function DiaDaAgenda({
                     <span className="text-xs text-muted-foreground">
                       {CORES_DO_TIPO[e.tipo].rotulo} · {e.situacao}
                     </span>
-                    {e.pago !== null && (
-                      <span
-                        className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          e.pago ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {e.pago ? "Pago" : "A pagar"}
-                      </span>
-                    )}
+                    <span className="ml-auto flex items-center gap-1.5">
+                      {e.pago !== null && (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            e.pago
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {e.pago ? "Pago" : "A pagar"}
+                        </span>
+                      )}
+                      {/* O X só aparece para quem ainda pode ser cancelado —
+                          `podeCancelar` recusa o que já é fim de linha
+                          (Cancelada, Realizada, Encerrada, Recusada). Um X
+                          numa consulta já cancelada seria um botão que
+                          promete uma ação e não faz nada. */}
+                      {aoCancelar && podeCancelar(e) && (
+                        <button
+                          onClick={() => setConfirmandoCancelamento(e.id)}
+                          disabled={cancelando === e.id}
+                          aria-label="Cancelar esta consulta"
+                          title="Cancelar esta consulta"
+                          className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:border-rose-400 hover:text-rose-600 disabled:opacity-50"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
                   </div>
+                  {/* A confirmação é uma MENSAGEM, não o mesmo botão virando
+                      "tem certeza?" — pedido do dono: "uma mensagem de
+                      confirmação... com opção sim ou não". */}
+                  {confirmandoCancelamento === e.id && (
+                    <div className="mt-2.5 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2.5 dark:border-rose-500/30 dark:bg-rose-500/10">
+                      <p className="text-[13px] leading-snug text-rose-900 dark:text-rose-100">
+                        Cancelar esta consulta com {e.titulo}?
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={async () => {
+                            setConfirmandoCancelamento(null);
+                            setCancelando(e.id);
+                            try {
+                              const r = await aoCancelar!(e);
+                              toast[r.ok ? "success" : "error"](
+                                r.ok ? "Consulta cancelada." : r.erro || "Não consegui cancelar.",
+                              );
+                            } finally {
+                              setCancelando(null);
+                            }
+                          }}
+                          className="press rounded-full bg-rose-600 px-3.5 py-1.5 text-xs font-semibold text-white"
+                        >
+                          Sim, cancelar
+                        </button>
+                        <button
+                          onClick={() => setConfirmandoCancelamento(null)}
+                          className="rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-muted-foreground"
+                        >
+                          Não
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {/* O link da sala, no dia — que é onde ele procura por ele.
                       Só para teleconsulta: presencial não tem sala, e um botão
                       "enviar link" ali mandaria a paciente para lugar nenhum. */}
