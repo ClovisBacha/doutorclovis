@@ -31,6 +31,12 @@ export const Route = createFileRoute("/preview-jogo")({
     // foto — e é justamente a metade (quatro apoios, borboleta) que o desenho
     // precisa provar que desenha certo.
     dia: Number(q.dia ?? 139),
+    /* `?feitos=0..6` finge o progresso do dia. É o que decide o placar de
+       estrelas E o recado da bolha: com o dia começado o balão fala do meio do
+       caminho e as frases de hora nem entram no bolo, então sem este parâmetro
+       não havia como fotografar a tela de abertura nem as frases de madrugada,
+       manhã, tarde e noite. Fica em 1 por padrão, que era o valor cravado. */
+    feitos: Math.max(0, Math.min(6, Number(q.feitos ?? 1))),
     /* `?premium=1` só para fotografar a tela liberada. Fora disso a bancada
        mostra o que uma visitante sem assinatura veria. */
     premium: q.premium === "1" || q.premium === true,
@@ -42,7 +48,7 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
-  const { tela, bebe, pele, dia, premium } = Route.useSearch();
+  const { tela, bebe, pele, dia, premium, feitos } = Route.useSearch();
   useEffect(() => {
     if (!pele) return;
     lsSet(SKIN_KEY, pele);
@@ -80,7 +86,7 @@ function PreviewJogo() {
             ? {
                 jogos: true,
                 saldo: 125,
-                halves: 1,
+                halves: feitos,
                 enfeites: ["🌻", "🧸", "🌙", "🦋", "🌿", "⭐", "🐣", "🌸", "🕯️"],
               }
             : undefined

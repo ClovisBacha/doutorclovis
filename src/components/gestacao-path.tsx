@@ -291,6 +291,7 @@ import {
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Bolha, humorDaJornada } from "@/components/bolha";
+import { recadoDaBolha } from "@/lib/recado-da-bolha";
 /* Arte própria desta tela, feita a partir do desenho de referência. Ela mora
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
    cenário fixo da tela de atividades. */
@@ -6411,19 +6412,30 @@ function WellnessScreen({
   const pctAula = aulaFeita ? 100 : Math.round((halves / 6) * 100);
 
   /* ─── O QUE O MASCOTE DIZ ────────────────────────────────────────────────
-     O texto do meio é o da referência, palavra por palavra. Os outros dois
-     existem porque o da referência ficaria ERRADO nos dois extremos:
+     Eram três textos fixos, um deles com 118 caracteres e cinco linhas — a
+     primeira dobra inteira gasta na mesma frase todo dia. Agora são 36 frases
+     em `recado-da-bolha.ts`, escolhidas pelo estado do dia e pela hora, e a
+     régua mora lá porque ela é pura e tem regras que só um teste pega (buraco
+     de gabarito na tela, "vocês dois" no Modo Cuidado, "Semana 41" no
+     pós-parto).
 
-     · Modo Cuidado — "um abraço no seu bebê e no futuro que vocês estão
-       criando" é exatamente a frase que não se diz a quem perdeu a gestação.
-       Aqui o recado não pede nada e não fala do bebê.
-     · Dia completo — um convite a começar, lido depois de ela ter feito tudo,
-       ensina que o app não repara no que ela fez. */
-  const recadoDoDia = careMode
-    ? "💗 Que bom te ver por aqui. Hoje, cuidar de você já basta — no seu tempo, do seu jeito."
-    : halves >= 6
-      ? "🌟 Dia completo! Você cuidou de vocês dois hoje, e isso fica. Descanse — amanhã tem mais. 💜"
-      : "💗 Que bom te ver por aqui! Cada escolha de cuidado hoje é um abraço no seu bebê e no futuro que vocês estão criando. 💜";
+     A HORA vem por estado, e não de um `new Date()` no corpo do render.
+     Renderizado no servidor, o relógio de lá escolheria uma frase e o do
+     navegador outra, e o balão trocaria de texto na hidratação. Enquanto ela
+     não chega, `hora: null` tira só as frases de hora do bolo — a tela nunca
+     fica sem recado. */
+  const [horaLocal, setHoraLocal] = useState<number | null>(null);
+  useEffect(() => setHoraLocal(new Date().getHours()), []);
+
+  const recadoDoDia = recadoDaBolha({
+    feitos: halves,
+    dia: day,
+    hora: horaLocal,
+    bebe: babyName,
+    semana: Math.floor(day / 7),
+    posParto: ehPosParto,
+    careMode,
+  });
 
   // Os 6 cards: aula primeiro (o conteúdo do dia), depois os 5 de bem-estar.
   const cards: { key: string; emoji: string; done: boolean }[] = [
