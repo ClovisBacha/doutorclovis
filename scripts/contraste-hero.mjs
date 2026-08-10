@@ -79,14 +79,21 @@ for (const [ceu, t] of Object.entries(HORA)) {
         parseFloat(getComputedStyle(e).fontSize) > 40,
     );
     const lab = ps.find((e) => e.children.length === 0 && /^semanas?$/.test(e.textContent.trim()));
-    /* O nome do bebê carrega um 💜 num <span>, então ele NÃO tem
-       `children.length === 0` como os outros. A regra aqui é "só o <p> mais
-       raso que começa com o nome" — sem isso o alvo nunca era encontrado e o
-       texto mais exposto da tela (branco ou índigo direto sobre a arte, sem
-       cartão atrás) passava a vida sem ser medido. */
-    const nome = ps.find(
-      (e) => e.tagName === "P" && /^Clovis\b/.test(e.textContent.trim()) && e.children.length <= 1,
-    );
+    /* O nome do bebê carrega corações em <span>, então ele NÃO tem
+       `children.length === 0` como os outros. A regra aqui é "o <p> mais raso
+       que CONTÉM o nome" — sem isso o alvo não é encontrado, e o texto mais
+       exposto da tela (branco ou índigo direto sobre a arte, sem cartão atrás)
+       passa a vida sem ser medido.
+
+       Era `/^Clovis\b/` sobre o texto aparado, e quebrou no dia em que o nome
+       ganhou um coração INVISÍVEL à esquerda para ficar centrado: o texto
+       passou a começar com o emoji. `includes` não se importa com o que vem
+       antes nem com quantos filhos existem.
+
+       Os emojis não sujam a medida: a foto "só sombra" pinta `color:
+       transparent`, e fonte de emoji colorido ignora `color` — os pixels dele
+       ficam idênticos nas duas fotos, cobertura zero, fora da conta. */
+    const nome = ps.find((e) => e.tagName === "P" && e.textContent.includes("Clovis"));
     num && num.setAttribute("data-alvo", "numero");
     lab && lab.setAttribute("data-alvo", "semanas");
     nome && nome.setAttribute("data-alvo", "nome");

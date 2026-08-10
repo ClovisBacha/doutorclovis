@@ -1216,10 +1216,44 @@ export function AppHomeScreen({
                      canto vazio valer a pena. O reserva continua SIMÉTRICO
                      porque o bloco é centrado: encolher só a esquerda tiraria
                      o nome do eixo. */
-                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-7rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] font-semibold leading-none ${textoDoTopo}`}
-                  style={{ ...overArtTopo, color: corDoTopo }}
+                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-7rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] leading-none ${textoDoTopo}`}
+                  style={{
+                    ...overArtTopo,
+                    color: corDoTopo,
+                    /* ─── O NOME SEGUE A MESMA RÉGUA DO NÚMERO DA SEMANA ────
+                       Medido, os dois maiores textos da tela estavam em pesos
+                       diferentes: o número em 500 (Medium) e o nome em 600.
+                       Semi-Bold empasta pelo mesmo motivo que empastava no
+                       número — e aqui é pior, porque o nome do filho dela é a
+                       única palavra do topo.
+                       O tracking acompanha a MESMA lógica, não o mesmo valor:
+                       o número usa −0,03em porque tem 90px, e texto grande
+                       precisa de tracking negativo. Em 20px, −0,03em fecharia
+                       as letras; −0,01em é o passo equivalente nesse corpo. */
+                    fontWeight: 500,
+                    letterSpacing: "-0.01em",
+                  }}
                 >
-                  {babyName} <span className="align-middle text-[0.72em]">💜</span>
+                  {/* ─── O CORAÇÃO GÊMEO INVISÍVEL ──────────────────────────
+                      O 💜 é decoração e fica só à direita, mas o bloco todo é
+                      que está centrado — então ele empurrava a PALAVRA para a
+                      esquerda. Medido: o nome saía com o centro em 202,5 numa
+                      tela cujo eixo é 215. 12,5px, contra os 2px que o "20"
+                      tinha antes de eu corrigir.
+                      A cópia invisível à esquerda devolve a palavra ao eixo, e
+                      é o único jeito que funciona em qualquer aparelho: a
+                      largura de um emoji muda com a fonte do sistema (Apple
+                      Color Emoji, Noto), então qualquer compensação escrita em
+                      px ou em `em` estaria certa num celular e errada no
+                      seguinte. O gêmeo mede sempre exatamente o mesmo que o
+                      original, porque É o original. */}
+                  <span aria-hidden className="align-middle text-[0.72em] opacity-0">
+                    💜
+                  </span>{" "}
+                  {babyName}{" "}
+                  <span aria-hidden className="align-middle text-[0.72em]">
+                    💜
+                  </span>
                 </p>
               )}
 
