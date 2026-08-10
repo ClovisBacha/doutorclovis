@@ -458,6 +458,9 @@ const MarcarNoDiaSchema = z.object({
   telefone: z.string().trim().max(40),
   motivo: z.string().trim().max(300),
   precoBrl: z.number().int().nonnegative().nullable(),
+  /** Em minutos, 5–240 — mesma faixa da grade de horários do médico
+      (`doctor_slots.slot_minutes`) e da validação do lado da tela. */
+  duracaoMinutos: z.number().int().min(5).max(240),
 });
 
 /**
@@ -527,23 +530,40 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
       };
     }
 
-    /* Mesma checagem de choque do `confirmAppointment`, e pelo mesmo motivo:
-       duas pacientes no mesmo horário é o erro que a agenda existe para
-       impedir. O índice único parcial continua sendo o backstop de verdade —
-       esta consulta é só para dar a mensagem com o NOME de quem já está lá. */
-    const { data: clash } = await scopedBy(
+    /* ─── O CHOQUE É DE FAIXA, NÃO DE MINUTO EXATO ───────────────────────────
+       Mesma checagem de choque do `confirmAppointment`, e pelo mesmo motivo:
+       duas pacientes em horários que se cruzam é o erro que a agenda existe
+       para impedir. O índice único parcial (`appt_confirmed_slot`) continua
+       sendo o backstop de verdade contra o INSTANTE exato — esta consulta lê o
+       DIA inteiro e usa a mesma régua pura do formulário (`agenda-unificada`)
+       para pegar também o choque por SOBREPOSIÇÃO: 10:00–10:30 marcado, 10:15
+       pedido agora, hora diferente e mesmo assim colide. */
+    const { minutosDesdeMeiaNoite, DURACAO_PADRAO_MINUTOS } = await import("./agenda-unificada");
+    const { data: doDia } = await scopedBy(
       (supabaseAdmin as any)
         .from("appointment_requests")
-        .select("id, patient_name")
+        .select("id, patient_name, confirmed_time, duration_minutes")
         .eq("status", "confirmed")
-        .eq("confirmed_date", data.dia)
-        .eq("confirmed_time", data.hora),
+        .eq("confirmed_date", data.dia),
       scope,
-    ).limit(1);
-    if (clash?.length) {
+    );
+    const inicioNovo = minutosDesdeMeiaNoite(data.hora);
+    const fimNovo = inicioNovo + data.duracaoMinutos;
+    const choque = ((doDia ?? []) as any[]).find((c) => {
+      /* `confirmed_time` é TEXTO e já aceitou "manhã" nesta base — o valor não
+         vira número, `NaN < x` é sempre falso, e a linha simplesmente não
+         colide (nem colidia antes, com a igualdade exata). */
+      if (!c.confirmed_time) return false;
+      const inicioExistente = minutosDesdeMeiaNoite(String(c.confirmed_time).slice(0, 5));
+      const duracaoExistente =
+        c.duration_minutes && c.duration_minutes > 0 ? c.duration_minutes : DURACAO_PADRAO_MINUTOS;
+      const fimExistente = inicioExistente + duracaoExistente;
+      return inicioNovo < fimExistente && inicioExistente < fimNovo;
+    });
+    if (choque) {
       return {
         ok: false as const,
-        error: `Já existe consulta confirmada nesse horário (${clash[0].patient_name ?? "outra paciente"}).`,
+        error: `Já existe consulta confirmada nesse horário (${choque.patient_name ?? "outra paciente"}).`,
       };
     }
 
@@ -572,6 +592,10 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
       status: "confirmed",
       price_brl: data.precoBrl,
       doctor_id: scope.isTeam ? null : scope.doctorId,
+      /* Em minutos — o "das X até Y" que o médico escolheu na tela. Nasceu
+         DEPOIS de `patient_user_id`, então o recuo abaixo tem de saber tirar
+         os dois, um por vez, e não só o primeiro. */
+      duration_minutes: data.duracaoMinutos,
     };
 
     const gravar = () =>
@@ -579,20 +603,23 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
 
     let { data: nova, error } = await gravar();
 
-    /* ─── A COLUNA NOVA NÃO PODE DERRUBAR O QUE JÁ FUNCIONAVA ────────────────
-       `patient_user_id` chegou depois. Num banco que ainda não rodou o SQL, o
-       PostgREST recusa o INSERT INTEIRO com PGRST204 ("coluna desconhecida no
-       payload") — e marcar consulta, que funcionava ontem, pararia de funcionar
-       hoje por causa de um campo opcional.
-       Repete sem ele: a consulta é marcada, só não fica ligada à conta dela.
+    /* ─── AS COLUNAS NOVAS NÃO PODEM DERRUBAR O QUE JÁ FUNCIONAVA ────────────
+       `patient_user_id` e `duration_minutes` chegaram em levas de SQL
+       diferentes. Num banco que ainda não rodou um dos dois, o PostgREST
+       recusa o INSERT INTEIRO com PGRST204 ("coluna desconhecida no payload")
+       — e marcar consulta, que funcionava ontem, pararia de funcionar hoje por
+       causa de um campo novo e opcional.
+       Tira uma coluna nova por vez e tenta de novo, até sobrar só o que o
+       banco realmente tem: o PGRST204 não diz QUAL coluna faltou, então uma
+       remoção só resolveria o caso de faltar exatamente a primeira da lista.
        É `PGRST204` e não `42703`: aquele é erro do Postgres em SELECT, e
-       escrito aqui seria um fallback que nunca roda. */
-    if (error) {
-      const { colunaAusente } = await import("./postgrest");
-      if (colunaAusente(error)) {
-        delete linha.patient_user_id;
-        ({ data: nova, error } = await gravar());
-      }
+       escrito aqui seria um recuo que nunca roda. */
+    const { colunaAusente } = await import("./postgrest");
+    for (const coluna of ["patient_user_id", "duration_minutes"] as const) {
+      if (!error || !colunaAusente(error)) break;
+      if (!(coluna in linha)) continue;
+      delete linha[coluna];
+      ({ data: nova, error } = await gravar());
     }
 
     if (error) {
@@ -601,10 +628,10 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
          segundo entre a checagem acima e este INSERT. */
       if (code === "23505")
         return { ok: false as const, error: "Já existe consulta confirmada nesse horário." };
-      const { colunaAusente: falta } = await import("./postgrest");
-      /* Se AINDA falta coluna depois de tirar `patient_user_id`, o que falta é
-         a leva antiga de colunas da agenda — outro SQL, outra instrução. */
-      if (falta(error))
+      /* Se AINDA falta coluna depois do laço acima ter tirado as duas colunas
+         novas, o que falta é a leva antiga de colunas da agenda — outro SQL,
+         outra instrução. `colunaAusente` já está em escopo, da checagem acima. */
+      if (colunaAusente(error))
         return {
           ok: false as const,
           error: "Faltam colunas de agenda no banco. Rode o APLICAR_PENDENTES.sql no Supabase.",
@@ -652,6 +679,52 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
        avisada" são dois desfechos diferentes — e o segundo é o que faz ele
        pegar o telefone. Sem `RESEND_API_KEY` o envio é no-op silencioso. */
     return { ok: true as const, id: nova.id as string, avisou, error: null };
+  });
+
+/**
+ * O CONTATO DE UMA PACIENTE VINCULADA — para pré-encher "Marcar consulta".
+ *
+ * ─── POR QUE ISTO NÃO VINHA JUNTO NA LISTA ──────────────────────────────────
+ *
+ * O e-mail mora em `auth.users`; o telefone, em `patient_profiles.phone`. Duas
+ * fontes que a lista de pacientes do painel (`listMyPatients` /
+ * `getEngagementData`) não carrega — trazê-las para LÁ encareceria toda leitura
+ * da lista por um dado que só importa quando ele escolhe uma paciente no
+ * formulário de marcar consulta. Por isso é uma chamada à parte, feita só no
+ * clique.
+ *
+ * A resposta é editável na tela: um cadastro sem telefone, ou com o e-mail de
+ * outra pessoa, não pode travar o formulário — só deixa os campos como
+ * estavam, e o médico digita por cima.
+ */
+export const contatoDaPaciente = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), pacienteId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const scope = await requireScope(data.accessToken);
+    if (!scope) return { ok: false as const, error: "Sem permissão." };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    /* Mesmo recorte de `marcarConsultaNoDia`: o VÍNCULO é conferido antes de
+       ler qualquer coisa. Sem isto, um `pacienteId` qualquer no corpo do
+       pedido devolveria o e-mail e o telefone de qualquer paciente da
+       plataforma para qualquer médico assinante. */
+    const { data: prof } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("id, doctor_id, phone")
+      .eq("id", data.pacienteId)
+      .maybeSingle();
+    if (!prof) return { ok: false as const, error: "Paciente não encontrada." };
+    if (!scope.isTeam && prof.doctor_id !== scope.doctorId)
+      return { ok: false as const, error: "Paciente não é sua." };
+
+    const { data: u } = await supabaseAdmin.auth.admin.getUserById(data.pacienteId);
+    return {
+      ok: true as const,
+      email: u?.user?.email ?? null,
+      telefone: (prof.phone as string | null) ?? null,
+    };
   });
 
 const ProposeSchema = z.object({
@@ -758,14 +831,21 @@ const BroadcastSchema = z.object({
   accessToken: z.string().min(10),
   title: z.string().trim().min(2).max(80),
   body: z.string().trim().min(2).max(300),
+  /**
+   * Vazio/ausente = TODAS as pacientes (o comportamento de sempre).
+   * Presente = só estas — o filtro que faltava para "avisar as cinco de
+   * quinta-feira" sem incomodar as outras 195.
+   */
+  patientIds: z.array(z.string().uuid()).max(1000).optional(),
 });
 
 /**
- * Envio manual de notificação: o médico manda um aviso (push) pra TODAS as
- * próprias pacientes. Escopo multi-tenant — o assinante só alcança as pacientes
- * do próprio doctor_id; a equipe alcança todas. No-op se o push não estiver
- * configurado. É comunicação direta do médico, então não é silenciada pelo
- * Modo Cuidado (que só cala a gamificação do app, não a voz do médico).
+ * Envio manual de notificação: o médico manda um aviso (push) pra suas
+ * pacientes — todas, ou só as que ele escolher. Escopo multi-tenant — o
+ * assinante só alcança as pacientes do próprio doctor_id; a equipe alcança
+ * todas. No-op se o push não estiver configurado. É comunicação direta do
+ * médico, então não é silenciada pelo Modo Cuidado (que só cala a gamificação
+ * do app, não a voz do médico).
  */
 export const sendDoctorBroadcast = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => BroadcastSchema.parse(i))
@@ -781,7 +861,18 @@ export const sendDoctorBroadcast = createServerFn({ method: "POST" })
       (supabaseAdmin as any).from("patient_profiles").select("id"),
       scope,
     );
-    const ids = ((patients ?? []) as { id: string }[]).map((p) => p.id);
+    let ids = ((patients ?? []) as { id: string }[]).map((p) => p.id);
+
+    /* ─── A INTERSEÇÃO É O QUE MANTÉM O RECORTE MULTI-TENANT ────────────────
+       `ids` já é só quem é DESTE médico (`scopedBy`, acima). Filtrar por essa
+       lista — e não confiar direto em `data.patientIds` — é o que impede um
+       id forjado no corpo do pedido de mandar aviso para a paciente de outro
+       médico: ela nunca entra no conjunto de partida, então a interseção a
+       descarta sozinha, sem precisar de outra consulta. */
+    if (data.patientIds && data.patientIds.length > 0) {
+      const escolhidas = new Set(data.patientIds);
+      ids = ids.filter((id) => escolhidas.has(id));
+    }
 
     let sent = 0;
     for (const id of ids) {

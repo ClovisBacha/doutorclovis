@@ -45,7 +45,30 @@ export type EventoDaAgenda = {
   firme: boolean;
   /** `null` quando não há cobrança nenhuma associada. */
   pago: boolean | null;
+  /**
+   * Quanto tempo o compromisso ocupa, em minutos.
+   *
+   * Pedido do dono (ago/2026): "das 10h até as 11h, tem que ter o intervalo da
+   * consulta" — marcar só o INÍCIO deixava o calendário sem saber até quando o
+   * horário fica ocupado, e duas consultas próximas podiam ser marcadas sem o
+   * sistema perceber que colidem.
+   *
+   * SEMPRE presente, mesmo quando a fonte não guarda duração nenhuma
+   * (teleconsulta, particular, pedido antigo): cai em `DURACAO_PADRAO_MINUTOS`.
+   * Um campo opcional espalharia `?? 30` por cada lugar que lê `duracaoMinutos`
+   * — aqui a régua mora numa fonte só, na hora de montar o evento.
+   */
+  duracaoMinutos: number;
 };
+
+/**
+ * A duração assumida quando a fonte não guarda uma.
+ *
+ * Mesma faixa da grade de horários do médico (`doctor_slots.slot_minutes`,
+ * 5–240): 30 é o padrão de lá também, e as duas réguas concordarem evita que
+ * "meia hora" signifique coisas diferentes em duas telas do mesmo produto.
+ */
+export const DURACAO_PADRAO_MINUTOS = 30;
 
 /** As cores da legenda. Uma fonte só — a legenda e as bolinhas leem daqui. */
 export const CORES_DO_TIPO: Record<TipoDeEvento, { ponto: string; rotulo: string }> = {
@@ -77,6 +100,31 @@ export function horaLocal(iso: string): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** `HH:MM` → minutos desde a meia-noite. Exportada porque a tela do dia usa a
+    mesma conta para sugerir o "até" a partir do "das". */
+export function minutosDesdeMeiaNoite(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/** Minutos desde a meia-noite → `HH:MM`, sempre com dois dígitos. */
+export function horaDosMinutos(min: number): string {
+  const h = Math.floor(min / 60) % 24;
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * "10:00–10:30" — a faixa do compromisso, para quem já tem hora marcada.
+ *
+ * `null` sem hora: um evento sem hora não tem faixa nenhuma para mostrar, e
+ * inventar uma a partir só da duração pintaria um horário que ninguém marcou.
+ */
+export function faixaHoraria(e: Pick<EventoDaAgenda, "hora" | "duracaoMinutos">): string | null {
+  if (!e.hora) return null;
+  return `${e.hora}–${horaDosMinutos(minutosDesdeMeiaNoite(e.hora) + e.duracaoMinutos)}`;
 }
 
 /**
@@ -126,6 +174,9 @@ type PedidoBruto = {
   status?: string | null;
   payment_status?: string | null;
   reason?: string | null;
+  /** Em minutos. `null`/ausente = pedido antigo ou vindo da paciente, sem
+      duração combinada — cai em `DURACAO_PADRAO_MINUTOS`. */
+  duration_minutes?: number | null;
 };
 
 type TeleBruta = {
@@ -182,6 +233,8 @@ export function doPedido(p: PedidoBruto): EventoDaAgenda | null {
       (hora && !/^\d{1,2}:\d{2}$/.test(hora) ? hora : "Pedido"),
     firme: !!confirmada,
     pago: p.payment_status ? p.payment_status === "pago" : null,
+    duracaoMinutos:
+      p.duration_minutes && p.duration_minutes > 0 ? p.duration_minutes : DURACAO_PADRAO_MINUTOS,
   };
 }
 
@@ -207,6 +260,10 @@ export function daTeleconsulta(t: TeleBruta): EventoDaAgenda | null {
        sempre tem compromisso de verdade. */
     firme: true,
     pago: null,
+    /* A teleconsulta não guarda duração — a sala não tem hora de encerrar
+       marcada antes de existir. Cai no padrão, só para efeito de colisão com
+       o que for marcado por perto. */
+    duracaoMinutos: DURACAO_PADRAO_MINUTOS,
   };
 }
 
@@ -238,6 +295,7 @@ export function daParticular(c: ParticularBruta): EventoDaAgenda | null {
         situacao: pago ? "Paga" : "Marcada · a pagar",
         firme: true,
         pago,
+        duracaoMinutos: DURACAO_PADRAO_MINUTOS,
       };
     }
   }
@@ -261,6 +319,7 @@ export function daParticular(c: ParticularBruta): EventoDaAgenda | null {
         : "Aguardando pagamento",
     firme: false,
     pago,
+    duracaoMinutos: DURACAO_PADRAO_MINUTOS,
   };
 }
 
@@ -334,8 +393,13 @@ export type NovaConsulta = {
   tipo: "presencial" | "teleconsulta";
   nome: string;
   email: string;
+  /** Livre — quem não tem conta é marcada por telefone tanto quanto por e-mail. */
+  telefone: string;
   /** `HH:MM`. */
   hora: string;
+  /** Em minutos — o "das X até Y" da tela vira isto. 5 a 240, mesma faixa da
+      grade de horários do médico. */
+  duracaoMinutos: number;
   /** Quando é paciente vinculada; `null` para quem só tem e-mail. */
   pacienteId: string | null;
 };
@@ -353,7 +417,14 @@ export type NovaConsulta = {
  *
  * A ordem das checagens é a ordem em que ele preenche: tipo, quem, quando.
  */
-export function validarNovaConsulta(v: NovaConsulta, doDia: EventoDaAgenda[]): string | null {
+export function validarNovaConsulta(
+  v: NovaConsulta,
+  doDia: EventoDaAgenda[],
+  /* Injetável para o teste — sem isto, "horário no passado" só poderia ser
+     testado escrevendo uma data no passado toda vez que o arquivo rodasse,
+     e o teste apodreceria sozinho. */
+  agora: Date = new Date(),
+): string | null {
   if (v.tipo === "teleconsulta" && !v.pacienteId) {
     /* A sala de vídeo pendura na conta dela: é a conta que recebe o aviso, abre
        a sala e guarda a gravação. Marcar teleconsulta para um e-mail avulso
@@ -378,9 +449,37 @@ export function validarNovaConsulta(v: NovaConsulta, doDia: EventoDaAgenda[]): s
     return "Confira o e-mail — é por ele que o aviso vai.";
   }
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(v.hora.trim())) return "Escolha um horário válido.";
+  if (!Number.isInteger(v.duracaoMinutos) || v.duracaoMinutos < 5 || v.duracaoMinutos > 240) {
+    return "A duração precisa estar entre 5 minutos e 4 horas — confira o horário final.";
+  }
 
-  const ocupado = doDia.find((e) => e.firme && e.hora === v.hora.trim());
-  if (ocupado) return `Já tem ${ocupado.titulo} às ${ocupado.hora} nesse dia.`;
+  /* ─── NADA NO PASSADO ──────────────────────────────────────────────────────
+     Comparar o INSTANTE (dia + hora), e não só o dia: um dia inteiro atrás tem
+     toda hora dentro dele no passado, e HOJE só as horas depois de agora
+     continuam livres — a mesma checagem cobre os dois casos.
+     `new Date("YYYY-MM-DDTHH:MM:00")` é lido como hora LOCAL (a regra do
+     ECMAScript; só a forma "só data" é UTC), então não há conversão de fuso
+     escondida aqui. */
+  const instante = new Date(`${v.dia}T${v.hora.trim()}:00`);
+  if (!Number.isNaN(instante.getTime()) && instante.getTime() < agora.getTime()) {
+    return "Esse horário já passou — escolha um horário a partir de agora.";
+  }
+
+  /* ─── O CHOQUE É DE FAIXA, NÃO DE INSTANTE ─────────────────────────────────
+     Duas consultas de 30 minutos às 10:00 e 10:15 não têm o MESMO horário, e a
+     checagem antiga (`e.hora === v.hora`) deixava passar — colidem mesmo
+     assim, porque a segunda começa dentro da primeira. */
+  const inicioNovo = minutosDesdeMeiaNoite(v.hora.trim());
+  const fimNovo = inicioNovo + v.duracaoMinutos;
+  const ocupado = doDia.find((e) => {
+    if (!e.firme || !e.hora) return false;
+    const inicioExistente = minutosDesdeMeiaNoite(e.hora);
+    const fimExistente = inicioExistente + e.duracaoMinutos;
+    return inicioNovo < fimExistente && inicioExistente < fimNovo;
+  });
+  if (ocupado) {
+    return `Já tem ${ocupado.titulo} às ${faixaHoraria(ocupado)} nesse dia.`;
+  }
   return null;
 }
 

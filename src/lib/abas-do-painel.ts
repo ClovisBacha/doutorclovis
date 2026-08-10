@@ -117,7 +117,7 @@ export const GRUPOS: readonly GrupoDeAbas[] = [
      uma continua inteira, com os botões que sempre teve. Pedido do dono: "não
      vai existir mais essa questão de agendamentos e teleconsultas em cima, vai
      ser tudo focado no calendário". */
-  { chave: "agenda", rotulo: "Agenda 📅", filhas: ["Calendário"] },
+  { chave: "agenda", rotulo: "Calendário 📅", filhas: ["Calendário"] },
 ] as const;
 
 /**

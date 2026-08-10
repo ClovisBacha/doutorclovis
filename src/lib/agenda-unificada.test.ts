@@ -8,11 +8,15 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  DURACAO_PADRAO_MINUTOS,
   celasDoMes,
   daParticular,
   daTeleconsulta,
   diaLocal,
   doPedido,
+  faixaHoraria,
+  horaDosMinutos,
+  minutosDesdeMeiaNoite,
   montarAgenda,
   porDia,
 } from "./agenda-unificada";
@@ -55,6 +59,28 @@ describe("1. o pedido de consulta", () => {
 
   test("sem data nenhuma, não entra no calendário", () => {
     expect(doPedido({ id: "d", status: "pending" })).toBeNull();
+  });
+
+  test("sem `duration_minutes`, cai no padrão", () => {
+    /* A maioria dos pedidos é da paciente e nunca combinou duração — o padrão
+       é o que faz o choque de horário funcionar mesmo assim. */
+    expect(doPedido({ id: "h", preferred_date: "2026-08-03" })!.duracaoMinutos).toBe(
+      DURACAO_PADRAO_MINUTOS,
+    );
+  });
+
+  test("com `duration_minutes`, usa o valor combinado", () => {
+    const e = doPedido({ id: "i", preferred_date: "2026-08-03", duration_minutes: 60 })!;
+    expect(e.duracaoMinutos).toBe(60);
+  });
+
+  test("`duration_minutes` zero ou negativo (linha corrompida) cai no padrão", () => {
+    /* Zero minutos não é uma consulta — é um valor que não devia ter chegado
+       aqui, e tratá-lo como válido faria essa consulta nunca colidir com
+       nada. */
+    expect(
+      doPedido({ id: "j", preferred_date: "2026-08-03", duration_minutes: 0 })!.duracaoMinutos,
+    ).toBe(DURACAO_PADRAO_MINUTOS);
   });
 
   test("o estado do pagamento vem junto — é o que ele quer ver ao abrir", () => {
@@ -164,5 +190,25 @@ describe("5. a grade do mês", () => {
   test("fevereiro de ano bissexto tem os 29", () => {
     const celas = celasDoMes(2024, 1).filter((c) => c.doMes);
     expect(celas.length).toBe(29);
+  });
+});
+
+describe("6. minutos e faixa horária", () => {
+  test("HH:MM vai e volta", () => {
+    expect(minutosDesdeMeiaNoite("00:00")).toBe(0);
+    expect(minutosDesdeMeiaNoite("10:30")).toBe(630);
+    expect(minutosDesdeMeiaNoite("23:59")).toBe(1439);
+    expect(horaDosMinutos(0)).toBe("00:00");
+    expect(horaDosMinutos(630)).toBe("10:30");
+    expect(horaDosMinutos(1439)).toBe("23:59");
+  });
+
+  test("faixaHoraria soma a duração ao início", () => {
+    expect(faixaHoraria({ hora: "10:00", duracaoMinutos: 30 })).toBe("10:00–10:30");
+    expect(faixaHoraria({ hora: "23:45", duracaoMinutos: 30 })).toBe("23:45–00:15");
+  });
+
+  test("sem hora, não há faixa — não inventa uma a partir só da duração", () => {
+    expect(faixaHoraria({ hora: null, duracaoMinutos: 30 })).toBeNull();
   });
 });

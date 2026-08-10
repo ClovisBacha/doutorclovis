@@ -291,6 +291,54 @@ Calendário é a tela, e as três listas viraram seções abaixo dele, inteiras.
 - **Cores:** 🟢 presencial, 🟠 teleconsulta, 🟣 particular (`CORES_DO_TIPO`).
   O que não tem hora combinada aparece tracejado.
 
+### Duração, contato automático e passado bloqueado (ago/2026)
+
+O calendário virou a agenda inteira; faltavam três coisas para marcar direto
+por ele: duração real, telefone da paciente e não deixar marcar no passado.
+
+- **`duracaoMinutos` é campo próprio** (`EventoDaAgenda.duracaoMinutos`,
+  coluna `duration_minutes` em `appointment_requests`,
+  `supabase/APLICAR_DURACAO_DA_CONSULTA.sql`), não um segundo horário em texto
+  — é a mesma lição do `confirmed_time` aceitar "manhã" que já custou três
+  horas aqui. `faixaHoraria` (`agenda-unificada.ts`) formata "10:00–10:30" a
+  partir de `hora` + `duracaoMinutos`; nunca duas colunas de hora.
+- **O choque de horário compara FAIXA, não instante exato.** `validarNovaConsulta`
+  (cliente) e `marcarConsultaNoDia` (servidor, `admin.functions.ts`) leem o
+  dia inteiro e testam sobreposição de intervalo
+  (`inicioNovo < fimExistente && inicioExistente < fimNovo`) — a checagem
+  antiga por igualdade de minuto deixava passar uma consulta de 30 min que
+  começa 15 minutos depois de outra. As DUAS colunas novas
+  (`patient_user_id`, `duration_minutes`) têm recuo próprio contra
+  `PGRST204`, uma de cada vez — um recuo que só soubesse tirar a primeira
+  quebraria de novo assim que a segunda faltasse num banco que só rodou meio
+  SQL.
+- **Nada no passado.** `validarNovaConsulta` ganhou um terceiro parâmetro
+  (`agora: Date`) e recusa qualquer `dia+hora` anterior a ele — cobre "o dia
+  inteiro já passou" e "é hoje, mas a hora já passou" com a mesma comparação,
+  sem fuso: `datetime-local` já devolve hora local, e `new Date("YYYY-MM-DDTHH:MM:00")`
+  é lida como local pelo ECMAScript.
+- **`contatoDaPaciente`** (`admin.functions.ts`) resolve e-mail (de
+  `auth.users`, só o servidor lê) e telefone (`patient_profiles.phone`) da
+  paciente escolhida no formulário de `DiaDaAgenda`, confirmando o vínculo
+  ATUAL antes — nunca antes de conferir, ou qualquer `pacienteId` forjado no
+  pedido devolveria o contato de qualquer paciente da plataforma. Um
+  `useRef` descarta resposta atrasada se a paciente escolhida mudar no meio
+  da busca.
+- **A aba virou "Calendário 📅"** (`abas-do-painel.ts`), e o `CalendarioDoMes`
+  é o primeiro elemento do corpo da aba — as três seções (Pedidos,
+  Teleconsultas, Particulares) continuam abaixo, inteiras.
+- **O título duplicado de Teleconsultas** (a seção externa e o componente
+  interno mostravam "Teleconsultas" duas vezes) virou um só, na seção
+  externa — o texto sobre pré-consulta e nota clínica com IA foi para lá
+  também, para não perder a informação.
+- **`sendDoctorBroadcast` ganhou filtro por paciente** (`patientIds`
+  opcional em `BroadcastSchema`): sem ele, manda para todas, como sempre;
+  com ele, o `ids` já recortado pelo médico (`scopedBy`) é **interseção**
+  com o `Set` de escolhidas — nunca `ids = data.patientIds` direto, ou um id
+  forjado no corpo do pedido mandaria aviso a paciente de outro médico.
+  Testado em `agenda-servidor.test.ts`.
+- **Aplicar no Supabase:** `supabase/APLICAR_DURACAO_DA_CONSULTA.sql`.
+
 ### Lembretes de consulta (24 h e 4 h) — ago/2026
 
 Falta em consultório de alto risco é vaga perdida duas vezes: o médico fica com

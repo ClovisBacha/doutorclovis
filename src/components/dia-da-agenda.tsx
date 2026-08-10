@@ -1,7 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   CORES_DO_TIPO,
+  diaLocal,
+  faixaHoraria,
+  horaDosMinutos,
+  minutosDesdeMeiaNoite,
   resumoDoDia,
   validarNovaConsulta,
   type EventoDaAgenda,
@@ -23,7 +27,7 @@ import {
  * eu já acrescentar o que eu quero, e se possível ali dentro eu já consigo
  * enviar pra pessoa o link naquele determinado dia".
  *
- * ─── AS TRÊS DECISÕES ───────────────────────────────────────────────────────
+ * ─── AS CINCO DECISÕES ──────────────────────────────────────────────────────
  *
  * **A paciente pode não ter conta.** O campo de e-mail é livre e a lista de
  * pacientes vinculadas é um atalho que o preenche. É o consultório fazendo a
@@ -32,12 +36,21 @@ import {
  *
  * **Teleconsulta é a exceção, e ela é dita.** A sala de vídeo pendura na conta
  * dela: é a conta que recebe o aviso, abre a sala e guarda o registro. Marcar
- * por e-mail avulso criaria uma sala sem dono do outro lado, e o médico só
- * descobriria na hora. A régua está em `validarNovaConsulta`, testada.
+ * por e-mail avulso criaria uma sala sem dono do outro lado. A régua está em
+ * `validarNovaConsulta`, testada.
  *
- * **O choque de horário aparece antes de mandar**, com o nome de quem já está
- * lá. O servidor recusaria de qualquer jeito — ele tem o índice único do slot —
- * mas devolveria "horário ocupado" sem dizer de quem.
+ * **O e-mail e o telefone vêm do CADASTRO**, assim que ele escolhe a paciente
+ * — `aoBuscarContato`, ago/2026. Antes o campo ficava em branco com uma
+ * promessa ("usaremos o e-mail do cadastro"); agora ele VÊ o contato e corrige
+ * se estiver errado, em vez de confiar num resolvedor invisível.
+ *
+ * **"Das" e "Até", não um "Horário" solto.** Pedido do dono: "das 10h até as
+ * 11h, tem que ter o intervalo da consulta" — a duração é o que faz o choque
+ * de horário enxergar uma consulta que começa NO MEIO de outra.
+ *
+ * **Nada no passado.** Um dia inteiro atrás não tem o que marcar; hoje, só as
+ * horas à frente de agora. `validarNovaConsulta` é o backstop; aqui é só a
+ * conveniência de não oferecer o que já não serve.
  */
 
 export type PacienteDoSelect = {
@@ -46,12 +59,24 @@ export type PacienteDoSelect = {
   email: string | null;
 };
 
+/** O contato que vem do cadastro dela, ao escolher na lista. */
+export type ContatoDaPaciente = { email: string | null; telefone: string | null };
+
+/** O próximo múltiplo de 5 minutos, para o horário default não nascer "agora
+    mesmo" e virar passado no instante em que ele termina de ler a tela. */
+function proximoQuartoDeHora(d: Date): string {
+  const min = d.getHours() * 60 + d.getMinutes();
+  const arredondado = Math.ceil(min / 5) * 5;
+  return horaDosMinutos(arredondado);
+}
+
 export function DiaDaAgenda({
   dia,
   eventos,
   pacientes,
   aoMarcar,
   aoEnviarLink,
+  aoBuscarContato,
   onFechar,
 }: {
   /** `YYYY-MM-DD`. */
@@ -62,16 +87,29 @@ export function DiaDaAgenda({
   aoMarcar: (v: NovaConsulta) => Promise<{ ok: boolean; erro?: string; avisou?: boolean }>;
   /** Abre a sala e manda o convite. `null` quando o evento não tem sala. */
   aoEnviarLink?: (evento: EventoDaAgenda) => Promise<{ ok: boolean; erro?: string }>;
+  /** Busca e-mail e telefone do cadastro dela. Sem isto, os dois campos ficam
+      em branco e editáveis, como sempre foram. */
+  aoBuscarContato?: (pacienteId: string) => Promise<ContatoDaPaciente>;
   onFechar: () => void;
 }) {
+  /* "Agora" é lido uma vez, na abertura — não a cada render. Um relógio que
+     anda sozinho reabriria a validação a cada minuto e moveria o chão debaixo
+     do médico enquanto ele digita. */
+  const [agora] = useState(() => new Date());
+  const diaEhHoje = dia === diaLocal(agora);
+  const diaJaPassou = dia < diaLocal(agora);
+
   const [abrindoForm, setAbrindoForm] = useState(false);
   const [tipo, setTipo] = useState<"presencial" | "teleconsulta">("presencial");
   const [pacienteId, setPacienteId] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
-  const [hora, setHora] = useState("09:00");
+  const [telefone, setTelefone] = useState("");
+  const [hora, setHora] = useState(() => (diaEhHoje ? proximoQuartoDeHora(agora) : "09:00"));
+  const [duracaoMinutos, setDuracaoMinutos] = useState(30);
   const [salvando, setSalvando] = useState(false);
   const [enviandoLink, setEnviandoLink] = useState<string | null>(null);
+  const [buscandoContato, setBuscandoContato] = useState(false);
 
   const titulo = useMemo(
     () =>
@@ -83,22 +121,46 @@ export function DiaDaAgenda({
     [dia],
   );
 
-  const nova: NovaConsulta = { dia, tipo, nome, email, hora, pacienteId };
+  /* "Até" é DERIVADO de hora + duração, não um terceiro estado independente.
+     Mudar o "Das" preserva a duração que ele já escolheu — trocar o início de
+     uma consulta de 45 min não devia resetar para 30. */
+  const horaFim = horaDosMinutos(minutosDesdeMeiaNoite(hora) + duracaoMinutos);
+
+  const nova: NovaConsulta = { dia, tipo, nome, email, telefone, hora, duracaoMinutos, pacienteId };
   /* O erro é calculado a cada tecla, mas só é MOSTRADO depois que ele tenta
      mandar: uma mensagem vermelha aparecendo enquanto ele digita a primeira
      letra do nome ensina a ignorar o vermelho. */
-  const erro = validarNovaConsulta(nova, eventos);
+  const erro = validarNovaConsulta(nova, eventos, agora);
   const [tentou, setTentou] = useState(false);
+
+  /* Contra a corrida: ele clica em Ana, o pedido de contato ainda está no ar,
+     ele clica em Beatriz — a resposta de Ana chegando depois não pode
+     sobrescrever os campos que agora são da Beatriz. */
+  const pedidoAtual = useRef(0);
 
   function escolherPaciente(id: string) {
     const p = pacientes.find((x) => x.id === id);
     setPacienteId(id || null);
-    if (p) {
-      setNome(p.nome);
-      /* E-mail em branco no cadastro acontece. Preencher com "" e deixar o
-         campo editável é melhor que travar: ele digita o que tiver. */
-      setEmail(p.email ?? "");
-    }
+    if (!p) return;
+    setNome(p.nome);
+    setEmail(p.email ?? "");
+
+    if (!aoBuscarContato) return;
+    const meuPedido = ++pedidoAtual.current;
+    setBuscandoContato(true);
+    aoBuscarContato(id)
+      .then((contato) => {
+        if (pedidoAtual.current !== meuPedido) return; // outra paciente foi escolhida entretanto
+        if (contato.email) setEmail(contato.email);
+        if (contato.telefone) setTelefone(contato.telefone);
+      })
+      .catch(() => {
+        /* Cadastro sem telefone, ou a busca falhou: os campos ficam como
+           estavam, editáveis — igual a antes desta busca existir. */
+      })
+      .finally(() => {
+        if (pedidoAtual.current === meuPedido) setBuscandoContato(false);
+      });
   }
 
   async function marcar() {
@@ -120,6 +182,7 @@ export function DiaDaAgenda({
       setAbrindoForm(false);
       setNome("");
       setEmail("");
+      setTelefone("");
       setPacienteId(null);
     } finally {
       setSalvando(false);
@@ -169,7 +232,9 @@ export function DiaDaAgenda({
                       aria-hidden
                     />
                     <span className="font-semibold tabular-nums">
-                      {e.hora ?? (e.firme ? "—" : "a combinar")}
+                      {/* Faixa completa (10:00–10:30) quando há hora — é o
+                          intervalo, não só o instante em que começa. */}
+                      {faixaHoraria(e) ?? (e.firme ? "—" : "a combinar")}
                     </span>
                     <span className="font-medium">{e.titulo}</span>
                     <span className="text-xs text-muted-foreground">
@@ -213,7 +278,13 @@ export function DiaDaAgenda({
           )}
 
           {/* ── Marcar ── */}
-          {!abrindoForm ? (
+          {diaJaPassou ? (
+            /* Dia inteiro no passado: não há o que oferecer para marcar. O
+               resto da tela — o que já aconteceu — continua de leitura. */
+            <p className="mt-4 rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+              Este dia já passou — não dá para marcar consulta nele.
+            </p>
+          ) : !abrindoForm ? (
             <button
               onClick={() => setAbrindoForm(true)}
               className="press mt-4 w-full rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 py-3 text-sm font-semibold text-primary hover:border-primary"
@@ -278,22 +349,49 @@ export function DiaDaAgenda({
                     className="mt-1 w-full rounded-xl border border-border bg-background px-2.5 py-2 text-sm"
                   />
                 </label>
-                <label className="block">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Horário
-                  </span>
-                  <input
-                    type="time"
-                    value={hora}
-                    onChange={(e) => setHora(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-border bg-background px-2.5 py-2 text-sm tabular-nums"
-                  />
-                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Das
+                    </span>
+                    <input
+                      type="time"
+                      value={hora}
+                      /* Só HOJE ganha piso — dias futuros não têm hora
+                         "passada" nenhuma para recusar. O navegador é só
+                         conveniência; quem barra de verdade é a validação. */
+                      min={diaEhHoje ? proximoQuartoDeHora(agora) : undefined}
+                      onChange={(e) => setHora(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-2 text-sm tabular-nums"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Até
+                    </span>
+                    <input
+                      type="time"
+                      value={horaFim}
+                      onChange={(e) => {
+                        /* A duração é o que persiste; "até" é só a forma de
+                           editá-la. Um "até" antes do "das" não pode virar
+                           duração negativa — vira 5 min, o piso da faixa. */
+                        const min = Math.max(
+                          5,
+                          minutosDesdeMeiaNoite(e.target.value) - minutosDesdeMeiaNoite(hora),
+                        );
+                        setDuracaoMinutos(min);
+                      }}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-2 py-2 text-sm tabular-nums"
+                    />
+                  </label>
+                </div>
               </div>
 
               <label className="mt-3 block">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                   E-mail {pacienteId ? "(opcional)" : "— é por ele que o aviso vai"}
+                  {buscandoContato && " · buscando do cadastro…"}
                 </span>
                 <input
                   type="email"
@@ -302,6 +400,19 @@ export function DiaDaAgenda({
                   placeholder={
                     pacienteId ? "Usaremos o e-mail do cadastro dela" : "paciente@email.com"
                   }
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-2.5 py-2 text-sm"
+                />
+              </label>
+
+              <label className="mt-3 block">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Telefone (opcional)
+                </span>
+                <input
+                  type="tel"
+                  value={telefone}
+                  onChange={(e) => setTelefone(e.target.value)}
+                  placeholder={pacienteId ? "Do cadastro dela, se tiver" : "(00) 00000-0000"}
                   className="mt-1 w-full rounded-xl border border-border bg-background px-2.5 py-2 text-sm"
                 />
               </label>

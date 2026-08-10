@@ -3,13 +3,14 @@ import {
   CORES_DO_TIPO,
   celasDoMes,
   diaLocal,
+  faixaHoraria,
   porDia,
   resumoDoDia,
   type EventoDaAgenda,
   type NovaConsulta,
   type TipoDeEvento,
 } from "@/lib/agenda-unificada";
-import { DiaDaAgenda, type PacienteDoSelect } from "./dia-da-agenda";
+import { DiaDaAgenda, type ContatoDaPaciente, type PacienteDoSelect } from "./dia-da-agenda";
 
 /**
  * O CALENDÁRIO DO MÊS — um só, com tudo dentro.
@@ -39,6 +40,7 @@ export function CalendarioDoMes({
   pacientes = [],
   aoMarcar,
   aoEnviarLink,
+  aoBuscarContato,
   className = "",
 }: {
   eventos: EventoDaAgenda[];
@@ -47,6 +49,8 @@ export function CalendarioDoMes({
   /** Quando existe, clicar num dia abre a tela grande com o formulário. */
   aoMarcar?: (v: NovaConsulta) => Promise<{ ok: boolean; erro?: string; avisou?: boolean }>;
   aoEnviarLink?: (evento: EventoDaAgenda) => Promise<{ ok: boolean; erro?: string }>;
+  /** Busca e-mail e telefone do cadastro da paciente escolhida no formulário. */
+  aoBuscarContato?: (pacienteId: string) => Promise<ContatoDaPaciente>;
   className?: string;
 }) {
   const hoje = new Date();
@@ -215,7 +219,7 @@ export function CalendarioDoMes({
               >
                 <span className={`h-2 w-2 shrink-0 rounded-full ${CORES_DO_TIPO[e.tipo].ponto}`} />
                 <span className="font-medium tabular-nums">
-                  {e.hora ?? (e.firme ? "—" : "a combinar")}
+                  {faixaHoraria(e) ?? (e.firme ? "—" : "a combinar")}
                 </span>
                 <span className="font-medium">{e.titulo}</span>
                 <span className="text-xs text-muted-foreground">{e.situacao}</span>
@@ -248,6 +252,7 @@ export function CalendarioDoMes({
           pacientes={pacientes}
           aoMarcar={aoMarcar}
           aoEnviarLink={aoEnviarLink}
+          aoBuscarContato={aoBuscarContato}
           onFechar={() => setDiaEmTela(null)}
         />
       )}

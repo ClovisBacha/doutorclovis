@@ -9,6 +9,7 @@ import {
   getPatientReport,
   markPreConsultaSeen,
   marcarConsultaNoDia,
+  contatoDaPaciente,
   setQuestionAnswered,
   updateAppointmentStatus,
   confirmAppointment,
@@ -1306,40 +1307,45 @@ function PainelPage() {
         )}
         {tab === "Calendário" && (
           <div className="space-y-10">
-            {/* A conexão com o Google fica NA AGENDA, e não em Meu Perfil.
-                É ela que decide se a teleconsulta vira um evento no Google
-                Agenda com sala do Meet e convite para as duas — a diferença
-                entre o link chegar sozinho e o médico ter de mandá-lo. */}
-            <GoogleCalendarCard tokenFn={token} />
-            {/* A grade de horários fica na AGENDA, e logo abaixo da conexão do
-                Google: as duas respondem "quando eu atendo" — uma para o meu
-                calendário, outra para o app da paciente. */}
-            <GradeDeHorarios tokenFn={token} />
-            /* ─── UM CALENDÁRIO SÓ, COM AS TRÊS FONTES ──────────────────────── Era uma faixa de
-            SETE dias que só conhecia `appointments`. O médico via a consulta presencial aqui e a
-            teleconsulta do mesmo dia noutra aba — e nenhuma das duas respondia "como está o meu
-            mês". O merge e a régua de "que dia é isto" moram em `agenda-unificada`, sem JSX: é lá
-            que estão as decisões difíceis (a data combinada ganha da preferida, nas três fontes;
-            particular ainda sem horário entra como preferência), e é lá que elas são testadas. */
+            {/* ─── O CALENDÁRIO VEM PRIMEIRO ───────────────────────────────
+                Era uma faixa de SETE dias que só conhecia `appointments`. O
+                médico via a consulta presencial aqui e a teleconsulta do
+                mesmo dia noutra aba — e nenhuma das duas respondia "como está
+                o meu mês". O merge e a régua de "que dia é isto" moram em
+                `agenda-unificada`, sem JSX: é lá que estão as decisões
+                difíceis (a data combinada ganha da preferida, nas três
+                fontes; particular ainda sem horário entra como preferência),
+                e é lá que elas são testadas.
+
+                Pedido do dono: "esse calendário tem que ser o primeiro
+                elemento da aba" — a conexão com o Google e a grade de
+                horários, que também respondem "quando eu atendo", vêm logo
+                abaixo, e não antes dele. */}
             <CalendarioDoMes
               eventos={montarAgenda({
                 pedidos: appointments as never[],
                 teleconsultas: teleconsultas as never[],
                 particulares: privateConsults as never[],
               })}
-              /* O atalho "é paciente do app": preenche nome e e-mail. A lista
-                 vem do engajamento, que é a mesma fonte dos outros seletores de
-                 paciente do painel — duas listas de pacientes divergiriam. */
-              /* Sem e-mail de propósito: ele mora em `auth.users` e nenhuma
-                 lista do painel o carrega. Escolher a paciente manda o `id`, e
-                 o servidor resolve o e-mail do cadastro — o campo da tela fica
-                 em branco e é opcional nesse caso. Preenchê-lo com "" fingindo
-                 que veio do banco faria o médico achar que ela não tem e-mail. */
+              /* O atalho "é paciente do app": preenche nome. E-mail e
+                 telefone vêm de `aoBuscarContato`, buscados no clique — nem
+                 um nem outro moram nesta lista (o e-mail está em
+                 `auth.users`; o telefone, num select que encareceria TODA
+                 leitura da lista de pacientes por um dado que só importa
+                 aqui). */
               pacientes={(engagement?.patients ?? []).map((p) => ({
                 id: p.id,
                 nome: p.display_name ?? "Paciente",
                 email: null,
               }))}
+              aoBuscarContato={async (pacienteId) => {
+                const r = await contatoDaPaciente({
+                  data: { accessToken: await token(), pacienteId },
+                });
+                return r.ok
+                  ? { email: r.email, telefone: r.telefone }
+                  : { email: null, telefone: null };
+              }}
               aoMarcar={async (v) => {
                 const tk = await token();
                 if (v.tipo === "teleconsulta") {
@@ -1370,9 +1376,13 @@ function PainelPage() {
                     /* Quem é ela — o servidor usa isto para pegar o e-mail do
                        cadastro (que só ele enxerga) e para conferir o vínculo. */
                     pacienteId: v.pacienteId,
-                    telefone: "",
+                    telefone: v.telefone.trim(),
                     motivo: "",
                     precoBrl: null,
+                    /* "Das X até Y" virou minutos na tela; o servidor guarda a
+                       duração e usa a MESMA régua para achar choque de FAIXA,
+                       não só de minuto exato. */
+                    duracaoMinutos: v.duracaoMinutos,
                   },
                 });
                 await load(true);
@@ -1401,6 +1411,15 @@ function PainelPage() {
                 return { ok: r.ok, erro: r.ok ? undefined : r.error };
               }}
             />
+            {/* A conexão com o Google fica NA AGENDA, e não em Meu Perfil.
+                É ela que decide se a teleconsulta vira um evento no Google
+                Agenda com sala do Meet e convite para as duas — a diferença
+                entre o link chegar sozinho e o médico ter de mandá-lo. */}
+            <GoogleCalendarCard tokenFn={token} />
+            {/* A grade de horários fica na AGENDA, logo abaixo da conexão do
+                Google: as duas respondem "quando eu atendo" — uma para o meu
+                calendário, outra para o app da paciente. */}
+            <GradeDeHorarios tokenFn={token} />
             <section>
               <h2 className="font-serif text-xl">Pedidos de consulta</h2>
               <p className="mb-4 mt-1 text-sm text-muted-foreground">
@@ -1414,12 +1433,13 @@ function PainelPage() {
                 medico={euMedico}
               />
               <WaitlistSection />
-              <BroadcastSection />
+              <BroadcastSection pacientes={engagement?.patients ?? []} />
             </section>
             <section>
               <h2 className="font-serif text-xl">Teleconsultas</h2>
               <p className="mb-4 mt-1 text-sm text-muted-foreground">
-                As salas de vídeo. Abrir a sala manda o convite com o link para ela e para você.
+                As salas de vídeo. Abrir a sala manda o convite com o link para ela e para você — a
+                pré-consulta dela e a nota clínica com IA ficam dentro de cada sessão.
               </p>
               <TeleconsultasSection
                 sessions={teleconsultas}
@@ -2415,21 +2435,57 @@ function DashboardSkeleton() {
 }
 
 /* ---------- Aviso por push (envio manual) ---------- */
-function BroadcastSection() {
+/**
+ * ENVIAR AVISO — para todas, ou para quem ele escolher.
+ *
+ * Pedido do dono (ago/2026): um filtro para "as pacientes de quinta-feira",
+ * sem incomodar as outras cento e noventa e cinco. Antes disso o único jeito
+ * era mandar para TODAS — e um recado sobre um horário específico virava
+ * notificação para quem nem tinha aquela consulta.
+ */
+function BroadcastSection({ pacientes }: { pacientes: PatientEngagement[] }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [modo, setModo] = useState<"todas" | "selecionar">("todas");
+  const [busca, setBusca] = useState("");
+  const [escolhidas, setEscolhidas] = useState<Set<string>>(new Set());
+
+  const filtradas = filtrarPacientes(pacientes, busca);
+
+  function alternar(id: string) {
+    setEscolhidas((s) => {
+      const novo = new Set(s);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  }
 
   async function send() {
     if (title.trim().length < 2 || body.trim().length < 2) {
       toast("Escreva um título e uma mensagem.");
       return;
     }
-    if (!confirm("Enviar este aviso por notificação para as suas pacientes?")) return;
+    /* No modo "selecionar", zero marcada não é "todas" por omissão — seria o
+       oposto do que ele pediu: uma tela que promete "só estas" mandando para
+       o consultório inteiro por engano. */
+    if (modo === "selecionar" && escolhidas.size === 0) {
+      toast('Escolha ao menos uma paciente, ou volte para "Todas".');
+      return;
+    }
+    const paraQuem =
+      modo === "todas" ? "todas as suas pacientes" : `${escolhidas.size} paciente(s) escolhida(s)`;
+    if (!confirm(`Enviar este aviso por notificação para ${paraQuem}?`)) return;
     setSending(true);
     try {
       const res = await sendDoctorBroadcast({
-        data: { accessToken: await token(), title: title.trim(), body: body.trim() },
+        data: {
+          accessToken: await token(),
+          title: title.trim(),
+          body: body.trim(),
+          patientIds: modo === "selecionar" ? [...escolhidas] : undefined,
+        },
       });
       if (res.ok) {
         toast.success(
@@ -2439,6 +2495,7 @@ function BroadcastSection() {
         );
         setTitle("");
         setBody("");
+        setEscolhidas(new Set());
       } else {
         toast.error(res.error || "Não consegui enviar agora.");
       }
@@ -2451,9 +2508,62 @@ function BroadcastSection() {
     <div className="rounded-3xl border border-border bg-card p-6">
       <p className="font-serif text-lg">Enviar aviso às pacientes</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        Manda uma notificação (push) para as suas pacientes que ativaram os lembretes. Ótimo para
-        recados como mudança de horário do consultório.
+        Manda uma notificação (push) para quem ativou os lembretes. Ótimo para recados como mudança
+        de horário do consultório — ou só para quem tem consulta numa data específica.
       </p>
+
+      {/* ── Para quem ── */}
+      <div className="mt-4 flex gap-2">
+        {(["todas", "selecionar"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setModo(m)}
+            className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              modo === m
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground"
+            }`}
+          >
+            {m === "todas"
+              ? "Todas as pacientes"
+              : `Selecionar${escolhidas.size ? ` (${escolhidas.size})` : ""}`}
+          </button>
+        ))}
+      </div>
+
+      {modo === "selecionar" && (
+        <div className="mt-3 rounded-2xl border border-border bg-background p-3">
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar pelo nome…"
+            className="w-full rounded-xl border border-border bg-card px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          />
+          <div className="mt-2 max-h-48 overflow-y-auto">
+            {filtradas.length === 0 ? (
+              <p className="p-2 text-[13px] text-muted-foreground">
+                Nenhuma paciente com esse nome.
+              </p>
+            ) : (
+              filtradas.map((p) => (
+                <label
+                  key={p.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-secondary/60"
+                >
+                  <input
+                    type="checkbox"
+                    checked={escolhidas.has(p.id)}
+                    onChange={() => alternar(p.id)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  {p.display_name?.trim() || "Sem nome"}
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 space-y-3">
         <input
           value={title}
@@ -4113,13 +4223,11 @@ function TeleconsultasSection({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-serif text-2xl">Teleconsultas</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Abra a sala de vídeo, veja a pré-consulta da paciente e gere a nota clínica com IA.
-          </p>
-        </div>
+      {/* Sem título próprio: a seção que chama este componente (`painel.tsx`,
+          aba Calendário) já tem "Teleconsultas" + a mesma frase de subtítulo
+          logo acima — um segundo título aqui duplicava as duas linhas na
+          tela, uma embaixo da outra. */}
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setShowForm((v) => !v)}
           className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground"
