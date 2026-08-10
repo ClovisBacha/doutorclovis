@@ -6730,7 +6730,25 @@ function WellnessScreen({
                     boxShadow: `inset 0 1px 0 ${vidroLuz}, 0 18px 40px -22px rgba(60,40,70,0.5)`,
                   }}
                 >
-                  <p className="text-[15px] leading-[1.5]" style={{ color: tinta }}>
+                  {/* ─── CENTRADO, E COM AS LINHAS EQUILIBRADAS ──────────
+                      A caixa está no eixo da tela (medido: centro em 215, o
+                      mesmo da tela); o que lia como torto era o TEXTO dentro
+                      dela. O balão tem largura FIXA de 257px, herdada da arte
+                      de referência, mas os recados novos são curtos: alinhado à
+                      esquerda, um texto de três linhas medindo 155, 156 e 193
+                      numa coluna de 215 deixava um vão só do lado direito, e a
+                      mancha do texto ficava à esquerda do meio do balão.
+
+                      `text-center` devolve a simetria, e `text-balance` evita o
+                      outro defeito que aparece assim que se centra: duas linhas
+                      cheias e uma última com duas palavras soltas no meio.
+                      Balão de fala centrado também é o que se lê em qualquer
+                      história em quadrinhos — o alinhamento à esquerda só
+                      funcionava porque o texto da referência enchia a caixa. */}
+                  <p
+                    className="text-center text-[15px] leading-[1.5] [text-wrap:balance]"
+                    style={{ color: tinta }}
+                  >
                     {recadoDoDia}
                   </p>
                 </div>
