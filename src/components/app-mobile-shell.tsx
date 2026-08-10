@@ -25,6 +25,7 @@ import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyRain, forcaDaChuva } from "@/components/sky-rain";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
 import { CeuDoDia, ceuPelaHora, ceuPeloSol } from "@/components/ceu-do-dia";
+import { CeuEfeitos } from "@/components/ceu-efeitos";
 import { babyForWeek } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
@@ -1061,7 +1062,15 @@ export function AppHomeScreen({
         {/* A CENA DO MOMENTO — amanhecer, dia, pôr do sol ou anoitecer.
             `dc-sky-breathe` dá o zoom lento que faz o céu parecer vivo; o SVG
             já nasce em `slice`, então a folga do zoom nunca revela borda. */}
-        {!ceuClassico && <CeuDoDia nome={slot.nome} className="dc-sky-breathe" />}
+        {!ceuClassico && (
+          <>
+            <CeuDoDia nome={slot.nome} className="dc-sky-breathe" />
+            {/* A vida por cima da arte: estrelas, cadentes e a luz do astro
+                respirando. Fica FORA do `dc-sky-breathe` de propósito — o zoom
+                lento arrastaria as cadentes junto e o risco sairia torto. */}
+            <CeuEfeitos nome={slot.nome} careMode={careMode} />
+          </>
+        )}
 
         {/* ─── O CÉU CLÁSSICO CONTINUA DE PÉ ───────────────────────────
             Ele é item PAGO da Loja (150 🌱). As dez artes que saíram em

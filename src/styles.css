@@ -1257,6 +1257,138 @@ button:active > .duo3d {
   will-change: transform;
 }
 
+/* ══════════════ Vida por cima da arte do céu ══════════════════════
+   Ver `src/components/ceu-efeitos.tsx` para as cinco regras. Em resumo: só
+   `transform` e `opacity`, ciclos longos, e nada cruzando a faixa do bebê. */
+
+/* O halo do astro respira. 11s é o limiar em que o olho sente que está vivo
+   sem conseguir dizer que é animação. */
+@keyframes dcAstroBrilho {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+.dc-astro-brilho {
+  animation: dcAstroBrilho 11s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* A estrela pisca pela OPACIDADE, nunca pelo tamanho: estrela que incha e
+   murcha lê como bolha pulsando. O valor de base de cada uma vem do `style`
+   e este `opacity` MULTIPLICA em cima dele. */
+@keyframes dcPisca {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.dc-pisca {
+  animation: dcPisca 4.6s ease-in-out infinite;
+}
+
+/* A CADENTE.
+   O elemento é o próprio risco: 2px de altura, largura que cresce do nada.
+   O gradiente morre nas duas pontas porque cadente não tem começo nem fim —
+   tem passagem. Ela vive 5% do ciclo: com 15s de volta, são 0,75s de brilho
+   e catorze segundos de céu parado, que é o que a faz ser um acontecimento.
+   O ângulo é -32°, descendo para a esquerda, como quase toda chuva de
+   meteoros vista do hemisfério sul. */
+@keyframes dcCadente {
+  0%,
+  100% {
+    opacity: 0;
+    transform: rotate(-32deg) translateX(0) scaleX(0.2);
+  }
+  1% {
+    opacity: 0;
+    transform: rotate(-32deg) translateX(0) scaleX(0.2);
+  }
+  2.2% {
+    opacity: 0.9;
+    transform: rotate(-32deg) translateX(-3vw) scaleX(1);
+  }
+  5% {
+    opacity: 0;
+    transform: rotate(-32deg) translateX(-16vw) scaleX(0.6);
+  }
+}
+.dc-cadente {
+  width: 12vw;
+  height: 2px;
+  border-radius: 2px;
+  transform-origin: right center;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 245, 255, 0.55) 55%,
+    rgba(255, 255, 255, 0.95) 88%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: drop-shadow(0 0 4px rgba(214, 226, 255, 0.9));
+  animation: dcCadente 15s linear infinite;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* A aurora: uma faixa fraquíssima que atravessa a banda das ondas de um lado
+   ao outro. `opacity` no teto de 0,5 de propósito — passando disso ela vira
+   um holofote correndo pela tela em vez de um brilho que atravessa. */
+@keyframes dcAurora {
+  0% {
+    opacity: 0;
+    transform: translateX(-60%);
+  }
+  35% {
+    opacity: 0.5;
+  }
+  65% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(60%);
+  }
+}
+.dc-aurora {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(226, 214, 255, 0.14) 40%,
+    rgba(255, 255, 255, 0.2) 52%,
+    rgba(214, 226, 255, 0.12) 62%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: blur(14px);
+  animation: dcAurora 26s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A cadente some por inteiro: ela é MOVIMENTO, não decoração — parada, é
+     um risco branco atravessado no céu. As outras congelam num quadro bom. */
+  .dc-cadente,
+  .dc-aurora {
+    animation: none;
+    opacity: 0;
+  }
+  .dc-astro-brilho {
+    animation: none;
+    opacity: 0.8;
+  }
+  .dc-pisca {
+    animation: none;
+  }
+}
+
 /* `.dc-estrela` saiu junto com as cenas em SVG (ago/2026). As estrelas
    voltaram a ser pintadas DENTRO da arte, e pixel pintado não cintila — o
    preço de usar a imagem que o dono aprovou em vez de um desenho meu. */
