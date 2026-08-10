@@ -35,8 +35,27 @@ export type NomeDoCeu = "amanhecer" | "dia" | "por-do-sol" | "anoitecer";
 
 export type Ceu = {
   nome: NomeDoCeu;
-  /** Céu escuro pede texto claro. Segue a ARTE, nunca o relógio. */
+  /**
+   * O PÉ da cena é escuro? Manda no número da semana, no rótulo "semanas" e
+   * nos cartões da segunda dobra. Segue a ARTE, nunca o relógio.
+   */
   dark: boolean;
+  /**
+   * O TOPO da cena é escuro? Manda na barra de status do iOS, no vidro do
+   * botão de menu e da pílula do clima, e no nome do bebê.
+   *
+   * ─── POR QUE DOIS BOOLEANOS E NÃO UM ────────────────────────────────────
+   *
+   * Duas das quatro cenas INVERTEM o brilho entre a faixa de cima e a de
+   * baixo. O pôr do sol abre em violeta escuro (#6f66bc) e termina em pêssego
+   * claro; o anoitecer abre em azul-marinho e termina em lavanda média.
+   *
+   * Com um booleano só, o nome do bebê no pôr do sol saía em texto escuro
+   * sobre violeta escuro: 3,43:1 medido, contra o mínimo de 4,5 que este app
+   * cobra. Não era escolha de cor — era a régua perguntando ao pedaço errado
+   * do céu.
+   */
+  topoEscuro: boolean;
   /**
    * A cor CHAPADA do topo da cena.
    *
@@ -62,19 +81,24 @@ const CEUS: Ceu[] = [
   {
     nome: "amanhecer",
     dark: false,
+    topoEscuro: false,
     corDeTopo: "#9b98e0",
     corDeBaixo: "#ddd3ee",
   },
-  { nome: "dia", dark: false, corDeTopo: "#2f96e8", corDeBaixo: "#6bcdc0" },
+  { nome: "dia", dark: false, topoEscuro: false, corDeTopo: "#2f96e8", corDeBaixo: "#6bcdc0" },
   {
     nome: "por-do-sol",
+    // O pé é pêssego claro, mas o topo é violeta escuro — daí os dois
+    // diferirem. Medido: texto escuro no topo dava 3,43:1; branco dá 4,98:1.
     dark: false,
+    topoEscuro: true,
     corDeTopo: "#6f66bc",
     corDeBaixo: "#9a88c6",
   },
   {
     nome: "anoitecer",
     dark: true,
+    topoEscuro: true,
     corDeTopo: "#16215f",
     corDeBaixo: "#4436a8",
   },

@@ -1296,71 +1296,18 @@ button:active > .duo3d {
    A vida do céu novo mora DENTRO da cena (`ceu-do-dia.tsx`): as estrelas
    cintilam por `.dc-estrela`, logo acima, e o céu inteiro respira por
    `.dc-sky-breathe`. Uma fonte só, versionada com o desenho que ela anima. */
-/* ══════════════ Texto de vidro (Liquid Glass) ══════════════════════
-   O relógio da tela bloqueada do iOS 26 não usa uma fonte especial: usa a
-   fonte do sistema com um MATERIAL por cima. "Liquid Glass" é o material,
-   não a tipografia — foi essa a descoberta que orientou este bloco.
+/* ─── O TEXTO DE VIDRO SAIU (ago/2026) ───────────────────────────────
+   `.dc-glass-text` era o material do relógio da tela bloqueada do iOS:
+   preenchimento translúcido com o céu atravessando a letra. O próprio bloco
+   avisava que só valia para TEXTO GRANDE — "num rótulo de 13px o mesmo
+   tratamento apaga a forma".
 
-   O material tem três partes, e é a soma que faz ler como vidro:
-     1. preenchimento TRANSLÚCIDO, com degradê vertical — vidro é mais claro
-        onde a luz atravessa e mais denso na barriga da letra;
-     2. um fio de luz na quina de baixo, que é a espessura do vidro pegando
-        luz refletida;
-     3. sombra difusa, que descola a letra do fundo e dá o volume.
-
-   SÓ PARA TEXTO GRANDE, e isso não é preguiça. O relógio da Apple tem uns
-   100px; a esta escala o olho reconstrói a letra mesmo translúcida. Num
-   rótulo de 13px o mesmo tratamento apaga a forma — e este app acabou de ter
-   32 medições de contraste calibradas para 4,5:1. Vidro em texto pequeno
-   desfaria isso.
-
-   O `@supports` existe porque `color: transparent` sem `background-clip: text`
-   deixaria o texto INVISÍVEL, não sem efeito. */
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  /* A letra é UM VIDRO: corpo translúcido que deixa o céu passar, contorno
-     branco marcando a espessura, e uma sombra que descola do fundo.
-     A primeira versão errou ao fazer duas variantes — vidro escuro no céu
-     claro, vidro claro no escuro. Vidro não muda de cor conforme o fundo: ele
-     é sempre a mesma parede transparente, e é o CONTORNO que garante a leitura
-     nos dois casos. No relógio da Apple é assim em qualquer papel de parede. */
-  .dc-glass-text {
-    /* ── 1. O CORPO ────────────────────────────────────────────────
-       Translúcido de ponta a ponta, e BEM aberto no miolo (0.20): o fundo
-       atravessa a letra, e é por isso que ela fica azul sobre céu azul e
-       lilás sobre céu lilás. O gradiente só insinua que a face de cima pega
-       mais luz que o meio. */
-    background-image: linear-gradient(
-      177deg,
-      rgba(255, 255, 255, 0.86) 0%,
-      rgba(255, 255, 255, 0.4) 24%,
-      rgba(255, 255, 255, 0.2) 54%,
-      rgba(255, 255, 255, 0.3) 80%,
-      rgba(255, 255, 255, 0.78) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    /* ── 2. A ESPESSURA: DOIS FIOS, NENHUM DESFOCADO ──────────────
-       Duas versões erradas antes desta, e cada uma ensinou uma regra.
-       A primeira usou `-webkit-text-stroke` branco: contorno de espessura
-       igual em toda a volta é traço de caneta, não vidro. Vidro tem lado.
-       A segunda acertou o lado mas errou a forma — pôs DESFOQUE nos fios
-       (`1.6px 3px 3.5px`). Sombra borrada atrás de um glifo translúcido
-       aparece POR DENTRO dele: vira véu cinza no miolo da letra, e no
-       aparelho isso lê como imagem fora de foco. Era o "blur" reclamado.
-       Sobraram dois fios de sub-pixel, os dois com raio ZERO — a quina
-       acesa em cima/à esquerda, a parede na sombra embaixo/à direita. Fio
-       duro mantém a letra nítida e ainda assim dá volume, porque segue cada
-       contorno, inclusive o miolo do "o". */
-    text-shadow:
-      -0.4px -0.4px 0 rgba(255, 255, 255, 1),
-      0.4px 0.7px 0 rgba(20, 34, 70, 0.58),
-      /* ── 3. O AR ─────────────────────────────────────────────────
-         Esta pode ser larga porque cai a 9px de distância — longe demais
-         para lavar o glifo, perto o bastante para descolá-lo do cenário. */
-        0 9px 20px rgba(16, 28, 60, 0.3);
-  }
-}
+   O rebranding tirou o vidro do nome do bebê e do número da semana (a
+   referência os traz nítidos, em cor sólida), e sobrou aplicado num único
+   lugar: o número de graus da pílula do clima, com 15px. Medido pixel a
+   pixel, dava 1,98:1 no amanhecer e 2,00:1 no dia — contra o mínimo de 4,5
+   que este app cobra. Era o caso exato que o comentário do bloco descrevia.
+   Com a cor sólida, o mesmo número passa a 8,3:1. */
 
 /* ══════════════ Chuva na home ══════════════════════════════════════
    Duas camadas: riscos caindo ao fundo e gotas na vidraça. A regra de peso é

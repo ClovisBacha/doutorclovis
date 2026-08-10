@@ -803,15 +803,32 @@ export function AppHomeScreen({
      No Céu Clássico quem decide é o período do gradiente, que é a régua com
      que aquele tema foi desenhado. */
   const darkSky = ceuClassico ? period === "madrugada" || period === "noite" : slot.dark;
+  /* ─── O TOPO TEM RÉGUA PRÓPRIA ────────────────────────────────────────────
+     Duas cenas INVERTEM o brilho entre a faixa de cima e a de baixo: o pôr do
+     sol abre em violeta escuro e termina em pêssego claro; o anoitecer abre em
+     azul-marinho e termina em lavanda média.
+     Com `darkSky` sozinho decidindo a tela inteira, o nome do bebê no pôr do
+     sol saía em texto escuro sobre violeta escuro — 3,43:1 medido, contra os
+     4,5 que este app cobra. `topoEscuro` manda no que encosta no topo (barra
+     de status, vidro do menu e da pílula, nome); `darkSky` manda no resto. */
+  const topoEscuro = ceuClassico ? darkSky : slot.topoEscuro;
 
-  /* Cores de texto adaptadas ao céu do momento.
-     `heroMuted` é o rótulo "semanas", e ele fica DIRETO sobre a cena, sem
-     cartão atrás — medido sobre o laranja do pôr do sol, `text-muted-foreground`
-     dava 2,9:1. `foreground/75` parte de um marrom escuro em vez de um cinza
-     médio e passa de 4,5:1 nos quatro céus, continuando a ler como
-     secundário ao lado do número. */
+  /* ─── CORES DE TEXTO, MEDIDAS PIXEL A PIXEL SOBRE AS QUATRO CENAS ─────────
+     Nada aqui é escolha de gosto: cada valor é o que passou de 4,5:1 (texto
+     normal) ou 3:1 (o número, que é grande) contra o PIXEL COMPOSTO do
+     gradiente atrás dele, não contra uma cor média inventada.
+
+     As opacidades que existiam antes eram justamente as que falhavam:
+     `foreground/75` dava 3,77 no pôr do sol e `white/75` dava 3,41 no
+     anoitecer. Um rótulo secundário se diferencia pelo TAMANHO e pelo peso,
+     que ele já tem — atenuar a cor por cima disso foi o que o derrubou. */
+  const textoDoTopo = topoEscuro ? "text-white" : "text-foreground";
   const heroText = darkSky ? "text-white/95" : "text-foreground";
-  const heroMuted = darkSky ? "text-white/75" : "text-foreground/75";
+  /* No anoitecer o rótulo cai sobre lavanda média (#9370da) — um meio-tom em
+     que NENHUMA cor de texto chega a 4,5:1 sozinha (branco cheio dá 3,79).
+     Quem resolve é o halo em `overArt`, e é por isso que ele é obrigatório
+     ali: sem a sombra, este rótulo não tem correção possível. */
+  const heroMuted = darkSky ? "text-white/[0.98]" : "text-foreground";
 
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
      o céu escurece e o mesmo branco cegaria — então o vidro inverte e o texto
@@ -839,15 +856,15 @@ export function AppHomeScreen({
      Fundo ainda mais transparente que o dos cartões — ele é ferramenta, tem
      que ser alcançável sem ser notado. */
   const glassLeve: React.CSSProperties = {
-    background: darkSky
+    background: topoEscuro
       ? "radial-gradient(circle at 34% 28%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 58%)," +
         " rgba(26,23,42,0.20)"
       : "radial-gradient(circle at 34% 28%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.14) 58%)," +
         " rgba(255,252,250,0.16)",
     backdropFilter: "blur(16px) saturate(170%)",
     WebkitBackdropFilter: "blur(16px) saturate(170%)",
-    border: `1px solid ${darkSky ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.58)"}`,
-    boxShadow: darkSky
+    border: `1px solid ${topoEscuro ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.58)"}`,
+    boxShadow: topoEscuro
       ? "inset 0 1.5px 0 rgba(255,255,255,0.45), inset 0 -8px 16px -12px rgba(0,0,0,0.5)," +
         " 0 6px 18px -10px rgba(0,0,0,0.45)"
       : "inset 0 1.5px 0 rgba(255,255,255,0.95), inset 0 -8px 16px -12px rgba(120,92,110,0.28)," +
@@ -870,13 +887,13 @@ export function AppHomeScreen({
         " 0 14px 36px -18px rgba(120,84,96,0.34)",
   };
   /* O BISEL DO VIDRO, para ícone.
-     Texto ganha o material por `.dc-glass-text`; ícone é traço e não aceita
-     `background-clip`. Aqui o mesmo bisel é escrito em `drop-shadow`: luz
+     Ícone é traço e não aceita `background-clip`, então o bisel do vidro vira
+     `drop-shadow`: luz
      acima e à esquerda, sombra abaixo e à direita. No céu claro a sombra
      escura precisa ser mais fraca — sobre lavanda ela viraria contorno sujo. */
   const tracoDeVidro: React.CSSProperties = {
-    stroke: darkSky ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.96)",
-    filter: darkSky
+    stroke: topoEscuro ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.96)",
+    filter: topoEscuro
       ? "drop-shadow(-0.8px -1px 0 rgba(255,255,255,0.85))" +
         " drop-shadow(0.8px 1.5px 0 rgba(26,40,76,0.44))" +
         " drop-shadow(1.6px 3px 3px rgba(26,40,76,0.28))" +
@@ -886,11 +903,6 @@ export function AppHomeScreen({
         " drop-shadow(1.2px 2.4px 3px rgba(96,66,110,0.22))",
   };
   const cardText = darkSky ? "text-white" : "text-foreground";
-  /* O vidro sobrou para UM texto: o número de graus na pílula do clima. O
-     nome do bebê e o número da semana passaram a ser cor sólida no rebranding
-     — a referência os traz nítidos, e vidro precisa de corpo grande para o
-     olho reconstruir a letra. Ver `.dc-glass-text` no styles.css. */
-  const glassSmall = "dc-glass-text";
   /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
      nasce de baixo contraste por ser secundário, e agora o céu passa por trás
      dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
@@ -900,11 +912,32 @@ export function AppHomeScreen({
      secundário ao lado do texto principal, mas parte de um preto, não de um
      cinza médio. */
   const cardMuted = darkSky ? "text-white/85" : "text-foreground/80";
-  /* Nome e etiqueta ficam SOBRE o céu, sem cartão atrás — o que pede sombra:
-     o fundo atrás deles muda de luminosidade ao longo do dia. */
+  /* ─── O HALO NÃO É ENFEITE: É O QUE SUSTENTA O CONTRASTE ─────────────────
+     Nome, número e rótulo ficam SOBRE a cena, sem cartão atrás — e a cena tem
+     contraste LOCAL: uma crista de onda acesa passando exatamente atrás da
+     base dos dígitos.
+     No anoitecer, medido pixel a pixel: sem sombra o pior ponto do "20" cai a
+     1,4:1 onde ele cruza a crista clara (#ddcef8). A sombra de uma camada só
+     levava aquele ponto a 2,65 — passa na mediana e falha no pior pixel. As
+     três camadas abaixo (curta e opaca, média, larga e difusa) levam o pior
+     ponto a 7,39 e o rótulo "semanas" de 3,41 para 13,09.
+     No céu claro o halo é o oposto — claro e fraco — porque ali o texto é
+     escuro e o que ele precisa é de separação, não de peso. */
   const overArt: React.CSSProperties = darkSky
-    ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" }
-    : { textShadow: "0 2px 10px rgba(90,60,110,0.28)" };
+    ? {
+        textShadow:
+          "0 1px 2px rgba(10,4,30,0.95), 0 2px 6px rgba(10,4,30,0.85)," +
+          " 0 3px 14px rgba(10,4,30,0.7)",
+      }
+    : { textShadow: "0 1px 3px rgba(255,255,255,0.5), 0 2px 10px rgba(90,60,110,0.22)" };
+  /* O nome mora no TOPO, onde a régua é outra (ver `topoEscuro`). */
+  const overArtTopo: React.CSSProperties = topoEscuro
+    ? {
+        textShadow:
+          "0 1px 2px rgba(10,4,30,0.9), 0 2px 6px rgba(10,4,30,0.75)," +
+          " 0 3px 14px rgba(10,4,30,0.6)",
+      }
+    : { textShadow: "0 1px 3px rgba(255,255,255,0.5), 0 2px 10px rgba(90,60,110,0.22)" };
 
   /* Quem o cartão do médico mostra.
      
@@ -949,12 +982,12 @@ export function AppHomeScreen({
        MESMA variável que decide a cor do texto do hero, e não uma cor fixa.
        Ao sair da home a barra volta ao padrão: as outras telas têm fundo claro
        de propósito. */
-    barraDeStatus(darkSky);
+    barraDeStatus(topoEscuro);
     return () => {
       raiz.style.backgroundColor = antes;
       barraDeStatus(false);
     };
-  }, [slot.corDeTopo, darkSky]);
+  }, [slot.corDeTopo, topoEscuro]);
 
   return (
     /* Sem `pb` aqui: a página que renderiza esta tela (minha-conta) já reserva
@@ -977,8 +1010,17 @@ export function AppHomeScreen({
 
            A margem negativa cancela a folga inteira e o padding devolve o mesmo
            tanto por dentro: a arte encosta no topo do aparelho, e o ícone do
-           perfil e o clima continuam abaixo do relógio, onde dá para tocar. */
-        className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(0.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
+           perfil e o clima continuam abaixo do relógio, onde dá para tocar.
+
+           O NÚMERO TEM QUE SER O MESMO DA PÁGINA. Ele era `0.5rem` enquanto o
+           container de `minha-conta` usava `1.5rem` — sobrava uma faixa creme
+           de 16px atravessando o topo, bem onde fica o relógio do sistema. A
+           bancada não mostrava: ela usa `pt-2`, que casava por acaso com o
+           valor errado. Se a folga da página mudar, este `calc` muda junto.
+
+           A primeira dobra NÃO repete mais este padding: repetindo, a folga
+           entrava duas vezes e a "tela exata" media 100svh + 24px. */
+        className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(1.5rem+var(--safe-top))]"
         /* A cor do PÉ da cena, não a do topo: a cena cobre só a primeira dobra
            (ver `CeuDoDia`), e é esta cor que continua atrás da segunda. O topo
            não precisa de cor de espera porque o SVG pinta no mesmo quadro em
@@ -1027,7 +1069,7 @@ export function AppHomeScreen({
               O bebê é o protagonista e fica com TODO o espaço que sobrar —
               por isso `h-[100svh]` aqui e não `min-h`: o que não couber vai
               para a dobra de baixo em vez de espremer o bebê. ── */}
-          <div className="flex h-[100svh] flex-col pt-[calc(0.5rem+var(--safe-top))] pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]">
+          <div className="flex h-[100svh] flex-col pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]">
             {/* ── BARRA DE TOPO: menu · nome · clima ────────────────────
                 Três peças numa linha só, e o nome fica no CENTRO ÓPTICO da
                 tela — não no centro do espaço que sobra entre os dois botões.
@@ -1069,8 +1111,15 @@ export function AppHomeScreen({
                   bloco cobriria o botão do menu e a pílula do clima. */}
               {babyName && (
                 <p
-                  className={`pointer-events-none absolute left-1/2 max-w-[52%] -translate-x-1/2 truncate text-center font-serif text-[clamp(1.15rem,5.2vw,1.5rem)] font-medium leading-none ${heroText}`}
-                  style={overArt}
+                  /* O teto é o que SOBRA depois dos dois cantos, não uma
+                     fração da linha. `52%` era metade da faixa — mas a faixa
+                     tem um botão de 40px de um lado e a pílula do clima de
+                     ~76px do outro, e em 320px de largura um nome comprido
+                     ("Ana Beatriz…") entrava 8px por baixo da pílula. Medido.
+                     11rem reserva os dois cantos mais o respiro; em telas
+                     largas o nome fica até MAIS folgado que antes. */
+                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-11rem)] -translate-x-1/2 truncate text-center font-serif text-[clamp(1.15rem,5.2vw,1.5rem)] font-medium leading-none ${textoDoTopo}`}
+                  style={overArtTopo}
                 >
                   {babyName} <span className="align-middle text-[0.72em]">💜</span>
                 </p>
@@ -1099,7 +1148,19 @@ export function AppHomeScreen({
                       style={tracoDeVidro}
                     />
                   )}
-                  <span className={`text-[15px] font-bold leading-none ${cardText} ${glassSmall}`}>
+                  {/* `textoDoTopo` e não `cardText`: a pílula mora no topo, e
+                      no pôr do sol o topo é violeta escuro enquanto a base é
+                      pêssego claro. Com a régua da base, o número de graus
+                      sairia escuro sobre o vidro escuro. */}
+                  {/* O halo vale aqui também, e pelo mesmo motivo dos outros
+                      textos sobre a cena: o vidro é fino (20% de opacidade),
+                      então quem está atrás do número é o CÉU, não o vidro. No
+                      pôr do sol o topo é violeta médio e o branco chegava a
+                      3,85:1 no pior pixel — com o halo vai a 8,4. */}
+                  <span
+                    className={`text-[15px] font-bold leading-none ${textoDoTopo}`}
+                    style={overArtTopo}
+                  >
                     {weather.temp}°
                   </span>
                 </div>
@@ -1138,12 +1199,22 @@ export function AppHomeScreen({
                   aria-label="Ver a semana do bebê"
                   className="relative flex shrink-0 items-center justify-center transition-transform active:scale-[0.97]"
                 >
-                  {/* A caixa que manda em bolha e bebê. Medida pela LARGURA
-                      (60vw) e com teto em rem: assim ela não depende da folga
-                      vertical, que agora pertence aos espaçadores. Em tela
-                      curta cai para 48vw — é o que faz o número continuar
-                      dentro da primeira dobra num aparelho de 780px. */}
-                  <div className="relative aspect-square w-[min(60vw,19.5rem)] short:w-[min(48vw,15rem)]">
+                  {/* A caixa que manda em bolha e bebê. TRÊS tetos, e o menor
+                      vence: 60% da largura, 19,5rem de teto absoluto, e 38% da
+                      ALTURA da tela.
+
+                      O termo em `svh` é o que conserta o celular deitado. Sem
+                      ele a bolha era medida só pela largura enquanto a
+                      variante `short` disparava pela altura — numa tela
+                      larga-e-baixa (667×375) ela recebia o tamanho de uma tela
+                      estreita, a coluna não cabia, e o "20" terminava 54px
+                      ABAIXO do viewport, atrás da barra. Medido.
+
+                      Com os três termos o `short:` na largura fica
+                      desnecessário, e some junto o degrau que ele criava: em
+                      849px a bolha saltava 25% de uma vez, e a tela MAIOR
+                      ficava mais apertada que a menor. */}
+                  <div className="relative aspect-square w-[min(60vw,19.5rem,38svh)]">
                     <BabyOrb />
                     {/* `scale` porque o SVG tem margem interna larga: a tinta do
                       bebê é ~55% da caixa, e 1.43 leva ela a ~80% da bolha — a
@@ -1183,7 +1254,13 @@ export function AppHomeScreen({
                       // o maior número da tela era o único texto que NÃO
                       // seguia a fonte do sistema.
                       fontFamily: "var(--font-serif)",
-                      fontSize: "clamp(4rem, 20vw, 6.5rem)",
+                      /* O termo em `svh` é irmão do que dimensiona a bolha, e
+                         está aqui pelo mesmo motivo: medido só pela LARGURA, o
+                         número ficava com 104px numa tela de 375px de altura
+                         (celular deitado) e empurrava a coluna para fora da
+                         primeira dobra. Em retrato o `20vw` continua vencendo,
+                         então nada muda no aparelho de pé. */
+                      fontSize: "clamp(2.75rem, min(20vw, 11svh), 6.5rem)",
                       // 300 e não 400: neste corpo o peso normal fica pesado
                       // demais e o número vira bloco. Fino, ele respira — é o
                       // que a referência do rebranding traz.
@@ -1195,7 +1272,7 @@ export function AppHomeScreen({
                     {gest.weeks}
                   </p>
                   <p
-                    className={`mt-1 text-[clamp(1rem,4.4vw,1.25rem)] font-normal leading-none ${heroMuted}`}
+                    className={`mt-1 text-[clamp(0.8rem,min(4.4vw,2.6svh),1.25rem)] font-normal leading-none ${heroMuted}`}
                   >
                     {gest.weeks === 1 ? "semana" : "semanas"}
                   </p>

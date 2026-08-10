@@ -46,7 +46,12 @@ function PreviewHome() {
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
       {/* Repete a folga de rodapé que a página real aplica (a barra
           flutuante fica por cima), para a bancada medir o mesmo espaço. */}
-      <div className="mx-auto max-w-md px-5 pb-[calc(7rem+var(--safe-bottom))] pt-2">
+      {/* A MESMA geometria de `minha-conta`, não uma aproximação: `max-w-5xl`,
+          `px-5` e a folga de topo em `1.5rem`. Com `pt-2` a bancada casava por
+          acaso com um `-mt` errado do hero e ESCONDIA a faixa creme de 16px
+          que aparecia em produção — a bancada era o único lugar do produto
+          onde o defeito não existia. */}
+      <div className="mx-auto max-w-5xl px-5 pb-[calc(7rem+var(--safe-bottom))] pt-[calc(1.5rem+var(--safe-top))]">
         <AppHomeScreen
           firstName="Clovis"
           babyName="Clovis"
