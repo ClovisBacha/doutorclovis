@@ -1057,8 +1057,8 @@ export const getEngagementData = createServerFn({ method: "POST" })
 
            `faltaNoBanco` cobre `PGRST205` além de 42703/42P01 — e essa é a
            diferença entre um alarme útil e um alarme inútil. Produção não tem
-           `contraction_logs`, `exam_files`, `panic_events` nem `triage_logs`, e
-           o PostgREST responde `PGRST205` (fora do schema cache), não `42P01`.
+           `contraction_logs`, `panic_events` nem `triage_logs`, e o PostgREST
+           responde `PGRST205` (fora do schema cache), não `42P01`.
            Sem isso, `atividadeIncompleta` ficava permanentemente true e a faixa
            "📡 Não consegui ler todos os registros" aparecia em TODO
            carregamento do painel. Um alarme que grita sempre é um alarme que se
@@ -1073,7 +1073,7 @@ export const getEngagementData = createServerFn({ method: "POST" })
       return { data: partes, erro };
     };
 
-    const [healthLogs, journals, kicks, qs, forms, contracoes, exames, panicos, triagens] =
+    const [healthLogs, journals, kicks, qs, forms, contracoes, panicos, triagens] =
       await Promise.all([
         desde("health_logs", "created_at"),
         desde("journal_entries", "created_at"),
@@ -1091,13 +1091,12 @@ export const getEngagementData = createServerFn({ method: "POST" })
             .order("submitted_at", { ascending: false }),
           scope,
         ),
-        /* As três abaixo faltavam, e a falta doía justamente em quem mais usa o
-           app: cronometrar contração, subir exame e acionar o SOS não contavam
-           como sinal de vida. Uma gestante de 38 semanas contando contrações
-           todo dia aparecia na lista de "sumidas". Tabela ainda não migrada
-           devolve erro e `data` indefinida — o `?.forEach` abaixo ignora. */
+        /* As duas abaixo faltavam, e a falta doía justamente em quem mais usa o
+           app: cronometrar contração e acionar o SOS não contavam como sinal de
+           vida. Uma gestante de 38 semanas contando contrações todo dia
+           aparecia na lista de "sumidas". Tabela ainda não migrada devolve erro
+           e `data` indefinida — o `?.forEach` abaixo ignora. */
         desde("contraction_logs", "created_at"),
-        desde("exam_files", "created_at"),
         desde("panic_events", "created_at"),
         /* Triagem de sintomas: ela abriu o app, descreveu o que sentia e
            recebeu uma orientação. Não contar isso como sinal de vida permitia
@@ -1127,7 +1126,6 @@ export const getEngagementData = createServerFn({ method: "POST" })
       kicks,
       qs,
       contracoes,
-      exames,
       panicos,
       triagens,
     ].some((r) => (r as { erro?: boolean }).erro);
@@ -1135,7 +1133,6 @@ export const getEngagementData = createServerFn({ method: "POST" })
     registrar(journals, "created_at");
     registrar(kicks, "started_at");
     registrar(contracoes, "created_at");
-    registrar(exames, "created_at");
     registrar(panicos, "created_at");
     registrar(triagens, "created_at");
     /* Pré-consulta enviada também é sinal de vida — a lista já vinha carregada

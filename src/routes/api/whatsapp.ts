@@ -143,29 +143,26 @@ async function processWebhook(body: unknown): Promise<void> {
         if (!text) {
           /* ─── SILÊNCIO ABSOLUTO ERA A RESPOSTA ANTIGA ────────────────────
              O comentário aqui dizia "por ora ignoramos". Na prática: a
-             paciente fotografa o laudo, manda pelo WhatsApp do consultório, e
-             não acontece NADA — nem resposta, nem registro, nem sequer o
+             paciente manda um arquivo pelo WhatsApp do consultório, e não
+             acontece NADA — nem resposta, nem registro, nem sequer o
              duplo-check azul, porque o `continue` acontecia antes do
              `waMarkRead`. Ela vê a mensagem entregue e não lida, e fica
-             esperando.
-             É o mesmo defeito que o chat do app acabou de fechar ("a tela
-             confirma e a confirmação é falsa"), sobrevivendo no canal em que
-             exame mais chega. E agora contradiz o produto duas vezes, porque o
-             painel já aprendeu a mostrar PDF de laudo.
+             esperando. O que NÃO pode continuar é o silêncio: marcar como
+             lida e dizer o que fazer custa duas linhas.
 
-             Baixar a mídia do Meta e gravar em `exam_files` exige o token de
-             mídia e uma etapa de download que este webhook ainda não tem —
-             fica para o passo seguinte. O que NÃO pode continuar é o silêncio:
-             marcar como lida e dizer o que fazer custa duas linhas e devolve à
-             paciente a informação de que ela precisa agora. */
+             O texto não aponta mais para "envie pelo app em Exames" — a
+             plataforma parou de guardar exame enviado pela paciente (ago/2026,
+             "não vamos ter essa responsabilidade em guardar os exames"), e
+             mandar para um caminho que não existe mais seria pior que o
+             silêncio que este bloco veio consertar. */
           waMarkRead(messageId);
           const tipo = String((m as Record<string, unknown>).type ?? "");
           if (tipo === "image" || tipo === "document") {
             await waSendText(
               fromPhone,
               "Recebi seu arquivo aqui, mas por este canal eu ainda não consigo abri-lo. " +
-                "Para o exame chegar direto ao consultório, envie pelo app em Exames — " +
-                "assim ele fica no seu prontuário e sua médica é avisada na hora. 💛",
+                "Leve o exame (impresso ou por e-mail) na sua próxima consulta — " +
+                "por aqui eu já ajudo se você me contar por texto o que ele mostra. 💛",
             ).catch(() => {});
           }
           continue;

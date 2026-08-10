@@ -528,6 +528,40 @@ confirmação separada, explicitamente.
 - **Aplicar no Supabase:** `supabase/APLICAR_CANCELAR_CONSULTA.sql` (só a
   teleconsulta precisa — as outras duas tabelas já aceitavam o valor).
 
+### O envio de exame (arquivo) saiu do produto (ago/2026)
+
+Pedido do dono: "essa opção de enviar exames em todo o site já não deve
+existir mais, pois não vamos ter essa responsabilidade em guardar os
+exames". Removida a CAPACIDADE DE ENVIAR — patient e médico — em todo ponto
+de entrada:
+
+- **Removidos por inteiro:** `src/lib/exame-do-chat.functions.ts` (upload
+  pelo chat), `src/components/exames-recebidos.tsx` (aba "Exames que elas
+  enviaram" do painel), a aba "Exames" inteira de `minha-conta.tsx`
+  (`ExamesTab`, upload + galeria + preview) e o menu de anexo do chat da
+  paciente (o botão "+" só existia para isto — sem outro item, o menu
+  inteiro saiu, junto com `handleImage`/`enviarParaOMedico`). `src/lib/abrir-pdf.ts`
+  saiu junto — só o preview do laudo em PDF o chamava.
+- **`clinical.functions.ts` perdeu só o visualizador dedicado**
+  (`examesRecebidos`/`imagemDoExame`/`devolutivaDoExame`) — `EspecieEvento`
+  continua com `"exame"`, e `clinical_events` continua unindo `exam_files`:
+  os laudos enviados ANTES desta mudança continuam aparecendo na linha do
+  tempo genérica da paciente (`prontuarioDaPaciente`) e no resumo "o que
+  mudou desde a última consulta", só sem o visor de imagem próprio.
+- **A tabela `exam_files`, o balde `exames` e a limpeza de conta
+  NÃO SAÍRAM.** Dado já enviado é dado de paciente — apagá-lo é uma decisão
+  diferente da de parar de aceitar mais, e mais irreversível. `conta.functions.ts`
+  continua varrendo o balde de exames na exclusão de conta (LGPD); é
+  justamente esse dado histórico que a varredura protege. Se um dia a
+  decisão for apagar o que já existe, é outra migration, deliberada.
+- **O WhatsApp do consultório** parou de apontar para "envie pelo app em
+  Exames" quando a paciente manda foto/PDF por lá — apontaria para um
+  caminho que não existe mais. Agora pede que ela leve o exame na consulta
+  ou descreva por texto.
+- **Não confundir com "Pedir exame"** (`AcoesDaPaciente`, `TipoDeEmissao`):
+  o médico PEDINDO um exame por mensagem de texto é outra função — sempre
+  foi um modelo de texto, nunca guardou arquivo, e continua existindo.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

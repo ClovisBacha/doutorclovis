@@ -950,22 +950,4 @@ describe("as decisões do dono, escritas em teste", () => {
     expect(widget).toContain("onClick={() => stop()}");
     expect(widget).toContain('role="status"');
   });
-
-  test("o custo dos laudos no banco é medido e mostrado", () => {
-    /* Base64 em coluna TEXT é a escolha certa hoje — a RLS, o visualizador e a
-       devolutiva já existem em cima da tabela. E é custo recorrente que cresce
-       sozinho: disco de banco custa ~6× o de Storage e entra em todo backup.
-       O número na tela é o que transforma "um dia vai custar caro" numa
-       decisão com data. `pg_column_size` mede o tamanho REAL depois do TOAST,
-       não o do base64. */
-    const clinical = readFileSync("src/lib/clinical.functions.ts", "utf8");
-    expect(clinical).toContain('rpc("tamanho_dos_exames"');
-    const visor = readFileSync("src/components/exames-recebidos.tsx", "utf8");
-    expect(visor).toContain("no banco. Acima de ~1 GB");
-    const sql = readFileSync("supabase/APLICAR_TAMANHO_EXAMES.sql", "utf8");
-    expect(sql).toContain("pg_column_size(image_data)");
-    expect(sql).toContain(
-      "GRANT EXECUTE ON FUNCTION public.tamanho_dos_exames(uuid[]) TO service_role",
-    );
-  });
 });

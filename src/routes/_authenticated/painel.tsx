@@ -40,7 +40,6 @@ import {
 import { AlertaSosMedico } from "@/components/alerta-sos-medico";
 import { ProntuarioPaciente } from "@/components/prontuario-paciente";
 import { RegistrarConsulta } from "@/components/registrar-consulta";
-import { ExamesRecebidos } from "@/components/exames-recebidos";
 import { EnviarParaPaciente } from "@/components/enviar-para-paciente";
 import {
   consultasDaPaciente,
@@ -1597,7 +1596,12 @@ function PainelPage() {
                 pressão de aparecer só ali. O contador do grupo na fita
                 (`unseenForms`) continua somando sozinho, sem depender desta
                 seção existir. */}
-            <ExamesRecebidos tokenFn={token} />
+            {/* ─── "EXAMES QUE ELAS ENVIARAM" SAIU (ago/2026) ────────────────
+                A plataforma parou de aceitar o envio de laudo em foto/PDF —
+                "não vamos ter essa responsabilidade em guardar os exames".
+                `ExamesRecebidos` e o ciclo em `clinical.functions.ts` saíram
+                junto; a tabela `exam_files` e os laudos já enviados antes
+                desta mudança continuam no banco, sem visualizador dedicado. */}
           </div>
         )}
         {tab === "Lives" && <LivesSection tokenFn={token} />}

@@ -24,7 +24,6 @@ import { TabSkeleton } from "@/components/tab-skeleton";
 import { BabyJourneyModal, PremiumUpsellModal } from "@/components/baby-journey";
 import { supabase } from "@/integrations/supabase/client";
 import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
-import { abrirPdfDeDataUrl } from "@/lib/abrir-pdf";
 import { formatarDinheiro } from "@/lib/dinheiro";
 import { DOCTOR } from "@/lib/doctor.config";
 import drPortrait from "@/assets/dr-clovis-portrait.jpg";
@@ -159,11 +158,8 @@ import {
   AudioLines,
   Baby,
   CalendarCheck,
-  Camera,
   ChevronLeft,
   ClipboardList,
-  FileText,
-  FlaskConical,
   Flower2,
   Gift,
   HeartPulse,
@@ -182,7 +178,6 @@ import {
   Mic,
   NotebookPen,
   PersonStanding,
-  Plus,
   Ribbon,
   Salad,
   Scroll,
@@ -330,15 +325,6 @@ type HealthLog = {
   sleep_hours: number | null;
   notes: string | null;
 };
-type ExamFile = {
-  id: string;
-  name: string;
-  category: string;
-  week: number | null;
-  notes: string | null;
-  image_data: string | null;
-  created_at: string;
-};
 type BirthPlan = {
   id?: string;
   birth_type: string;
@@ -398,7 +384,6 @@ const TABS = [
   "Médico",
   "Chat IA",
   "Perfil",
-  "Exames",
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -409,7 +394,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Saúde",
-    tabs: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
+    tabs: ["Saúde", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
   },
   {
     label: "Família",
@@ -457,14 +442,6 @@ const HUB_SAUDE: {
     Icon: HeartPulse,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
-  },
-  {
-    key: "Exames",
-    label: "Exames",
-    sub: "Resultados e laudos",
-    Icon: FlaskConical,
-    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
-    tinta: "text-sky-600",
   },
   {
     key: "Nutrição",
@@ -1820,7 +1797,6 @@ function MinhaContaPage() {
                 )}
                 {tab === "Saúde da mulher" && <SaudeMulherHub />}
                 {tab === "Médico" && <MédicoTab />}
-                {tab === "Exames" && <ExamesTab gest={gest} />}
                 {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} careMode={careMode} />}
                 {tab === "Perfil" && (
                   <ProfileTab
@@ -6713,7 +6689,6 @@ type WAMsg = {
   role: "user" | "assistant";
   content: string;
   ts: Date;
-  image?: string;
   audioUrl?: string;
   audioDuration?: string;
   fileName?: string;
@@ -6811,20 +6786,6 @@ function WABubble({
               }
         }
       >
-        {/* Anexo. PDF NÃO é imagem: `<img src="data:application/pdf…">` desenha
-            o ícone de arquivo quebrado, e o app passou a aceitar laudo em PDF.
-            A miniatura de PDF é um cartão com o nome do formato — ela sabe o
-            que mandou, e quem vai LER é o médico. */}
-        {msg.image &&
-          (msg.image.startsWith("data:application/pdf") ? (
-            <div className="flex items-center gap-2 px-3 py-2.5 text-sm">
-              <span aria-hidden>📄</span>
-              <span className="text-muted-foreground">Laudo em PDF enviado</span>
-            </div>
-          ) : (
-            <img src={msg.image} alt="" className="block w-full max-h-52 object-cover" />
-          ))}
-
         {/* Áudio */}
         {msg.audioUrl && (
           <div className="flex items-center gap-2 px-3 py-2.5" style={{ minWidth: 180 }}>
@@ -7128,7 +7089,6 @@ export function ChatTab({
   }, [doctorName, messages.length]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showAttach, setShowAttach] = useState(false);
   /* O texto que se digita sozinho para de digitar assim que a paciente entra
      no campo: escrever POR CIMA de algo que está se movendo é desconcertante,
      mesmo que o convite desapareça no primeiro caractere. */
@@ -7218,26 +7178,21 @@ export function ChatTab({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileImageRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading]);
 
-  function dataUrlMediaType(dataUrl: string): string {
-    return /^data:([^;,]+)/.exec(dataUrl)?.[1] ?? "image/jpeg";
-  }
-
-  async function sendText(textOverride?: string, image?: string) {
+  async function sendText(textOverride?: string) {
     const text = (textOverride ?? input).trim();
-    if ((!text && !image) || loading) return;
+    if (!text || loading) return;
 
     const enrichedText =
       ctx && messages.filter((m) => m.role === "user").length === 0
         ? `[Contexto: ${ctx}]\n\n${text}`.trim()
         : text;
 
-    const displayMsg: WAMsg = { role: "user", content: text, image, ts: new Date() };
+    const displayMsg: WAMsg = { role: "user", content: text, ts: new Date() };
     const displayNext = [...messages, displayMsg];
 
     setMessages(displayNext);
@@ -7246,22 +7201,10 @@ export function ChatTab({
     setLoading(true);
 
     /* A bolha da IA é criada ANTES do `try` porque o `catch` precisa achá-la:
-       é o `ts` dela que identifica onde escrever, e reconstruir a lista a
-       partir do retrato antigo apagaria o que a paciente anexou no meio. */
+       é o `ts` dela que identifica onde escrever. */
     const asstMsg: WAMsg = { role: "assistant", content: "", ts: new Date() };
 
     try {
-      /* SÓ TEXTO VAI PARA A IA — e isso resolve dois problemas de uma vez.
-
-         1. A IA não analisa exame. É ato médico: o anexo vai para a aba do
-            médico, e mandá-lo junto convidaria a IA a opinar sobre ele.
-         2. O anexo ficava no estado da conversa PARA SEMPRE e era reenviado em
-            toda mensagem seguinte, reconstruído como parte `file` com o data
-            URL inteiro. Uma foto de laudo de 3,8 MB vira ~5,1 MB de base64 no
-            corpo do POST — acima do limite de 4,5 MB de função da Vercel. A
-            partir dali TODO o chat falhava até a paciente recarregar a página,
-            e cada turno anterior já gastava megabytes que o servidor descarta
-            (ele reconstrói o histórico do banco de qualquer forma). */
       const uiMessages = [...messages.filter((m) => m.content?.trim()), displayMsg].map((m, i) => {
         const msgText = m === displayMsg ? enrichedText : m.content;
         return {
@@ -7325,9 +7268,10 @@ export function ChatTab({
       /* A ESCRITA DA BOLHA DA IA, num lugar só.
          O laço por quadro foi consertado para atualização funcional, mas as
          QUATRO escritas de fim de stream continuaram usando `displayNext` — o
-         retrato capturado quando o envio começou. O anexo enviado durante a
-         resposta sobrevivia ao laço e era apagado quando o stream fechava: o
-         mesmo defeito, ~1s depois. Uma função só, e as cinco usam ela. */
+         retrato capturado quando o envio começou. Uma mensagem enviada
+         durante a resposta sobrevivia ao laço e era apagada quando o stream
+         fechava: o mesmo defeito, ~1s depois. Uma função só, e as cinco usam
+         ela. */
       const escreverNaBolha = (texto: string, extra?: Partial<WAMsg>) =>
         setMessages((atuais) => {
           const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
@@ -7476,10 +7420,10 @@ export function ChatTab({
       };
       /* FUNCIONAL aqui também, e pelo mesmo motivo dos outros quatro: o
          `displayNext` é o retrato de antes do envio, então reconstruir a lista
-         a partir dele apagaria o exame que ela anexou enquanto a resposta
-         chegava — justamente no caminho de erro, onde ela mais precisa ver que
-         o arquivo foi salvo. A bolha parcial substitui a da IA no lugar dela,
-         e o aviso entra no fim. */
+         a partir dele apagaria qualquer mensagem enviada enquanto a resposta
+         chegava — justamente no caminho de erro, onde ela mais precisa ver a
+         tela consistente. A bolha parcial substitui a da IA no lugar dela, e
+         o aviso entra no fim. */
       setMessages((atuais) => {
         const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
         const semVazia = i < 0 ? atuais : atuais.filter((_, k) => k !== i);
@@ -7502,148 +7446,8 @@ export function ChatTab({
     }
   }
 
-  /**
-   * O ARQUIVO DO EXAME — redimensionado, como todos os outros deste app.
-   *
-   * Este era o ÚNICO caminho de imagem do arquivo sem canvas. O avatar
-   * redimensiona a 256px, o álbum a 800px, a aba Exames a 1200px — e a foto de
-   * laudo, que é a maior de todas, ia crua.
-   *
-   * O preço eram duas coisas somadas:
-   *
-   * - **A conta não fechava.** base64 cresce 4/3, então o teto de 3,3 MiB
-   *   virava ~4,61 MB de data URL contra um limite de corpo de 4,5 MB na
-   *   Vercel. Ficava EM CIMA da ambiguidade de unidade (MB decimal × MiB), com
-   *   ±2% de folga.
-   * - **A instrução era impossível de seguir.** Foto de celular de 48MP tem
-   *   8–15 MB: a paciente era recusada com "tente uma foto com menos
-   *   resolução", que quase ninguém sabe executar — e o laudo não chegava.
-   *
-   * Com o canvas, a foto típica cai ~10×, o HEIC do iPhone vira JPEG, e a
-   * conta sai da borda. PDF passa direto: não é imagem, e comprimir laudo
-   * vetorial só destruiria o texto.
-   */
-  function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    setShowAttach(false);
-    if (!file) return;
-    const ehPdf = file.type === "application/pdf";
-    if (!file.type.startsWith("image/") && !ehPdf) {
-      toast.error("Envie uma foto ou um PDF do exame.");
-      return;
-    }
-    /* PDF não passa por canvas — e por isso continua com teto de tamanho.
-       3,0 MiB × 4/3 = 4,19 MB, abaixo do limite sob qualquer leitura da
-       unidade (4,5 MB decimal ou 4,5 MiB). */
-    if (ehPdf && file.size > 3.0 * 1024 * 1024) {
-      toast.error("PDF muito grande — o limite é 3 MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const bruto = ev.target?.result as string;
-      if (ehPdf) {
-        void enviarParaOMedico(bruto);
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        /* 1600px: laudo fotografado precisa de mais resolução que um avatar —
-           é texto impresso, e o médico vai LER. Qualidade 0,85 pelo mesmo
-           motivo. */
-        const canvas = document.createElement("canvas");
-        const maxSize = 1600;
-        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        void enviarParaOMedico(canvas.toDataURL("image/jpeg", 0.85));
-      };
-      /* Arquivo que o navegador não decodifica (HEIC em Android antigo): não
-         some em silêncio — ela precisa saber para tirar outra foto. */
-      img.onerror = () => toast.error("Não consegui ler essa imagem. Tente tirar a foto de novo.");
-      img.src = bruto;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  /**
-   * O anexo vai para o MÉDICO — não para a IA.
-   *
-   * Antes ele ia para `sendText`, que mandava a imagem junto da mensagem. E a
-   * imagem não chegava a lugar nenhum: era descartada no servidor (o histórico
-   * é reconstruído só com texto) e sumia no primeiro recarregamento. A tela
-   * confirmava o envio com o duplo-check, e a confirmação era falsa.
-   *
-   * Ler exame é ato médico. Uma IA dizendo "seu hemograma está bom" é conduta
-   * sem CRM, e se errar o erro chega vestido de confiança. Então o arquivo vai
-   * para a aba Exames do painel — o ciclo que já existe, com visualizador e
-   * devolutiva — e ele é avisado.
-   */
-  async function enviarParaOMedico(dataUrl: string) {
-    const nota = input.trim();
-    setInput("");
-    const enviada: WAMsg = {
-      role: "user",
-      content: nota,
-      image: dataUrl,
-      ts: new Date(),
-    };
-    setMessages((m) => [...m, enviada]);
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) throw new Error("sem sessão");
-      const { enviarExameDoChat } = await import("@/lib/exame-do-chat.functions");
-      const res = await enviarExameDoChat({
-        data: {
-          accessToken: s.session.access_token,
-          imagem: dataUrl,
-          ...(nota ? { nota } : {}),
-        },
-      });
-      if (!res.ok) {
-        /* "Muitos" é diferente de "falhou": ela precisa saber que o arquivo
-           não foi recusado por ser inválido, e sim porque já mandou vários. */
-        throw new Error(
-          "motivo" in res && res.motivo === "muitos"
-            ? "Você enviou muitos arquivos seguidos. Tente de novo daqui a pouco 💛"
-            : "",
-        );
-      }
-      /* A confirmação diz o DESTINO, não só "enviado". A paciente precisa
-         saber que quem vai olhar é uma pessoa, e não a assistente — senão ela
-         fica esperando uma leitura que não vem. */
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content:
-            "semMedico" in res && res.semMedico
-              ? "Recebi o seu arquivo e guardei na sua aba de Exames. Assim que você se vincular a um obstetra, ele poderá ver."
-              : `Recebi o seu exame e já encaminhei para ${doctorName || "a sua médica"} — ele aparece na aba de Exames dele, e a resposta chega aqui. Eu não analiso exames: quem olha é quem pode assinar.`,
-          ts: new Date(),
-        },
-      ]);
-    } catch (e) {
-      /* Falha aqui a paciente PRECISA ver: se o exame não foi guardado, ela
-         tem que saber para mandar de novo. */
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content:
-            (e as Error)?.message?.trim() ||
-            "Não consegui enviar o arquivo agora. Pode tentar de novo?",
-          ts: new Date(),
-          error: true,
-        },
-      ]);
-    }
-  }
-
   function handleAudioSoon() {
-    toast("Mensagens de áudio em breve — por enquanto, envie texto ou fotos.");
+    toast("Mensagens de áudio em breve — por enquanto, envie texto.");
   }
 
   /* O céu vem do gradiente do site; as auroras são a camada de "tecnologia"
@@ -7900,65 +7704,6 @@ export function ChatTab({
         )}
       </div>
 
-      {/* Menu de anexos */}
-      {showAttach && (
-        <div
-          className="relative grid grid-cols-3 gap-3 px-4 py-4"
-          style={{
-            background: skyDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.34)",
-            backdropFilter: "blur(24px) saturate(180%)",
-            WebkitBackdropFilter: "blur(24px) saturate(180%)",
-            borderTop: `1px solid ${skyDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.6)"}`,
-          }}
-        >
-          {[
-            /* UM BOTÃO SÓ PARA ARQUIVO, e isso é honestidade de destino.
-               Eram dois — "Galeria" e "Exame" — abrindo o MESMO seletor e
-               gravando o MESMO registro em `exam_files`, com e-mail e push
-               para o médico. Uma foto da barriga mandada pela "Galeria"
-               disparava "📄 Uma paciente enviou um exame". Aviso que chega
-               errado ensina o médico a ignorar aviso.
-               Desde que a IA deixou de analisar imagem, todo arquivo tem um
-               destino só: a aba de Exames dele. Então é um botão, e ele diz
-               para onde vai. */
-            {
-              Icon: FileText,
-              label: "Enviar ao médico",
-              grad: "#ec4899, #f97316",
-              on: () => fileImageRef.current?.click(),
-            },
-
-            {
-              Icon: X,
-              label: "Fechar",
-              grad: "#64748b, #334155",
-              on: () => setShowAttach(false),
-            },
-          ].map((a) => (
-            <button
-              key={a.label}
-              onClick={a.on}
-              className="flex flex-col items-center gap-1.5 transition-transform active:scale-95"
-            >
-              <span
-                className="flex h-12 w-12 items-center justify-center rounded-full text-white"
-                style={{
-                  background: `linear-gradient(140deg, ${a.grad})`,
-                  border: "1px solid rgba(255,255,255,0.4)",
-                  boxShadow:
-                    "inset 0 1px 1px rgba(255,255,255,0.5), 0 8px 20px -8px rgba(60,40,120,0.6)",
-                }}
-              >
-                <a.Icon className="h-[22px] w-[22px]" strokeWidth={1.9} />
-              </span>
-              <span className="text-[11px] font-medium" style={{ color: headInkSoft }}>
-                {a.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* ── Barra de mensagem ─────────────────────────────────────────── */}
       <div
         className="relative flex items-end gap-2 px-2 py-2"
@@ -7969,16 +7714,6 @@ export function ChatTab({
           borderTop: `1px solid ${skyDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.55)"}`,
         }}
       >
-        {/* Botão + (anexar) */}
-        <button
-          onClick={() => setShowAttach((v) => !v)}
-          aria-label="Anexar"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 ${showAttach ? "rotate-45" : ""}`}
-          style={{ color: headInkSoft, transitionProperty: "transform" }}
-        >
-          <Plus className="h-[22px] w-[22px]" strokeWidth={1.9} />
-        </button>
-
         {/* Campo de texto */}
         <div
           className="relative flex min-h-[42px] flex-1 items-end rounded-3xl px-4 py-2"
@@ -8030,16 +7765,6 @@ export function ChatTab({
             className="relative flex-1 resize-none bg-transparent text-[15px] leading-[1.45] outline-none"
             style={{ maxHeight: 100, color: headInk }}
           />
-          {!input.trim() && (
-            <button
-              onClick={() => fileImageRef.current?.click()}
-              aria-label="Enviar foto"
-              className="ml-1 shrink-0 self-end p-0.5 transition-transform active:scale-90"
-              style={{ color: headInkSoft }}
-            >
-              <Camera className="h-[22px] w-[22px]" strokeWidth={1.9} />
-            </button>
-          )}
         </div>
 
         {/* PARAR — a saída de emergência. Enquanto a resposta corre, o botão de
@@ -8084,15 +7809,6 @@ export function ChatTab({
           </button>
         )}
       </div>
-
-      {/* Inputs de arquivo ocultos */}
-      <input
-        ref={fileImageRef}
-        type="file"
-        accept="image/*,application/pdf"
-        onChange={handleImage}
-        className="hidden"
-      />
     </div>
   );
 }
@@ -18890,337 +18606,6 @@ function MédicoTab() {
                 </button>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ---------- Exames ---------- */
-const EXAM_CATEGORIES = [
-  { value: "ultrassom", label: "Ultrassom" },
-  { value: "laboratorial", label: "Laboratorial" },
-  { value: "cardiotocografia", label: "Cardiotocografia" },
-  { value: "outros", label: "Outros" },
-];
-
-function ExamesTab({ gest }: { gest: Gest }) {
-  const [exams, setExams] = useState<ExamFile[]>([]);
-  const [filter, setFilter] = useState("todos");
-  const [form, setForm] = useState({ name: "", category: "ultrassom", week: "", notes: "" });
-  const [imageData, setImageData] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [preview, setPreview] = useState<ExamFile | null>(null);
-  /* A imagem chega DEPOIS do modal abrir. Sem um estado de falha, "ainda não
-     chegou" e "não vai chegar" ficam iguais — e a tela precisa dizer coisas
-     diferentes para cada um. */
-  const [erroPreview, setErroPreview] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  async function load() {
-    /* SEM `image_data` NA LISTA — e isto virou obrigatório, não otimização.
-       `select("*")` puxava o base64 de TODA linha. Enquanto os uploads dela
-       vinham a 1200px (~250 KB) era só desperdício; desde que o chat passou a
-       gravar laudo aqui, são arquivos de megabytes: vinte exames viram dezenas
-       de MB de JSON num navegador de celular.
-       É exatamente a decisão que o lado do MÉDICO já documenta ter tomado
-       (`examesRecebidos` exclui `image_data` de propósito) — a tela dela tinha
-       ficado para trás. A imagem é buscada só ao abrir um exame. */
-    const { data } = await (supabase as any)
-      .from("exam_files")
-      .select("id,name,category,week,notes,created_at,user_id")
-      .order("created_at", { ascending: false });
-    setExams(data ?? []);
-  }
-
-  /**
-   * A imagem de UM exame, sob demanda — é o que a lista não carrega.
-   *
-   * Passou a vir pelo SERVIDOR. Com o laudo no Storage, `image_data` fica NULL
-   * e o navegador não pode ler o balde (privado, sem policy) — ela deixaria de
-   * ver o próprio exame, calada, à medida que os novos fossem migrando.
-   */
-  async function abrirExame(exam: ExamFile) {
-    setPreview(exam);
-    setErroPreview(false);
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      const tk = sess.session?.access_token;
-      if (!tk) {
-        setErroPreview(true);
-        return;
-      }
-      const { minhaImagemDeExame } = await import("@/lib/exame-do-chat.functions");
-      const r = await minhaImagemDeExame({ data: { accessToken: tk, exameId: exam.id } });
-      if (r.ok && r.imagem) setPreview({ ...exam, image_data: r.imagem });
-      else setErroPreview(true);
-    } catch {
-      setErroPreview(true);
-    }
-  }
-  useEffect(() => {
-    load();
-  }, []);
-
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const maxSize = 1200;
-        const ratio = Math.min(maxSize / img.width, maxSize / img.height, 1);
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setImageData(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.src = ev.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  async function save() {
-    if (!form.name) return;
-    setSubmitting(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      setSubmitting(false);
-      return;
-    }
-    const { error } = await (supabase as any).from("exam_files").insert({
-      user_id: u.user.id,
-      name: form.name,
-      category: form.category,
-      week: form.week ? Number(form.week) : null,
-      notes: form.notes || null,
-      image_data: imageData,
-    });
-    setSubmitting(false);
-    if (error) {
-      toast.error("Não foi possível salvar o exame. Tente novamente.");
-      return;
-    }
-    setForm({ name: "", category: "ultrassom", week: "", notes: "" });
-    setImageData(null);
-    if (fileRef.current) fileRef.current.value = "";
-    load();
-  }
-
-  async function remove(id: string) {
-    if (!window.confirm("Excluir este exame?")) return;
-    /* Pelo SERVIDOR, e não mais direto do banco: com o laudo no Storage, apagar
-       a linha deixava o arquivo no balde — e o navegador não pode limpá-lo,
-       porque os baldes são privados e sem policy. Ela mandava apagar, a tela
-       dizia que apagou, e o laudo continuava no nosso disco. */
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      const tk = sess.session?.access_token;
-      if (!tk) {
-        toast.error("Sua sessão expirou. Entre de novo para excluir.");
-        return;
-      }
-      const { apagarMeuExame } = await import("@/lib/exame-do-chat.functions");
-      const r = await apagarMeuExame({ data: { accessToken: tk, exameId: id } });
-      if (!r.ok) {
-        toast.error("Não foi possível excluir o exame. Tente novamente.");
-        return;
-      }
-    } catch {
-      toast.error("Não foi possível excluir o exame. Tente novamente.");
-      return;
-    }
-    load();
-  }
-
-  const filtered = filter === "todos" ? exams : exams.filter((e) => e.category === filter);
-
-  return (
-    <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="font-serif text-xl">Adicionar exame</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Fotografe ou importe a imagem do laudo para guardar no seu histórico.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Nome do exame *
-            </label>
-            <input
-              className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-              placeholder="Ex.: Morfológico 2º trimestre"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Categoria
-            </label>
-            <select
-              className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-            >
-              {EXAM_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Semana gestacional
-            </label>
-            <input
-              type="number"
-              className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-              placeholder="Ex.: 20"
-              value={form.week}
-              onChange={(e) => setForm({ ...form, week: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Observações
-            </label>
-            <input
-              className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-              placeholder="Médico, clínica, resultado..."
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            />
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary hover:text-primary"
-          >
-            {imageData ? "Trocar foto" : "Adicionar foto do laudo"}
-          </button>
-          {imageData && (
-            <img
-              src={imageData}
-              alt="pré-visualização da imagem"
-              className="h-12 w-12 rounded-lg object-cover ring-2 ring-primary/40"
-            />
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFile}
-          />
-        </div>
-        <button
-          onClick={save}
-          disabled={submitting || !form.name}
-          className="mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {submitting ? "Salvando…" : "Salvar exame"}
-        </button>
-      </div>
-
-      {/* Filter */}
-      <div className="flex flex-wrap gap-2">
-        {[{ value: "todos", label: "Todos" }, ...EXAM_CATEGORIES].map((c) => (
-          <button
-            key={c.value}
-            onClick={() => setFilter(c.value)}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${filter === c.value ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:text-foreground"}`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      {/* List */}
-      {filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum exame registrado ainda.</p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {filtered.map((exam) => (
-            <div key={exam.id} className="flex gap-3 rounded-2xl border border-border bg-card p-4">
-              {/* Sem miniatura: a lista não carrega mais o base64 (ver `load`).
-                  O cartão abre o exame, e a imagem chega aí. */}
-              <button
-                onClick={() => abrirExame(exam)}
-                className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-secondary ring-1 ring-border"
-              >
-                <span className="text-xl">🔍</span>
-                <span className="text-[9px] font-semibold text-muted-foreground">Abrir</span>
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-foreground truncate">{exam.name}</p>
-                <p className="text-xs text-primary mt-0.5">
-                  {EXAM_CATEGORIES.find((c) => c.value === exam.category)?.label ?? exam.category}
-                  {exam.week ? ` · Sem. ${exam.week}` : ""}
-                </p>
-                {exam.notes && (
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">{exam.notes}</p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  {new Date(exam.created_at).toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-              <button
-                onClick={() => remove(exam.id)}
-                className="text-muted-foreground hover:text-destructive text-lg flex-shrink-0"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Lightbox preview */}
-      {preview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setPreview(null)}
-        >
-          <div className="relative max-h-[90vh] max-w-2xl overflow-auto rounded-2xl bg-white p-2">
-            {/* ─── A IMAGEM PODE NÃO TER CHEGADO AINDA ──────────────────────
-                `setPreview(exam)` é síncrono e `exam` vem da lista, que NÃO
-                traz `image_data`. No primeiro render ele é `undefined`, e o
-                `!` seguido de `.startsWith` estourava a tela inteira — a
-                paciente clicava em "Abrir" e via uma página branca.
-                Três estados, e cada um diz o seu: carregando, falhou, pronto. */}
-            {!preview.image_data ? (
-              <p className="p-8 text-center text-sm text-muted-foreground">
-                {erroPreview
-                  ? "Não consegui carregar este exame agora. Tente de novo em instantes."
-                  : "Carregando o exame…"}
-              </p>
-            ) : preview.image_data.startsWith("data:application/pdf") ? (
-              <object
-                data={preview.image_data}
-                type="application/pdf"
-                className="h-[75vh] w-[85vw] max-w-2xl rounded-xl"
-                aria-label={preview.name}
-              >
-                {/* Celular nem sempre embute PDF — abrir em aba nova funciona
-                    em todos. */}
-                <button
-                  type="button"
-                  onClick={() => abrirPdfDeDataUrl(preview.image_data!)}
-                  className="block p-6 text-center text-sm text-primary underline"
-                >
-                  Abrir o PDF
-                </button>
-              </object>
-            ) : (
-              <img src={preview.image_data} alt={preview.name} className="max-w-full rounded-xl" />
-            )}
-            <p className="mt-2 text-center text-sm font-medium text-foreground">{preview.name}</p>
           </div>
         </div>
       )}

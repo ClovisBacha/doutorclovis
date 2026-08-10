@@ -3,9 +3,13 @@
  *
  * ─── O QUE ESTÁ EM JOGO ─────────────────────────────────────────────────────
  *
- * O conteúdo é laudo de exame de gestante e foto de álbum de família. Uma
+ * O conteúdo ativo é foto de álbum de família — a plataforma parou de aceitar
+ * envio de laudo de exame (ago/2026, "não vamos ter essa responsabilidade em
+ * guardar os exames"), mas os laudos já enviados antes continuam no banco e
+ * no Storage, e `imagens.server.ts` continua servindo os dois baldes: a
+ * exclusão de conta (LGPD) ainda precisa varrer o balde de exames órfão. Uma
  * migração de armazenamento mal feita aqui não "degrada a performance": perde
- * o laudo que a paciente fotografou às onze da noite, e não há desfazer.
+ * a foto que a família mandou, e não há desfazer.
  *
  * Por isso o desenho inteiro é de recuo seguro, e é isso que este arquivo
  * cobra — não a economia de disco, que é só a razão de existir.
@@ -108,11 +112,7 @@ describe("2. o upload nunca derruba a gravação", () => {
     expect(mod).toContain("image_path: caminho");
     /* A CHAMADA, não o import: trocar só a linha do `import` deixava o teste
        verde enquanto a escrita voltava a mandar a coluna crua. */
-    for (const arq of ["src/lib/family.functions.ts", "src/lib/exame-do-chat.functions.ts"]) {
-      expect(semComentarios(arq)).toContain("await gravarLinhaComImagem({");
-    }
-    /* E a leitura do laudo, do outro lado. */
-    expect(semComentarios("src/lib/clinical.functions.ts")).toContain("await lerComCaminho<{");
+    expect(semComentarios("src/lib/family.functions.ts")).toContain("await gravarLinhaComImagem({");
   });
 
   test("coluna ausente NÃO impede a gravação — recua para base64", () => {
@@ -141,22 +141,12 @@ describe("2. o upload nunca derruba a gravação", () => {
 
   test("e a LEITURA também recua — 42703 derruba a consulta inteira", () => {
     /* Um `select` citando coluna ausente não devolve a linha sem o campo: volta
-       42703 e derruba tudo. O médico não veria laudo nenhum — nem os que estão
-       em base64 e sempre funcionaram. */
+       42703 e derruba tudo. O médico não veria a foto nenhuma — nem as que
+       estão em base64 e sempre funcionaram. */
     const i = mod.indexOf("export async function lerComCaminho");
     const corpo = mod.slice(i, i + 900);
     expect(corpo).toContain("if (!colunaAusente(primeira.error)) return primeira;");
     expect(corpo).toContain("aplicarFiltros(sb.from(tabela).select(colunas))");
-  });
-
-  test("o exame ainda é gravado quando o Storage não responde", () => {
-    /* A asserção que descreve o pior caso: `guardarImagem` devolveu null e o
-       insert continua acontecendo, com base64. Nenhum `if (!caminho) return`. */
-    const exame = semComentarios("src/lib/exame-do-chat.functions.ts");
-    const i = exame.indexOf("guardarImagem");
-    const ate = exame.indexOf("if (error) return", i);
-    expect(ate).toBeGreaterThan(i);
-    expect(exame.slice(i, ate)).not.toMatch(/if \(!caminho\)\s*return/);
   });
 });
 
@@ -185,45 +175,7 @@ describe("3. a leitura prefere o arquivo, mas nunca mostra tela quebrada", () =>
   });
 });
 
-describe("4. laudo de exame não vaza pela URL assinada", () => {
-  const clinical = semComentarios("src/lib/clinical.functions.ts");
-
-  test("a URL só é gerada DEPOIS da checagem de vínculo", () => {
-    /**
-     * Uma URL assinada vale uma hora e sobrevive ao "não" que a função
-     * devolve. Assiná-la antes de checar o vínculo criaria um link válido para
-     * o laudo de uma paciente que não é dele — e o `return {ok:false}` depois
-     * não desfaz nada, porque o link já existe.
-     */
-    const iVinculo = clinical.indexOf("pacientesAtuais(user.id)");
-    expect(iVinculo).toBeGreaterThan(-1);
-    /**
-     * A PRIMEIRA assinatura do arquivo, não "alguma depois do vínculo".
-     * Procurar a partir do índice do vínculo era uma asserção que não podia
-     * falhar: inserir uma assinatura ANTES deixava a de depois no lugar, e o
-     * mutante sobrevivia com o vazamento instalado.
-     */
-    const iAssina = clinical.indexOf("imagemDaLinha(");
-    expect(iAssina).toBeGreaterThan(iVinculo);
-    /**
-     * E o MÓDULO inteiro só é tocado depois. Cobrar o nome da função deixava
-     * escapar quem a importasse com outro nome — foi o que um mutante fez para
-     * sobreviver. Nenhuma linha desta função tem motivo para falar com o
-     * Storage antes de saber se a paciente é dele.
-     */
-    const iImport = clinical.indexOf("imagens.server");
-    expect(iImport).toBeGreaterThan(iVinculo);
-  });
-
-  test("e depois da trilha de auditoria", () => {
-    const iTrilha = clinical.indexOf('trilha(user, "exame.imagem"');
-    const iAssina = clinical.indexOf("imagemDaLinha(BALDE_EXAMES", iTrilha);
-    expect(iTrilha).toBeGreaterThan(-1);
-    expect(iAssina).toBeGreaterThan(iTrilha);
-  });
-});
-
-describe("5. apagar a linha apaga o arquivo", () => {
+describe("4. apagar a linha apaga o arquivo", () => {
   const family = semComentarios("src/lib/family.functions.ts");
 
   test("o caminho é lido ANTES do delete", () => {
@@ -259,7 +211,7 @@ describe("5. apagar a linha apaga o arquivo", () => {
   });
 });
 
-describe("6. os baldes são privados, e o SQL diz por quê", () => {
+describe("5. os baldes são privados, e o SQL diz por quê", () => {
   const sql = readFileSync("supabase/APLICAR_IMAGENS_NO_STORAGE.sql", "utf8");
 
   test("os dois baldes entram com public = false", () => {
@@ -298,7 +250,7 @@ describe("6. os baldes são privados, e o SQL diz por quê", () => {
   });
 });
 
-describe("7. o backfill é seguro por construção", () => {
+describe("6. o backfill é seguro por construção", () => {
   const script = readFileSync("scripts/migrar-imagens.mjs", "utf8");
 
   test("subir NÃO apaga o base64", () => {
@@ -337,66 +289,7 @@ describe("7. o backfill é seguro por construção", () => {
   });
 });
 
-describe("8. a paciente continua vendo o PRÓPRIO exame", () => {
-  /**
-   * ─── A METADE QUE FALTAVA DA MIGRAÇÃO ─────────────────────────────────────
-   *
-   * A aba Exames dela lia `image_data` direto do banco com a chave anon. Isso
-   * funcionava enquanto o laudo morava DENTRO da linha.
-   *
-   * Com o laudo no Storage, `image_data` fica NULL — e o navegador não pode ler
-   * o balde: eles são privados e sem policy nenhuma, por decisão explícita.
-   * A economia de disco teria custado à paciente o acesso ao laudo dela,
-   * caladamente, à medida que os exames novos fossem migrando.
-   *
-   * E a tela ainda estourava: `setPreview(exam)` é síncrono, `exam` vem da
-   * lista (que não traz a imagem), e `preview.image_data!.startsWith(...)` sobre
-   * `undefined` derrubava a página. Ela clicava em "Abrir" e via branco.
-   */
-  const fn = semComentarios("src/lib/exame-do-chat.functions.ts");
-  const app = semComentarios("src/routes/_authenticated/minha-conta.tsx");
-
-  test("existe uma função de servidor para a imagem dela", () => {
-    expect(fn).toContain("export const minhaImagemDeExame");
-    expect(fn).toContain("imagemDaLinha(BALDE_EXAMES, linha)");
-  });
-
-  test("e ela só devolve exame DA PRÓPRIA paciente", () => {
-    /* O filtro vai na CONSULTA, não num `if` depois: assim um id de outra
-       pessoa não devolve linha nenhuma, em vez de devolver e depender de uma
-       comparação para barrar. A leitura é com a chave de serviço, que ignora
-       RLS — o filtro é obrigatório. */
-    const i = fn.indexOf("export const minhaImagemDeExame");
-    expect(fn.slice(i)).toContain('.eq("user_id", u.user.id)');
-  });
-
-  test("a tela pede ao servidor, não ao banco", () => {
-    const i = app.indexOf("async function abrirExame");
-    const bloco = app.slice(i, i + 900);
-    expect(bloco).toContain("minhaImagemDeExame");
-    expect(bloco).not.toContain('.select("image_data")');
-  });
-
-  test("e NUNCA estoura quando a imagem ainda não chegou", () => {
-    /* Era `preview.image_data!.startsWith(...)` — `!` sobre `undefined`. */
-    expect(app).not.toContain("preview.image_data!.startsWith");
-    expect(app).toContain("{!preview.image_data ? (");
-  });
-
-  test("«ainda não chegou» e «não vai chegar» dizem coisas diferentes", () => {
-    /* Sem o estado de falha, um erro de rede ficaria em "Carregando o exame…"
-       para sempre — e ela esperaria por algo que não vem. */
-    /* O RAMO que marca a falha, não a menção ao nome: `setErroPreview` aparece
-       três vezes (limpar, catch, else), e cobrar o identificador solto deixava
-       apagar justamente o `else` — o caso "o servidor respondeu que não tem". */
-    expect(app).toContain("else setErroPreview(true);");
-    expect(app).toContain("} catch {\n      setErroPreview(true);");
-    expect(app).toContain("Não consegui carregar este exame agora");
-    expect(app).toContain("Carregando o exame…");
-  });
-});
-
-describe("9. excluir a conta apaga os ARQUIVOS, não só as linhas", () => {
+describe("7. excluir a conta apaga os ARQUIVOS, não só as linhas", () => {
   /**
    * ─── A SEGUNDA PONTA SOLTA DA MIGRAÇÃO, ACHADA POR REVISÃO ────────────────
    *
@@ -453,7 +346,7 @@ describe("9. excluir a conta apaga os ARQUIVOS, não só as linhas", () => {
   });
 });
 
-describe("10. o script de migração não gira, não exclui e respeita o recorte", () => {
+describe("8. o script de migração não gira, não exclui e respeita o recorte", () => {
   /**
    * Três defeitos achados por revisão adversarial, todos no comando que o DONO
    * vai rodar à mão contra o banco de produção.
@@ -521,51 +414,7 @@ describe("10. o script de migração não gira, não exclui e respeita o recorte
   });
 });
 
-describe("11. «ela não anexou» e «não consegui servir» pararam de ser a mesma frase", () => {
-  /**
-   * ─── UMA REGRESSÃO CLÍNICA QUE A MIGRAÇÃO TROUXE DE VOLTA ─────────────────
-   *
-   * Antes de mover o laudo para o Storage, `null` no visor só podia significar
-   * uma coisa: a linha não tem imagem. Depois, passou a significar também "o
-   * arquivo existe e eu não consegui assinar a URL" — Storage instável, balde
-   * ainda não criado, chave rotacionada.
-   *
-   * A tela traduzia as duas como "Este registro não tem imagem anexada — só a
-   * anotação dela". Ela fotografou o laudo; ele lê que não há laudo, marca como
-   * visto e segue.
-   *
-   * O comentário no topo de `imagemDoExame` descreve esse MESMO desfecho como
-   * já tendo acontecido uma vez, por outro motivo. A minha migração o trouxe de
-   * volta por um caminho novo — e foi a revisão adversarial que viu.
-   */
-  const clinical = semComentarios("src/lib/clinical.functions.ts");
-  const visor = semComentarios("src/components/exames-recebidos.tsx");
-
-  test("o servidor distingue pelos DADOS, não por palpite", () => {
-    /* `image_path` preenchido é a prova de que existe arquivo. */
-    expect(clinical).toContain(
-      "const tinhaArquivo = !!(row as { image_path?: string | null }).image_path?.trim();",
-    );
-    expect(clinical).toContain('? ("falha_no_arquivo" as const)');
-  });
-
-  test("e a tela diz o que NÃO concluir", () => {
-    /* "Não tem imagem" faria ele marcar como visto. O texto precisa impedir
-       essa conclusão, que é o dano real. */
-    expect(visor).toContain('motivo === "falha_no_arquivo"');
-    expect(visor).toContain("Ela anexou um arquivo e eu não consegui carregá-lo agora");
-    expect(visor).toContain("antes de dar como visto");
-  });
-
-  test("o «sem imagem» de verdade continua existindo", () => {
-    /* Trocar um pelo outro só moveria a mentira: registro que é mesmo só
-       anotação passaria a sugerir falha. */
-    expect(visor).toContain("Este registro não tem imagem anexada");
-    expect(clinical).toContain(': ("sem_imagem" as const)');
-  });
-});
-
-describe("12. o caminho no balde NÃO carrega o uuid da paciente", () => {
+describe("9. o caminho no balde NÃO carrega o uuid da paciente", () => {
   /**
    * ─── O VAZAMENTO QUE A REVISÃO COMPLETA ACHOU ─────────────────────────────
    *
@@ -606,48 +455,5 @@ describe("12. o caminho no balde NÃO carrega o uuid da paciente", () => {
      */
     expect(script).toContain('createHash("sha256").update(String(id)).digest("hex").slice(0, 32)');
     expect(script).toContain("${pastaDoDono(linha[cfg.dono])}/");
-  });
-});
-
-describe("13. apagar UM exame apaga o arquivo — a terceira ponta", () => {
-  /**
-   * A aba Exames dela apagava a linha direto do navegador. Enquanto o laudo
-   * morava DENTRO da linha isso apagava a imagem junto; com ele no Storage, a
-   * linha some e o arquivo fica — e o navegador não pode limpá-lo, porque os
-   * baldes são privados e sem policy.
-   *
-   * Mesmo defeito já fechado em `deleteAlbumPost` e na exclusão da conta. Esta
-   * ficou aberta porque mora na TELA, não numa função de servidor — não
-   * apareceu em nenhuma busca pelos arquivos que a migração tocou.
-   */
-  const fn = semComentarios("src/lib/exame-do-chat.functions.ts");
-  const app = semComentarios("src/routes/_authenticated/minha-conta.tsx");
-
-  test("existe função de servidor, e ela apaga os dois", () => {
-    expect(fn).toContain("export const apagarMeuExame");
-    expect(fn).toContain("apagarImagem(BALDE_EXAMES, linha.image_path)");
-  });
-
-  test("o caminho é lido ANTES do delete", () => {
-    const i = fn.indexOf("export const apagarMeuExame");
-    const corpo = fn.slice(i);
-    expect(corpo.indexOf("lerComCaminho<{ image_path")).toBeLessThan(corpo.indexOf(".delete()"));
-  });
-
-  test("e só apaga exame DELA", () => {
-    const i = fn.indexOf("export const apagarMeuExame");
-    const corpo = fn.slice(i);
-    expect((corpo.match(/\.eq\("user_id", u\.user\.id\)/g) ?? []).length).toBe(2);
-  });
-
-  test("a tela não apaga mais direto do banco", () => {
-    /* Ancorado na CONFIRMAÇÃO, que é única. Existe outro `remove(id: string)`
-       no arquivo — o do diário — e ele vem antes: cortar da primeira ocorrência
-       media a função errada, e o teste passava por acidente. */
-    const i = app.indexOf('window.confirm("Excluir este exame?")');
-    expect(i).toBeGreaterThan(-1);
-    const bloco = app.slice(i, i + 1200);
-    expect(bloco).toContain("apagarMeuExame");
-    expect(bloco).not.toContain('.from("exam_files").delete()');
   });
 });
