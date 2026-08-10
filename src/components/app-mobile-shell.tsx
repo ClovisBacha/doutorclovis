@@ -13,6 +13,9 @@ import {
   Gamepad2,
   LifeBuoy,
   Heart,
+  Menu,
+  Moon,
+  Sun,
   UserRound,
   MessageCircle,
   type LucideIcon,
@@ -20,21 +23,10 @@ import {
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
-import { SkyAmbience } from "@/components/sky-ambience";
 import { SkyRain, forcaDaChuva } from "@/components/sky-rain";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
-import skyManha from "@/assets/sky/manha.webp";
-import skyMeioDia from "@/assets/sky/meio-dia.webp";
-import skyTarde from "@/assets/sky/tarde.webp";
-import skyGolden from "@/assets/sky/golden-hour.webp";
-import skyEntardecer from "@/assets/sky/entardecer.webp";
-/* `noite.webp` sai do bundle: a arte dele é crepúsculo, não noite — ver o
-   comentário na tabela SKY_SLOTS. O arquivo continua no repositório. */
-import skyMadrugada from "@/assets/sky/madrugada.webp";
-import skyPreAmanhecer from "@/assets/sky/pre-amanhecer.webp";
-import skyAmanhecer from "@/assets/sky/amanhecer.webp";
-import skyAnoitecer from "@/assets/sky/anoitecer.webp";
-import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
+import { CeuDoDia, ceuPelaHora, ceuPeloSol } from "@/components/ceu-do-dia";
+import { babyForWeek } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
 import { getApproxLocation } from "@/lib/local.functions";
@@ -210,9 +202,13 @@ export function useSkyNow(homeCity?: { nome: string; lat: number; lon: number } 
     const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
   }, []);
+  /* Antes de montar vale o meio-dia, e é de propósito: no SSR o relógio é o do
+     servidor (UTC na Vercel), então sortear o céu ali mostraria a noite para
+     quem abre às 8h da manhã. O céu do dia é o mais neutro para essa espera de
+     um quadro — e é claro, como a maioria das horas em que o app é aberto. */
   const slot = agora
-    ? skySlotForSun(agora, weather?.sunrise ?? null, weather?.sunset ?? null)
-    : skySlotFor(12);
+    ? ceuPeloSol(agora, weather?.sunrise ?? null, weather?.sunset ?? null)
+    : ceuPelaHora(12);
   return { agora, weather, origem, slot, darkSky: slot.dark };
 }
 
@@ -713,103 +709,19 @@ function BabyOrb() {
   );
 }
 
-/** Tema do céu da home. V2 = arte por período; V1 = o gradiente original. */
+/** Tema do céu da home. `v2` = as quatro cenas novas (padrão); `v1` = o Céu
+ *  Clássico, item pago da Loja. */
 export type SkyThemeId = "v2" | "v1";
 
-/**
- * Arte de fundo por FAIXA DE HORA (tema V2).
- *
- * Escala própria, mais fina que a do gradiente V1 (`periodFor`, 5 períodos):
- * com 5 faixas sobravam saltos de 5 a 7 horas em que o céu não mudava nada. As
- * oito faixas cobrem as transições que a paciente realmente percebe — o
- * primeiro clarão, o sol nascendo, o céu virando depois do pôr do sol.
- *
- * `dark` acompanha a ARTE, não o relógio: o amanhecer é claro apesar de cedo, e
- * o anoitecer é escuro apesar de ainda não ser noite fechada. É esse campo que
- * decide se os cartões usam vidro claro ou escuro.
- */
-const SKY_SLOTS: { from: number; to: number; nome: string; src: string; dark: boolean }[] = [
-  { from: 0, to: 4, nome: "madrugada", src: skyMadrugada, dark: true },
-  { from: 4, to: 6, nome: "pré-amanhecer", src: skyPreAmanhecer, dark: true },
-  { from: 6, to: 8, nome: "amanhecer", src: skyAmanhecer, dark: false },
-  { from: 8, to: 11, nome: "manhã", src: skyManha, dark: false },
-  { from: 11, to: 14, nome: "meio-dia", src: skyMeioDia, dark: false },
-  { from: 14, to: 16, nome: "tarde", src: skyTarde, dark: false },
-  { from: 16, to: 18, nome: "golden hour", src: skyGolden, dark: false },
-  { from: 18, to: 19, nome: "entardecer", src: skyEntardecer, dark: false },
-  { from: 19, to: 21, nome: "anoitecer", src: skyAnoitecer, dark: true },
-  /* NOITE usa a arte de madrugada, e isso é intencional.
-     O arquivo `noite.webp` é, na verdade, uma foto de CREPÚSCULO: tem o brilho
-     alaranjado do sol ainda no horizonte. Ele servia enquanto o céu vinha de
-     uma tabela de horas, mas a janela da "noite" começa 80 minutos depois do
-     pôr do sol e vai até as 4h — às 22h fazia mais de quatro horas que
-     escurecera, e o app mostrava o sol se pondo. Era o oposto do que o céu
-     ancorado no sol veio prometer.
-     Das dez artes, só duas são noite de verdade: `madrugada` (lua alta, via
-     láctea) e `pre-amanhecer` (a mesma noite com o primeiro clarão frio no
-     horizonte). A segunda não serve às 22h — aquele clarão é o dia chegando.
-     Sobra a de madrugada, e ela está certa: entre as 21h e as 4h o céu
-     realmente não muda. `noite.webp` fica no repositório como matéria-prima
-     caso um dia entre uma arte própria para o começo da noite. */
-  { from: 21, to: 24, nome: "noite", src: skyMadrugada, dark: true },
-];
-
-/** Só o relógio — o plano B de quando não se sabe onde a pessoa está. */
-function skySlotFor(hour: number) {
-  const h = Math.max(0, Math.min(23, hour));
-  return SKY_SLOTS.find((s) => h >= s.from && h < s.to) ?? SKY_SLOTS[SKY_SLOTS.length - 1];
-}
-
-const porNome = (nome: string) => SKY_SLOTS.find((s) => s.nome === nome)!;
-
-/**
- * O céu do app seguindo o CÉU DE VERDADE, ancorado no nascer e no pôr do sol
- * da localização da paciente.
- *
- * O relógio sozinho mente. Às 19h30 de julho, no Brasil, o sol se pôs há
- * quase duas horas e está escuro — mas a tabela de horas fixas mostrava o
- * entardecer alaranjado. Em dezembro, no mesmo 19h30, ainda é dia claro e ela
- * mostraria exatamente a mesma imagem. Uma das duas está sempre errada, e a
- * distância entre elas só cresce quanto mais longe do equador.
- *
- * As janelas do dia são FRAÇÕES da duração do dia, não minutos fixos: num dia
- * de 14h a manhã é mais longa que num de 10h, e é assim que se sente. Já os
- * crepúsculos são minutos fixos, porque a passagem do sol pelo horizonte dura
- * mais ou menos o mesmo tempo em qualquer estação (fora dos polos).
- *
- * "Madrugada" continua sendo a única faixa definida pelo relógio, e de
- * propósito: em português madrugada é a hora pequena da noite, não uma posição
- * do sol. Às 2h da manhã é madrugada mesmo no verão da Noruega.
- */
-function skySlotForSun(agora: Date, sunrise: Date | null, sunset: Date | null) {
-  if (!sunrise || !sunset) return skySlotFor(agora.getHours());
-  const SR = sunrise.getTime();
-  const SS = sunset.getTime();
-  const t = agora.getTime();
-  const dia = SS - SR;
-  // Dia degenerado (sol da meia-noite, noite polar, resposta estranha):
-  // o relógio erra menos que uma conta em cima de dado ruim.
-  if (!(dia > 0) || dia > 22 * 3600_000) return skySlotFor(agora.getHours());
-
-  const min = 60_000;
-  const meioDia = SR + dia / 2;
-  const bloco = dia * 0.14; // ~1h40 num dia de 12h
-
-  // Antes do primeiro sinal de luz o céu é o mesmo o tempo todo — escuro. Quem
-  // separa "noite" de "madrugada" aqui é o relógio, não o sol: às 23h de um dia
-  // curto ainda é noite, e às 2h já é madrugada.
-  if (t < SR - 90 * min) return porNome(agora.getHours() >= 21 ? "noite" : "madrugada");
-  if (t < SR - 25 * min) return porNome("pré-amanhecer");
-  if (t < SR + 50 * min) return porNome("amanhecer");
-  if (t < meioDia - bloco) return porNome("manhã");
-  if (t < meioDia + bloco) return porNome("meio-dia");
-  if (t < SS - 90 * min) return porNome("tarde");
-  if (t < SS - 25 * min) return porNome("golden hour");
-  if (t < SS + 20 * min) return porNome("entardecer");
-  if (t < SS + 80 * min) return porNome("anoitecer");
-  // Depois disso é noite até o relógio virar para a madrugada.
-  return porNome(agora.getHours() < 4 ? "madrugada" : "noite");
-}
+/* ─── OS DEZ CÉUS VIRARAM QUATRO (ago/2026) ────────────────────────────────
+   A tabela que morava aqui tinha dez faixas de hora apontando para dez
+   arquivos `.webp` (700 KB). Pedido do dono: "a gente vai remover o que está
+   atualmente, que são várias versões ali, porém que no final não ficou bom o
+   suficiente... vai ficar muito mais simples".
+   As quatro cenas novas — amanhecer, dia, pôr do sol e anoitecer — são SVG e
+   moram em `ceu-do-dia.tsx`, junto com a régua de qual mostrar. A escolha
+   continua ancorada no sol de verdade da cidade da paciente, com o relógio
+   como plano B; o que mudou foi quantas cenas existem para escolher. */
 
 export function AppHomeScreen({
   firstName,
@@ -892,23 +804,28 @@ export function AppHomeScreen({
 
   const h = agora ? agora.getHours() : 12;
   const isMadrugada = h < 5;
+  /** O tema pago da Loja. `v2` (as quatro cenas novas) é o padrão de todo mundo. */
+  const ceuClassico = skyTheme === "v1";
   const period = periodFor(h);
-  // Céu escuro (noite/madrugada) pede texto claro. O entardecer TERMINA claro
-  // na base do card (oklch ~0.8) — texto branco ali ficava ilegível, então ele
-  // conta como céu claro para o texto (auditoria de contraste).
-  const artTheme = skyTheme !== "v1";
-  // Com a arte quem manda no claro/escuro é a FAIXA da arte (8 faixas), não o
-  // período do gradiente (5): às 7h o gradiente ainda diz "manhã" enquanto o
-  // amanhecer já está claro, e às 20h diz "noite" enquanto o anoitecer é
-  // escuro. Sem arte, vale o período do gradiente.
-  // Enquanto o clima não chegou (ou a pessoa negou a localização), vale o
-  // relógio. Assim que o sol da cidade dela chega, a arte se corrige sozinha.
-  // `slot` vem do `useSkyNow` lá em cima — o mesmo que a tela do jogo lê.
-  const darkSky = artTheme ? slot.dark : period === "madrugada" || period === "noite";
+  /* Quem manda no claro/escuro é a CENA, nunca o relógio: o amanhecer é claro
+     apesar de cedo, e o anoitecer é escuro apesar de ainda não ser noite
+     fechada. É esta variável que decide a cor do texto do hero, o vidro dos
+     cartões e a barra de status do iOS.
+     Enquanto o clima não chegou (ou a paciente negou a localização), a cena
+     vem do relógio; assim que o sol da cidade dela chega, ela se corrige
+     sozinha. `slot` vem do `useSkyNow` — o mesmo que a tela do jogo lê.
+     No Céu Clássico quem decide é o período do gradiente, que é a régua com
+     que aquele tema foi desenhado. */
+  const darkSky = ceuClassico ? period === "madrugada" || period === "noite" : slot.dark;
 
-  // Cores de texto adaptadas ao céu do momento
+  /* Cores de texto adaptadas ao céu do momento.
+     `heroMuted` é o rótulo "semanas", e ele fica DIRETO sobre a cena, sem
+     cartão atrás — medido sobre o laranja do pôr do sol, `text-muted-foreground`
+     dava 2,9:1. `foreground/75` parte de um marrom escuro em vez de um cinza
+     médio e passa de 4,5:1 nos quatro céus, continuando a ler como
+     secundário ao lado do número. */
   const heroText = darkSky ? "text-white/95" : "text-foreground";
-  const heroMuted = darkSky ? "text-white/65" : "text-muted-foreground";
+  const heroMuted = darkSky ? "text-white/75" : "text-foreground/75";
 
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
      o céu escurece e o mesmo branco cegaria — então o vidro inverte e o texto
@@ -966,6 +883,22 @@ export function AppHomeScreen({
       : "inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -14px 30px -20px rgba(120,92,110,0.30)," +
         " 0 14px 36px -18px rgba(120,84,96,0.34)",
   };
+  /* O BISEL DO VIDRO, para ícone.
+     Texto ganha o material por `.dc-glass-text`; ícone é traço e não aceita
+     `background-clip`. Aqui o mesmo bisel é escrito em `drop-shadow`: luz
+     acima e à esquerda, sombra abaixo e à direita. No céu claro a sombra
+     escura precisa ser mais fraca — sobre lavanda ela viraria contorno sujo. */
+  const tracoDeVidro: React.CSSProperties = {
+    stroke: darkSky ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.96)",
+    filter: darkSky
+      ? "drop-shadow(-0.8px -1px 0 rgba(255,255,255,0.85))" +
+        " drop-shadow(0.8px 1.5px 0 rgba(26,40,76,0.44))" +
+        " drop-shadow(1.6px 3px 3px rgba(26,40,76,0.28))" +
+        " drop-shadow(0 8px 18px rgba(18,30,62,0.32))"
+      : "drop-shadow(-0.6px -0.8px 0 rgba(255,255,255,0.9))" +
+        " drop-shadow(0.7px 1.2px 0 rgba(96,66,110,0.34))" +
+        " drop-shadow(1.2px 2.4px 3px rgba(96,66,110,0.22))",
+  };
   const cardText = darkSky ? "text-white" : "text-foreground";
   /* UMA classe de vidro para toda a tela, grande e pequeno. Ela não troca de
      cor conforme o céu: vidro é sempre a mesma parede translúcida, e quem
@@ -982,10 +915,11 @@ export function AppHomeScreen({
      secundário ao lado do texto principal, mas parte de um preto, não de um
      cinza médio. */
   const cardMuted = darkSky ? "text-white/85" : "text-foreground/80";
-  /* Nome e etiqueta ficam SOBRE o céu, sem cartão atrás. Na arte isso pede
-     sombra: o fundo atrás deles muda de luminosidade ao longo do dia. */
-  const overArt: React.CSSProperties =
-    artTheme && darkSky ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" } : {};
+  /* Nome e etiqueta ficam SOBRE o céu, sem cartão atrás — o que pede sombra:
+     o fundo atrás deles muda de luminosidade ao longo do dia. */
+  const overArt: React.CSSProperties = darkSky
+    ? { textShadow: "0 2px 10px rgba(0,0,0,0.55)" }
+    : { textShadow: "0 2px 10px rgba(90,60,110,0.28)" };
 
   /* Quem o cartão do médico mostra.
      
@@ -1018,12 +952,12 @@ export function AppHomeScreen({
   useEffect(() => {
     const raiz = document.documentElement;
     const antes = raiz.style.backgroundColor;
-    /* `gradientFor` devolve um gradiente, e a moldura precisa de uma COR
-       chapada. A primeira cor do gradiente é a do topo do céu, que é
-       exatamente a borda que encosta na barra de status. */
-    const grad = gradientFor(period, weather?.code ?? 1);
-    const primeira = grad.match(/(#[0-9a-f]{3,8}|rgba?\([^)]+\)|oklch\([^)]+\)|hsla?\([^)]+\))/i);
-    if (primeira) raiz.style.backgroundColor = primeira[0];
+    /* A moldura precisa de uma COR CHAPADA, e ela tem de ser exatamente a do
+       topo da cena — é essa borda que encosta na barra de status. Cada céu
+       declara a sua (`corDeTopo`), ao lado do gradiente de onde ela saiu:
+       separadas em dois arquivos, elas divergiriam na primeira troca de
+       paleta e a emenda apareceria como uma linha de cor errada. */
+    raiz.style.backgroundColor = slot.corDeTopo;
     /* No app nativo, o relógio e a bateria do SISTEMA ficam sobre este mesmo
        céu — e o céu muda com a hora. Ícones escuros somem no céu de madrugada;
        ícones claros somem no azul do meio-dia. Então quem decide a barra é a
@@ -1035,7 +969,7 @@ export function AppHomeScreen({
       raiz.style.backgroundColor = antes;
       barraDeStatus(false);
     };
-  }, [period, weather?.code, darkSky]);
+  }, [slot.corDeTopo, darkSky]);
 
   return (
     /* Sem `pb` aqui: a página que renderiza esta tela (minha-conta) já reserva
@@ -1060,64 +994,46 @@ export function AppHomeScreen({
            tanto por dentro: a arte encosta no topo do aparelho, e o ícone do
            perfil e o clima continuam abaixo do relógio, onde dá para tocar. */
         className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(0.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
-        style={{ background: gradientFor(period, weather?.code ?? 1) }}
+        /* A cor do PÉ da cena, não a do topo: a cena cobre só a primeira dobra
+           (ver `CeuDoDia`), e é esta cor que continua atrás da segunda. O topo
+           não precisa de cor de espera porque o SVG pinta no mesmo quadro em
+           que monta — não há imagem para carregar. */
+        style={{
+          background: ceuClassico ? gradientFor(period, weather?.code ?? 1) : slot.corDeBaixo,
+        }}
       >
-        {/* Arte do momento do dia (tema V2). Fica ACIMA do gradiente, que
-            continua atrás como cor de espera enquanto a imagem carrega —
-            assim nunca há um flash branco. `cover` recorta as sobras: a arte
-            é vertical, então em telas largas sobra em cima e embaixo, e é lá
-            que mora só céu. */}
-        {/* UMA camada, em `cover`. Houve uma tentativa de recuar o fundo
-            mostrando a arte em largura cheia sobre uma cópia desfocada dela
-            mesma, com a emenda derretida por uma máscara de duas camadas
-            (`mask-composite`). Funcionava no Chromium do teste e FALHAVA no
-            Safari do iPhone: a máscara zerava, a arte nítida sumia inteira e
-            sobrava só o borrão. Voltou para `cover`, que é suportado em toda
-            parte. Se um dia valer a pena recuar o fundo de novo, tem que ser
-            por um caminho sem `mask-composite` — e testado em iOS de verdade,
-            não em Chromium. O recuo da CENA continua de pé: quem o dá é a
-            bolha menor, não o enquadramento do céu. */}
-        {artTheme && (
-          <div
-            aria-hidden
-            className="dc-sky-breathe pointer-events-none absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${slot.src})` }}
-          />
+        {/* A CENA DO MOMENTO — amanhecer, dia, pôr do sol ou anoitecer.
+            `dc-sky-breathe` dá o zoom lento que faz o céu parecer vivo; o SVG
+            já nasce em `slice`, então a folga do zoom nunca revela borda. */}
+        {!ceuClassico && <CeuDoDia nome={slot.nome} className="dc-sky-breathe" />}
+
+        {/* ─── O CÉU CLÁSSICO CONTINUA DE PÉ ───────────────────────────
+            Ele é item PAGO da Loja (150 🌱). As dez artes que saíram em
+            ago/2026 eram o tema padrão; este é a alternativa que alguém
+            comprou, e apagá-la tiraria da paciente uma coisa que ela pagou —
+            decisão de produto, não de refator. Continua sendo o gradiente com
+            sol, lua, estrelas e nuvens desenhados, como sempre foi. */}
+        {ceuClassico && (
+          <>
+            <SkyLayers code={weather?.code ?? 1} isDark={darkSky} mini period={period} />
+            {!darkSky && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{ background: DREAM_VEIL }}
+              />
+            )}
+          </>
         )}
 
-        {/* Vida de fundo do momento do dia — detalhe, nunca protagonista. */}
-        {artTheme && <SkyAmbience slot={slot.nome} careMode={careMode} />}
-
-        {/* Chuva: entra DEPOIS do ambiente porque molha o cenário inteiro,
-            inclusive os pássaros e as sementinhas. Continua abaixo do
-            conteúdo — a chuva não pinga em cima do texto.
-            Só no tema com arte: o Céu Clássico (V1) já desenha os próprios
-            fios de chuva no SkyLayers, e as duas juntas dariam chuva dupla. */}
-        {artTheme && (
+        {/* Chuva: entra DEPOIS da cena porque molha o cenário inteiro, e
+            continua abaixo do conteúdo — a chuva não pinga em cima do texto.
+            Só no céu novo: o Clássico já desenha os próprios fios de chuva no
+            `SkyLayers`, e as duas juntas dariam chuva dupla. */}
+        {!ceuClassico && (
           <SkyRain
             forca={weather ? forcaDaChuva(weather.code, weather.mm) : null}
             careMode={careMode}
-          />
-        )}
-
-        {/* Céu vivo (sol/lua, estrelas, nuvens, chuva) só no tema V1: sobre a
-            arte ele brigaria com as nuvens já pintadas nela. */}
-        {!artTheme && (
-          <SkyLayers
-            code={weather?.code ?? 1}
-            isDark={period === "madrugada" || period === "noite"}
-            mini
-            period={period}
-          />
-        )}
-
-        {/* Véu pastel: só no V1 e só no céu claro — à noite lavaria o escuro
-            e as estrelas sumiriam. */}
-        {!artTheme && !darkSky && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{ background: DREAM_VEIL }}
           />
         )}
 
@@ -1127,19 +1043,27 @@ export function AppHomeScreen({
               por isso `h-[100svh]` aqui e não `min-h`: o que não couber vai
               para a dobra de baixo em vez de espremer o bebê. ── */}
           <div className="flex h-[100svh] flex-col pt-[calc(0.5rem+var(--safe-top))] pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]">
-            {/* ── Barra de topo flutuante: menu + clima ─────────────── */}
-            <div className="flex items-start justify-between gap-3">
+            {/* ── BARRA DE TOPO: menu · nome · clima ────────────────────
+                Três peças numa linha só, e o nome fica no CENTRO ÓPTICO da
+                tela — não no centro do espaço que sobra entre os dois botões.
+                Por isso ele é posicionado em `absolute` com `-translate-x-1/2`
+                em vez de entrar no fluxo: o botão da esquerda mede 40px e a
+                pílula do clima mede ~72px, e num `justify-between` o nome
+                nasceria 16px fora do eixo. Com a pílula ausente (clima ainda
+                carregando) ele sairia de novo, e do outro lado — o nome
+                andaria pela tela sozinho conforme a rede respondesse. */}
+            <div className="relative flex h-10 items-center justify-between gap-3">
               <button
                 onClick={() => {
                   hapticTap();
                   onOpenMenu?.();
                 }}
-                aria-label={temNaoLidas ? "Perfil — há notificações novas" : "Perfil"}
-                className="press relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                aria-label={temNaoLidas ? "Menu — há notificações novas" : "Menu"}
+                className="press relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                 style={glassLeve}
               >
                 {/* O ponto fica FORA do círculo de vidro, encostado na borda:
-                    dentro ele competiria com a silhueta num botão de 40px e
+                    dentro ele competiria com o ícone num botão de 40px e
                     sumiria contra nuvem clara. O anel branco o descola do céu. */}
                 {temNaoLidas && (
                   <span
@@ -1147,42 +1071,49 @@ export function AppHomeScreen({
                     className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-rose-500 ring-2 ring-white/85"
                   />
                 )}
-                {/* Silhueta de perfil no lugar do ☰. Três barras não dizem o
-                    que há atrás delas — cabem notificações, ajustes, sair,
-                    qualquer coisa. A silhueta diz: isto é a SUA conta. E é
-                    o mesmo desenho que todo app usa para esse canto, então
-                    ninguém precisa aprender nada.
-
-                    O botão é irmão do número de graus, e ícone não aceita
-                    `background-clip: text`. O material vira traço: linha
-                    branca translúcida com as MESMAS sombras deslocadas do
-                    vidro — claras para cima e à esquerda, escuras para baixo
-                    e à direita. É o mesmo bisel, escrito em `drop-shadow`. */}
-                <UserRound
-                  className="h-5 w-5"
-                  strokeWidth={2.1}
-                  style={{
-                    stroke: "rgba(255,255,255,0.9)",
-                    filter:
-                      "drop-shadow(-0.8px -1px 0 rgba(255,255,255,0.85))" +
-                      " drop-shadow(0.8px 1.5px 0 rgba(26,40,76,0.44))" +
-                      " drop-shadow(1.6px 3px 3px rgba(26,40,76,0.28))" +
-                      " drop-shadow(0 8px 18px rgba(18,30,62,0.32))",
-                  }}
-                />
+                {/* Ícone não aceita `background-clip: text`, então o material
+                    do vidro vira traço: linha branca translúcida com as MESMAS
+                    sombras deslocadas dos cartões — claras para cima e à
+                    esquerda, escuras para baixo e à direita. É o mesmo bisel,
+                    escrito em `drop-shadow`. */}
+                <Menu className="h-5 w-5" strokeWidth={2.2} style={{ ...tracoDeVidro }} />
               </button>
 
-              {/* Só o número. O ícone do tempo desceu para o cartão de
-                  saudação, onde ele tem espaço para ser o ícone REAL da
-                  condição em vez de um genérico — e o topo fica com dois
-                  círculos do mesmo tamanho, um de cada lado, em vez de um
-                  botão e uma pílula comprida. */}
+              {/* O NOME DO BEBÊ, no eixo da tela. `pointer-events-none` porque
+                  ele atravessa a faixa inteira: sem isso a metade invisível do
+                  bloco cobriria o botão do menu e a pílula do clima. */}
+              {babyName && (
+                <p
+                  className={`pointer-events-none absolute left-1/2 max-w-[52%] -translate-x-1/2 truncate text-center font-serif text-[clamp(1.15rem,5.2vw,1.5rem)] font-medium leading-none ${heroText}`}
+                  style={overArt}
+                >
+                  {babyName} <span className="align-middle text-[0.72em]">💜</span>
+                </p>
+              )}
+
+              {/* A pílula do clima: ícone do céu + graus. O ícone segue a CENA
+                  e não o relógio — lua no anoitecer, sol no resto —, que é a
+                  mesma régua do texto claro/escuro. Sem ele a pílula seria só
+                  um número solto e ninguém saberia do que ele fala. */}
               {weather && (
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                  className="relative z-10 flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3"
                   style={glassLeve}
                   aria-label={`${weather.temp} graus, ${weather.condition}`}
                 >
+                  {darkSky ? (
+                    <Moon
+                      className="h-[15px] w-[15px] shrink-0"
+                      strokeWidth={2.2}
+                      style={tracoDeVidro}
+                    />
+                  ) : (
+                    <Sun
+                      className="h-[15px] w-[15px] shrink-0"
+                      strokeWidth={2.2}
+                      style={tracoDeVidro}
+                    />
+                  )}
                   <span className={`text-[15px] font-bold leading-none ${cardText} ${glassSmall}`}>
                     {weather.temp}°
                   </span>
@@ -1191,56 +1122,43 @@ export function AppHomeScreen({
             </div>
 
             {isMadrugada && (
-              <p className="mt-3 text-[11px] text-white/65">
+              <p className="mt-3 text-center text-[11px] text-white/65">
                 🌙 Madrugada — tente descansar um pouco
               </p>
             )}
 
             {gest && baby ? (
               <>
-                {/* Só o nome. O rótulo "Acompanhando" saiu: ele ocupava uma
-                    linha inteira para dizer o óbvio, e era o texto de menor
-                    contraste da tela. Sem ele — e sem as pílulas — o nome pode
-                    crescer e respirar, que é o que faz alguém LER em vez de só
-                    reconhecer. */}
-                {babyName && (
-                  <div className="mt-5 short:mt-3 text-center" style={overArt}>
-                    <p
-                      className={`font-serif text-[clamp(1.8rem,8vw,2.35rem)] font-normal leading-none ${heroText} ${glassText}`}
-                    >
-                      {babyName} <span className="dc-sem-vidro align-middle text-[0.5em]">💜</span>
-                    </p>
-                  </div>
-                )}
-
-                {/* As pílulas de trimestre e de contagem regressiva saíram.
-                    A data prevista do parto já aparece por extenso no cartão de
-                    progresso, logo abaixo, e o trimestre é dedutível da semana
-                    que está em letras garrafais no meio da tela. Duas pílulas
-                    para repetir o que a tela já diz é justamente o que tirava
-                    o ar do topo.
-                    A mensagem de reta final (40s+) não se perde: título, corpo
-                    e dica continuam na aba do Bebê — aqui só existia o rótulo. */}
-
                 {/* Bebê protagonista dentro da bolha (o "ventre").
                   Toque abre a aba do Bebê com a semana detalhada — e pede a
                   sub-aba "semana" de propósito: a aba do Bebê agora abre numa
                   grade de seis, e este toque promete a semana, não um menu. */}
+                {/* ─── A COMPOSIÇÃO VERTICAL, EM TRÊS RESPIROS ──────────
+                    Antes o botão da bolha era `flex-1` e engolia TODA a folga
+                    da tela — a bolha ficava centrada num vão de 684px e
+                    empurrava o número para 90% da altura, encostado na barra
+                    de baixo (medido: sobrava 21px, e em tela curta virava
+                    sobreposição).
+
+                    Agora a folga é repartida por três espaçadores com pesos
+                    fixos. Os pesos não são gosto: saíram das proporções da
+                    referência do rebranding — bolha centrada a 39% da altura,
+                    número a 68%, e um respiro de ~14% antes da barra. Como
+                    são PESOS e não pixels, a mesma proporção vale de um SE a
+                    um Pro Max. */}
+                <div className="flex-[1.15] short:flex-[0.7]" aria-hidden />
+
                 <button
                   onClick={() => onNavigate("Bebê", "semana")}
                   aria-label="Ver a semana do bebê"
-                  className="relative flex min-h-0 flex-1 items-center justify-center py-1.5 transition-transform active:scale-[0.97]"
+                  className="relative flex shrink-0 items-center justify-center transition-transform active:scale-[0.97]"
                 >
-                  {/* UMA caixa manda em bola e bebê. Antes cada um tinha a sua
-                    medida e em tela curta um escapava do outro. Ela cabe na
-                    faixa (`h-full`), na largura (`76vw`) e tem teto — nessa
-                    ordem, o que for menor vence. */}
-                  {/* Recuada de ~25%: a bolha vinha ocupando 76vw — em 430px
-                    são 327 de 430, quase a largura toda, e o que se sente é
-                    lente colada no rosto. Em 57vw ela volta a ser um objeto
-                    DENTRO de uma cena, com céu em volta para o objeto estar
-                    dentro de quê. O céu que sobra não é vazio: é a distância. */}
-                  <div className="relative aspect-square h-full max-h-[min(57vw,19.5rem)]">
+                  {/* A caixa que manda em bolha e bebê. Medida pela LARGURA
+                      (60vw) e com teto em rem: assim ela não depende da folga
+                      vertical, que agora pertence aos espaçadores. Em tela
+                      curta cai para 48vw — é o que faz o número continuar
+                      dentro da primeira dobra num aparelho de 780px. */}
+                  <div className="relative aspect-square w-[min(60vw,19.5rem)] short:w-[min(48vw,15rem)]">
                     {ART_HAS_ORB ? null : <BabyOrb />}
                     {/* `scale` porque o SVG tem margem interna larga: a tinta do
                       bebê é ~55% da caixa, e 1.43 leva ela a ~80% da bolha — a
@@ -1257,106 +1175,48 @@ export function AppHomeScreen({
                   </div>
                 </button>
 
-                {/* ── Cartão da semana em degrau ──────────────────────
-                  A aba do número SOBE do cartão, como no conceito. São dois
-                  irmãos encostados (não empilhados): vidro sobre vidro
-                  dobraria a opacidade e deixaria a emenda escura. */}
-                <div className="mt-1 flex flex-col items-center">
-                  <div
-                    className="px-5 pb-1 pt-1.5 short:pt-1 text-center"
-                    style={{ ...glass, borderBottom: "none", borderRadius: "24px 24px 0 0" }}
-                  >
-                    <p
-                      /* Sem vidro aqui, e o motivo é físico: este número fica
-                         DENTRO de um cartão de vidro, e vidro precisa de cena
-                         atrás para existir. Sobre a chapa clara do cartão não
-                         há o que atravessar — o "20" quase sumia. O material
-                         só vale para texto que se apoia direto no céu. */
-                      className={`leading-none ${cardText} ${glassSmall}`}
-                      style={{
-                        // `var(--font-serif)` e não "Nunito" fixo: preso assim,
-                        // o maior número da tela era o único texto que NÃO
-                        // seguia a fonte do sistema.
-                        fontFamily: "var(--font-serif)",
-                        fontSize: "clamp(2.5rem, 10.5vw, 3.2rem)",
-                        fontWeight: 400,
-                        letterSpacing: "-0.01em",
-                        fontVariantNumeric: "tabular-nums lining-nums",
-                      }}
-                    >
-                      {gest.weeks}
-                    </p>
-                    <p className={`mt-0.5 text-[15px] font-normal ${cardMuted} ${glassSmall}`}>
-                      {gest.weeks === 1 ? "semana" : "semanas"}
-                      {gest.days > 0 && ` e ${gest.days} ${gest.days === 1 ? "dia" : "dias"}`}
-                    </p>
-                  </div>
+                {/* ── A SEMANA, direto no céu ──────────────────────────
+                  O cartão de vidro que ficava aqui saiu inteiro (ago/2026).
+                  Ele empilhava número, rótulo, um divisor com coração e três
+                  medidas (comprimento, peso, fruta) num bloco de ~140px —
+                  metade da altura que o bebê tinha para ser protagonista.
 
-                  <div
-                    className="w-full rounded-[24px] px-3.5 pb-3 pt-2.5 short:pb-2.5 short:pt-2"
-                    style={glass}
-                  >
-                    {/* Medidas da semana (silenciadas no Modo Cuidado) */}
-                    {!careMode && (
-                      <>
-                        {/* Divisor com coração — o mesmo traço do conceito */}
-                        <div className="mt-1 flex items-center justify-center gap-2.5" aria-hidden>
-                          <span
-                            className="h-px w-16"
-                            style={{
-                              background: `linear-gradient(90deg, transparent, ${darkSky ? "rgba(255,255,255,0.34)" : "rgba(186,150,170,0.55)"})`,
-                            }}
-                          />
-                          <span className="text-sm">💗</span>
-                          <span
-                            className="h-px w-16"
-                            style={{
-                              background: `linear-gradient(90deg, ${darkSky ? "rgba(255,255,255,0.34)" : "rgba(186,150,170,0.55)"}, transparent)`,
-                            }}
-                          />
-                        </div>
+                  As três medidas não se perderam: continuam na aba do Bebê,
+                  que é onde ela vai quando quer o DETALHE da semana. Aqui
+                  ficou o que a tela existe para dizer, e que se lê de longe.
 
-                        <div className="mt-3 short:mt-2 grid grid-cols-3">
-                          {[
-                            { emoji: "📏", value: baby.size, label: "Comprimento" },
-                            { emoji: "⚖️", value: baby.weight, label: "Peso" },
-                            {
-                              emoji: fruitEmojiForWeek(gest.weeks),
-                              value: baby.fruit,
-                              label: "Tamanho",
-                            },
-                          ].map((s, i) => (
-                            <div
-                              key={s.label}
-                              className={`flex flex-col items-center px-1 ${i < 2 ? "border-r" : ""}`}
-                              style={{
-                                borderColor: darkSky
-                                  ? "rgba(255,255,255,0.16)"
-                                  : "rgba(150,110,120,0.16)",
-                              }}
-                            >
-                              <span className="text-lg short:text-base leading-none">
-                                {s.emoji}
-                              </span>
-                              <p
-                                className={`mt-1 text-[14px] font-semibold leading-tight ${cardText} ${glassSmall}`}
-                              >
-                                {s.value}
-                              </p>
-                              {/* Sem `opacity-80` aqui: `cardMuted` JÁ é uma cor
-                                  atenuada, e as duas camadas se multiplicavam —
-                                  70% de opacidade dentro de um bloco a 80% dá
-                                  56% na tela, e a medida caía para 2,8:1. */}
-                              <p className={`text-[11px] font-normal ${cardMuted} ${glassSmall}`}>
-                                {s.label}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  Sem vidro atrás porque o número agora se apoia direto na
+                  cena — e é justamente isso que deixa o material funcionar:
+                  vidro precisa de céu atravessando para existir. */}
+                <div className="flex-[0.72] short:flex-[0.5]" aria-hidden />
+
+                <div className="flex shrink-0 flex-col items-center" style={overArt}>
+                  <p
+                    className={`leading-[0.9] ${heroText}`}
+                    style={{
+                      // `var(--font-serif)` e não uma fonte fixa: preso assim,
+                      // o maior número da tela era o único texto que NÃO
+                      // seguia a fonte do sistema.
+                      fontFamily: "var(--font-serif)",
+                      fontSize: "clamp(4rem, 20vw, 6.5rem)",
+                      // 300 e não 400: neste corpo o peso normal fica pesado
+                      // demais e o número vira bloco. Fino, ele respira — é o
+                      // que a referência do rebranding traz.
+                      fontWeight: 300,
+                      letterSpacing: "-0.02em",
+                      fontVariantNumeric: "tabular-nums lining-nums",
+                    }}
+                  >
+                    {gest.weeks}
+                  </p>
+                  <p
+                    className={`mt-1 text-[clamp(1rem,4.4vw,1.25rem)] font-normal leading-none ${heroMuted}`}
+                  >
+                    {gest.weeks === 1 ? "semana" : "semanas"}
+                  </p>
                 </div>
+
+                <div className="flex-[0.85] short:flex-[0.6]" aria-hidden />
               </>
             ) : (
               /* flex-1 centrado: sem isso o texto ficava colado no topo com
