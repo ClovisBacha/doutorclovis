@@ -65,20 +65,29 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import feliz from "@/assets/bolha/feliz.webp";
 import comemorando from "@/assets/bolha/comemorando.webp";
 import dormindo from "@/assets/bolha/dormindo.webp";
-import preocupada from "@/assets/bolha/preocupada.webp";
 import orgulhosa from "@/assets/bolha/orgulhosa.webp";
 import surpresa from "@/assets/bolha/surpresa.webp";
 
-export type Humor = "feliz" | "comemorando" | "dormindo" | "preocupada" | "orgulhosa" | "surpresa";
+/**
+ * ─── "PREOCUPADA" SAIU (ago/2026) ───────────────────────────────────────────
+ *
+ * Existia um quinto humor, com cara triste e uma gota de suor, que aparecia
+ * quando a sequência de dias morria. Foi removido a pedido do dono, e a razão
+ * já estava escrita no próprio arquivo antes de ele pedir: este app fala com
+ * gestante de alto risco, e uma carinha decepcionada por ela ter faltado dois
+ * dias é cobrança disfarçada de fofura.
+ *
+ * Quem some não é só a arte — é o gatilho. `sequenciaPerdida` saiu da
+ * assinatura junto, senão sobraria um parâmetro que ninguém lê e o próximo a
+ * mexer aqui acharia que ele ainda faz alguma coisa.
+ */
+export type Humor = "feliz" | "comemorando" | "dormindo" | "orgulhosa" | "surpresa";
 
 /**
  * ─── AS ARTES DO BEBÊ BOLHA (ago/2026) ──────────────────────────────────────
  *
- * Cinco das seis já são a personagem nova. `preocupada` é a única que ainda
- * está na personagem anterior, em aquarela — a expressão não foi desenhada, e
- * NÃO dá para emprestar outra: `surpresa` num "a sequência acabou" lê como
- * animação, e `feliz` apagaria o sinal. Uma cara que contradiz o que a tela
- * diz é pior que uma diferença de traço.
+ * As cinco são a personagem nova. A sexta, `preocupada`, foi removida — ver o
+ * bloco acima.
  *
  * ─── TODAS PARTEM DA MESMA ESFERA ───────────────────────────────────────────
  *
@@ -99,28 +108,33 @@ export type Humor = "feliz" | "comemorando" | "dormindo" | "preocupada" | "orgul
  * por preenchimento a partir das bordas, e não por "todo pixel claro vira
  * transparente" — este último furaria os reflexos brancos dentro da bolha.
  */
-const ARTE: Record<Humor, string> = {
-  feliz,
-  comemorando,
-  dormindo,
-  preocupada,
-  orgulhosa,
-  surpresa,
-};
+const ARTE: Record<Humor, string> = { feliz, comemorando, dormindo, orgulhosa, surpresa };
 
 /**
  * Que cara ela faz, a partir do estado da jornada.
  *
  * A ordem das perguntas é a prioridade emocional, e ela importa: comemorar
- * ganha de tudo, porque é o único instante que a paciente veio buscar. A cara
- * preocupada só aparece quando a sequência já morreu — nunca como cobrança de
- * quem está em dia, o que seria pressão num público que não precisa de mais.
+ * ganha de tudo, porque é o único instante que a paciente veio buscar.
+ *
+ * Depois da saída de `preocupada`, NENHUMA cara desta lista é negativa. Isso é
+ * a regra e não uma coincidência: o app não tem nada a ganhar fazendo cara
+ * feia para uma gestante de alto risco que abriu o aplicativo.
  */
 export function humorDaJornada(o: {
   comemorando?: boolean;
   diaFeito?: boolean;
-  sequenciaPerdida?: boolean;
   noite?: boolean;
+  /**
+   * Ela abriu de MADRUGADA (0h–5h).
+   *
+   * Não é rotina, e por isso vira surpresa e não preocupação: a bolha se
+   * espanta de bom ("olha quem apareceu!"), em vez de estranhar. Quem está
+   * acordada às 3h numa gestação de risco não precisa de mais ninguém achando
+   * aquilo ruim.
+   */
+  madrugada?: boolean;
+  /** Ela fez muito mais coisa num dia só do que a rotina pede. */
+  ritmoIncomum?: boolean;
   /**
    * Modo Cuidado — a paciente perdeu a gestação.
    *
@@ -131,12 +145,11 @@ export function humorDaJornada(o: {
    */
   careMode?: boolean;
 }): Humor {
-  /* No luto, festa e cobrança somem juntas. "preocupada" seria pior ainda que
-     "comemorando": cara triste por sequência quebrada, para quem parou de
-     abrir o app porque enterrou um filho. */
+  /* No luto a bolha fica NEUTRA, e é a primeira pergunta de todas.
+     Festa não sai, e nem a surpresa da madrugada: às 3h da manhã, para quem
+     perdeu a gestação, "olha quem apareceu!" é a última coisa a se dizer. */
   if (o.careMode) return o.noite && o.diaFeito ? "dormindo" : "feliz";
   if (o.comemorando) return "comemorando";
-  if (o.sequenciaPerdida) return "preocupada";
   if (o.noite && o.diaFeito) return "dormindo";
   /* ORGULHOSA — a piscadinha. Fica entre a festa e o repouso: o dia está
      fechado, mas não é o instante da comemoração nem a hora de dormir. É o que
@@ -144,6 +157,13 @@ export function humorDaJornada(o: {
      `feliz`, a mesma cara de quem ainda não começou — e a bolha deixava de
      reparar no dia dela. */
   if (o.diaFeito) return "orgulhosa";
+  /* SURPRESA — o fora do comum, e sempre para o BEM.
+     Vem DEPOIS de `diaFeito` de propósito: quem fechou o dia merece a
+     piscadinha, que é reconhecimento; a surpresa é para o que ainda está
+     acontecendo. Um dia com muita coisa feita ainda em andamento, ou uma
+     visita de madrugada, são as duas coisas que fogem da rotina — e nas duas a
+     cara certa é o espanto bom, não o estranhamento. */
+  if (o.madrugada || o.ritmoIncomum) return "surpresa";
   return "feliz";
 }
 

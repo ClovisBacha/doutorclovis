@@ -291,7 +291,7 @@ import {
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Bolha, humorDaJornada } from "@/components/bolha";
-import { recadoDaBolha } from "@/lib/recado-da-bolha";
+import { faixaDaHora, recadoDaBolha } from "@/lib/recado-da-bolha";
 /* Arte própria desta tela, feita a partir do desenho de referência. Ela mora
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
    cenário fixo da tela de atividades. */
@@ -6684,9 +6684,18 @@ function WellnessScreen({
                   A festa continua onde existe o instante: ao terminar uma
                   atividade e ao gabaritar o quiz. Aqui fica a piscadinha, que
                   é o "eu vi o que você fez" sem estourar confete de novo. */}
+              {/* `ritmoIncomum` em 4 de 6, e não em 2: metade do dia é rotina,
+                  e uma bolha espantada com o que é normal ensina que o espanto
+                  dela não quer dizer nada. Em 4 já é dia cheio — e ainda não é
+                  o dia fechado, que tem cara própria. */}
               <Bolha
                 tamanho={298}
-                humor={humorDaJornada({ diaFeito: halves >= 6, careMode })}
+                humor={humorDaJornada({
+                  diaFeito: halves >= 6,
+                  madrugada: horaLocal !== null && faixaDaHora(horaLocal) === "madrugada",
+                  ritmoIncomum: halves >= 4,
+                  careMode,
+                })}
                 careMode={careMode}
               />
 

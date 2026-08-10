@@ -283,19 +283,43 @@ describe("MODO CUIDADO — no luto, festa e cobranca somem", () => {
     expect(humorDaJornada({ comemorando: true, careMode: true })).not.toBe("comemorando");
   });
 
-  test("nunca cobra", () => {
-    /* Cara preocupada por sequencia quebrada, para quem parou de abrir o app
-       porque enterrou um filho, e o mesmo defeito com o sinal trocado. */
-    expect(humorDaJornada({ sequenciaPerdida: true, careMode: true })).not.toBe("preocupada");
+  test("nunca cobra — e agora nao ha COMO cobrar", () => {
+    /* O humor `preocupada` saiu do app (ago/2026). O teste que sobrava aqui
+       provava que ele nao aparecia no luto; este prova algo mais forte, que e
+       o que passou a valer: a cara negativa nao existe mais em lugar nenhum,
+       para nenhuma paciente.
+
+       A checagem e no TIPO e no IMPORT, e nao na palavra solta: o arquivo
+       explica em prosa por que ela saiu, e apagar essa explicacao para o teste
+       passar seria trocar a memoria do projeto por um `grep` feliz. */
+    const fonte = readFileSync(new URL("./bolha.tsx", import.meta.url), "utf8");
+    expect(fonte).not.toMatch(/from "@\/assets\/bolha\/preocupada/);
+    expect(fonte).not.toMatch(/export type Humor =[^;]*preocupada/);
+    expect(fonte).not.toMatch(/const ARTE[^;]*preocupada/);
   });
 
   test("dormir continua — nao e festa, e companhia", () => {
     expect(humorDaJornada({ noite: true, diaFeito: true, careMode: true })).toBe("dormindo");
   });
 
+  test("no luto a surpresa da madrugada tambem some", () => {
+    /* "Olha quem apareceu!" as 3h da manha, para quem perdeu a gestacao, e o
+       mesmo defeito de comemorar com o sinal trocado. */
+    expect(humorDaJornada({ madrugada: true, careMode: true })).toBe("feliz");
+    expect(humorDaJornada({ ritmoIncomum: true, careMode: true })).toBe("feliz");
+  });
+
   test("sem Modo Cuidado nada muda", () => {
     expect(humorDaJornada({ comemorando: true })).toBe("comemorando");
-    expect(humorDaJornada({ sequenciaPerdida: true })).toBe("preocupada");
+    expect(humorDaJornada({ madrugada: true })).toBe("surpresa");
+    expect(humorDaJornada({ ritmoIncomum: true })).toBe("surpresa");
+  });
+
+  test("a piscadinha do dia fechado ganha da surpresa", () => {
+    /* Quem fechou o dia merece o reconhecimento, e nao o espanto: a surpresa e
+       para o que ainda esta acontecendo. */
+    expect(humorDaJornada({ diaFeito: true, ritmoIncomum: true })).toBe("orgulhosa");
+    expect(humorDaJornada({ diaFeito: true, madrugada: true })).toBe("orgulhosa");
   });
 
   test("o portao mora no componente, nao no ponto de uso", () => {
