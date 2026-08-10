@@ -44,7 +44,7 @@ describe("recadoDaBolha — o que não pode acontecer", () => {
       for (const semana of [null, 0, 1, 20, 42])
         for (const posParto of [false, true])
           for (const careMode of [false, true])
-            for (let feitos = 0; feitos <= 6; feitos++)
+            for (let feitos = 0; feitos <= 5; feitos++)
               for (let hora = 0; hora < 24; hora++)
                 for (let dia = 0; dia < 40; dia++) {
                   const t = recadoDaBolha({ feitos, dia, hora, bebe, semana, posParto, careMode });
@@ -58,7 +58,7 @@ describe("recadoDaBolha — o que não pode acontecer", () => {
 
   test("no Modo Cuidado não fala do bebê nem em 'vocês dois'", () => {
     for (let dia = 0; dia < 30; dia++)
-      for (let feitos = 0; feitos <= 6; feitos++)
+      for (let feitos = 0; feitos <= 5; feitos++)
         for (const hora of [3, 9, 15, 22]) {
           const t = recadoDaBolha({ ...base, careMode: true, dia, feitos, hora });
           expect(t.toLowerCase()).not.toContain("bebê");
@@ -71,7 +71,7 @@ describe("recadoDaBolha — o que não pode acontecer", () => {
 
   test("no pós-parto não diz que o bebê está crescendo aí dentro nem a semana", () => {
     for (let dia = 0; dia < 40; dia++)
-      for (let feitos = 0; feitos <= 6; feitos++)
+      for (let feitos = 0; feitos <= 5; feitos++)
         for (const hora of [3, 6, 9, 13, 16, 19, 22]) {
           const t = recadoDaBolha({ ...base, posParto: true, dia, feitos, hora });
           expect(t).not.toContain("aí dentro");
@@ -99,25 +99,31 @@ describe("recadoDaBolha — o que não pode acontecer", () => {
 });
 
 describe("recadoDaBolha — a frase certa para o momento", () => {
-  test("com os 6 fechados, sempre celebra", () => {
+  test("com os 5 fechados, sempre celebra", () => {
     for (let dia = 0; dia < 40; dia++)
       for (const hora of [3, 9, 15, 22]) {
-        const t = recadoDaBolha({ ...base, feitos: 6, dia, hora });
+        const t = recadoDaBolha({ ...base, feitos: 5, dia, hora });
         expect(t.startsWith("🌟")).toBe(true);
       }
   });
 
   test("começado e não fechado, fala do meio do caminho", () => {
-    for (let feitos = 1; feitos <= 5; feitos++)
+    for (let feitos = 1; feitos <= 4; feitos++)
       for (let dia = 0; dia < 20; dia++) {
         const t = recadoDaBolha({ ...base, feitos, dia });
         expect(t.startsWith("✨")).toBe(true);
       }
   });
 
+  test("o total é parâmetro, não número cravado", () => {
+    /* Já mudou uma vez (6 → 5). Cravado no texto, o "de 6" ficaria escrito na
+       tela por mais tempo do que foi verdade. */
+    expect(recadoDaBolha({ ...base, feitos: 2, dia: 0, total: 8 })).toContain("2 de 8");
+  });
+
   test("mostra quantos faltam, com o número certo", () => {
     const t = recadoDaBolha({ ...base, feitos: 3, dia: 0 });
-    expect(t).toContain("3 de 6");
+    expect(t).toContain("3 de 5");
   });
 
   test("na abertura, a faixa de hora entra no bolo", () => {

@@ -342,12 +342,12 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
     const doneCount = WELLNESS_ACTIVITIES.filter((a) => doneSet.has(keyFor(a))).length;
     const allDone = doneCount === WELLNESS_ACTIVITIES.length;
 
-    // (O bônus do dia é por fechar as 3 ESTRELAS — os 6 jogos, cada um valendo
-    // meia — via grantDayStarsBonus. Aqui cada atividade só rende a sua.)
+    // (O bônus do dia é por fechar as 5 ESTRELAS — a aula + os 4 jogos, uma
+    // estrela cada — via grantDayStarsBonus. Aqui cada atividade só rende a sua.)
     return { ok: true as const, granted, doneCount, allDone };
   });
 
-/** Bônus por fechar as 3 estrelas do dia (6 jogos × meia estrela). 1x/dia. */
+/** Bônus por fechar as 5 estrelas do dia (a aula + os 4 jogos). 1x/dia. */
 export const grantDayStarsBonus = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ accessToken: z.string().min(10), day: z.number().int().min(1).max(400) }).parse(i),
@@ -383,18 +383,16 @@ export const grantDayStarsBonus = createServerFn({ method: "POST" })
       .maybeSingle();
     if (had) return { ok: true as const, granted: 0 };
     const amount = 20;
-    await grantSementinhas(db, uid, [{ amount, reason: "3 estrelas do dia! 🌟", dedupeKey }]);
+    await grantSementinhas(db, uid, [{ amount, reason: "5 estrelas do dia! 🌟", dedupeKey }]);
     return { ok: true as const, granted: amount };
   });
 
 /** Atividades do desafio diário de bem-estar (ordem = ordem no jogo). */
-const WELLNESS_ACTIVITIES = [
-  "breathing",
-  "movement",
-  "meditation",
-  "bonding",
-  "gratitude",
-] as const;
+/* ─── QUATRO, E NÃO MAIS CINCO (ago/2026) ────────────────────────────────
+   "breathing" saiu: a respiração guiada virou um tema da meditação, e uma
+   chave que ninguém mais grava faria `allDone` nunca ser verdade — o bônus do
+   dia deixaria de existir em silêncio, sem erro nenhum a apontar. */
+const WELLNESS_ACTIVITIES = ["movement", "meditation", "bonding", "gratitude"] as const;
 
 /** Progresso do desafio de bem-estar de HOJE (quais atividades já foram feitas). */
 export const getWellnessProgress = createServerFn({ method: "POST" })

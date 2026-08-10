@@ -68,17 +68,17 @@ const ABERTURA: Frase[] = [
 
 /** B — começou e não fechou. O papel aqui é tirar pressa, não cobrar. */
 const NO_MEIO: Frase[] = [
-  f("✨ {feitos} de 6, e cada um deles conta. Segue no seu ritmo. 💗"),
+  f("✨ {feitos} de {total}, e cada um conta. Segue no seu ritmo. 💗"),
   f("✨ Você já começou — essa é a parte difícil. O resto vem. 💜"),
   f("✨ Falta pouquinho pra fechar o dia. Mas sem pressa, tá? 💗"),
   f("✨ Um de cada vez. Ninguém aqui está contando o relógio. 💜"),
 ];
 
-/** C — os seis fechados. */
+/** C — todos fechados. */
 const COMPLETO: Frase[] = [
   f("🌟 Dia completo! O que você fez hoje fica com vocês dois. 💜", { soGestacao: true }),
   f("🌟 Fechou tudo. Agora descansa — você cuidou bem de vocês. 💗"),
-  f("🌟 Seis de seis. Que dia bonito o de vocês hoje. 💜"),
+  f("🌟 Tudo feito. Que dia bonito o de vocês hoje. 💜"),
   f("🌟 Pronto por hoje. Amanhã a gente recomeça, sem cobrança. 💗"),
 ];
 
@@ -164,8 +164,18 @@ const CUIDADO: Frase[] = [
 ];
 
 export type EstadoDoRecado = {
-  /** Quantos dos 6 momentos do dia já foram feitos. */
+  /** Quantos momentos do dia já foram feitos. */
   feitos: number;
+  /**
+   * Quantos momentos o dia tem.
+   *
+   * Entra por parâmetro, e não como constante daqui, porque o número já mudou
+   * uma vez: eram 6 (a respiração era um deles) e viraram 5 quando ela foi
+   * absorvida pela meditação. Cravado no texto, o "de 6" continuaria escrito
+   * na tela por mais tempo do que foi verdade — e é o tipo de erro que
+   * ninguém reporta, só desconfia.
+   */
+  total?: number;
   /** Dia da jornada — é ele que gira a frase, e nunca o acaso. */
   dia: number;
   /**
@@ -190,9 +200,15 @@ function primeiroNome(nome: string): string {
   return nome.trim().split(/\s+/)[0] ?? "";
 }
 
+/** Cinco hoje; o parâmetro existe para o dia em que deixar de ser. */
+function totalDoDia(e: EstadoDoRecado): number {
+  return typeof e.total === "number" && e.total > 0 ? e.total : 5;
+}
+
 function preencher(texto: string, e: EstadoDoRecado): string {
   return texto
     .replace("{feitos}", String(e.feitos))
+    .replace("{total}", String(totalDoDia(e)))
     .replace("{semana}", String(e.semana ?? ""))
     .replace(/\{bebe\}/g, e.bebe ? primeiroNome(e.bebe) : "");
 }
@@ -219,7 +235,7 @@ function serve(fr: Frase, e: EstadoDoRecado): boolean {
 export function recadoDaBolha(e: EstadoDoRecado): string {
   const lista = (() => {
     if (e.careMode) return CUIDADO;
-    if (e.feitos >= 6) return COMPLETO;
+    if (e.feitos >= totalDoDia(e)) return COMPLETO;
     if (e.feitos > 0) return NO_MEIO;
     const daHora = typeof e.hora === "number" ? POR_HORA[faixaDaHora(e.hora)] : [];
     return [...ABERTURA, ...VINCULO, ...daHora];

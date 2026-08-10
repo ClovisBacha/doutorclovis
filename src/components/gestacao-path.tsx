@@ -49,40 +49,47 @@ import { fireConfetti, celebrateChime, celebrateHaptic, nivelDaSequencia } from 
  * + som + vibração. Só dispara quando o bônus foi de fato concedido. O reward
  * já é gated por Modo Cuidado no servidor e no gate `canEarn`.
  */
-/* ── Estrelas do dia em MEIAS: 6 jogos × ½⭐ = 3⭐ ─────────────────────────
-   Os 5 jogos de bem-estar + a aula da professora. Cada um vale meia estrela. */
-const WELLNESS_HALF_KEYS = [
-  "w_breathing",
-  "w_movement",
-  "w_meditation",
-  "w_bonding",
-  "w_gratitude",
-] as const;
+/* ── Os momentos do dia: 5 × 1⭐ ──────────────────────────────────────────
+   Os 4 jogos de bem-estar + a aula da professora. Cada um vale UMA estrela.
 
-function halvesFromState(s: Record<string, boolean>): number {
-  return WELLNESS_HALF_KEYS.filter((k) => s[k]).length + (s.desafio ? 1 : 0);
+   Eram seis valendo meia (a respiração era o sexto). Ela virou tema da
+   meditação, e com cinco não há mais motivo para metades — ver `StarMeter`. */
+const TOTAL_DO_DIA = 5;
+const WELLNESS_DAY_KEYS = ["w_movement", "w_meditation", "w_bonding", "w_gratitude"] as const;
+
+function momentosDoDia(s: Record<string, boolean>): number {
+  return WELLNESS_DAY_KEYS.filter((k) => s[k]).length + (s.desafio ? 1 : 0);
 }
 
-/** 3 estrelas que enchem em METADES (0–6). Base cinza, recheio por cima. */
-function StarMeter({ halves, size = "text-xl" }: { halves: number; size?: string }) {
+/**
+ * O PLACAR DO DIA NA TRILHA — cinco estrelas, uma por momento.
+ *
+ * ─── ERAM TRÊS ESTRELAS EM METADES, E ISSO ACABOU (ago/2026) ────────────────
+ *
+ * A conta antiga era 6 momentos × meia estrela = 3 estrelas. Ela existia só
+ * para fazer seis coisas caberem em três desenhos, e cobrava caro por isso: a
+ * MESMA jornada era contada em duas denominações — a trilha dizia "1½ de 3" e
+ * a folha do dia dizia "3 de 6" —, e meia estrela é um estado que ninguém
+ * consegue ler de relance.
+ *
+ * Com a respiração absorvida pela meditação sobraram cinco momentos, e cinco é
+ * um número que não pede metade nenhuma. Uma estrela por momento, inteira.
+ *
+ * Desenha com o MESMO `EstrelaDoDia` do painel da folha do dia. Antes eram
+ * dois renderizadores diferentes (emoji com recorte aqui, SVG lá) para a mesma
+ * ideia — e o emoji não tem versão vazia, então a estrela apagada saía cinza
+ * suja em vez do contorno leve.
+ */
+function StarMeter({ feitos, px = 15 }: { feitos: number; px?: number }) {
   return (
-    <span className={`inline-flex gap-0.5 ${size} leading-none`} aria-label={`${halves / 2} de 3`}>
-      {[0, 1, 2].map((i) => {
-        const fill = Math.max(0, Math.min(2, halves - i * 2)); // 0 | 1 (meia) | 2 (cheia)
-        return (
-          <span key={i} className="relative inline-block">
-            <span className="opacity-30 grayscale">⭐</span>
-            {fill > 0 && (
-              <span
-                className="absolute inset-y-0 left-0 overflow-hidden whitespace-nowrap"
-                style={{ width: fill === 2 ? "100%" : "50%" }}
-              >
-                ⭐
-              </span>
-            )}
-          </span>
-        );
-      })}
+    <span
+      className="inline-flex items-center gap-0.5 leading-none"
+      role="img"
+      aria-label={`${feitos} de ${TOTAL_DO_DIA} estrelas`}
+    >
+      {Array.from({ length: TOTAL_DO_DIA }, (_, i) => (
+        <EstrelaDoDia key={i} acesa={i < feitos} tamanho={px} />
+      ))}
     </span>
   );
 }
@@ -1630,8 +1637,8 @@ export function GestacaoPath({
     lsSet(LS.dayTasks(D), state);
     if (wellnessDay === D) setDayTasks(state);
     if (D === todayD) setTodayTasks(state);
-    // As 3 estrelas do dia agora são 6 MEIAS: aula + os 5 jogos de bem-estar.
-    const allDone = halvesFromState(state) >= 6;
+    // As 5 estrelas do dia: a aula + os 4 jogos de bem-estar, uma cada.
+    const allDone = momentosDoDia(state) >= TOTAL_DO_DIA;
     if (allDone && !doneDays.includes(D)) {
       const next = [...doneDays, D];
       setDoneDays(next);
@@ -1639,7 +1646,7 @@ export function GestacaoPath({
       setRevealing(true);
       setTimeout(() => setRevealing(false), 1800);
       collectSticker(Math.floor(D / 7), false);
-      // 3 estrelas fechadas hoje (fora do Modo Cuidado): bônus + celebração.
+      // As 5 estrelas fechadas hoje (fora do Modo Cuidado): bônus + celebração.
       if (D === todayD && !careMode) {
         /* A festa cresce com a sequência: `streak` já conta os dias seguidos,
            e é ele que decide quantos confetes, quantas notas e quanta
@@ -1657,8 +1664,8 @@ export function GestacaoPath({
               const r = await grantDayStarsBonus({
                 data: { accessToken: s.session.access_token, day: D },
               });
-              if (r.ok && r.granted > 0) toast.success(`⭐⭐⭐ 3 estrelas! +${r.granted} 🌱`);
-              else toast.success("⭐⭐⭐ 3 estrelas do dia!");
+              if (r.ok && r.granted > 0) toast.success(`⭐ 5 estrelas! +${r.granted} 🌱`);
+              else toast.success("⭐ As 5 estrelas do dia!");
             }
           } catch {
             /* o bônus é secundário */
@@ -2598,7 +2605,7 @@ export function GestacaoPath({
           const dia = isToday ? 84 : 64;
           const dayOfWeek = (D % 7) + 1;
           // Progresso de hoje em MEIAS estrelas (0–6): aula + 5 jogos de bem-estar.
-          const halvesToday = isToday ? halvesFromState(todayTasks) : 0;
+          const feitosHoje = isToday ? momentosDoDia(todayTasks) : 0;
 
           return (
             <div key={`d${D}`}>
@@ -2624,7 +2631,7 @@ export function GestacaoPath({
                 aria-label={
                   `Dia ${dayOfWeek} da semana ${week}` +
                   (isToday
-                    ? `, hoje — ${halvesToday} de 6 atividades`
+                    ? `, hoje — ${feitosHoje} de ${TOTAL_DO_DIA} atividades`
                     : done
                       ? ", concluído"
                       : isFuture
@@ -2657,7 +2664,13 @@ export function GestacaoPath({
                       tempo todo, no canto do olho de quem só quer ler o que
                       tem para fazer hoje. */}
                   {/* Anel segmentado: 3 segmentos = as 3 tarefas de hoje */}
-                  {isToday && <TaskRing done={done ? 6 : halvesToday} total={6} color={tm.main} />}
+                  {isToday && (
+                    <TaskRing
+                      done={done ? TOTAL_DO_DIA : feitosHoje}
+                      total={TOTAL_DO_DIA}
+                      color={tm.main}
+                    />
+                  )}
                   {peleAtiva ? (
                     /* COM PELE: a arte substitui a bolinha inteira, sem o
                        relevo 3D nem o brilho — a imagem já traz o próprio
@@ -2709,13 +2722,13 @@ export function GestacaoPath({
                     </div>
                   )}
                 </div>
-                {/* 3 estrelas do dia em MEIAS (6 jogos). Só em HOJE e nos dias
+                {/* As 5 estrelas do dia, uma por momento. Só em HOJE e nos dias
                     FEITOS: num dia passado que ela não jogou, três estrelas
                     apagadas não informam nada — repetidas ao longo da trilha
                     viram ruído, e ainda por cima parecem cobrança. */}
                 {(isToday || done) && !careMode && (
                   <div className="mt-1.5 drop-shadow-sm">
-                    <StarMeter halves={done ? 6 : halvesToday} size="text-sm" />
+                    <StarMeter feitos={done ? TOTAL_DO_DIA : feitosHoje} px={13} />
                   </div>
                 )}
               </button>
@@ -2752,7 +2765,9 @@ export function GestacaoPath({
                 day={D}
                 canEarn={isT}
                 careMode={careMode}
-                halves={bancada?.halves ?? (doneDays.includes(D) ? 6 : halvesFromState(st))}
+                halves={
+                  bancada?.halves ?? (doneDays.includes(D) ? TOTAL_DO_DIA : momentosDoDia(st))
+                }
                 babyName={profile?.baby_name ?? null}
                 homeCity={homeCity ?? null}
                 enfeites={
@@ -3653,13 +3668,18 @@ function QuizIntro({
   );
 }
 
-/* ══════════════════ Respiração guiada (atividade de bem-estar do dia) ══════════════════
-   Estilo iPhone/Apple Watch: um círculo que abre (inspire), segura e fecha
-   (expire), com vibração suave a cada fase. Padrão calmo 4-4-6. Ao concluir,
-   recompensa fixa (nunca punitiva), suprimida em Modo Cuidado. */
+/* ─── A RESPIRAÇÃO GUIADA SAIU DAQUI (ago/2026) ─────────────────────────────
+   Eram ~600 linhas de componente próprio para um exercício que rodava o MESMO
+   motor da meditação: as mesmas fases in/hold/out encadeadas, a mesma
+   `vibratePhase`, a mesma voz da Isabella nas fases, o mesmo `manterTelaAcesa`,
+   a mesma classe `dc-guiado` e o mesmo `finish()` com a estrela antes do
+   servidor. Duas telas mantendo a mesma máquina divergem — e divergiram: o
+   ritmo era 4-4-6 aqui e 4-2-6 lá, sem que ninguém tivesse decidido isso.
 
-const BREATH_PATTERN = { in: 4000, hold: 4000, out: 6000 } as const;
-const BREATH_CYCLES = 5;
+   Ela virou o tema "Só respirar" da meditação (`lines: []`), e o que ela tinha
+   de melhor — a Bolha respirando no centro — foi para a sessão de lá.
+   `createBreathAudio` continua vivo: o Momento com o bebê e o marco de semana
+   usam. O que morreu foi a duplicata do relógio. */
 
 /* Toque curto das viradas (mudança de movimento, próxima linha da carta).
    Passa pela ponte: `navigator.vibrate` não existe no iPhone, então isto era
@@ -3668,392 +3688,6 @@ const BREATH_CYCLES = 5;
 function buzz(ms = 28) {
   tocarPadrao([ms]);
 }
-
-function BreathingBlock({
-  day,
-  canEarn,
-  careMode = false,
-  alreadyDone,
-  onEarn,
-  aoSair,
-}: {
-  day: number;
-  canEarn: boolean;
-  careMode?: boolean;
-  alreadyDone: boolean;
-  onEarn: () => void;
-  /**
-   * Presente quando o exercício foi aberto pela lista de atividades — que é
-   * como a paciente chega aqui de verdade.
-   *
-   * Muda duas coisas: o exercício abre JÁ na tela cheia (sem o cartão
-   * "Começar a meditar", que só repetia o nome do exercício que ela acabou
-   * de tocar), e fechar volta para a lista em vez de voltar para o cartão.
-   * Sem isto, sair do exercício caía numa tela intermediária que ninguém
-   * pediu para ver.
-   */
-  aoSair?: () => void;
-}) {
-  const [open, setOpen] = useState(!!aoSair);
-  const [phase, setPhase] = useState<"intro" | "in" | "hold" | "out" | "done">("intro");
-  const [cycle, setCycle] = useState(0);
-  const [tick, setTick] = useState(0); // segundos restantes da fase (contagem viva)
-  const [reward, setReward] = useState<number | null>(null);
-  const [sound, setSound] = useState(true);
-  const grantedRef = useRef(false);
-  const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
-
-  // Contagem regressiva visível dentro do círculo (1s em 1s).
-  useEffect(() => {
-    if (phase !== "in" && phase !== "hold" && phase !== "out") return;
-    const dur =
-      phase === "in"
-        ? BREATH_PATTERN.in
-        : phase === "hold"
-          ? BREATH_PATTERN.hold
-          : BREATH_PATTERN.out;
-    setTick(Math.round(dur / 1000));
-    const iv = setInterval(() => setTick((t) => Math.max(1, t - 1)), 1000);
-    return () => clearInterval(iv);
-  }, [phase, cycle]);
-
-  // Loop das respirações: inspire → segure → expire, BREATH_CYCLES vezes.
-  // Ao ENTRAR em cada fase, dispara a vibração e o som (que incha/afina junto).
-  useEffect(() => {
-    if (phase !== "in" && phase !== "hold" && phase !== "out") return;
-    const dur =
-      phase === "in"
-        ? BREATH_PATTERN.in
-        : phase === "hold"
-          ? BREATH_PATTERN.hold
-          : BREATH_PATTERN.out;
-    vibratePhase(phase, dur);
-    audioRef.current?.setPhase(phase, dur);
-    /* A VOZ da fase — "inspire", "segure", "solte".
-       As três faixas existem em `voz.ts` desde que a Isabella foi gravada, e
-       só o MeditationBlock as usava. Esta tela escreve "pode fechar os olhos —
-       o som conduz o compasso" e guiava com um drone de volume variável: de
-       olhos fechados não dá para saber se está no "segure" ou no "solte".
-       O primeiro disparo sai de dentro do clique (`begin`), então a política
-       de autoplay libera os seguintes. */
-    if (sound) {
-      const palavra =
-        phase === "in" ? RESPIRACAO.in : phase === "hold" ? RESPIRACAO.hold : RESPIRACAO.out;
-      tocarVoz(palavra, { canal: "pulso", volume: 0.85 });
-    }
-    let cancelled = false;
-    const t = setTimeout(() => {
-      if (cancelled) return;
-      if (phase === "in") setPhase("hold");
-      else if (phase === "hold") setPhase("out");
-      else {
-        const next = cycle + 1;
-        if (next >= BREATH_CYCLES) {
-          setPhase("done");
-          finish();
-        } else {
-          setCycle(next);
-          setPhase("in");
-        }
-      }
-    }, dur);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, cycle]);
-
-  // Garante que o áudio pare se o componente sair da tela.
-  useEffect(() => () => audioRef.current?.stop(), []);
-
-  /* Tela acesa enquanto respira. São 70 segundos com a tela pedindo que ela
-     feche os olhos — tempo de sobra para o aparelho bloquear e suspender o
-     `setTimeout` que conduz as fases. */
-  useEffect(() => {
-    if (phase !== "in" && phase !== "hold" && phase !== "out") return;
-    return manterTelaAcesa();
-  }, [phase]);
-
-  async function finish() {
-    if (grantedRef.current || !canEarn || careMode) return;
-    grantedRef.current = true;
-    /**
-     * A meia-estrela acende ANTES de falar com o servidor, e de propósito.
-     *
-     * Ela é progresso local: quem a ganhou foi a paciente, fazendo a atividade
-     * inteira. Antes o `onEarn()` vivia dentro do `if (r.ok)` — então uma
-     * queda de rede, um token expirado ou a tabela de Sementinhas ainda não
-     * criada no banco faziam a tela dizer "concluído" e a estrela não acender.
-     * E como `grantedRef` já estava marcado, não havia segunda chance sem
-     * reabrir a atividade. Sem estrela o dia não fecha, a sequência quebra e a
-     * figurinha da semana não vem — perde-se muito mais que a moeda.
-     *
-     * A Sementinha continua dependendo do servidor, que é quem tem o direito
-     * de conceder. Essa parte pode falhar em silêncio; a estrela não.
-     */
-    onEarn();
-    try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data: s } = await supabase.auth.getSession();
-      const token = s.session?.access_token;
-      if (!token) return;
-      const r = await grantWellnessReward({
-        data: { accessToken: token, day, activity: "breathing" },
-      });
-      // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
-      // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
-      // isso não pode apagar o progresso da estrela.
-      if (r.ok && r.granted > 0) setReward(r.granted);
-    } catch {
-      /* recompensa é secundária */
-    }
-  }
-
-  function begin() {
-    setCycle(0);
-    setReward(null);
-    grantedRef.current = false;
-    /* Primeira palavra DENTRO do clique: o efeito da fase roda depois do
-       React pintar, e aí o Safari e o Chrome do celular já não consideram
-       mais o gesto — o `play()` volta rejeitado e a sessão inteira sai muda.
-       Mesmo motivo documentado no MeditationBlock. */
-    if (sound) tocarVoz(RESPIRACAO.in, { canal: "pulso", volume: 0.85 });
-    if (sound) {
-      audioRef.current = createBreathAudio();
-      audioRef.current.start();
-    }
-    setPhase("in");
-  }
-
-  function close() {
-    audioRef.current?.stop();
-    audioRef.current = null;
-    if (aoSair) return aoSair();
-    setOpen(false);
-    setPhase("intro");
-  }
-
-  function toggleSound() {
-    setSound((on) => {
-      const next = !on;
-      if (!next) {
-        audioRef.current?.stop();
-        audioRef.current = null;
-      } else if (phase === "in" || phase === "hold" || phase === "out") {
-        audioRef.current = createBreathAudio();
-        audioRef.current.start();
-      }
-      return next;
-    });
-  }
-
-  const label =
-    phase === "in" ? "Inspire" : phase === "hold" ? "Segure" : phase === "out" ? "Expire" : "";
-  // Escala do círculo: começa pequeno (desaproxima), incha ao inspirar/segurar,
-  // encolhe ao expirar — igual ao "Respirar" do iPhone/Apple Watch.
-  const scale = phase === "in" || phase === "hold" ? 1 : phase === "out" ? 0.5 : 0.5;
-  const scaleDur = phase === "in" ? BREATH_PATTERN.in : phase === "out" ? BREATH_PATTERN.out : 0;
-  /* Duração da fase em curso — a MESMA que move o som, a vibração e a bolha.
-     `scaleDur` não serve: ele é 0 no "segure" porque os anéis não mudam de
-     tamanho ali, e uma transição de 0ms faria a bolha saltar. */
-  const faseDur =
-    phase === "hold"
-      ? BREATH_PATTERN.hold
-      : phase === "out"
-        ? BREATH_PATTERN.out
-        : BREATH_PATTERN.in;
-
-  return (
-    <>
-      <div className="mt-4 rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 to-cyan-50 p-4">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🌬️</span>
-          <div className="flex-1">
-            <p className="text-sm font-extrabold text-sky-800">Respiração do dia</p>
-            <p className="text-xs text-sky-700/80">
-              Um minutinho de calma pra você e o bebê {alreadyDone ? "· feito hoje ✓" : ""}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => {
-            setOpen(true);
-            setPhase("intro");
-          }}
-          className="press mt-3 w-full rounded-full bg-sky-500 py-2.5 text-sm font-extrabold text-white"
-        >
-          {alreadyDone ? "Respirar de novo" : "Começar a respirar"}
-        </button>
-      </div>
-
-      {open && (
-        <div
-          className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-sky-100 via-cyan-50 to-white"
-          style={{ paddingTop: "var(--safe-top)" }}
-        >
-          <div className="flex items-center px-4 py-3">
-            <button
-              onClick={close}
-              aria-label="Fechar"
-              className="press text-2xl leading-none text-slate-400"
-            >
-              ✕
-            </button>
-            {phase === "in" || phase === "hold" || phase === "out" ? (
-              <p className="flex-1 text-center text-xs font-bold uppercase tracking-wider text-sky-500">
-                Ciclo {Math.min(cycle + 1, BREATH_CYCLES)} de {BREATH_CYCLES}
-              </p>
-            ) : (
-              <span className="flex-1" />
-            )}
-            <button
-              onClick={toggleSound}
-              aria-label={sound ? "Desligar som" : "Ligar som"}
-              className="press text-xl leading-none"
-            >
-              {sound ? "🔊" : "🔇"}
-            </button>
-          </div>
-
-          {phase === "intro" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-              <span className="text-6xl">🌸</span>
-              <h3 className="mt-4 text-2xl font-extrabold text-sky-900">Respire com seu bebê</h3>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-sky-800/80">
-                Vamos fazer {BREATH_CYCLES} respirações lentas: inspire em 4s, segure 4s e solte em
-                6s. Deixe os ombros caírem. 💙
-              </p>
-              <button
-                onClick={begin}
-                className="press mt-8 rounded-full bg-sky-500 px-8 py-3 text-sm font-extrabold text-white"
-              >
-                Começar
-              </button>
-            </div>
-          )}
-
-          {(phase === "in" || phase === "hold" || phase === "out") && (
-            <div className="flex flex-1 flex-col items-center justify-center">
-              <div className="relative flex h-72 w-72 items-center justify-center">
-                {/* Aura girando devagar — dá vida ao círculo sem repaint pesado */}
-                <div
-                  className="absolute -inset-4 rounded-full opacity-60 blur-2xl"
-                  style={{
-                    background:
-                      "conic-gradient(from 0deg, rgba(56,189,248,0.35), rgba(34,211,238,0.12), rgba(129,140,248,0.28), rgba(56,189,248,0.35))",
-                    animation: "orbitSpin 16s linear infinite",
-                  }}
-                  aria-hidden
-                />
-                <div
-                  className="dc-guiado absolute inset-0 rounded-full bg-sky-300/30"
-                  style={
-                    {
-                      transform: `scale(${scale})`,
-                      "--guiado-ms": `${scaleDur}ms`,
-                      "--guiado-escala": scale,
-                    } as React.CSSProperties
-                  }
-                  aria-hidden
-                />
-                <div
-                  className="dc-guiado absolute inset-6 rounded-full bg-sky-400/40"
-                  style={
-                    {
-                      transform: `scale(${scale})`,
-                      "--guiado-ms": `${scaleDur}ms`,
-                      "--guiado-escala": scale,
-                    } as React.CSSProperties
-                  }
-                  aria-hidden
-                />
-                {/* No centro, ELA — inflando e esvaziando no compasso.
-                    Duas coisas de propósito:
-
-                    · O humor é `dormindo`, de olhos fechados. O personagem
-                      DEMONSTRA o que se pede à paciente, em vez de a tela
-                      mandar. É o que o Duo faz no Duolingo: ele não explica o
-                      exercício, ele faz junto.
-
-                    · Ela escala sozinha, pelo `respiro`. Pôr um `scale` no
-                      contêiner multiplicaria com o dela e a bolha estouraria o
-                      anel — os anéis atrás continuam com o seu próprio. */}
-                <div className="relative z-10 flex flex-col items-center gap-3">
-                  <Bolha
-                    tamanho={104}
-                    humor="dormindo"
-                    flutua={false}
-                    respiro={{ fase: phase, duracaoMs: faseDur }}
-                  />
-                  <span className="tabular-nums text-2xl font-black leading-none text-sky-700">
-                    {tick}
-                  </span>
-                </div>
-              </div>
-              {/* O rótulo aparecia DUAS vezes — dentro do círculo e aqui. Ficou
-                  só este: um comando repetido na mesma tela não reforça, cansa. */}
-              <p className="mt-8 text-lg font-bold text-sky-800">{label}…</p>
-              <p className="mt-1 max-w-[230px] text-center text-xs text-sky-700/70">
-                Pode fechar os olhos — o som conduz o compasso.
-              </p>
-              {/* Bolinhas dos ciclos — enchem conforme respira */}
-              <div className="mt-3 flex gap-1.5">
-                {Array.from({ length: BREATH_CYCLES }, (_, i) => (
-                  <span
-                    key={i}
-                    className={`h-2 w-2 rounded-full transition-colors ${
-                      i < cycle ? "bg-sky-500" : i === cycle ? "bg-sky-400/70" : "bg-sky-200"
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {phase === "done" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-              {!careMode && <ConfettiBurst />}
-              {/* A flor emoji saiu: cada celular desenha uma flor diferente, e
-                  o instante que a paciente veio buscar era o único da sessão
-                  sem a personagem nele.
-
-                  E o `dc-result-in` que embrulhava isto saiu junto: ele é
-                  `scale(0.4→1.18→1)` mais `rotate(-8°→3°)` em 620ms, então os
-                  primeiros 620 dos 900ms do pulo — a antecipação inteira e
-                  toda a subida — rodavam MULTIPLICADOS por um pop-in que gira.
-                  Medido: no instante do agachamento o embrulho estava em
-                  scale 0,80. O único uso do salto no produto era justamente o
-                  que anulava o princípio que ele existe para mostrar. A bolha
-                  já tem a própria entrada. */}
-              <Bolha tamanho={96} humor="comemorando" entrada="pulo" careMode={careMode} />
-              <h3 className="mt-3 text-2xl font-extrabold text-sky-900">Que calma boa 💙</h3>
-              <p className="mt-1 text-sm text-sky-800/80">
-                Você respirou com seu bebê. Guarde essa sensação.
-              </p>
-              {!careMode && reward != null && reward > 0 && (
-                <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
-                  +{reward} 🌱 Sementinhas!
-                </div>
-              )}
-              <button
-                onClick={close}
-                className="press mt-8 w-full max-w-xs rounded-full bg-sky-500 py-3 text-sm font-extrabold text-white"
-              >
-                Voltar ao caminho
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
-
-/* ══════════════════ Movimento do dia (atividade de bem-estar) ══════════════════
-   Movimentos LEVES e seguros em qualquer trimestre (sentada/em pé, sem deitar
-   de costas). Sequência curta com cronômetro. Sempre com aviso de confirmar
-   com o médico. Recompensa fixa por concluir (nunca punitiva). */
 
 /**
  * Um movimento agora carrega COMO fazer, e não só o nome.
@@ -4601,6 +4235,23 @@ function MovementBlock({
 
 const MEDITACOES: { theme: string; need: string; emoji: string; lines: string[] }[] = [
   {
+    /* ─── A RESPIRAÇÃO VIROU UM TEMA (ago/2026) ─────────────────────────
+       Era uma atividade separada, com 600 linhas de componente próprio — e
+       o motor dela era ESTE: as mesmas fases in/hold/out, a mesma
+       `vibratePhase`, a mesma voz da Isabella, o mesmo `manterTelaAcesa`, a
+       mesma classe `dc-guiado`. A única coisa que ela tinha de diferente
+       está logo abaixo, no centro da sessão: a Bolha respirando junto.
+
+       E não precisou de código para virar tema. `lines: []` já produz
+       exatamente a respiração: `frase` volta nulo, a tela escreve "Só
+       respire.", a voz das fases continua conduzindo e as rechamadas entram
+       de cinco em cinco ciclos. O silêncio guiado É o exercício. */
+    theme: "Só respirar",
+    need: "Quero só respirar",
+    emoji: "🌬️",
+    lines: [],
+  },
+  {
     theme: "Calma",
     need: "Estou tensa",
     emoji: "🌊",
@@ -4765,7 +4416,11 @@ function registrarMeditacao(minutos: number, humor: string | null) {
 const RESPIRO = { in: 4, hold: 2, out: 6 } as const; // 12s por ciclo
 const CICLO_SEGS = RESPIRO.in + RESPIRO.hold + RESPIRO.out;
 
-const DURACOES = [2, 5, 10] as const;
+/* O 1 min entrou quando a Respiração foi absorvida aqui (ago/2026): ela durava
+   70 segundos e o cartão dela prometia "um minutinho de calma". Sem este
+   degrau, quem só tinha um minuto perdia o exercício inteiro.
+   Cai redondo: o ciclo tem 12s, então 1 min são exatamente 5 respirações. */
+const DURACOES = [1, 2, 5, 10] as const;
 
 /** Frases esparsas do trecho silencioso — nunca instruem, só reancoram. */
 const RECHAMADAS = [
@@ -4888,9 +4543,9 @@ function MeditationBlock({
       }
     }, dur * 1000);
     /* `RESPIRO` guarda SEGUNDOS, e `vibratePhase` quer milissegundos. O outro
-       ponto de chamada (BreathingBlock) já usa ms, então a mesma variável `dur`
-       significa coisas diferentes nos dois — passar cru aqui daria um padrão de
-       4 ms, imperceptível, e o defeito pareceria "vibração não funciona". */
+       era em ms no BreathingBlock, que foi absorvido aqui — a mesma variável
+       `dur` significava coisas diferentes nos dois. Passar cru daria um padrão
+       de 4 ms, imperceptível, e o defeito pareceria "vibração não funciona". */
     vibratePhase(fase, dur * 1000);
     return () => {
       clearInterval(iv);
@@ -5280,11 +4935,29 @@ function MeditationBlock({
                   }
                   aria-hidden
                 />
-                <div className="relative flex flex-col items-center">
+                {/* ── ELA, RESPIRANDO JUNTO (veio da Respiração) ──────────
+                    Era o único ativo que a Respiração tinha e esta tela não, e
+                    é o melhor que ela tinha. O comentário que morava lá dizia
+                    por quê, e vale igual aqui: o personagem DEMONSTRA o que se
+                    pede à paciente, em vez de a tela mandar. É o que o Duo faz
+                    no Duolingo — ele não explica o exercício, ele faz junto.
+                    Antes havia dois círculos de gradiente e um número: isso é
+                    informação, não companhia.
+
+                    Ela escala SOZINHA, pelo `respiro`. Um `scale` no contêiner
+                    multiplicaria com o dela e a bolha estouraria os anéis, que
+                    já têm o seu próprio. */}
+                <div className="relative z-10 flex flex-col items-center gap-2">
+                  <Bolha
+                    tamanho={96}
+                    humor="dormindo"
+                    flutua={false}
+                    respiro={{ fase, duracaoMs: RESPIRO[fase] * 1000 }}
+                  />
                   <span className="text-[13px] font-bold uppercase tracking-[0.18em] text-violet-500">
                     {faseLabel}
                   </span>
-                  <span className="tabular-nums text-5xl font-extrabold text-violet-800">
+                  <span className="tabular-nums text-3xl font-extrabold leading-none text-violet-800">
                     {tick}
                   </span>
                 </div>
@@ -6036,7 +5709,6 @@ function GratitudeBlock({
 
 /** Motor dos "jogos do dia": os 5 de bem-estar + a AULA (que virou jogo). */
 const WELLNESS_TYPES = [
-  { key: "breathing", emoji: "🌬️", label: "Respirar", Comp: BreathingBlock },
   { key: "movement", emoji: "🤸", label: "Mexer", Comp: MovementBlock },
   { key: "meditation", emoji: "🧘", label: "Meditar", Comp: MeditationBlock },
   { key: "bonding", emoji: "💛", label: "Bebê", Comp: BondingBlock },
@@ -6081,16 +5753,6 @@ const WELLNESS_META: Record<
     a: "#818cf8",
     b: "#3b82f6",
     desc: "A lição da professora + o quiz da semana.",
-  },
-  breathing: {
-    inkDark: "#8cc4ff",
-    ink: "#1c5fd0",
-    tile: "#d6e8fb",
-    tileB: "#bcd9f7",
-    title: "Respirar",
-    a: "#38bdf8",
-    b: "#06b6d4",
-    desc: "Respiração guiada com som e vibração pra acalmar.",
   },
   movement: {
     inkDark: "#ffbe7a",
@@ -6246,14 +5908,6 @@ function AtividadeIcone({ chave }: { chave: string }) {
     className: "h-[22px] w-[22px]",
   };
   switch (chave) {
-    case "breathing": // pulmões
-      return (
-        <svg {...comum}>
-          <path d="M11.2 3.4h1.6v8.2h-1.6z" />
-          <path d="M10.6 10.2c0-2-1.5-3.4-3.3-3.4-2 0-3.4 1.7-3.8 3.7-.4 2-.6 3.9-.6 5.6 0 1.6 1.3 2.9 2.9 2.9h1.4c2 0 3.4-1.7 3.4-3.6v-5.2z" />
-          <path d="M13.4 10.2c0-2 1.5-3.4 3.3-3.4 2 0 3.4 1.7 3.8 3.7.4 2 .6 3.9.6 5.6 0 1.6-1.3 2.9-2.9 2.9h-1.4c-2 0-3.4-1.7-3.4-3.6v-5.2z" />
-        </svg>
-      );
     case "movement": // pessoa de braços abertos
       return (
         <svg {...comum}>
@@ -6327,7 +5981,7 @@ function WellnessScreen({
   ehPosParto?: boolean;
   canEarn: boolean;
   careMode?: boolean;
-  /** Meias estrelas do dia (0–6): aula + 5 jogos de bem-estar. */
+  /** Estrelas do dia (0–5): a aula + os 4 jogos de bem-estar. */
   halves: number;
   lesson: WellnessLesson;
   /** Nome do bebê — a tela cumprimenta por ele. */
@@ -6467,6 +6121,7 @@ function WellnessScreen({
 
   const recadoDoDia = recadoDaBolha({
     feitos: halves,
+    total: TOTAL_DO_DIA,
     dia: day,
     hora: horaLocal,
     bebe: babyName,
@@ -6729,9 +6384,9 @@ function WellnessScreen({
               <Bolha
                 tamanho={298}
                 humor={humorDaJornada({
-                  diaFeito: halves >= 6,
+                  diaFeito: halves >= TOTAL_DO_DIA,
                   madrugada: horaLocal !== null && faixaDaHora(horaLocal) === "madrugada",
-                  ritmoIncomum: halves >= 4,
+                  ritmoIncomum: halves >= TOTAL_DO_DIA - 1,
                   careMode,
                 })}
                 careMode={careMode}
@@ -6984,25 +6639,25 @@ function WellnessScreen({
                 <div
                   className="mt-3 flex items-center justify-center gap-3.5"
                   role="img"
-                  aria-label={`${halves} de 6 estrelas conquistadas`}
+                  aria-label={`${halves} de ${TOTAL_DO_DIA} estrelas conquistadas`}
                 >
-                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                  {Array.from({ length: TOTAL_DO_DIA }, (_, i) => (
                     <EstrelaDoDia key={i} acesa={i < halves} tamanho={38} />
                   ))}
                 </div>
 
                 <p className="mt-3 text-center text-[13px]" style={{ color: tintaSec }}>
                   <span className="text-[16px] font-bold tabular-nums" style={{ color: tinta }}>
-                    {halves}/6
+                    {halves}/{TOTAL_DO_DIA}
                   </span>{" "}
                   estrelas conquistadas
                 </p>
                 <p className="mt-1 text-center text-[12px]" style={{ color: tintaSec }}>
-                  {halves >= 6 ? (
-                    "Dia completo! Você acendeu as seis 🌟"
+                  {halves >= TOTAL_DO_DIA ? (
+                    "Dia completo! Você acendeu as cinco 🌟"
                   ) : halves > 0 ? (
                     <>
-                      Continue assim! Acenda as 6 e ganhe{" "}
+                      Continue assim! Acenda as 5 e ganhe{" "}
                       <span className="font-semibold" style={{ color: "#7c3aed" }}>
                         Sementinhas
                       </span>{" "}
@@ -7010,7 +6665,7 @@ function WellnessScreen({
                     </>
                   ) : (
                     <>
-                      Comece por onde quiser — acenda as 6 e ganhe{" "}
+                      Comece por onde quiser — acenda as 5 e ganhe{" "}
                       <span className="font-semibold" style={{ color: "#7c3aed" }}>
                         Sementinhas
                       </span>{" "}
